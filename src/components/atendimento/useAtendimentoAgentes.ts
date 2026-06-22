@@ -29,11 +29,12 @@ export interface AtendimentoAgentes {
   agentes: AgenteRow[];
 }
 
-export function useAtendimentoAgentes(dateRange: { from: Date; to: Date }) {
+export function useAtendimentoAgentes() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
+  const { dateRange, departmentId } = useAtendimentoFilter();
   return useQuery<AtendimentoAgentes>({
-    queryKey: ["atendimento-agentes", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId],
+    queryKey: ["atendimento-agentes", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId],
     enabled: !!tid,
     refetchOnWindowFocus: false,
     queryFn: async () => {
