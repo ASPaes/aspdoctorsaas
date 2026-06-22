@@ -1,10 +1,8 @@
 import { useState } from "react";
-import { startOfDay, endOfDay, subDays } from "date-fns";
 import { Loader2, Gauge, UserX } from "lucide-react";
 import { useAtendimentoVelocidade } from "./useAtendimentoVelocidade";
 import { fmtEspera } from "./TempoRealTab";
 import { VelocidadeTimeline } from "./VelocidadeTimeline";
-import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 import { cn } from "@/lib/utils";
@@ -16,18 +14,14 @@ const SLA_OPCOES = [
 ];
 
 export function VelocidadeTab() {
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => ({
-    from: startOfDay(subDays(new Date(), 29)),
-    to: endOfDay(new Date()),
-  }));
   const [slaSeconds, setSlaSeconds] = useState(900);
-  const { data, isLoading, isError, error } = useAtendimentoVelocidade(dateRange, slaSeconds);
+  const { data, isLoading, isError, error } = useAtendimentoVelocidade(slaSeconds);
   const dur = (s: number | null | undefined) => (s && s > 0 ? fmtEspera(s) : "—");
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
+      <div className="flex flex-wrap items-center justify-end gap-3">
+
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Alvo SLA 1ª resposta:</span>
           <div className="inline-flex overflow-hidden rounded-md border border-border">
@@ -120,7 +114,7 @@ export function VelocidadeTab() {
             />
           </div>
 
-          <VelocidadeTimeline dateRange={dateRange} slaSeconds={slaSeconds} />
+          <VelocidadeTimeline slaSeconds={slaSeconds} />
 
           <div className="rounded-lg border border-border bg-card p-4">
             <div className="mb-3 flex items-center gap-2">

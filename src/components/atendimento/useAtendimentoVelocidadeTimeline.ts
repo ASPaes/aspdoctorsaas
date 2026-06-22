@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
+import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 
 export interface VelocidadeTimelinePoint {
   bucket: string;
@@ -15,12 +16,12 @@ export interface VelocidadeTimelinePoint {
 }
 
 export function useAtendimentoVelocidadeTimeline(
-  dateRange: { from: Date; to: Date },
   slaSeconds: number,
   bucket: "day" | "week",
 ) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
+  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
   return useQuery<VelocidadeTimelinePoint[]>({
     queryKey: [
       "atendimento-velocidade-timeline",
@@ -30,6 +31,8 @@ export function useAtendimentoVelocidadeTimeline(
       slaSeconds,
       bucket,
       selectedUnidadeId,
+      departmentId,
+      agentId,
     ],
     enabled: !!tid,
     refetchOnWindowFocus: false,
@@ -41,6 +44,8 @@ export function useAtendimentoVelocidadeTimeline(
         p_bucket: bucket,
         p_sla_frt_seconds: slaSeconds,
         p_unidade_base_id: selectedUnidadeId ?? null,
+        p_department_id: departmentId ?? null,
+        p_agent_id: agentId ?? null,
       });
       if (error) throw error;
       const num = (v: any) => (v === null || v === undefined ? null : Number(v));

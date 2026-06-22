@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
+import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 
 export interface VelocidadeDeptRow {
   department_id: string | null;
@@ -29,12 +30,10 @@ export interface AtendimentoVelocidade {
   por_departamento: VelocidadeDeptRow[];
 }
 
-export function useAtendimentoVelocidade(
-  dateRange: { from: Date; to: Date },
-  slaSeconds: number,
-) {
+export function useAtendimentoVelocidade(slaSeconds: number) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
+  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
   return useQuery<AtendimentoVelocidade>({
     queryKey: [
       "atendimento-velocidade",
@@ -43,6 +42,8 @@ export function useAtendimentoVelocidade(
       dateRange.to.toISOString(),
       slaSeconds,
       selectedUnidadeId,
+      departmentId,
+      agentId,
     ],
     enabled: !!tid,
     refetchOnWindowFocus: false,
@@ -53,6 +54,8 @@ export function useAtendimentoVelocidade(
         p_date_to: dateRange.to.toISOString(),
         p_sla_frt_seconds: slaSeconds,
         p_unidade_base_id: selectedUnidadeId ?? null,
+        p_department_id: departmentId ?? null,
+        p_agent_id: agentId ?? null,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;

@@ -15,6 +15,7 @@ import { ptBR } from "date-fns/locale";
 import { Loader2 } from "lucide-react";
 import { useAtendimentoVelocidadeTimeline } from "./useAtendimentoVelocidadeTimeline";
 import { fmtEspera } from "./TempoRealTab";
+import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 import { cn } from "@/lib/utils";
 
 type MetricKey = "sla_pct" | "tme_p50" | "frt_p50" | "tmr_p50";
@@ -25,16 +26,11 @@ const METRICAS: { key: MetricKey; label: string; tipo: "pct" | "tempo"; cor: str
   { key: "tmr_p50", label: "TMR", tipo: "tempo", cor: "#0ea5e9" },
 ];
 
-export function VelocidadeTimeline({
-  dateRange,
-  slaSeconds,
-}: {
-  dateRange: { from: Date; to: Date };
-  slaSeconds: number;
-}) {
+export function VelocidadeTimeline({ slaSeconds }: { slaSeconds: number }) {
+  const { dateRange } = useAtendimentoFilter();
   const bucket: "day" | "week" = differenceInDays(dateRange.to, dateRange.from) > 31 ? "week" : "day";
   const [metrica, setMetrica] = useState<MetricKey>("sla_pct");
-  const { data, isLoading } = useAtendimentoVelocidadeTimeline(dateRange, slaSeconds, bucket);
+  const { data, isLoading } = useAtendimentoVelocidadeTimeline(slaSeconds, bucket);
   const cfg = METRICAS.find((m) => m.key === metrica)!;
   const meta = metrica === "sla_pct" ? 90 : metrica === "frt_p50" ? slaSeconds : null;
   const fmtEixo = (v: number) => (cfg.tipo === "pct" ? `${v}%` : fmtEspera(v));
