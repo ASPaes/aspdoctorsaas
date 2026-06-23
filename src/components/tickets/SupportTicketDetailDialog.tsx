@@ -390,11 +390,18 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
   const handleAddCheckItem = async () => {
     if (!newCheckItem.trim()) return;
-    const items = [...((ticket?.checklist as any[]) ?? []), { text: newCheckItem.trim(), done: false }];
-    await (supabase.from("support_tickets" as any) as any)
-      .update({ checklist: items }).eq("id", ticketId);
+    const itemText = newCheckItem.trim();
+    const items = [...((ticket?.checklist as any[]) ?? []), { text: itemText, done: false }];
+    const { error } = await (supabase.rpc as any)("update_ticket_checklist", {
+      p_ticket_id: ticketId,
+      p_checklist: items,
+      p_action: "add",
+      p_item_text: itemText,
+    });
+    if (error) { toast.error("Erro: " + (error.message ?? "")); return; }
     setNewCheckItem("");
     queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+    queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
   };
 
   const handleRemoveCheckItem = async (index: number) => {
