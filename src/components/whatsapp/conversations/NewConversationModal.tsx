@@ -306,16 +306,17 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             await new Promise(r => setTimeout(r, 100));
             const cleanPhone = data.phone;
             createConversation.mutate(
-              { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined },
+              { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined, clienteId: selectedCliente?.id },
               {
                 onSuccess: (d) => {
-                  if (selectedCliente) {
-                    supabase.from("whatsapp_conversations").update({ metadata: { cliente_id: selectedCliente.id } as any }).eq("id", d.conversation.id).then();
+                  if (d.status === 'blocked') {
+                    toast.error(`Este contato já está em atendimento com ${d.techName || 'outro atendente'}`);
+                    return;
                   }
-                  toast.success("Conversa criada com sucesso");
+                  toast.success(d.status === 'reused' ? 'Conversa retomada' : 'Conversa criada com sucesso');
                   onOpenChange(false);
                   resetForm();
-                  onCreated?.(d.conversation.id);
+                  onCreated?.(d.conversationId);
                 },
                 onError: () => toast.error("Erro ao criar conversa"),
               }
