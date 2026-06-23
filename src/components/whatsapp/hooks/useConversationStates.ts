@@ -38,6 +38,7 @@ export function useConversationStates(conversationIds: string[]) {
           attendance_assigned_to: row.attendance_assigned_to,
           department_id: row.department_id,
           tenant_id: row.tenant_id,
+          agent_alert_due_at: row.agent_alert_due_at ?? null,
         });
       }
       return map;

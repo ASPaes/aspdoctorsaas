@@ -23,6 +23,7 @@ export interface ConversationStateRow {
   attendance_assigned_to: string | null;
   department_id: string | null;
   tenant_id: string;
+  agent_alert_due_at?: string | null;
 }
 
 export function getConversationBucket(row: ConversationStateRow): ConversationBucket {
