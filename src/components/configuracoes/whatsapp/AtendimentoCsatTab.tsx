@@ -33,6 +33,13 @@ const schema = z.object({
   support_send_inactivity_warning: z.boolean(),
   support_inactivity_warning_before_minutes: z.number().min(1).max(60),
   support_inactivity_warning_template: z.string().min(1, "Obrigatório"),
+
+  // Ausência do agente (bola com o agente)
+  support_agent_alert_enabled: z.boolean(),
+  support_agent_alert_minutes: z.number().min(1).max(1440),
+  support_agent_no_response_close_enabled: z.boolean(),
+  support_agent_no_response_close_minutes: z.number().min(1).max(1440),
+
   // CSAT
   support_csat_enabled: z.boolean(),
   support_csat_prompt_template: z.string().min(1, "Obrigatório"),
@@ -65,6 +72,12 @@ export default function AtendimentoCsatTab() {
       support_send_inactivity_warning: true,
       support_inactivity_warning_before_minutes: 5,
       support_inactivity_warning_template: "",
+
+      support_agent_alert_enabled: false,
+      support_agent_alert_minutes: 5,
+      support_agent_no_response_close_enabled: false,
+      support_agent_no_response_close_minutes: 60,
+
       support_csat_enabled: true,
       support_csat_prompt_template: "",
       support_csat_timeout_minutes: 5,
@@ -119,6 +132,12 @@ export default function AtendimentoCsatTab() {
         support_send_inactivity_warning: config.support_send_inactivity_warning,
         support_inactivity_warning_before_minutes: config.support_inactivity_warning_before_minutes,
         support_inactivity_warning_template: config.support_inactivity_warning_template,
+
+        support_agent_alert_enabled: config.support_agent_alert_enabled ?? false,
+        support_agent_alert_minutes: config.support_agent_alert_minutes ?? 5,
+        support_agent_no_response_close_enabled: config.support_agent_no_response_close_enabled ?? false,
+        support_agent_no_response_close_minutes: config.support_agent_no_response_close_minutes ?? 60,
+
         support_csat_enabled: config.support_csat_enabled,
         support_csat_prompt_template: config.support_csat_prompt_template,
         support_csat_timeout_minutes: config.support_csat_timeout_minutes,
