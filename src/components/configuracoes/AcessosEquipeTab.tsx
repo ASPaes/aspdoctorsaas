@@ -75,7 +75,11 @@ import {
   AlertTriangle,
   Mail,
   Link2,
+  Building2,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // ========== Types ==========
 
