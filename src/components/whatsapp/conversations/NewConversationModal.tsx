@@ -39,77 +39,29 @@ interface Props {
 }
 
 function useCheckOpenConversation(phone: string, instanceId: string) {
-  const { user } = useAuth();
-  const cleanPhone = phone.replace(/\D/g, '');
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const cleanPhone = normalizePhoneBR(phone);
 
   return useQuery({
-    queryKey: ['check-open-conversation', cleanPhone, instanceId],
+    queryKey: ['check-open-conversation', tid, cleanPhone, instanceId],
     queryFn: async () => {
-      if (!cleanPhone || cleanPhone.length < 10 || !instanceId) return null;
+      if (!tid || cleanPhone.replace(/\D/g, '').length < 10 || !instanceId) return null;
 
-      // Buscar contato pelo número
-      const { data: contact } = await supabase
-        .from('whatsapp_contacts')
-        .select('id')
-        .ilike('phone_number', `%${cleanPhone.slice(-10)}%`)
-        .limit(1)
-        .maybeSingle();
-
-      if (!contact) return null;
-
-      // Buscar conversa ativa com attendance aberto
-      const { data: conv } = await supabase
-        .from('whatsapp_conversations')
-        .select('id, assigned_to')
-        .eq('contact_id', contact.id)
-        .eq('instance_id', instanceId)
-        .eq('status', 'active')
-        .limit(1)
-        .maybeSingle();
-
-      if (!conv) return null;
-
-      const { data: att } = await supabase
-        .from('support_attendances')
-        .select('id, assigned_to')
-        .eq('conversation_id', conv.id)
-        .in('status', ['waiting', 'in_progress'])
-        .limit(1)
-        .maybeSingle();
-
-      if (!att) return null;
-
-      const assignedTo = att.assigned_to || conv.assigned_to;
-      const isOwnUser = assignedTo === user?.id;
-
-      // Buscar nome do técnico
-      let techName = 'outro técnico';
-      if (assignedTo) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('funcionario_id')
-          .eq('user_id', assignedTo)
-          .maybeSingle();
-
-        if (profile?.funcionario_id) {
-          const { data: func } = await supabase
-            .from('funcionarios')
-            .select('nome')
-            .eq('id', profile.funcionario_id)
-            .maybeSingle();
-          if (func?.nome) techName = func.nome;
-        }
-      }
+      const { data, error } = await (supabase.rpc as any)('wa_check_conversation_availability', {
+        p_tenant_id: tid,
+        p_instance_id: instanceId,
+        p_phone: cleanPhone,
+      });
+      if (error || !data) return null;
 
       return {
-        exists: true,
-        conversationId: conv.id,
-        assignedTo,
-        isOwnUser,
-        techName,
+        exists: data.occupied === true,
+        isOwnUser: data.is_own === true,
+        techName: data.tech_name || 'outro atendente',
+        conversationId: data.conversation_id as string | undefined,
       };
     },
-    enabled: cleanPhone.length >= 10 && !!instanceId,
+    enabled: !!tid && normalizePhoneBR(phone).replace(/\D/g, '').length >= 10 && !!instanceId,
     staleTime: 0,
     gcTime: 0,
     refetchOnWindowFocus: true,
