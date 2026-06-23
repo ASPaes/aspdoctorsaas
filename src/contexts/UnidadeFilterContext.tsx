@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useMemo, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useMemo, useRef, ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -36,7 +36,8 @@ export function UnidadeFilterProvider({ children }: { children: ReactNode }) {
   const userId = profile?.user_id;
 
   const [selectedUnidadeIds, setSelectedUnidadeIdsRaw] = useState<number[]>([]);
-  const [hydratedFor, setHydratedFor] = useState<string | null>(null);
+  const prevTidRef = useRef<string | null>(null);
+  const hydratedRef = useRef<string | null>(null);
 
   const { data: unidades = [], isLoading } = useQuery({
     queryKey: ["unidades_base_filter", tid],
@@ -51,41 +52,54 @@ export function UnidadeFilterProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Hidratar do servidor uma vez por (tid, userId)
   useEffect(() => {
-    if (!tid || !userId) return;
+    if (!tid || !userId || isLoading) return;
+
     const key = `${tid}:${userId}`;
-    if (hydratedFor === key) return;
+    if (hydratedRef.current === key) return;
+
+    hydratedRef.current = key;
+
+    const prevTid = prevTidRef.current;
+    prevTidRef.current = tid;
+
+    const tenantChanged = prevTid !== null && prevTid !== tid;
+
     let cancelled = false;
+
     (async () => {
+      if (tenantChanged) {
+        setSelectedUnidadeIdsRaw([]);
+        await (supabase.rpc as any)("set_view_unidades", { p_ids: [] });
+        if (!cancelled) queryClient.invalidateQueries();
+        return;
+      }
+
       const { data } = await (supabase.from("user_view_state" as any) as any)
         .select("unidade_ids")
         .eq("user_id", userId)
         .maybeSingle();
-      if (cancelled) return;
-      setSelectedUnidadeIdsRaw((data?.unidade_ids ?? []) as number[]);
-      setHydratedFor(key);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [tid, userId, hydratedFor]);
 
-  // Trocou tenant: limpa visão localmente e no servidor
-  useEffect(() => {
-    if (!tid) return;
-    let cancelled = false;
-    (async () => {
-      setSelectedUnidadeIdsRaw([]);
-      await (supabase.rpc as any)("set_view_unidades", { p_ids: [] });
       if (cancelled) return;
-      queryClient.invalidateQueries();
+
+      if (data) {
+        setSelectedUnidadeIdsRaw((data.unidade_ids ?? []) as number[]);
+      } else {
+        const def = unidades.find((u) => u.is_default_filter);
+        if (def) {
+          setSelectedUnidadeIdsRaw([def.id]);
+          await (supabase.rpc as any)("set_view_unidades", { p_ids: [def.id] });
+          if (!cancelled) queryClient.invalidateQueries();
+        } else {
+          setSelectedUnidadeIdsRaw([]);
+        }
+      }
     })();
+
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tid]);
+  }, [tid, userId, isLoading, unidades, queryClient]);
 
   const setSelectedUnidadeIds = async (ids: number[]) => {
     setSelectedUnidadeIdsRaw(ids);
