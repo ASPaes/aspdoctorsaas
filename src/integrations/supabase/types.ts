@@ -1621,6 +1621,10 @@ export type Database = {
           oncall_phone_number: string | null
           oncall_repeat_cooldown_minutes: number
           oncall_urgency_keywords: Json
+          support_agent_alert_enabled: boolean
+          support_agent_alert_minutes: number
+          support_agent_no_response_close_enabled: boolean
+          support_agent_no_response_close_minutes: number
           support_auto_close_inactivity_minutes: number
           support_config: Json
           support_csat_confirm_before_close: boolean | null
@@ -1672,6 +1676,10 @@ export type Database = {
           oncall_phone_number?: string | null
           oncall_repeat_cooldown_minutes?: number
           oncall_urgency_keywords?: Json
+          support_agent_alert_enabled?: boolean
+          support_agent_alert_minutes?: number
+          support_agent_no_response_close_enabled?: boolean
+          support_agent_no_response_close_minutes?: number
           support_auto_close_inactivity_minutes?: number
           support_config?: Json
           support_csat_confirm_before_close?: boolean | null
@@ -1723,6 +1731,10 @@ export type Database = {
           oncall_phone_number?: string | null
           oncall_repeat_cooldown_minutes?: number
           oncall_urgency_keywords?: Json
+          support_agent_alert_enabled?: boolean
+          support_agent_alert_minutes?: number
+          support_agent_no_response_close_enabled?: boolean
+          support_agent_no_response_close_minutes?: number
           support_auto_close_inactivity_minutes?: number
           support_config?: Json
           support_csat_confirm_before_close?: boolean | null
@@ -4229,6 +4241,7 @@ export type Database = {
           assigned_to: string | null
           assumed_at: string | null
           attendance_code: string
+          awaiting_agent_since: string | null
           cliente_id: string | null
           closed_at: string | null
           closed_by: string | null
@@ -4305,6 +4318,7 @@ export type Database = {
           assigned_to?: string | null
           assumed_at?: string | null
           attendance_code?: string
+          awaiting_agent_since?: string | null
           cliente_id?: string | null
           closed_at?: string | null
           closed_by?: string | null
@@ -4381,6 +4395,7 @@ export type Database = {
           assigned_to?: string | null
           assumed_at?: string | null
           attendance_code?: string
+          awaiting_agent_since?: string | null
           cliente_id?: string | null
           closed_at?: string | null
           closed_by?: string | null
@@ -4696,6 +4711,10 @@ export type Database = {
       }
       support_departments: {
         Row: {
+          agent_alert_enabled: boolean | null
+          agent_alert_minutes: number | null
+          agent_no_response_close_enabled: boolean | null
+          agent_no_response_close_minutes: number | null
           auto_close_inactivity_minutes: number | null
           business_hours: Json
           business_hours_enabled: boolean
@@ -4721,6 +4740,10 @@ export type Database = {
           welcome_message: string | null
         }
         Insert: {
+          agent_alert_enabled?: boolean | null
+          agent_alert_minutes?: number | null
+          agent_no_response_close_enabled?: boolean | null
+          agent_no_response_close_minutes?: number | null
           auto_close_inactivity_minutes?: number | null
           business_hours?: Json
           business_hours_enabled?: boolean
@@ -4746,6 +4769,10 @@ export type Database = {
           welcome_message?: string | null
         }
         Update: {
+          agent_alert_enabled?: boolean | null
+          agent_alert_minutes?: number | null
+          agent_no_response_close_enabled?: boolean | null
+          agent_no_response_close_minutes?: number | null
           auto_close_inactivity_minutes?: number | null
           business_hours?: Json
           business_hours_enabled?: boolean
@@ -7175,12 +7202,15 @@ export type Database = {
       }
       v_whatsapp_conversations_state: {
         Row: {
+          agent_alert_enabled: boolean | null
+          agent_alert_minutes: number | null
           attendance_assigned_to: string | null
           attendance_has_customer_msg: boolean | null
           attendance_id: string | null
           attendance_opened_at: string | null
           attendance_status: string | null
           attendance_unidade_base_id: number | null
+          awaiting_agent_since: string | null
           conversation_assigned_to: string | null
           conversation_id: string | null
           conversation_status: string | null
@@ -7733,6 +7763,7 @@ export type Database = {
         }
         Returns: Json
       }
+      fn_close_attendances_no_agent_response: { Args: never; Returns: Json }
       fn_cohort_logos:
         | {
             Args: {
