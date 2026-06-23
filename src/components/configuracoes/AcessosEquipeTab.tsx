@@ -307,7 +307,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       const [profilesRes, emailsRes, funcionariosRes, departmentsRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("user_id, role, is_super_admin, status, access_status, funcionario_id, max_concurrent_chats, skills")
+          .select("user_id, role, is_super_admin, status, access_status, funcionario_id, max_concurrent_chats, skills, acesso_todas_unidades")
           .eq("tenant_id", tenantId!)
           .order("created_at"),
         (supabase.rpc as any)("get_tenant_users_with_email", { p_tenant_id: tenantId! }),
