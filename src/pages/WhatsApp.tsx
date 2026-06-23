@@ -171,11 +171,11 @@ function WhatsAppContent() {
       phoneNumber: params.phone,
       contactName: params.clienteName || params.phone,
       clienteId: params.clienteId ?? undefined,
-    }).then(async ({ conversation, contact }) => {
+    }).then(async ({ conversationId }) => {
       const { data } = await supabase
         .from("whatsapp_conversations")
         .select("*, contact:whatsapp_contacts(*)")
-        .eq("id", conversation.id)
+        .eq("id", conversationId)
         .single();
 
       if (data) {
@@ -193,7 +193,7 @@ function WhatsAppContent() {
         if (!existing || existing.length === 0) {
           await supabase.from("cliente_contatos").insert({
             cliente_id: params.clienteId,
-            nome: params.clienteName || contact.name || params.phone,
+            nome: params.clienteName || params.phone,
             fone: params.phone,
           } as any);
         }
