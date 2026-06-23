@@ -30,10 +30,14 @@ export default function SetoresInstanciasTab() {
   const [welcomeMsg, setWelcomeMsg] = useState("");
   const [inactivityMinutes, setInactivityMinutes] = useState<string>("");
   const [warningMinutes, setWarningMinutes] = useState<string>("");
+  const [agentAlertMinutes, setAgentAlertMinutes] = useState<string>("");
+  const [agentCloseMinutes, setAgentCloseMinutes] = useState<string>("");
   const { instances } = useWhatsAppInstances();
   const { data: supportConfig } = useSupportConfig();
   const globalCloseMin = supportConfig?.support_auto_close_inactivity_minutes;
   const globalWarnMin = supportConfig?.support_inactivity_warning_before_minutes;
+  const globalAgentAlertMin = supportConfig?.support_agent_alert_minutes;
+  const globalAgentCloseMin = supportConfig?.support_agent_no_response_close_minutes;
 
   const { data: departments = [] } = useQuery({
     queryKey: ["support_departments_wa", tid],
@@ -41,7 +45,7 @@ export default function SetoresInstanciasTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_departments")
-        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message, auto_close_inactivity_minutes, inactivity_warning_before_minutes")
+        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message, auto_close_inactivity_minutes, inactivity_warning_before_minutes, agent_alert_minutes, agent_no_response_close_minutes")
         .eq("tenant_id", tid!)
         .eq("is_active", true)
         .order("name");
@@ -59,6 +63,8 @@ export default function SetoresInstanciasTab() {
   useEffect(() => {
     setInactivityMinutes(selectedDept?.auto_close_inactivity_minutes?.toString() ?? "");
     setWarningMinutes(selectedDept?.inactivity_warning_before_minutes?.toString() ?? "");
+    setAgentAlertMinutes(selectedDept?.agent_alert_minutes?.toString() ?? "");
+    setAgentCloseMinutes(selectedDept?.agent_no_response_close_minutes?.toString() ?? "");
   }, [selectedDept]);
 
   const { data: deptInstances = [] } = useQuery({
@@ -172,6 +178,52 @@ export default function SetoresInstanciasTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
       toast.success("Tempo de aviso salvo");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const saveAgentAlert = useMutation({
+    mutationFn: async (minutes: string) => {
+      if (!selectedId) return;
+      const trimmed = minutes.trim();
+      let value: number | null = null;
+      if (trimmed !== "") {
+        const parsed = parseInt(trimmed, 10);
+        if (isNaN(parsed) || parsed < 1) throw new Error("Informe um número inteiro maior ou igual a 1, ou deixe em branco.");
+        value = parsed;
+      }
+      const { error } = await supabase
+        .from("support_departments")
+        .update({ agent_alert_minutes: value } as any)
+        .eq("id", selectedId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
+      toast.success("Tempo de alerta salvo");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const saveAgentClose = useMutation({
+    mutationFn: async (minutes: string) => {
+      if (!selectedId) return;
+      const trimmed = minutes.trim();
+      let value: number | null = null;
+      if (trimmed !== "") {
+        const parsed = parseInt(trimmed, 10);
+        if (isNaN(parsed) || parsed < 1) throw new Error("Informe um número inteiro maior ou igual a 1, ou deixe em branco.");
+        value = parsed;
+      }
+      const { error } = await supabase
+        .from("support_departments")
+        .update({ agent_no_response_close_minutes: value } as any)
+        .eq("id", selectedId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
+      toast.success("Tempo de encerramento salvo");
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -345,6 +397,50 @@ export default function SetoresInstanciasTab() {
                   </div>
                 </div>
 
+
+                <div className="space-y-2 pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <Label>Alerta de ausência do agente (minutos)</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Minutos úteis aguardando o agente antes de destacar o chat. Vazio = padrão global{globalAgentAlertMin != null ? ` (atualmente ${globalAgentAlertMin} min)` : ""}.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input type="number" min={1} step={1} className="w-32"
+                      placeholder={globalAgentAlertMin != null ? `${globalAgentAlertMin} (global)` : "Global"}
+                      value={agentAlertMinutes}
+                      onChange={(e) => setAgentAlertMinutes(e.target.value)} />
+                    <span className="text-xs text-muted-foreground">min</span>
+                    <Button size="sm"
+                      disabled={saveAgentAlert.isPending || agentAlertMinutes === (selectedDept?.agent_alert_minutes?.toString() ?? "")}
+                      onClick={() => saveAgentAlert.mutate(agentAlertMinutes)}>
+                      {saveAgentAlert.isPending ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <Label>Encerrar por ausência do agente (minutos)</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Minutos úteis aguardando o agente antes de encerrar (silencioso, sem notificar o cliente). Vazio = padrão global{globalAgentCloseMin != null ? ` (atualmente ${globalAgentCloseMin} min)` : ""}.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input type="number" min={1} step={1} className="w-32"
+                      placeholder={globalAgentCloseMin != null ? `${globalAgentCloseMin} (global)` : "Global"}
+                      value={agentCloseMinutes}
+                      onChange={(e) => setAgentCloseMinutes(e.target.value)} />
+                    <span className="text-xs text-muted-foreground">min</span>
+                    <Button size="sm"
+                      disabled={saveAgentClose.isPending || agentCloseMinutes === (selectedDept?.agent_no_response_close_minutes?.toString() ?? "")}
+                      onClick={() => saveAgentClose.mutate(agentCloseMinutes)}>
+                      {saveAgentClose.isPending ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+                </div>
 
                 <div className="space-y-2 pt-4 border-t">
                   <div className="flex items-center gap-2">
