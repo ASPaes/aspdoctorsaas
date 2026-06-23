@@ -68,6 +68,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const [activePill, setActivePillRaw] = useState("waiting");
   const [pillAutoSet, setPillAutoSet] = useState(false);
   const [forcedConvId, setForcedConvId] = useState<string | null>(null);
+
+  // Tick local p/ reavaliar alertas de ausência do agente (client-side, sem request)
+  const [nowMs, setNowMs] = useState<number>(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, []);
   const [filters, setFiltersRaw] = useState<FiltersState>({
     sortBy: saved?.sortBy ?? "recent",
     status: saved?.status ?? undefined,
@@ -351,6 +358,17 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       }
     }
 
+    // Alerta de ausência do agente: sobe pro topo (sort estável preserva ordem interna)
+    result.sort((a, b) => {
+      const aDue = getStateForConv(a).agent_alert_due_at;
+      const bDue = getStateForConv(b).agent_alert_due_at;
+      const aAlert = aDue != null && nowMs >= new Date(aDue).getTime();
+      const bAlert = bDue != null && nowMs >= new Date(bDue).getTime();
+      if (aAlert && !bAlert) return -1;
+      if (!aAlert && bAlert) return 1;
+      return 0;
+    });
+
     // Force newly created conv to top
     if (forcedConvId) {
       const forcedConv = result.find(c => c.id === forcedConvId);
@@ -364,7 +382,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     }
 
     return result;
-  }, [conversations, activePill, filters.sortBy, forcedConvId, isAdmin, user?.id, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv]);
+  }, [conversations, activePill, filters.sortBy, forcedConvId, isAdmin, user?.id, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv, nowMs]);
 
   const handleCreated = useCallback(async (convId: string) => {
     setForcedConvId(convId);
@@ -598,6 +616,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
                 onClick={() => handleSelect(conv)}
                 instanceName={instances.length > 1 ? instanceMap[conv.instance_id] : undefined}
                 attendance={attendanceMap.get(conv.id)}
+                isAgentAlert={(() => { const d = getStateForConv(conv).agent_alert_due_at; return d != null && nowMs >= new Date(d).getTime(); })()}
               />
             ))}
           </div>

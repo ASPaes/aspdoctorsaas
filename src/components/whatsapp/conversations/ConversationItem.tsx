@@ -16,9 +16,10 @@ interface Props {
   onClick: () => void;
   instanceName?: string;
   attendance?: AttendanceInfo;
+  isAgentAlert?: boolean;
 }
 
-export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance }: Props) {
+export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance, isAgentAlert }: Props) {
   const contact = conv.contact;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
   const { sentiment } = useWhatsAppSentiment(conv.id);
