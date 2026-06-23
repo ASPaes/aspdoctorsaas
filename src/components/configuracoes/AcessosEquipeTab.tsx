@@ -1027,6 +1027,16 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                       <TableHead>
                         <TooltipProvider delayDuration={200}>
                           <Tooltip>
+                            <TooltipTrigger className="cursor-help">Unidades</TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              Unidades que o usuário pode visualizar. "Todas" = vê todas as unidades do tenant.
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableHead>
+                      <TableHead>
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
                             <TooltipTrigger className="cursor-help">Limite</TooltipTrigger>
                             <TooltipContent className="max-w-xs">
                               Quantos atendimentos simultâneos o agente pode receber. Em branco = usa o padrão do tenant (5).
