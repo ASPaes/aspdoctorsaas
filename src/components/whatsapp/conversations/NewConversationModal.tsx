@@ -95,12 +95,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
 
   // Invalidar cache quando phone ou instanceId mudar
   useEffect(() => {
-    const cleanPhone = phone.replace(/\D/g, '');
-    if (cleanPhone.length >= 10 && instanceId) {
-      queryClient.invalidateQueries({ 
-        queryKey: ['check-open-conversation', cleanPhone, instanceId] 
-      });
-    }
+    queryClient.invalidateQueries({ queryKey: ['check-open-conversation'] });
   }, [phone, instanceId, queryClient]);
 
   useEffect(() => {
