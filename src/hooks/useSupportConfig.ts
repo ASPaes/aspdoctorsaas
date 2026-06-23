@@ -9,6 +9,8 @@ export interface SupportConfig {
   support_send_inactivity_warning: boolean;
   support_inactivity_warning_before_minutes: number;
   support_inactivity_warning_template: string;
+  support_agent_alert_minutes: number;
+  support_agent_no_response_close_minutes: number;
   support_csat_enabled: boolean;
   support_csat_prompt_template: string;
   support_csat_timeout_minutes: number;
@@ -31,6 +33,8 @@ const DEFAULTS: SupportConfig = {
   support_inactivity_warning_before_minutes: 5,
   support_inactivity_warning_template:
     '⚠️ Por falta de interação, este atendimento será encerrado em {{minutes}} minutos. Se ainda precisar de ajuda, responda esta mensagem.',
+  support_agent_alert_minutes: 5,
+  support_agent_no_response_close_minutes: 60,
   support_csat_enabled: true,
   support_csat_prompt_template:
     'Oi {{customer_name}}, para encerrar este atendimento é muito importante entender como foi sua experiência. De 0 a 5, como você avalia este atendimento? (Responda apenas a nota)',
@@ -53,6 +57,8 @@ const SELECT_FIELDS = [
   'support_send_inactivity_warning',
   'support_inactivity_warning_before_minutes',
   'support_inactivity_warning_template',
+  'support_agent_alert_minutes',
+  'support_agent_no_response_close_minutes',
   'support_csat_enabled',
   'support_csat_prompt_template',
   'support_csat_timeout_minutes',
