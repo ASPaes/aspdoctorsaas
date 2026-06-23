@@ -7528,6 +7528,14 @@ export type Database = {
           updated_at: string
         }[]
       }
+      admin_set_user_unidades: {
+        Args: {
+          p_target_user_id: string
+          p_todas: boolean
+          p_unidade_ids?: number[]
+        }
+        Returns: undefined
+      }
       admin_swap_cliente_produto: {
         Args: {
           p_cliente_produto_id: string

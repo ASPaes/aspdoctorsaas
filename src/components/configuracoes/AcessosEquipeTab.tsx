@@ -75,7 +75,11 @@ import {
   AlertTriangle,
   Mail,
   Link2,
+  Building2,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // ========== Types ==========
 
@@ -95,6 +99,7 @@ interface AccessUser {
   access_status: string | null;
   max_concurrent_chats: number | null;
   skills: string[] | null;
+  acesso_todas_unidades: boolean;
 }
 
 interface Department {
@@ -232,7 +237,134 @@ function SkillsCell({
   );
 }
 
+function UnidadesCell({
+  user,
+  allUnidades,
+  assignedIds,
+  onSave,
+  isPending,
+}: {
+  user: AccessUser;
+  allUnidades: Array<{ id: number; nome: string }>;
+  assignedIds: number[];
+  onSave: (next: { todas: boolean; ids: number[] }) => void;
+  isPending: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"todas" | "specific">(
+    user.acesso_todas_unidades ? "todas" : "specific"
+  );
+  const [selected, setSelected] = useState<Set<number>>(new Set(assignedIds));
+
+  useEffect(() => {
+    if (open) {
+      setMode(user.acesso_todas_unidades ? "todas" : "specific");
+      setSelected(new Set(assignedIds));
+    }
+  }, [open, user.acesso_todas_unidades, assignedIds]);
+
+  if (user.is_super_admin) {
+    return (
+      <Badge variant="outline" className="text-xs opacity-60">
+        Todas
+      </Badge>
+    );
+  }
+
+  const label = user.acesso_todas_unidades
+    ? "Todas"
+    : `${assignedIds.length} de ${allUnidades.length}`;
+
+  const canSave = mode === "todas" || selected.size > 0;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 text-sm gap-1.5">
+          <Building2 className="h-3.5 w-3.5" />
+          {label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-3 space-y-3" align="start">
+        <RadioGroup
+          value={mode}
+          onValueChange={(v) => setMode(v as "todas" | "specific")}
+          className="space-y-1"
+        >
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="todas" id={`u-${user.user_id}-todas`} />
+            <Label htmlFor={`u-${user.user_id}-todas`} className="text-sm font-normal cursor-pointer">
+              Todas as unidades
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="specific" id={`u-${user.user_id}-spec`} />
+            <Label htmlFor={`u-${user.user_id}-spec`} className="text-sm font-normal cursor-pointer">
+              Unidades específicas
+            </Label>
+          </div>
+        </RadioGroup>
+
+        {mode === "specific" && (
+          <div className="max-h-56 overflow-y-auto space-y-1.5 border rounded-md p-2">
+            {allUnidades.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Nenhuma unidade ativa.</p>
+            ) : (
+              allUnidades.map((un) => {
+                const checked = selected.has(un.id);
+                return (
+                  <div key={un.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`u-${user.user_id}-un-${un.id}`}
+                      checked={checked}
+                      onCheckedChange={(c) => {
+                        setSelected((prev) => {
+                          const next = new Set(prev);
+                          if (c) next.add(un.id);
+                          else next.delete(un.id);
+                          return next;
+                        });
+                      }}
+                    />
+                    <Label
+                      htmlFor={`u-${user.user_id}-un-${un.id}`}
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      {un.nome}
+                    </Label>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={isPending}>
+            Cancelar
+          </Button>
+          <Button
+            size="sm"
+            disabled={!canSave || isPending}
+            onClick={() => {
+              onSave({
+                todas: mode === "todas",
+                ids: mode === "todas" ? [] : Array.from(selected),
+              });
+              setOpen(false);
+            }}
+          >
+            {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
+            Salvar
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // ========== Main Component ==========
+
 
 export default function AcessosEquipeTab() {
   const { profile } = useAuth();
@@ -302,7 +434,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       const [profilesRes, emailsRes, funcionariosRes, departmentsRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("user_id, role, is_super_admin, status, access_status, funcionario_id, max_concurrent_chats, skills")
+          .select("user_id, role, is_super_admin, status, access_status, funcionario_id, max_concurrent_chats, skills, acesso_todas_unidades")
           .eq("tenant_id", tenantId!)
           .order("created_at"),
         (supabase.rpc as any)("get_tenant_users_with_email", { p_tenant_id: tenantId! }),
@@ -345,6 +477,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
         funcionario_id: number | null;
         max_concurrent_chats: number | null;
         skills: string[] | null;
+        acesso_todas_unidades: boolean;
       }>).map((profileRow) => {
         const funcionario = profileRow.funcionario_id
           ? funcionarioById.get(profileRow.funcionario_id) ?? null
@@ -369,6 +502,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
           access_status: profileRow.access_status,
           max_concurrent_chats: profileRow.max_concurrent_chats,
           skills: profileRow.skills ?? [],
+          acesso_todas_unidades: profileRow.acesso_todas_unidades ?? true,
         };
       });
     },
@@ -390,6 +524,43 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       return (data ?? []) as Department[];
     },
   });
+
+  // Fetch unidades_base of tenant
+  const { data: allUnidades = [] } = useQuery<Array<{ id: number; nome: string }>>({
+    queryKey: ["tenant-unidades-list", tenantId],
+    enabled: !!tenantId,
+    placeholderData: [],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("unidades_base" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tenantId!)
+        .eq("is_active", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: number; nome: string }>;
+    },
+  });
+
+  // Fetch profile_unidades and group by user
+  const { data: unidadesByUser = new Map<string, number[]>() } = useQuery<Map<string, number[]>>({
+    queryKey: ["tenant-profile-unidades", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("profile_unidades" as any) as any)
+        .select("user_id, unidade_base_id")
+        .eq("tenant_id", tenantId!);
+      if (error) throw error;
+      const map = new Map<string, number[]>();
+      ((data ?? []) as Array<{ user_id: string; unidade_base_id: number }>).forEach((row) => {
+        const arr = map.get(row.user_id) ?? [];
+        arr.push(row.unidade_base_id);
+        map.set(row.user_id, arr);
+      });
+      return map;
+    },
+  });
+
+
 
   // Fetch active funcionários for invite — filter by tenant
   const { data: funcionarios = [] } = useQuery<Funcionario[]>({
@@ -628,6 +799,24 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
 
   const updateMaxChatsMutation = useUpdateUserMaxConcurrentChats();
   const updateSkillsMutation = useUpdateUserSkills();
+
+  const setUnidadesMutation = useMutation({
+    mutationFn: async ({ userId, todas, ids }: { userId: string; todas: boolean; ids: number[] }) => {
+      const { error } = await (supabase.rpc as any)("admin_set_user_unidades", {
+        p_target_user_id: userId,
+        p_todas: todas,
+        p_unidade_ids: ids,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
+      void queryClient.invalidateQueries({ queryKey: ["tenant-profile-unidades", tenantId] });
+      sonnerToast.success("Acesso de unidade atualizado.");
+    },
+    onError: (err: any) => sonnerToast.error(err.message),
+  });
+
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
 
   const handleSendInvite = () => {
@@ -965,6 +1154,16 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                       <TableHead>
                         <TooltipProvider delayDuration={200}>
                           <Tooltip>
+                            <TooltipTrigger className="cursor-help">Unidades</TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              Unidades que o usuário pode visualizar. "Todas" = vê todas as unidades do tenant.
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableHead>
+                      <TableHead>
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
                             <TooltipTrigger className="cursor-help">Limite</TooltipTrigger>
                             <TooltipContent className="max-w-xs">
                               Quantos atendimentos simultâneos o agente pode receber. Em branco = usa o padrão do tenant (5).
@@ -1122,6 +1321,17 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                       </TableCell>
                       {isAdmin && (
                         <>
+                          <TableCell>
+                            <UnidadesCell
+                              user={u}
+                              allUnidades={allUnidades}
+                              assignedIds={unidadesByUser.get(u.user_id) ?? []}
+                              isPending={setUnidadesMutation.isPending}
+                              onSave={({ todas, ids }) =>
+                                setUnidadesMutation.mutate({ userId: u.user_id, todas, ids })
+                              }
+                            />
+                          </TableCell>
                           <TableCell>
                             <MaxChatsCell
                               user={u}
