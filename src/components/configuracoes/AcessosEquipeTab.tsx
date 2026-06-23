@@ -672,6 +672,24 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
 
   const updateMaxChatsMutation = useUpdateUserMaxConcurrentChats();
   const updateSkillsMutation = useUpdateUserSkills();
+
+  const setUnidadesMutation = useMutation({
+    mutationFn: async ({ userId, todas, ids }: { userId: string; todas: boolean; ids: number[] }) => {
+      const { error } = await (supabase.rpc as any)("admin_set_user_unidades", {
+        p_target_user_id: userId,
+        p_todas: todas,
+        p_unidade_ids: ids,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
+      void queryClient.invalidateQueries({ queryKey: ["tenant-profile-unidades", tenantId] });
+      sonnerToast.success("Acesso de unidade atualizado.");
+    },
+    onError: (err: any) => sonnerToast.error(err.message),
+  });
+
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
 
   const handleSendInvite = () => {
