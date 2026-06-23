@@ -237,7 +237,134 @@ function SkillsCell({
   );
 }
 
+function UnidadesCell({
+  user,
+  allUnidades,
+  assignedIds,
+  onSave,
+  isPending,
+}: {
+  user: AccessUser;
+  allUnidades: Array<{ id: number; nome: string }>;
+  assignedIds: number[];
+  onSave: (next: { todas: boolean; ids: number[] }) => void;
+  isPending: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"todas" | "specific">(
+    user.acesso_todas_unidades ? "todas" : "specific"
+  );
+  const [selected, setSelected] = useState<Set<number>>(new Set(assignedIds));
+
+  useEffect(() => {
+    if (open) {
+      setMode(user.acesso_todas_unidades ? "todas" : "specific");
+      setSelected(new Set(assignedIds));
+    }
+  }, [open, user.acesso_todas_unidades, assignedIds]);
+
+  if (user.is_super_admin) {
+    return (
+      <Badge variant="outline" className="text-xs opacity-60">
+        Todas
+      </Badge>
+    );
+  }
+
+  const label = user.acesso_todas_unidades
+    ? "Todas"
+    : `${assignedIds.length} de ${allUnidades.length}`;
+
+  const canSave = mode === "todas" || selected.size > 0;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 text-sm gap-1.5">
+          <Building2 className="h-3.5 w-3.5" />
+          {label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-3 space-y-3" align="start">
+        <RadioGroup
+          value={mode}
+          onValueChange={(v) => setMode(v as "todas" | "specific")}
+          className="space-y-1"
+        >
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="todas" id={`u-${user.user_id}-todas`} />
+            <Label htmlFor={`u-${user.user_id}-todas`} className="text-sm font-normal cursor-pointer">
+              Todas as unidades
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="specific" id={`u-${user.user_id}-spec`} />
+            <Label htmlFor={`u-${user.user_id}-spec`} className="text-sm font-normal cursor-pointer">
+              Unidades específicas
+            </Label>
+          </div>
+        </RadioGroup>
+
+        {mode === "specific" && (
+          <div className="max-h-56 overflow-y-auto space-y-1.5 border rounded-md p-2">
+            {allUnidades.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Nenhuma unidade ativa.</p>
+            ) : (
+              allUnidades.map((un) => {
+                const checked = selected.has(un.id);
+                return (
+                  <div key={un.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`u-${user.user_id}-un-${un.id}`}
+                      checked={checked}
+                      onCheckedChange={(c) => {
+                        setSelected((prev) => {
+                          const next = new Set(prev);
+                          if (c) next.add(un.id);
+                          else next.delete(un.id);
+                          return next;
+                        });
+                      }}
+                    />
+                    <Label
+                      htmlFor={`u-${user.user_id}-un-${un.id}`}
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      {un.nome}
+                    </Label>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={isPending}>
+            Cancelar
+          </Button>
+          <Button
+            size="sm"
+            disabled={!canSave || isPending}
+            onClick={() => {
+              onSave({
+                todas: mode === "todas",
+                ids: mode === "todas" ? [] : Array.from(selected),
+              });
+              setOpen(false);
+            }}
+          >
+            {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
+            Salvar
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // ========== Main Component ==========
+
 
 export default function AcessosEquipeTab() {
   const { profile } = useAuth();
