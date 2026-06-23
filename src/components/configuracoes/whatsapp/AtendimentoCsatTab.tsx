@@ -33,6 +33,13 @@ const schema = z.object({
   support_send_inactivity_warning: z.boolean(),
   support_inactivity_warning_before_minutes: z.number().min(1).max(60),
   support_inactivity_warning_template: z.string().min(1, "Obrigatório"),
+
+  // Ausência do agente (bola com o agente)
+  support_agent_alert_enabled: z.boolean(),
+  support_agent_alert_minutes: z.number().min(1).max(1440),
+  support_agent_no_response_close_enabled: z.boolean(),
+  support_agent_no_response_close_minutes: z.number().min(1).max(1440),
+
   // CSAT
   support_csat_enabled: z.boolean(),
   support_csat_prompt_template: z.string().min(1, "Obrigatório"),
@@ -65,6 +72,12 @@ export default function AtendimentoCsatTab() {
       support_send_inactivity_warning: true,
       support_inactivity_warning_before_minutes: 5,
       support_inactivity_warning_template: "",
+
+      support_agent_alert_enabled: false,
+      support_agent_alert_minutes: 5,
+      support_agent_no_response_close_enabled: false,
+      support_agent_no_response_close_minutes: 60,
+
       support_csat_enabled: true,
       support_csat_prompt_template: "",
       support_csat_timeout_minutes: 5,
@@ -102,7 +115,7 @@ export default function AtendimentoCsatTab() {
     queryKey: ["configuracoes-atendimento", tid],
     queryFn: async () => {
       let q = supabase.from("configuracoes").select(
-        "id, support_reopen_window_minutes, support_auto_close_inactivity_minutes, support_send_inactivity_warning, support_inactivity_warning_before_minutes, support_inactivity_warning_template, support_csat_enabled, support_csat_prompt_template, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template, support_ura_enabled, support_ura_welcome_template, support_ura_invalid_option_template, support_ura_timeout_minutes, support_ura_default_department_id"
+        "id, support_reopen_window_minutes, support_auto_close_inactivity_minutes, support_send_inactivity_warning, support_inactivity_warning_before_minutes, support_inactivity_warning_template, support_agent_alert_enabled, support_agent_alert_minutes, support_agent_no_response_close_enabled, support_agent_no_response_close_minutes, support_csat_enabled, support_csat_prompt_template, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template, support_ura_enabled, support_ura_welcome_template, support_ura_invalid_option_template, support_ura_timeout_minutes, support_ura_default_department_id"
       );
       if (tid) q = q.eq("tenant_id", tid);
       const { data, error } = await q.limit(1).maybeSingle();
@@ -119,6 +132,12 @@ export default function AtendimentoCsatTab() {
         support_send_inactivity_warning: config.support_send_inactivity_warning,
         support_inactivity_warning_before_minutes: config.support_inactivity_warning_before_minutes,
         support_inactivity_warning_template: config.support_inactivity_warning_template,
+
+        support_agent_alert_enabled: config.support_agent_alert_enabled ?? false,
+        support_agent_alert_minutes: config.support_agent_alert_minutes ?? 5,
+        support_agent_no_response_close_enabled: config.support_agent_no_response_close_enabled ?? false,
+        support_agent_no_response_close_minutes: config.support_agent_no_response_close_minutes ?? 60,
+
         support_csat_enabled: config.support_csat_enabled,
         support_csat_prompt_template: config.support_csat_prompt_template,
         support_csat_timeout_minutes: config.support_csat_timeout_minutes,
@@ -166,6 +185,8 @@ export default function AtendimentoCsatTab() {
 
   const csatEnabled = form.watch("support_csat_enabled");
   const warningEnabled = form.watch("support_send_inactivity_warning");
+  const agentAlertEnabled = form.watch("support_agent_alert_enabled");
+  const agentCloseEnabled = form.watch("support_agent_no_response_close_enabled");
   const uraEnabled = form.watch("support_ura_enabled");
 
   return (
@@ -241,6 +262,66 @@ export default function AtendimentoCsatTab() {
                   </FormItem>
                 )} />
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Ausência do Agente ── */}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Ausência do Agente</CardTitle>
+            <CardDescription>
+              Quando o cliente envia mensagem e fica aguardando resposta do agente. Os tempos são em minutos úteis (descontam o horário de expediente).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FormField control={form.control} name="support_agent_alert_enabled" render={({ field }) => (
+              <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <FormLabel>Alerta visual de ausência</FormLabel>
+                  <FormDescription>Destaca o atendimento na lista quando o agente demora a responder o cliente.</FormDescription>
+                </div>
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+              </FormItem>
+            )} />
+            {agentAlertEnabled && (
+              <FormField control={form.control} name="support_agent_alert_minutes" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Alertar após (min)</FormLabel>
+                  <FormControl>
+                    <NumericInput value={field.value} onChange={field.onChange} placeholder="5" suffix="min" />
+                  </FormControl>
+                  <FormDescription>Minutos úteis aguardando o agente antes de destacar o chat.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
+            <Separator />
+            <FormField control={form.control} name="support_agent_no_response_close_enabled" render={({ field }) => (
+              <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <FormLabel>Encerrar por ausência do agente</FormLabel>
+                  <FormDescription>Encerra o atendimento automaticamente se o agente não responder. O cliente NÃO é notificado.</FormDescription>
+                </div>
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+              </FormItem>
+            )} />
+            {agentCloseEnabled && (
+              <FormField control={form.control} name="support_agent_no_response_close_minutes" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Encerrar após (min)</FormLabel>
+                  <FormControl>
+                    <NumericInput value={field.value} onChange={field.onChange} placeholder="60" suffix="min" />
+                  </FormControl>
+                  <FormDescription>Minutos úteis aguardando o agente antes de encerrar.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )} />
             )}
           </CardContent>
         </Card>
