@@ -3518,9 +3518,39 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_unidades: {
+        Row: {
+          created_at: string
+          tenant_id: string
+          unidade_base_id: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          tenant_id: string
+          unidade_base_id: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          tenant_id?: string
+          unidade_base_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_unidades_unidade_base_id_fkey"
+            columns: ["unidade_base_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_base"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           access_status: string
+          acesso_todas_unidades: boolean
           allowed_domain: string | null
           approved_at: string | null
           approved_by: string | null
@@ -3539,6 +3569,7 @@ export type Database = {
         }
         Insert: {
           access_status?: string
+          acesso_todas_unidades?: boolean
           allowed_domain?: string | null
           approved_at?: string | null
           approved_by?: string | null
@@ -3557,6 +3588,7 @@ export type Database = {
         }
         Update: {
           access_status?: string
+          acesso_todas_unidades?: boolean
           allowed_domain?: string | null
           approved_at?: string | null
           approved_by?: string | null
@@ -9109,6 +9141,7 @@ export type Database = {
         Args: { p_conversation_id: string; p_cooldown_minutes?: number }
         Returns: boolean
       }
+      unidade_visible: { Args: { p_unidade: number }; Returns: boolean }
       unlink_cliente_from_conversation: {
         Args: {
           p_conversation_id: string
@@ -9181,6 +9214,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      user_allowed_unidades: { Args: never; Returns: number[] }
       validate_access_invite: {
         Args: { p_invite_id: string }
         Returns: {
@@ -9206,6 +9240,17 @@ export type Database = {
       vault_update_secret: {
         Args: { p_id: string; p_secret: string }
         Returns: undefined
+      }
+      wa_open_or_reuse_conversation: {
+        Args: {
+          p_cliente_id?: string
+          p_contact_name?: string
+          p_department_id?: string
+          p_instance_id: string
+          p_phone: string
+          p_tenant_id: string
+        }
+        Returns: Json
       }
     }
     Enums: {
