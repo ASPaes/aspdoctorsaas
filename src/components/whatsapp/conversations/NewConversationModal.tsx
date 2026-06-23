@@ -17,6 +17,7 @@ import { normalizeBRPhone, formatBRPhone, coreDigits } from "@/lib/phoneBR";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AlertTriangle, Info } from "lucide-react";
 import { MetaTemplatePicker } from "@/components/whatsapp/templates/MetaTemplatePicker";
