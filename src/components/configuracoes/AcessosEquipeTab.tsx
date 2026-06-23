@@ -398,6 +398,43 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     },
   });
 
+  // Fetch unidades_base of tenant
+  const { data: allUnidades = [] } = useQuery<Array<{ id: number; nome: string }>>({
+    queryKey: ["tenant-unidades-list", tenantId],
+    enabled: !!tenantId,
+    placeholderData: [],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("unidades_base" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tenantId!)
+        .eq("is_active", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: number; nome: string }>;
+    },
+  });
+
+  // Fetch profile_unidades and group by user
+  const { data: unidadesByUser = new Map<string, number[]>() } = useQuery<Map<string, number[]>>({
+    queryKey: ["tenant-profile-unidades", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("profile_unidades" as any) as any)
+        .select("user_id, unidade_base_id")
+        .eq("tenant_id", tenantId!);
+      if (error) throw error;
+      const map = new Map<string, number[]>();
+      ((data ?? []) as Array<{ user_id: string; unidade_base_id: number }>).forEach((row) => {
+        const arr = map.get(row.user_id) ?? [];
+        arr.push(row.unidade_base_id);
+        map.set(row.user_id, arr);
+      });
+      return map;
+    },
+  });
+
+
+
   // Fetch active funcionários for invite — filter by tenant
   const { data: funcionarios = [] } = useQuery<Funcionario[]>({
     queryKey: accessEquipeQueryKeys.inviteFuncionarios(tenantId),
