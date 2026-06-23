@@ -1581,6 +1581,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               <div key={evt.id} className="relative pl-5 pb-4">
                 <div className={`absolute -left-[5px] top-1.5 w-2 h-2 rounded-full ${
                   evt.event_type === "comment" ? "bg-primary" :
+                  evt.event_type === "checklist" ? "bg-emerald-400" :
                   evt.event_type === "status_change" ? "bg-blue-400" :
                   evt.event_type === "ai_summary" ? "bg-blue-400" :
                   evt.event_type === "assignment_change" ? "bg-purple-400" :
@@ -1618,6 +1619,15 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                       <summary className="text-[11px] text-blue-400 cursor-pointer hover:underline">Ver resumo IA</summary>
                       <p className="text-xs text-muted-foreground mt-1.5 whitespace-pre-wrap">{evt.new_value}</p>
                     </details>
+                  </div>
+                ) : evt.event_type === "checklist" ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground">{getAgentName(evt.user_id)}</span>
+                    <span className="text-xs">
+                      {evt.new_value === "check" ? "marcou" : evt.new_value === "uncheck" ? "desmarcou" : evt.new_value === "add" ? "adicionou" : evt.new_value === "remove" ? "removeu" : "alterou"} item do checklist:
+                    </span>
+                    <span className="text-xs font-medium">{evt.content ?? "—"}</span>
+                    <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
                   </div>
                 ) : (
                   <div>
