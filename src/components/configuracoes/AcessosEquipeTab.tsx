@@ -1195,6 +1195,17 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                       {isAdmin && (
                         <>
                           <TableCell>
+                            <UnidadesCell
+                              user={u}
+                              allUnidades={allUnidades}
+                              assignedIds={unidadesByUser.get(u.user_id) ?? []}
+                              isPending={setUnidadesMutation.isPending}
+                              onSave={({ todas, ids }) =>
+                                setUnidadesMutation.mutate({ userId: u.user_id, todas, ids })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
                             <MaxChatsCell
                               user={u}
                               isPending={updateMaxChatsMutation.isPending}
