@@ -374,26 +374,49 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
   const handleToggleCheck = async (index: number) => {
     const items = [...((ticket?.checklist as any[]) ?? [])];
-    items[index] = { ...items[index], done: !items[index].done };
-    await (supabase.from("support_tickets" as any) as any)
-      .update({ checklist: items }).eq("id", ticketId);
+    const willBeDone = !items[index].done;
+    const itemText = items[index]?.text ?? "";
+    items[index] = { ...items[index], done: willBeDone };
+    const { error } = await (supabase.rpc as any)("update_ticket_checklist", {
+      p_ticket_id: ticketId,
+      p_checklist: items,
+      p_action: willBeDone ? "check" : "uncheck",
+      p_item_text: itemText,
+    });
+    if (error) { toast.error("Erro: " + (error.message ?? "")); return; }
     queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+    queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
   };
 
   const handleAddCheckItem = async () => {
     if (!newCheckItem.trim()) return;
-    const items = [...((ticket?.checklist as any[]) ?? []), { text: newCheckItem.trim(), done: false }];
-    await (supabase.from("support_tickets" as any) as any)
-      .update({ checklist: items }).eq("id", ticketId);
+    const itemText = newCheckItem.trim();
+    const items = [...((ticket?.checklist as any[]) ?? []), { text: itemText, done: false }];
+    const { error } = await (supabase.rpc as any)("update_ticket_checklist", {
+      p_ticket_id: ticketId,
+      p_checklist: items,
+      p_action: "add",
+      p_item_text: itemText,
+    });
+    if (error) { toast.error("Erro: " + (error.message ?? "")); return; }
     setNewCheckItem("");
     queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+    queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
   };
 
   const handleRemoveCheckItem = async (index: number) => {
-    const items = ((ticket?.checklist as any[]) ?? []).filter((_: any, i: number) => i !== index);
-    await (supabase.from("support_tickets" as any) as any)
-      .update({ checklist: items }).eq("id", ticketId);
+    const all = ((ticket?.checklist as any[]) ?? []);
+    const itemText = all[index]?.text ?? "";
+    const items = all.filter((_: any, i: number) => i !== index);
+    const { error } = await (supabase.rpc as any)("update_ticket_checklist", {
+      p_ticket_id: ticketId,
+      p_checklist: items,
+      p_action: "remove",
+      p_item_text: itemText,
+    });
+    if (error) { toast.error("Erro: " + (error.message ?? "")); return; }
     queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+    queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
   };
 
   const attendanceId = ticket?.attendance_id ?? null;
@@ -1566,6 +1589,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               <div key={evt.id} className="relative pl-5 pb-4">
                 <div className={`absolute -left-[5px] top-1.5 w-2 h-2 rounded-full ${
                   evt.event_type === "comment" ? "bg-primary" :
+                  evt.event_type === "checklist" ? "bg-emerald-400" :
                   evt.event_type === "status_change" ? "bg-blue-400" :
                   evt.event_type === "ai_summary" ? "bg-blue-400" :
                   evt.event_type === "assignment_change" ? "bg-purple-400" :
@@ -1603,6 +1627,15 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                       <summary className="text-[11px] text-blue-400 cursor-pointer hover:underline">Ver resumo IA</summary>
                       <p className="text-xs text-muted-foreground mt-1.5 whitespace-pre-wrap">{evt.new_value}</p>
                     </details>
+                  </div>
+                ) : evt.event_type === "checklist" ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground">{getAgentName(evt.user_id)}</span>
+                    <span className="text-xs">
+                      {evt.new_value === "check" ? "marcou" : evt.new_value === "uncheck" ? "desmarcou" : evt.new_value === "add" ? "adicionou" : evt.new_value === "remove" ? "removeu" : "alterou"} item do checklist:
+                    </span>
+                    <span className="text-xs font-medium">{evt.content ?? "—"}</span>
+                    <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
                   </div>
                 ) : (
                   <div>

@@ -9097,6 +9097,15 @@ export type Database = {
         }
         Returns: Json
       }
+      update_ticket_checklist: {
+        Args: {
+          p_action?: string
+          p_checklist: Json
+          p_item_text?: string
+          p_ticket_id: string
+        }
+        Returns: undefined
+      }
       update_ticket_fields: {
         Args: { p_fields: Json; p_ticket_id: string }
         Returns: undefined
