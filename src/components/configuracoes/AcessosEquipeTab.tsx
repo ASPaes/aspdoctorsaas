@@ -350,6 +350,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
         funcionario_id: number | null;
         max_concurrent_chats: number | null;
         skills: string[] | null;
+        acesso_todas_unidades: boolean;
       }>).map((profileRow) => {
         const funcionario = profileRow.funcionario_id
           ? funcionarioById.get(profileRow.funcionario_id) ?? null
@@ -374,6 +375,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
           access_status: profileRow.access_status,
           max_concurrent_chats: profileRow.max_concurrent_chats,
           skills: profileRow.skills ?? [],
+          acesso_todas_unidades: profileRow.acesso_todas_unidades ?? true,
         };
       });
     },
