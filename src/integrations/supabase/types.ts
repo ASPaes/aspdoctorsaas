@@ -9241,6 +9241,10 @@ export type Database = {
         Args: { p_id: string; p_secret: string }
         Returns: undefined
       }
+      wa_check_conversation_availability: {
+        Args: { p_instance_id: string; p_phone: string; p_tenant_id: string }
+        Returns: Json
+      }
       wa_open_or_reuse_conversation: {
         Args: {
           p_cliente_id?: string
