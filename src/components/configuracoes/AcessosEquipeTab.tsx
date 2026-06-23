@@ -99,6 +99,7 @@ interface AccessUser {
   access_status: string | null;
   max_concurrent_chats: number | null;
   skills: string[] | null;
+  acesso_todas_unidades: boolean;
 }
 
 interface Department {
