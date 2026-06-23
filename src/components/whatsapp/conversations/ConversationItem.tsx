@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Archive, CheckCheck, AlertTriangle, CalendarClock, Ban } from "lucide-react";
+import { Archive, CheckCheck, AlertTriangle, CalendarClock, Ban, Clock } from "lucide-react";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
@@ -150,7 +150,8 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
         isSelected && "bg-accent",
         needsCSTicket && "ring-1 ring-destructive/40",
         hasBlock && "ring-1 ring-destructive/60 bg-destructive/5",
-        !hasBlock && hasClientAlert && "ring-1 ring-amber-500/50 bg-amber-500/5"
+        !hasBlock && hasClientAlert && "ring-1 ring-amber-500/50 bg-amber-500/5",
+        isAgentAlert && "ring-2 ring-red-500/70 bg-red-500/[0.06]"
       )}
       style={{ gridTemplateColumns: "40px minmax(0, 1fr) max-content" }}
     >
@@ -167,6 +168,12 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
           <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive/60" />
             <AlertTriangle className="relative h-3.5 w-3.5 text-destructive" />
+          </span>
+        )}
+        {isAgentAlert && (
+          <span className="absolute -top-1 -left-1 flex h-3 w-3">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500/70" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
           </span>
         )}
       </div>
@@ -229,6 +236,12 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
           )}>
             {timeStr}
           </span>
+        )}
+        {isAgentAlert && (
+          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 gap-0.5 border-red-500/70 text-red-600 dark:text-red-400 animate-pulse">
+            <Clock className="h-2.5 w-2.5" />
+            Aguardando você
+          </Badge>
         )}
         {attendanceBadge}
         <div className="flex items-center gap-1">
