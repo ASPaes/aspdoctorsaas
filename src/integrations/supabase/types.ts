@@ -5956,6 +5956,24 @@ export type Database = {
           },
         ]
       }
+      user_view_state: {
+        Row: {
+          unidade_ids: number[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          unidade_ids?: number[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          unidade_ids?: number[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       whatsapp_contacts: {
         Row: {
           cliente_id: string | null
@@ -8560,6 +8578,15 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_my_allowed_unidades: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          id: number
+          is_default_filter: boolean
+          is_principal: boolean
+          nome: string
+        }[]
+      }
       get_my_permissions: {
         Args: never
         Returns: {
@@ -9115,6 +9142,7 @@ export type Database = {
         Args: { p_unidade_id: number }
         Returns: undefined
       }
+      set_view_unidades: { Args: { p_ids: number[] }; Returns: undefined }
       should_create_recipient: {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: boolean
@@ -9149,6 +9177,7 @@ export type Database = {
         Args: { p_conversation_id: string; p_cooldown_minutes?: number }
         Returns: boolean
       }
+      unidade_allowed: { Args: { p_unidade: number }; Returns: boolean }
       unidade_visible: { Args: { p_unidade: number }; Returns: boolean }
       unlink_cliente_from_conversation: {
         Args: {
@@ -9223,6 +9252,7 @@ export type Database = {
         Returns: undefined
       }
       user_allowed_unidades: { Args: never; Returns: number[] }
+      user_view_unidades: { Args: never; Returns: number[] }
       validate_access_invite: {
         Args: { p_invite_id: string }
         Returns: {
