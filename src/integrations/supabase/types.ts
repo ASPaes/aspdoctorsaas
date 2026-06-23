@@ -7202,6 +7202,7 @@ export type Database = {
       }
       v_whatsapp_conversations_state: {
         Row: {
+          agent_alert_due_at: string | null
           agent_alert_enabled: boolean | null
           agent_alert_minutes: number | null
           attendance_assigned_to: string | null
@@ -7754,6 +7755,15 @@ export type Database = {
         Returns: Json
       }
       fn_auto_offline_stale_agents: { Args: never; Returns: Json }
+      fn_business_due_at: {
+        Args: {
+          p_department_id?: string
+          p_minutes_uteis: number
+          p_start: string
+          p_tenant_id: string
+        }
+        Returns: string
+      }
       fn_check_acceptance_timeouts: { Args: never; Returns: Json }
       fn_close_attendance_atomic: {
         Args: {
