@@ -1,5 +1,19 @@
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useAtendimentoChats, useAtendimentoChatsTimeline } from "./useAtendimentoChats";
+
+const CLOSE_OPTS: { v: string; label: string }[] = [
+  { v: "manual", label: "Manual" },
+  { v: "inactivity", label: "Inatividade" },
+  { v: "system", label: "Sistema" },
+  { v: "csat_timeout", label: "Timeout CSAT" },
+];
+const TICKET_OPTS: { v: "all" | "with" | "without"; label: string }[] = [
+  { v: "all", label: "Todos" },
+  { v: "with", label: "Com ticket" },
+  { v: "without", label: "Sem ticket" },
+];
 
 type BarRow = { key: string; nome: string; qtd: number; pct: number; color?: string };
 
