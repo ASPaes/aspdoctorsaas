@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { maskPhoneBR } from '@/lib/masks';
 import { normalizeBRPhone, isValidBRPhone, maskBRPhoneLive } from '@/lib/phoneBR';
 import { Link2, Search, Loader2, X, Building2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface EditContactModalProps {
   open: boolean;
@@ -22,12 +23,13 @@ interface EditContactModalProps {
   contactNotes?: string | null;
   onSuccess?: () => void;
   isNewContact?: boolean;
+  conversationId?: string | null;
+  attendanceId?: string | null;
 }
 
-interface ContactFormData { name: string; notes: string; phone: string; }
-
-export function EditContactModal({ open, onOpenChange, contactId, contactName, contactPhone, contactNotes, onSuccess, isNewContact }: EditContactModalProps) {
+export function EditContactModal({ open, onOpenChange, contactId, contactName, contactPhone, contactNotes, onSuccess, isNewContact, conversationId, attendanceId }: EditContactModalProps) {
   const { updateContact, isUpdatingContact } = useWhatsAppActions();
+  const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
