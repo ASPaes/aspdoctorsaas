@@ -194,18 +194,16 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             )}
           </div>
 
-          {/* History button — Admin/Head only */}
-          {isAdminOrHead && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full h-7 text-xs gap-1.5"
-              onClick={() => setHistoryOpen(true)}
-            >
-              <History className="h-3.5 w-3.5" />
-              Histórico do Contato
-            </Button>
-          )}
+  {/* History button — todos os perfis */}
+  <Button
+    variant="outline"
+    size="sm"
+    className="w-full h-7 text-xs gap-1.5"
+    onClick={() => setHistoryOpen(true)}
+  >
+    <History className="h-3.5 w-3.5" />
+    Histórico do Contato
+  </Button>
 
           {/* ─── Cliente Link ─── */}
           <ClienteLinkCard
@@ -550,16 +548,14 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
         </div>
       </div>
       {/* Contact History Unified Modal */}
-      {isAdminOrHead && (
-        <ContactHistoryUnifiedModal
-          open={historyOpen}
-          onOpenChange={setHistoryOpen}
-          contactId={contact?.id || ""}
-          contactName={name}
-          contactPhone={contact?.phone_number || ""}
-          onNavigateToConversation={onNavigateToConversation}
-        />
-      )}
+      <ContactHistoryUnifiedModal
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        contactId={contact?.id || ""}
+        contactName={name}
+        contactPhone={contact?.phone_number || ""}
+        onNavigateToConversation={onNavigateToConversation}
+      />
     </div>
   );
 }
