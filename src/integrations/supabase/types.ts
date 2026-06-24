@@ -6212,6 +6212,7 @@ export type Database = {
           sender_ticket_code: string | null
           status: string
           tenant_id: string
+          unidade_base_id: number | null
           unread_count: number
           updated_at: string
         }
@@ -6244,6 +6245,7 @@ export type Database = {
           sender_ticket_code?: string | null
           status?: string
           tenant_id: string
+          unidade_base_id?: number | null
           unread_count?: number
           updated_at?: string
         }
@@ -6276,6 +6278,7 @@ export type Database = {
           sender_ticket_code?: string | null
           status?: string
           tenant_id?: string
+          unidade_base_id?: number | null
           unread_count?: number
           updated_at?: string
         }
@@ -6313,6 +6316,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_unidade_base_id_fkey"
+            columns: ["unidade_base_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_base"
             referencedColumns: ["id"]
           },
         ]
@@ -6521,6 +6531,7 @@ export type Database = {
           skip_ura: boolean
           status: string
           tenant_id: string
+          unidade_base_id: number | null
           updated_at: string
           webhook_url: string | null
         }
@@ -6544,6 +6555,7 @@ export type Database = {
           skip_ura?: boolean
           status?: string
           tenant_id: string
+          unidade_base_id?: number | null
           updated_at?: string
           webhook_url?: string | null
         }
@@ -6567,6 +6579,7 @@ export type Database = {
           skip_ura?: boolean
           status?: string
           tenant_id?: string
+          unidade_base_id?: number | null
           updated_at?: string
           webhook_url?: string | null
         }
@@ -6583,6 +6596,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_instances_unidade_base_id_fkey"
+            columns: ["unidade_base_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_base"
             referencedColumns: ["id"]
           },
         ]
@@ -7546,6 +7566,10 @@ export type Database = {
           updated_at: string
         }[]
       }
+      admin_set_instance_unidade: {
+        Args: { p_instance_id: string; p_unidade_id: number }
+        Returns: undefined
+      }
       admin_set_user_unidades: {
         Args: {
           p_target_user_id: string
@@ -7954,6 +7978,10 @@ export type Database = {
       fn_process_ura_timeouts: { Args: never; Returns: Json }
       fn_retry_waiting_conversations: { Args: never; Returns: Json }
       fn_schedule_group_syncs: { Args: never; Returns: undefined }
+      fn_sync_member_for_funcionario: {
+        Args: { p_funcionario_id: number; p_tenant_id: string }
+        Returns: undefined
+      }
       fn_user_owns_ticket_attachment_path: {
         Args: { object_name: string }
         Returns: boolean
