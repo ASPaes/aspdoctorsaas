@@ -44,6 +44,20 @@ export default function RoteamentoInstanciasTab() {
     },
   });
 
+  const { data: unidades = [] } = useQuery({
+    queryKey: ["unidades_base_routing", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("unidades_base" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tid!)
+        .eq("is_active", true)
+        .order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const { data: uraEnabled = false } = useQuery({
     queryKey: ["configuracoes_support_ura_enabled", tid],
     enabled: !!tid,
@@ -71,11 +85,26 @@ export default function RoteamentoInstanciasTab() {
     toast.success("Setor de entrada atualizado");
   }
 
+  async function handleChangeUnidade(instId: string, value: string) {
+    const newVal = value === NONE ? null : Number(value);
+    const { error } = await (supabase.rpc as any)("admin_set_instance_unidade", {
+      p_instance_id: instId,
+      p_unidade_id: newVal,
+    });
+    if (error) {
+      toast.error("Erro ao salvar: " + error.message);
+      return;
+    }
+    await queryClient.invalidateQueries({ queryKey: ["whatsapp", "instances"] });
+    toast.success("Unidade da instância atualizada");
+  }
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Defina para qual setor cada número (instância) encaminha quando a URA está desligada.
         Cada instância vai para um único setor.
+        A Unidade define qual unidade enxerga as conversas dessa instância (filtro de acesso).
       </p>
 
       {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
@@ -135,6 +164,23 @@ export default function RoteamentoInstanciasTab() {
                     ⚠ Este setor não tem regra de atribuição — atendimentos ficarão na fila sem distribuir.
                   </p>
                 )}
+                <Label className="text-xs">Unidade</Label>
+                <Select
+                  value={inst.unidade_base_id ? String(inst.unidade_base_id) : NONE}
+                  onValueChange={(v) => handleChangeUnidade(inst.id, v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma unidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Nenhuma (visível a todos)</SelectItem>
+                    {unidades.map((u: any) => (
+                      <SelectItem key={u.id} value={String(u.id)}>
+                        {u.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </CardContent>
             </Card>
           );
