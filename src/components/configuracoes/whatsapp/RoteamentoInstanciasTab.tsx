@@ -44,6 +44,20 @@ export default function RoteamentoInstanciasTab() {
     },
   });
 
+  const { data: unidades = [] } = useQuery({
+    queryKey: ["unidades_base_routing", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("unidades_base" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tid!)
+        .eq("is_active", true)
+        .order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const { data: uraEnabled = false } = useQuery({
     queryKey: ["configuracoes_support_ura_enabled", tid],
     enabled: !!tid,
