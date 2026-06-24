@@ -27,6 +27,8 @@ interface EditContactModalProps {
   attendanceId?: string | null;
 }
 
+interface ContactFormData { name: string; notes: string; phone: string; }
+
 export function EditContactModal({ open, onOpenChange, contactId, contactName, contactPhone, contactNotes, onSuccess, isNewContact, conversationId, attendanceId }: EditContactModalProps) {
   const { updateContact, isUpdatingContact } = useWhatsAppActions();
   const queryClient = useQueryClient();
