@@ -18,6 +18,8 @@ interface UnidadeFilterContextType {
   selectedUnidadeId: number | null;
   setSelectedUnidadeId: (id: number | null) => void;
   isLoading: boolean;
+  viewKey: string;
+  unidadeFilterReady: boolean;
 }
 
 const UnidadeFilterContext = createContext<UnidadeFilterContextType>({
@@ -27,6 +29,8 @@ const UnidadeFilterContext = createContext<UnidadeFilterContextType>({
   selectedUnidadeId: null,
   setSelectedUnidadeId: () => {},
   isLoading: false,
+  viewKey: "all",
+  unidadeFilterReady: false,
 });
 
 export function UnidadeFilterProvider({ children }: { children: ReactNode }) {
@@ -36,6 +40,8 @@ export function UnidadeFilterProvider({ children }: { children: ReactNode }) {
   const userId = profile?.user_id;
 
   const [selectedUnidadeIds, setSelectedUnidadeIdsRaw] = useState<number[]>([]);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [viewSynced, setViewSynced] = useState(true);
   const prevTidRef = useRef<string | null>(null);
   const hydratedRef = useRef<string | null>(null);
 
@@ -58,12 +64,14 @@ export function UnidadeFilterProvider({ children }: { children: ReactNode }) {
     const key = `${tid}:${userId}`;
     if (hydratedRef.current === key) return;
 
-    hydratedRef.current = key;
-
     const prevTid = prevTidRef.current;
+    const tenantChanged = prevTid !== null && prevTid !== tid;
+
+    hydratedRef.current = key;
     prevTidRef.current = tid;
 
-    const tenantChanged = prevTid !== null && prevTid !== tid;
+    // pausa as queries até a seleção estar resolvida (evita fetch zerado/velho)
+    setIsHydrated(false);
 
     let cancelled = false;
 
@@ -71,7 +79,10 @@ export function UnidadeFilterProvider({ children }: { children: ReactNode }) {
       if (tenantChanged) {
         setSelectedUnidadeIdsRaw([]);
         await (supabase.rpc as any)("set_view_unidades", { p_ids: [] });
-        if (!cancelled) queryClient.invalidateQueries();
+        if (cancelled) return;
+        setViewSynced(true);
+        setIsHydrated(true);
+        queryClient.invalidateQueries();
         return;
       }
 
@@ -84,14 +95,21 @@ export function UnidadeFilterProvider({ children }: { children: ReactNode }) {
 
       if (data) {
         setSelectedUnidadeIdsRaw((data.unidade_ids ?? []) as number[]);
+        setViewSynced(true);
+        setIsHydrated(true);
       } else {
         const def = unidades.find((u) => u.is_default_filter);
         if (def) {
           setSelectedUnidadeIdsRaw([def.id]);
           await (supabase.rpc as any)("set_view_unidades", { p_ids: [def.id] });
-          if (!cancelled) queryClient.invalidateQueries();
+          if (cancelled) return;
+          setViewSynced(true);
+          setIsHydrated(true);
+          queryClient.invalidateQueries();
         } else {
           setSelectedUnidadeIdsRaw([]);
+          setViewSynced(true);
+          setIsHydrated(true);
         }
       }
     })();
@@ -101,10 +119,16 @@ export function UnidadeFilterProvider({ children }: { children: ReactNode }) {
     };
   }, [tid, userId, isLoading, unidades, queryClient]);
 
-  const setSelectedUnidadeIds = async (ids: number[]) => {
+  const setSelectedUnidadeIds = (ids: number[]) => {
+    // feedback visual imediato
     setSelectedUnidadeIdsRaw(ids);
-    await (supabase.rpc as any)("set_view_unidades", { p_ids: ids });
-    queryClient.invalidateQueries();
+    // pausa as queries até gravar o estado de servidor (mata o race com unidade_visible/user_view_state)
+    setViewSynced(false);
+    (async () => {
+      await (supabase.rpc as any)("set_view_unidades", { p_ids: ids });
+      setViewSynced(true);
+      queryClient.invalidateQueries();
+    })();
   };
 
   const setSelectedUnidadeId = (id: number | null) => {
@@ -114,6 +138,13 @@ export function UnidadeFilterProvider({ children }: { children: ReactNode }) {
   const selectedUnidadeId =
     selectedUnidadeIds.length === 1 ? selectedUnidadeIds[0] : null;
 
+  const viewKey =
+    selectedUnidadeIds.length === 0
+      ? "all"
+      : [...selectedUnidadeIds].sort((a, b) => a - b).join(",");
+
+  const unidadeFilterReady = isHydrated && viewSynced;
+
   const value = useMemo(
     () => ({
       unidades,
@@ -122,8 +153,10 @@ export function UnidadeFilterProvider({ children }: { children: ReactNode }) {
       selectedUnidadeId,
       setSelectedUnidadeId,
       isLoading,
+      viewKey,
+      unidadeFilterReady,
     }),
-    [unidades, selectedUnidadeIds, selectedUnidadeId, isLoading]
+    [unidades, selectedUnidadeIds, selectedUnidadeId, isLoading, viewKey, unidadeFilterReady]
   );
 
   return (
