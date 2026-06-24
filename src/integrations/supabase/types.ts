@@ -9283,6 +9283,7 @@ export type Database = {
         Returns: undefined
       }
       user_allowed_unidades: { Args: never; Returns: number[] }
+      user_effective_unidades: { Args: never; Returns: number[] }
       user_view_unidades: { Args: never; Returns: number[] }
       validate_access_invite: {
         Args: { p_invite_id: string }
