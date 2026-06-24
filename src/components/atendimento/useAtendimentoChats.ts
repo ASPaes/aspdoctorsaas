@@ -30,12 +30,13 @@ export interface AtendimentoChats {
   media_atend_cliente: ChatMediaCliente;
 }
 
-export function useAtendimentoChats() {
+export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: "all" | "with" | "without" }) {
+  const { closedReasons, hasTicket } = opts;
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
   const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds } = useAtendimentoFilter();
   return useQuery<AtendimentoChats>({
-    queryKey: ["atendimento-chats", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds],
+    queryKey: ["atendimento-chats", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, closedReasons, hasTicket],
     enabled: !!tid,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -49,6 +50,8 @@ export function useAtendimentoChats() {
         p_agent_id: agentId ?? null,
         p_segmento_ids: orNull(segmentoIds), p_area_ids: orNull(areaIds), p_estado_ids: orNull(estadoIds),
         p_cidade_ids: orNull(cidadeIds), p_fornecedor_ids: orNull(fornecedorIds), p_produto_ids: orNull(produtoIds),
+        p_closed_reasons: closedReasons.length ? closedReasons : null,
+        p_has_ticket: hasTicket === "all" ? null : hasTicket === "with",
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
