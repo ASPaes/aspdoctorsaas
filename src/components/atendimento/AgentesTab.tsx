@@ -96,16 +96,36 @@ export function AgentesTab() {
                   <thead>
                     <tr className="border-b border-border text-left text-xs uppercase text-muted-foreground">
                       <th className="py-2 pr-3 font-medium">Agente</th>
-                      <th className="py-2 px-3 text-right font-medium">Atend.</th>
-                      <th className="py-2 px-3 text-right font-medium">Encerr.</th>
-                      <th className="py-2 px-3 text-right font-medium">Pico</th>
-                      <th className="py-2 px-3 text-right font-medium">TMA</th>
-                      <th className="py-2 px-3 text-right font-medium">1ª resp</th>
-                      <th className="py-2 px-3 text-right font-medium">Latência</th>
-                      <th className="py-2 px-3 text-right font-medium">Faixa + comum</th>
-                      <th className="py-2 px-3 text-right font-medium">CSAT</th>
-                      <th className="py-2 px-3 text-right font-medium">Reabert.</th>
-                      <th className="py-2 pl-3 text-right font-medium">Msgs/at.</th>
+                      <th className="py-2 px-3 text-right">
+                        <KpiHelpPopover wrapLabel="Atend." kpiKey="atendimento_ag_total" labelSize="sm" />
+                      </th>
+                      <th className="py-2 px-3 text-right">
+                        <KpiHelpPopover wrapLabel="Encerr." kpiKey="atendimento_ag_encerrados" labelSize="sm" />
+                      </th>
+                      <th className="py-2 px-3 text-right">
+                        <KpiHelpPopover wrapLabel="Pico" kpiKey="atendimento_ag_pico" labelSize="sm" />
+                      </th>
+                      <th className="py-2 px-3 text-right">
+                        <KpiHelpPopover wrapLabel="TMA" kpiKey="atendimento_ag_tma" labelSize="sm" />
+                      </th>
+                      <th className="py-2 px-3 text-right">
+                        <KpiHelpPopover wrapLabel="1ª resp" kpiKey="atendimento_ag_frt" labelSize="sm" />
+                      </th>
+                      <th className="py-2 px-3 text-right">
+                        <KpiHelpPopover wrapLabel="Latência" kpiKey="atendimento_ag_latencia" labelSize="sm" />
+                      </th>
+                      <th className="py-2 px-3 text-right">
+                        <KpiHelpPopover wrapLabel="Faixa + comum" kpiKey="atendimento_ag_faixa" labelSize="sm" />
+                      </th>
+                      <th className="py-2 px-3 text-right">
+                        <KpiHelpPopover wrapLabel="CSAT" kpiKey="atendimento_ag_csat" labelSize="sm" />
+                      </th>
+                      <th className="py-2 px-3 text-right">
+                        <KpiHelpPopover wrapLabel="Reabert." kpiKey="atendimento_ag_reabertura" labelSize="sm" />
+                      </th>
+                      <th className="py-2 pl-3 text-right">
+                        <KpiHelpPopover wrapLabel="Msgs/at." kpiKey="atendimento_ag_msgs" labelSize="sm" />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
