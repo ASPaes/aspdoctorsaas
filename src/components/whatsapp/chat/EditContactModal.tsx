@@ -170,7 +170,7 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
         }
 
         // If a cliente was linked, sync to cliente_contatos + persist link on conversation/attendance
-        if (linkedCliente) {
+        if (linkedCliente && linkedCliente.id !== originalClienteId) {
           const { data: existingContato } = await supabase
             .from('cliente_contatos')
             .select('id')
