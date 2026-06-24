@@ -85,6 +85,20 @@ export default function RoteamentoInstanciasTab() {
     toast.success("Setor de entrada atualizado");
   }
 
+  async function handleChangeUnidade(instId: string, value: string) {
+    const newVal = value === NONE ? null : Number(value);
+    const { error } = await (supabase.rpc as any)("admin_set_instance_unidade", {
+      p_instance_id: instId,
+      p_unidade_id: newVal,
+    });
+    if (error) {
+      toast.error("Erro ao salvar: " + error.message);
+      return;
+    }
+    await queryClient.invalidateQueries({ queryKey: ["whatsapp", "instances"] });
+    toast.success("Unidade da instância atualizada");
+  }
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
