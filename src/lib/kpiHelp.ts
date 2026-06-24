@@ -1003,7 +1003,7 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     title: "Tempo de Espera (TME)",
     definition: "Quanto tempo o cliente fica na fila até um agente assumir. Mostramos a mediana (p50) e a cauda (p90).",
     why_it_matters: "Fila longa frustra e gera abandono. A mediana mostra o típico; o p90 mostra o pior caso recorrente.",
-    formula: "mediana e p90 de (assumido − aberto), excluindo zeros e outliers acima de 1h",
+    formula: "mediana e p90 de (assumido − aberto), excluindo zeros e outliers acima de 2h",
   },
   atendimento_frt: {
     title: "1ª Resposta",
@@ -1016,13 +1016,13 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     title: "Tempo de Atendimento (TMA)",
     definition: "Tempo ativo do atendimento, de quando o agente assume até encerrar. Mediana (p50) e p90.",
     why_it_matters: "Mede o esforço por atendimento. Cruzado com volume, ajuda a dimensionar equipe.",
-    formula: "mediana e p90 de (encerrado − assumido), excluindo zeros e outliers acima de 2h",
+    formula: "mediana e p90 de (encerrado − assumido), excluindo zeros e outliers acima de 4h",
   },
   atendimento_tmr: {
     title: "Tempo de Resolução (TMR)",
     definition: "Tempo total da abertura ao encerramento da conversa. Mediana (p50) e p90.",
     why_it_matters: "É o tempo que o cliente espera até o problema acabar — resolução ponta a ponta.",
-    formula: "mediana e p90 de (encerrado − aberto), excluindo outliers acima de 8h (conversa largada)",
+    formula: "mediana e p90 de (encerrado − aberto), excluindo outliers acima de 10h (conversa largada)",
   },
   atendimento_sla_frt: {
     title: "% dentro do SLA",
@@ -1094,7 +1094,7 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     title: "TMA — Tempo de Atendimento",
     definition: "Tempo mediano de duração dos atendimentos do agente, de quando ele assume até encerrar.",
     why_it_matters: "Mede o esforço por atendimento. Mostramos a mediana (o atendimento típico), não a média — que infla com casos extremos.",
-    formula: "mediana de handle_seconds dos atendimentos do agente, excluindo zeros e acima de 2h",
+    formula: "mediana de handle_seconds dos atendimentos do agente, excluindo zeros e acima de 4h",
   },
   atendimento_ag_frt: {
     title: "1ª Resposta",
