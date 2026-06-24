@@ -164,6 +164,23 @@ export default function RoteamentoInstanciasTab() {
                     ⚠ Este setor não tem regra de atribuição — atendimentos ficarão na fila sem distribuir.
                   </p>
                 )}
+                <Label className="text-xs">Unidade</Label>
+                <Select
+                  value={inst.unidade_base_id ? String(inst.unidade_base_id) : NONE}
+                  onValueChange={(v) => handleChangeUnidade(inst.id, v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma unidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Nenhuma (visível a todos)</SelectItem>
+                    {unidades.map((u: any) => (
+                      <SelectItem key={u.id} value={String(u.id)}>
+                        {u.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </CardContent>
             </Card>
           );
