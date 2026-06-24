@@ -377,10 +377,36 @@ export async function findOrCreateContact(
   try {
     const variants = phoneSearchVariants(phoneNumber);
 
-    const { data: existing } = await supabase.from('whatsapp_contacts').select('id, name, phone_number').eq('tenant_id', tenantId).eq('instance_id', instanceId).in('phone_number', variants).maybeSingle();
+    // Unicidade real do contato = (tenant_id, phone_number). NÃO filtrar por instance_id:
+    // o mesmo número pode falar com várias instâncias do tenant; filtrar por instância
+    // fazia o lookup não achar o contato → INSERT falho (23505) + retry em todo inbound
+    // cross-instância. Busca exata pela chave canônica; só cai em variantes (legado).
+    let existing: { id: string; name: string; phone_number: string } | null = null;
+    {
+      const { data } = await supabase.from('whatsapp_contacts')
+        .select('id, name, phone_number')
+        .eq('tenant_id', tenantId)
+        .eq('phone_number', phoneNumber)
+        .maybeSingle();
+      existing = data ?? null;
+    }
+    if (!existing) {
+      const { data } = await supabase.from('whatsapp_contacts')
+        .select('id, name, phone_number')
+        .eq('tenant_id', tenantId)
+        .in('phone_number', variants)
+        .limit(1)
+        .maybeSingle();
+      existing = data ?? null;
+    }
 
     if (existing) {
-      if (existing.phone_number !== phoneNumber) await supabase.from('whatsapp_contacts').update({ phone_number: phoneNumber, updated_at: new Date().toISOString() }).eq('id', existing.id);
+      if (existing.phone_number !== phoneNumber) {
+        const { error: upErr } = await supabase.from('whatsapp_contacts').update({ phone_number: phoneNumber, updated_at: new Date().toISOString() }).eq('id', existing.id);
+        // Se já existe registro canônico com esse phone_number (variante legada duplicada),
+        // o UPDATE colide (23505). Ignora e mantém o contato encontrado — sem derrubar a mensagem.
+        if (upErr && upErr.code !== '23505') console.error('[processor] Error updating contact phone:', upErr);
+      }
       if (!isGroup) {
         if (!isFromMe && name !== phoneNumber && existing.name === phoneNumber) await supabase.from('whatsapp_contacts').update({ name, updated_at: new Date().toISOString() }).eq('id', existing.id);
       }
