@@ -1,5 +1,19 @@
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useAtendimentoChats, useAtendimentoChatsTimeline } from "./useAtendimentoChats";
+
+const CLOSE_OPTS: { v: string; label: string }[] = [
+  { v: "manual", label: "Manual" },
+  { v: "inactivity", label: "Inatividade" },
+  { v: "system", label: "Sistema" },
+  { v: "csat_timeout", label: "Timeout CSAT" },
+];
+const TICKET_OPTS: { v: "all" | "with" | "without"; label: string }[] = [
+  { v: "all", label: "Todos" },
+  { v: "with", label: "Com ticket" },
+  { v: "without", label: "Sem ticket" },
+];
 
 type BarRow = { key: string; nome: string; qtd: number; pct: number; color?: string };
 
@@ -126,10 +140,61 @@ function LinhaTemporal({ rows }: { rows: { mes: string; atendimentos: number; mr
 }
 
 export function ChatsTab() {
-  const { data, isLoading, isError, error } = useAtendimentoChats();
+  const [closedReasons, setClosedReasons] = useState<string[]>([]);
+  const [hasTicket, setHasTicket] = useState<"all" | "with" | "without">("all");
+  const { data, isLoading, isError, error } = useAtendimentoChats({ closedReasons, hasTicket });
   const { data: timeline } = useAtendimentoChatsTimeline();
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Encerramento:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {CLOSE_OPTS.map((o) => {
+              const on = closedReasons.includes(o.v);
+              return (
+                <button
+                  key={o.v}
+                  onClick={() =>
+                    setClosedReasons((p) => (p.includes(o.v) ? p.filter((x) => x !== o.v) : [...p, o.v]))
+                  }
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                    on
+                      ? "border-primary bg-primary/10 text-primary font-medium"
+                      : "border-border text-muted-foreground hover:bg-muted/50"
+                  )}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Ticket:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {TICKET_OPTS.map((o) => {
+              const on = hasTicket === o.v;
+              return (
+                <button
+                  key={o.v}
+                  onClick={() => setHasTicket(o.v)}
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                    on
+                      ? "border-primary bg-primary/10 text-primary font-medium"
+                      : "border-border text-muted-foreground hover:bg-muted/50"
+                  )}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       {isLoading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : isError || !data ? (
@@ -139,7 +204,7 @@ export function ChatsTab() {
         </div>
       ) : data.total === 0 ? (
         <div className="rounded-md border border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
-          Nenhum atendimento no período.
+          Nenhum atendimento no período com esses filtros.
         </div>
       ) : (
         <>
