@@ -15,10 +15,10 @@ export interface ChatRealtimeRow {
 
 export function useAtendimentoRealtimeChats(bucket: string | null) {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { selectedUnidadeId } = useUnidadeFilter();
+  const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
   return useQuery<ChatRealtimeRow[]>({
-    queryKey: ["atendimento-realtime-chats", tid, bucket, selectedUnidadeId],
-    enabled: !!tid && !!bucket,
+    queryKey: ["atendimento-realtime-chats", tid, bucket, viewKey],
+    enabled: !!tid && !!bucket && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)(

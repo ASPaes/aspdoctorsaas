@@ -20,11 +20,11 @@ export interface AtendimentoUra {
 
 export function useAtendimentoUra() {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { selectedUnidadeId } = useUnidadeFilter();
+  const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const { dateRange, departmentId } = useAtendimentoFilter();
   return useQuery<AtendimentoUra>({
-    queryKey: ["atendimento-ura", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId],
-    enabled: !!tid,
+    queryKey: ["atendimento-ura", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId],
+    enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_atendimento_ura", {

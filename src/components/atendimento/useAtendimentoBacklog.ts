@@ -18,11 +18,11 @@ export interface AtendimentoBacklog {
 
 export function useAtendimentoBacklog() {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { selectedUnidadeId } = useUnidadeFilter();
+  const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds } = useAtendimentoFilter();
   return useQuery<AtendimentoBacklog>({
-    queryKey: ["atendimento-backlog", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds],
-    enabled: !!tid,
+    queryKey: ["atendimento-backlog", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds],
+    enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const orNull = (a: number[]) => (a.length ? a : null);

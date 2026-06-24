@@ -18,11 +18,11 @@ export interface AtendimentoRealtime {
 
 export function useAtendimentoRealtime() {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { selectedUnidadeId } = useUnidadeFilter();
+  const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
 
   const query = useQuery<AtendimentoRealtime>({
-    queryKey: ["atendimento-realtime", tid, selectedUnidadeId],
-    enabled: !!tid,
+    queryKey: ["atendimento-realtime", tid, viewKey],
+    enabled: !!tid && unidadeFilterReady,
     refetchInterval: 15_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,

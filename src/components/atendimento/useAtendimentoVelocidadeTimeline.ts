@@ -20,7 +20,7 @@ export function useAtendimentoVelocidadeTimeline(
   bucket: "day" | "week",
 ) {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { selectedUnidadeId } = useUnidadeFilter();
+  const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const { dateRange, departmentId, agentId } = useAtendimentoFilter();
   return useQuery<VelocidadeTimelinePoint[]>({
     queryKey: [
@@ -30,11 +30,11 @@ export function useAtendimentoVelocidadeTimeline(
       dateRange.to.toISOString(),
       slaSeconds,
       bucket,
-      selectedUnidadeId,
+      viewKey,
       departmentId,
       agentId,
     ],
-    enabled: !!tid,
+    enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_atendimento_velocidade_timeline", {
