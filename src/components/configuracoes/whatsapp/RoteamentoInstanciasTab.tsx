@@ -104,6 +104,7 @@ export default function RoteamentoInstanciasTab() {
       <p className="text-sm text-muted-foreground">
         Defina para qual setor cada número (instância) encaminha quando a URA está desligada.
         Cada instância vai para um único setor.
+        A Unidade define qual unidade enxerga as conversas dessa instância (filtro de acesso).
       </p>
 
       {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
