@@ -13,6 +13,7 @@ import { maskPhoneBR } from '@/lib/masks';
 import { normalizeBRPhone, isValidBRPhone, maskBRPhoneLive } from '@/lib/phoneBR';
 import { Link2, Search, Loader2, X, Building2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useLinkedCliente } from '../hooks/useLinkedCliente';
 
 interface EditContactModalProps {
   open: boolean;
