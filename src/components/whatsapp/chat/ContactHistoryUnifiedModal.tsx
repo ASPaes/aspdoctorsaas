@@ -221,7 +221,7 @@ export function ContactHistoryUnifiedModal({
     instances,
     agents,
     totalConversations,
-  } = useContactUnifiedHistory(contactId, open && isAdminOrHead);
+  } = useContactUnifiedHistory(contactId, open);
 
   // Linked cliente for saving evaluations
   const { data: linkedCliente } = useLinkedCliente(contactId, contactPhone);
@@ -367,17 +367,17 @@ export function ContactHistoryUnifiedModal({
                 {contactName} · {formatBRPhone(contactPhone)}
               </p>
             </div>
-            {isAdminOrHead && (
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Badge variant="outline" className="text-[10px] h-5 gap-1">
-                  <Radio className="h-2.5 w-2.5" />
-                  {totalConversations}
-                </Badge>
-                <Badge variant="outline" className="text-[10px] h-5">
-                  {messages.length} msg{messages.length !== 1 ? "s" : ""}
-                </Badge>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Badge variant="outline" className="text-[10px] h-5 gap-1">
+                <Radio className="h-2.5 w-2.5" />
+                {totalConversations}
+              </Badge>
+              <Badge variant="outline" className="text-[10px] h-5">
+                {messages.length} msg{messages.length !== 1 ? "s" : ""}
+              </Badge>
 
-                {/* Diagnóstico IA button */}
+              {/* Diagnóstico IA button */}
+              {isAdminOrHead && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -401,33 +401,28 @@ export function ContactHistoryUnifiedModal({
                       : "Gerar diagnóstico de atendimento com IA"}
                   </TooltipContent>
                 </Tooltip>
+              )}
 
-                {/* Mobile filters toggle */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs gap-1 md:hidden"
-                  onClick={() => setFiltersVisible((v) => !v)}
-                >
-                  <Filter className="h-3 w-3" />
-                  {activeFilterCount > 0 && (
-                    <span className="bg-primary text-primary-foreground rounded-full h-4 w-4 text-[9px] flex items-center justify-center">
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </Button>
-              </div>
-            )}
+              {/* Mobile filters toggle */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1 md:hidden"
+                onClick={() => setFiltersVisible((v) => !v)}
+              >
+                <Filter className="h-3 w-3" />
+                {activeFilterCount > 0 && (
+                  <span className="bg-primary text-primary-foreground rounded-full h-4 w-4 text-[9px] flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
         <Separator />
 
-        {!isAdminOrHead ? (
-          <div className="flex items-center justify-center py-16 px-6 text-muted-foreground text-sm">
-            Apenas Admin/Head pode ver histórico unificado.
-          </div>
-        ) : (
           <div className="flex flex-1 min-h-0 overflow-hidden">
             {/* Filters sidebar */}
             <div
@@ -717,7 +712,6 @@ export function ContactHistoryUnifiedModal({
               )}
             </div>
           </div>
-        )}
 
         {/* Footer */}
         <Separator />
