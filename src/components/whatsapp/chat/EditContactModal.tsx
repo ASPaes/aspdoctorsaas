@@ -13,6 +13,7 @@ import { maskPhoneBR } from '@/lib/masks';
 import { normalizeBRPhone, isValidBRPhone, maskBRPhoneLive } from '@/lib/phoneBR';
 import { Link2, Search, Loader2, X, Building2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useLinkedCliente } from '../hooks/useLinkedCliente';
 
 interface EditContactModalProps {
   open: boolean;
@@ -36,7 +37,14 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
   const [searchTerm, setSearchTerm] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [linkedCliente, setLinkedCliente] = useState<{ id: string; label: string } | null>(null);
+  const [originalClienteId, setOriginalClienteId] = useState<string | null>(null);
   const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen ? searchTerm : '');
+
+  // Busca cliente atualmente vinculado para pré-preencher na edição
+  const { data: currentLinked } = useLinkedCliente(
+    open && !isNewContact ? contactId || null : null,
+    open && !isNewContact ? contactPhone || null : null,
+  );
 
   const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm<ContactFormData>({
     defaultValues: { name: contactName, notes: contactNotes || '', phone: contactPhone ? maskPhoneBR(contactPhone) : '' },
@@ -46,10 +54,24 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
     if (open) {
       reset({ name: contactName, notes: contactNotes || '', phone: contactPhone ? maskPhoneBR(contactPhone) : '' });
       setLinkedCliente(null);
+      setOriginalClienteId(null);
       setSearchOpen(false);
       setSearchTerm('');
     }
   }, [open, contactName, contactNotes, contactPhone, reset]);
+
+  // Pré-preenche a empresa vinculada quando a query retorna
+  useEffect(() => {
+    if (!open || isNewContact) return;
+    if (currentLinked?.id) {
+      setOriginalClienteId(currentLinked.id);
+      setLinkedCliente((prev) => prev ?? {
+        id: currentLinked.id,
+        label: currentLinked.nome_fantasia || currentLinked.razao_social || currentLinked.cnpj || 'Empresa vinculada',
+      });
+    }
+  }, [open, isNewContact, currentLinked]);
+
 
   const persistClienteLink = async (clienteId: string) => {
     if (!conversationId) return;
@@ -148,7 +170,7 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
         }
 
         // If a cliente was linked, sync to cliente_contatos + persist link on conversation/attendance
-        if (linkedCliente) {
+        if (linkedCliente && linkedCliente.id !== originalClienteId) {
           const { data: existingContato } = await supabase
             .from('cliente_contatos')
             .select('id')
@@ -198,7 +220,7 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
         },
         {
           onSuccess: async () => {
-            if (linkedCliente) {
+            if (linkedCliente && linkedCliente.id !== originalClienteId) {
               try {
                 // Sync cliente_contatos
                 const digits = (normalized || contactPhone || '').replace(/\D/g, '');
