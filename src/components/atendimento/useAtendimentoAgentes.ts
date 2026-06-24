@@ -31,11 +31,11 @@ export interface AtendimentoAgentes {
 
 export function useAtendimentoAgentes() {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { selectedUnidadeId } = useUnidadeFilter();
+  const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const { dateRange, departmentId } = useAtendimentoFilter();
   return useQuery<AtendimentoAgentes>({
-    queryKey: ["atendimento-agentes", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId],
-    enabled: !!tid,
+    queryKey: ["atendimento-agentes", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId],
+    enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_atendimento_agentes", {

@@ -33,11 +33,11 @@ export interface AtendimentoChats {
 export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: "all" | "with" | "without" }) {
   const { closedReasons, hasTicket } = opts;
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { selectedUnidadeId } = useUnidadeFilter();
+  const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds } = useAtendimentoFilter();
   return useQuery<AtendimentoChats>({
-    queryKey: ["atendimento-chats", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, closedReasons, hasTicket],
-    enabled: !!tid,
+    queryKey: ["atendimento-chats", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, closedReasons, hasTicket],
+    enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const orNull = (a: number[]) => (a.length ? a : null);
@@ -95,10 +95,10 @@ export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: 
 
 export function useAtendimentoChatsTimeline() {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { selectedUnidadeId } = useUnidadeFilter();
+  const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
   return useQuery<ChatTimelineRow[]>({
-    queryKey: ["atendimento-chats-timeline", tid, selectedUnidadeId],
-    enabled: !!tid,
+    queryKey: ["atendimento-chats-timeline", tid, viewKey],
+    enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_atendimento_chats_timeline", {

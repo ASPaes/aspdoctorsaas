@@ -17,11 +17,11 @@ export interface AtendimentoClientes {
 
 export function useAtendimentoClientes() {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { selectedUnidadeId } = useUnidadeFilter();
+  const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const { dateRange, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds } = useAtendimentoFilter();
   return useQuery<AtendimentoClientes>({
-    queryKey: ["atendimento-clientes", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds],
-    enabled: !!tid,
+    queryKey: ["atendimento-clientes", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds],
+    enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const orNull = (a: number[]) => (a.length ? a : null);

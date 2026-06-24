@@ -32,7 +32,7 @@ export interface AtendimentoVelocidade {
 
 export function useAtendimentoVelocidade(slaSeconds: number) {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { selectedUnidadeId } = useUnidadeFilter();
+  const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const { dateRange, departmentId, agentId } = useAtendimentoFilter();
   return useQuery<AtendimentoVelocidade>({
     queryKey: [
@@ -41,11 +41,11 @@ export function useAtendimentoVelocidade(slaSeconds: number) {
       dateRange.from.toISOString(),
       dateRange.to.toISOString(),
       slaSeconds,
-      selectedUnidadeId,
+      viewKey,
       departmentId,
       agentId,
     ],
-    enabled: !!tid,
+    enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_atendimento_velocidade", {
