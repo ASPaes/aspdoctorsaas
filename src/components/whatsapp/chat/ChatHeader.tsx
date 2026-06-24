@@ -845,7 +845,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         contactName={contact?.name || ""}
         contactPhone={contact?.phone_number || ""}
         contactNotes={contact?.notes}
+        conversationId={conversation.id}
+        attendanceId={attendance?.id ?? null}
       />
+
       <TransferDialog
         open={isTransferOpen}
         onOpenChange={setIsTransferOpen}

@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { maskPhoneBR } from '@/lib/masks';
 import { normalizeBRPhone, isValidBRPhone, maskBRPhoneLive } from '@/lib/phoneBR';
 import { Link2, Search, Loader2, X, Building2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface EditContactModalProps {
   open: boolean;
@@ -22,12 +23,15 @@ interface EditContactModalProps {
   contactNotes?: string | null;
   onSuccess?: () => void;
   isNewContact?: boolean;
+  conversationId?: string | null;
+  attendanceId?: string | null;
 }
 
 interface ContactFormData { name: string; notes: string; phone: string; }
 
-export function EditContactModal({ open, onOpenChange, contactId, contactName, contactPhone, contactNotes, onSuccess, isNewContact }: EditContactModalProps) {
+export function EditContactModal({ open, onOpenChange, contactId, contactName, contactPhone, contactNotes, onSuccess, isNewContact, conversationId, attendanceId }: EditContactModalProps) {
   const { updateContact, isUpdatingContact } = useWhatsAppActions();
+  const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -46,6 +50,49 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
       setSearchTerm('');
     }
   }, [open, contactName, contactNotes, contactPhone, reset]);
+
+  const persistClienteLink = async (clienteId: string) => {
+    if (!conversationId) return;
+    // 1) Prefer attendance RPC (writes to attendance + propagates to conversation metadata)
+    let resolvedAttendanceId = attendanceId ?? null;
+    if (!resolvedAttendanceId) {
+      const { data: active } = await (supabase as any)
+        .from('support_attendances')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .neq('status', 'closed')
+        .order('opened_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      resolvedAttendanceId = active?.id ?? null;
+    }
+    if (resolvedAttendanceId) {
+      const { error } = await (supabase as any).rpc('set_attendance_cliente', {
+        p_attendance_id: resolvedAttendanceId,
+        p_cliente_id: clienteId,
+      });
+      if (!error) return;
+    }
+    // 2) Fallback: update conversation metadata directly
+    const { data: conv } = await (supabase as any)
+      .from('whatsapp_conversations')
+      .select('metadata')
+      .eq('id', conversationId)
+      .maybeSingle();
+    const currentMeta = (conv?.metadata && typeof conv.metadata === 'object') ? conv.metadata : {};
+    await (supabase as any)
+      .from('whatsapp_conversations')
+      .update({ metadata: { ...currentMeta, cliente_id: clienteId } })
+      .eq('id', conversationId);
+  };
+
+  const invalidateClienteQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['linked-cliente'] });
+    queryClient.invalidateQueries({ queryKey: ['cliente-linked'] });
+    queryClient.invalidateQueries({ queryKey: ['cliente-candidatos-by-phone'] });
+    queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+    queryClient.invalidateQueries({ queryKey: ['relevant-attendance'] });
+  };
 
   const onSubmit = async (data: ContactFormData) => {
     if (isNewContact) {
@@ -100,7 +147,7 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
           toast.success(`Contato "${data.name}" salvo com sucesso`);
         }
 
-        // If a cliente was linked, sync the phone to cliente_contatos
+        // If a cliente was linked, sync to cliente_contatos + persist link on conversation/attendance
         if (linkedCliente) {
           const { data: existingContato } = await supabase
             .from('cliente_contatos')
@@ -119,9 +166,11 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
                 tenant_id: profile.tenant_id,
               });
           }
+          await persistClienteLink(linkedCliente.id);
           toast.success(`Contato vinculado ao cliente ${linkedCliente.label}`);
         }
 
+        invalidateClienteQueries();
         onOpenChange(false);
         onSuccess?.();
       } catch (err: any) {
@@ -147,10 +196,56 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
             ...(phoneChanged ? { phone_number: normalized } : {}),
           },
         },
-        { onSuccess: () => { onOpenChange(false); onSuccess?.(); } }
+        {
+          onSuccess: async () => {
+            if (linkedCliente) {
+              try {
+                // Sync cliente_contatos
+                const digits = (normalized || contactPhone || '').replace(/\D/g, '');
+                if (digits) {
+                  const { data: profile } = await supabase.auth.getUser().then(async (r) => {
+                    const uid = r.data.user?.id;
+                    if (!uid) return { data: null } as any;
+                    return supabase
+                      .from('profiles')
+                      .select('tenant_id')
+                      .eq('user_id', uid)
+                      .eq('status', 'ativo')
+                      .maybeSingle();
+                  });
+                  if (profile?.tenant_id) {
+                    const { data: existingContato } = await supabase
+                      .from('cliente_contatos')
+                      .select('id')
+                      .eq('cliente_id', linkedCliente.id)
+                      .eq('fone', digits)
+                      .maybeSingle();
+                    if (!existingContato) {
+                      await supabase.from('cliente_contatos').insert({
+                        cliente_id: linkedCliente.id,
+                        nome: data.name,
+                        fone: digits,
+                        tenant_id: profile.tenant_id,
+                      });
+                    }
+                  }
+                }
+                await persistClienteLink(linkedCliente.id);
+                toast.success(`Contato vinculado ao cliente ${linkedCliente.label}`);
+              } catch (err) {
+                console.error('Error linking cliente:', err);
+                toast.error('Contato salvo, mas falhou ao vincular cliente');
+              }
+            }
+            invalidateClienteQueries();
+            onOpenChange(false);
+            onSuccess?.();
+          },
+        }
       );
     }
   };
+
 
   const saving = isNewContact ? isSaving : isUpdatingContact;
 

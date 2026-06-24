@@ -399,7 +399,9 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
         contactName={saveContactName}
         contactPhone={saveContactPhone}
         isNewContact
+        conversationId={conversation?.id ?? null}
       />
+
     </div>
   );
 }
