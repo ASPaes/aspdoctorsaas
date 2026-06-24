@@ -8027,11 +8027,13 @@ export type Database = {
           p_agent_id?: string
           p_area_ids?: number[]
           p_cidade_ids?: number[]
+          p_closed_reasons?: string[]
           p_date_from: string
           p_date_to: string
           p_department_id?: string
           p_estado_ids?: number[]
           p_fornecedor_ids?: number[]
+          p_has_ticket?: boolean
           p_produto_ids?: number[]
           p_segmento_ids?: number[]
           p_tenant_id: string
