@@ -220,7 +220,7 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
         },
         {
           onSuccess: async () => {
-            if (linkedCliente) {
+            if (linkedCliente && linkedCliente.id !== originalClienteId) {
               try {
                 // Sync cliente_contatos
                 const digits = (normalized || contactPhone || '').replace(/\D/g, '');
