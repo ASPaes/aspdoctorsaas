@@ -1009,7 +1009,7 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     title: "1ª Resposta",
     definition: "Tempo até a primeira resposta de um agente ao cliente. Mediana (p50) e cauda (p90).",
     why_it_matters: "É a métrica de SLA que o cliente mais percebe — o silêncio inicial define a impressão do atendimento.",
-    formula: "mediana e p90 de first_response_time_seconds, excluindo zeros e outliers acima de 30min",
+    formula: "mediana e p90 de first_response_time_seconds, excluindo zeros e outliers acima de 4h",
     market_benchmark: "Em chat, 1–2 min é o ideal de mercado; em suporte técnico B2B, alguns minutos é realista.",
   },
   atendimento_tma: {
@@ -1100,7 +1100,7 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     title: "1ª Resposta",
     definition: "Tempo mediano até a primeira resposta do agente ao cliente dentro de cada atendimento.",
     why_it_matters: "É o silêncio inicial que o cliente mais percebe — define a primeira impressão do atendimento.",
-    formula: "mediana de first_response_time_seconds do agente, excluindo zeros e acima de 30min",
+    formula: "mediana de first_response_time_seconds do agente, excluindo zeros e acima de 4h",
     market_benchmark: "Em chat, 1–2 min é o ideal de mercado.",
   },
   atendimento_ag_latencia: {

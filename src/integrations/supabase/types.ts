@@ -8862,6 +8862,7 @@ export type Database = {
       is_tenant_active_member: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
       is_tenant_admin_or_head: { Args: never; Returns: boolean }
+      kpi_cap_seconds: { Args: { p_metric: string }; Returns: number }
       link_cliente_to_attendance: {
         Args: { p_attendance_id: string; p_cliente_id: string }
         Returns: undefined
