@@ -34,13 +34,14 @@ function normalizar(s: string): string {
 
 export default function OmieVinculosTab() {
   const { toast } = useToast();
+  const { effectiveTenantId: tid } = useTenantFilter();
   const [savingKey, setSavingKey] = useState<string | null>(null);
   // Selected values keyed by linha ("vend:<id>" / "prod:<id>")
   const [selecoes, setSelecoes] = useState<Record<string, string>>({});
   const [vinculados, setVinculados] = useState<Record<string, boolean>>({});
 
   const { data: remote, isLoading: loadingRemote, error: errRemote } = useQuery({
-    queryKey: ["omie_listar_vinculos"],
+    queryKey: ["omie_listar_vinculos", tid],
     queryFn: async (): Promise<ListarVinculosResp> => {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
         body: { acao: "listar_vinculos" },
@@ -52,11 +53,13 @@ export default function OmieVinculosTab() {
   });
 
   const { data: funcionarios, isLoading: loadingFunc } = useQuery({
-    queryKey: ["omie_vinculos_funcionarios"],
+    queryKey: ["omie_vinculos_funcionarios", tid],
+    enabled: !!tid,
     queryFn: async (): Promise<Funcionario[]> => {
       const { data, error } = await supabase
         .from("funcionarios")
         .select("id, nome")
+        .eq("tenant_id", tid as string)
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
@@ -65,11 +68,13 @@ export default function OmieVinculosTab() {
   });
 
   const { data: produtos, isLoading: loadingProd } = useQuery({
-    queryKey: ["omie_vinculos_produtos"],
+    queryKey: ["omie_vinculos_produtos", tid],
+    enabled: !!tid,
     queryFn: async (): Promise<Produto[]> => {
       const { data, error } = await supabase
         .from("produtos")
         .select("id, nome")
+        .eq("tenant_id", tid as string)
         .order("nome");
       if (error) throw error;
       return (data || []) as Produto[];
