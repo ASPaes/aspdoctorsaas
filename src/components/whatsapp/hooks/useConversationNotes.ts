@@ -17,6 +17,7 @@ export interface ConversationNote {
 
 export const useConversationNotes = (conversationId: string | null) => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const { data: notes, isLoading, refetch } = useQuery({
     queryKey: ['conversation-notes', conversationId],
