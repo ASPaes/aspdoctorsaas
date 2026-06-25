@@ -519,6 +519,7 @@ export function MovimentosMrrModal({
               </CardHeader>
               <CardContent className="py-1 px-3">
                 <p className="text-lg font-bold text-blue-600">+{formatCurrency(totalCrossSell)}</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">{qtdCrossSell} {qtdCrossSell === 1 ? 'movimento' : 'movimentos'}</p>
                 <p className="text-xs text-muted-foreground">Custo: +{formatCurrency(totalCustoCrossSell)}</p>
               </CardContent>
             </Card>
