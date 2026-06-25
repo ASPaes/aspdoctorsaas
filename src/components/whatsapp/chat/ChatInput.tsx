@@ -52,6 +52,8 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeMacro, setActiveMacro] = useState<{ id: string; content: string; permite_edicao_livre: boolean; media_type?: string | null; media_path?: string | null } | null>(null);
+  const [isInternalNote, setIsInternalNote] = useState(false);
+  const { createNote, isCreating: isCreatingNote } = useConversationNotes(conversationId);
 
   const MAX_FILE_SIZE_MB = 100;
   const WARN_FILE_SIZE_MB = 60;
