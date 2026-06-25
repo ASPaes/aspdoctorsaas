@@ -43,6 +43,7 @@ export interface ConversationWithContact {
     updated_at: string;
   };
   isLastMessageFromMe?: boolean;
+  sentiment?: { needs_cs_ticket: boolean | null; cs_ticket_created_id: string | null } | null;
 }
 
 export interface ConversationsFilters {
