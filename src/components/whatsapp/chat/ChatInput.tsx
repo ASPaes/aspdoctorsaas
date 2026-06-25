@@ -378,15 +378,16 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const handlePaste = useCallback((e: ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
+    const files: File[] = [];
     for (let i = 0; i < items.length; i++) {
       if (items[i].kind === 'file') {
-        const file = items[i].getAsFile();
-        if (file) {
-          e.preventDefault();
-          validateAndAttachFile(file);
-          return;
-        }
+        const f = items[i].getAsFile();
+        if (f) files.push(f);
       }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      validateAndAttachFiles(files);
     }
   }, []);
 
@@ -407,15 +408,17 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    const file = e.dataTransfer?.files?.[0];
-    if (file) validateAndAttachFile(file);
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) validateAndAttachFiles(files);
   }, []);
 
   // File input handler
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) validateAndAttachFile(file);
+    const files = e.target.files;
+    if (files && files.length > 0) validateAndAttachFiles(files);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
+
 
   const handleEmojiSelect = (emoji: string) => {
     if (!textareaRef.current) return;
