@@ -168,7 +168,14 @@ export function ChatMessages({
     setInternalHighlight(target.id);
   }, [messagesByExternalId]);
 
-  // Merge messages and assignment events into a single timeline
+  // Helper: timestamp de qualquer item da timeline
+  const itemTimestamp = (item: TimelineItem): string => {
+    if (item.type === 'message') return item.msg.timestamp;
+    if (item.type === 'transfer') return item.event.created_at;
+    return item.note.created_at;
+  };
+
+  // Merge messages, assignment events e notas internas em uma única timeline
   const timelineItems = useMemo(() => {
     const items: TimelineItem[] = messages
       .filter(msg => msg.message_type !== 'reaction')
@@ -178,13 +185,14 @@ export function ChatMessages({
         items.push({ type: 'transfer' as const, event });
       }
     }
-    items.sort((a, b) => {
-      const tA = a.type === 'message' ? a.msg.timestamp : a.event.created_at;
-      const tB = b.type === 'message' ? b.msg.timestamp : b.event.created_at;
-      return new Date(tA).getTime() - new Date(tB).getTime();
-    });
+    if (notes && notes.length > 0) {
+      for (const note of notes) {
+        items.push({ type: 'note' as const, note });
+      }
+    }
+    items.sort((a, b) => new Date(itemTimestamp(a)).getTime() - new Date(itemTimestamp(b)).getTime());
     return items;
-  }, [messages, assignments, isGroup]);
+  }, [messages, assignments, isGroup, notes]);
 
   // Compute the ID of the first unread incoming message
   const firstUnreadId = useMemo(() => {
@@ -200,7 +208,7 @@ export function ChatMessages({
     const groups: { date: string; items: TimelineItem[] }[] = [];
     let currentDate = '';
     for (const item of timelineItems) {
-      const ts = item.type === 'message' ? item.msg.timestamp : item.event.created_at;
+      const ts = itemTimestamp(item);
       const d = formatDateLabel(ts, timezone);
       if (d !== currentDate) {
         currentDate = d;
