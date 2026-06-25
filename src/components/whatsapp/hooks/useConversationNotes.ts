@@ -83,7 +83,7 @@ export const useConversationNotes = (conversationId: string | null) => {
 
   const createNote = useMutation({
     mutationFn: async (content: string) => {
-      const { error } = await supabase.from('whatsapp_conversation_notes').insert({ conversation_id: conversationId, content } as any);
+      const { error } = await supabase.from('whatsapp_conversation_notes').insert({ conversation_id: conversationId, content, created_by: user?.id } as any);
       if (error) throw error;
     },
     onSuccess: () => {
