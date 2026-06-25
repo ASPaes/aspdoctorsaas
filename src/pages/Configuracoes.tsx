@@ -51,6 +51,7 @@ import HorarioPlantaoTab from "@/components/configuracoes/HorarioPlantaoTab";
 import ClienteImportModal from "@/components/import/ClienteImportModal";
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
 import CategoriasServicosTab from "@/components/configuracoes/CategoriasServicosTab";
+import OmieIntegrationTab from "@/components/configuracoes/OmieIntegrationTab";
 import PermissoesPapeisContent from "@/components/configuracoes/PermissoesPapeisContent";
 import { usePermissions } from "@/hooks/usePermissions";
 import AccessDenied from "@/pages/AccessDenied";
@@ -98,6 +99,7 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   importacao: { breadcrumb: ["Dados", "Importação"], title: "Importação de Dados", description: "Importe sua base de clientes a partir de um arquivo CSV ou planilha." },
   geral: { breadcrumb: ["Sistema", "Geral"], title: "Geral", description: "Fuso horário e configurações globais do sistema." },
   setup: { breadcrumb: ["Sistema", "Guia de configuração"], title: "Guia de configuração", description: "Passos recomendados para configurar a plataforma." },
+  "integracoes-omie": { breadcrumb: ["Integrações", "Omie"], title: "Omie", description: "Conecte o sistema ao Omie para sincronizar clientes e contratos." },
 };
 
 
@@ -450,6 +452,8 @@ export default function Configuracoes() {
         return <ChatTimezoneSelector />;
       case "setup":
         return <SetupGuideCollapsible />;
+      case "integracoes-omie":
+        return <OmieIntegrationTab />;
       default:
         return null;
     }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { DollarSign, Database, Users, Headset, Upload, ChevronRight, RefreshCw, Settings } from "lucide-react";
+import { DollarSign, Database, Users, Headset, Upload, ChevronRight, RefreshCw, Settings, Plug } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -47,6 +47,8 @@ export const SECTION_TO_RESOURCE: Record<string, string> = {
   // Dados
   "duplicidades": "cfg.duplicidades",
   "importacao": "cfg.importacao",
+  // Integrações
+  "integracoes-omie": "cfg.integracoes_omie",
 };
 
 export const CADASTRO_SECTIONS = [
@@ -214,6 +216,17 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
           items: [
             { value: "duplicidades", label: "Duplicidades" },
             { value: "importacao", label: "Importação" },
+          ],
+        },
+      ],
+    },
+    {
+      label: "Integrações",
+      icon: Plug,
+      subgroups: [
+        {
+          items: [
+            { value: "integracoes-omie", label: "Omie" },
           ],
         },
       ],
