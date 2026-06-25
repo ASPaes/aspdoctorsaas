@@ -507,6 +507,7 @@ export function MovimentosMrrModal({
               </CardHeader>
               <CardContent className="py-1 px-3">
                 <p className="text-lg font-bold text-green-600">+{formatCurrency(totalUpsell)}</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">{qtdUpsell} {qtdUpsell === 1 ? 'movimento' : 'movimentos'}</p>
                 <p className="text-xs text-muted-foreground">Custo: +{formatCurrency(totalCustoUpsell)}</p>
               </CardContent>
             </Card>
