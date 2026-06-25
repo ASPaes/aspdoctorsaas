@@ -226,6 +226,19 @@ export default function MovimentosMrrTab() {
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Fornecedor</label>
+          <Select value={fornecedorFilter || "__all__"} onValueChange={(v) => setFornecedorFilter(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="h-9 w-[220px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todos os fornecedores</SelectItem>
+              <SelectItem value="__null__">Sem fornecedor</SelectItem>
+              {fornecedores?.map(f => (
+                <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* KPI Cards */}
