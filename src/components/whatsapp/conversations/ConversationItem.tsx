@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Archive, CheckCheck, AlertTriangle, CalendarClock, Ban, Clock } from "lucide-react";
 import { formatBRPhone } from "@/lib/phoneBR";
-import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
+
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import type { AttendanceInfo } from "../hooks/useAttendanceStatus";
@@ -22,9 +22,8 @@ interface Props {
 export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance, isAgentAlert }: Props) {
   const contact = conv.contact;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
-  const { sentiment } = useWhatsAppSentiment(conv.id);
+  const sentimentData = conv.sentiment as any;
   const { timezone } = useAppTimezone();
-  const sentimentData = sentiment as any;
   const needsCSTicket = sentimentData?.needs_cs_ticket && !sentimentData?.cs_ticket_created_id;
 
   const { data: allClientAlerts = [] } = useClientAlerts();
