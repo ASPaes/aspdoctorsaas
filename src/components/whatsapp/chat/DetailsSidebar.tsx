@@ -12,6 +12,7 @@ import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, Refr
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { ContactHistoryUnifiedModal } from "./ContactHistoryUnifiedModal";
+import { ContactTicketsSection } from "./ContactTicketsSection";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { CSTicketAlert } from "./CSTicketAlert";
 import { useConversationNotes } from "../hooks/useConversationNotes";
@@ -72,6 +73,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const [kbOpen, setKbOpen] = useState(true);
   const [kbEditOpen, setKbEditOpen] = useState(false);
   const [pinnedOpen, setPinnedOpen] = useState(true);
+  const [ticketsOpen, setTicketsOpen] = useState(true);
 
   // Pinned contact notes (persistem entre todos os atendimentos do contato)
   const [pinnedNotes, setPinnedNotes] = useState(contact?.notes || "");
@@ -217,6 +219,16 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
     <History className="h-3.5 w-3.5" />
     Histórico do Contato
   </Button>
+
+          {/* ─── Histórico de Tickets do cliente ─── */}
+          <CollapsibleSection
+            icon={<Ticket className="h-3.5 w-3.5" />}
+            title="Histórico de Tickets"
+            open={ticketsOpen}
+            onOpenChange={setTicketsOpen}
+          >
+            <ContactTicketsSection clienteId={(metadata?.cliente_id as string) || null} />
+          </CollapsibleSection>
 
           {/* ─── Anotações fixas do contato (persistem entre atendimentos) ─── */}
           <CollapsibleSection
