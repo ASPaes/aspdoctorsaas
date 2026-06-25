@@ -304,6 +304,18 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
         }, 800);
       })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'whatsapp_sentiment_analysis',
+        filter: tid ? `tenant_id=eq.${tid}` : undefined,
+      } as any, () => {
+        const now = Date.now();
+        if (now - invalidateThrottleRef.current > 1000) {
+          invalidateThrottleRef.current = now;
+          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+        }
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
