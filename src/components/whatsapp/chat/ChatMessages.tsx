@@ -10,7 +10,8 @@ import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages"
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { formatDateLabel, formatTime } from "@/lib/formatDateWithTimezone";
 import { useConversationAssignmentHistory, type AssignmentEvent } from "../hooks/useConversationAssignmentHistory";
-import { ArrowRightLeft, ChevronDown, Loader2 } from "lucide-react";
+import { useConversationNotes, type ConversationNote } from "../hooks/useConversationNotes";
+import { ArrowRightLeft, ChevronDown, Loader2, StickyNote, Trash2 } from "lucide-react";
 
 interface Props {
   conversationId: string;
