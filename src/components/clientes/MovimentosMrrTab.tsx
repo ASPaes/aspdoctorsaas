@@ -48,6 +48,7 @@ export default function MovimentosMrrTab() {
   });
   const [tipoFilter, setTipoFilter] = useState("");
   const [funcionarioFilter, setFuncionarioFilter] = useState("");
+  const [fornecedorFilter, setFornecedorFilter] = useState("");
   const [sortField, setSortField] = useState<SortField>("data_movimento");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -56,12 +57,12 @@ export default function MovimentosMrrTab() {
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
 
   const { data: movimentos, isLoading } = useQuery({
-    queryKey: ["movimentos_mrr_list", periodo, tipoFilter, funcionarioFilter, tid],
+    queryKey: ["movimentos_mrr_list", periodo, tipoFilter, funcionarioFilter, fornecedorFilter, tid],
     queryFn: async () => {
       const data = await fetchAllRows<any>(() => {
         let q = supabase
           .from("movimentos_mrr")
-          .select("id, tipo, valor_delta, custo_delta, valor_venda_avulsa, data_movimento, descricao, status, estornado_por, estorno_de, cliente_id, funcionario_id, origem_venda, criado_em")
+          .select("id, tipo, valor_delta, custo_delta, valor_venda_avulsa, data_movimento, descricao, status, estornado_por, estorno_de, cliente_id, funcionario_id, fornecedor_id, origem_venda, criado_em")
           .eq("status", "ativo")
           .is("estornado_por", null)
           .is("estorno_de", null)
@@ -73,11 +74,38 @@ export default function MovimentosMrrTab() {
         if (periodo.to) q = q.lte("data_movimento", format(periodo.to, "yyyy-MM-dd"));
         if (tipoFilter) q = q.eq("tipo", tipoFilter as any);
         if (funcionarioFilter) q = q.eq("funcionario_id", Number(funcionarioFilter));
+        if (fornecedorFilter === "__null__") {
+          q = q.is("fornecedor_id", null);
+        } else if (fornecedorFilter) {
+          q = q.eq("fornecedor_id", Number(fornecedorFilter));
+        }
 
         return q;
       });
       return data || [];
     },
+  });
+
+  const { data: fornecedores } = useQuery({
+    queryKey: ["movimentos_mrr_fornecedores", tid],
+    queryFn: async () => {
+      if (!tid) return [];
+      const { data: idsRaw } = await supabase
+        .from("movimentos_mrr")
+        .select("fornecedor_id")
+        .eq("tenant_id", tid)
+        .not("fornecedor_id", "is", null);
+      const ids = [...new Set((idsRaw || []).map((x: any) => x.fornecedor_id))].filter(Boolean);
+      if (!ids.length) return [];
+      const { data } = await supabase
+        .from("fornecedores")
+        .select("id, nome")
+        .eq("tenant_id", tid)
+        .in("id", ids as any)
+        .order("nome", { ascending: true });
+      return data || [];
+    },
+    enabled: !!tid,
   });
 
   // Fetch client names for display
@@ -193,6 +221,19 @@ export default function MovimentosMrrTab() {
             <SelectContent>
               <SelectItem value="__all__">Todos</SelectItem>
               {lookups.funcionarios.data?.map(f => (
+                <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Fornecedor</label>
+          <Select value={fornecedorFilter || "__all__"} onValueChange={(v) => setFornecedorFilter(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="h-9 w-[220px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todos os fornecedores</SelectItem>
+              <SelectItem value="__null__">Sem fornecedor</SelectItem>
+              {fornecedores?.map(f => (
                 <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>
               ))}
             </SelectContent>

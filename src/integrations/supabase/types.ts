@@ -3068,6 +3068,7 @@ export type Database = {
           descricao: string | null
           estornado_por: string | null
           estorno_de: string | null
+          fornecedor_id: number | null
           funcionario_id: number | null
           id: string
           inativado_em: string | null
@@ -3089,6 +3090,7 @@ export type Database = {
           descricao?: string | null
           estornado_por?: string | null
           estorno_de?: string | null
+          fornecedor_id?: number | null
           funcionario_id?: number | null
           id?: string
           inativado_em?: string | null
@@ -3110,6 +3112,7 @@ export type Database = {
           descricao?: string | null
           estornado_por?: string | null
           estorno_de?: string | null
+          fornecedor_id?: number | null
           funcionario_id?: number | null
           id?: string
           inativado_em?: string | null
@@ -3162,6 +3165,13 @@ export type Database = {
             columns: ["estorno_de"]
             isOneToOne: false
             referencedRelation: "movimentos_mrr"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
             referencedColumns: ["id"]
           },
           {
