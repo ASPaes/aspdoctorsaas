@@ -431,6 +431,16 @@ export default function OmieVinculosTab() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {isSugestaoPendente(key, p, false) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isSaving}
+                          onClick={() => salvarProduto(p, selecoes[key])}
+                        >
+                          Confirmar vínculo
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );
