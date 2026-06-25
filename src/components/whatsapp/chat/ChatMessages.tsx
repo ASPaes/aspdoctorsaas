@@ -64,6 +64,7 @@ export function ChatMessages({
 }: Props) {
   const { messages, isLoading, onNewMessage, fetchNextPage, hasNextPage, isFetchingNextPage } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
+  const { notes, deleteNote } = useConversationNotes(conversationId);
   const { timezone } = useAppTimezone();
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
