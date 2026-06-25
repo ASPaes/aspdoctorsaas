@@ -12,6 +12,7 @@ import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, Refr
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { ContactHistoryUnifiedModal } from "./ContactHistoryUnifiedModal";
+import { ContactTicketsSection } from "./ContactTicketsSection";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { CSTicketAlert } from "./CSTicketAlert";
 import { useConversationNotes } from "../hooks/useConversationNotes";
