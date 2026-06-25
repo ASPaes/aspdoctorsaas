@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface ConversationNote {
   id: string;
@@ -16,6 +17,7 @@ export interface ConversationNote {
 
 export const useConversationNotes = (conversationId: string | null) => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const { data: notes, isLoading, refetch } = useQuery({
     queryKey: ['conversation-notes', conversationId],
@@ -81,7 +83,7 @@ export const useConversationNotes = (conversationId: string | null) => {
 
   const createNote = useMutation({
     mutationFn: async (content: string) => {
-      const { error } = await supabase.from('whatsapp_conversation_notes').insert({ conversation_id: conversationId, content } as any);
+      const { error } = await supabase.from('whatsapp_conversation_notes').insert({ conversation_id: conversationId, content, created_by: user?.id } as any);
       if (error) throw error;
     },
     onSuccess: () => {
