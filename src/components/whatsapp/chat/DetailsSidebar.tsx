@@ -224,8 +224,8 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
           <CollapsibleSection
             icon={<Ticket className="h-3.5 w-3.5" />}
             title="Histórico de Tickets"
-            open={true}
-            onOpenChange={() => {}}
+            open={ticketsOpen}
+            onOpenChange={setTicketsOpen}
           >
             <ContactTicketsSection clienteId={(metadata?.cliente_id as string) || null} />
           </CollapsibleSection>
