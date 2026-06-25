@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert } from "lucide-react";
+import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert, Pin } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { ContactHistoryUnifiedModal } from "./ContactHistoryUnifiedModal";
@@ -71,6 +71,24 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const [summariesOpen, setSummariesOpen] = useState(false);
   const [kbOpen, setKbOpen] = useState(true);
   const [kbEditOpen, setKbEditOpen] = useState(false);
+  const [pinnedOpen, setPinnedOpen] = useState(true);
+
+  // Pinned contact notes (persistem entre todos os atendimentos do contato)
+  const [pinnedNotes, setPinnedNotes] = useState(contact?.notes || "");
+  const [pinnedDirty, setPinnedDirty] = useState(false);
+  useEffect(() => {
+    setPinnedNotes(contact?.notes || "");
+    setPinnedDirty(false);
+  }, [contact?.id, contact?.notes]);
+
+  const handleSavePinnedNotes = () => {
+    if (!contact?.id) return;
+    updateContact({
+      contactId: contact.id,
+      data: { name: contact.name || "", notes: pinnedNotes.trim() || null },
+    });
+    setPinnedDirty(false);
+  };
 
   // Find latest closed attendance for this conversation (for KB section)
   const { data: latestClosedAttendance } = useQuery({
