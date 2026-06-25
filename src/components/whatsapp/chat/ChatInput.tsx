@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Send, Mic, Paperclip, Maximize2, Minimize2, FileText, AlertTriangle, StickyNote } from "lucide-react";
 import { useConversationNotes } from "../hooks/useConversationNotes";
+import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmojiPickerButton } from "./input/EmojiPickerButton";
 import { AIComposerButton } from "./input/AIComposerButton";
