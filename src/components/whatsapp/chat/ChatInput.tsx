@@ -689,9 +689,6 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
             : "Enter para enviar, Shift+Enter para nova linha"}
         </p>
       </div>
-        </div>
-        <p className="text-xs text-muted-foreground mt-1">Enter para enviar, Shift+Enter para nova linha</p>
-      </div>
 
       {isMeta && metaWindow?.instanceId && contactPhone && (
         <MetaTemplatePicker
