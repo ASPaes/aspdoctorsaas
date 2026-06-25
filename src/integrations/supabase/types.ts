@@ -9051,6 +9051,7 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: Json
       }
+      salvar_integracao_omie: { Args: { p_chave: string }; Returns: Json }
       scan_ura_battle_conversations: {
         Args: {
           p_days?: number

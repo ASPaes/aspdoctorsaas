@@ -332,13 +332,24 @@ export function MovimentosMrrModal({
   const mrrAjustado = mensalidadeBase + somaMovimentosAtivos;
   const custoAjustado = custoBase + somaCustoMovimentos;
 
-  const totalUpsell = movimentosAtivos.filter(m => m.tipo === 'upsell').reduce((sum, m) => sum + m.valor_delta, 0);
-  const totalCrossSell = movimentosAtivos.filter(m => m.tipo === 'cross_sell').reduce((sum, m) => sum + m.valor_delta, 0);
-  const totalDownsell = movimentosAtivos.filter(m => m.tipo === 'downsell').reduce((sum, m) => sum + Math.abs(m.valor_delta), 0);
+  const upsellItems = movimentosAtivos.filter(m => m.tipo === 'upsell');
+  const crossSellItems = movimentosAtivos.filter(m => m.tipo === 'cross_sell');
+  const downsellItems = movimentosAtivos.filter(m => m.tipo === 'downsell');
+  const reajusteItems = movimentosAtivos.filter(m => m.tipo === 'reajuste');
 
-  const totalCustoUpsell = movimentosAtivos.filter(m => m.tipo === 'upsell').reduce((sum, m) => sum + (m.custo_delta || 0), 0);
-  const totalCustoCrossSell = movimentosAtivos.filter(m => m.tipo === 'cross_sell').reduce((sum, m) => sum + (m.custo_delta || 0), 0);
-  const totalCustoDownsell = movimentosAtivos.filter(m => m.tipo === 'downsell').reduce((sum, m) => sum + Math.abs(m.custo_delta || 0), 0);
+  const totalUpsell = upsellItems.reduce((sum, m) => sum + m.valor_delta, 0);
+  const totalCrossSell = crossSellItems.reduce((sum, m) => sum + m.valor_delta, 0);
+  const totalDownsell = downsellItems.reduce((sum, m) => sum + Math.abs(m.valor_delta), 0);
+
+  const qtdUpsell = upsellItems.length;
+  const qtdCrossSell = crossSellItems.length;
+  const qtdDownsell = downsellItems.length;
+  const qtdReajuste = reajusteItems.length;
+  const qtdVendasAvulsas = vendasAvulsasAtivas.length;
+
+  const totalCustoUpsell = upsellItems.reduce((sum, m) => sum + (m.custo_delta || 0), 0);
+  const totalCustoCrossSell = crossSellItems.reduce((sum, m) => sum + (m.custo_delta || 0), 0);
+  const totalCustoDownsell = downsellItems.reduce((sum, m) => sum + Math.abs(m.custo_delta || 0), 0);
 
   const getFuncionarioNome = (id: number | null) => {
     if (!id) return '-';
@@ -496,6 +507,7 @@ export function MovimentosMrrModal({
               </CardHeader>
               <CardContent className="py-1 px-3">
                 <p className="text-lg font-bold text-green-600">+{formatCurrency(totalUpsell)}</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">{qtdUpsell} {qtdUpsell === 1 ? 'movimento' : 'movimentos'}</p>
                 <p className="text-xs text-muted-foreground">Custo: +{formatCurrency(totalCustoUpsell)}</p>
               </CardContent>
             </Card>
@@ -507,6 +519,7 @@ export function MovimentosMrrModal({
               </CardHeader>
               <CardContent className="py-1 px-3">
                 <p className="text-lg font-bold text-blue-600">+{formatCurrency(totalCrossSell)}</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">{qtdCrossSell} {qtdCrossSell === 1 ? 'movimento' : 'movimentos'}</p>
                 <p className="text-xs text-muted-foreground">Custo: +{formatCurrency(totalCustoCrossSell)}</p>
               </CardContent>
             </Card>
@@ -518,6 +531,7 @@ export function MovimentosMrrModal({
               </CardHeader>
               <CardContent className="py-1 px-3">
                 <p className="text-lg font-bold text-orange-600">-{formatCurrency(totalDownsell)}</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">{qtdDownsell} {qtdDownsell === 1 ? 'movimento' : 'movimentos'}</p>
                 <p className="text-xs text-muted-foreground">Custo: -{formatCurrency(totalCustoDownsell)}</p>
               </CardContent>
             </Card>
@@ -529,6 +543,7 @@ export function MovimentosMrrModal({
               </CardHeader>
               <CardContent className="py-1 px-3">
                 <p className="text-lg font-bold text-purple-600">{formatCurrency(totalVendasAvulsas)}</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">{qtdVendasAvulsas} {qtdVendasAvulsas === 1 ? 'movimento' : 'movimentos'}</p>
                 <p className="text-xs text-muted-foreground">Não afeta MRR</p>
               </CardContent>
             </Card>
@@ -540,6 +555,7 @@ export function MovimentosMrrModal({
               </CardHeader>
               <CardContent className="py-1 px-3">
                 <p className="text-lg font-bold text-cyan-500">+{formatCurrency(totalReajuste)}</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">{qtdReajuste} {qtdReajuste === 1 ? 'movimento' : 'movimentos'}</p>
                 <p className="text-muted-foreground text-[9px]">Não afeta MRR</p>
               </CardContent>
             </Card>
