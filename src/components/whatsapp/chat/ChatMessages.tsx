@@ -36,7 +36,8 @@ interface Props {
 
 type TimelineItem =
   | { type: 'message'; msg: Message }
-  | { type: 'transfer'; event: AssignmentEvent };
+  | { type: 'transfer'; event: AssignmentEvent }
+  | { type: 'note'; note: ConversationNote };
 
 const NEAR_BOTTOM_THRESHOLD = 150;
 const TOP_LOAD_THRESHOLD = 120;
