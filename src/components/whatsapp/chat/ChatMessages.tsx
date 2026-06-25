@@ -10,7 +10,8 @@ import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages"
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { formatDateLabel, formatTime } from "@/lib/formatDateWithTimezone";
 import { useConversationAssignmentHistory, type AssignmentEvent } from "../hooks/useConversationAssignmentHistory";
-import { ArrowRightLeft, ChevronDown, Loader2 } from "lucide-react";
+import { useConversationNotes, type ConversationNote } from "../hooks/useConversationNotes";
+import { ArrowRightLeft, ChevronDown, Loader2, StickyNote, Trash2 } from "lucide-react";
 
 interface Props {
   conversationId: string;
@@ -35,7 +36,8 @@ interface Props {
 
 type TimelineItem =
   | { type: 'message'; msg: Message }
-  | { type: 'transfer'; event: AssignmentEvent };
+  | { type: 'transfer'; event: AssignmentEvent }
+  | { type: 'note'; note: ConversationNote };
 
 const NEAR_BOTTOM_THRESHOLD = 150;
 const TOP_LOAD_THRESHOLD = 120;
@@ -62,6 +64,7 @@ export function ChatMessages({
 }: Props) {
   const { messages, isLoading, onNewMessage, fetchNextPage, hasNextPage, isFetchingNextPage } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
+  const { notes, deleteNote } = useConversationNotes(conversationId);
   const { timezone } = useAppTimezone();
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -165,7 +168,14 @@ export function ChatMessages({
     setInternalHighlight(target.id);
   }, [messagesByExternalId]);
 
-  // Merge messages and assignment events into a single timeline
+  // Helper: timestamp de qualquer item da timeline
+  const itemTimestamp = (item: TimelineItem): string => {
+    if (item.type === 'message') return item.msg.timestamp;
+    if (item.type === 'transfer') return item.event.created_at;
+    return item.note.created_at;
+  };
+
+  // Merge messages, assignment events e notas internas em uma única timeline
   const timelineItems = useMemo(() => {
     const items: TimelineItem[] = messages
       .filter(msg => msg.message_type !== 'reaction')
@@ -175,13 +185,14 @@ export function ChatMessages({
         items.push({ type: 'transfer' as const, event });
       }
     }
-    items.sort((a, b) => {
-      const tA = a.type === 'message' ? a.msg.timestamp : a.event.created_at;
-      const tB = b.type === 'message' ? b.msg.timestamp : b.event.created_at;
-      return new Date(tA).getTime() - new Date(tB).getTime();
-    });
+    if (notes && notes.length > 0) {
+      for (const note of notes) {
+        items.push({ type: 'note' as const, note });
+      }
+    }
+    items.sort((a, b) => new Date(itemTimestamp(a)).getTime() - new Date(itemTimestamp(b)).getTime());
     return items;
-  }, [messages, assignments, isGroup]);
+  }, [messages, assignments, isGroup, notes]);
 
   // Compute the ID of the first unread incoming message
   const firstUnreadId = useMemo(() => {
@@ -197,7 +208,7 @@ export function ChatMessages({
     const groups: { date: string; items: TimelineItem[] }[] = [];
     let currentDate = '';
     for (const item of timelineItems) {
-      const ts = item.type === 'message' ? item.msg.timestamp : item.event.created_at;
+      const ts = itemTimestamp(item);
       const d = formatDateLabel(ts, timezone);
       if (d !== currentDate) {
         currentDate = d;
@@ -392,14 +403,48 @@ export function ChatMessages({
                   );
                 }
 
+                if (item.type === 'transfer') {
+                  return (
+                    <div key={`transfer-${item.event.id}`} className="flex justify-center my-2">
+                      <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full">
+                        <ArrowRightLeft className="h-3 w-3" />
+                        Transferido para {item.event.agent_name || 'Agente'}
+                        {item.event.agent_role ? ` · ${item.event.agent_role}` : ''}
+                        <span className="opacity-60 ml-1">{formatTime(item.event.created_at, timezone)}</span>
+                      </span>
+                    </div>
+                  );
+                }
+
+                // Nota interna — visível apenas para a equipe
                 return (
-                  <div key={`transfer-${item.event.id}`} className="flex justify-center my-2">
-                    <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full">
-                      <ArrowRightLeft className="h-3 w-3" />
-                      Transferido para {item.event.agent_name || 'Agente'}
-                      {item.event.agent_role ? ` · ${item.event.agent_role}` : ''}
-                      <span className="opacity-60 ml-1">{formatTime(item.event.created_at, timezone)}</span>
-                    </span>
+                  <div key={`note-${item.note.id}`} className="flex justify-center my-2 group">
+                    <div className="max-w-[85%] flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 shadow-sm">
+                      <StickyNote className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                            Nota interna
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatTime(item.note.created_at, timezone)}
+                          </span>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap break-words text-foreground/90">
+                          {item.note.content}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm('Excluir esta nota interna?')) deleteNote(item.note.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-1"
+                        aria-label="Excluir nota"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}

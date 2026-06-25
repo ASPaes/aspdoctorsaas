@@ -6,7 +6,9 @@ import { useMetaWindow } from "@/hooks/useMetaWindow";
 import { MetaTemplatePicker } from "@/components/whatsapp/templates/MetaTemplatePicker";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Send, Mic, Paperclip, Maximize2, Minimize2, FileText, AlertTriangle } from "lucide-react";
+import { Send, Mic, Paperclip, Maximize2, Minimize2, FileText, AlertTriangle, StickyNote } from "lucide-react";
+import { useConversationNotes } from "../hooks/useConversationNotes";
+import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmojiPickerButton } from "./input/EmojiPickerButton";
 import { AIComposerButton } from "./input/AIComposerButton";
@@ -51,6 +53,8 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeMacro, setActiveMacro] = useState<{ id: string; content: string; permite_edicao_livre: boolean; media_type?: string | null; media_path?: string | null } | null>(null);
+  const [isInternalNote, setIsInternalNote] = useState(false);
+  const { createNote, isCreating: isCreatingNote } = useConversationNotes(conversationId);
 
   const MAX_FILE_SIZE_MB = 100;
   const WARN_FILE_SIZE_MB = 60;
@@ -220,6 +224,18 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   }, [isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
 
   const handleSend = useCallback(() => {
+    // Nota interna: salva no whatsapp_conversation_notes, NÃO envia ao cliente
+    if (isInternalNote) {
+      const content = message.trim();
+      if (!content) return;
+      if (isCreatingNote) return;
+      createNote(content);
+      setMessage("");
+      onCancelReply?.();
+      requestAnimationFrame(() => textareaRef.current?.focus());
+      setTimeout(() => textareaRef.current?.focus(), 100);
+      return;
+    }
     if (attachedFile) {
       sendAttachedFile(attachedFile, message.trim() || undefined);
       return;
@@ -244,7 +260,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         onError: (err: any) => { toast.error(err.message || "Erro ao enviar mensagem"); },
       }
     );
-  }, [attachedFile, sendAttachedFile, message, isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
+  }, [isInternalNote, isCreatingNote, createNote, attachedFile, sendAttachedFile, message, isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
 
   const handleSendMedia = useCallback((params: MediaSendParams) => {
     if (isBlocked) {
@@ -470,7 +486,42 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         onRefresh={refresh}
       />
 
-      <div className="p-4">
+      <div className={cn("p-4", isInternalNote && "bg-amber-500/5 border-t-2 border-amber-500/60")}> 
+        {/* Toggle: Mensagem ao cliente vs. Nota interna */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
+            <button
+              type="button"
+              onClick={() => setIsInternalNote(false)}
+              className={cn(
+                "px-3 py-1 transition-colors flex items-center gap-1.5",
+                !isInternalNote ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:bg-muted"
+              )}
+              aria-pressed={!isInternalNote}
+            >
+              <Send className="w-3 h-3" />
+              Mensagem ao cliente
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsInternalNote(true)}
+              className={cn(
+                "px-3 py-1 transition-colors flex items-center gap-1.5 border-l border-border",
+                isInternalNote ? "bg-amber-500 text-amber-950" : "bg-transparent text-muted-foreground hover:bg-muted"
+              )}
+              aria-pressed={isInternalNote}
+            >
+              <StickyNote className="w-3 h-3" />
+              Nota interna
+            </button>
+          </div>
+          {isInternalNote && (
+            <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
+              Visível apenas para a equipe — não enviada ao cliente
+            </span>
+          )}
+        </div>
+
         {requiresTemplate && (
           <div className="flex items-start gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 mb-2">
             <AlertTriangle className="w-4 h-4 mt-0.5 text-amber-600 shrink-0" />
@@ -526,22 +577,24 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         <div className="relative flex gap-2 items-end">
           {showMacroSuggestions && <MacroSuggestions macros={filteredMacros} onSelect={handleMacroSelect} selectedIndex={macroSelectedIndex} onClose={() => setShowMacroSuggestions(false)} />}
 
-          <EmojiPickerButton onEmojiSelect={handleEmojiSelect} disabled={sendMutation.isPending || isBlocked} />
+          <EmojiPickerButton onEmojiSelect={handleEmojiSelect} disabled={sendMutation.isPending || isBlocked || isInternalNote} />
 
           {/* File attach button */}
           <input ref={fileInputRef} type="file" accept="*/*" onChange={handleFileSelect} className="hidden" />
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={sendMutation.isPending || isBlocked}
-            aria-label="Anexar arquivo"
-          >
-            <Paperclip className="w-5 h-5" />
-          </Button>
+          {!isInternalNote && (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sendMutation.isPending || isBlocked}
+              aria-label="Anexar arquivo"
+            >
+              <Paperclip className="w-5 h-5" />
+            </Button>
+          )}
 
-          {isMeta && !requiresTemplate && (
+          {!isInternalNote && isMeta && !requiresTemplate && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -559,7 +612,9 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
             </Tooltip>
           )}
 
-          <AIComposerButton message={message} onComposed={(newMessage) => setMessage(newMessage)} disabled={sendMutation.isPending || isBlocked} />
+          {!isInternalNote && (
+            <AIComposerButton message={message} onComposed={(newMessage) => setMessage(newMessage)} disabled={sendMutation.isPending || isBlocked} />
+          )}
 
           <div className="relative flex-1">
             <Textarea
@@ -569,7 +624,9 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={
-                activeMacro
+                isInternalNote
+                  ? "Escreva uma nota interna para a equipe (n\u{00E3}o ser\u{00E1} enviada ao cliente)..."
+                  : activeMacro
                   ? "Preencha o template acima..."
                   : isBlocked
                   ? "Voc\u{00EA} precisa estar ATIVO para atender."
@@ -577,14 +634,17 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
                   ? "Janela de 24h fechada \u2014 use um template Meta"
                   : "Digite uma mensagem..."
               }
-              className="resize-none pr-8"
+              className={cn(
+                "resize-none pr-8",
+                isInternalNote && "border-amber-500/70 focus-visible:ring-amber-500/40 bg-amber-50 dark:bg-amber-950/20"
+              )}
               style={{
                 minHeight: '44px',
                 height: isExpanded ? '400px' : undefined,
                 maxHeight: isExpanded ? '400px' : '200px',
                 overflowY: isExpanded ? 'auto' : undefined,
               }}
-              disabled={isBlocked || requiresTemplate || !!activeMacro}
+              disabled={(!isInternalNote && (isBlocked || requiresTemplate)) || !!activeMacro}
             />
             <Button
               type="button"
@@ -598,7 +658,22 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
             </Button>
           </div>
 
-          {hasContent ? (
+          {isInternalNote ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={handleSend}
+                  size="icon"
+                  disabled={!message.trim() || isCreatingNote}
+                  className="bg-amber-500 hover:bg-amber-600 text-amber-950"
+                  aria-label="Salvar nota interna"
+                >
+                  <StickyNote className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Salvar nota interna</TooltipContent>
+            </Tooltip>
+          ) : hasContent ? (
             <Button onClick={handleSend} size="icon" disabled={isBlocked || requiresTemplate}>
               <Send className="w-4 h-4" />
             </Button>
@@ -608,7 +683,11 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
             </Button>
           )}
         </div>
-        <p className="text-xs text-muted-foreground mt-1">Enter para enviar, Shift+Enter para nova linha</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {isInternalNote
+            ? "Enter para salvar a nota, Shift+Enter para nova linha"
+            : "Enter para enviar, Shift+Enter para nova linha"}
+        </p>
       </div>
 
       {isMeta && metaWindow?.instanceId && contactPhone && (
