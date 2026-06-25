@@ -223,6 +223,18 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   }, [isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
 
   const handleSend = useCallback(() => {
+    // Nota interna: salva no whatsapp_conversation_notes, NÃO envia ao cliente
+    if (isInternalNote) {
+      const content = message.trim();
+      if (!content) return;
+      if (isCreatingNote) return;
+      createNote(content);
+      setMessage("");
+      onCancelReply?.();
+      requestAnimationFrame(() => textareaRef.current?.focus());
+      setTimeout(() => textareaRef.current?.focus(), 100);
+      return;
+    }
     if (attachedFile) {
       sendAttachedFile(attachedFile, message.trim() || undefined);
       return;
@@ -247,7 +259,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         onError: (err: any) => { toast.error(err.message || "Erro ao enviar mensagem"); },
       }
     );
-  }, [attachedFile, sendAttachedFile, message, isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
+  }, [isInternalNote, isCreatingNote, createNote, attachedFile, sendAttachedFile, message, isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
 
   const handleSendMedia = useCallback((params: MediaSendParams) => {
     if (isBlocked) {
