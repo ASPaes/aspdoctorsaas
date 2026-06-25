@@ -577,22 +577,24 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         <div className="relative flex gap-2 items-end">
           {showMacroSuggestions && <MacroSuggestions macros={filteredMacros} onSelect={handleMacroSelect} selectedIndex={macroSelectedIndex} onClose={() => setShowMacroSuggestions(false)} />}
 
-          <EmojiPickerButton onEmojiSelect={handleEmojiSelect} disabled={sendMutation.isPending || isBlocked} />
+          <EmojiPickerButton onEmojiSelect={handleEmojiSelect} disabled={sendMutation.isPending || isBlocked || isInternalNote} />
 
           {/* File attach button */}
           <input ref={fileInputRef} type="file" accept="*/*" onChange={handleFileSelect} className="hidden" />
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={sendMutation.isPending || isBlocked}
-            aria-label="Anexar arquivo"
-          >
-            <Paperclip className="w-5 h-5" />
-          </Button>
+          {!isInternalNote && (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sendMutation.isPending || isBlocked}
+              aria-label="Anexar arquivo"
+            >
+              <Paperclip className="w-5 h-5" />
+            </Button>
+          )}
 
-          {isMeta && !requiresTemplate && (
+          {!isInternalNote && isMeta && !requiresTemplate && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -610,7 +612,9 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
             </Tooltip>
           )}
 
-          <AIComposerButton message={message} onComposed={(newMessage) => setMessage(newMessage)} disabled={sendMutation.isPending || isBlocked} />
+          {!isInternalNote && (
+            <AIComposerButton message={message} onComposed={(newMessage) => setMessage(newMessage)} disabled={sendMutation.isPending || isBlocked} />
+          )}
 
           <div className="relative flex-1">
             <Textarea
@@ -620,7 +624,9 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={
-                activeMacro
+                isInternalNote
+                  ? "Escreva uma nota interna para a equipe (n\u{00E3}o ser\u{00E1} enviada ao cliente)..."
+                  : activeMacro
                   ? "Preencha o template acima..."
                   : isBlocked
                   ? "Voc\u{00EA} precisa estar ATIVO para atender."
@@ -628,14 +634,17 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
                   ? "Janela de 24h fechada \u2014 use um template Meta"
                   : "Digite uma mensagem..."
               }
-              className="resize-none pr-8"
+              className={cn(
+                "resize-none pr-8",
+                isInternalNote && "border-amber-500/70 focus-visible:ring-amber-500/40 bg-amber-50 dark:bg-amber-950/20"
+              )}
               style={{
                 minHeight: '44px',
                 height: isExpanded ? '400px' : undefined,
                 maxHeight: isExpanded ? '400px' : '200px',
                 overflowY: isExpanded ? 'auto' : undefined,
               }}
-              disabled={isBlocked || requiresTemplate || !!activeMacro}
+              disabled={(!isInternalNote && (isBlocked || requiresTemplate)) || !!activeMacro}
             />
             <Button
               type="button"
@@ -649,7 +658,22 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
             </Button>
           </div>
 
-          {hasContent ? (
+          {isInternalNote ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={handleSend}
+                  size="icon"
+                  disabled={!message.trim() || isCreatingNote}
+                  className="bg-amber-500 hover:bg-amber-600 text-amber-950"
+                  aria-label="Salvar nota interna"
+                >
+                  <StickyNote className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Salvar nota interna</TooltipContent>
+            </Tooltip>
+          ) : hasContent ? (
             <Button onClick={handleSend} size="icon" disabled={isBlocked || requiresTemplate}>
               <Send className="w-4 h-4" />
             </Button>
@@ -658,6 +682,13 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
               <Mic className="w-4 h-4" />
             </Button>
           )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          {isInternalNote
+            ? "Enter para salvar a nota, Shift+Enter para nova linha"
+            : "Enter para enviar, Shift+Enter para nova linha"}
+        </p>
+      </div>
         </div>
         <p className="text-xs text-muted-foreground mt-1">Enter para enviar, Shift+Enter para nova linha</p>
       </div>
