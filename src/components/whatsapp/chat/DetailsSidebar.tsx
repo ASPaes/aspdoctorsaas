@@ -219,6 +219,16 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
     Histórico do Contato
   </Button>
 
+          {/* ─── Histórico de Tickets do cliente ─── */}
+          <CollapsibleSection
+            icon={<Ticket className="h-3.5 w-3.5" />}
+            title="Histórico de Tickets"
+            open={true}
+            onOpenChange={() => {}}
+          >
+            <ContactTicketsSection clienteId={(metadata?.cliente_id as string) || null} />
+          </CollapsibleSection>
+
           {/* ─── Anotações fixas do contato (persistem entre atendimentos) ─── */}
           <CollapsibleSection
             icon={<Pin className="h-3.5 w-3.5" />}
