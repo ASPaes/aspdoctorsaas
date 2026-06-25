@@ -49,7 +49,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [showMacroSuggestions, setShowMacroSuggestions] = useState(false);
   const [filteredMacros, setFilteredMacros] = useState<any[]>([]);
   const [macroSelectedIndex, setMacroSelectedIndex] = useState(0);
-  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeMacro, setActiveMacro] = useState<{ id: string; content: string; permite_edicao_livre: boolean; media_type?: string | null; media_path?: string | null } | null>(null);
@@ -58,23 +58,60 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
 
   const MAX_FILE_SIZE_MB = 100;
   const WARN_FILE_SIZE_MB = 60;
+  const MAX_FILES = 10;
 
-  const validateAndAttachFile = (file: File) => {
+  const validateAndAttachFiles = (incoming: FileList | File[]) => {
+    const arr = Array.from(incoming);
+    if (arr.length === 0) return;
     const maxBytes = MAX_FILE_SIZE_MB * 1024 * 1024;
     const warnBytes = WARN_FILE_SIZE_MB * 1024 * 1024;
-    if (file.size > maxBytes) {
-      toast.error("Arquivo muito grande", {
-        description: "O limite máximo é de 100MB. Selecione um arquivo menor.",
-      });
-      return;
-    }
-    if (file.size > warnBytes) {
-      toast.warning("Arquivo grande", {
-        description: "Arquivos acima de 60MB podem falhar no envio pelo WhatsApp.",
-      });
-    }
-    setAttachedFile(file);
+
+    setAttachedFiles((prev) => {
+      const remaining = MAX_FILES - prev.length;
+      if (remaining <= 0) {
+        toast.error("Limite de anexos atingido", {
+          description: `Você pode anexar no máximo ${MAX_FILES} arquivos por mensagem.`,
+        });
+        return prev;
+      }
+
+      const accepted: File[] = [];
+      let rejectedBySize = 0;
+      let warnedBySize = 0;
+
+      for (const file of arr) {
+        if (accepted.length >= remaining) break;
+        if (file.size > maxBytes) {
+          rejectedBySize++;
+          continue;
+        }
+        if (file.size > warnBytes) warnedBySize++;
+        accepted.push(file);
+      }
+
+      const skippedByLimit = arr.length - accepted.length - rejectedBySize;
+
+      if (rejectedBySize > 0) {
+        toast.error(
+          rejectedBySize === 1 ? "Arquivo muito grande" : `${rejectedBySize} arquivos muito grandes`,
+          { description: `O limite máximo por arquivo é de ${MAX_FILE_SIZE_MB}MB.` }
+        );
+      }
+      if (skippedByLimit > 0) {
+        toast.error("Limite de anexos excedido", {
+          description: `Você pode anexar no máximo ${MAX_FILES} arquivos. ${skippedByLimit} arquivo(s) não foram adicionados.`,
+        });
+      }
+      if (warnedBySize > 0) {
+        toast.warning("Arquivo grande", {
+          description: `Arquivos acima de ${WARN_FILE_SIZE_MB}MB podem falhar no envio pelo WhatsApp.`,
+        });
+      }
+
+      return accepted.length > 0 ? [...prev, ...accepted] : prev;
+    });
   };
+
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -190,38 +227,67 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     setMacroSelectedIndex(0);
   }, [filteredMacros]);
 
-  // Send attached file as media
+  // Send a single attached file as media
+  const sendOneFile = useCallback(async (file: File, caption?: string) => {
+    const messageType = getMessageType(file.type || 'application/octet-stream');
+    await sendMutation.mutateAsync({
+      conversationId,
+      content: caption || undefined,
+      messageType,
+      file,
+      mediaMimetype: file.type || 'application/octet-stream',
+      fileName: file.name,
+      quotedMessageId: replyTo?.message_id || undefined,
+    });
+  }, [sendMutation, conversationId, replyTo]);
+
+  // Backward-compatible helper used by macro flow
   const sendAttachedFile = useCallback(async (file: File, caption?: string) => {
     if (isBlocked) {
       toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
       return;
     }
     if (sendMutation.isPending) return;
+    try {
+      await sendOneFile(file, caption);
+      setAttachedFiles([]);
+      setMessage("");
+      onCancelReply?.();
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setTimeout(() => textareaRef.current?.focus(), 50);
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao enviar mídia");
+    }
+  }, [isBlocked, sendMutation.isPending, sendOneFile, onCancelReply]);
 
-    const messageType = getMessageType(file.type || 'application/octet-stream');
-
-    sendMutation.mutate(
-      {
-        conversationId,
-        content: caption || undefined,
-        messageType,
-        file,
-        mediaMimetype: file.type || 'application/octet-stream',
-        fileName: file.name,
-        quotedMessageId: replyTo?.message_id || undefined,
-      },
-      {
-        onSuccess: () => {
-          setAttachedFile(null);
-          setMessage("");
-          onCancelReply?.();
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          setTimeout(() => textareaRef.current?.focus(), 50);
-        },
-        onError: (err: any) => { toast.error(err.message || "Erro ao enviar mídia"); },
+  const sendAttachedFilesAll = useCallback(async (files: File[], caption?: string) => {
+    if (isBlocked) {
+      toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
+      return;
+    }
+    if (sendMutation.isPending) return;
+    let sent = 0;
+    let failed = 0;
+    for (let i = 0; i < files.length; i++) {
+      try {
+        await sendOneFile(files[i], i === 0 ? caption : undefined);
+        sent++;
+      } catch (err: any) {
+        failed++;
+        toast.error(`Falha ao enviar "${files[i].name}"`, { description: err?.message });
       }
-    );
-  }, [isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
+    }
+    if (sent > 0) {
+      setAttachedFiles([]);
+      setMessage("");
+      onCancelReply?.();
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setTimeout(() => textareaRef.current?.focus(), 50);
+    }
+    if (sent > 1 && failed === 0) {
+      toast.success(`${sent} arquivos enviados`);
+    }
+  }, [isBlocked, sendMutation.isPending, sendOneFile, onCancelReply]);
 
   const handleSend = useCallback(() => {
     // Nota interna: salva no whatsapp_conversation_notes, NÃO envia ao cliente
@@ -236,8 +302,8 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
       setTimeout(() => textareaRef.current?.focus(), 100);
       return;
     }
-    if (attachedFile) {
-      sendAttachedFile(attachedFile, message.trim() || undefined);
+    if (attachedFiles.length > 0) {
+      sendAttachedFilesAll(attachedFiles, message.trim() || undefined);
       return;
     }
     // Normal text send
@@ -260,7 +326,8 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         onError: (err: any) => { toast.error(err.message || "Erro ao enviar mensagem"); },
       }
     );
-  }, [isInternalNote, isCreatingNote, createNote, attachedFile, sendAttachedFile, message, isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
+  }, [isInternalNote, isCreatingNote, createNote, attachedFiles, sendAttachedFilesAll, message, isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
+
 
   const handleSendMedia = useCallback((params: MediaSendParams) => {
     if (isBlocked) {
@@ -311,15 +378,16 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const handlePaste = useCallback((e: ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
+    const files: File[] = [];
     for (let i = 0; i < items.length; i++) {
       if (items[i].kind === 'file') {
-        const file = items[i].getAsFile();
-        if (file) {
-          e.preventDefault();
-          validateAndAttachFile(file);
-          return;
-        }
+        const f = items[i].getAsFile();
+        if (f) files.push(f);
       }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      validateAndAttachFiles(files);
     }
   }, []);
 
@@ -340,15 +408,17 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    const file = e.dataTransfer?.files?.[0];
-    if (file) validateAndAttachFile(file);
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) validateAndAttachFiles(files);
   }, []);
 
   // File input handler
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) validateAndAttachFile(file);
+    const files = e.target.files;
+    if (files && files.length > 0) validateAndAttachFiles(files);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
+
 
   const handleEmojiSelect = (emoji: string) => {
     if (!textareaRef.current) return;
@@ -459,7 +529,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     );
   }
 
-  const hasContent = message.trim() || attachedFile;
+  const hasContent = message.trim() || attachedFiles.length > 0;
 
   return (
     <div
@@ -554,12 +624,22 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           </Tooltip>
         )}
 
-        {/* Attachment chip */}
-        {attachedFile && (
-          <div className="mb-2">
-            <AttachmentChip file={attachedFile} onRemove={() => { setAttachedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} />
+        {/* Attachment chips */}
+        {attachedFiles.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {attachedFiles.map((f, idx) => (
+              <AttachmentChip
+                key={`${f.name}-${idx}-${f.size}`}
+                file={f}
+                onRemove={() => setAttachedFiles((prev) => prev.filter((_, i) => i !== idx))}
+              />
+            ))}
+            <span className="text-[11px] text-muted-foreground self-center">
+              {attachedFiles.length}/{MAX_FILES} arquivos
+            </span>
           </div>
         )}
+
 
         {activeMacro && (
           <MacroFillCard
@@ -580,7 +660,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           <EmojiPickerButton onEmojiSelect={handleEmojiSelect} disabled={sendMutation.isPending || isBlocked || isInternalNote} />
 
           {/* File attach button */}
-          <input ref={fileInputRef} type="file" accept="*/*" onChange={handleFileSelect} className="hidden" />
+          <input ref={fileInputRef} type="file" accept="*/*" multiple onChange={handleFileSelect} className="hidden" />
           {!isInternalNote && (
             <Button
               type="button"
