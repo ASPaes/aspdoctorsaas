@@ -90,19 +90,18 @@ export default function MovimentosMrrTab() {
     queryKey: ["movimentos_mrr_fornecedores", tid],
     queryFn: async () => {
       if (!tid) return [];
+      const { data: idsRaw } = await supabase
+        .from("movimentos_mrr")
+        .select("fornecedor_id")
+        .eq("tenant_id", tid)
+        .not("fornecedor_id", "is", null);
+      const ids = [...new Set((idsRaw || []).map((x: any) => x.fornecedor_id))].filter(Boolean);
+      if (!ids.length) return [];
       const { data } = await supabase
         .from("fornecedores")
         .select("id, nome")
         .eq("tenant_id", tid)
-        .in(
-          "id",
-          (await supabase
-            .from("movimentos_mrr")
-            .select("fornecedor_id")
-            .eq("tenant_id", tid)
-            .not("fornecedor_id", "is", null)
-            .then((r: any) => [...new Set((r.data || []).map((x: any) => x.fornecedor_id))])) as any
-        )
+        .in("id", ids as any)
         .order("nome", { ascending: true });
       return data || [];
     },
