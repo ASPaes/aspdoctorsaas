@@ -265,29 +265,22 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
       toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
       return;
     }
-    if (sendMutation.isPending) return;
-    let sent = 0;
-    let failed = 0;
-    for (let i = 0; i < files.length; i++) {
-      try {
-        await sendOneFile(files[i], i === 0 ? caption : undefined);
-        sent++;
-      } catch (err: any) {
-        failed++;
-        toast.error(`Falha ao enviar "${files[i].name}"`, { description: err?.message });
-      }
-    }
-    if (sent > 0) {
-      setAttachedFiles([]);
-      setMessage("");
-      onCancelReply?.();
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      setTimeout(() => textareaRef.current?.focus(), 50);
-    }
-    if (sent > 1 && failed === 0) {
+    // Envio em paralelo — UI já foi limpa pelo handleSend
+    const results = await Promise.allSettled(
+      files.map((f, i) => sendOneFile(f, i === 0 ? caption : undefined))
+    );
+    const failed = results
+      .map((r, i) => ({ r, name: files[i].name }))
+      .filter((x) => x.r.status === "rejected");
+    const sent = files.length - failed.length;
+    failed.forEach(({ r, name }) => {
+      const reason: any = (r as PromiseRejectedResult).reason;
+      toast.error(`Falha ao enviar "${name}"`, { description: reason?.message });
+    });
+    if (sent > 1 && failed.length === 0) {
       toast.success(`${sent} arquivos enviados`);
     }
-  }, [isBlocked, sendMutation.isPending, sendOneFile, onCancelReply]);
+  }, [isBlocked, sendOneFile]);
 
   const handleSend = useCallback(() => {
     // Nota interna: salva no whatsapp_conversation_notes, NÃO envia ao cliente
@@ -303,9 +296,24 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
       return;
     }
     if (attachedFiles.length > 0) {
-      sendAttachedFilesAll(attachedFiles, message.trim() || undefined);
+      if (isBlocked) {
+        toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
+        return;
+      }
+      // Snapshot e limpa UI IMEDIATAMENTE para evitar duplo clique e dar feedback instantâneo
+      const filesSnapshot = attachedFiles;
+      const captionSnapshot = message.trim() || undefined;
+      setAttachedFiles([]);
+      setMessage("");
+      onCancelReply?.();
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      requestAnimationFrame(() => textareaRef.current?.focus());
+      setTimeout(() => textareaRef.current?.focus(), 100);
+      // Dispara envio em paralelo em background
+      void sendAttachedFilesAll(filesSnapshot, captionSnapshot);
       return;
     }
+
     // Normal text send
     if (isBlocked) {
       toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
