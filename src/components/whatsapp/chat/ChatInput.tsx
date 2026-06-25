@@ -485,7 +485,42 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         onRefresh={refresh}
       />
 
-      <div className="p-4">
+      <div className={cn("p-4", isInternalNote && "bg-amber-500/5 border-t-2 border-amber-500/60")}> 
+        {/* Toggle: Mensagem ao cliente vs. Nota interna */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
+            <button
+              type="button"
+              onClick={() => setIsInternalNote(false)}
+              className={cn(
+                "px-3 py-1 transition-colors flex items-center gap-1.5",
+                !isInternalNote ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:bg-muted"
+              )}
+              aria-pressed={!isInternalNote}
+            >
+              <Send className="w-3 h-3" />
+              Mensagem ao cliente
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsInternalNote(true)}
+              className={cn(
+                "px-3 py-1 transition-colors flex items-center gap-1.5 border-l border-border",
+                isInternalNote ? "bg-amber-500 text-amber-950" : "bg-transparent text-muted-foreground hover:bg-muted"
+              )}
+              aria-pressed={isInternalNote}
+            >
+              <StickyNote className="w-3 h-3" />
+              Nota interna
+            </button>
+          </div>
+          {isInternalNote && (
+            <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
+              Visível apenas para a equipe — não enviada ao cliente
+            </span>
+          )}
+        </div>
+
         {requiresTemplate && (
           <div className="flex items-start gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 mb-2">
             <AlertTriangle className="w-4 h-4 mt-0.5 text-amber-600 shrink-0" />
