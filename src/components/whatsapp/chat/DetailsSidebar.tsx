@@ -223,6 +223,49 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
     Histórico do Contato
   </Button>
 
+          {/* ─── Anotações fixas do contato (persistem entre atendimentos) ─── */}
+          <CollapsibleSection
+            icon={<Pin className="h-3.5 w-3.5" />}
+            title="Anotações fixas do contato"
+            open={pinnedOpen}
+            onOpenChange={setPinnedOpen}
+          >
+            <div className="space-y-1.5 min-w-0">
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                Visível em todos os atendimentos deste contato. Use para login, senha, IP de equipamento, instruções recorrentes, etc.
+              </p>
+              <Textarea
+                value={pinnedNotes}
+                onChange={(e) => { setPinnedNotes(e.target.value); setPinnedDirty(true); }}
+                placeholder="Ex.: Site: exemplo.com.br&#10;Login: admin / Senha: ****&#10;IP impressora cozinha: 192.168.0.50"
+                className="text-xs min-h-[90px] font-mono"
+                rows={5}
+              />
+              {pinnedDirty && (
+                <div className="flex gap-1.5 justify-end">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 text-[10px]"
+                    onClick={() => { setPinnedNotes(contact?.notes || ""); setPinnedDirty(false); }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-6 text-[10px]"
+                    onClick={handleSavePinnedNotes}
+                    disabled={isUpdatingContact}
+                  >
+                    {isUpdatingContact ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salvar"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CollapsibleSection>
+
+
+
           {/* ─── Cliente Link ─── */}
           <ClienteLinkCard
             conversation={conversation}
