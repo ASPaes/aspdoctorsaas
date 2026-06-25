@@ -660,7 +660,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           <EmojiPickerButton onEmojiSelect={handleEmojiSelect} disabled={sendMutation.isPending || isBlocked || isInternalNote} />
 
           {/* File attach button */}
-          <input ref={fileInputRef} type="file" accept="*/*" onChange={handleFileSelect} className="hidden" />
+          <input ref={fileInputRef} type="file" accept="*/*" multiple onChange={handleFileSelect} className="hidden" />
           {!isInternalNote && (
             <Button
               type="button"
