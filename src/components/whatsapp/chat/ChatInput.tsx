@@ -624,12 +624,22 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           </Tooltip>
         )}
 
-        {/* Attachment chip */}
-        {attachedFile && (
-          <div className="mb-2">
-            <AttachmentChip file={attachedFile} onRemove={() => { setAttachedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} />
+        {/* Attachment chips */}
+        {attachedFiles.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {attachedFiles.map((f, idx) => (
+              <AttachmentChip
+                key={`${f.name}-${idx}-${f.size}`}
+                file={f}
+                onRemove={() => setAttachedFiles((prev) => prev.filter((_, i) => i !== idx))}
+              />
+            ))}
+            <span className="text-[11px] text-muted-foreground self-center">
+              {attachedFiles.length}/{MAX_FILES} arquivos
+            </span>
           </div>
         )}
+
 
         {activeMacro && (
           <MacroFillCard
