@@ -185,7 +185,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               {editingContact ? (
                 <div className="space-y-1.5">
                   <Input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Nome" className="text-xs h-7" />
-                  <Textarea value={contactNotes} onChange={(e) => setContactNotes(e.target.value)} placeholder="Observações" className="text-xs min-h-[28px]" rows={1} />
+                  
                   <div className="flex gap-1.5">
                     <Button size="sm" className="h-6 text-[10px] flex-1" onClick={handleSaveContact} disabled={isUpdatingContact}>Salvar</Button>
                     <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => setEditingContact(false)}>Cancelar</Button>
@@ -197,11 +197,6 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
                   <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5 truncate">
                     <Phone className="h-3 w-3 shrink-0" /> {contact?.phone_number ? formatBRPhone(contact.phone_number) : ""}
                   </p>
-                  {contact?.notes && (
-                    <p className="text-[10px] text-muted-foreground mt-1 whitespace-normal break-words" style={{ overflowWrap: 'anywhere' }}>
-                      {contact.notes}
-                    </p>
-                  )}
                 </>
               )}
             </div>
@@ -462,7 +457,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
           {/* ─── Notes ─── */}
           <CollapsibleSection
             icon={<StickyNote className="h-3.5 w-3.5" />}
-            title="Notas"
+            title="Notas desta conversa"
             badge={notes.length > 0 ? notes.length : undefined}
             open={notesOpen}
             onOpenChange={setNotesOpen}
