@@ -529,7 +529,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     );
   }
 
-  const hasContent = message.trim() || attachedFile;
+  const hasContent = message.trim() || attachedFiles.length > 0;
 
   return (
     <div
