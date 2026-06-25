@@ -208,7 +208,17 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         isLastMessageFromMe: (conv as any).is_last_message_from_me ?? false,
       }));
 
-      return { conversations: result };
+      const ids = result.map(c => c.id);
+      let withSentiment = result;
+      if (ids.length > 0) {
+        const { data: sData } = await (supabase.from('whatsapp_sentiment_analysis' as any) as any)
+          .select('conversation_id, needs_cs_ticket, cs_ticket_created_id')
+          .in('conversation_id', ids);
+        const sentimentMap = new Map((sData ?? []).map((s: any) => [s.conversation_id, s]));
+        withSentiment = result.map(c => ({ ...c, sentiment: (sentimentMap.get(c.id) as any) ?? null }));
+      }
+
+      return { conversations: withSentiment };
     },
   });
 
