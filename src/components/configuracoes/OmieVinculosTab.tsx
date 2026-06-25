@@ -258,16 +258,21 @@ export default function OmieVinculosTab() {
     );
   }
 
+  const isSugestaoPendente = (key: string, funcOrProd: Funcionario | Produto, isVend: boolean) => {
+    if (vinculados[key]) return false;
+    const sel = selecoes[key];
+    if (!sel) return false;
+    const nameMatch = isVend
+      ? vendedorPorNome[normalizar(funcOrProd.nome)]
+      : categoriaPorNome[normalizar(funcOrProd.nome)];
+    return !!(nameMatch && String(nameMatch.codigo) === sel);
+  };
+
   const renderRowBadge = (key: string, funcOrProd: Funcionario | Produto, isVend: boolean) => {
     if (vinculados[key]) {
       return <Badge variant="secondary" className="text-[10px]">vinculado</Badge>;
     }
-    const sel = selecoes[key];
-    if (!sel) return null;
-    const nameMatch = isVend
-      ? vendedorPorNome[normalizar(funcOrProd.nome)]
-      : categoriaPorNome[normalizar(funcOrProd.nome)];
-    if (nameMatch && String(nameMatch.codigo) === sel) {
+    if (isSugestaoPendente(key, funcOrProd, isVend)) {
       return <Badge variant="outline" className="text-[10px]">sugerido</Badge>;
     }
     return null;
@@ -341,6 +346,16 @@ export default function OmieVinculosTab() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {isSugestaoPendente(key, f, true) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isSaving}
+                          onClick={() => salvarVendedor(f, selecoes[key])}
+                        >
+                          Confirmar vínculo
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );
@@ -416,6 +431,16 @@ export default function OmieVinculosTab() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {isSugestaoPendente(key, p, false) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isSaving}
+                          onClick={() => salvarProduto(p, selecoes[key])}
+                        >
+                          Confirmar vínculo
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );
