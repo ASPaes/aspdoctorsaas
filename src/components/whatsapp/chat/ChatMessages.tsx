@@ -426,6 +426,11 @@ export function ChatMessages({
                           <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
                             Nota interna
                           </span>
+                          {item.note.author_name && (
+                            <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                              {item.note.author_name}
+                            </span>
+                          )}
                           <span className="text-[10px] text-muted-foreground">
                             {formatTime(item.note.created_at, timezone)}
                           </span>
