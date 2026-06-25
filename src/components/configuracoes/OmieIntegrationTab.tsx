@@ -21,7 +21,7 @@ export default function OmieIntegrationTab() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
 
-  const { data: integracao, isLoading } = useQuery({
+  const { data: integracao, isLoading, refetch } = useQuery({
     queryKey: ["omie_integration", tid],
     queryFn: async () => {
       let q = supabase
