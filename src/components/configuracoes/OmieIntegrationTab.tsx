@@ -53,7 +53,7 @@ export default function OmieIntegrationTab() {
       setChave("");
       setTrocando(false);
       toast({ title: "Integração conectada com sucesso" });
-      queryClient.invalidateQueries({ queryKey: ["omie_integration"] });
+      await refetch();
     } catch (err: any) {
       toast({ title: "Erro ao conectar", description: err.message || "Erro de rede. Tente novamente.", variant: "destructive" });
     } finally {
