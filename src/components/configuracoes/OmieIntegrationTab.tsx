@@ -108,98 +108,113 @@ export default function OmieIntegrationTab() {
   }
 
   return (
-    <div className="space-y-4 max-w-xl">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Plug className="h-5 w-5" />
-            Status da conexão
-          </CardTitle>
-          <CardDescription>
-            Estado atual da integração com o Omie para este tenant.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col gap-1">
-              {renderStatus()}
-              {integracao?.ultimo_teste_at && (
-                <span className="text-xs text-muted-foreground">
-                  Último teste: {new Date(integracao.ultimo_teste_at).toLocaleString("pt-BR")}
-                </span>
-              )}
-            </div>
-            {configurado && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleTest}
-                disabled={testing}
-              >
-                {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                Testar conexão
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+    <Tabs defaultValue="conexao" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="conexao">Conexão</TabsTrigger>
+        <TabsTrigger value="vinculos" disabled={!configurado}>Vínculos</TabsTrigger>
+      </TabsList>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <KeyRound className="h-5 w-5" />
-            Chave de Integração
-          </CardTitle>
-          <CardDescription>
-            Cole a chave gerada no Omie. Por segurança, ela nunca é exibida novamente após salva.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {mostrarInput ? (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="omie-chave">Chave de Integração</Label>
-                <Input
-                  id="omie-chave"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="dmie_live_..."
-                  value={chave}
-                  onChange={(e) => setChave(e.target.value)}
-                  disabled={saving}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Salvar e conectar
-                </Button>
-                {configurado && (
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setTrocando(false);
-                      setChave("");
-                    }}
-                    disabled={saving}
-                  >
-                    Cancelar
-                  </Button>
+      <TabsContent value="conexao" className="space-y-4 max-w-xl">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plug className="h-5 w-5" />
+              Status da conexão
+            </CardTitle>
+            <CardDescription>
+              Estado atual da integração com o Omie para este tenant.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                {renderStatus()}
+                {integracao?.ultimo_teste_at && (
+                  <span className="text-xs text-muted-foreground">
+                    Último teste: {new Date(integracao.ultimo_teste_at).toLocaleString("pt-BR")}
+                  </span>
                 )}
               </div>
-            </>
-          ) : (
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">
-                Chave configurada ••••••••
-              </span>
-              <Button variant="outline" size="sm" onClick={() => setTrocando(true)}>
-                Trocar chave
-              </Button>
+              {configurado && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTest}
+                  disabled={testing}
+                >
+                  {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Testar conexão
+                </Button>
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5" />
+              Chave de Integração
+            </CardTitle>
+            <CardDescription>
+              Cole a chave gerada no Omie. Por segurança, ela nunca é exibida novamente após salva.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {mostrarInput ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="omie-chave">Chave de Integração</Label>
+                  <Input
+                    id="omie-chave"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="dmie_live_..."
+                    value={chave}
+                    onChange={(e) => setChave(e.target.value)}
+                    disabled={saving}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleSave} disabled={saving}>
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Salvar e conectar
+                  </Button>
+                  {configurado && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setTrocando(false);
+                        setChave("");
+                      }}
+                      disabled={saving}
+                    >
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Chave configurada ••••••••
+                </span>
+                <Button variant="outline" size="sm" onClick={() => setTrocando(true)}>
+                  Trocar chave
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="vinculos">
+        {configurado ? (
+          <OmieVinculosTab />
+        ) : (
+          <p className="text-sm text-muted-foreground">Conecte a integração antes de configurar os vínculos.</p>
+        )}
+      </TabsContent>
+    </Tabs>
   );
 }
