@@ -94,7 +94,14 @@ export function UnidadeFilterProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
 
       if (data) {
-        setSelectedUnidadeIdsRaw((data.unidade_ids ?? []) as number[]);
+        const raw = (data.unidade_ids ?? []) as number[];
+        const clamped = raw.filter((id) => unidades.some((u) => u.id === id));
+        setSelectedUnidadeIdsRaw(clamped);
+        if (clamped.length !== raw.length) {
+          await (supabase.rpc as any)("set_view_unidades", { p_ids: clamped });
+          if (cancelled) return;
+          queryClient.invalidateQueries();
+        }
         setViewSynced(true);
         setIsHydrated(true);
       } else {
