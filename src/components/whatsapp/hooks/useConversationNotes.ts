@@ -10,6 +10,8 @@ export interface ConversationNote {
   is_pinned: boolean;
   created_at: string;
   updated_at: string;
+  created_by?: string;
+  author_name?: string;
 }
 
 export const useConversationNotes = (conversationId: string | null) => {
@@ -26,7 +28,44 @@ export const useConversationNotes = (conversationId: string | null) => {
         .order('is_pinned' as any, { ascending: false })
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as unknown as ConversationNote[];
+
+      const rawNotes = (data || []) as unknown as ConversationNote[];
+
+      if (rawNotes.length === 0) return rawNotes;
+
+      const authorIds = [...new Set(rawNotes.map(n => n.created_by).filter(Boolean))];
+      if (authorIds.length === 0) return rawNotes;
+
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, funcionario_id')
+        .in('user_id', authorIds as string[]);
+      if (profilesError) console.error('[notes] profiles error:', profilesError);
+
+      const funcionarioIds = [...new Set((profilesData || []).map(p => p.funcionario_id).filter(Boolean))];
+
+      let funcionariosMap = new Map<number, string>();
+      if (funcionarioIds.length > 0) {
+        const { data: funcData, error: funcError } = await supabase
+          .from('funcionarios')
+          .select('id, nome')
+          .in('id', funcionarioIds as number[]);
+        if (funcError) console.error('[notes] funcionarios error:', funcError);
+        for (const f of funcData || []) {
+          funcionariosMap.set(f.id, f.nome || '');
+        }
+      }
+
+      const profileMap = new Map<string, number | null>();
+      for (const p of profilesData || []) {
+        profileMap.set(p.user_id, p.funcionario_id ?? null);
+      }
+
+      return rawNotes.map(note => {
+        const funcId = note.created_by ? profileMap.get(note.created_by) ?? null : null;
+        const authorName = funcId ? funcionariosMap.get(funcId) || undefined : undefined;
+        return { ...note, author_name: authorName };
+      });
     },
     enabled: !!conversationId,
   });
