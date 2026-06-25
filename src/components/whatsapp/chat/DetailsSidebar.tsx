@@ -73,6 +73,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const [kbOpen, setKbOpen] = useState(true);
   const [kbEditOpen, setKbEditOpen] = useState(false);
   const [pinnedOpen, setPinnedOpen] = useState(true);
+  const [ticketsOpen, setTicketsOpen] = useState(true);
 
   // Pinned contact notes (persistem entre todos os atendimentos do contato)
   const [pinnedNotes, setPinnedNotes] = useState(contact?.notes || "");
