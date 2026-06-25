@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert } from "lucide-react";
+import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert, Pin } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { ContactHistoryUnifiedModal } from "./ContactHistoryUnifiedModal";
@@ -71,6 +71,24 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const [summariesOpen, setSummariesOpen] = useState(false);
   const [kbOpen, setKbOpen] = useState(true);
   const [kbEditOpen, setKbEditOpen] = useState(false);
+  const [pinnedOpen, setPinnedOpen] = useState(true);
+
+  // Pinned contact notes (persistem entre todos os atendimentos do contato)
+  const [pinnedNotes, setPinnedNotes] = useState(contact?.notes || "");
+  const [pinnedDirty, setPinnedDirty] = useState(false);
+  useEffect(() => {
+    setPinnedNotes(contact?.notes || "");
+    setPinnedDirty(false);
+  }, [contact?.id, contact?.notes]);
+
+  const handleSavePinnedNotes = () => {
+    if (!contact?.id) return;
+    updateContact({
+      contactId: contact.id,
+      data: { name: contact.name || "", notes: pinnedNotes.trim() || null },
+    });
+    setPinnedDirty(false);
+  };
 
   // Find latest closed attendance for this conversation (for KB section)
   const { data: latestClosedAttendance } = useQuery({
@@ -167,7 +185,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               {editingContact ? (
                 <div className="space-y-1.5">
                   <Input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Nome" className="text-xs h-7" />
-                  <Textarea value={contactNotes} onChange={(e) => setContactNotes(e.target.value)} placeholder="Observações" className="text-xs min-h-[28px]" rows={1} />
+                  
                   <div className="flex gap-1.5">
                     <Button size="sm" className="h-6 text-[10px] flex-1" onClick={handleSaveContact} disabled={isUpdatingContact}>Salvar</Button>
                     <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => setEditingContact(false)}>Cancelar</Button>
@@ -179,11 +197,6 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
                   <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5 truncate">
                     <Phone className="h-3 w-3 shrink-0" /> {contact?.phone_number ? formatBRPhone(contact.phone_number) : ""}
                   </p>
-                  {contact?.notes && (
-                    <p className="text-[10px] text-muted-foreground mt-1 whitespace-normal break-words" style={{ overflowWrap: 'anywhere' }}>
-                      {contact.notes}
-                    </p>
-                  )}
                 </>
               )}
             </div>
@@ -204,6 +217,49 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
     <History className="h-3.5 w-3.5" />
     Histórico do Contato
   </Button>
+
+          {/* ─── Anotações fixas do contato (persistem entre atendimentos) ─── */}
+          <CollapsibleSection
+            icon={<Pin className="h-3.5 w-3.5" />}
+            title="Anotações fixas do contato"
+            open={pinnedOpen}
+            onOpenChange={setPinnedOpen}
+          >
+            <div className="space-y-1.5 min-w-0">
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                Visível em todos os atendimentos deste contato. Use para login, senha, IP de equipamento, instruções recorrentes, etc.
+              </p>
+              <Textarea
+                value={pinnedNotes}
+                onChange={(e) => { setPinnedNotes(e.target.value); setPinnedDirty(true); }}
+                placeholder="Ex.: Site: exemplo.com.br&#10;Login: admin / Senha: ****&#10;IP impressora cozinha: 192.168.0.50"
+                className="text-xs min-h-[90px] font-mono"
+                rows={5}
+              />
+              {pinnedDirty && (
+                <div className="flex gap-1.5 justify-end">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 text-[10px]"
+                    onClick={() => { setPinnedNotes(contact?.notes || ""); setPinnedDirty(false); }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-6 text-[10px]"
+                    onClick={handleSavePinnedNotes}
+                    disabled={isUpdatingContact}
+                  >
+                    {isUpdatingContact ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salvar"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CollapsibleSection>
+
+
 
           {/* ─── Cliente Link ─── */}
           <ClienteLinkCard
@@ -401,7 +457,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
           {/* ─── Notes ─── */}
           <CollapsibleSection
             icon={<StickyNote className="h-3.5 w-3.5" />}
-            title="Notas"
+            title="Notas desta conversa"
             badge={notes.length > 0 ? notes.length : undefined}
             open={notesOpen}
             onOpenChange={setNotesOpen}
