@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -36,9 +37,10 @@ export default function OmieVinculosTab() {
   const { toast } = useToast();
   const { effectiveTenantId: tid } = useTenantFilter();
   const [savingKey, setSavingKey] = useState<string | null>(null);
-  // Selected values keyed by linha ("vend:<id>" / "prod:<id>")
   const [selecoes, setSelecoes] = useState<Record<string, string>>({});
   const [vinculados, setVinculados] = useState<Record<string, boolean>>({});
+  const [mostrarTodosVendedores, setMostrarTodosVendedores] = useState(false);
+  const [mostrarTodosProdutos, setMostrarTodosProdutos] = useState(false);
 
   const { data: remote, isLoading: loadingRemote, error: errRemote } = useQuery({
     queryKey: ["omie_listar_vinculos", tid],
@@ -84,7 +86,6 @@ export default function OmieVinculosTab() {
   const vendedoresOmie = remote?.vendedores || [];
   const categoriasOmie = remote?.categorias || [];
 
-  // Map by normalized name (only when unique)
   const vendedorPorNome = useMemo(() => {
     const counts: Record<string, number> = {};
     const map: Record<string, OmieVendedor> = {};
@@ -129,7 +130,6 @@ export default function OmieVinculosTab() {
     return m;
   }, [remote]);
 
-  // Initialize selections + vinculados from data
   useEffect(() => {
     if (!remote || !funcionarios || !produtos) return;
     const novasSel: Record<string, string> = {};
@@ -223,6 +223,17 @@ export default function OmieVinculosTab() {
     }
   };
 
+  const isVinculadoVend = (id: number) => !!vinculados[`vend:${id}`];
+  const isVinculadoProd = (id: number) => !!vinculados[`prod:${id}`];
+
+  const funcionariosVisiveis = mostrarTodosVendedores
+    ? funcionarios
+    : funcionarios?.filter((f) => !isVinculadoVend(f.id));
+
+  const produtosVisiveis = mostrarTodosProdutos
+    ? produtos
+    : produtos?.filter((p) => !isVinculadoProd(p.id));
+
   if (errRemote) {
     return (
       <Card>
@@ -273,13 +284,37 @@ export default function OmieVinculosTab() {
           <CardDescription>
             Vincule cada funcionário ativo ao vendedor correspondente no Omie.
           </CardDescription>
+          <div className="mt-2 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              À esquerda, o funcionário cadastrado no seu sistema. À direita, o vendedor correspondente no Omie. Vincule cada funcionário ao seu equivalente no Omie.
+            </p>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                {mostrarTodosVendedores ? "Mostrando todos os funcionários." : "Mostrando apenas funcionários sem vínculo."}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMostrarTodosVendedores((v) => !v)}
+              >
+                {mostrarTodosVendedores ? "Ver só pendentes" : "Ver todos"}
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {(funcionarios?.length ?? 0) === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhum funcionário ativo encontrado.</p>
+          ) : (funcionariosVisiveis?.length ?? 0) === 0 ? (
+            <div className="py-6 text-center space-y-3">
+              <p className="text-sm text-muted-foreground">Todos os vendedores estão vinculados.</p>
+              <Button variant="outline" size="sm" onClick={() => setMostrarTodosVendedores(true)}>
+                Ver todos
+              </Button>
+            </div>
           ) : (
             <div className="divide-y">
-              {funcionarios!.map((f) => {
+              {funcionariosVisiveis!.map((f) => {
                 const key = `vend:${f.id}`;
                 const isSaving = savingKey === key;
                 return (
@@ -324,13 +359,37 @@ export default function OmieVinculosTab() {
           <CardDescription>
             Vincule cada produto à categoria correspondente no Omie.
           </CardDescription>
+          <div className="mt-2 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              À esquerda, o produto do seu sistema. À direita, a categoria de contrato correspondente no Omie. Vincule cada produto à sua categoria.
+            </p>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                {mostrarTodosProdutos ? "Mostrando todos os produtos." : "Mostrando apenas produtos sem vínculo."}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMostrarTodosProdutos((v) => !v)}
+              >
+                {mostrarTodosProdutos ? "Ver só pendentes" : "Ver todos"}
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {(produtos?.length ?? 0) === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhum produto cadastrado.</p>
+          ) : (produtosVisiveis?.length ?? 0) === 0 ? (
+            <div className="py-6 text-center space-y-3">
+              <p className="text-sm text-muted-foreground">Todos os produtos estão vinculados.</p>
+              <Button variant="outline" size="sm" onClick={() => setMostrarTodosProdutos(true)}>
+                Ver todos
+              </Button>
+            </div>
           ) : (
             <div className="divide-y">
-              {produtos!.map((p) => {
+              {produtosVisiveis!.map((p) => {
                 const key = `prod:${p.id}`;
                 const isSaving = savingKey === key;
                 return (
