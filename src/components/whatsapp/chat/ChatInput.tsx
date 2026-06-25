@@ -227,38 +227,67 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     setMacroSelectedIndex(0);
   }, [filteredMacros]);
 
-  // Send attached file as media
+  // Send a single attached file as media
+  const sendOneFile = useCallback(async (file: File, caption?: string) => {
+    const messageType = getMessageType(file.type || 'application/octet-stream');
+    await sendMutation.mutateAsync({
+      conversationId,
+      content: caption || undefined,
+      messageType,
+      file,
+      mediaMimetype: file.type || 'application/octet-stream',
+      fileName: file.name,
+      quotedMessageId: replyTo?.message_id || undefined,
+    });
+  }, [sendMutation, conversationId, replyTo]);
+
+  // Backward-compatible helper used by macro flow
   const sendAttachedFile = useCallback(async (file: File, caption?: string) => {
     if (isBlocked) {
       toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
       return;
     }
     if (sendMutation.isPending) return;
+    try {
+      await sendOneFile(file, caption);
+      setAttachedFiles([]);
+      setMessage("");
+      onCancelReply?.();
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setTimeout(() => textareaRef.current?.focus(), 50);
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao enviar mídia");
+    }
+  }, [isBlocked, sendMutation.isPending, sendOneFile, onCancelReply]);
 
-    const messageType = getMessageType(file.type || 'application/octet-stream');
-
-    sendMutation.mutate(
-      {
-        conversationId,
-        content: caption || undefined,
-        messageType,
-        file,
-        mediaMimetype: file.type || 'application/octet-stream',
-        fileName: file.name,
-        quotedMessageId: replyTo?.message_id || undefined,
-      },
-      {
-        onSuccess: () => {
-          setAttachedFile(null);
-          setMessage("");
-          onCancelReply?.();
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          setTimeout(() => textareaRef.current?.focus(), 50);
-        },
-        onError: (err: any) => { toast.error(err.message || "Erro ao enviar mídia"); },
+  const sendAttachedFilesAll = useCallback(async (files: File[], caption?: string) => {
+    if (isBlocked) {
+      toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
+      return;
+    }
+    if (sendMutation.isPending) return;
+    let sent = 0;
+    let failed = 0;
+    for (let i = 0; i < files.length; i++) {
+      try {
+        await sendOneFile(files[i], i === 0 ? caption : undefined);
+        sent++;
+      } catch (err: any) {
+        failed++;
+        toast.error(`Falha ao enviar "${files[i].name}"`, { description: err?.message });
       }
-    );
-  }, [isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
+    }
+    if (sent > 0) {
+      setAttachedFiles([]);
+      setMessage("");
+      onCancelReply?.();
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setTimeout(() => textareaRef.current?.focus(), 50);
+    }
+    if (sent > 1 && failed === 0) {
+      toast.success(`${sent} arquivos enviados`);
+    }
+  }, [isBlocked, sendMutation.isPending, sendOneFile, onCancelReply]);
 
   const handleSend = useCallback(() => {
     // Nota interna: salva no whatsapp_conversation_notes, NÃO envia ao cliente
@@ -273,8 +302,8 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
       setTimeout(() => textareaRef.current?.focus(), 100);
       return;
     }
-    if (attachedFile) {
-      sendAttachedFile(attachedFile, message.trim() || undefined);
+    if (attachedFiles.length > 0) {
+      sendAttachedFilesAll(attachedFiles, message.trim() || undefined);
       return;
     }
     // Normal text send
@@ -297,7 +326,8 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         onError: (err: any) => { toast.error(err.message || "Erro ao enviar mensagem"); },
       }
     );
-  }, [isInternalNote, isCreatingNote, createNote, attachedFile, sendAttachedFile, message, isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
+  }, [isInternalNote, isCreatingNote, createNote, attachedFiles, sendAttachedFilesAll, message, isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
+
 
   const handleSendMedia = useCallback((params: MediaSendParams) => {
     if (isBlocked) {
