@@ -24,12 +24,13 @@ export default function OmieIntegrationTab() {
   const { data: integracao, isLoading, refetch } = useQuery({
     queryKey: ["omie_integration", tid],
     queryFn: async () => {
-      let q = supabase
+      // RLS já filtra pelo tenant do usuário logado; não filtrar manualmente.
+      const { data, error } = await supabase
         .from("omie_integration")
         .select("ativo, ultimo_status, ultimo_teste_at")
-        .limit(1);
-      if (tid) q = q.eq("tenant_id", tid);
-      const { data, error } = await q.maybeSingle();
+        .limit(1)
+        .maybeSingle();
+      console.log("[OmieIntegrationTab] omie_integration raw:", { data, error, tid });
       if (error) throw error;
       return data;
     },
