@@ -555,6 +555,7 @@ export function MovimentosMrrModal({
               </CardHeader>
               <CardContent className="py-1 px-3">
                 <p className="text-lg font-bold text-cyan-500">+{formatCurrency(totalReajuste)}</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">{qtdReajuste} {qtdReajuste === 1 ? 'movimento' : 'movimentos'}</p>
                 <p className="text-muted-foreground text-[9px]">Não afeta MRR</p>
               </CardContent>
             </Card>
