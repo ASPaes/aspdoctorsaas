@@ -8979,6 +8979,7 @@ export type Database = {
       }
       next_ticket_code: { Args: { p_tenant_id: string }; Returns: string }
       norm_txt: { Args: { t: string }; Returns: string }
+      obter_chave_omie: { Args: never; Returns: string }
       preparar_reajuste: {
         Args: {
           p_percentual: number
