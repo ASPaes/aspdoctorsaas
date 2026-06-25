@@ -48,6 +48,7 @@ export default function MovimentosMrrTab() {
   });
   const [tipoFilter, setTipoFilter] = useState("");
   const [funcionarioFilter, setFuncionarioFilter] = useState("");
+  const [fornecedorFilter, setFornecedorFilter] = useState("");
   const [sortField, setSortField] = useState<SortField>("data_movimento");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
