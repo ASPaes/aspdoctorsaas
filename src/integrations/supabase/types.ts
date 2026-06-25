@@ -3381,6 +3381,36 @@ export type Database = {
           },
         ]
       }
+      omie_integration: {
+        Row: {
+          ativo: boolean
+          id: string
+          tenant_id: string
+          ultimo_status: string
+          ultimo_teste_at: string | null
+          updated_at: string
+          vault_secret_id: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          id?: string
+          tenant_id: string
+          ultimo_status?: string
+          ultimo_teste_at?: string | null
+          updated_at?: string
+          vault_secret_id?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          id?: string
+          tenant_id?: string
+          ultimo_status?: string
+          ultimo_teste_at?: string | null
+          updated_at?: string
+          vault_secret_id?: string | null
+        }
+        Relationships: []
+      }
       origens_venda: {
         Row: {
           id: number
