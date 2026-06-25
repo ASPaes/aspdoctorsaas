@@ -403,14 +403,48 @@ export function ChatMessages({
                   );
                 }
 
+                if (item.type === 'transfer') {
+                  return (
+                    <div key={`transfer-${item.event.id}`} className="flex justify-center my-2">
+                      <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full">
+                        <ArrowRightLeft className="h-3 w-3" />
+                        Transferido para {item.event.agent_name || 'Agente'}
+                        {item.event.agent_role ? ` · ${item.event.agent_role}` : ''}
+                        <span className="opacity-60 ml-1">{formatTime(item.event.created_at, timezone)}</span>
+                      </span>
+                    </div>
+                  );
+                }
+
+                // Nota interna — visível apenas para a equipe
                 return (
-                  <div key={`transfer-${item.event.id}`} className="flex justify-center my-2">
-                    <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full">
-                      <ArrowRightLeft className="h-3 w-3" />
-                      Transferido para {item.event.agent_name || 'Agente'}
-                      {item.event.agent_role ? ` · ${item.event.agent_role}` : ''}
-                      <span className="opacity-60 ml-1">{formatTime(item.event.created_at, timezone)}</span>
-                    </span>
+                  <div key={`note-${item.note.id}`} className="flex justify-center my-2 group">
+                    <div className="max-w-[85%] flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 shadow-sm">
+                      <StickyNote className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                            Nota interna
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatTime(item.note.created_at, timezone)}
+                          </span>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap break-words text-foreground/90">
+                          {item.note.content}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm('Excluir esta nota interna?')) deleteNote(item.note.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-1"
+                        aria-label="Excluir nota"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
