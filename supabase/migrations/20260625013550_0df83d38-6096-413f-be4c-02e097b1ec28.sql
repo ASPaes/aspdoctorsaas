@@ -1,0 +1,1 @@
+UPDATE assignment_rules SET respect_business_hours = true WHERE id = '31c69240-f395-4bcc-8fe9-6d76bbb7675b';
