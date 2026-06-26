@@ -157,9 +157,9 @@ export default function MovimentosMrrTab() {
         fornecedorMap,
       });
     } catch (e: any) {
-      // eslint-disable-next-line no-console
-      console.error("Erro ao exportar movimentos MRR:", e);
+      toast.error("Falha ao exportar: " + (e?.message ?? String(e)));
     }
+
   };
 
 
