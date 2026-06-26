@@ -4337,6 +4337,7 @@ export type Database = {
           id: string
           inactivity_warning_sent_at: string | null
           instance_id: string | null
+          is_group: boolean
           last_customer_message_at: string | null
           last_operator_message_at: string | null
           last_queue_reason: string | null
@@ -4414,6 +4415,7 @@ export type Database = {
           id?: string
           inactivity_warning_sent_at?: string | null
           instance_id?: string | null
+          is_group?: boolean
           last_customer_message_at?: string | null
           last_operator_message_at?: string | null
           last_queue_reason?: string | null
@@ -4491,6 +4493,7 @@ export type Database = {
           id?: string
           inactivity_warning_sent_at?: string | null
           instance_id?: string | null
+          is_group?: boolean
           last_customer_message_at?: string | null
           last_operator_message_at?: string | null
           last_queue_reason?: string | null
@@ -9157,6 +9160,10 @@ export type Database = {
       set_attendance_cliente: {
         Args: { p_attendance_id: string; p_cliente_id: string }
         Returns: undefined
+      }
+      set_group_cliente: {
+        Args: { p_cliente_id: string; p_conversation_id: string }
+        Returns: Json
       }
       set_unidade_default_filter: {
         Args: { p_unidade_id: number }
