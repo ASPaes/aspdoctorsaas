@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -45,6 +45,7 @@ export function useConversationStates(conversationIds: string[]) {
     },
     enabled: conversationIds.length > 0,
     staleTime: 30000,
+    placeholderData: keepPreviousData,
   });
 
   // Realtime: invalida quando estado muda. Filter por tenant_id reduz volume processado.
