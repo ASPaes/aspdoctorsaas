@@ -2,7 +2,10 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AlertTriangle, Loader2, Percent, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Download, Loader2, Percent, Plus, Trash2 } from "lucide-react";
+import { ProtectedElement } from "@/components/auth/ProtectedElement";
+import { exportReajustesXlsx } from "@/lib/exportReajustesXlsx";
+
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
