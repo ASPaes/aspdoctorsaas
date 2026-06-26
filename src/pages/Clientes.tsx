@@ -781,6 +781,17 @@ export default function Clientes() {
 
         <TabsContent value="clientes" className="space-y-4 mt-4">
 
+      <div className="flex justify-end">
+        <ProtectedElement resource="clientes.exportar" action="view" mode="notify">
+          <Button variant="outline" onClick={handleExportXlsx} disabled={isExporting}>
+            <Download className="h-4 w-4" />
+            {isExporting ? "Gerando XLSX..." : "Exportar XLSX"}
+          </Button>
+        </ProtectedElement>
+      </div>
+
+
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
