@@ -142,6 +142,26 @@ export default function MovimentosMrrTab() {
     return m;
   }, [lookups.funcionarios.data]);
 
+  const fornecedorMap = useMemo(() => {
+    return new Map<number, string>((fornecedores ?? []).map((f: any) => [f.id, f.nome]));
+  }, [fornecedores]);
+
+  const handleExportXlsx = () => {
+    try {
+      exportMovimentosMrrXlsx({
+        rows: sortedData,
+        clientesMap: clientesMap ?? {},
+        funcMap,
+        fornecedorMap,
+      });
+    } catch (e: any) {
+      // eslint-disable-next-line no-console
+      console.error("Erro ao exportar movimentos MRR:", e);
+    }
+  };
+
+
+
   // KPI totals
   const totals = useMemo(() => {
     const items = movimentos || [];
