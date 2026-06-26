@@ -615,7 +615,8 @@ function ProdutoDialog({
   const { profile } = useAuth();
   const isSuperAdmin = profile?.is_super_admin === true;
   const isTenantAdmin = profile?.role === "admin";
-  const canSwapProduto = isEdit && (isSuperAdmin || isTenantAdmin) && modulosCountForEdit === 0;
+  const isHead = profile?.role === "head";
+  const canSwapProduto = isEdit && (isSuperAdmin || isTenantAdmin || isHead) && modulosCountForEdit === 0;
   const [produtoId, setProdutoId] = useState<string>("");
   const [fornecedorId, setFornecedorId] = useState<string>("");
   const [codigo, setCodigo] = useState("");
