@@ -33,7 +33,7 @@ interface QueueIndicatorProps {
 
 export function QueueIndicator({ conversationId, assignedTo, onTransferClick, assignedOperatorName, contactId, clienteId }: QueueIndicatorProps) {
   const { user, profile } = useAuth();
-  const { assignConversation, unassignConversation, isAssigning } = useConversationAssignment();
+  const { claimConversation, unassignConversation, isAssigning, isClaiming } = useConversationAssignment();
 
   // Use attendance status as source of truth (it updates via realtime)
   const { attendanceMap } = useAttendanceStatus([conversationId], true);
@@ -65,7 +65,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
 
   const doClaim = () => {
     if (!user?.id) return;
-    assignConversation({ conversationId, assignedTo: user.id, reason: "Assumido manualmente" });
+    claimConversation({ conversationId, reason: "Assumido manualmente" });
   };
 
   // Registra auditoria ao furar bloqueios "confirmação" e assume o atendimento.
