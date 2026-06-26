@@ -17,6 +17,8 @@ import { TrendingUp, TrendingDown, ShoppingCart, DollarSign, ArrowUpDown, ArrowU
 import { Button } from "@/components/ui/button";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
 import { exportMovimentosMrrXlsx } from "@/lib/exportMovimentosMrrXlsx";
+import { toast } from "sonner";
+
 
 
 const fmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
