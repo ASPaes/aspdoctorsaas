@@ -259,6 +259,25 @@ export const useConversationAssignment = () => {
     },
   });
 
+  const claimConversation = useMutation({
+    mutationFn: async ({ conversationId, reason }: { conversationId: string; reason?: string }) => {
+      const { error } = await (supabase.rpc as any)('claim_conversation', {
+        p_conversation_id: conversationId,
+        p_reason: reason || 'Assumido manualmente',
+      });
+      if (error) throw error;
+      return { conversationId };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
+      toast({ title: "Conversa assumida", description: "Você assumiu o atendimento." });
+    },
+    onError: () => {
+      toast({ title: "Erro ao assumir", description: "Não foi possível assumir o atendimento.", variant: "destructive" });
+    },
+  });
+
   const getAssignmentHistory = (conversationId: string) => {
     return useQuery({
       queryKey: ['conversation-assignments', conversationId],
@@ -277,11 +296,13 @@ export const useConversationAssignment = () => {
 
   return {
     assignConversation: assignConversation.mutate,
+    claimConversation: claimConversation.mutate,
     transferConversation: transferConversation.mutate,
     transferToDepartment: transferToDepartment.mutate,
     unassignConversation: unassignConversation.mutate,
     getAssignmentHistory,
     isAssigning: assignConversation.isPending,
+    isClaiming: claimConversation.isPending,
     isTransferring: transferConversation.isPending,
     isTransferringDepartment: transferToDepartment.isPending,
   };

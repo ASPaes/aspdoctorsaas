@@ -7653,6 +7653,10 @@ export type Database = {
         }
         Returns: Json
       }
+      claim_conversation: {
+        Args: { p_conversation_id: string; p_reason?: string }
+        Returns: undefined
+      }
       cleanup_ai_usage_log: { Args: never; Returns: undefined }
       cleanup_group_messages: { Args: never; Returns: undefined }
       cleanup_notification_dispatch_queue: { Args: never; Returns: number }
