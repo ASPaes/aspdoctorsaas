@@ -13,7 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, ShoppingCart, DollarSign, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, UserMinus, ArrowUpCircle } from "lucide-react";
+import { TrendingUp, TrendingDown, ShoppingCart, DollarSign, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, UserMinus, ArrowUpCircle, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ProtectedElement } from "@/components/auth/ProtectedElement";
+import { exportMovimentosMrrXlsx } from "@/lib/exportMovimentosMrrXlsx";
+import { toast } from "sonner";
+
+
 
 const fmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -138,6 +144,26 @@ export default function MovimentosMrrTab() {
     return m;
   }, [lookups.funcionarios.data]);
 
+  const fornecedorMap = useMemo(() => {
+    return new Map<number, string>((fornecedores ?? []).map((f: any) => [f.id, f.nome]));
+  }, [fornecedores]);
+
+  const handleExportXlsx = () => {
+    try {
+      exportMovimentosMrrXlsx({
+        rows: sortedData,
+        clientesMap: clientesMap ?? {},
+        funcMap,
+        fornecedorMap,
+      });
+    } catch (e: any) {
+      toast.error("Falha ao exportar: " + (e?.message ?? String(e)));
+    }
+
+  };
+
+
+
   // KPI totals
   const totals = useMemo(() => {
     const items = movimentos || [];
@@ -239,7 +265,20 @@ export default function MovimentosMrrTab() {
             </SelectContent>
           </Select>
         </div>
+        <div className="ml-auto">
+          <ProtectedElement resource="clientes.exportar" action="view" mode="notify">
+            <Button
+              variant="outline"
+              onClick={handleExportXlsx}
+              disabled={isLoading || sortedData.length === 0}
+            >
+              <Download className="h-4 w-4" />
+              Exportar XLSX
+            </Button>
+          </ProtectedElement>
+        </div>
       </div>
+
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">

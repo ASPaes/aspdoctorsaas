@@ -2,7 +2,10 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AlertTriangle, Loader2, Percent, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Download, Loader2, Percent, Plus, Trash2 } from "lucide-react";
+import { ProtectedElement } from "@/components/auth/ProtectedElement";
+import { exportReajustesXlsx } from "@/lib/exportReajustesXlsx";
+
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -138,17 +141,36 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Lotes de reajuste</h2>
-        <Button
-          onClick={() => {
-            setSelectedReajusteId(null);
-            setNovoReajusteOpen(true);
-          }}
-          className="bg-green-600 hover:bg-green-700 text-white"
-        >
-          <Plus className="h-4 w-4 mr-1" />
-          Novo reajuste
-        </Button>
+        <div className="flex items-center gap-2">
+          <ProtectedElement resource="clientes.exportar" action="view" mode="notify">
+            <Button
+              variant="outline"
+              onClick={() => {
+                try {
+                  exportReajustesXlsx({ rows: reajustes ?? [] });
+                } catch (e: any) {
+                  toast.error("Falha ao exportar: " + (e?.message ?? String(e)));
+                }
+              }}
+              disabled={isLoading || !reajustes?.length}
+            >
+              <Download className="h-4 w-4" />
+              Exportar XLSX
+            </Button>
+          </ProtectedElement>
+          <Button
+            onClick={() => {
+              setSelectedReajusteId(null);
+              setNovoReajusteOpen(true);
+            }}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Novo reajuste
+          </Button>
+        </div>
       </div>
+
 
       {reajustesError && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-400 text-sm">
