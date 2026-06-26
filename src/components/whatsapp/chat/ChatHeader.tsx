@@ -465,7 +465,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     if (attendance) {
       if (attendance.status === "waiting") return "waiting";
       if (attendance.status === "in_progress") return "in_progress";
-      if (attendance.status === "closed" || attendance.status === "inactive_closed") return "closed";
+      if (attendance.status === "closed" || attendance.status === "inactive_closed") {
+        // A conversa é a fonte de verdade para "encerrada". Um atendimento
+        // encerrado NÃO pode marcar a conversa como Encerrada enquanto a
+        // conversa ainda está ativa — o atendimento ativo pode estar oculto
+        // por filtro de unidade/RLS, e o badge não pode mentir.
+        if (conversation.status === "closed") return "closed";
+        return conversation.status;
+      }
     }
     return conversation.status;
   }, [attendance, conversation.status, isGroupConv]);
