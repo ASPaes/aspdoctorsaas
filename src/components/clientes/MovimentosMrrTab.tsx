@@ -265,7 +265,20 @@ export default function MovimentosMrrTab() {
             </SelectContent>
           </Select>
         </div>
+        <div className="ml-auto">
+          <ProtectedElement resource="clientes.exportar" action="view" mode="notify">
+            <Button
+              variant="outline"
+              onClick={handleExportXlsx}
+              disabled={isLoading || sortedData.length === 0}
+            >
+              <Download className="h-4 w-4" />
+              Exportar XLSX
+            </Button>
+          </ProtectedElement>
+        </div>
       </div>
+
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
