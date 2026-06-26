@@ -157,9 +157,9 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
           size="sm"
           className="h-7 text-xs gap-1.5 rounded-full"
           onClick={handleClaim}
-          disabled={isAssigning || isBlocked}
+          disabled={isAssigning || isClaiming || isBlocked}
         >
-          {isAssigning ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
+          {(isAssigning || isClaiming) ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
           Assumir
         </Button>
       ) : (
@@ -170,9 +170,9 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
               size="sm"
               className="h-7 text-xs gap-1.5 rounded-full"
               onClick={() => setTakeoverDialogOpen(true)}
-              disabled={isAssigning || isBlocked}
+              disabled={isAssigning || isClaiming || isBlocked}
             >
-              {isAssigning ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
+              {(isAssigning || isClaiming) ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
               Assumir
             </Button>
           )}
