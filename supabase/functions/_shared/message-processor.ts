@@ -8,6 +8,8 @@ import { normalizeBRPhone, phoneSearchVariants } from './phone.ts';
 const AUTO_SENTIMENT_THRESHOLD = 5;
 const AUTO_CATEGORIZATION_THRESHOLD = 5;
 
+const CSAT_LATE_GRACE_MINUTES = 180;
+
 const GOODBYE_PATTERNS = /^(tchau|obrigad[oa]|valeu|vlw|flw|falou|até\s*(mais|logo|breve)?|brigad[oa]|grat[oa]|obg|tmj|ok\s*obrigad[oa]?)[\s!.?]*$/i;
 
 const INVALID_OPTION_MESSAGES = [
