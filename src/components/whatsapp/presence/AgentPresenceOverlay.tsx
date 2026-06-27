@@ -7,7 +7,7 @@ import { Play, Coffee, Clock, Plus, Loader2, Timer } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AgentPresenceOverlay() {
-  const { status, isBlocked, presence, pauseReasons, startShift, setActive, extendPause } = useAgentPresence();
+  const { status, isBlocked, presence, pauseReasons, startShift, setActive, extendPause, droppedForInactivity } = useAgentPresence();
   const [loading, setLoading] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
   const [extendMinutes, setExtendMinutes] = useState(15);
@@ -29,8 +29,13 @@ export default function AgentPresenceOverlay() {
     setLoading(true);
     try {
       if (status === "offline") {
-        await startShift();
-        toast.success("Expediente iniciado!");
+        if (droppedForInactivity) {
+          await setActive();
+          toast.success("Você voltou a ficar disponível!");
+        } else {
+          await startShift();
+          toast.success("Expediente iniciado!");
+        }
       } else {
         await setActive();
         toast.success("Voltou ao ativo!");

@@ -259,6 +259,11 @@ export function useAgentPresence() {
 
   const status: AgentStatus = (presence?.status as AgentStatus) ?? "offline";
 
+  const droppedForInactivity =
+    status === "offline" &&
+    !!presence?.shift_started_at &&
+    !presence?.shift_ended_at;
+
   return {
     presence,
     presenceLoading,
@@ -273,6 +278,7 @@ export function useAgentPresence() {
     fetchActiveAttendances,
     releaseToQueueAndEndShift,
     keepAssignmentsAndEndShift,
+    droppedForInactivity,
     isBlocked: !isAdmin && status === "offline",
   };
 }
