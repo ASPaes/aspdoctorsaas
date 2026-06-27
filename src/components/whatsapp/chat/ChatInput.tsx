@@ -322,6 +322,11 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   }, [isBlocked, sendOneFile]);
 
   const handleSend = useCallback(() => {
+    // Rascunho: não envia nem salva no servidor; é apenas local por conversa
+    if (isDraftMode) {
+      toast.info("Você está no modo Rascunho — troque para 'Mensagem ao cliente' ou 'Nota interna' para enviar.");
+      return;
+    }
     // Nota interna: salva no whatsapp_conversation_notes, NÃO envia ao cliente
     if (isInternalNote) {
       const content = message.trim();
