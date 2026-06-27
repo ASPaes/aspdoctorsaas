@@ -18,8 +18,14 @@ interface ContactCardProps {
 export function parseVCard(vcard: string | null): { name: string; phones: string[] } {
   if (!vcard) return { name: '', phones: [] };
 
+  let text = vcard;
   let name = '';
   const phones: string[] = [];
+
+  if (!/BEGIN:VCARD/i.test(text)) {
+    try { const d = atob(text.trim()); if (/BEGIN:VCARD/i.test(d)) text = d; } catch { /* mantém original */ }
+  }
+
 
   const lines = vcard.split(/\r?\n/);
   for (const line of lines) {
