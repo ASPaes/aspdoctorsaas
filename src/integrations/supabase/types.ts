@@ -4629,6 +4629,7 @@ export type Database = {
           created_at: string
           department_id: string | null
           id: string
+          late_response: boolean
           reason: string | null
           responded_at: string | null
           score: number | null
@@ -4641,6 +4642,7 @@ export type Database = {
           created_at?: string
           department_id?: string | null
           id?: string
+          late_response?: boolean
           reason?: string | null
           responded_at?: string | null
           score?: number | null
@@ -4653,6 +4655,7 @@ export type Database = {
           created_at?: string
           department_id?: string | null
           id?: string
+          late_response?: boolean
           reason?: string | null
           responded_at?: string | null
           score?: number | null
