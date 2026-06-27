@@ -44,6 +44,7 @@ export default function AgentPresenceButton() {
     fetchActiveAttendances,
     releaseToQueueAndEndShift,
     keepAssignmentsAndEndShift,
+    droppedForInactivity,
   } = useAgentPresence();
 
   const [loading, setLoading] = useState(false);
@@ -151,6 +152,21 @@ export default function AgentPresenceButton() {
 
   return (
     <>
+      {droppedForInactivity && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          <span>Você saiu por inatividade e não está recebendo atendimentos.</span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-xs"
+            disabled={loading}
+            onClick={() => wrap(setActive, "Você voltou a ficar disponível!")}
+          >
+            Voltar
+          </Button>
+        </div>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2.5 text-xs font-medium" disabled={loading}>
