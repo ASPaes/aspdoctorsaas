@@ -27,7 +27,7 @@ export function parseVCard(vcard: string | null): { name: string; phones: string
   }
 
 
-  const lines = vcard.split(/\r?\n/);
+  const lines = text.split(/\r?\n/);
   for (const line of lines) {
     if (line.startsWith('FN:')) {
       name = line.substring(3).trim();
