@@ -1443,10 +1443,22 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
         const zapiSingle = raw?.contact;
         const zapiMulti = raw?.contacts;
 
-        const parseVcard = (vcard: string, displayNameOverride?: string) => {
-          const name = displayNameOverride || vcard.match(/FN[^:]*:(.*)/i)?.[1]?.trim() || '';
-          const phone = vcard.match(/TEL[^:]*:(.*)/i)?.[1]?.trim().replace(/\D/g, '') || '';
-          return { displayName: name, vcard };
+        // Meta Cloud manda name como objeto {first_name, formatted_name} → coage p/ string
+        const coerceName = (v: any): string =>
+          typeof v === 'string' ? v
+          : (v && typeof v === 'object' ? (v.formatted_name || v.first_name || '') : '');
+
+        // Alguns providers (Meta Cloud) mandam o vcard em base64 → decodifica p/ texto plano
+        const decodeVcard = (vc: string): string => {
+          if (!vc) return vc;
+          if (/BEGIN:VCARD/i.test(vc)) return vc;
+          try { const d = atob(vc.trim()); return /BEGIN:VCARD/i.test(d) ? d : vc; } catch { return vc; }
+        };
+
+        const parseVcard = (vcard: string, displayNameOverride?: any) => {
+          const vc = decodeVcard(vcard || '');
+          const name = coerceName(displayNameOverride) || vc.match(/FN[^:]*:(.*)/i)?.[1]?.trim() || '';
+          return { displayName: name, vcard: vc };
         };
 
         let contacts: any[] = [];
@@ -1456,13 +1468,13 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
           const vc = zapiSingle.vCard || zapiSingle.vcard;
           contacts = [parseVcard(vc, zapiSingle.displayName || zapiSingle.name)];
         } else if (zapiSingle && (zapiSingle.displayName || zapiSingle.name)) {
-          const dn = zapiSingle.displayName || zapiSingle.name || '';
+          const dn = coerceName(zapiSingle.displayName || zapiSingle.name);
           const ph = (zapiSingle.phones?.[0] || zapiSingle.phone || zapiSingle.phoneNumber || '').replace(/\D/g, '');
           const sv = ph ? `BEGIN:VCARD\nVERSION:3.0\nFN:${dn}\nTEL:${ph}\nEND:VCARD` : null;
           contacts = [{ displayName: dn, vcard: sv }];
         } else if (zapiMulti?.length) {
           contacts = zapiMulti.map((c: any) => {
-            const dn = c.displayName || c.name || '';
+            const dn = coerceName(c.displayName || c.name);
             const vc = c.vCard || c.vcard;
             if (vc) return parseVcard(vc, dn);
             const ph = (c.phones?.[0] || c.phone || c.phoneNumber || '').replace(/\D/g, '');
