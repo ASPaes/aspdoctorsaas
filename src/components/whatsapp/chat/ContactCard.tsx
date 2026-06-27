@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 interface ContactInfo {
-  displayName: string | null;
+  displayName: string | { first_name?: string; formatted_name?: string } | null;
   vcard: string | null;
 }
 
