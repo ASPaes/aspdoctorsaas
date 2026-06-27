@@ -43,30 +43,46 @@ function getMessageType(mimeType: string): MediaSendParams['messageType'] {
   return 'document';
 }
 
+type ComposerMode = "message" | "note" | "draft";
+
 const DRAFT_STORAGE_PREFIX = "wa:chat-draft:";
-const getDraft = (id: string) => {
-  try { return sessionStorage.getItem(DRAFT_STORAGE_PREFIX + id) || ""; } catch { return ""; }
+const draftKey = (id: string, mode: ComposerMode) => `${DRAFT_STORAGE_PREFIX}${id}:${mode}`;
+const getDraft = (id: string, mode: ComposerMode) => {
+  try { return sessionStorage.getItem(draftKey(id, mode)) || ""; } catch { return ""; }
 };
-const setDraft = (id: string, val: string) => {
+const setDraft = (id: string, mode: ComposerMode, val: string) => {
   try {
-    if (val) sessionStorage.setItem(DRAFT_STORAGE_PREFIX + id, val);
-    else sessionStorage.removeItem(DRAFT_STORAGE_PREFIX + id);
+    if (val) sessionStorage.setItem(draftKey(id, mode), val);
+    else sessionStorage.removeItem(draftKey(id, mode));
   } catch { /* noop */ }
 };
 
 export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled }: Props) {
-  const [message, setMessage] = useState(() => initialMessage || getDraft(conversationId) || "");
+  const [mode, setMode] = useState<ComposerMode>("message");
+  const [message, setMessage] = useState(() => initialMessage || getDraft(conversationId, "message") || "");
 
-  // Ao trocar de conversa, hidrata com o rascunho salvo daquela conversa
+  // Ao trocar de conversa, volta para "Mensagem ao cliente" e hidrata o rascunho dessa aba
   useEffect(() => {
-    setMessage(getDraft(conversationId) || "");
+    setMode("message");
+    setMessage(getDraft(conversationId, "message") || "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
-  // Persiste o rascunho sempre que o texto muda
+  // Persiste o rascunho da aba atual sempre que o texto muda
   useEffect(() => {
-    setDraft(conversationId, message);
+    setDraft(conversationId, mode, message);
+  }, [conversationId, mode, message]);
+
+  // Trocar de aba: salva o texto atual no modo de origem e carrega o do modo de destino
+  const switchMode = useCallback((next: ComposerMode) => {
+    setMode((prev) => {
+      if (prev === next) return prev;
+      setDraft(conversationId, prev, message);
+      setMessage(getDraft(conversationId, next) || "");
+      return next;
+    });
   }, [conversationId, message]);
+
   const [isRecording, setIsRecording] = useState(false);
   const [showMacroSuggestions, setShowMacroSuggestions] = useState(false);
   const [filteredMacros, setFilteredMacros] = useState<any[]>([]);
@@ -75,7 +91,8 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeMacro, setActiveMacro] = useState<{ id: string; content: string; permite_edicao_livre: boolean; media_type?: string | null; media_path?: string | null } | null>(null);
-  const [isInternalNote, setIsInternalNote] = useState(false);
+  const isInternalNote = mode === "note";
+  const isDraftMode = mode === "draft";
   const { createNote, isCreating: isCreatingNote } = useConversationNotes(conversationId);
 
   const MAX_FILE_SIZE_MB = 100;
