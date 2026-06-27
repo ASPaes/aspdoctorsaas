@@ -605,6 +605,65 @@ async function sendDeferredClosureMessage(supabase: any, ctx: SendContext, conve
   } catch (err) { console.error('[processor] Error in sendDeferredClosureMessage:', err); }
 }
 
+// Nota de CSAT que chega DEPOIS de o CSAT expirar (cliente respondeu tarde).
+// Sem isto, a mensagem so-numero vira "demanda nova" e abre um atendimento fantasma.
+// Registra o score retroativo (late_response=true) sem reabrir atendimento.
+export async function handleLateCsatResponse(supabase: any, ctx: SendContext, conversationId: string, tenantId: string, messageContent: string): Promise<boolean> {
+  try {
+    const trimmed = (messageContent || '').trim();
+
+    // Filtro barato: so age se a mensagem for essencialmente um numero curto
+    const digits = trimmed.replace(/[^0-9]/g, '');
+    if (!(trimmed.length <= 4 && /^[0-9]+$/.test(digits))) return false;
+
+    const scoreNum = parseInt(digits, 10);
+
+    const supportConfig = await getSupportConfig(supabase, tenantId);
+    if (scoreNum < supportConfig.support_csat_score_min || scoreNum > supportConfig.support_csat_score_max) return false;
+
+    // Nao age se ja houver atendimento ativo (o numero pode pertencer a um fluxo em curso)
+    const { data: activeAtt } = await supabase
+      .from('support_attendances').select('id')
+      .eq('conversation_id', conversationId)
+      .in('status', ['waiting', 'in_progress']).limit(1).maybeSingle();
+    if (activeAtt) return false;
+
+    // Procura CSAT expirado da conversa dentro da janela de grace (ancorada no envio)
+    const cutoff = new Date(Date.now() - CSAT_LATE_GRACE_MINUTES * 60 * 1000).toISOString();
+
+    const { data: convAtts } = await supabase
+      .from('support_attendances').select('id').eq('conversation_id', conversationId);
+    const attIds = (convAtts ?? []).map((a: any) => a.id);
+    if (attIds.length === 0) return false;
+
+    const { data: csat } = await supabase
+      .from('support_csat')
+      .select('id, status, asked_at, score')
+      .in('attendance_id', attIds)
+      .eq('status', 'expired')
+      .gte('asked_at', cutoff)
+      .order('asked_at', { ascending: false })
+      .limit(1).maybeSingle();
+
+    if (!csat) return false;
+
+    // Grava a nota tardia: sem reabrir atendimento, sem pedir motivo
+    await supabase.from('support_csat').update({
+      score: scoreNum,
+      status: 'completed',
+      late_response: true,
+      responded_at: new Date().toISOString(),
+    }).eq('id', csat.id);
+
+    await sendAndPersistAutoMessage(supabase, ctx, conversationId,
+      '\u{2705} Avaliacao registrada. Obrigado pelo retorno! \u{1F64F}',
+      { csat: true, csat_late: true });
+
+    console.log(`[processor] Late CSAT registered for conversation ${conversationId}: score=${scoreNum}`);
+    return true;
+  } catch (err) { console.error('[processor] Error in handleLateCsatResponse:', err); return false; }
+}
+
 // ─── Department-level Business Hours ──────────────────────────────────────────
 
 interface DepartmentBusinessHoursResult {
@@ -1581,6 +1640,9 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
 
   const csatHandled = await handleCsatResponse(supabase, ctx, conversationId, tenantId, content);
   if (csatHandled) return;
+
+  const lateCsatHandled = await handleLateCsatResponse(supabase, ctx, conversationId, tenantId, content);
+  if (lateCsatHandled) return;
 
   const { data: convStatus } = await supabase.from('whatsapp_conversations').select('status').eq('id', conversationId).single();
   if (convStatus?.status === 'closed') await supabase.from('whatsapp_conversations').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', conversationId);
