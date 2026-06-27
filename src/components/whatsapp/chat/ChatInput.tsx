@@ -603,38 +603,59 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         onRefresh={refresh}
       />
 
-      <div className={cn("p-4", isInternalNote && "bg-amber-500/5 border-t-2 border-amber-500/60")}> 
-        {/* Toggle: Mensagem ao cliente vs. Nota interna */}
+      <div className={cn(
+        "p-4",
+        isInternalNote && "bg-amber-500/5 border-t-2 border-amber-500/60",
+        isDraftMode && "bg-sky-500/5 border-t-2 border-sky-500/60",
+      )}>
+        {/* Toggle: Mensagem ao cliente vs. Nota interna vs. Rascunho */}
         <div className="flex items-center justify-between mb-2">
           <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
             <button
               type="button"
-              onClick={() => setIsInternalNote(false)}
+              onClick={() => switchMode("message")}
               className={cn(
                 "px-3 py-1 transition-colors flex items-center gap-1.5",
-                !isInternalNote ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:bg-muted"
+                mode === "message" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:bg-muted"
               )}
-              aria-pressed={!isInternalNote}
+              aria-pressed={mode === "message"}
             >
               <Send className="w-3 h-3" />
               Mensagem ao cliente
             </button>
             <button
               type="button"
-              onClick={() => setIsInternalNote(true)}
+              onClick={() => switchMode("note")}
               className={cn(
                 "px-3 py-1 transition-colors flex items-center gap-1.5 border-l border-border",
-                isInternalNote ? "bg-amber-500 text-amber-950" : "bg-transparent text-muted-foreground hover:bg-muted"
+                mode === "note" ? "bg-amber-500 text-amber-950" : "bg-transparent text-muted-foreground hover:bg-muted"
               )}
-              aria-pressed={isInternalNote}
+              aria-pressed={mode === "note"}
             >
               <StickyNote className="w-3 h-3" />
               Nota interna
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode("draft")}
+              className={cn(
+                "px-3 py-1 transition-colors flex items-center gap-1.5 border-l border-border",
+                mode === "draft" ? "bg-sky-500 text-sky-50" : "bg-transparent text-muted-foreground hover:bg-muted"
+              )}
+              aria-pressed={mode === "draft"}
+            >
+              <FileText className="w-3 h-3" />
+              Rascunho
             </button>
           </div>
           {isInternalNote && (
             <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
               Visível apenas para a equipe — não enviada ao cliente
+            </span>
+          )}
+          {isDraftMode && (
+            <span className="text-[11px] text-sky-700 dark:text-sky-300 font-medium">
+              Rascunho local — não é enviado nem salvo no servidor
             </span>
           )}
         </div>
