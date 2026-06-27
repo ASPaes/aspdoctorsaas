@@ -43,8 +43,30 @@ function getMessageType(mimeType: string): MediaSendParams['messageType'] {
   return 'document';
 }
 
+const DRAFT_STORAGE_PREFIX = "wa:chat-draft:";
+const getDraft = (id: string) => {
+  try { return sessionStorage.getItem(DRAFT_STORAGE_PREFIX + id) || ""; } catch { return ""; }
+};
+const setDraft = (id: string, val: string) => {
+  try {
+    if (val) sessionStorage.setItem(DRAFT_STORAGE_PREFIX + id, val);
+    else sessionStorage.removeItem(DRAFT_STORAGE_PREFIX + id);
+  } catch { /* noop */ }
+};
+
 export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled }: Props) {
-  const [message, setMessage] = useState(initialMessage || "");
+  const [message, setMessage] = useState(() => initialMessage || getDraft(conversationId) || "");
+
+  // Ao trocar de conversa, hidrata com o rascunho salvo daquela conversa
+  useEffect(() => {
+    setMessage(getDraft(conversationId) || "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
+
+  // Persiste o rascunho sempre que o texto muda
+  useEffect(() => {
+    setDraft(conversationId, message);
+  }, [conversationId, message]);
   const [isRecording, setIsRecording] = useState(false);
   const [showMacroSuggestions, setShowMacroSuggestions] = useState(false);
   const [filteredMacros, setFilteredMacros] = useState<any[]>([]);
