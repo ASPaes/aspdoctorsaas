@@ -66,7 +66,14 @@ function SingleContactCard({
   onContactSave?: (phone: string, name: string) => void;
 }) {
   const { name, phones } = parseVCard(contact.vcard);
-  const displayName = contact.displayName || name || 'Contato';
+  const rawDisplay: any = contact.displayName;
+  const resolvedDisplay =
+    typeof rawDisplay === 'string'
+      ? rawDisplay
+      : rawDisplay && typeof rawDisplay === 'object'
+        ? (rawDisplay.formatted_name || rawDisplay.first_name || '')
+        : '';
+  const displayName = resolvedDisplay || name || 'Contato';
   const primaryPhone = phones[0] || '';
   const digits = primaryPhone.replace(/\D/g, '');
 
