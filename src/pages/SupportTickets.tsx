@@ -957,7 +957,7 @@ export default function SupportTickets() {
     }));
     const totalMinutos = rows.reduce((sum, t) => sum + (t.duracao_minutos ?? 0), 0);
     data.push({
-      "Código": "", "Cliente": "", "Assunto": "", "Produto": "", "Categoria": "",
+      "Código": "", "Cliente": "", "Rótulo": "", "Assunto": "", "Produto": "", "Categoria": "",
       "Subcategoria": "", "Tipo": "", "Canal": "", "Tipo Horário": "", "Status": "",
       "Prioridade": "", "Responsável": `TOTAL (${rows.length} tickets)`,
       "Aberto em": "", "Concluído em": "", "Hr Início Plantão": "", "Hr Fim Plantão": "",
