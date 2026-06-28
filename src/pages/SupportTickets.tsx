@@ -71,6 +71,7 @@ interface TicketRow {
   id: string;
   ticket_code: string | null;
   assunto: string | null;
+  rotulo: string | null;
   status_id: string | null;
   prioridade: string | null;
   canal_origem: string | null;
@@ -664,7 +665,7 @@ export default function SupportTickets() {
 
       let q = (supabase.from("support_tickets" as any) as any)
         .select(`
-          id, ticket_code, assunto, status_id, prioridade, canal_origem, tipo_horario,
+          id, ticket_code, assunto, rotulo, status_id, prioridade, canal_origem, tipo_horario,
           aberto_em, concluido_em, agendado_para, parent_ticket_id,
           horario_inicio, horario_fim, duracao_minutos, responsavel_user_id,
           clientes:cliente_id(nome_fantasia),
@@ -707,7 +708,7 @@ export default function SupportTickets() {
       }
 
       if (s) {
-        const orParts = [...ticketCodePatterns, `assunto.ilike.*${s}*`];
+        const orParts = [...ticketCodePatterns, `assunto.ilike.*${s}*`, `rotulo.ilike.*${s}*`];
         if (clienteIds.length > 0) {
           orParts.push(`cliente_id.in.(${clienteIds.join(",")})`);
         }
@@ -854,7 +855,7 @@ export default function SupportTickets() {
     const builder = () => {
       let q = (supabase.from("support_tickets" as any) as any)
         .select(`
-          id, ticket_code, assunto, status_id, prioridade, canal_origem, tipo_horario,
+          id, ticket_code, assunto, rotulo, status_id, prioridade, canal_origem, tipo_horario,
           aberto_em, concluido_em, agendado_para, parent_ticket_id,
           horario_inicio, horario_fim, duracao_minutos, responsavel_user_id,
           clientes:cliente_id(nome_fantasia),
@@ -892,7 +893,7 @@ export default function SupportTickets() {
       }
 
       if (s) {
-        const orParts = [...ticketCodePatterns, `assunto.ilike.*${s}*`];
+        const orParts = [...ticketCodePatterns, `assunto.ilike.*${s}*`, `rotulo.ilike.*${s}*`];
         if (clienteIds.length > 0) {
           orParts.push(`cliente_id.in.(${clienteIds.join(",")})`);
         }
@@ -936,6 +937,7 @@ export default function SupportTickets() {
     const data: Record<string, any>[] = rows.map(t => ({
       "Código": t.ticket_code ?? "",
       "Cliente": t.clientes?.nome_fantasia ?? "",
+      "Rótulo": t.rotulo ?? "",
       "Assunto": t.assunto ?? "",
       "Produto": t.produtos?.nome ?? "",
       "Categoria": t.service_categories?.nome ?? "",
@@ -955,7 +957,7 @@ export default function SupportTickets() {
     }));
     const totalMinutos = rows.reduce((sum, t) => sum + (t.duracao_minutos ?? 0), 0);
     data.push({
-      "Código": "", "Cliente": "", "Assunto": "", "Produto": "", "Categoria": "",
+      "Código": "", "Cliente": "", "Rótulo": "", "Assunto": "", "Produto": "", "Categoria": "",
       "Subcategoria": "", "Tipo": "", "Canal": "", "Tipo Horário": "", "Status": "",
       "Prioridade": "", "Responsável": `TOTAL (${rows.length} tickets)`,
       "Aberto em": "", "Concluído em": "", "Hr Início Plantão": "", "Hr Fim Plantão": "",
@@ -1624,6 +1626,7 @@ export default function SupportTickets() {
                         <p className="text-sm font-medium truncate">
                           {t.clientes?.nome_fantasia ?? "Cliente não vinculado"}
                         </p>
+                        {t.rotulo && <span className="text-sm font-semibold text-sky-400 truncate">({t.rotulo})</span>}
                         {(() => { const si = getStatusInfo(t.status_id); return (
                           <Badge className="text-[10px] border font-semibold" style={{ background: si.color, color: getReadableTextColor(si.color), borderColor: si.color }}>{si.name}</Badge>
                         ); })()}

@@ -5175,6 +5175,7 @@ export type Database = {
           responsavel_user_id: string | null
           resumo_conclusivo: string | null
           resumo_parcial: string | null
+          rotulo: string | null
           service_type_id: string | null
           status_id: string | null
           subcategory_id: string | null
@@ -5221,6 +5222,7 @@ export type Database = {
           responsavel_user_id?: string | null
           resumo_conclusivo?: string | null
           resumo_parcial?: string | null
+          rotulo?: string | null
           service_type_id?: string | null
           status_id?: string | null
           subcategory_id?: string | null
@@ -5267,6 +5269,7 @@ export type Database = {
           responsavel_user_id?: string | null
           resumo_conclusivo?: string | null
           resumo_parcial?: string | null
+          rotulo?: string | null
           service_type_id?: string | null
           status_id?: string | null
           subcategory_id?: string | null
