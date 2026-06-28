@@ -937,6 +937,7 @@ export default function SupportTickets() {
     const data: Record<string, any>[] = rows.map(t => ({
       "Código": t.ticket_code ?? "",
       "Cliente": t.clientes?.nome_fantasia ?? "",
+      "Rótulo": t.rotulo ?? "",
       "Assunto": t.assunto ?? "",
       "Produto": t.produtos?.nome ?? "",
       "Categoria": t.service_categories?.nome ?? "",
