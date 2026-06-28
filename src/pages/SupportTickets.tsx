@@ -1625,6 +1625,7 @@ export default function SupportTickets() {
                         <p className="text-sm font-medium truncate">
                           {t.clientes?.nome_fantasia ?? "Cliente não vinculado"}
                         </p>
+                        {t.rotulo && <span className="text-sm font-semibold text-sky-400 truncate">({t.rotulo})</span>}
                         {(() => { const si = getStatusInfo(t.status_id); return (
                           <Badge className="text-[10px] border font-semibold" style={{ background: si.color, color: getReadableTextColor(si.color), borderColor: si.color }}>{si.name}</Badge>
                         ); })()}
