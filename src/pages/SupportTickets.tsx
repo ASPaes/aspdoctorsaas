@@ -720,7 +720,7 @@ export default function SupportTickets() {
 
 
       if (sortBy === "cliente") {
-        // no-op: mantém ordenação por aberto_em (recente)
+        q = q.order("nome_fantasia", { ascending: true, referencedTable: "clientes" });
       } else if (sortBy === "agenda") {
         q = q.order("agendado_para", { ascending: true, nullsFirst: false });
       } else {
