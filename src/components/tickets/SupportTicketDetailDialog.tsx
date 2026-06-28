@@ -1062,23 +1062,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </div>
       </div>
 
-      {/* Rótulo (editável) */}
-      <div className="space-y-1.5">
-        <Label className="text-xs font-medium">Rótulo</Label>
-        <Input
-          defaultValue={ticket?.rotulo ?? ""}
-          key={`rotulo-${ticket?.rotulo ?? ""}`}
-          placeholder="Nome complementar para distinguir este ticket..."
-          className="text-sm"
-          onBlur={(e) => {
-            const val = e.target.value;
-            if (val !== (ticket?.rotulo ?? "")) {
-              handleFieldUpdate({ rotulo: val });
-            }
-          }}
-          disabled={updating}
-        />
-      </div>
 
       {/* Assunto */}
       {ticket.assunto && (
