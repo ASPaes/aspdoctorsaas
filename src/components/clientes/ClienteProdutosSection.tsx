@@ -730,12 +730,16 @@ function ProdutoDialog({
         body: { acao: "ler_padroes", tenant_id: resolvedTenantId, dados: { operacao: "ler" } },
       });
       if (error) throw error;
-      const payload = (data as any)?.dados ?? data ?? {};
+      const resultado = (data as any)?.resultado ?? (data as any)?.dados ?? data ?? {};
+      if (resultado?.ok === false) {
+        throw new Error(resultado?.error || "Falha ao carregar opções do Omie");
+      }
       return {
-        contas: (payload.contas ?? []) as Array<{ codigo: any; descricao: string }>,
-        servicos: (payload.servicos ?? []) as Array<{ codigo: any; descricao: string }>,
-        tipos_faturamento: (payload.tipos_faturamento ?? []) as Array<{ codigo: any; descricao: string }>,
+        contas: (resultado.contas ?? []) as Array<{ codigo: any; descricao: string }>,
+        servicos: (resultado.servicos ?? []) as Array<{ codigo: any; descricao: string }>,
+        tipos_faturamento: (resultado.tipos_faturamento ?? []) as Array<{ codigo: any; descricao: string }>,
       };
+
     },
   });
 
@@ -1201,7 +1205,11 @@ function ProdutoDialog({
               <p className="text-xs text-muted-foreground">
                 Valores específicos deste produto. Se vazios, os padrões da integração serão usados.
               </p>
+              {omiePadroesQ.isError && (
+                <p className="text-xs text-destructive">Não foi possível carregar as opções do Omie.</p>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
                 <div className="space-y-1">
                   <Label>Serviço Omie</Label>
                   <Select
