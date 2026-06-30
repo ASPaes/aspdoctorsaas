@@ -661,45 +661,57 @@ function ProdutoDialog({
   const produtoTrocou = isEdit && produtoId !== "" && produtoId !== produtoIdOriginal;
 
   // Lookups
+  const clienteTenantQ = useQuery<{ tenant_id: string | null }>({
+    queryKey: ["cliente_tenant_id", clienteId],
+    enabled: open && !!clienteId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("clientes" as any) as any)
+        .select("tenant_id").eq("id", clienteId).maybeSingle();
+      if (error) throw error;
+      return (data ?? { tenant_id: null }) as any;
+    },
+  });
+  const resolvedTenantId: string | null = (clienteTenantQ.data?.tenant_id ?? tid) ?? null;
+
   const modelosContratoLookup = useQuery<{ id: number; nome: string }[]>({
-    queryKey: ["modelos_contrato_lookup", tid],
-    enabled: open,
+    queryKey: ["modelos_contrato_lookup", resolvedTenantId],
+    enabled: open && !!resolvedTenantId,
     queryFn: async () => {
       let q = (supabase.from("modelos_contrato" as any) as any).select("id, nome").order("nome");
-      if (tid) q = q.eq("tenant_id", tid);
+      if (resolvedTenantId) q = q.eq("tenant_id", resolvedTenantId);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as any;
     },
   });
   const funcionariosLookup = useQuery<{ id: number; nome: string }[]>({
-    queryKey: ["funcionarios_lookup", tid],
-    enabled: open,
+    queryKey: ["funcionarios_lookup", resolvedTenantId],
+    enabled: open && !!resolvedTenantId,
     queryFn: async () => {
       let q = (supabase.from("funcionarios" as any) as any).select("id, nome").order("nome");
-      if (tid) q = q.eq("tenant_id", tid);
+      if (resolvedTenantId) q = q.eq("tenant_id", resolvedTenantId);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as any;
     },
   });
   const origensVendaLookup = useQuery<{ id: number; nome: string }[]>({
-    queryKey: ["origens_venda_lookup", tid],
-    enabled: open,
+    queryKey: ["origens_venda_lookup", resolvedTenantId],
+    enabled: open && !!resolvedTenantId,
     queryFn: async () => {
       let q = (supabase.from("origens_venda" as any) as any).select("id, nome").order("nome");
-      if (tid) q = q.eq("tenant_id", tid);
+      if (resolvedTenantId) q = q.eq("tenant_id", resolvedTenantId);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as any;
     },
   });
   const formasPagamentoLookup = useQuery<{ id: number; nome: string }[]>({
-    queryKey: ["formas_pagamento_lookup", tid],
-    enabled: open,
+    queryKey: ["formas_pagamento_lookup", resolvedTenantId],
+    enabled: open && !!resolvedTenantId,
     queryFn: async () => {
       let q = (supabase.from("formas_pagamento" as any) as any).select("id, nome").order("nome");
-      if (tid) q = q.eq("tenant_id", tid);
+      if (resolvedTenantId) q = q.eq("tenant_id", resolvedTenantId);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as any;
