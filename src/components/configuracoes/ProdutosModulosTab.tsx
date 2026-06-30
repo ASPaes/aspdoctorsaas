@@ -433,15 +433,110 @@ export default function ProdutosModulosTab() {
 
       {/* Produto Dialog */}
       <Dialog open={produtoDialogOpen} onOpenChange={setProdutoDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingProduto ? "Editar Produto" : "Novo Produto"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="produto-nome">Nome</Label>
               <Input id="produto-nome" value={produtoNome} onChange={(e) => setProdutoNome(e.target.value)} autoFocus />
             </div>
+
+            {omieAtivo && (
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-semibold">Integração Omie</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Estes campos são opcionais. Se deixados em branco, o contrato usará os Padrões Omie configurados em Configurações → Integrações → Omie. Preencha apenas se este produto precisar de valores diferentes do padrão.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Serviço Omie</Label>
+                    <Select value={omieServico || "__default__"} onValueChange={(v) => setOmieServico(v === "__default__" ? "" : v)}>
+                      <SelectTrigger><SelectValue placeholder="Usar padrão" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__default__">Usar padrão</SelectItem>
+                        {(omiePadroesQ.data?.servicos ?? []).map((s) => (
+                          <SelectItem key={String(s.codigo)} value={String(s.codigo)}>{s.descricao}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Conta Corrente</Label>
+                    <Select value={omieConta || "__default__"} onValueChange={(v) => setOmieConta(v === "__default__" ? "" : v)}>
+                      <SelectTrigger><SelectValue placeholder="Usar padrão" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__default__">Usar padrão</SelectItem>
+                        {(omiePadroesQ.data?.contas ?? []).map((c) => (
+                          <SelectItem key={String(c.codigo)} value={String(c.codigo)}>{c.descricao}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Tipo de Faturamento</Label>
+                    <Select value={omieTipoFat || "__default__"} onValueChange={(v) => setOmieTipoFat(v === "__default__" ? "" : v)}>
+                      <SelectTrigger><SelectValue placeholder="Usar padrão" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__default__">Usar padrão</SelectItem>
+                        {(omiePadroesQ.data?.tipos_faturamento ?? []).map((t) => (
+                          <SelectItem key={String(t.codigo)} value={String(t.codigo)}>{t.descricao}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="omie-dia-fat">Dia de Faturamento</Label>
+                    <Input
+                      id="omie-dia-fat"
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={omieDiaFat}
+                      onChange={(e) => setOmieDiaFat(e.target.value)}
+                      placeholder="1-31"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="omie-num-parcelas">Número de Parcelas</Label>
+                    <Input
+                      id="omie-num-parcelas"
+                      type="number"
+                      min={1}
+                      value={omieNumParcelas}
+                      onChange={(e) => setOmieNumParcelas(e.target.value)}
+                      placeholder="Em branco para usar padrão"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-start justify-between gap-3 rounded-md border border-border bg-background p-3">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="omie-permite-nuvem" className="text-sm">Permite servidor em nuvem</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Habilita a cobrança recorrente de servidor em nuvem para clientes deste produto.
+                    </p>
+                  </div>
+                  <Switch
+                    id="omie-permite-nuvem"
+                    checked={omiePermiteNuvem}
+                    onCheckedChange={setOmiePermiteNuvem}
+                  />
+                </div>
+
+                <p className="text-xs text-muted-foreground italic">
+                  A categoria Omie deste produto é definida em Configurações → Integrações → Omie, na aba Vínculos.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setProdutoDialogOpen(false)} disabled={savingProduto}>Cancelar</Button>
