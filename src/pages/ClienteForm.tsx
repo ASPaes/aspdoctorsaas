@@ -133,12 +133,15 @@ export type ClienteFormValues = z.infer<typeof clienteSchema>;
 
 function ContratoEventosHistorico({ clienteId }: { clienteId: string }) {
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin === true;
+  const [editEvt, setEditEvt] = useState<any | null>(null);
 
   const eventosQuery = useQuery({
     queryKey: ["contrato_eventos_historico", tid, clienteId],
     queryFn: async () => {
       let q = (supabase.from("contrato_eventos" as any) as any)
-        .select("id, acao, data_acao, observacao, mensalidade_contrato_snapshot, mensalidade_cliente_snapshot, contrato_id, created_at")
+        .select("id, acao, data_acao, observacao, mensalidade_contrato_snapshot, mensalidade_cliente_snapshot, contrato_id, created_at, motivo_cancelamento_id")
         .eq("cliente_id", clienteId)
         .order("data_acao", { ascending: false });
 
