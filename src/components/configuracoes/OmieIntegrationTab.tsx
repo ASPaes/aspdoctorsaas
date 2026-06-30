@@ -217,6 +217,14 @@ export default function OmieIntegrationTab() {
           <p className="text-sm text-muted-foreground">Conecte a integração antes de configurar os vínculos.</p>
         )}
       </TabsContent>
+
+      <TabsContent value="padroes">
+        {configurado ? (
+          <OmiePadroesTab />
+        ) : (
+          <p className="text-sm text-muted-foreground">Conecte a integração antes de configurar os padrões.</p>
+        )}
+      </TabsContent>
     </Tabs>
   );
 }
