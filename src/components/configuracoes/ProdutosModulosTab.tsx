@@ -20,9 +20,20 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "@/hooks/use-toast";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
+import { Switch } from "@/components/ui/switch";
 
 
-interface Produto { id: number; nome: string; tenant_id: string; }
+interface Produto {
+  id: number;
+  nome: string;
+  tenant_id: string;
+  omie_servico_codigo?: number | null;
+  omie_conta_corrente_codigo?: number | null;
+  omie_tipo_faturamento_codigo?: string | null;
+  omie_dia_faturamento?: number | null;
+  omie_numero_parcelas?: number | null;
+  omie_permite_servidor_nuvem?: boolean | null;
+}
 interface Modulo {
   id: string;
   nome: string;
