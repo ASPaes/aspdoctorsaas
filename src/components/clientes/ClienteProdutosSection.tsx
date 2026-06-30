@@ -141,11 +141,24 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     return map;
   }, [modulosQuery.data]);
 
+  const clienteTenantQuery = useQuery<{ tenant_id: string | null }>({
+    queryKey: ["cliente_tenant_lookup", clienteId],
+    enabled: !!clienteId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("clientes" as any) as any)
+        .select("tenant_id").eq("id", clienteId).maybeSingle();
+      if (error) throw error;
+      return (data ?? { tenant_id: null }) as any;
+    },
+  });
+  const lookupTenantId: string | null = (clienteTenantQuery.data?.tenant_id ?? tid) ?? null;
+
   const produtosLookup = useQuery<{ id: number; nome: string }[]>({
-    queryKey: ["produtos_lookup", tid],
+    queryKey: ["produtos_lookup", lookupTenantId],
+    enabled: !!lookupTenantId,
     queryFn: async () => {
       let q = (supabase.from("produtos" as any) as any).select("id, nome").order("nome");
-      if (tid) q = q.eq("tenant_id", tid);
+      if (lookupTenantId) q = q.eq("tenant_id", lookupTenantId);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as any;
@@ -153,10 +166,11 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   });
 
   const fornecedoresLookup = useQuery<{ id: number; nome: string }[]>({
-    queryKey: ["fornecedores_lookup", tid],
+    queryKey: ["fornecedores_lookup", lookupTenantId],
+    enabled: !!lookupTenantId,
     queryFn: async () => {
       let q = supabase.from("fornecedores").select("id, nome").order("nome");
-      if (tid) q = q.eq("tenant_id", tid);
+      if (lookupTenantId) q = q.eq("tenant_id", lookupTenantId);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as any;
