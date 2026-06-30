@@ -730,12 +730,16 @@ function ProdutoDialog({
         body: { acao: "ler_padroes", tenant_id: resolvedTenantId, dados: { operacao: "ler" } },
       });
       if (error) throw error;
-      const payload = (data as any)?.dados ?? data ?? {};
+      const resultado = (data as any)?.resultado ?? (data as any)?.dados ?? data ?? {};
+      if (resultado?.ok === false) {
+        throw new Error(resultado?.error || "Falha ao carregar opções do Omie");
+      }
       return {
-        contas: (payload.contas ?? []) as Array<{ codigo: any; descricao: string }>,
-        servicos: (payload.servicos ?? []) as Array<{ codigo: any; descricao: string }>,
-        tipos_faturamento: (payload.tipos_faturamento ?? []) as Array<{ codigo: any; descricao: string }>,
+        contas: (resultado.contas ?? []) as Array<{ codigo: any; descricao: string }>,
+        servicos: (resultado.servicos ?? []) as Array<{ codigo: any; descricao: string }>,
+        tipos_faturamento: (resultado.tipos_faturamento ?? []) as Array<{ codigo: any; descricao: string }>,
       };
+
     },
   });
 
