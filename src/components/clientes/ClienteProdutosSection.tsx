@@ -690,6 +690,87 @@ function ProdutoDialog({
     },
   });
 
+  // ========= Omie: tenant a partir do cliente + integração ativa + padrões =========
+  const clienteTenantQ = useQuery<{ tenant_id: string | null }>({
+    queryKey: ["cliente_tenant_id", clienteId],
+    enabled: open && !!clienteId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("clientes" as any) as any)
+        .select("tenant_id").eq("id", clienteId).maybeSingle();
+      if (error) throw error;
+      return (data ?? { tenant_id: null }) as any;
+    },
+  });
+  const resolvedTenantId: string | null = (clienteTenantQ.data?.tenant_id ?? tid) ?? null;
+
+  const omieAtivoQ = useQuery({
+    queryKey: ["omie_integration_ativo_dialog", resolvedTenantId],
+    enabled: open && !!resolvedTenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("omie_integration" as any) as any)
+        .select("tenant_id")
+        .eq("tenant_id", resolvedTenantId as string)
+        .eq("ativo", true)
+        .maybeSingle();
+      // eslint-disable-next-line no-console
+      console.log("[ProdutoDialog/Omie] tenantId resolvido:", resolvedTenantId, "omie_integration:", data, "error:", error);
+      if (error) throw error;
+      return !!data;
+    },
+  });
+  const omieAtivo = omieAtivoQ.data === true;
+
+  const omiePadroesQ = useQuery({
+    queryKey: ["omie_padroes_lists_dialog", resolvedTenantId],
+    enabled: open && omieAtivo && !!resolvedTenantId,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("omie-integration-call", {
+        body: { acao: "ler_padroes", tenant_id: resolvedTenantId, dados: { operacao: "ler" } },
+      });
+      if (error) throw error;
+      const payload = (data as any)?.dados ?? data ?? {};
+      return {
+        contas: (payload.contas ?? []) as Array<{ codigo: any; descricao: string }>,
+        servicos: (payload.servicos ?? []) as Array<{ codigo: any; descricao: string }>,
+        tipos_faturamento: (payload.tipos_faturamento ?? []) as Array<{ codigo: any; descricao: string }>,
+      };
+    },
+  });
+
+  // Carrega o produto selecionado para ler campos omie_* atuais
+  const produtoOmieQ = useQuery({
+    queryKey: ["produto_omie_atual", produtoId, resolvedTenantId],
+    enabled: open && omieAtivo && !!produtoId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("produtos" as any) as any)
+        .select("id, omie_servico_codigo, omie_conta_corrente_codigo, omie_tipo_faturamento_codigo, omie_dia_faturamento, omie_numero_parcelas, omie_permite_servidor_nuvem")
+        .eq("id", Number(produtoId))
+        .maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+  });
+
+  // Estado dos campos Omie
+  const [omieServico, setOmieServico] = useState<string>("");
+  const [omieConta, setOmieConta] = useState<string>("");
+  const [omieTipoFat, setOmieTipoFat] = useState<string>("");
+  const [omieDiaFat, setOmieDiaFat] = useState<string>("");
+  const [omieNumParcelas, setOmieNumParcelas] = useState<string>("");
+  const [omiePermiteNuvem, setOmiePermiteNuvem] = useState<boolean>(false);
+
+  useEffect(() => {
+    const p = produtoOmieQ.data;
+    setOmieServico(p?.omie_servico_codigo != null ? String(p.omie_servico_codigo) : "");
+    setOmieConta(p?.omie_conta_corrente_codigo != null ? String(p.omie_conta_corrente_codigo) : "");
+    setOmieTipoFat(p?.omie_tipo_faturamento_codigo ?? "");
+    setOmieDiaFat(p?.omie_dia_faturamento != null ? String(p.omie_dia_faturamento) : "");
+    setOmieNumParcelas(p?.omie_numero_parcelas != null ? String(p.omie_numero_parcelas) : "");
+    setOmiePermiteNuvem(p?.omie_permite_servidor_nuvem === true);
+  }, [produtoOmieQ.data, produtoId]);
+
+
+
   // Reset on open
   useMemo(() => {
     if (open) {
