@@ -59,6 +59,13 @@ export default function ProdutosModulosTab() {
   const [editingProduto, setEditingProduto] = useState<Produto | null>(null);
   const [produtoNome, setProdutoNome] = useState("");
   const [savingProduto, setSavingProduto] = useState(false);
+  // Omie fields (only used when integration is active)
+  const [omieServico, setOmieServico] = useState<string>("");
+  const [omieConta, setOmieConta] = useState<string>("");
+  const [omieTipoFat, setOmieTipoFat] = useState<string>("");
+  const [omieDiaFat, setOmieDiaFat] = useState<string>("");
+  const [omieNumParcelas, setOmieNumParcelas] = useState<string>("");
+  const [omiePermiteNuvem, setOmiePermiteNuvem] = useState<boolean>(false);
 
   // Produto delete
   const [deleteProduto, setDeleteProduto] = useState<Produto | null>(null);
