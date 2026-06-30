@@ -719,17 +719,6 @@ function ProdutoDialog({
   });
 
   // ========= Omie: tenant a partir do cliente + integração ativa + padrões =========
-  const clienteTenantQ = useQuery<{ tenant_id: string | null }>({
-    queryKey: ["cliente_tenant_id", clienteId],
-    enabled: open && !!clienteId,
-    queryFn: async () => {
-      const { data, error } = await (supabase.from("clientes" as any) as any)
-        .select("tenant_id").eq("id", clienteId).maybeSingle();
-      if (error) throw error;
-      return (data ?? { tenant_id: null }) as any;
-    },
-  });
-  const resolvedTenantId: string | null = (clienteTenantQ.data?.tenant_id ?? tid) ?? null;
 
   const omieAtivoQ = useQuery({
     queryKey: ["omie_integration_ativo_dialog", resolvedTenantId],
