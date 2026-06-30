@@ -3544,16 +3544,34 @@ export type Database = {
         Row: {
           id: number
           nome: string
+          omie_conta_corrente_codigo: number | null
+          omie_dia_faturamento: number | null
+          omie_numero_parcelas: number | null
+          omie_permite_servidor_nuvem: boolean | null
+          omie_servico_codigo: number | null
+          omie_tipo_faturamento_codigo: string | null
           tenant_id: string | null
         }
         Insert: {
           id?: number
           nome: string
+          omie_conta_corrente_codigo?: number | null
+          omie_dia_faturamento?: number | null
+          omie_numero_parcelas?: number | null
+          omie_permite_servidor_nuvem?: boolean | null
+          omie_servico_codigo?: number | null
+          omie_tipo_faturamento_codigo?: string | null
           tenant_id?: string | null
         }
         Update: {
           id?: number
           nome?: string
+          omie_conta_corrente_codigo?: number | null
+          omie_dia_faturamento?: number | null
+          omie_numero_parcelas?: number | null
+          omie_permite_servidor_nuvem?: boolean | null
+          omie_servico_codigo?: number | null
+          omie_tipo_faturamento_codigo?: string | null
           tenant_id?: string | null
         }
         Relationships: []
