@@ -33,6 +33,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+
 import SugestaoMRRDialog from "./SugestaoMRRDialog";
 import ReajusteModulosDialog from "./ReajusteModulosDialog";
 
@@ -690,6 +692,87 @@ function ProdutoDialog({
     },
   });
 
+  // ========= Omie: tenant a partir do cliente + integração ativa + padrões =========
+  const clienteTenantQ = useQuery<{ tenant_id: string | null }>({
+    queryKey: ["cliente_tenant_id", clienteId],
+    enabled: open && !!clienteId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("clientes" as any) as any)
+        .select("tenant_id").eq("id", clienteId).maybeSingle();
+      if (error) throw error;
+      return (data ?? { tenant_id: null }) as any;
+    },
+  });
+  const resolvedTenantId: string | null = (clienteTenantQ.data?.tenant_id ?? tid) ?? null;
+
+  const omieAtivoQ = useQuery({
+    queryKey: ["omie_integration_ativo_dialog", resolvedTenantId],
+    enabled: open && !!resolvedTenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("omie_integration" as any) as any)
+        .select("tenant_id")
+        .eq("tenant_id", resolvedTenantId as string)
+        .eq("ativo", true)
+        .maybeSingle();
+      // eslint-disable-next-line no-console
+      console.log("[ProdutoDialog/Omie] tenantId resolvido:", resolvedTenantId, "omie_integration:", data, "error:", error);
+      if (error) throw error;
+      return !!data;
+    },
+  });
+  const omieAtivo = omieAtivoQ.data === true;
+
+  const omiePadroesQ = useQuery({
+    queryKey: ["omie_padroes_lists_dialog", resolvedTenantId],
+    enabled: open && omieAtivo && !!resolvedTenantId,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("omie-integration-call", {
+        body: { acao: "ler_padroes", tenant_id: resolvedTenantId, dados: { operacao: "ler" } },
+      });
+      if (error) throw error;
+      const payload = (data as any)?.dados ?? data ?? {};
+      return {
+        contas: (payload.contas ?? []) as Array<{ codigo: any; descricao: string }>,
+        servicos: (payload.servicos ?? []) as Array<{ codigo: any; descricao: string }>,
+        tipos_faturamento: (payload.tipos_faturamento ?? []) as Array<{ codigo: any; descricao: string }>,
+      };
+    },
+  });
+
+  // Carrega o produto selecionado para ler campos omie_* atuais
+  const produtoOmieQ = useQuery({
+    queryKey: ["produto_omie_atual", produtoId, resolvedTenantId],
+    enabled: open && omieAtivo && !!produtoId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("produtos" as any) as any)
+        .select("id, omie_servico_codigo, omie_conta_corrente_codigo, omie_tipo_faturamento_codigo, omie_dia_faturamento, omie_numero_parcelas, omie_permite_servidor_nuvem")
+        .eq("id", Number(produtoId))
+        .maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+  });
+
+  // Estado dos campos Omie
+  const [omieServico, setOmieServico] = useState<string>("");
+  const [omieConta, setOmieConta] = useState<string>("");
+  const [omieTipoFat, setOmieTipoFat] = useState<string>("");
+  const [omieDiaFat, setOmieDiaFat] = useState<string>("");
+  const [omieNumParcelas, setOmieNumParcelas] = useState<string>("");
+  const [omiePermiteNuvem, setOmiePermiteNuvem] = useState<boolean>(false);
+
+  useEffect(() => {
+    const p = produtoOmieQ.data;
+    setOmieServico(p?.omie_servico_codigo != null ? String(p.omie_servico_codigo) : "");
+    setOmieConta(p?.omie_conta_corrente_codigo != null ? String(p.omie_conta_corrente_codigo) : "");
+    setOmieTipoFat(p?.omie_tipo_faturamento_codigo ?? "");
+    setOmieDiaFat(p?.omie_dia_faturamento != null ? String(p.omie_dia_faturamento) : "");
+    setOmieNumParcelas(p?.omie_numero_parcelas != null ? String(p.omie_numero_parcelas) : "");
+    setOmiePermiteNuvem(p?.omie_permite_servidor_nuvem === true);
+  }, [produtoOmieQ.data, produtoId]);
+
+
+
   // Reset on open
   useMemo(() => {
     if (open) {
@@ -837,9 +920,39 @@ function ProdutoDialog({
         });
         if (error) throw error;
       }
+
+      // Salva campos omie_* na tabela produtos (escopado por tenant) se Omie ativo
+      if (omieAtivo && produtoId && resolvedTenantId) {
+        const parseIntOrNull = (s: string) => {
+          const t = s.trim(); if (!t) return null;
+          const n = Number(t); return Number.isFinite(n) ? Math.trunc(n) : null;
+        };
+        const dia = parseIntOrNull(omieDiaFat);
+        if (dia !== null && (dia < 1 || dia > 31)) {
+          toast({ title: "Dia de faturamento inválido", description: "Use um valor entre 1 e 31.", variant: "destructive" });
+        } else {
+          const omiePayload = {
+            omie_servico_codigo: omieServico ? Number(omieServico) : null,
+            omie_conta_corrente_codigo: omieConta ? Number(omieConta) : null,
+            omie_tipo_faturamento_codigo: omieTipoFat || null,
+            omie_dia_faturamento: dia,
+            omie_numero_parcelas: parseIntOrNull(omieNumParcelas),
+            omie_permite_servidor_nuvem: !!omiePermiteNuvem,
+          };
+          const { error: omieErr } = await (supabase.from("produtos" as any) as any)
+            .update(omiePayload)
+            .eq("id", Number(produtoId))
+            .eq("tenant_id", resolvedTenantId);
+          if (omieErr) {
+            toast({ title: "Atenção", description: `Falha ao salvar campos Omie: ${omieErr.message}`, variant: "destructive" });
+          }
+        }
+      }
+
       if (!produtoTrocou) {
         toast({ title: isEdit ? "Produto atualizado" : "Produto adicionado" });
       }
+
       onSaved();
       onClose();
     } catch (err: any) {
@@ -1079,7 +1192,93 @@ function ProdutoDialog({
           />
         </div>
 
+
+        {omieAtivo && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-muted-foreground">Integração Omie</h4>
+              <p className="text-xs text-muted-foreground">
+                Valores específicos deste produto. Se vazios, os padrões da integração serão usados.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <Label>Serviço Omie</Label>
+                  <Select
+                    value={omieServico || "__default__"}
+                    onValueChange={(v) => setOmieServico(v === "__default__" ? "" : v)}
+                    disabled={omiePadroesQ.isLoading}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Usar padrão" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">— Usar padrão —</SelectItem>
+                      {(omiePadroesQ.data?.servicos ?? []).map((s) => (
+                        <SelectItem key={String(s.codigo)} value={String(s.codigo)}>{s.descricao}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Conta Corrente</Label>
+                  <Select
+                    value={omieConta || "__default__"}
+                    onValueChange={(v) => setOmieConta(v === "__default__" ? "" : v)}
+                    disabled={omiePadroesQ.isLoading}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Usar padrão" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">— Usar padrão —</SelectItem>
+                      {(omiePadroesQ.data?.contas ?? []).map((c) => (
+                        <SelectItem key={String(c.codigo)} value={String(c.codigo)}>{c.descricao}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Tipo de Faturamento</Label>
+                  <Select
+                    value={omieTipoFat || "__default__"}
+                    onValueChange={(v) => setOmieTipoFat(v === "__default__" ? "" : v)}
+                    disabled={omiePadroesQ.isLoading}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Usar padrão" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">— Usar padrão —</SelectItem>
+                      {(omiePadroesQ.data?.tipos_faturamento ?? []).map((t) => (
+                        <SelectItem key={String(t.codigo)} value={String(t.codigo)}>{t.descricao}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Dia de Faturamento</Label>
+                  <Input
+                    type="number" min={1} max={31}
+                    value={omieDiaFat}
+                    onChange={(e) => setOmieDiaFat(e.target.value)}
+                    placeholder="1-31"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Número de Parcelas</Label>
+                  <Input
+                    type="number" min={1}
+                    value={omieNumParcelas}
+                    onChange={(e) => setOmieNumParcelas(e.target.value)}
+                    placeholder="—"
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-md border p-2 md:col-span-1">
+                  <Label className="text-sm">Permite servidor em nuvem</Label>
+                  <Switch checked={omiePermiteNuvem} onCheckedChange={setOmiePermiteNuvem} />
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
         <p className="text-xs text-muted-foreground mt-2">
+
           Se este produto terá módulos detalhados, os valores serão recalculados automaticamente.
         </p>
         <DialogFooter>
