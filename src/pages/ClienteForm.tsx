@@ -251,6 +251,12 @@ function ContratoEventosHistorico({ clienteId }: { clienteId: string }) {
           );
         })}
       </div>
+      <EditarCancelamentoDialog
+        open={!!editEvt}
+        onOpenChange={(o) => !o && setEditEvt(null)}
+        evento={editEvt}
+        clienteId={clienteId}
+      />
     </div>
   );
 }
