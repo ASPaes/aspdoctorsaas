@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Save, Plug, RefreshCw, KeyRound } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OmieVinculosTab from "./OmieVinculosTab";
+import OmiePadroesTab from "./OmiePadroesTab";
 
 export default function OmieIntegrationTab() {
   const { toast } = useToast();
@@ -112,6 +113,7 @@ export default function OmieIntegrationTab() {
       <TabsList>
         <TabsTrigger value="conexao">Conexão</TabsTrigger>
         <TabsTrigger value="vinculos" disabled={!configurado}>Vínculos</TabsTrigger>
+        <TabsTrigger value="padroes" disabled={!configurado}>Padrões Omie</TabsTrigger>
       </TabsList>
 
       <TabsContent value="conexao" className="space-y-4 max-w-xl">
@@ -213,6 +215,14 @@ export default function OmieIntegrationTab() {
           <OmieVinculosTab />
         ) : (
           <p className="text-sm text-muted-foreground">Conecte a integração antes de configurar os vínculos.</p>
+        )}
+      </TabsContent>
+
+      <TabsContent value="padroes">
+        {configurado ? (
+          <OmiePadroesTab />
+        ) : (
+          <p className="text-sm text-muted-foreground">Conecte a integração antes de configurar os padrões.</p>
         )}
       </TabsContent>
     </Tabs>
