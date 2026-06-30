@@ -1192,7 +1192,93 @@ function ProdutoDialog({
           />
         </div>
 
+
+        {omieAtivo && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-muted-foreground">Integração Omie</h4>
+              <p className="text-xs text-muted-foreground">
+                Valores específicos deste produto. Se vazios, os padrões da integração serão usados.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <Label>Serviço Omie</Label>
+                  <Select
+                    value={omieServico || "__default__"}
+                    onValueChange={(v) => setOmieServico(v === "__default__" ? "" : v)}
+                    disabled={omiePadroesQ.isLoading}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Usar padrão" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">— Usar padrão —</SelectItem>
+                      {(omiePadroesQ.data?.servicos ?? []).map((s) => (
+                        <SelectItem key={String(s.codigo)} value={String(s.codigo)}>{s.descricao}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Conta Corrente</Label>
+                  <Select
+                    value={omieConta || "__default__"}
+                    onValueChange={(v) => setOmieConta(v === "__default__" ? "" : v)}
+                    disabled={omiePadroesQ.isLoading}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Usar padrão" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">— Usar padrão —</SelectItem>
+                      {(omiePadroesQ.data?.contas ?? []).map((c) => (
+                        <SelectItem key={String(c.codigo)} value={String(c.codigo)}>{c.descricao}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Tipo de Faturamento</Label>
+                  <Select
+                    value={omieTipoFat || "__default__"}
+                    onValueChange={(v) => setOmieTipoFat(v === "__default__" ? "" : v)}
+                    disabled={omiePadroesQ.isLoading}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Usar padrão" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">— Usar padrão —</SelectItem>
+                      {(omiePadroesQ.data?.tipos_faturamento ?? []).map((t) => (
+                        <SelectItem key={String(t.codigo)} value={String(t.codigo)}>{t.descricao}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Dia de Faturamento</Label>
+                  <Input
+                    type="number" min={1} max={31}
+                    value={omieDiaFat}
+                    onChange={(e) => setOmieDiaFat(e.target.value)}
+                    placeholder="1-31"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Número de Parcelas</Label>
+                  <Input
+                    type="number" min={1}
+                    value={omieNumParcelas}
+                    onChange={(e) => setOmieNumParcelas(e.target.value)}
+                    placeholder="—"
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-md border p-2 md:col-span-1">
+                  <Label className="text-sm">Permite servidor em nuvem</Label>
+                  <Switch checked={omiePermiteNuvem} onCheckedChange={setOmiePermiteNuvem} />
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
         <p className="text-xs text-muted-foreground mt-2">
+
           Se este produto terá módulos detalhados, os valores serão recalculados automaticamente.
         </p>
         <DialogFooter>
