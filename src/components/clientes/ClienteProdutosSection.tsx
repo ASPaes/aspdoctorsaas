@@ -661,52 +661,6 @@ function ProdutoDialog({
   const produtoTrocou = isEdit && produtoId !== "" && produtoId !== produtoIdOriginal;
 
   // Lookups
-  const modelosContratoLookup = useQuery<{ id: number; nome: string }[]>({
-    queryKey: ["modelos_contrato_lookup", tid],
-    enabled: open,
-    queryFn: async () => {
-      let q = (supabase.from("modelos_contrato" as any) as any).select("id, nome").order("nome");
-      if (tid) q = q.eq("tenant_id", tid);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as any;
-    },
-  });
-  const funcionariosLookup = useQuery<{ id: number; nome: string }[]>({
-    queryKey: ["funcionarios_lookup", tid],
-    enabled: open,
-    queryFn: async () => {
-      let q = (supabase.from("funcionarios" as any) as any).select("id, nome").order("nome");
-      if (tid) q = q.eq("tenant_id", tid);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as any;
-    },
-  });
-  const origensVendaLookup = useQuery<{ id: number; nome: string }[]>({
-    queryKey: ["origens_venda_lookup", tid],
-    enabled: open,
-    queryFn: async () => {
-      let q = (supabase.from("origens_venda" as any) as any).select("id, nome").order("nome");
-      if (tid) q = q.eq("tenant_id", tid);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as any;
-    },
-  });
-  const formasPagamentoLookup = useQuery<{ id: number; nome: string }[]>({
-    queryKey: ["formas_pagamento_lookup", tid],
-    enabled: open,
-    queryFn: async () => {
-      let q = (supabase.from("formas_pagamento" as any) as any).select("id, nome").order("nome");
-      if (tid) q = q.eq("tenant_id", tid);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as any;
-    },
-  });
-
-  // ========= Omie: tenant a partir do cliente + integração ativa + padrões =========
   const clienteTenantQ = useQuery<{ tenant_id: string | null }>({
     queryKey: ["cliente_tenant_id", clienteId],
     enabled: open && !!clienteId,
@@ -718,6 +672,53 @@ function ProdutoDialog({
     },
   });
   const resolvedTenantId: string | null = (clienteTenantQ.data?.tenant_id ?? tid) ?? null;
+
+  const modelosContratoLookup = useQuery<{ id: number; nome: string }[]>({
+    queryKey: ["modelos_contrato_lookup", resolvedTenantId],
+    enabled: open && !!resolvedTenantId,
+    queryFn: async () => {
+      let q = (supabase.from("modelos_contrato" as any) as any).select("id, nome").order("nome");
+      if (resolvedTenantId) q = q.eq("tenant_id", resolvedTenantId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+  const funcionariosLookup = useQuery<{ id: number; nome: string }[]>({
+    queryKey: ["funcionarios_lookup", resolvedTenantId],
+    enabled: open && !!resolvedTenantId,
+    queryFn: async () => {
+      let q = (supabase.from("funcionarios" as any) as any).select("id, nome").order("nome");
+      if (resolvedTenantId) q = q.eq("tenant_id", resolvedTenantId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+  const origensVendaLookup = useQuery<{ id: number; nome: string }[]>({
+    queryKey: ["origens_venda_lookup", resolvedTenantId],
+    enabled: open && !!resolvedTenantId,
+    queryFn: async () => {
+      let q = (supabase.from("origens_venda" as any) as any).select("id, nome").order("nome");
+      if (resolvedTenantId) q = q.eq("tenant_id", resolvedTenantId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+  const formasPagamentoLookup = useQuery<{ id: number; nome: string }[]>({
+    queryKey: ["formas_pagamento_lookup", resolvedTenantId],
+    enabled: open && !!resolvedTenantId,
+    queryFn: async () => {
+      let q = (supabase.from("formas_pagamento" as any) as any).select("id, nome").order("nome");
+      if (resolvedTenantId) q = q.eq("tenant_id", resolvedTenantId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+
+  // ========= Omie: tenant a partir do cliente + integração ativa + padrões =========
 
   const omieAtivoQ = useQuery({
     queryKey: ["omie_integration_ativo_dialog", resolvedTenantId],
