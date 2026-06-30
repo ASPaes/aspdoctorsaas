@@ -47,7 +47,7 @@ export default function OmieVinculosTab() {
     queryKey: ["omie_listar_vinculos", tid],
     queryFn: async (): Promise<ListarVinculosResp> => {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: { acao: "listar_vinculos" },
+        body: { acao: "listar_vinculos", tenant_id: tid },
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error || "Falha ao carregar vínculos.");
@@ -183,6 +183,7 @@ export default function OmieVinculosTab() {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
         body: {
           acao: "salvar_vinculo",
+          tenant_id: tid,
           dados: {
             tipo: "vendedor",
             ds_funcionario_id: String(func.id),
@@ -214,6 +215,7 @@ export default function OmieVinculosTab() {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
         body: {
           acao: "salvar_vinculo",
+          tenant_id: tid,
           dados: {
             tipo: "produto",
             ds_produto_id: String(prod.id),
@@ -243,6 +245,7 @@ export default function OmieVinculosTab() {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
         body: {
           acao: "salvar_vinculo",
+          tenant_id: tid,
           dados: { tipo: "ignorar_vendedor", ds_funcionario_id: String(func.id), nome_ds: func.nome },
         },
       });
@@ -265,6 +268,7 @@ export default function OmieVinculosTab() {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
         body: {
           acao: "salvar_vinculo",
+          tenant_id: tid,
           dados: { tipo: "ignorar_produto", ds_produto_id: String(prod.id), nome_ds: prod.nome },
         },
       });
@@ -287,6 +291,7 @@ export default function OmieVinculosTab() {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
         body: {
           acao: "salvar_vinculo",
+          tenant_id: tid,
           dados: { tipo: "remover_vinculo", alvo: "vendedor", ds_funcionario_id: String(func.id) },
         },
       });
@@ -315,6 +320,7 @@ export default function OmieVinculosTab() {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
         body: {
           acao: "salvar_vinculo",
+          tenant_id: tid,
           dados: { tipo: "remover_vinculo", alvo: "produto", ds_produto_id: String(prod.id) },
         },
       });

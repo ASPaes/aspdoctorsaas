@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,7 @@ type LerResp = {
 
 export default function OmiePadroesTab() {
   const { toast } = useToast();
+  const { effectiveTenantId: tid } = useTenantFilter();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -80,14 +82,14 @@ export default function OmiePadroesTab() {
   useEffect(() => {
     void carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tid]);
 
   async function carregar() {
     setLoading(true);
     setErro(null);
     try {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: { acao: "ler_padroes", dados: { operacao: "ler" } },
+        body: { acao: "ler_padroes", tenant_id: tid, dados: { operacao: "ler" } },
       });
       if (error) throw error;
       const res = (data?.resultado ?? data) as LerResp;
@@ -197,7 +199,7 @@ export default function OmiePadroesTab() {
       };
 
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: { acao: "salvar_padroes", dados: { operacao: "salvar", padroes } },
+        body: { acao: "salvar_padroes", tenant_id: tid, dados: { operacao: "salvar", padroes } },
       });
       if (error) throw error;
       const res = (data?.resultado ?? data) as { ok: boolean; error?: string };

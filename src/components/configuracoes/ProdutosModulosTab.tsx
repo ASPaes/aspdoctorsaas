@@ -135,7 +135,7 @@ export default function ProdutosModulosTab() {
     enabled: !!tid && omieAtivo && produtoDialogOpen,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: { acao: "ler_padroes", dados: { operacao: "ler" } },
+        body: { acao: "ler_padroes", tenant_id: tid, dados: { operacao: "ler" } },
       });
       if (error) throw error;
       const payload = (data as any)?.dados ?? data ?? {};

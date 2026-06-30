@@ -8971,7 +8971,7 @@ export type Database = {
       }
       next_ticket_code: { Args: { p_tenant_id: string }; Returns: string }
       norm_txt: { Args: { t: string }; Returns: string }
-      obter_chave_omie: { Args: never; Returns: string }
+      obter_chave_omie: { Args: { p_tenant_id?: string }; Returns: string }
       preparar_reajuste: {
         Args: {
           p_percentual: number
@@ -9044,7 +9044,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: Json
       }
-      salvar_integracao_omie: { Args: { p_chave: string }; Returns: Json }
+      salvar_integracao_omie: {
+        Args: { p_chave: string; p_tenant_id?: string }
+        Returns: Json
+      }
       scan_ura_battle_conversations: {
         Args: {
           p_days?: number
