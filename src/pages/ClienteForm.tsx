@@ -490,6 +490,9 @@ export default function ClienteForm() {
         const { error } = await supabase.from("clientes").update(updatePayload).eq("id", id!);
         if (error) throw error;
       } else {
+        if (profile?.is_super_admin && !tid) {
+          throw new Error("Selecione um tenant no seletor antes de criar um cliente.");
+        }
         // CRIAÇÃO: remove campos legacy/deprecated. Produto e contrato são adicionados depois via Sections.
         const {
           data_venda: _l1, data_reajuste: _l2, fornecedor_id: _l3, modelo_contrato_id: _l4,
@@ -499,7 +502,7 @@ export default function ClienteForm() {
           forma_pagamento_mensalidade_id: _l15, custo_operacao: _l16,
           ...insertPayload
         } = payload;
-        const { data, error } = await supabase.from("clientes").insert(insertPayload).select("id").single();
+        const { data, error } = await supabase.from("clientes").insert({ ...insertPayload, tenant_id: tid }).select("id").single();
         if (error) throw error;
         return (data as any)?.id as string;
       }
