@@ -114,25 +114,89 @@ export default function ProdutosModulosTab() {
     },
   });
 
+  // Omie integration active check
+  const omieAtivoQ = useQuery({
+    queryKey: ["omie_integration_ativo", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("omie_integration" as any) as any)
+        .select("ativo")
+        .eq("tenant_id", tid)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as any)?.ativo === true;
+    },
+  });
+  const omieAtivo = omieAtivoQ.data === true;
+
+  // Omie lists (only when integration is active and dialog is open)
+  const omiePadroesQ = useQuery({
+    queryKey: ["omie_padroes_lists", tid],
+    enabled: !!tid && omieAtivo && produtoDialogOpen,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("omie-integration-call", {
+        body: { acao: "ler_padroes", dados: { operacao: "ler" } },
+      });
+      if (error) throw error;
+      const payload = (data as any)?.dados ?? data ?? {};
+      return {
+        contas: (payload.contas ?? []) as Array<{ codigo: any; descricao: string }>,
+        servicos: (payload.servicos ?? []) as Array<{ codigo: any; descricao: string }>,
+        tipos_faturamento: (payload.tipos_faturamento ?? []) as Array<{ codigo: any; descricao: string }>,
+      };
+    },
+  });
+
   const selectedProduto = produtosQ.data?.find(p => p.id === selectedProdutoId) ?? null;
 
   // Produto handlers
-  const openNewProduto = () => { setEditingProduto(null); setProdutoNome(""); setProdutoDialogOpen(true); };
-  const openEditProduto = (p: Produto) => { setEditingProduto(p); setProdutoNome(p.nome); setProdutoDialogOpen(true); };
+  const resetOmieFields = (p?: Produto | null) => {
+    setOmieServico(p?.omie_servico_codigo != null ? String(p.omie_servico_codigo) : "");
+    setOmieConta(p?.omie_conta_corrente_codigo != null ? String(p.omie_conta_corrente_codigo) : "");
+    setOmieTipoFat(p?.omie_tipo_faturamento_codigo ?? "");
+    setOmieDiaFat(p?.omie_dia_faturamento != null ? String(p.omie_dia_faturamento) : "");
+    setOmieNumParcelas(p?.omie_numero_parcelas != null ? String(p.omie_numero_parcelas) : "");
+    setOmiePermiteNuvem(p?.omie_permite_servidor_nuvem === true);
+  };
+  const openNewProduto = () => {
+    setEditingProduto(null); setProdutoNome(""); resetOmieFields(null); setProdutoDialogOpen(true);
+  };
+  const openEditProduto = (p: Produto) => {
+    setEditingProduto(p); setProdutoNome(p.nome); resetOmieFields(p); setProdutoDialogOpen(true);
+  };
 
   const saveProduto = async () => {
     if (!produtoNome.trim()) { toast({ title: "Nome obrigatório", variant: "destructive" }); return; }
+    const parseIntOrNull = (s: string) => {
+      const t = s.trim();
+      if (!t) return null;
+      const n = Number(t);
+      return Number.isFinite(n) ? Math.trunc(n) : null;
+    };
+    const dia = parseIntOrNull(omieDiaFat);
+    if (omieAtivo && dia !== null && (dia < 1 || dia > 31)) {
+      toast({ title: "Dia de faturamento inválido", description: "Use um valor entre 1 e 31.", variant: "destructive" });
+      return;
+    }
+    const omiePayload = omieAtivo ? {
+      omie_servico_codigo: omieServico ? Number(omieServico) : null,
+      omie_conta_corrente_codigo: omieConta ? Number(omieConta) : null,
+      omie_tipo_faturamento_codigo: omieTipoFat ? omieTipoFat : null,
+      omie_dia_faturamento: dia,
+      omie_numero_parcelas: parseIntOrNull(omieNumParcelas),
+      omie_permite_servidor_nuvem: !!omiePermiteNuvem,
+    } : {};
     setSavingProduto(true);
     try {
       if (editingProduto) {
         const { error } = await (supabase.from("produtos" as any) as any)
-          .update({ nome: produtoNome.trim() })
+          .update({ nome: produtoNome.trim(), ...omiePayload })
           .eq("id", editingProduto.id);
         if (error) throw error;
         toast({ title: "Produto atualizado" });
       } else {
         const { error } = await (supabase.from("produtos" as any) as any)
-          .insert({ nome: produtoNome.trim(), tenant_id: tid });
+          .insert({ nome: produtoNome.trim(), tenant_id: tid, ...omiePayload });
         if (error) throw error;
         toast({ title: "Produto criado" });
       }
