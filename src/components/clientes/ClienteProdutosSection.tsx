@@ -1205,7 +1205,11 @@ function ProdutoDialog({
               <p className="text-xs text-muted-foreground">
                 Valores específicos deste produto. Se vazios, os padrões da integração serão usados.
               </p>
+              {omiePadroesQ.isError && (
+                <p className="text-xs text-destructive">Não foi possível carregar as opções do Omie.</p>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
                 <div className="space-y-1">
                   <Label>Serviço Omie</Label>
                   <Select
