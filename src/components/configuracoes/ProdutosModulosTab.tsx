@@ -192,7 +192,8 @@ export default function ProdutosModulosTab() {
       if (editingProduto) {
         const { error } = await (supabase.from("produtos" as any) as any)
           .update({ nome: produtoNome.trim(), ...omiePayload })
-          .eq("id", editingProduto.id);
+          .eq("id", editingProduto.id)
+          .eq("tenant_id", tid as string);
         if (error) throw error;
         toast({ title: "Produto atualizado" });
       } else {
