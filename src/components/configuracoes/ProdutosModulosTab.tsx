@@ -114,17 +114,18 @@ export default function ProdutosModulosTab() {
     },
   });
 
-  // Omie integration active check
+  // Omie integration active check — usa o mesmo effectiveTenantId que as demais telas (super admin pode simular tenant).
   const omieAtivoQ = useQuery({
     queryKey: ["omie_integration_ativo", tid],
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.from("omie_integration" as any) as any)
-        .select("ativo")
-        .eq("tenant_id", tid)
+        .select("tenant_id")
+        .eq("tenant_id", tid as string)
+        .eq("ativo", true)
         .maybeSingle();
       if (error) throw error;
-      return (data as any)?.ativo === true;
+      return !!data;
     },
   });
   const omieAtivo = omieAtivoQ.data === true;
@@ -191,7 +192,8 @@ export default function ProdutosModulosTab() {
       if (editingProduto) {
         const { error } = await (supabase.from("produtos" as any) as any)
           .update({ nome: produtoNome.trim(), ...omiePayload })
-          .eq("id", editingProduto.id);
+          .eq("id", editingProduto.id)
+          .eq("tenant_id", tid as string);
         if (error) throw error;
         toast({ title: "Produto atualizado" });
       } else {
