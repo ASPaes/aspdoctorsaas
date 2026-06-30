@@ -69,7 +69,7 @@ export default function OmieIntegrationTab() {
     setTesting(true);
     try {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: { acao: "testar" },
+        body: { acao: "testar", tenant_id: tid },
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error || "Falha ao testar conexão.");
