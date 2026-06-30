@@ -918,9 +918,39 @@ function ProdutoDialog({
         });
         if (error) throw error;
       }
+
+      // Salva campos omie_* na tabela produtos (escopado por tenant) se Omie ativo
+      if (omieAtivo && produtoId && resolvedTenantId) {
+        const parseIntOrNull = (s: string) => {
+          const t = s.trim(); if (!t) return null;
+          const n = Number(t); return Number.isFinite(n) ? Math.trunc(n) : null;
+        };
+        const dia = parseIntOrNull(omieDiaFat);
+        if (dia !== null && (dia < 1 || dia > 31)) {
+          toast({ title: "Dia de faturamento inválido", description: "Use um valor entre 1 e 31.", variant: "destructive" });
+        } else {
+          const omiePayload = {
+            omie_servico_codigo: omieServico ? Number(omieServico) : null,
+            omie_conta_corrente_codigo: omieConta ? Number(omieConta) : null,
+            omie_tipo_faturamento_codigo: omieTipoFat || null,
+            omie_dia_faturamento: dia,
+            omie_numero_parcelas: parseIntOrNull(omieNumParcelas),
+            omie_permite_servidor_nuvem: !!omiePermiteNuvem,
+          };
+          const { error: omieErr } = await (supabase.from("produtos" as any) as any)
+            .update(omiePayload)
+            .eq("id", Number(produtoId))
+            .eq("tenant_id", resolvedTenantId);
+          if (omieErr) {
+            toast({ title: "Atenção", description: `Falha ao salvar campos Omie: ${omieErr.message}`, variant: "destructive" });
+          }
+        }
+      }
+
       if (!produtoTrocou) {
         toast({ title: isEdit ? "Produto atualizado" : "Produto adicionado" });
       }
+
       onSaved();
       onClose();
     } catch (err: any) {
