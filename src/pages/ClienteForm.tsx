@@ -28,7 +28,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Loader2, Building2, FileText, XCircle, ChevronLeft, ChevronRight, Eye, EyeOff, ShieldAlert, History, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Loader2, Building2, FileText, XCircle, ChevronLeft, ChevronRight, Eye, EyeOff, ShieldAlert, History, AlertTriangle, Pencil } from "lucide-react";
+import EditarCancelamentoDialog from "@/components/clientes/EditarCancelamentoDialog";
 import { MovimentosMrrModal } from "@/components/clientes/MovimentosMrrModal";
 import DadosClienteTab from "@/components/clientes/DadosClienteTab";
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
@@ -132,12 +133,15 @@ export type ClienteFormValues = z.infer<typeof clienteSchema>;
 
 function ContratoEventosHistorico({ clienteId }: { clienteId: string }) {
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin === true;
+  const [editEvt, setEditEvt] = useState<any | null>(null);
 
   const eventosQuery = useQuery({
     queryKey: ["contrato_eventos_historico", tid, clienteId],
     queryFn: async () => {
       let q = (supabase.from("contrato_eventos" as any) as any)
-        .select("id, acao, data_acao, observacao, mensalidade_contrato_snapshot, mensalidade_cliente_snapshot, contrato_id, created_at")
+        .select("id, acao, data_acao, observacao, mensalidade_contrato_snapshot, mensalidade_cliente_snapshot, contrato_id, created_at, motivo_cancelamento_id")
         .eq("cliente_id", clienteId)
         .order("data_acao", { ascending: false });
 
@@ -218,6 +222,18 @@ function ContratoEventosHistorico({ clienteId }: { clienteId: string }) {
                       {contratoNumMap[evt.contrato_id]}
                     </span>
                   )}
+                  {isCancelamento && isAdmin && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 ml-auto"
+                      onClick={() => setEditEvt(evt)}
+                    >
+                      <Pencil className="h-3 w-3" />
+                      <span className="text-xs">Editar</span>
+                    </Button>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   MRR Contrato: R$ {fmtBRL(Number(evt.mensalidade_contrato_snapshot))}
@@ -235,6 +251,12 @@ function ContratoEventosHistorico({ clienteId }: { clienteId: string }) {
           );
         })}
       </div>
+      <EditarCancelamentoDialog
+        open={!!editEvt}
+        onOpenChange={(o) => !o && setEditEvt(null)}
+        evento={editEvt}
+        clienteId={clienteId}
+      />
     </div>
   );
 }
