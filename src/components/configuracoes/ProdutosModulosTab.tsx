@@ -20,9 +20,20 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "@/hooks/use-toast";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
+import { Switch } from "@/components/ui/switch";
 
 
-interface Produto { id: number; nome: string; tenant_id: string; }
+interface Produto {
+  id: number;
+  nome: string;
+  tenant_id: string;
+  omie_servico_codigo?: number | null;
+  omie_conta_corrente_codigo?: number | null;
+  omie_tipo_faturamento_codigo?: string | null;
+  omie_dia_faturamento?: number | null;
+  omie_numero_parcelas?: number | null;
+  omie_permite_servidor_nuvem?: boolean | null;
+}
 interface Modulo {
   id: string;
   nome: string;
@@ -48,6 +59,13 @@ export default function ProdutosModulosTab() {
   const [editingProduto, setEditingProduto] = useState<Produto | null>(null);
   const [produtoNome, setProdutoNome] = useState("");
   const [savingProduto, setSavingProduto] = useState(false);
+  // Omie fields (only used when integration is active)
+  const [omieServico, setOmieServico] = useState<string>("");
+  const [omieConta, setOmieConta] = useState<string>("");
+  const [omieTipoFat, setOmieTipoFat] = useState<string>("");
+  const [omieDiaFat, setOmieDiaFat] = useState<string>("");
+  const [omieNumParcelas, setOmieNumParcelas] = useState<string>("");
+  const [omiePermiteNuvem, setOmiePermiteNuvem] = useState<boolean>(false);
 
   // Produto delete
   const [deleteProduto, setDeleteProduto] = useState<Produto | null>(null);
@@ -96,25 +114,89 @@ export default function ProdutosModulosTab() {
     },
   });
 
+  // Omie integration active check
+  const omieAtivoQ = useQuery({
+    queryKey: ["omie_integration_ativo", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("omie_integration" as any) as any)
+        .select("ativo")
+        .eq("tenant_id", tid)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as any)?.ativo === true;
+    },
+  });
+  const omieAtivo = omieAtivoQ.data === true;
+
+  // Omie lists (only when integration is active and dialog is open)
+  const omiePadroesQ = useQuery({
+    queryKey: ["omie_padroes_lists", tid],
+    enabled: !!tid && omieAtivo && produtoDialogOpen,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("omie-integration-call", {
+        body: { acao: "ler_padroes", dados: { operacao: "ler" } },
+      });
+      if (error) throw error;
+      const payload = (data as any)?.dados ?? data ?? {};
+      return {
+        contas: (payload.contas ?? []) as Array<{ codigo: any; descricao: string }>,
+        servicos: (payload.servicos ?? []) as Array<{ codigo: any; descricao: string }>,
+        tipos_faturamento: (payload.tipos_faturamento ?? []) as Array<{ codigo: any; descricao: string }>,
+      };
+    },
+  });
+
   const selectedProduto = produtosQ.data?.find(p => p.id === selectedProdutoId) ?? null;
 
   // Produto handlers
-  const openNewProduto = () => { setEditingProduto(null); setProdutoNome(""); setProdutoDialogOpen(true); };
-  const openEditProduto = (p: Produto) => { setEditingProduto(p); setProdutoNome(p.nome); setProdutoDialogOpen(true); };
+  const resetOmieFields = (p?: Produto | null) => {
+    setOmieServico(p?.omie_servico_codigo != null ? String(p.omie_servico_codigo) : "");
+    setOmieConta(p?.omie_conta_corrente_codigo != null ? String(p.omie_conta_corrente_codigo) : "");
+    setOmieTipoFat(p?.omie_tipo_faturamento_codigo ?? "");
+    setOmieDiaFat(p?.omie_dia_faturamento != null ? String(p.omie_dia_faturamento) : "");
+    setOmieNumParcelas(p?.omie_numero_parcelas != null ? String(p.omie_numero_parcelas) : "");
+    setOmiePermiteNuvem(p?.omie_permite_servidor_nuvem === true);
+  };
+  const openNewProduto = () => {
+    setEditingProduto(null); setProdutoNome(""); resetOmieFields(null); setProdutoDialogOpen(true);
+  };
+  const openEditProduto = (p: Produto) => {
+    setEditingProduto(p); setProdutoNome(p.nome); resetOmieFields(p); setProdutoDialogOpen(true);
+  };
 
   const saveProduto = async () => {
     if (!produtoNome.trim()) { toast({ title: "Nome obrigatório", variant: "destructive" }); return; }
+    const parseIntOrNull = (s: string) => {
+      const t = s.trim();
+      if (!t) return null;
+      const n = Number(t);
+      return Number.isFinite(n) ? Math.trunc(n) : null;
+    };
+    const dia = parseIntOrNull(omieDiaFat);
+    if (omieAtivo && dia !== null && (dia < 1 || dia > 31)) {
+      toast({ title: "Dia de faturamento inválido", description: "Use um valor entre 1 e 31.", variant: "destructive" });
+      return;
+    }
+    const omiePayload = omieAtivo ? {
+      omie_servico_codigo: omieServico ? Number(omieServico) : null,
+      omie_conta_corrente_codigo: omieConta ? Number(omieConta) : null,
+      omie_tipo_faturamento_codigo: omieTipoFat ? omieTipoFat : null,
+      omie_dia_faturamento: dia,
+      omie_numero_parcelas: parseIntOrNull(omieNumParcelas),
+      omie_permite_servidor_nuvem: !!omiePermiteNuvem,
+    } : {};
     setSavingProduto(true);
     try {
       if (editingProduto) {
         const { error } = await (supabase.from("produtos" as any) as any)
-          .update({ nome: produtoNome.trim() })
+          .update({ nome: produtoNome.trim(), ...omiePayload })
           .eq("id", editingProduto.id);
         if (error) throw error;
         toast({ title: "Produto atualizado" });
       } else {
         const { error } = await (supabase.from("produtos" as any) as any)
-          .insert({ nome: produtoNome.trim(), tenant_id: tid });
+          .insert({ nome: produtoNome.trim(), tenant_id: tid, ...omiePayload });
         if (error) throw error;
         toast({ title: "Produto criado" });
       }
@@ -351,15 +433,110 @@ export default function ProdutosModulosTab() {
 
       {/* Produto Dialog */}
       <Dialog open={produtoDialogOpen} onOpenChange={setProdutoDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingProduto ? "Editar Produto" : "Novo Produto"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="produto-nome">Nome</Label>
               <Input id="produto-nome" value={produtoNome} onChange={(e) => setProdutoNome(e.target.value)} autoFocus />
             </div>
+
+            {omieAtivo && (
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-semibold">Integração Omie</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Estes campos são opcionais. Se deixados em branco, o contrato usará os Padrões Omie configurados em Configurações → Integrações → Omie. Preencha apenas se este produto precisar de valores diferentes do padrão.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Serviço Omie</Label>
+                    <Select value={omieServico || "__default__"} onValueChange={(v) => setOmieServico(v === "__default__" ? "" : v)}>
+                      <SelectTrigger><SelectValue placeholder="Usar padrão" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__default__">Usar padrão</SelectItem>
+                        {(omiePadroesQ.data?.servicos ?? []).map((s) => (
+                          <SelectItem key={String(s.codigo)} value={String(s.codigo)}>{s.descricao}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Conta Corrente</Label>
+                    <Select value={omieConta || "__default__"} onValueChange={(v) => setOmieConta(v === "__default__" ? "" : v)}>
+                      <SelectTrigger><SelectValue placeholder="Usar padrão" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__default__">Usar padrão</SelectItem>
+                        {(omiePadroesQ.data?.contas ?? []).map((c) => (
+                          <SelectItem key={String(c.codigo)} value={String(c.codigo)}>{c.descricao}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Tipo de Faturamento</Label>
+                    <Select value={omieTipoFat || "__default__"} onValueChange={(v) => setOmieTipoFat(v === "__default__" ? "" : v)}>
+                      <SelectTrigger><SelectValue placeholder="Usar padrão" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__default__">Usar padrão</SelectItem>
+                        {(omiePadroesQ.data?.tipos_faturamento ?? []).map((t) => (
+                          <SelectItem key={String(t.codigo)} value={String(t.codigo)}>{t.descricao}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="omie-dia-fat">Dia de Faturamento</Label>
+                    <Input
+                      id="omie-dia-fat"
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={omieDiaFat}
+                      onChange={(e) => setOmieDiaFat(e.target.value)}
+                      placeholder="1-31"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="omie-num-parcelas">Número de Parcelas</Label>
+                    <Input
+                      id="omie-num-parcelas"
+                      type="number"
+                      min={1}
+                      value={omieNumParcelas}
+                      onChange={(e) => setOmieNumParcelas(e.target.value)}
+                      placeholder="Em branco para usar padrão"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-start justify-between gap-3 rounded-md border border-border bg-background p-3">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="omie-permite-nuvem" className="text-sm">Permite servidor em nuvem</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Habilita a cobrança recorrente de servidor em nuvem para clientes deste produto.
+                    </p>
+                  </div>
+                  <Switch
+                    id="omie-permite-nuvem"
+                    checked={omiePermiteNuvem}
+                    onCheckedChange={setOmiePermiteNuvem}
+                  />
+                </div>
+
+                <p className="text-xs text-muted-foreground italic">
+                  A categoria Omie deste produto é definida em Configurações → Integrações → Omie, na aba Vínculos.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setProdutoDialogOpen(false)} disabled={savingProduto}>Cancelar</Button>
