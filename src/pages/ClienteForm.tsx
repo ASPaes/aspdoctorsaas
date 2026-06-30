@@ -222,6 +222,18 @@ function ContratoEventosHistorico({ clienteId }: { clienteId: string }) {
                       {contratoNumMap[evt.contrato_id]}
                     </span>
                   )}
+                  {isCancelamento && isAdmin && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 ml-auto"
+                      onClick={() => setEditEvt(evt)}
+                    >
+                      <Pencil className="h-3 w-3" />
+                      <span className="text-xs">Editar</span>
+                    </Button>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   MRR Contrato: R$ {fmtBRL(Number(evt.mensalidade_contrato_snapshot))}
