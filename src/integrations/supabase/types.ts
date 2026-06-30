@@ -7845,6 +7845,15 @@ export type Database = {
         Args: { p_attendance_id: string; p_motivo?: string }
         Returns: undefined
       }
+      editar_cancelamento: {
+        Args: {
+          p_evento_id: string
+          p_motivo_id?: number
+          p_nova_data: string
+          p_observacao?: string
+        }
+        Returns: Json
+      }
       email_domain: { Args: { email: string }; Returns: string }
       enable_rbac_for_tenant: { Args: { p_tenant_id?: string }; Returns: Json }
       encrypt_api_key: {
