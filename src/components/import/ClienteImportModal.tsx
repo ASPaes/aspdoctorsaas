@@ -1226,7 +1226,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         for (const record of payloadDuplicados) {
           const { error: upsertErr } = await supabase
             .from('clientes')
-            .update(record)
+            .update(toClienteRow(record))
             .eq('cnpj', record.cnpj)
             .eq('tenant_id', tenantId);
           if (upsertErr) {
