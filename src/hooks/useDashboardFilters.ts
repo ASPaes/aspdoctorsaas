@@ -29,6 +29,7 @@ function getDefaults(): DashboardFilters {
   const now = new Date();
   return {
     fornecedorId: null,
+    fornecedorIds: [],
     periodoInicio: startOfMonth(now),
     periodoFim: endOfMonth(now),
     showAllData: false,
