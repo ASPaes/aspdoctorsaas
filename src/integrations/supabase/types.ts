@@ -1216,6 +1216,8 @@ export type Database = {
       }
       clientes: {
         Row: {
+          _deprecated_codigo_fornecedor: string | null
+          _deprecated_link_portal_fornecedor: string | null
           area_atuacao_id: number | null
           bairro: string | null
           cancelado: boolean
@@ -1225,7 +1227,6 @@ export type Database = {
           cert_a1_vencimento: string | null
           cidade_id: number | null
           cnpj: string | null
-          codigo_fornecedor: string | null
           codigo_sequencial: number
           complemento: string | null
           contato_aniversario: string | null
@@ -1251,7 +1252,6 @@ export type Database = {
           funcionario_id: number | null
           id: string
           imposto_percentual: number | null
-          link_portal_fornecedor: string | null
           matriz_id: string | null
           mensalidade: number | null
           modelo_contrato_id: number | null
@@ -1278,6 +1278,8 @@ export type Database = {
           valor_ativacao: number | null
         }
         Insert: {
+          _deprecated_codigo_fornecedor?: string | null
+          _deprecated_link_portal_fornecedor?: string | null
           area_atuacao_id?: number | null
           bairro?: string | null
           cancelado?: boolean
@@ -1287,7 +1289,6 @@ export type Database = {
           cert_a1_vencimento?: string | null
           cidade_id?: number | null
           cnpj?: string | null
-          codigo_fornecedor?: string | null
           codigo_sequencial?: number
           complemento?: string | null
           contato_aniversario?: string | null
@@ -1313,7 +1314,6 @@ export type Database = {
           funcionario_id?: number | null
           id?: string
           imposto_percentual?: number | null
-          link_portal_fornecedor?: string | null
           matriz_id?: string | null
           mensalidade?: number | null
           modelo_contrato_id?: number | null
@@ -1340,6 +1340,8 @@ export type Database = {
           valor_ativacao?: number | null
         }
         Update: {
+          _deprecated_codigo_fornecedor?: string | null
+          _deprecated_link_portal_fornecedor?: string | null
           area_atuacao_id?: number | null
           bairro?: string | null
           cancelado?: boolean
@@ -1349,7 +1351,6 @@ export type Database = {
           cert_a1_vencimento?: string | null
           cidade_id?: number | null
           cnpj?: string | null
-          codigo_fornecedor?: string | null
           codigo_sequencial?: number
           complemento?: string | null
           contato_aniversario?: string | null
@@ -1375,7 +1376,6 @@ export type Database = {
           funcionario_id?: number | null
           id?: string
           imposto_percentual?: number | null
-          link_portal_fornecedor?: string | null
           matriz_id?: string | null
           mensalidade?: number | null
           modelo_contrato_id?: number | null
