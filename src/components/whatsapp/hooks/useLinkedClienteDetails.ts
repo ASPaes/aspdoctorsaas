@@ -10,8 +10,7 @@ export interface ClienteDetailsForChat {
   area_atuacao: string | null;
   segmento: string | null;
   unidade_base: string | null;
-  fornecedor: string | null;
-  produto: string | null;
+  produtos: { produto: string | null; fornecedor: string | null }[];
   cidade: string | null;
   estado_sigla: string | null;
 }
