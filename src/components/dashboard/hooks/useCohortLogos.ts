@@ -9,6 +9,7 @@ export interface CohortLogosParams {
   toCohortMonth?: string;
   maxAgeMonths?: number;
   fornecedorId?: number | null;
+  fornecedorIds?: number[];
   unidadeBaseId?: number | null;
 }
 
