@@ -101,7 +101,7 @@ export default function Dashboard() {
             <CSTab tvMode={tvMode} periodoInicio={filters.periodoInicio} periodoFim={filters.periodoFim} />
           </TabsContent>
           <TabsContent value="cohort">
-            <CohortTab tvMode={tvMode} fornecedorId={filters.fornecedorId} unidadeBaseId={filters.unidadeBaseId} />
+            <CohortTab tvMode={tvMode} fornecedorId={filters.fornecedorId} fornecedorIds={filters.fornecedorIds} unidadeBaseId={filters.unidadeBaseId} />
           </TabsContent>
         </Tabs>
       )}
