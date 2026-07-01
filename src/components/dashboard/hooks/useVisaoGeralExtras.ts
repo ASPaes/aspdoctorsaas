@@ -82,9 +82,10 @@ export function useVisaoGeralExtras(filters?: DashboardFilters) {
         p_tenant_id: tid,
         p_months_back: 12,
         p_unidade_base_id: unidadeBaseId,
-        p_fornecedor_id: fornecedorId,
+        p_fornecedor_id: null,
+        p_fornecedor_ids: fornecedorIds.length ? fornecedorIds : null,
         p_data_referencia: dataReferencia,
-      });
+      } as any);
 
       if (seriesError) {
         console.error('[useVisaoGeralExtras] series error:', seriesError);
