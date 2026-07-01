@@ -62,7 +62,7 @@ export function DashboardFilters({
 
   return (
     <div className={`flex flex-wrap items-end gap-3 ${tvMode ? 'p-4' : ''}`}>
-      <div className="space-y-1">
+      <div className="flex flex-col space-y-1">
         <label className="text-xs font-medium text-muted-foreground">Fornecedor</label>
         <MultiSelectFilter
           label={(filters.fornecedorIds?.length ?? 0) > 0 ? `${filters.fornecedorIds.length} fornecedor(es)` : 'Todos Fornecedores'}
