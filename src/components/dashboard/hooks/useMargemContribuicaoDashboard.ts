@@ -32,7 +32,7 @@ export function useMargemContribuicaoDashboard(filters: DashboardFilters) {
   const periodoFimStr = filters.periodoFim ? format(filters.periodoFim, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
 
   return useQuery({
-    queryKey: ['margem-contribuicao-dashboard', filters.unidadeBaseId, filters.fornecedorId, periodoFimStr, tid],
+    queryKey: ['margem-contribuicao-dashboard', filters.unidadeBaseId, JSON.stringify(filters.fornecedorIds), periodoFimStr, tid],
     queryFn: async (): Promise<MargemContribuicaoData> => {
       const raw = await fetchAllRows<any>(() => {
         let q = supabase
