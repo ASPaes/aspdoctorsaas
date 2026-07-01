@@ -100,8 +100,9 @@ export function useVisaoGeralExtras(filters?: DashboardFilters) {
       const { data: tenureData, error: tenureError } = await supabase.rpc('get_tenure_medio_meses', {
         p_tenant_id: tid,
         p_unidade_base_id: unidadeBaseId,
-        p_fornecedor_id: fornecedorId,
-      });
+        p_fornecedor_id: null,
+        p_fornecedor_ids: fornecedorIds.length ? fornecedorIds : null,
+      } as any);
 
       if (tenureError) {
         console.error('[useVisaoGeralExtras] tenure error:', tenureError);
