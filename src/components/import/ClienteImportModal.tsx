@@ -1191,7 +1191,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
             }) ?? batches[b][ri];
             const { error: rowErr, data: rowInserted } = await supabase
               .from('clientes')
-              .insert(record)
+              .insert(toClienteRow(record))
               .select('id')
               .single();
             if (rowErr) {
