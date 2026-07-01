@@ -5,6 +5,7 @@ import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 export interface CohortSaldoParams {
   fornecedorId?: number | null;
+  fornecedorIds?: number[];
   unidadeBaseId?: number | null;
   janelaMeses?: number;
 }
