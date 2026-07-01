@@ -30,14 +30,16 @@ export interface UseCohortForecastResult {
 export function useCohortForecast(params: CohortSaldoParams = {}): UseCohortForecastResult {
   const { effectiveTenantId: tid } = useTenantFilter();
   const fornecedorId = params.fornecedorId ?? null;
+  const fornecedorIds = params.fornecedorIds ?? [];
   const unidadeBaseId = params.unidadeBaseId ?? null;
   const janela = params.janelaMeses ?? 12;
 
   const { data, isLoading } = useQuery({
-    queryKey: ['cohort-saldo', janela, fornecedorId, unidadeBaseId, tid],
+    queryKey: ['cohort-saldo', janela, fornecedorId, JSON.stringify(fornecedorIds), unidadeBaseId, tid],
     queryFn: async () => {
       const rpcParams: Record<string, any> = { p_janela_meses: janela, p_horizontes: [3, 6, 12] };
-      if (fornecedorId != null) rpcParams.p_fornecedor_id = fornecedorId;
+      if (fornecedorIds.length) rpcParams.p_fornecedor_ids = fornecedorIds;
+      else if (fornecedorId != null) rpcParams.p_fornecedor_id = fornecedorId;
       if (unidadeBaseId != null) rpcParams.p_unidade_base_id = unidadeBaseId;
       if (tid) rpcParams.p_tenant_id = tid;
       const { data, error } = await supabase.rpc('fn_cohort_saldo_forecast' as any, rpcParams);
