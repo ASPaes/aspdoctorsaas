@@ -1157,7 +1157,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       if (payloadNovos.length > 0) {
         const { error: batchErr, data: insertedData } = await supabase
           .from('clientes')
-          .insert(payloadNovos)
+          .insert(payloadNovos.map(toClienteRow))
           .select('id');
         if (!batchErr) {
           // Lote inteiro sucesso
