@@ -101,16 +101,16 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
                 <p className="font-medium truncate">{clienteDetails.unidade_base}</p>
               </div>
             )}
-            {clienteDetails.fornecedor && (
-              <div>
-                <span className="text-muted-foreground">Fornecedor</span>
-                <p className="font-medium truncate">{clienteDetails.fornecedor}</p>
-              </div>
-            )}
-            {clienteDetails.produto && (
-              <div>
-                <span className="text-muted-foreground">Produto</span>
-                <p className="font-medium truncate">{clienteDetails.produto}</p>
+            {clienteDetails.produtos?.length > 0 && (
+              <div className="col-span-2">
+                <span className="text-muted-foreground">Produtos</span>
+                <div className="space-y-0.5 mt-0.5">
+                  {clienteDetails.produtos.map((p, i) => (
+                    <p key={i} className="font-medium truncate">
+                      {p.produto ?? "—"}{p.fornecedor ? <span className="text-muted-foreground font-normal"> · {p.fornecedor}</span> : null}
+                    </p>
+                  ))}
+                </div>
               </div>
             )}
             {clienteDetails.data_ativacao && (
