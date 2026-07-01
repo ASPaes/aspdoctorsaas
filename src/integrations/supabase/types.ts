@@ -8300,6 +8300,7 @@ export type Database = {
           p_dim: string
           p_fim: string
           p_fornecedor?: number
+          p_fornecedor_ids?: number[]
           p_tenant: string
           p_uf?: string
           p_unidade?: number
@@ -8318,6 +8319,7 @@ export type Database = {
         Args: {
           p_fim: string
           p_fornecedor?: number
+          p_fornecedor_ids?: number[]
           p_ini: string
           p_nivel: string
           p_tenant: string
@@ -8337,6 +8339,7 @@ export type Database = {
           p_cidade: string
           p_fim: string
           p_fornecedor?: number
+          p_fornecedor_ids?: number[]
           p_tenant: string
           p_uf: string
           p_unidade?: number
@@ -8350,6 +8353,7 @@ export type Database = {
       get_carteira_serie_uf: {
         Args: {
           p_fornecedor?: number
+          p_fornecedor_ids?: number[]
           p_meses?: number
           p_tenant: string
           p_unidade?: number
@@ -8366,6 +8370,7 @@ export type Database = {
           p_fim_anterior: string
           p_fim_atual: string
           p_fornecedor?: number
+          p_fornecedor_ids?: number[]
           p_tenant: string
           p_unidade?: number
         }
@@ -8396,6 +8401,7 @@ export type Database = {
         Args: {
           p_fim: string
           p_fornecedor?: number
+          p_fornecedor_ids?: number[]
           p_ini: string
           p_tenant: string
           p_uf: string
