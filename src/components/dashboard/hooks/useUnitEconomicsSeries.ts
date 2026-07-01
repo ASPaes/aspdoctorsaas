@@ -59,7 +59,7 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
   const refDateStr = format(refDate, 'yyyy-MM-dd');
 
   return useQuery<UnitEconomicsResult>({
-    queryKey: ['unit-economics-saas', filters.unidadeBaseId, filters.fornecedorId, rangeMonths, refDateStr, tid],
+    queryKey: ['unit-economics-saas', filters.unidadeBaseId, JSON.stringify(filters.fornecedorIds), rangeMonths, refDateStr, tid],
     queryFn: async () => {
       const now = refDate;
       const totalMonthsNeeded = rangeMonths + 5; // warmup for 6M window
