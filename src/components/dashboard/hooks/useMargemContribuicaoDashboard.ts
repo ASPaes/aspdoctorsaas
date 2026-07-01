@@ -32,7 +32,7 @@ export function useMargemContribuicaoDashboard(filters: DashboardFilters) {
   const periodoFimStr = filters.periodoFim ? format(filters.periodoFim, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
 
   return useQuery({
-    queryKey: ['margem-contribuicao-dashboard', filters.unidadeBaseId, filters.fornecedorId, periodoFimStr, tid],
+    queryKey: ['margem-contribuicao-dashboard', filters.unidadeBaseId, JSON.stringify(filters.fornecedorIds), periodoFimStr, tid],
     queryFn: async (): Promise<MargemContribuicaoData> => {
       const raw = await fetchAllRows<any>(() => {
         let q = supabase
@@ -41,7 +41,7 @@ export function useMargemContribuicaoDashboard(filters: DashboardFilters) {
           .lte('data_cadastro', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
-        if (filters.fornecedorId) q = q.eq('fornecedor_id', filters.fornecedorId);
+        if (filters.fornecedorIds?.length) q = q.in('fornecedor_id', filters.fornecedorIds);
         return q;
       });
       if (!raw || raw.length === 0) return defaultData;

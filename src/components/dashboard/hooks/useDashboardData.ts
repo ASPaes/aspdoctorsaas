@@ -47,11 +47,11 @@ export function useDashboardData(filters: DashboardFilters) {
 
       // Fornecedor filter via cliente_produtos (deprecated clientes.fornecedor_id)
       let fornecedorClientIds: Set<string> | null = null;
-      if (filters.fornecedorId) {
+      if (filters.fornecedorIds?.length) {
         const cpByForn = await fetchAllRows<any>(() => {
           let q = (supabase.from('cliente_produtos' as any) as any)
             .select('cliente_id')
-            .eq('fornecedor_id', filters.fornecedorId);
+            .in('fornecedor_id', filters.fornecedorIds);
           if (tid) q = q.eq('tenant_id', tid);
           return q;
         });
@@ -309,7 +309,7 @@ export function useDashboardData(filters: DashboardFilters) {
         ...(novosClientesFilt || []).map(c => c.id),
       ]);
 
-      const needsClientFilter = !!(filters.fornecedorId || filters.unidadeBaseId);
+      const needsClientFilter = !!(filters.fornecedorIds?.length || filters.unidadeBaseId);
 
       movimentosPeriodo?.forEach(m => {
         // Skip movements from clients outside the filter scope

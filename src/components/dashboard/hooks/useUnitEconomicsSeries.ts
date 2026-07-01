@@ -59,7 +59,7 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
   const refDateStr = format(refDate, 'yyyy-MM-dd');
 
   return useQuery<UnitEconomicsResult>({
-    queryKey: ['unit-economics-saas', filters.unidadeBaseId, filters.fornecedorId, rangeMonths, refDateStr, tid],
+    queryKey: ['unit-economics-saas', filters.unidadeBaseId, JSON.stringify(filters.fornecedorIds), rangeMonths, refDateStr, tid],
     queryFn: async () => {
       const now = refDate;
       const totalMonthsNeeded = rangeMonths + 5; // warmup for 6M window
@@ -93,7 +93,7 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
 
       const clients = (allClientes || []).filter(c => {
         if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
-        if (filters.fornecedorId && c.fornecedor_id !== filters.fornecedorId) return false;
+        if (filters.fornecedorIds?.length && !filters.fornecedorIds.includes(c.fornecedor_id)) return false;
         return true;
       });
 

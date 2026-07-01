@@ -8615,6 +8615,7 @@ export type Database = {
         Args: {
           p_data_referencia?: string
           p_fornecedor_id?: number
+          p_fornecedor_ids?: number[]
           p_months_back?: number
           p_tenant_id: string
           p_unidade_base_id?: number
@@ -8776,6 +8777,7 @@ export type Database = {
       get_tenure_medio_meses: {
         Args: {
           p_fornecedor_id?: number
+          p_fornecedor_ids?: number[]
           p_tenant_id: string
           p_unidade_base_id?: number
         }

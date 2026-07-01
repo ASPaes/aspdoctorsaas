@@ -2,6 +2,7 @@
 
 export interface DashboardFilters {
   fornecedorId: number | null;
+  fornecedorIds: number[];
   periodoInicio: Date | null;
   periodoFim: Date | null;
   showAllData: boolean;

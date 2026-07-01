@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
+import { MultiSelectFilter } from '@/components/atendimento/MultiSelectFilter';
 import type { DashboardFilters as FiltersType } from './types';
 
 export type PeriodPreset = 'personalizado' | 'mes_atual' | 'ultimos_3_meses' | 'ultimos_6_meses' | 'ultimos_12_meses';
@@ -63,13 +64,13 @@ export function DashboardFilters({
     <div className={`flex flex-wrap items-end gap-3 ${tvMode ? 'p-4' : ''}`}>
       <div className="space-y-1">
         <label className="text-xs font-medium text-muted-foreground">Fornecedor</label>
-        <Select value={filters.fornecedorId?.toString() || 'all'} onValueChange={v => onFiltersChange({ ...filters, fornecedorId: v === 'all' ? null : Number(v) })}>
-          <SelectTrigger className={cn('w-[180px]', tvMode && 'h-12 text-lg')}><SelectValue placeholder="Fornecedor" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos Fornecedores</SelectItem>
-            {fornecedores.map(f => <SelectItem key={f.id} value={f.id.toString()}>{f.nome}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <MultiSelectFilter
+          label="Fornecedor"
+          options={fornecedores}
+          selected={filters.fornecedorIds ?? []}
+          onChange={(ids) => onFiltersChange({ ...filters, fornecedorIds: ids, fornecedorId: ids.length === 1 ? ids[0] : null })}
+          className={cn('w-[200px]', tvMode && 'h-12 text-lg')}
+        />
       </div>
 
       <DateRangePicker label="Período" value={dateRange} onChange={handleDateRangeChange} className="w-64" />

@@ -65,12 +65,13 @@ export function useVisaoGeralExtras(filters?: DashboardFilters) {
 
   const unidadeBaseId = filters?.unidadeBaseId ?? null;
   const fornecedorId = filters?.fornecedorId ?? null;
+  const fornecedorIds = filters?.fornecedorIds ?? [];
   const dataReferencia = filters?.periodoFim
     ? new Date(filters.periodoFim).toISOString().slice(0, 10)
     : null;
 
   return useQuery({
-    queryKey: ['visao-geral-extras', tid, unidadeBaseId, fornecedorId, dataReferencia],
+    queryKey: ['visao-geral-extras', tid, unidadeBaseId, JSON.stringify(fornecedorIds), dataReferencia],
     enabled: !!tid,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<VisaoGeralExtras> => {
@@ -81,9 +82,10 @@ export function useVisaoGeralExtras(filters?: DashboardFilters) {
         p_tenant_id: tid,
         p_months_back: 12,
         p_unidade_base_id: unidadeBaseId,
-        p_fornecedor_id: fornecedorId,
+        p_fornecedor_id: null,
+        p_fornecedor_ids: fornecedorIds.length ? fornecedorIds : null,
         p_data_referencia: dataReferencia,
-      });
+      } as any);
 
       if (seriesError) {
         console.error('[useVisaoGeralExtras] series error:', seriesError);
@@ -98,8 +100,9 @@ export function useVisaoGeralExtras(filters?: DashboardFilters) {
       const { data: tenureData, error: tenureError } = await supabase.rpc('get_tenure_medio_meses', {
         p_tenant_id: tid,
         p_unidade_base_id: unidadeBaseId,
-        p_fornecedor_id: fornecedorId,
-      });
+        p_fornecedor_id: null,
+        p_fornecedor_ids: fornecedorIds.length ? fornecedorIds : null,
+      } as any);
 
       if (tenureError) {
         console.error('[useVisaoGeralExtras] tenure error:', tenureError);
