@@ -1115,10 +1115,19 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         observacoes_contratuais: p.observacao_negociacao,
       });
 
-      // Remove campos legados de fornecedor antes de gravar em `clientes`.
-      // Fonte de verdade = cliente_produtos (populado via import_clientes_produtos_batch).
+      // Remove campos legados antes de gravar em `clientes`.
+      // Fonte de verdade = cliente_produtos/contratos (populado via import_clientes_produtos_batch).
+      // ATENÇÃO: p NÃO é mutado — buildDadosImport(p) continua recebendo todos os valores pra RPC.
       const toClienteRow = (p: any) => {
-        const { codigo_fornecedor, link_portal_fornecedor, ...rest } = p;
+        const {
+          codigo_fornecedor,
+          link_portal_fornecedor,
+          fornecedor_id,
+          funcionario_id,
+          origem_venda_id,
+          recorrencia,
+          ...rest
+        } = p;
         return rest;
       };
 
