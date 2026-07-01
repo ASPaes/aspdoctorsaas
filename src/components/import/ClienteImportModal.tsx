@@ -1115,6 +1115,13 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         observacoes_contratuais: p.observacao_negociacao,
       });
 
+      // Remove campos legados de fornecedor antes de gravar em `clientes`.
+      // Fonte de verdade = cliente_produtos (populado via import_clientes_produtos_batch).
+      const toClienteRow = (p: any) => {
+        const { codigo_fornecedor, link_portal_fornecedor, ...rest } = p;
+        return rest;
+      };
+
       const callImportRpc = async (
         rows: { cliente_id: string; produto_id: any; dados: any }[],
         sourceLookup: Map<string, { razao_social: string; cnpj: string }>,
