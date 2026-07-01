@@ -385,7 +385,7 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
         diagInput={diagInput as any}
         filtrosAplicados={{
           unidadeBaseId: filters.unidadeBaseId,
-          fornecedorId: filters.fornecedorId,
+          fornecedorIds: filters.fornecedorIds,
           periodoInicio,
           periodoFim,
         }}

@@ -487,7 +487,7 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
           alertasFactuais={insights}
           filtrosAplicados={{
             unidadeBaseId: filters.unidadeBaseId,
-            fornecedorId: filters.fornecedorId,
+            fornecedorIds: filters.fornecedorIds,
             periodoInicio: filters.periodoInicio,
             periodoFim: filters.periodoFim,
           }}

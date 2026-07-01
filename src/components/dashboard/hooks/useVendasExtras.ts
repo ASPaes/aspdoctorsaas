@@ -47,7 +47,6 @@ function resolvePeriodo(filters: DashboardFilters): { iniStr: string; fimStr: st
 export function useVendasExplorer(filters: DashboardFilters, dim: string) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { iniStr, fimStr } = resolvePeriodo(filters);
-  const forn = filters.fornecedorId ?? null;
   const fornIds = filters.fornecedorIds ?? [];
   const unid = filters.unidadeBaseId ?? null;
 
@@ -73,7 +72,6 @@ export function useVendasExplorer(filters: DashboardFilters, dim: string) {
 
 export function useVendasSerie(filters: DashboardFilters, meses = 12) {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const forn = filters.fornecedorId ?? null;
   const fornIds = filters.fornecedorIds ?? [];
   const unid = filters.unidadeBaseId ?? null;
 
@@ -108,7 +106,6 @@ export interface VendasTicketStats {
 export function useVendasTicketStats(filters: DashboardFilters) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { iniStr, fimStr } = resolvePeriodo(filters);
-  const forn = filters.fornecedorId ?? null;
   const fornIds = filters.fornecedorIds ?? [];
   const unid = filters.unidadeBaseId ?? null;
 
@@ -134,7 +131,6 @@ export function useVendasTicketStats(filters: DashboardFilters) {
 export function useVendasProdutos(filters: DashboardFilters) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { iniStr, fimStr } = resolvePeriodo(filters);
-  const forn = filters.fornecedorId ?? null;
   const fornIds = filters.fornecedorIds ?? [];
   const unid = filters.unidadeBaseId ?? null;
 

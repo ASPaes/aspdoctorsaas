@@ -512,7 +512,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
         diagInput={diagInput as Record<string, any>}
         filtrosAplicados={{
           unidadeBaseId: filters.unidadeBaseId,
-          fornecedorId: filters.fornecedorId,
+          fornecedorIds: filters.fornecedorIds,
           periodoInicio: filters.periodoInicio,
           periodoFim: filters.periodoFim,
         }}
