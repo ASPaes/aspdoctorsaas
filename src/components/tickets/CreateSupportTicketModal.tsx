@@ -586,6 +586,12 @@ export function CreateSupportTicketModal({
             .update({ checklist: checklistItems })
             .eq("id", ticketId);
         }
+        if (prioridade && prioridade !== "media") {
+          await (supabase.from("support_tickets" as any) as any)
+            .update({ prioridade })
+            .eq("id", ticketId);
+        }
+
       }
 
       toast.success("Ticket criado com sucesso");
