@@ -47,6 +47,7 @@ export function useDashboardFilters(globalUnidadeId?: number | null) {
       if (raw) {
         const parsed = deserialize(raw);
         if (parsed?.fornecedorId) defaults.fornecedorId = parsed.fornecedorId;
+        if (parsed?.fornecedorIds?.length) defaults.fornecedorIds = parsed.fornecedorIds;
       }
     } catch {}
     return defaults;
