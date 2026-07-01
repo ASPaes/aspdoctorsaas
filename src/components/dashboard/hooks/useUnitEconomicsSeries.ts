@@ -78,6 +78,19 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
       });
 
       // === QUERY A: All clients ===
+      let fornecedorClientIds: Set<string> | null = null;
+
+      if (filters.fornecedorIds?.length) {
+        const cpByForn = await fetchAllRows<any>(() => {
+          let q = (supabase.from('cliente_produtos' as any) as any)
+            .select('cliente_id')
+            .in('fornecedor_id', filters.fornecedorIds);
+          if (tid) q = q.eq('tenant_id', tid);
+          return q;
+        });
+        fornecedorClientIds = new Set((cpByForn || []).map((r: any) => r.cliente_id));
+      }
+
       const allClientes = await fetchAllRows<any>(() => {
         let q = supabase
           .from('vw_clientes_financeiro')
@@ -93,7 +106,7 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
 
       const clients = (allClientes || []).filter(c => {
         if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
-        if (filters.fornecedorIds?.length && !filters.fornecedorIds.includes(c.fornecedor_id)) return false;
+        if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
         return true;
       });
 

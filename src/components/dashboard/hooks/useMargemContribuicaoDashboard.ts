@@ -34,14 +34,26 @@ export function useMargemContribuicaoDashboard(filters: DashboardFilters) {
   return useQuery({
     queryKey: ['margem-contribuicao-dashboard', filters.unidadeBaseId, JSON.stringify(filters.fornecedorIds), periodoFimStr, tid],
     queryFn: async (): Promise<MargemContribuicaoData> => {
+      let fornecedorClientIds: Set<string> | null = null;
+
+      if (filters.fornecedorIds?.length) {
+        const cpByForn = await fetchAllRows<any>(() => {
+          let q = (supabase.from('cliente_produtos' as any) as any)
+            .select('cliente_id')
+            .in('fornecedor_id', filters.fornecedorIds);
+          if (tid) q = q.eq('tenant_id', tid);
+          return q;
+        });
+        fornecedorClientIds = new Set((cpByForn || []).map((r: any) => r.cliente_id));
+      }
+
       const raw = await fetchAllRows<any>(() => {
         let q = supabase
           .from('vw_clientes_financeiro')
-          .select('mensalidade, custo_operacao, data_cadastro, data_cancelamento, cancelado')
+          .select('id, mensalidade, custo_operacao, data_cadastro, data_cancelamento, cancelado')
           .lte('data_cadastro', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
-        if (filters.fornecedorIds?.length) q = q.in('fornecedor_id', filters.fornecedorIds);
         return q;
       });
       if (!raw || raw.length === 0) return defaultData;
@@ -49,6 +61,7 @@ export function useMargemContribuicaoDashboard(filters: DashboardFilters) {
       // Filtra clientes ativos no fim do período.
       // Regra canônica: ativo = cancelado !== true OU (cancelado=true E data_cancelamento > periodoFim).
       const data = raw.filter(c => {
+        if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
         if (c.cancelado !== true) return true;
         if (!c.data_cancelamento) return false;
         return new Date(c.data_cancelamento) > new Date(periodoFimStr);
