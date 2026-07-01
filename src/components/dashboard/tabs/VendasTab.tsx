@@ -632,7 +632,7 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
         diagInput={diagInput as Record<string, any>}
         filtrosAplicados={{
           unidadeBaseId: filters.unidadeBaseId,
-          fornecedorId: filters.fornecedorId,
+          fornecedorIds: filters.fornecedorIds,
           periodoInicio: filters.periodoInicio,
           periodoFim: filters.periodoFim,
         }}

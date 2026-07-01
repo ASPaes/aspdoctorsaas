@@ -780,7 +780,7 @@ export function CohortTab({ tvMode = false, fornecedorId, fornecedorIds, unidade
           tabKey="cohort"
           diagInput={conselhoDiagInput}
           alertasFactuais={conselhoAlertas}
-          filtrosAplicados={{ fornecedorId, unidadeBaseId, janelaMeses: maxAge, periodoSafrasMeses: Number(cohortRange) }}
+          filtrosAplicados={{ fornecedorIds, unidadeBaseId, janelaMeses: maxAge, periodoSafrasMeses: Number(cohortRange) }}
           isAdmin={isAdmin}
         />
       )}
