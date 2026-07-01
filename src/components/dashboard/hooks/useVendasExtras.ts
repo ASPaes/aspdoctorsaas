@@ -48,10 +48,11 @@ export function useVendasExplorer(filters: DashboardFilters, dim: string) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { iniStr, fimStr } = resolvePeriodo(filters);
   const forn = filters.fornecedorId ?? null;
+  const fornIds = filters.fornecedorIds ?? [];
   const unid = filters.unidadeBaseId ?? null;
 
   return useQuery({
-    queryKey: ['vendas-breakdown', tid, iniStr, fimStr, dim, forn, unid],
+    queryKey: ['vendas-breakdown', tid, iniStr, fimStr, dim, JSON.stringify(fornIds), unid],
     enabled: !!tid && !!dim,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<VendasBreakdownRow[]> => {
@@ -60,7 +61,8 @@ export function useVendasExplorer(filters: DashboardFilters, dim: string) {
         p_ini: iniStr,
         p_fim: fimStr,
         p_dim: dim,
-        p_fornecedor_id: forn,
+        p_fornecedor_id: null,
+        p_fornecedor_ids: fornIds.length ? fornIds : null,
         p_unidade_base_id: unid,
       });
       if (error) throw error;

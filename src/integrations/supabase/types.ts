@@ -8815,6 +8815,7 @@ export type Database = {
           p_dim: string
           p_fim: string
           p_fornecedor_id?: number
+          p_fornecedor_ids?: number[]
           p_ini: string
           p_tenant: string
           p_unidade_base_id?: number
@@ -8833,6 +8834,7 @@ export type Database = {
         Args: {
           p_fim: string
           p_fornecedor_id?: number
+          p_fornecedor_ids?: number[]
           p_ini: string
           p_tenant: string
           p_unidade_base_id?: number
@@ -8848,6 +8850,7 @@ export type Database = {
       get_vendas_serie_mensal: {
         Args: {
           p_fornecedor_id?: number
+          p_fornecedor_ids?: number[]
           p_meses?: number
           p_tenant: string
           p_unidade_base_id?: number
@@ -8863,6 +8866,7 @@ export type Database = {
         Args: {
           p_fim: string
           p_fornecedor_id?: number
+          p_fornecedor_ids?: number[]
           p_ini: string
           p_tenant: string
           p_unidade_base_id?: number
