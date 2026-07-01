@@ -7887,46 +7887,30 @@ export type Database = {
         Returns: Json
       }
       fn_close_attendances_no_agent_response: { Args: never; Returns: Json }
-      fn_cohort_logos:
-        | {
-            Args: {
-              p_fornecedor_id?: number
-              p_from_month?: string
-              p_max_age?: number
-              p_to_month?: string
-              p_unidade_base_id?: number
-            }
-            Returns: {
-              age_months: number
-              cohort_month: string
-              cohort_size: number
-              retained: number
-              retention_percent: number
-              tenant_id: string
-            }[]
-          }
-        | {
-            Args: {
-              p_fornecedor_id?: number
-              p_from_month?: string
-              p_max_age?: number
-              p_tenant_id?: string
-              p_to_month?: string
-              p_unidade_base_id?: number
-            }
-            Returns: {
-              age_months: number
-              cohort_month: string
-              cohort_size: number
-              retained: number
-              retention_percent: number
-              tenant_id: string
-            }[]
-          }
+      fn_cohort_logos: {
+        Args: {
+          p_fornecedor_id?: number
+          p_fornecedor_ids?: number[]
+          p_from_month?: string
+          p_max_age?: number
+          p_tenant_id?: string
+          p_to_month?: string
+          p_unidade_base_id?: number
+        }
+        Returns: {
+          age_months: number
+          cohort_month: string
+          cohort_size: number
+          retained: number
+          retention_percent: number
+          tenant_id: string
+        }[]
+      }
       fn_cohort_revenue: {
         Args: {
           p_dimensao?: string
           p_fornecedor_id?: number
+          p_fornecedor_ids?: number[]
           p_from_month?: string
           p_max_age?: number
           p_tenant_id?: string
@@ -7949,6 +7933,7 @@ export type Database = {
       fn_cohort_saldo_forecast: {
         Args: {
           p_fornecedor_id?: number
+          p_fornecedor_ids?: number[]
           p_horizontes?: number[]
           p_janela_meses?: number
           p_tenant_id?: string
@@ -7969,6 +7954,7 @@ export type Database = {
       fn_cohort_survival_forecast: {
         Args: {
           p_fornecedor_id?: number
+          p_fornecedor_ids?: number[]
           p_from_month?: string
           p_horizontes?: number[]
           p_max_age?: number
