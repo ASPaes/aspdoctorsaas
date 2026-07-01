@@ -8247,6 +8247,7 @@ export type Database = {
       get_cancelamentos_breakdown: {
         Args: {
           p_fornecedor_id?: number
+          p_fornecedor_ids?: number[]
           p_periodo_fim: string
           p_periodo_inicio: string
           p_tenant_id: string

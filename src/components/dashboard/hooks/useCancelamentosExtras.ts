@@ -130,6 +130,7 @@ export function useCancelamentosExtras(params: {
 
   const unidadeBaseId = filters.unidadeBaseId ?? null;
   const fornecedorId = filters.fornecedorId ?? null;
+  const fornecedorIds = filters.fornecedorIds ?? [];
   const periodoInicio = filters.periodoInicio
     ? format(new Date(filters.periodoInicio), 'yyyy-MM-dd')
     : null;
@@ -138,7 +139,7 @@ export function useCancelamentosExtras(params: {
     : null;
 
   return useQuery({
-    queryKey: ['cancelamentos-extras', tid, periodoInicio, periodoFim, unidadeBaseId, fornecedorId],
+    queryKey: ['cancelamentos-extras', tid, periodoInicio, periodoFim, unidadeBaseId, JSON.stringify(fornecedorIds)],
     enabled: !!tid && !!periodoInicio && !!periodoFim,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<CancelamentosExtras> => {
@@ -147,7 +148,8 @@ export function useCancelamentosExtras(params: {
         p_periodo_inicio: periodoInicio,
         p_periodo_fim: periodoFim,
         p_unidade_base_id: unidadeBaseId,
-        p_fornecedor_id: fornecedorId,
+        p_fornecedor_id: null,
+        p_fornecedor_ids: fornecedorIds.length ? fornecedorIds : null,
       });
 
       if (error) {
