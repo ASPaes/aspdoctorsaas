@@ -508,6 +508,10 @@ export default function ClienteForm() {
           custo_operacao: _ignored6,
           codigo_fornecedor: _ignored7,
           link_portal_fornecedor: _ignored8,
+          fornecedor_id: _ignored9,
+          funcionario_id: _ignored10,
+          origem_venda_id: _ignored11,
+          recorrencia: _ignored12,
           ...updatePayload
         } = payload;
 
