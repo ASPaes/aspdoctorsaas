@@ -65,11 +65,11 @@ export function DashboardFilters({
       <div className="space-y-1">
         <label className="text-xs font-medium text-muted-foreground">Fornecedor</label>
         <MultiSelectFilter
-          label="Fornecedor"
+          label={(filters.fornecedorIds?.length ?? 0) > 0 ? `${filters.fornecedorIds.length} fornecedor(es)` : 'Todos Fornecedores'}
           options={fornecedores}
           selected={filters.fornecedorIds ?? []}
           onChange={(ids) => onFiltersChange({ ...filters, fornecedorIds: ids, fornecedorId: ids.length === 1 ? ids[0] : null })}
-          className={cn('w-[200px]', tvMode && 'h-12 text-lg')}
+          className={cn('w-[180px]', tvMode && 'h-12 text-lg')}
         />
       </div>
 
