@@ -93,7 +93,7 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
 
       const clients = (allClientes || []).filter(c => {
         if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
-        if (filters.fornecedorId && c.fornecedor_id !== filters.fornecedorId) return false;
+        if (filters.fornecedorIds?.length && !filters.fornecedorIds.includes(c.fornecedor_id)) return false;
         return true;
       });
 
