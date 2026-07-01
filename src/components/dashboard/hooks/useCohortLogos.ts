@@ -9,6 +9,7 @@ export interface CohortLogosParams {
   toCohortMonth?: string;
   maxAgeMonths?: number;
   fornecedorId?: number | null;
+  fornecedorIds?: number[];
   unidadeBaseId?: number | null;
 }
 
@@ -51,17 +52,19 @@ export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosRe
     ? normalizeMonth(params.toCohortMonth)
     : format(new Date(), 'yyyy-MM-dd');
   const fornecedorId = params.fornecedorId ?? null;
+  const fornecedorIds = params.fornecedorIds ?? [];
   const unidadeBaseId = params.unidadeBaseId ?? null;
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['cohort-logos', from, to, maxAge, fornecedorId, unidadeBaseId, tid],
+    queryKey: ['cohort-logos', from, to, maxAge, fornecedorId, JSON.stringify(fornecedorIds), unidadeBaseId, tid],
     queryFn: async () => {
       const rpcParams: Record<string, any> = {
         p_from_month: from,
         p_to_month: to,
         p_max_age: maxAge,
       };
-      if (fornecedorId != null) rpcParams.p_fornecedor_id = fornecedorId;
+      if (fornecedorIds.length) rpcParams.p_fornecedor_ids = fornecedorIds;
+      else if (fornecedorId != null) rpcParams.p_fornecedor_id = fornecedorId;
       if (unidadeBaseId != null) rpcParams.p_unidade_base_id = unidadeBaseId;
       if (tid) rpcParams.p_tenant_id = tid;
 

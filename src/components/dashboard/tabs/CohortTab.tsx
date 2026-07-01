@@ -24,6 +24,7 @@ interface CohortTabProps {
   periodoInicio?: Date | null;
   periodoFim?: Date | null;
   fornecedorId?: number | null;
+  fornecedorIds?: number[];
   unidadeBaseId?: number | null;
 }
 
@@ -55,7 +56,7 @@ function formatCohortLabel(month: string): string {
   catch { return month; }
 }
 
-export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: CohortTabProps) {
+export function CohortTab({ tvMode = false, fornecedorId, fornecedorIds, unidadeBaseId }: CohortTabProps) {
   const [ageWindow, setAgeWindow] = useState<string>('12');
   const [cohortRange, setCohortRange] = useState<string>('12');
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
@@ -72,6 +73,7 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
     toCohortMonth: toMonth,
     maxAgeMonths: maxAge,
     fornecedorId,
+    fornecedorIds,
     unidadeBaseId,
   });
 
@@ -80,10 +82,11 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
     toCohortMonth: toMonth,
     maxAgeMonths: maxAge,
     fornecedorId,
+    fornecedorIds,
     unidadeBaseId,
   });
 
-  const { rows: forecastRows } = useCohortForecast({ fornecedorId, unidadeBaseId });
+  const { rows: forecastRows } = useCohortForecast({ fornecedorId, fornecedorIds, unidadeBaseId });
 
   const activeMatrix = metricMode === 'revenue' ? revenueMatrix : matrix;
 
