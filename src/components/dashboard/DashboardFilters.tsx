@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
+import { MultiSelectFilter } from '@/components/atendimento/MultiSelectFilter';
 import type { DashboardFilters as FiltersType } from './types';
 
 export type PeriodPreset = 'personalizado' | 'mes_atual' | 'ultimos_3_meses' | 'ultimos_6_meses' | 'ultimos_12_meses';
