@@ -24,6 +24,7 @@ interface CohortTabProps {
   periodoInicio?: Date | null;
   periodoFim?: Date | null;
   fornecedorId?: number | null;
+  fornecedorIds?: number[];
   unidadeBaseId?: number | null;
 }
 
