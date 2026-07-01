@@ -309,7 +309,7 @@ export function useDashboardData(filters: DashboardFilters) {
         ...(novosClientesFilt || []).map(c => c.id),
       ]);
 
-      const needsClientFilter = !!(filters.fornecedorId || filters.unidadeBaseId);
+      const needsClientFilter = !!(filters.fornecedorIds?.length || filters.unidadeBaseId);
 
       movimentosPeriodo?.forEach(m => {
         // Skip movements from clients outside the filter scope
