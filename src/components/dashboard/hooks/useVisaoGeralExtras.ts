@@ -65,12 +65,13 @@ export function useVisaoGeralExtras(filters?: DashboardFilters) {
 
   const unidadeBaseId = filters?.unidadeBaseId ?? null;
   const fornecedorId = filters?.fornecedorId ?? null;
+  const fornecedorIds = filters?.fornecedorIds ?? [];
   const dataReferencia = filters?.periodoFim
     ? new Date(filters.periodoFim).toISOString().slice(0, 10)
     : null;
 
   return useQuery({
-    queryKey: ['visao-geral-extras', tid, unidadeBaseId, fornecedorId, dataReferencia],
+    queryKey: ['visao-geral-extras', tid, unidadeBaseId, JSON.stringify(fornecedorIds), dataReferencia],
     enabled: !!tid,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<VisaoGeralExtras> => {
