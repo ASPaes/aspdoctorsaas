@@ -506,6 +506,8 @@ export default function ClienteForm() {
           observacao_cancelamento: _ignored4,
           mensalidade: _ignored5,
           custo_operacao: _ignored6,
+          codigo_fornecedor: _ignored7,
+          link_portal_fornecedor: _ignored8,
           ...updatePayload
         } = payload;
 
