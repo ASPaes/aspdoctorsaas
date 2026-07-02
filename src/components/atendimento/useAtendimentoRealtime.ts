@@ -20,9 +20,11 @@ export interface AtendimentoRealtime {
 export function useAtendimentoRealtime() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
+  const { tipoAtendimento } = useAtendimentoFilter();
+  const pIsGroup = tipoAtendimento === 'all' ? null : tipoAtendimento === 'group';
 
   const query = useQuery<AtendimentoRealtime>({
-    queryKey: ["atendimento-realtime", tid, viewKey],
+    queryKey: ["atendimento-realtime", tid, viewKey, tipoAtendimento],
     enabled: !!tid && unidadeFilterReady,
     refetchInterval: 15_000,
     refetchIntervalInBackground: false,
@@ -30,7 +32,7 @@ export function useAtendimentoRealtime() {
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)(
         "get_atendimento_realtime",
-        { p_tenant_id: tid, p_unidade_base_id: selectedUnidadeId ?? null }
+        { p_tenant_id: tid, p_unidade_base_id: selectedUnidadeId ?? null, p_is_group: pIsGroup }
       );
       if (error) throw error;
       const raw = (data ?? {}) as any;
