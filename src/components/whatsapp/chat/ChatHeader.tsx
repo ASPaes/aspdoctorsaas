@@ -342,6 +342,27 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     await startGroupAttendance(groupIncludePrevious);
   }, [startGroupAttendance, groupIncludePrevious, queryClient]);
 
+  const handleGroupCloseRequest = useCallback(async () => {
+    const attTicketId = (attendance as any)?.ticket_id ?? null;
+    if (attTicketId) {
+      setReopenTicketId(attTicketId);
+      setShowReopenChoice(true);
+      return;
+    }
+
+    const { data: cfg } = await (supabase.from("configuracoes" as any) as any)
+      .select("group_require_ticket_on_close")
+      .eq("tenant_id", conversation.tenant_id || tid)
+      .maybeSingle();
+
+    if ((cfg as any)?.group_require_ticket_on_close === true) {
+      setShowClassifyModal(true);
+      return;
+    }
+
+    setShowCloseModal(true);
+  }, [attendance, conversation.tenant_id, tid, setReopenTicketId, setShowReopenChoice, setShowClassifyModal, setShowCloseModal]);
+
 
 
 
@@ -726,7 +747,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                   size="sm"
                   variant="outline"
                   className="h-8 gap-1.5 text-destructive hover:text-destructive"
-                  onClick={() => setShowCloseModal(true)}
+                  onClick={handleGroupCloseRequest}
                 >
                   <XCircle className="h-3.5 w-3.5" />
                   Encerrar
