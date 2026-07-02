@@ -371,20 +371,23 @@ REGRAS:
       // Se não encontrou, mantém area_id original sem erro
     }
 
-    // 12. Create KB draft
-    await supabase.from("support_kb_articles").insert({
-      tenant_id: att.tenant_id,
-      source_attendance_id: attendanceId,
-      title: (result.title || result.summary || "").substring(0, 120),
-      summary: (result.summary || "").substring(0, 500),
-      problem: result.problem || "",
-      solution: result.solution || "",
-      tags: Array.isArray(result.tags) ? result.tags.slice(0, 5) : [],
-      area_id: resolvedAreaId,
-      status: "draft",
-    });
-
-    console.log(`[${FUNCTION_NAME}][${requestId}] Sucesso — KB draft criado, sentimento=${sentimentValue}`);
+    // 12. Create KB draft (pular se já existia — só o sentimento estava faltando)
+    if (!kbAlreadyExists) {
+      await supabase.from("support_kb_articles").insert({
+        tenant_id: att.tenant_id,
+        source_attendance_id: attendanceId,
+        title: (result.title || result.summary || "").substring(0, 120),
+        summary: (result.summary || "").substring(0, 500),
+        problem: result.problem || "",
+        solution: result.solution || "",
+        tags: Array.isArray(result.tags) ? result.tags.slice(0, 5) : [],
+        area_id: resolvedAreaId,
+        status: "draft",
+      });
+      console.log(`[${FUNCTION_NAME}][${requestId}] Sucesso — KB draft criado, sentimento=${sentimentValue}`);
+    } else {
+      console.log(`[${FUNCTION_NAME}][${requestId}] Sucesso — sentimento gravado (KB já existia), sentimento=${sentimentValue}`);
+    }
 
     return new Response(
       JSON.stringify({ success: true, sentiment: sentimentValue, topics: limitedTopics }),
