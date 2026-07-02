@@ -202,7 +202,7 @@ export const useWhatsAppActions = () => {
             ? Math.round((now.getTime() - assumedAt.getTime()) / 1000)
             : 0;
 
-          const effSkipCsat = skipCsat || isGroup === true;
+          const effSkipCsat = skipCsat;
 
           const closureType = skipClosureMessage
             ? 'silent'

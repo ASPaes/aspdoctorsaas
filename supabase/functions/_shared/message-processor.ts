@@ -1579,6 +1579,77 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   // Grupos: pular TODA automação (URA, business hours, CSAT, attendance, sentiment)
   if (isGroup) {
     console.log('[processor] Group message saved, skipping automation for', conversationId);
+
+    // Captura de CSAT de grupo (silenciosa): apenas mensagens de participantes (não fromMe).
+    // Regra: primeira mensagem após envio decide. Nota válida => registra + agradece.
+    // Qualquer outra coisa => expira em silêncio (sem nudge).
+    if (!fromMe) {
+      try {
+        const { data: att } = await supabase
+          .from('support_attendances')
+          .select('id')
+          .eq('conversation_id', conversationId)
+          .eq('is_group', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (att?.id) {
+          const { data: csat } = await supabase
+            .from('support_csat')
+            .select('id, asked_at')
+            .eq('attendance_id', att.id)
+            .eq('status', 'pending')
+            .order('asked_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (csat?.id) {
+            const supportConfig = await getSupportConfig(supabase, tenantId);
+            const nowIso = new Date().toISOString();
+            const askedAtMs = new Date(csat.asked_at).getTime();
+            const elapsedMin = (Date.now() - askedAtMs) / 60000;
+
+            if (elapsedMin > supportConfig.support_csat_timeout_minutes) {
+              console.log('[processor][group-csat] timeout expired for csat=', csat.id);
+              await supabase.from('support_csat')
+                .update({ status: 'expired', responded_at: nowIso })
+                .eq('id', csat.id);
+            } else {
+              const trimmed = (content || '').trim();
+              const digits = trimmed.replace(/[^0-9]/g, '');
+              const scoreNum = digits.length > 0 && digits.length <= 2 ? parseInt(digits, 10) : NaN;
+              const valid = !isNaN(scoreNum)
+                && scoreNum >= supportConfig.support_csat_score_min
+                && scoreNum <= supportConfig.support_csat_score_max;
+
+              if (valid) {
+                console.log('[processor][group-csat] valid score=', scoreNum, 'csat=', csat.id);
+                await supabase.from('support_csat')
+                  .update({ score: scoreNum, status: 'completed', responded_at: nowIso })
+                  .eq('id', csat.id);
+
+                const thanks = supportConfig.support_csat_thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.';
+                const groupCtx: SendContext = {
+                  instanceId, tenantId, providerType, instanceInfo, secrets,
+                  remoteJid: remoteJid.includes('@') ? remoteJid : `${remoteJid}@g.us`,
+                  contactName: pushName || phone,
+                };
+                await sendAndPersistAutoMessage(supabase, groupCtx, conversationId, thanks, { csat: true });
+              } else {
+                console.log('[processor][group-csat] invalid reply, expiring silently csat=', csat.id);
+                await supabase.from('support_csat')
+                  .update({ status: 'expired', responded_at: nowIso })
+                  .eq('id', csat.id);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[processor][group-csat] error:', err);
+      }
+    }
+
     return;
   }
 
