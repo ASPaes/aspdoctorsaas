@@ -623,6 +623,37 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               </Tooltip>
             )}
 
+            {isGroupConv && !groupAttendance && (
+              <Button
+                size="sm"
+                variant="default"
+                className="h-8 gap-1.5"
+                onClick={startGroupAttendance}
+                disabled={isStartingGroupAtt}
+              >
+                <Play className="h-3.5 w-3.5" />
+                Iniciar atendimento
+              </Button>
+            )}
+
+            {isGroupConv && groupAttendance && (
+              <div className="flex items-center gap-1.5">
+                <Badge variant="secondary" className="whitespace-nowrap">
+                  Em atendimento{assignedOperatorName ? ` · ${assignedOperatorName}` : ""}
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-destructive hover:text-destructive"
+                  onClick={() => setShowCloseModal(true)}
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                  Encerrar
+                </Button>
+              </div>
+            )}
+
+
             {presenceBlocked && !isGroupConv ? (
               <Tooltip>
                 <TooltipTrigger asChild>
