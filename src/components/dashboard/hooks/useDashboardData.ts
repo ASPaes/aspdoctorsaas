@@ -825,13 +825,14 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           mensalidade: Number(c.mensalidade) || 0,
         }))
         .sort((a, b) => new Date(b.dataVenda).getTime() - new Date(a.dataVenda).getTime());
+      if (seq !== fetchSeqRef.current) return;
       setNovosClientesList(novosListItems);
     } catch (err) {
       console.error('Dashboard data error:', err);
     } finally {
-      setLoading(false);
+      if (seq === fetchSeqRef.current) setLoading(false);
     }
-  }, [filters, tid]);
+  }, [filters, tid, ready]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
