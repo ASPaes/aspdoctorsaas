@@ -32,9 +32,10 @@ export interface AtendimentoAgentes {
 export function useAtendimentoAgentes() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
-  const { dateRange, departmentId } = useAtendimentoFilter();
+  const { dateRange, departmentId, tipoAtendimento } = useAtendimentoFilter();
+  const pIsGroup = tipoAtendimento === 'all' ? null : tipoAtendimento === 'group';
   return useQuery<AtendimentoAgentes>({
-    queryKey: ["atendimento-agentes", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId],
+    queryKey: ["atendimento-agentes", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, tipoAtendimento],
     enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -44,6 +45,7 @@ export function useAtendimentoAgentes() {
         p_date_to: dateRange.to.toISOString(),
         p_unidade_base_id: selectedUnidadeId ?? null,
         p_department_id: departmentId ?? null,
+        p_is_group: pIsGroup,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
