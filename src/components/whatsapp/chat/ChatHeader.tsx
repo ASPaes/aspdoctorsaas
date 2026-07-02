@@ -16,6 +16,7 @@ import { ScheduleAttendanceDialog } from "./ScheduleAttendanceDialog";
 import GroupParticipantsSheet from "./GroupParticipantsSheet";
 import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CreateCSTicketFromChat } from "./CreateCSTicketFromChat";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppActions } from "../hooks/useWhatsAppActions";
