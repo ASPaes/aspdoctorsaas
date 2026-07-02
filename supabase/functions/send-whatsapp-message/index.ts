@@ -478,6 +478,67 @@ Deno.serve(async (req) => {
       }
     }
 
+    // --- PRE-SEND (GROUPS): If agent sending to group and no active attendance, start via RPC and notify ---
+    if (senderUserId && !body.systemMessage && isGroupConv) {
+      try {
+        const { data: existingGroupAtt } = await supabase
+          .from('support_attendances')
+          .select('id')
+          .eq('conversation_id', body.conversationId)
+          .in('status', ['waiting', 'in_progress'])
+          .limit(1)
+          .maybeSingle();
+
+        if (!existingGroupAtt) {
+          console.log(`[send-whatsapp-message][group] No active attendance, calling start_group_attendance for conv=${body.conversationId}`);
+          const { data: rpcData, error: rpcErr } = await supabase.rpc('start_group_attendance', {
+            p_conversation_id: body.conversationId,
+            p_agent_id: senderUserId,
+            p_created_from: 'group_auto',
+          } as any);
+
+          if (rpcErr) {
+            console.error('[send-whatsapp-message][group] RPC error:', rpcErr);
+          } else {
+            const rpcRes = rpcData as any;
+            if (rpcRes?.success) {
+              console.log(`[send-whatsapp-message][group] Attendance started att=${rpcRes.attendance_id} code=${rpcRes.attendance_code}`);
+              try {
+                const preNow = new Date();
+                const openingText = `\u{2705} Atendimento *${rpcRes.attendance_code}* iniciado.`;
+                const openResult = await adapter.send(secrets, instanceData, {
+                  to: destinationNumber,
+                  messageType: 'text',
+                  content: openingText,
+                });
+                const openMsgId = openResult.messageId;
+                const openTimestamp = new Date(preNow.getTime() - 1000).toISOString();
+                await supabase.from('whatsapp_messages').upsert({
+                  conversation_id: body.conversationId,
+                  remote_jid: destinationNumber,
+                  message_id: openMsgId,
+                  content: openingText,
+                  message_type: 'system',
+                  is_from_me: true,
+                  status: 'sent',
+                  timestamp: openTimestamp,
+                  tenant_id: tenantId,
+                  metadata: { system: true, attendance_event: 'opened', attendance_id: rpcRes.attendance_id },
+                }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true });
+                console.log(`[send-whatsapp-message][group] Opening notification sent for att=${rpcRes.attendance_id}`);
+              } catch (openErr) {
+                console.error('[send-whatsapp-message][group] Error sending opening notification:', openErr);
+              }
+            } else {
+              console.log(`[send-whatsapp-message][group] Not opened: ${rpcRes?.error ?? 'unknown'}`);
+            }
+          }
+        }
+      } catch (groupPreErr) {
+        console.error('[send-whatsapp-message][group] PRE-SEND error (non-blocking):', groupPreErr);
+      }
+    }
+
     // --- Now send the agent's actual message via adapter ---
     const sendRequest = {
       to: destinationNumber,
