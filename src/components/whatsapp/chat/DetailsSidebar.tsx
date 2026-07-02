@@ -217,15 +217,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             )}
           </div>
 
-          {/* ─── 2. Cliente Link ─── */}
-          <ClienteLinkCard
-            conversation={conversation}
-            attendanceId={relevantAttendanceId}
-            isAttendanceClosed={isRelevantClosed}
-            isAdminOrHead={isAdminOrHead}
-          />
-
-          {/* ─── 3. Anotações fixas do contato (persistem entre atendimentos) ─── */}
+          {/* ─── 2. Anotações fixas do contato (persistem entre atendimentos) ─── */}
           <CollapsibleSection
             icon={<Pin className="h-3.5 w-3.5" />}
             title="Anotações fixas do contato"
@@ -266,7 +258,26 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             </div>
           </CollapsibleSection>
 
-          {/* ─── 4. Notas desta conversa ─── */}
+          {/* ─── 3. Cliente Link ─── */}
+          <ClienteLinkCard
+            conversation={conversation}
+            attendanceId={relevantAttendanceId}
+            isAttendanceClosed={isRelevantClosed}
+            isAdminOrHead={isAdminOrHead}
+          />
+
+          {/* ─── 4. Histórico do Contato ─── */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-7 text-xs gap-1.5"
+            onClick={() => setHistoryOpen(true)}
+          >
+            <History className="h-3.5 w-3.5" />
+            Histórico do Contato
+          </Button>
+
+          {/* ─── 5. Notas desta conversa ─── */}
           <CollapsibleSection
             icon={<StickyNote className="h-3.5 w-3.5" />}
             title="Notas desta conversa"
@@ -323,16 +334,6 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             <ContactTicketsSection clienteId={(metadata?.cliente_id as string) || null} />
           </CollapsibleSection>
 
-          {/* ─── 7. Histórico do Contato ─── */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full h-7 text-xs gap-1.5"
-            onClick={() => setHistoryOpen(true)}
-          >
-            <History className="h-3.5 w-3.5" />
-            Histórico do Contato
-          </Button>
 
           <Separator />
 
