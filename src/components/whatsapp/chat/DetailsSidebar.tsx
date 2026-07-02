@@ -59,6 +59,8 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const [contactName, setContactName] = useState(contact?.name || "");
   const [contactNotes, setContactNotes] = useState(contact?.notes || "");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [groupAttendancesOpen, setGroupAttendancesOpen] = useState(true);
+  const [selectedAttendance, setSelectedAttendance] = useState<any | null>(null);
 
   // Optimistic local override for rules_disabled (parent state may not refresh immediately)
   const [rulesDisabledLocal, setRulesDisabledLocal] = useState<boolean | null>(null);
