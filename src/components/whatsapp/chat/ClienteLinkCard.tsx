@@ -250,21 +250,28 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Desvincular cliente</AlertDialogTitle>
+                  <AlertDialogTitle>{isGroup ? "Desvincular grupo" : "Desvincular cliente"}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    O vínculo com este cliente será removido e o número será excluído do cadastro de contatos. Deseja continuar?
+                    {isGroup
+                      ? "O vínculo deste grupo com o cliente será removido. Deseja continuar?"
+                      : "O vínculo com este cliente será removido e o número será excluído do cadastro de contatos. Deseja continuar?"}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="gap-2">
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => { unlinkCliente(true); setUnlinkDialogOpen(false); }}
+                    onClick={() => {
+                      if (isGroup) groupLinkMutation.mutate(null);
+                      else unlinkCliente(true);
+                      setUnlinkDialogOpen(false);
+                    }}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     Desvincular
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
+
             </AlertDialog>
           )}
         </div>
