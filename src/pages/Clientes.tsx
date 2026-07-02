@@ -422,7 +422,7 @@ export default function Clientes() {
 
   // Query "Novos no Mês"
   const { data: novosNoMes } = useQuery({
-    queryKey: ["clientes_novos_mes", filterKey],
+    queryKey: ["clientes_novos_mes", filterKey, hasProductStructureFilters ? productFilterClientIds?.size ?? "loading" : null],
     queryFn: async () => {
       if (hasDateOrValueFilters) {
         const rows = await fetchClientesFilteredRows({ forNovosNoMes: true });
