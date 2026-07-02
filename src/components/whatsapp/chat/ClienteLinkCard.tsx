@@ -329,7 +329,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
     );
   }
 
-  if (suggestedCliente) {
+  if (!isGroup && suggestedCliente) {
     return (
       <div className="bg-accent/50 border border-accent rounded-md p-3 space-y-2">
         <div className="flex items-center gap-2">
