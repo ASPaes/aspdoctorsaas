@@ -81,6 +81,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showParticipants, setShowParticipants] = useState(false);
   const [showGroupLinkModal, setShowGroupLinkModal] = useState(false);
   const [isStartingGroupAtt, setIsStartingGroupAtt] = useState(false);
+  const [groupStartPopoverOpen, setGroupStartPopoverOpen] = useState(false);
+  const [groupIncludePrevious, setGroupIncludePrevious] = useState<number>(2);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInChatSearch, setShowInChatSearch] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
