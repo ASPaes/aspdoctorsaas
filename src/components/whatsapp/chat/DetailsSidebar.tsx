@@ -74,8 +74,8 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const rulesDisabledEffective = rulesDisabledLocal ?? rulesDisabledFromProp;
 
   // Collapsible section states
-  const [topicsOpen, setTopicsOpen] = useState(true);
-  const [sentimentOpen, setSentimentOpen] = useState(true);
+  const [topicsOpen, setTopicsOpen] = useState(false);
+  const [sentimentOpen, setSentimentOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(true);
   const [summariesOpen, setSummariesOpen] = useState(false);
   const [kbOpen, setKbOpen] = useState(true);
