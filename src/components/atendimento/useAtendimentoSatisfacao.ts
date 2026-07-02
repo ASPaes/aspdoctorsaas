@@ -37,7 +37,8 @@ export interface AtendimentoSatisfacao {
 export function useAtendimentoSatisfacao() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
-  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
+  const { dateRange, departmentId, agentId, tipoAtendimento } = useAtendimentoFilter();
+  const pIsGroup = tipoAtendimento === 'all' ? null : tipoAtendimento === 'group';
   return useQuery<AtendimentoSatisfacao>({
     queryKey: [
       "atendimento-satisfacao",
@@ -47,6 +48,7 @@ export function useAtendimentoSatisfacao() {
       viewKey,
       departmentId,
       agentId,
+      tipoAtendimento,
     ],
     enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
@@ -58,6 +60,7 @@ export function useAtendimentoSatisfacao() {
         p_unidade_base_id: selectedUnidadeId ?? null,
         p_department_id: departmentId ?? null,
         p_agent_id: agentId ?? null,
+        p_is_group: pIsGroup,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
