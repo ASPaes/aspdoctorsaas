@@ -78,6 +78,35 @@ export default function WhatsAppGroupsTab() {
     },
   });
 
+  const { data: groupAttendanceConfig } = useQuery({
+    queryKey: ["group-attendance-config", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("configuracoes" as any) as any)
+        .select("group_require_ticket_on_close")
+        .eq("tenant_id", tid)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { group_require_ticket_on_close?: boolean } | null;
+    },
+  });
+
+  const updateGroupRequireTicketMutation = useMutation({
+    mutationFn: async (value: boolean) => {
+      const { error } = await (supabase.from("configuracoes" as any) as any)
+        .update({ group_require_ticket_on_close: value, updated_at: new Date().toISOString() })
+        .eq("tenant_id", tid);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["group-attendance-config", tid] });
+      toast.success("Configuração atualizada");
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Erro ao atualizar configuração");
+    },
+  });
+
   const syncMutation = useMutation({
     mutationFn: async () => {
       if (!selectedInstanceId) throw new Error("Selecione uma instância");
