@@ -662,6 +662,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
       />
     </div>
   );
+}
 
 /* ─── Group monitor section (only for group conversations) ─── */
 function GroupMonitorSection({
