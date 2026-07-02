@@ -10,7 +10,16 @@ import {
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 
 export function UnidadeSelector() {
-  const { unidades, selectedUnidadeIds, setSelectedUnidadeIds } = useUnidadeFilter();
+  const { unidades, selectedUnidadeIds, setSelectedUnidadeIds, isLoading } = useUnidadeFilter();
+
+  if (isLoading) {
+    return (
+      <Button variant="outline" size="sm" disabled className="h-8 gap-1.5 text-xs max-w-[200px]">
+        <Building2 className="h-3.5 w-3.5 shrink-0" />
+        <span className="truncate">Unidades...</span>
+      </Button>
+    );
+  }
 
   if (unidades.length <= 1) return null;
 
