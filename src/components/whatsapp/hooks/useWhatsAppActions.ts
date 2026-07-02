@@ -239,7 +239,7 @@ export const useWhatsAppActions = () => {
                   .maybeSingle();
 
                 const houveAtendimentoHumano = !!activeAtt.assumed_at || (activeAtt.msg_agent_count ?? 0) > 0;
-                if (config?.support_csat_enabled && !skipCsat && houveAtendimentoHumano) {
+                if (config?.support_csat_enabled && !effSkipCsat && houveAtendimentoHumano) {
                   csatEnabled = true;
 
                   // Get contact name for template
