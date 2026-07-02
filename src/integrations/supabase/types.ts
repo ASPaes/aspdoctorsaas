@@ -1635,6 +1635,7 @@ export type Database = {
           chat_timezone: string
           created_at: string
           custo_fixo_percentual: number
+          group_require_ticket_on_close: boolean
           id: number
           imposto_percentual: number
           notification_defaults: Json
@@ -1690,6 +1691,7 @@ export type Database = {
           chat_timezone?: string
           created_at?: string
           custo_fixo_percentual?: number
+          group_require_ticket_on_close?: boolean
           id?: number
           imposto_percentual?: number
           notification_defaults?: Json
@@ -1745,6 +1747,7 @@ export type Database = {
           chat_timezone?: string
           created_at?: string
           custo_fixo_percentual?: number
+          group_require_ticket_on_close?: boolean
           id?: number
           imposto_percentual?: number
           notification_defaults?: Json
