@@ -40,6 +40,7 @@ import { TicketReopenChoiceDialog } from "./TicketReopenChoiceDialog";
 import { TicketUpdateExistingDialog } from "./TicketUpdateExistingDialog";
 import { InterruptAutoReplyDialog } from "./InterruptAutoReplyDialog";
 import { CleanupConversationDialog } from "./CleanupConversationDialog";
+import { GroupLinkClienteModal } from "./GroupLinkClienteModal";
 
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
