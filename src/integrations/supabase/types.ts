@@ -3419,6 +3419,7 @@ export type Database = {
         Row: {
           ativo: boolean
           id: string
+          integrar_a_partir_de: string | null
           tenant_id: string
           ultimo_status: string
           ultimo_teste_at: string | null
@@ -3428,6 +3429,7 @@ export type Database = {
         Insert: {
           ativo?: boolean
           id?: string
+          integrar_a_partir_de?: string | null
           tenant_id: string
           ultimo_status?: string
           ultimo_teste_at?: string | null
@@ -3437,6 +3439,7 @@ export type Database = {
         Update: {
           ativo?: boolean
           id?: string
+          integrar_a_partir_de?: string | null
           tenant_id?: string
           ultimo_status?: string
           ultimo_teste_at?: string | null
@@ -8994,6 +8997,10 @@ export type Database = {
         Args: { p_keep_id: string; p_merge_id: string; p_tenant_id: string }
         Returns: undefined
       }
+      montar_payload_contrato_omie: {
+        Args: { p_contrato_id: string; p_tenant_id: string }
+        Returns: Json
+      }
       mute_conversation: {
         Args: { p_conversation_id: string; p_duration: string }
         Returns: undefined
@@ -9252,6 +9259,14 @@ export type Database = {
           p_participant_type?: string
           p_phone: string
           p_ticket_id: string
+        }
+        Returns: Json
+      }
+      start_group_attendance: {
+        Args: {
+          p_agent_id: string
+          p_conversation_id: string
+          p_created_from?: string
         }
         Returns: Json
       }
