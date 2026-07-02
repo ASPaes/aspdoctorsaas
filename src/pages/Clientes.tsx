@@ -31,7 +31,7 @@ import { exportClientesXlsx } from "@/lib/exportClientesXlsx";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
 import { toast } from "sonner";
 
-type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "data_reajuste" | "cancelado";
+type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_cadastro" | "qtde_contratos_ativos" | "cancelado";
 type SortDir = "asc" | "desc";
 
 function RangeInput({ label, min, max, onMinChange, onMaxChange, prefix }: {
@@ -357,7 +357,7 @@ export default function Clientes() {
   const fetchClientesFilteredRows = useCallback(async (options?: { forNovosNoMes?: boolean }) => {
     const selectFields = [
       "id", "codigo_sequencial", "razao_social", "nome_fantasia", "cnpj", "produto_id", "qtde_produtos_ativos",
-      "mensalidade", "data_ativacao", "data_cadastro", "cancelado", "data_venda", "data_venda_efetiva", "unidade_base_id",
+      "mensalidade", "data_ativacao", "data_cadastro", "cancelado", "data_venda", "data_venda_efetiva", "qtde_contratos_ativos", "unidade_base_id",
       "custo_operacao", "imposto_percentual", "custo_fixo_percentual", "telefone_whatsapp", "telefone_contato", "setup_completo",
     ].join(",");
 
@@ -409,6 +409,8 @@ export default function Clientes() {
         cmp = Number(aVal ?? Number.NEGATIVE_INFINITY) - Number(bVal ?? Number.NEGATIVE_INFINITY);
       } else if (sortField === "cancelado") {
         cmp = Number(Boolean(aVal)) - Number(Boolean(bVal));
+      } else if (sortField === "qtde_contratos_ativos") {
+        cmp = Number(aVal ?? 0) - Number(bVal ?? 0);
       } else {
         cmp = String(aVal ?? "").localeCompare(String(bVal ?? ""), "pt-BR", { sensitivity: "base" });
       }
@@ -1108,8 +1110,8 @@ export default function Clientes() {
                 ["cnpj", "CNPJ/CPF"],
                 ["produto_id", "Produto"],
                 ["mensalidade", "MRR ATUAL"],
-                ["data_ativacao", "Dt. Cadastro"],
-                ["data_reajuste", "Contratos"],
+                ["data_cadastro", "Dt. Cadastro"],
+                ["qtde_contratos_ativos", "Contratos"],
                 ["cancelado", "Status"],
               ] as [SortField, string][]).map(([field, label]) => (
                 <TableHead key={field}>
