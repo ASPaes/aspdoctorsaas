@@ -809,6 +809,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           };
         })
         .sort((a, b) => new Date(b.dataCancelamento).getTime() - new Date(a.dataCancelamento).getTime());
+      if (seq !== fetchSeqRef.current) return;
       setCanceladosList(canceladosListItems);
 
       // Novos clientes list
