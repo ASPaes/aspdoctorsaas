@@ -782,6 +782,17 @@ export function CreateSupportTicketModal({
             {/* Setor + Status + Responsável */}
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Setor <Req /></Label>
+                <Select value={departamentoId} onValueChange={setDepartamentoId}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    {departamentos.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Status</Label>
                 <Select value={statusId} onValueChange={setStatusId} disabled={!departamentoId}>
                   <SelectTrigger className="h-9 text-xs">
@@ -802,17 +813,6 @@ export function CreateSupportTicketModal({
                           {s.name}
                         </span>
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium">Setor <Req /></Label>
-                <Select value={departamentoId} onValueChange={setDepartamentoId}>
-                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    {departamentos.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
