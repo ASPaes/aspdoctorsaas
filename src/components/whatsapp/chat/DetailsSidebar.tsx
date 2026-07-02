@@ -694,7 +694,7 @@ function GroupMonitorSection({
         funcMap = new Map((funcs ?? []).map((f: any) => [String(f.id), f.nome as string]));
       }
       return active
-        .map((u) => ({ user_id: u.user_id, nome: (u.funcionario_id && funcMap.get(u.funcionario_id)) || u.email }))
+        .map((u) => ({ user_id: u.user_id, nome: (u.funcionario_id && funcMap.get(String(u.funcionario_id))) || u.email }))
         .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
     },
   });
