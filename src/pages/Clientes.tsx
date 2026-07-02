@@ -571,7 +571,7 @@ export default function Clientes() {
   // dividido por todos os clientes (incluindo MRR=0), mesma fórmula do Dashboard:
   //   ticket_medio = SUM(mensalidade + deltas_ativos) / COUNT(clientes)
   const { data: ticketMedioFull } = useQuery({
-    queryKey: ["clientes_ticket_medio", filterKey, somenteMatrizes ? matrizIdsSet?.size ?? "loading" : null],
+    queryKey: ["clientes_ticket_medio", filterKey, somenteMatrizes ? matrizIdsSet?.size ?? "loading" : null, hasProductStructureFilters ? productFilterClientIds?.size ?? "loading" : null],
     queryFn: async () => {
       let allRows: Array<{ id: string; mensalidade: number | null }>;
       if (hasDateOrValueFilters) {
