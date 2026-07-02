@@ -632,7 +632,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">
-                  {effIsLinked ? `Vinculado ao cliente: ${effLinkedName}` : "Contato sem cliente quizado vinculado"}
+                  {effIsLinked ? `Vinculado ao cliente: ${effLinkedName}` : "Contato sem cliente vinculado"}
                 </TooltipContent>
               </Tooltip>
               {contact?.phone_number && (
