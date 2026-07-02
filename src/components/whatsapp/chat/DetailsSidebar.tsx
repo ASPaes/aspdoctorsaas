@@ -286,6 +286,17 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             isAdminOrHead={isAdminOrHead}
           />
 
+          {/* ─── Últimos atendimentos (grupos) ─── */}
+          {isGroup && (
+            <GroupAttendancesSection
+              contactId={contact?.id ?? null}
+              open={groupAttendancesOpen}
+              onOpenChange={setGroupAttendancesOpen}
+              onSelect={setSelectedAttendance}
+            />
+          )}
+
+
           {/* ─── Tags ─── */}
           {contact?.tags && contact.tags.length > 0 && (
             <div className="min-w-0">
