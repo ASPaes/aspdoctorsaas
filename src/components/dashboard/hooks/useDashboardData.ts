@@ -37,7 +37,11 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
 
+  const fetchSeqRef = useRef(0);
+
   const fetchData = useCallback(async () => {
+    if (!ready) return;
+    const seq = ++fetchSeqRef.current;
     setLoading(true);
     try {
       const periodoInicio = filters.showAllData ? new Date('2000-01-01') : (filters.periodoInicio || startOfMonth(new Date()));
