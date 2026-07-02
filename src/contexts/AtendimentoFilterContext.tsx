@@ -14,6 +14,8 @@ export interface FiltroOpcoes {
   cidades: FiltroOpt[]; fornecedores: FiltroOpt[]; produtos: FiltroOpt[];
 }
 
+export type TipoAtendimento = 'all' | 'individual' | 'group';
+
 interface AtendimentoFilterContextType {
   dateRange: AtendimentoDateRange;
   setDateRange: (r: AtendimentoDateRange) => void;
@@ -21,6 +23,8 @@ interface AtendimentoFilterContextType {
   setDepartmentId: (id: string | null) => void;
   agentId: string | null;
   setAgentId: (id: string | null) => void;
+  tipoAtendimento: TipoAtendimento;
+  setTipoAtendimento: (t: TipoAtendimento) => void;
   segmentoIds: number[]; setSegmentoIds: (ids: number[]) => void;
   areaIds: number[]; setAreaIds: (ids: number[]) => void;
   estadoIds: number[]; setEstadoIds: (ids: number[]) => void;
@@ -47,6 +51,8 @@ const AtendimentoFilterContext = createContext<AtendimentoFilterContextType>({
   setDepartmentId: () => {},
   agentId: null,
   setAgentId: () => {},
+  tipoAtendimento: 'all',
+  setTipoAtendimento: () => {},
   segmentoIds: [], setSegmentoIds: () => {},
   areaIds: [], setAreaIds: () => {},
   estadoIds: [], setEstadoIds: () => {},
@@ -64,6 +70,7 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
   const [dateRange, setDateRange] = useState<AtendimentoDateRange>(defaultRange);
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
+  const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento>('all');
   const [segmentoIds, setSegmentoIds] = useState<number[]>([]);
   const [areaIds, setAreaIds] = useState<number[]>([]);
   const [estadoIds, setEstadoIds] = useState<number[]>([]);
@@ -133,6 +140,7 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
       dateRange, setDateRange,
       departmentId, setDepartmentId,
       agentId, setAgentId,
+      tipoAtendimento, setTipoAtendimento,
       segmentoIds, setSegmentoIds,
       areaIds, setAreaIds,
       estadoIds, setEstadoIds,
@@ -142,7 +150,7 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
       setores, agentes, opcoes,
       isLoading: loadingSet || loadingAg || loadingOpc,
     }),
-    [dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, setores, agentes, opcoes, loadingSet, loadingAg, loadingOpc]
+    [dateRange, departmentId, agentId, tipoAtendimento, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, setores, agentes, opcoes, loadingSet, loadingAg, loadingOpc]
   );
 
   return (

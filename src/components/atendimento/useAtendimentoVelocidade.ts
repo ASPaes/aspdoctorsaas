@@ -33,7 +33,8 @@ export interface AtendimentoVelocidade {
 export function useAtendimentoVelocidade(slaSeconds: number) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
-  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
+  const { dateRange, departmentId, agentId, tipoAtendimento } = useAtendimentoFilter();
+  const pIsGroup = tipoAtendimento === 'all' ? null : tipoAtendimento === 'group';
   return useQuery<AtendimentoVelocidade>({
     queryKey: [
       "atendimento-velocidade",
@@ -44,6 +45,7 @@ export function useAtendimentoVelocidade(slaSeconds: number) {
       viewKey,
       departmentId,
       agentId,
+      tipoAtendimento,
     ],
     enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
@@ -56,6 +58,7 @@ export function useAtendimentoVelocidade(slaSeconds: number) {
         p_unidade_base_id: selectedUnidadeId ?? null,
         p_department_id: departmentId ?? null,
         p_agent_id: agentId ?? null,
+        p_is_group: pIsGroup,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
