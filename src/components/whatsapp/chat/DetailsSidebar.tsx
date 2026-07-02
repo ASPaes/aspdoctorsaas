@@ -662,7 +662,91 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
       />
     </div>
   );
+
+/* ─── Group monitor section (only for group conversations) ─── */
+function GroupMonitorSection({
+  conversationId,
+  tenantId,
+  monitorUserId,
+  isAdminOrHead,
+}: {
+  conversationId: string;
+  tenantId: string | null;
+  monitorUserId: string | null;
+  isAdminOrHead: boolean;
+}) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const { data: tenantUsers } = useTenantUsers();
+
+  const tenantUsersKey = (tenantUsers ?? []).map((u) => `${u.user_id}:${u.funcionario_id ?? ""}:${u.status}`).join(",");
+  const { data: agents } = useQuery({
+    queryKey: ["tenant-agents", tenantId, tenantUsersKey],
+    enabled: !!tenantUsers && tenantUsers.length > 0,
+    queryFn: async () => {
+      const active = (tenantUsers ?? []).filter((u) => u.status === "ativo" && u.funcionario_id);
+      const funcIds = active.map((u) => u.funcionario_id!).filter(Boolean);
+      let funcMap = new Map<string, string>();
+      if (funcIds.length > 0) {
+        const { data: funcs } = await supabase.from("funcionarios").select("id, nome").in("id", funcIds);
+        funcMap = new Map((funcs ?? []).map((f) => [f.id, f.nome]));
+      }
+      return active
+        .map((u) => ({ user_id: u.user_id, nome: (u.funcionario_id && funcMap.get(u.funcionario_id)) || u.email }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
+    },
+  });
+
+  const currentName = useMemo(() => {
+    if (!monitorUserId) return null;
+    return agents?.find((a) => a.user_id === monitorUserId)?.nome ?? null;
+  }, [agents, monitorUserId]);
+
+  const handleChange = async (value: string) => {
+    setSaving(true);
+    try {
+      const { error } = await (supabase.rpc as any)("set_group_monitor", {
+        p_conversation_id: conversationId,
+        p_user_id: value === "none" ? null : value,
+      });
+      if (error) throw error;
+      toast.success("Monitor do grupo atualizado");
+      qc.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+      qc.invalidateQueries({ queryKey: ["whatsapp", "conversation-counts"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao atualizar monitor");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <CollapsibleSection
+      icon={<User className="h-3.5 w-3.5" />}
+      title="Monitor do grupo"
+      open={open}
+      onOpenChange={setOpen}
+    >
+      {isAdminOrHead ? (
+        <Select value={monitorUserId ?? "none"} onValueChange={handleChange} disabled={saving}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder="Sem monitor" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Sem monitor</SelectItem>
+            {(agents ?? []).map((a) => (
+              <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <p className="text-xs text-muted-foreground">{currentName ?? "Sem monitor"}</p>
+      )}
+    </CollapsibleSection>
+  );
 }
+
 
 /* ─── Group attendances section (only for group conversations) ─── */
 function GroupAttendancesSection({
