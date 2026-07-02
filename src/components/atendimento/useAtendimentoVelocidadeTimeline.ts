@@ -21,7 +21,8 @@ export function useAtendimentoVelocidadeTimeline(
 ) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
-  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
+  const { dateRange, departmentId, agentId, tipoAtendimento } = useAtendimentoFilter();
+  const pIsGroup = tipoAtendimento === 'all' ? null : tipoAtendimento === 'group';
   return useQuery<VelocidadeTimelinePoint[]>({
     queryKey: [
       "atendimento-velocidade-timeline",
