@@ -597,6 +597,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         ltvCacEvolution.push({ month: m.month, monthFull: m.monthFull, value: Math.round(ltvCacMes * 100) / 100 });
       });
 
+      if (seq !== fetchSeqRef.current) return;
       setTimeSeries({ mrrEvolution, faturamentoEvolution, churnQtdEvolution, churnMrrEvolution, ltvMesesEvolution, ltvCacEvolution });
 
       // === DISTRIBUTIONS ===
