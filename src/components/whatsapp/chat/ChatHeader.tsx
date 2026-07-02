@@ -622,9 +622,9 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                     size="sm"
                     className="h-5 w-5 p-0 shrink-0"
                     onClick={onToggleDetails}
-                    aria-label={isLinked ? `Vinculado ao cliente: ${linkedClienteName}` : "Contato sem cliente vinculado"}
+                    aria-label={effIsLinked ? `Vinculado ao cliente: ${effLinkedName}` : "Contato sem cliente vinculado"}
                   >
-                    {isLinked ? (
+                    {effIsLinked ? (
                       <Link2 className="h-3 w-3 text-green-500" />
                     ) : (
                       <AlertTriangle className="h-3 w-3 text-yellow-500" />
@@ -632,7 +632,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">
-                  {isLinked ? `Vinculado ao cliente: ${linkedClienteName}` : "Contato sem cliente vinculado"}
+                  {effIsLinked ? `Vinculado ao cliente: ${effLinkedName}` : "Contato sem cliente quizado vinculado"}
                 </TooltipContent>
               </Tooltip>
               {contact?.phone_number && (
