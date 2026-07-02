@@ -531,6 +531,26 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     },
   });
 
+  const { data: groupClienteProdutos = [] } = useQuery({
+    queryKey: ["group-cliente-produto", groupLinkedCliente?.id],
+    enabled: isGroupConv && !!groupLinkedCliente?.id,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("cliente_produtos" as any) as any)
+        .select("produto_id")
+        .eq("cliente_id", groupLinkedCliente!.id)
+        .eq("ativo", true);
+      if (error) throw error;
+      return (data ?? []) as Array<{ produto_id: number }>;
+    },
+  });
+
+  const groupProdutoId = groupClienteProdutos.length === 1 ? groupClienteProdutos[0].produto_id : null;
+
+  const closureClienteIdEff = isGroupConv ? (groupLinkedCliente?.id ?? null) : ((linkedCliente as any)?.id ?? null);
+  const closureClienteNomeEff = isGroupConv ? (groupLinkedCliente?.nome_fantasia || groupLinkedCliente?.razao_social || null) : (linkedClienteName ?? null);
+  const closureClienteCodigoEff = isGroupConv ? (groupLinkedCliente?.codigo_sequencial ?? null) : ((linkedCliente as any)?.codigo_sequencial ?? null);
+  const closureProdutoIdEff = isGroupConv ? groupProdutoId : ((linkedCliente as any)?.produto_id ?? null);
+
   const effIsLinked = isGroupConv ? !!groupLinkedCliente : isLinked;
   const effLinkedName = isGroupConv
     ? (groupLinkedCliente?.nome_fantasia || groupLinkedCliente?.razao_social || null)
@@ -1074,10 +1094,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         onCreated={handleClassifyCompleted}
         fromClosure
         attendanceId={attendance?.id ?? null}
-        closureClienteId={(linkedCliente as any)?.id ?? null}
-        closureClienteNome={linkedClienteName ?? null}
-        closureClienteCodigo={(linkedCliente as any)?.codigo_sequencial ?? null}
-        closureProdutoId={(linkedCliente as any)?.produto_id ?? null}
+        closureClienteId={closureClienteIdEff}
+        closureClienteNome={closureClienteNomeEff}
+        closureClienteCodigo={closureClienteCodigoEff}
+        closureProdutoId={closureProdutoIdEff}
         closureDepartmentId={(conversation as any).department_id ?? null}
         closureResponsavelId={attendance?.assigned_to ?? null}
         closureContactName={contact?.name ?? null}
@@ -1224,10 +1244,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           onCreated={handleAttendanceTicketCreated}
           fromClosure
           attendanceId={attendanceTicketTarget.id}
-          closureClienteId={attendanceTicketTarget.clientes?.id ?? (linkedCliente as any)?.id ?? null}
-          closureClienteNome={attendanceTicketTarget.clientes?.nome_fantasia ?? linkedClienteName ?? null}
-          closureClienteCodigo={attendanceTicketTarget.clientes?.codigo_sequencial ?? (linkedCliente as any)?.codigo_sequencial ?? null}
-          closureProdutoId={attendanceTicketTarget.clientes?.produto_id ?? (linkedCliente as any)?.produto_id ?? null}
+          closureClienteId={attendanceTicketTarget.clientes?.id ?? closureClienteIdEff}
+          closureClienteNome={attendanceTicketTarget.clientes?.nome_fantasia ?? closureClienteNomeEff}
+          closureClienteCodigo={attendanceTicketTarget.clientes?.codigo_sequencial ?? closureClienteCodigoEff}
+          closureProdutoId={attendanceTicketTarget.clientes?.produto_id ?? closureProdutoIdEff}
           closureDepartmentId={attendanceTicketTarget.department_id ?? (conversation as any).department_id ?? null}
           closureResponsavelId={attendanceTicketTarget.assigned_to ?? (conversation as any).assigned_to ?? null}
           closureContactName={contact?.name ?? null}
@@ -1268,10 +1288,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         fromClosure
         mode="additional"
         attendanceId={attendance?.id ?? null}
-        closureClienteId={(linkedCliente as any)?.id ?? null}
-        closureClienteNome={linkedClienteName ?? null}
-        closureClienteCodigo={(linkedCliente as any)?.codigo_sequencial ?? null}
-        closureProdutoId={(linkedCliente as any)?.produto_id ?? null}
+        closureClienteId={closureClienteIdEff}
+        closureClienteNome={closureClienteNomeEff}
+        closureClienteCodigo={closureClienteCodigoEff}
+        closureProdutoId={closureProdutoIdEff}
         closureDepartmentId={(conversation as any).department_id ?? null}
         closureResponsavelId={attendance?.assigned_to ?? null}
         closureContactName={contact?.name ?? null}
