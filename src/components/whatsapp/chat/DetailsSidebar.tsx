@@ -216,7 +216,39 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               </Button>
             )}
           </div>
+          <ClienteLinkCard
+            conversation={conversation}
+            attendanceId={relevantAttendanceId}
+            isAttendanceClosed={isRelevantClosed}
+            isAdminOrHead={isAdminOrHead}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-7 text-xs gap-1.5"
+            onClick={() => setHistoryOpen(true)}
+          >
+            <History className="h-3.5 w-3.5" />
+            Histórico do Contato
+          </Button>
+          <Separator />
 
+          {isGroup && (
+            <GroupAttendancesSection
+              contactId={contact?.id ?? null}
+              open={groupAttendancesOpen}
+              onOpenChange={setGroupAttendancesOpen}
+              onSelect={setSelectedAttendance}
+            />
+          )}
+          <CollapsibleSection
+            icon={<Ticket className="h-3.5 w-3.5" />}
+            title="Histórico de Tickets"
+            open={ticketsOpen}
+            onOpenChange={setTicketsOpen}
+          >
+            <ContactTicketsSection clienteId={(metadata?.cliente_id as string) || null} />
+          </CollapsibleSection>
           {/* ─── 2. Anotações fixas do contato (persistem entre atendimentos) ─── */}
           <CollapsibleSection
             icon={<Pin className="h-3.5 w-3.5" />}
@@ -257,27 +289,6 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               )}
             </div>
           </CollapsibleSection>
-
-          {/* ─── 3. Cliente Link ─── */}
-          <ClienteLinkCard
-            conversation={conversation}
-            attendanceId={relevantAttendanceId}
-            isAttendanceClosed={isRelevantClosed}
-            isAdminOrHead={isAdminOrHead}
-          />
-
-          {/* ─── 4. Histórico do Contato ─── */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full h-7 text-xs gap-1.5"
-            onClick={() => setHistoryOpen(true)}
-          >
-            <History className="h-3.5 w-3.5" />
-            Histórico do Contato
-          </Button>
-
-          {/* ─── 5. Notas desta conversa ─── */}
           <CollapsibleSection
             icon={<StickyNote className="h-3.5 w-3.5" />}
             title="Notas desta conversa"
@@ -311,33 +322,8 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               </div>
             </div>
           </CollapsibleSection>
-
           <Separator />
 
-          {/* ─── 5. Últimos atendimentos (grupos) ─── */}
-          {isGroup && (
-            <GroupAttendancesSection
-              contactId={contact?.id ?? null}
-              open={groupAttendancesOpen}
-              onOpenChange={setGroupAttendancesOpen}
-              onSelect={setSelectedAttendance}
-            />
-          )}
-
-          {/* ─── 6. Histórico de Tickets ─── */}
-          <CollapsibleSection
-            icon={<Ticket className="h-3.5 w-3.5" />}
-            title="Histórico de Tickets"
-            open={ticketsOpen}
-            onOpenChange={setTicketsOpen}
-          >
-            <ContactTicketsSection clienteId={(metadata?.cliente_id as string) || null} />
-          </CollapsibleSection>
-
-
-          <Separator />
-
-          {/* ─── 8. Sentimento IA ─── */}
           <CollapsibleSection
             icon={<MessageSquare className="h-3.5 w-3.5" />}
             title="Sentimento IA"
@@ -421,8 +407,6 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               <p className="text-xs text-muted-foreground">Nenhuma análise disponível.</p>
             )}
           </CollapsibleSection>
-
-          {/* ─── 9. Tópicos IA ─── */}
           <CollapsibleSection
             icon={<Sparkles className="h-3.5 w-3.5" />}
             title="Tópicos IA"
@@ -459,8 +443,6 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               <p className="text-xs text-muted-foreground">Nenhum tópico identificado.</p>
             )}
           </CollapsibleSection>
-
-          {/* ─── 10. Resumos ─── */}
           <CollapsibleSection
             icon={<FileText className="h-3.5 w-3.5" />}
             title="Resumos"
@@ -502,8 +484,6 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               )}
             </div>
           </CollapsibleSection>
-
-          {/* ─── 11. Base de Conhecimento (KB) ─── */}
           {closedAttendanceId && (
             <>
               <CollapsibleSection
@@ -569,10 +549,8 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               )}
             </>
           )}
-
           <Separator />
 
-          {/* ─── 12. Monitor do grupo ─── */}
           {isGroup && (
             <GroupMonitorSection
               conversationId={conversation.id}
@@ -581,8 +559,6 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               isAdminOrHead={!!isAdminOrHead}
             />
           )}
-
-          {/* ─── 13. Avisos e bloqueios do contato ─── */}
           {!isGroup && isAdminOrHead && contact?.id && (
             <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
               <div className="flex items-center gap-1.5">
@@ -592,8 +568,6 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               <ClientAlertsManager contactId={contact.id} canManage={isAdminOrHead} />
             </div>
           )}
-
-          {/* ─── 14. Regras do sistema ─── */}
           {!isGroup && (
             <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -624,8 +598,6 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               )}
             </div>
           )}
-
-          {/* ─── 15. Tags ─── */}
           {contact?.tags && contact.tags.length > 0 && (
             <div className="min-w-0">
               <div className="flex items-center gap-1 mb-1.5">
