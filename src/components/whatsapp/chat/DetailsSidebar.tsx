@@ -217,15 +217,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             )}
           </div>
 
-          {/* ─── 2. Cliente Link ─── */}
-          <ClienteLinkCard
-            conversation={conversation}
-            attendanceId={relevantAttendanceId}
-            isAttendanceClosed={isRelevantClosed}
-            isAdminOrHead={isAdminOrHead}
-          />
-
-          {/* ─── 3. Anotações fixas do contato (persistem entre atendimentos) ─── */}
+          {/* ─── 2. Anotações fixas do contato (persistem entre atendimentos) ─── */}
           <CollapsibleSection
             icon={<Pin className="h-3.5 w-3.5" />}
             title="Anotações fixas do contato"
@@ -265,6 +257,14 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               )}
             </div>
           </CollapsibleSection>
+
+          {/* ─── 3. Cliente Link ─── */}
+          <ClienteLinkCard
+            conversation={conversation}
+            attendanceId={relevantAttendanceId}
+            isAttendanceClosed={isRelevantClosed}
+            isAdminOrHead={isAdminOrHead}
+          />
 
           {/* ─── 4. Notas desta conversa ─── */}
           <CollapsibleSection
