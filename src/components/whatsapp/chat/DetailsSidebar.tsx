@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert, Pin } from "lucide-react";
+import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert, Pin, ExternalLink } from "lucide-react";
+import { format } from "date-fns";
+import { AttendanceMessagesDialog } from "./AttendanceMessagesDialog";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { ContactHistoryUnifiedModal } from "./ContactHistoryUnifiedModal";
@@ -57,6 +59,8 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const [contactName, setContactName] = useState(contact?.name || "");
   const [contactNotes, setContactNotes] = useState(contact?.notes || "");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [groupAttendancesOpen, setGroupAttendancesOpen] = useState(true);
+  const [selectedAttendance, setSelectedAttendance] = useState<any | null>(null);
 
   // Optimistic local override for rules_disabled (parent state may not refresh immediately)
   const [rulesDisabledLocal, setRulesDisabledLocal] = useState<boolean | null>(null);
@@ -281,6 +285,17 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             isAttendanceClosed={isRelevantClosed}
             isAdminOrHead={isAdminOrHead}
           />
+
+          {/* ─── Últimos atendimentos (grupos) ─── */}
+          {isGroup && (
+            <GroupAttendancesSection
+              contactId={contact?.id ?? null}
+              open={groupAttendancesOpen}
+              onOpenChange={setGroupAttendancesOpen}
+              onSelect={setSelectedAttendance}
+            />
+          )}
+
 
           {/* ─── Tags ─── */}
           {contact?.tags && contact.tags.length > 0 && (
@@ -627,7 +642,108 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
         contactPhone={contact?.phone_number || ""}
         onNavigateToConversation={onNavigateToConversation}
       />
+      <AttendanceMessagesDialog
+        open={!!selectedAttendance}
+        onOpenChange={(v) => !v && setSelectedAttendance(null)}
+        attendance={selectedAttendance}
+      />
     </div>
+  );
+}
+
+/* ─── Group attendances section (only for group conversations) ─── */
+function GroupAttendancesSection({
+  contactId,
+  open,
+  onOpenChange,
+  onSelect,
+}: {
+  contactId: string | null;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSelect: (a: any) => void;
+}) {
+  const { data: groupCliente } = useQuery({
+    queryKey: ["group-linked-cliente", contactId],
+    enabled: !!contactId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data: contactRow } = await (supabase.from("whatsapp_contacts" as any) as any)
+        .select("cliente_id")
+        .eq("id", contactId)
+        .maybeSingle();
+      const cid = (contactRow as any)?.cliente_id ?? null;
+      if (!cid) return null;
+      const { data: cli } = await (supabase.from("clientes" as any) as any)
+        .select("id, codigo_sequencial, nome_fantasia, razao_social")
+        .eq("id", cid)
+        .maybeSingle();
+      return (cli as any) ?? null;
+    },
+  });
+
+  const clienteId = groupCliente?.id ?? null;
+
+  const { data: attendances, isLoading } = useQuery({
+    queryKey: ["group-cliente-attendances", clienteId],
+    enabled: !!clienteId,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_attendances" as any) as any)
+        .select("id, attendance_code, sentiment_final, status, opened_at, closed_at, conversation_id")
+        .eq("cliente_id", clienteId)
+        .order("opened_at", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+  });
+
+  const sentimentMeta = (s: string | null) => {
+    switch (s) {
+      case "positive": return { emoji: "😊", label: "Positivo", color: "text-green-600 dark:text-green-400" };
+      case "negative": return { emoji: "😟", label: "Negativo", color: "text-red-600 dark:text-red-400" };
+      case "neutral": return { emoji: "😐", label: "Neutro", color: "text-yellow-600 dark:text-yellow-400" };
+      default: return { emoji: "—", label: "—", color: "text-muted-foreground" };
+    }
+  };
+
+  return (
+    <CollapsibleSection
+      icon={<History className="h-3.5 w-3.5" />}
+      title="Últimos atendimentos"
+      open={open}
+      onOpenChange={onOpenChange}
+    >
+      {!clienteId ? (
+        <p className="text-xs text-muted-foreground">Vincule um cliente para ver os atendimentos.</p>
+      ) : isLoading ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" /> Carregando...
+        </div>
+      ) : !attendances || attendances.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Nenhum atendimento registrado.</p>
+      ) : (
+        <div className="space-y-1.5 min-w-0">
+          {attendances.map((a) => {
+            const s = sentimentMeta(a.sentiment_final);
+            const date = a.opened_at ? format(new Date(a.opened_at), "dd/MM/yy") : "—";
+            return (
+              <button
+                key={a.id}
+                onClick={() => onSelect(a)}
+                className="w-full flex items-center gap-2 rounded-md border border-border bg-muted/30 hover:bg-muted transition-colors px-2 py-1.5 text-left min-w-0"
+              >
+                <span className="font-mono text-[11px] shrink-0">#{a.attendance_code ?? "—"}</span>
+                <span className={`text-xs shrink-0 ${s.color}`} title={s.label}>{s.emoji}</span>
+                <span className="text-[10px] text-muted-foreground flex-1 truncate">{date}</span>
+                <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </CollapsibleSection>
   );
 }
 
