@@ -279,7 +279,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
     );
   }
 
-  if (isAmbiguous && canEdit) {
+  if (!isGroup && isAmbiguous && canEdit) {
     return (
       <div className="bg-accent/40 border border-accent rounded-md p-3 space-y-2">
         <div className="flex items-center gap-2">
