@@ -66,7 +66,7 @@ serve(async (req) => {
     // 1. Fetch attendance
     const { data: att, error: attErr } = await supabase
       .from("support_attendances")
-      .select("id, tenant_id, conversation_id, opened_at, closed_at, area_id, ai_summary, first_human_response_at, msg_customer_count, closure_type, is_group")
+      .select("id, tenant_id, conversation_id, opened_at, closed_at, area_id, ai_summary, first_human_response_at, msg_customer_count, closure_type, is_group, sentiment_at")
       .eq("id", attendanceId)
       .single();
 
@@ -86,12 +86,17 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
+    let kbAlreadyExists = false;
     if (existingKb) {
-      console.log(`[${FUNCTION_NAME}][${requestId}] KB já existe, skip`);
-      return new Response(
-        JSON.stringify({ success: true, skipped: true, reason: "kb_already_exists" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (att.sentiment_at) {
+        console.log(`[${FUNCTION_NAME}][${requestId}] KB já existe e sentimento já gravado, skip`);
+        return new Response(
+          JSON.stringify({ success: true, skipped: true, reason: "kb_already_exists" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      console.log(`[${FUNCTION_NAME}][${requestId}] KB já existe mas sentiment_at nulo — prosseguindo para gravar sentimento (pulará insert do KB)`);
+      kbAlreadyExists = true;
     }
 
     // 2.5 Regra determinística: cliente ficou sem resposta de humano
@@ -157,17 +162,31 @@ serve(async (req) => {
     const { data: messages } = await msgQuery;
 
     if (!messages || messages.length < 2) {
-      console.log(`[${FUNCTION_NAME}][${requestId}] Poucas mensagens (${messages?.length || 0}), criando KB básico`);
-      await supabase.from("support_kb_articles").insert({
-        tenant_id: att.tenant_id,
-        source_attendance_id: attendanceId,
-        title: "Atendimento com poucas mensagens",
-        problem: "",
-        solution: "",
-        tags: [],
-        area_id: att.area_id || null,
-        status: "draft",
-      });
+      console.log(`[${FUNCTION_NAME}][${requestId}] Poucas mensagens (${messages?.length || 0}), gravando veredito determinístico neutral/parcial`);
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from("support_attendances")
+        .update({
+          sentiment_score: 0,
+          sentiment_final: "neutral",
+          resolucao: "parcial",
+          sentiment_at: nowIso,
+          sentiment_model: "deterministic",
+          updated_at: nowIso,
+        })
+        .eq("id", attendanceId);
+      if (!kbAlreadyExists) {
+        await supabase.from("support_kb_articles").insert({
+          tenant_id: att.tenant_id,
+          source_attendance_id: attendanceId,
+          title: "Atendimento com poucas mensagens",
+          problem: "",
+          solution: "",
+          tags: [],
+          area_id: att.area_id || null,
+          status: "draft",
+        });
+      }
       return new Response(
         JSON.stringify({ success: true, ai: false, reason: "too_few_messages" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -245,20 +264,10 @@ REGRAS:
     } catch (aiError: any) {
       const msg = aiError?.message || "";
       if (msg.includes("429") || msg.includes("insufficient_quota") || msg.includes("rate") || msg.includes("quota")) {
-        console.warn(`[${FUNCTION_NAME}][${requestId}] IA indisponível (quota/rate limit), criando KB básico`);
-        await supabase.from("support_kb_articles").insert({
-          tenant_id: att.tenant_id,
-          source_attendance_id: attendanceId,
-          title: "Atendimento (IA indisponível - sem créditos)",
-          problem: "",
-          solution: "",
-          tags: [],
-          area_id: att.area_id || null,
-          status: "draft",
-        });
+        console.warn(`[${FUNCTION_NAME}][${requestId}] IA indisponível (quota/rate limit) — retornando 503 para re-tentativa da fila`);
         return new Response(
-          JSON.stringify({ success: true, ai: false, reason: "ai_quota_exceeded" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ success: false, reason: "ai_quota_exceeded" }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       throw aiError;
@@ -362,20 +371,23 @@ REGRAS:
       // Se não encontrou, mantém area_id original sem erro
     }
 
-    // 12. Create KB draft
-    await supabase.from("support_kb_articles").insert({
-      tenant_id: att.tenant_id,
-      source_attendance_id: attendanceId,
-      title: (result.title || result.summary || "").substring(0, 120),
-      summary: (result.summary || "").substring(0, 500),
-      problem: result.problem || "",
-      solution: result.solution || "",
-      tags: Array.isArray(result.tags) ? result.tags.slice(0, 5) : [],
-      area_id: resolvedAreaId,
-      status: "draft",
-    });
-
-    console.log(`[${FUNCTION_NAME}][${requestId}] Sucesso — KB draft criado, sentimento=${sentimentValue}`);
+    // 12. Create KB draft (pular se já existia — só o sentimento estava faltando)
+    if (!kbAlreadyExists) {
+      await supabase.from("support_kb_articles").insert({
+        tenant_id: att.tenant_id,
+        source_attendance_id: attendanceId,
+        title: (result.title || result.summary || "").substring(0, 120),
+        summary: (result.summary || "").substring(0, 500),
+        problem: result.problem || "",
+        solution: result.solution || "",
+        tags: Array.isArray(result.tags) ? result.tags.slice(0, 5) : [],
+        area_id: resolvedAreaId,
+        status: "draft",
+      });
+      console.log(`[${FUNCTION_NAME}][${requestId}] Sucesso — KB draft criado, sentimento=${sentimentValue}`);
+    } else {
+      console.log(`[${FUNCTION_NAME}][${requestId}] Sucesso — sentimento gravado (KB já existia), sentimento=${sentimentValue}`);
+    }
 
     return new Response(
       JSON.stringify({ success: true, sentiment: sentimentValue, topics: limitedTopics }),
