@@ -17,9 +17,10 @@ export interface AtendimentoVolume {
 export function useAtendimentoVolume() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
-  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
+  const { dateRange, departmentId, agentId, tipoAtendimento } = useAtendimentoFilter();
+  const pIsGroup = tipoAtendimento === 'all' ? null : tipoAtendimento === 'group';
   return useQuery<AtendimentoVolume>({
-    queryKey: ["atendimento-volume", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, agentId],
+    queryKey: ["atendimento-volume", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, agentId, tipoAtendimento],
     enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -30,6 +31,7 @@ export function useAtendimentoVolume() {
         p_unidade_base_id: selectedUnidadeId ?? null,
         p_department_id: departmentId ?? null,
         p_agent_id: agentId ?? null,
+        p_is_group: pIsGroup,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
