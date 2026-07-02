@@ -1094,10 +1094,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         onCreated={handleClassifyCompleted}
         fromClosure
         attendanceId={attendance?.id ?? null}
-        closureClienteId={(linkedCliente as any)?.id ?? null}
-        closureClienteNome={linkedClienteName ?? null}
-        closureClienteCodigo={(linkedCliente as any)?.codigo_sequencial ?? null}
-        closureProdutoId={(linkedCliente as any)?.produto_id ?? null}
+        closureClienteId={closureClienteIdEff}
+        closureClienteNome={closureClienteNomeEff}
+        closureClienteCodigo={closureClienteCodigoEff}
+        closureProdutoId={closureProdutoIdEff}
         closureDepartmentId={(conversation as any).department_id ?? null}
         closureResponsavelId={attendance?.assigned_to ?? null}
         closureContactName={contact?.name ?? null}
@@ -1244,10 +1244,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           onCreated={handleAttendanceTicketCreated}
           fromClosure
           attendanceId={attendanceTicketTarget.id}
-          closureClienteId={attendanceTicketTarget.clientes?.id ?? (linkedCliente as any)?.id ?? null}
-          closureClienteNome={attendanceTicketTarget.clientes?.nome_fantasia ?? linkedClienteName ?? null}
-          closureClienteCodigo={attendanceTicketTarget.clientes?.codigo_sequencial ?? (linkedCliente as any)?.codigo_sequencial ?? null}
-          closureProdutoId={attendanceTicketTarget.clientes?.produto_id ?? (linkedCliente as any)?.produto_id ?? null}
+          closureClienteId={attendanceTicketTarget.clientes?.id ?? closureClienteIdEff}
+          closureClienteNome={attendanceTicketTarget.clientes?.nome_fantasia ?? closureClienteNomeEff}
+          closureClienteCodigo={attendanceTicketTarget.clientes?.codigo_sequencial ?? closureClienteCodigoEff}
+          closureProdutoId={attendanceTicketTarget.clientes?.produto_id ?? closureProdutoIdEff}
           closureDepartmentId={attendanceTicketTarget.department_id ?? (conversation as any).department_id ?? null}
           closureResponsavelId={attendanceTicketTarget.assigned_to ?? (conversation as any).assigned_to ?? null}
           closureContactName={contact?.name ?? null}
@@ -1288,10 +1288,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         fromClosure
         mode="additional"
         attendanceId={attendance?.id ?? null}
-        closureClienteId={(linkedCliente as any)?.id ?? null}
-        closureClienteNome={linkedClienteName ?? null}
-        closureClienteCodigo={(linkedCliente as any)?.codigo_sequencial ?? null}
-        closureProdutoId={(linkedCliente as any)?.produto_id ?? null}
+        closureClienteId={closureClienteIdEff}
+        closureClienteNome={closureClienteNomeEff}
+        closureClienteCodigo={closureClienteCodigoEff}
+        closureProdutoId={closureProdutoIdEff}
         closureDepartmentId={(conversation as any).department_id ?? null}
         closureResponsavelId={attendance?.assigned_to ?? null}
         closureContactName={contact?.name ?? null}
