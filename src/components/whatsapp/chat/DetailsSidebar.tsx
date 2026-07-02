@@ -323,16 +323,6 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             <ContactTicketsSection clienteId={(metadata?.cliente_id as string) || null} />
           </CollapsibleSection>
 
-          {/* ─── 7. Histórico do Contato ─── */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full h-7 text-xs gap-1.5"
-            onClick={() => setHistoryOpen(true)}
-          >
-            <History className="h-3.5 w-3.5" />
-            Histórico do Contato
-          </Button>
 
           <Separator />
 
