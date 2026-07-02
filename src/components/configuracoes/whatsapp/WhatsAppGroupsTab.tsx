@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RefreshCw, Users, Calendar, Loader2 } from "lucide-react";
+import { RefreshCw, Users, Calendar, Loader2, Ticket } from "lucide-react";
 import { toast } from "sonner";
 
 interface WhatsAppInstance {
