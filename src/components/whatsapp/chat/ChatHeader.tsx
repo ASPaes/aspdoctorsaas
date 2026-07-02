@@ -1298,6 +1298,13 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           setShowCleanupDialog(false);
         }}
       />
+
+      <GroupLinkClienteModal
+        open={showGroupLinkModal}
+        onOpenChange={setShowGroupLinkModal}
+        conversationId={conversation.id}
+        onLinked={handleGroupLinked}
+      />
       <ScheduleAttendanceDialog
         open={showScheduleDialog}
         onOpenChange={setShowScheduleDialog}
