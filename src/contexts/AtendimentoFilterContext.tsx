@@ -14,6 +14,8 @@ export interface FiltroOpcoes {
   cidades: FiltroOpt[]; fornecedores: FiltroOpt[]; produtos: FiltroOpt[];
 }
 
+export type TipoAtendimento = 'all' | 'individual' | 'group';
+
 interface AtendimentoFilterContextType {
   dateRange: AtendimentoDateRange;
   setDateRange: (r: AtendimentoDateRange) => void;
@@ -21,6 +23,8 @@ interface AtendimentoFilterContextType {
   setDepartmentId: (id: string | null) => void;
   agentId: string | null;
   setAgentId: (id: string | null) => void;
+  tipoAtendimento: TipoAtendimento;
+  setTipoAtendimento: (t: TipoAtendimento) => void;
   segmentoIds: number[]; setSegmentoIds: (ids: number[]) => void;
   areaIds: number[]; setAreaIds: (ids: number[]) => void;
   estadoIds: number[]; setEstadoIds: (ids: number[]) => void;
