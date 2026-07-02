@@ -50,6 +50,8 @@ function FiltrosGlobais({ cfg }: { cfg: FiltroConfig }) {
     setDepartmentId,
     agentId,
     setAgentId,
+    tipoAtendimento,
+    setTipoAtendimento,
     setores,
     agentes,
     opcoes,
