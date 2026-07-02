@@ -495,29 +495,31 @@ export default function ClienteForm() {
       };
 
       if (isEditing) {
-        // Campos DERIVADOS — gerenciados exclusivamente por RPCs e triggers do banco.
-        // NUNCA enviar no UPDATE direto, ou o form sobrescreve o estado correto.
-        // - cancelado/data_cancelamento/motivo/observacao_cancelamento: RPCs cancelar_contrato/reativar_contrato
-        // - mensalidade/custo_operacao: trigger fn_sync_cliente_mensalidade (recalcula a partir de cliente_produtos)
-        const {
-          cancelado: _ignored1,
-          data_cancelamento: _ignored2,
-          motivo_cancelamento_id: _ignored3,
-          observacao_cancelamento: _ignored4,
-          mensalidade: _ignored5,
-          custo_operacao: _ignored6,
-          codigo_fornecedor: _ignored7,
-          link_portal_fornecedor: _ignored8,
-          fornecedor_id: _ignored9,
-          funcionario_id: _ignored10,
-          origem_venda_id: _ignored11,
-          recorrencia: _ignored12,
-          ...updatePayload
-        } = payload;
+        // Whitelist explícito das colunas atualmente existentes na tabela `clientes`.
+        // Campos derivados (cancelado, mensalidade, custo_operacao) são gerenciados por RPCs/triggers.
+        // Campos legados (codigo_fornecedor, link_portal_fornecedor, fornecedor_id, produto_id, etc.)
+        // foram migrados para `cliente_produtos` e NÃO devem ir no UPDATE — a coluna nem existe mais.
+        const ALLOWED_UPDATE_COLS = [
+          "data_cadastro","razao_social","nome_fantasia","cnpj","email",
+          "telefone_contato","telefone_whatsapp","telefone_whatsapp_contato",
+          "estado_id","cidade_id","area_atuacao_id","segmento_id",
+          "observacao_cliente","observacao_negociacao",
+          "imposto_percentual","custo_fixo_percentual",
+          "cert_a1_vencimento","cert_a1_ultima_venda_em","cert_a1_ultimo_vendedor_id",
+          "contato_nome","contato_cpf","contato_fone","contato_aniversario",
+          "unidade_base_id","matriz_id",
+          "cep","endereco","numero","complemento","bairro",
+          "dia_vencimento_mrr",
+        ] as const;
+        const updatePayload: Record<string, any> = {};
+        for (const k of ALLOWED_UPDATE_COLS) {
+          if (k in payload) updatePayload[k] = payload[k];
+        }
 
         const { error } = await supabase.from("clientes").update(updatePayload).eq("id", id!);
         if (error) throw error;
       } else {
+
         if (profile?.is_super_admin && !tid) {
           throw new Error("Selecione um tenant no seletor antes de criar um cliente.");
         }
