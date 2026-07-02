@@ -51,6 +51,8 @@ const AtendimentoFilterContext = createContext<AtendimentoFilterContextType>({
   setDepartmentId: () => {},
   agentId: null,
   setAgentId: () => {},
+  tipoAtendimento: 'all',
+  setTipoAtendimento: () => {},
   segmentoIds: [], setSegmentoIds: () => {},
   areaIds: [], setAreaIds: () => {},
   estadoIds: [], setEstadoIds: () => {},
