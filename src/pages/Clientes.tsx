@@ -210,7 +210,8 @@ export default function Clientes() {
 
       const cpRows = await fetchAllRows<any>(() => {
         let q = (supabase.from("cliente_produtos" as any) as any)
-          .select("id, cliente_id");
+          .select("id, cliente_id")
+          .eq("ativo", true);
         if (tid) q = q.eq("tenant_id", tid);
         if (fornecedorId) q = q.eq("fornecedor_id", Number(fornecedorId));
         if (produtoId) q = q.eq("produto_id", Number(produtoId));
