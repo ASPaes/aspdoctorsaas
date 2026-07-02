@@ -8,9 +8,10 @@ export interface LatenciaHistograma { total: number; mediana_s: number | null; f
 
 export function useAtendimentoLatenciaHistograma() {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
+  const { dateRange, departmentId, agentId, tipoAtendimento } = useAtendimentoFilter();
+  const pIsGroup = tipoAtendimento === 'all' ? null : tipoAtendimento === 'group';
   return useQuery({
-    queryKey: ["atendimento-latencia-histograma", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), departmentId, agentId],
+    queryKey: ["atendimento-latencia-histograma", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), departmentId, agentId, tipoAtendimento],
     enabled: !!tid,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -20,6 +21,7 @@ export function useAtendimentoLatenciaHistograma() {
         p_date_to: dateRange.to.toISOString(),
         p_department_id: departmentId ?? null,
         p_agent_id: agentId ?? null,
+        p_is_group: pIsGroup,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
