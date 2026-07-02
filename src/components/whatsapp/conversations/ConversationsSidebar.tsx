@@ -148,7 +148,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     departmentId: isGroupsPill ? undefined : (selectedDepartmentId || undefined),
     instanceIds: isGroupsPill ? undefined : (selectedDepartmentId ? undefined : (filteredInstanceIds ?? undefined)),
     status: isGroupsPill ? undefined : filters.status,
-    assignedTo: isGroupsPill || queueLikePills ? undefined : resolvedAssignedTo,
+    assignedTo: queueLikePills ? undefined : resolvedAssignedTo,
     unassigned: isGroupsPill || queueLikePills ? undefined : (resolvedUnassigned || undefined),
     isGroup: isGroupsPill ? true : activePill === "all" ? undefined : false,
     pageSize: 100,
