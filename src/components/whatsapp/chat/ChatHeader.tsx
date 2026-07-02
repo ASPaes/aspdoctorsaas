@@ -678,31 +678,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               </Popover>
             )}
 
-            {isGroupConv && (() => {
-              const cliName = (groupLinkedCliente as any)?.nome_fantasia || (groupLinkedCliente as any)?.razao_social || null;
-              const hasActive = !!groupAttendance;
-              const clickable = !!cliName ? !hasActive : !hasActive;
-              const badgeInner = (
-                <Badge
-                  variant="outline"
-                  className={`gap-1 max-w-[180px] ${clickable ? "cursor-pointer hover:bg-accent" : "cursor-default"} ${cliName ? "" : "text-muted-foreground"}`}
-                  onClick={() => { if (clickable) setShowGroupLinkModal(true); }}
-                >
-                  <Building2 className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{cliName ?? "Sem cliente vinculado"}</span>
-                </Badge>
-              );
-              return (
-                <Tooltip>
-                  <TooltipTrigger asChild>{badgeInner}</TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs">
-                    {hasActive
-                      ? "Encerre o atendimento para trocar o cliente"
-                      : (cliName ?? "Clique para vincular um cliente ao grupo")}
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })()}
+
+
 
             {isGroupConv && groupAttendance && (
               <div className="flex items-center gap-1.5">
