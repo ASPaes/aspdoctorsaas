@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch, ShieldOff, FileText, Search } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch, ShieldOff, FileText, Search, Play } from "lucide-react";
 import { toast } from "sonner";
 import { InChatMessageSearchModal } from "./InChatMessageSearchModal";
 import { ScheduleAttendanceDialog } from "./ScheduleAttendanceDialog";
@@ -40,6 +40,7 @@ import { TicketReopenChoiceDialog } from "./TicketReopenChoiceDialog";
 import { TicketUpdateExistingDialog } from "./TicketUpdateExistingDialog";
 import { InterruptAutoReplyDialog } from "./InterruptAutoReplyDialog";
 import { CleanupConversationDialog } from "./CleanupConversationDialog";
+import { GroupLinkClienteModal } from "./GroupLinkClienteModal";
 
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
@@ -77,6 +78,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showGroupLinkModal, setShowGroupLinkModal] = useState(false);
+  const [isStartingGroupAtt, setIsStartingGroupAtt] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInChatSearch, setShowInChatSearch] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -275,6 +278,51 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   // Use attendance status as single source of truth for status display
   const { attendanceMap } = useAttendanceStatus([conversation.id], true);
   const attendance = attendanceMap.get(conversation.id);
+
+  const groupAttendance = ((conversation as any)?.is_group === true)
+    && attendance
+    && (attendance.status === "waiting" || attendance.status === "in_progress")
+    ? attendance
+    : null;
+
+  const startGroupAttendance = useCallback(async () => {
+    if (!user?.id) return;
+    setIsStartingGroupAtt(true);
+    try {
+      const { data, error } = await (supabase.rpc as any)("start_group_attendance", {
+        p_conversation_id: conversation.id,
+        p_agent_id: user.id,
+        p_created_from: "group_manual",
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res?.success) {
+        toast.success(`Atendimento ${res.attendance_code} iniciado`);
+        queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+        return;
+      }
+      if (res?.error === "no_client") {
+        setShowGroupLinkModal(true);
+        return;
+      }
+      if (res?.error === "active_exists") {
+        toast.error(res?.message ?? `Já em atendimento com ${res?.active_agent_name ?? "outro operador"}`);
+        return;
+      }
+      toast.error(res?.message ?? "Não foi possível iniciar o atendimento");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao iniciar atendimento");
+    } finally {
+      setIsStartingGroupAtt(false);
+    }
+  }, [conversation.id, user?.id, queryClient]);
+
+  const handleGroupLinked = useCallback(async () => {
+    // Vinculou cliente ao grupo → tentar iniciar atendimento novamente
+    await startGroupAttendance();
+  }, [startGroupAttendance]);
+
+
 
   const handleClienteConfirmed = useCallback(async () => {
     setShowConfirmCliente(false);
@@ -574,6 +622,37 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 <TooltipContent>Participantes do grupo</TooltipContent>
               </Tooltip>
             )}
+
+            {isGroupConv && !groupAttendance && (
+              <Button
+                size="sm"
+                variant="default"
+                className="h-8 gap-1.5"
+                onClick={startGroupAttendance}
+                disabled={isStartingGroupAtt}
+              >
+                <Play className="h-3.5 w-3.5" />
+                Iniciar atendimento
+              </Button>
+            )}
+
+            {isGroupConv && groupAttendance && (
+              <div className="flex items-center gap-1.5">
+                <Badge variant="secondary" className="whitespace-nowrap">
+                  Em atendimento{assignedOperatorName ? ` · ${assignedOperatorName}` : ""}
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-destructive hover:text-destructive"
+                  onClick={() => setShowCloseModal(true)}
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                  Encerrar
+                </Button>
+              </div>
+            )}
+
 
             {presenceBlocked && !isGroupConv ? (
               <Tooltip>
@@ -1218,6 +1297,13 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           resumeAutoReply(conversation.id);
           setShowCleanupDialog(false);
         }}
+      />
+
+      <GroupLinkClienteModal
+        open={showGroupLinkModal}
+        onOpenChange={setShowGroupLinkModal}
+        conversationId={conversation.id}
+        onLinked={handleGroupLinked}
       />
       <ScheduleAttendanceDialog
         open={showScheduleDialog}
