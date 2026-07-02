@@ -279,6 +279,51 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { attendanceMap } = useAttendanceStatus([conversation.id], true);
   const attendance = attendanceMap.get(conversation.id);
 
+  const groupAttendance = ((conversation as any)?.is_group === true)
+    && attendance
+    && (attendance.status === "waiting" || attendance.status === "in_progress")
+    ? attendance
+    : null;
+
+  const startGroupAttendance = useCallback(async () => {
+    if (!user?.id) return;
+    setIsStartingGroupAtt(true);
+    try {
+      const { data, error } = await (supabase.rpc as any)("start_group_attendance", {
+        p_conversation_id: conversation.id,
+        p_agent_id: user.id,
+        p_created_from: "group_manual",
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res?.success) {
+        toast.success(`Atendimento ${res.attendance_code} iniciado`);
+        queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+        return;
+      }
+      if (res?.error === "no_client") {
+        setShowGroupLinkModal(true);
+        return;
+      }
+      if (res?.error === "active_exists") {
+        toast.error(res?.message ?? `Já em atendimento com ${res?.active_agent_name ?? "outro operador"}`);
+        return;
+      }
+      toast.error(res?.message ?? "Não foi possível iniciar o atendimento");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao iniciar atendimento");
+    } finally {
+      setIsStartingGroupAtt(false);
+    }
+  }, [conversation.id, user?.id, queryClient]);
+
+  const handleGroupLinked = useCallback(async () => {
+    // Vinculou cliente ao grupo → tentar iniciar atendimento novamente
+    await startGroupAttendance();
+  }, [startGroupAttendance]);
+
+
+
   const handleClienteConfirmed = useCallback(async () => {
     setShowConfirmCliente(false);
 
