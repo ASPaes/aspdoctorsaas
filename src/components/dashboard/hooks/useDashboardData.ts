@@ -775,6 +775,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       const areaAtuacaoByEstado = buildByEstado('area_atuacao_id', areaMap);
       const fornecedorByEstado = buildByEstado('fornecedor_id', fornecedorMap);
 
+      if (seq !== fetchSeqRef.current) return;
       setDistributions({
         porCidade, porEstado: porEstadoSigla, porFornecedor, porMotivoCancelamento,
         porOrigemVenda, porSegmento, porAreaAtuacao, topCidadesByEstado,
