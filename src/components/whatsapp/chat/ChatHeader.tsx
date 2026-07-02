@@ -78,6 +78,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showGroupLinkModal, setShowGroupLinkModal] = useState(false);
+  const [isStartingGroupAtt, setIsStartingGroupAtt] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInChatSearch, setShowInChatSearch] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
