@@ -654,17 +654,75 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             )}
 
             {isGroupConv && !groupAttendance && (
-              <Button
-                size="sm"
-                variant="default"
-                className="h-8 gap-1.5"
-                onClick={startGroupAttendance}
-                disabled={isStartingGroupAtt}
-              >
-                <Play className="h-3.5 w-3.5" />
-                Iniciar atendimento
-              </Button>
+              <Popover open={groupStartPopoverOpen} onOpenChange={setGroupStartPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="h-8 gap-1.5"
+                    disabled={isStartingGroupAtt}
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                    Iniciar atendimento
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-64 p-3 space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="group-include-previous" className="text-xs">
+                      Incluir mensagens anteriores
+                    </Label>
+                    <Input
+                      id="group-include-previous"
+                      type="number"
+                      min={0}
+                      max={50}
+                      value={groupIncludePrevious}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        setGroupIncludePrevious(Number.isFinite(v) ? Math.max(0, Math.min(50, v)) : 0);
+                      }}
+                      className="h-8 px-2"
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      disabled={isStartingGroupAtt}
+                      onClick={() => startGroupAttendance(Number(groupIncludePrevious) || 0)}
+                    >
+                      Iniciar
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             )}
+
+            {isGroupConv && (() => {
+              const cliName = (groupLinkedCliente as any)?.nome_fantasia || (groupLinkedCliente as any)?.razao_social || null;
+              const hasActive = !!groupAttendance;
+              const clickable = !!cliName ? !hasActive : !hasActive;
+              const badgeInner = (
+                <Badge
+                  variant="outline"
+                  className={`gap-1 max-w-[180px] ${clickable ? "cursor-pointer hover:bg-accent" : "cursor-default"} ${cliName ? "" : "text-muted-foreground"}`}
+                  onClick={() => { if (clickable) setShowGroupLinkModal(true); }}
+                >
+                  <Building2 className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{cliName ?? "Sem cliente vinculado"}</span>
+                </Badge>
+              );
+              return (
+                <Tooltip>
+                  <TooltipTrigger asChild>{badgeInner}</TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    {hasActive
+                      ? "Encerre o atendimento para trocar o cliente"
+                      : (cliName ?? "Clique para vincular um cliente ao grupo")}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })()}
 
             {isGroupConv && groupAttendance && (
               <div className="flex items-center gap-1.5">
