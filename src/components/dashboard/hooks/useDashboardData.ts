@@ -19,7 +19,7 @@ const defaultMetrics: KPIMetrics = {
   funcionariosRanking: [], quickRatio: 0, revenuePerFuncionario: 0,
 };
 
-export function useDashboardData(filters: DashboardFilters) {
+export function useDashboardData(filters: DashboardFilters, ready: boolean = true) {
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState<KPIMetrics>(defaultMetrics);
   const [canceladosList, setCanceladosList] = useState<CanceladoListItem[]>([]);
