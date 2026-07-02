@@ -479,6 +479,29 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const deleteTargetName = (contact?.name || contact?.phone_number || "").trim();
   const isGroupConv = (conversation as any)?.is_group === true;
 
+  const { data: groupLinkedCliente } = useQuery({
+    queryKey: ["group-linked-cliente", conversation.contact?.id],
+    enabled: isGroupConv && !!conversation.contact?.id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data: wc } = await (supabase.from("whatsapp_contacts" as any) as any)
+        .select("cliente_id")
+        .eq("id", conversation.contact?.id)
+        .maybeSingle();
+      if (!wc?.cliente_id) return null;
+      const { data: cliente } = await (supabase.from("clientes" as any) as any)
+        .select("id, codigo_sequencial, nome_fantasia, razao_social")
+        .eq("id", wc.cliente_id)
+        .maybeSingle();
+      return cliente ?? null;
+    },
+  });
+
+  const effIsLinked = isGroupConv ? !!groupLinkedCliente : isLinked;
+  const effLinkedName = isGroupConv
+    ? (groupLinkedCliente?.nome_fantasia || groupLinkedCliente?.razao_social || null)
+    : linkedClienteName;
+
   // Resolve assigned operator name — try senderMap (funcionario via profile), then query funcionario directly
   const { data: tenantUsers } = useTenantUsers();
   const { getSenderLabel } = useSenderMap();
@@ -599,9 +622,9 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                     size="sm"
                     className="h-5 w-5 p-0 shrink-0"
                     onClick={onToggleDetails}
-                    aria-label={isLinked ? `Vinculado ao cliente: ${linkedClienteName}` : "Contato sem cliente vinculado"}
+                    aria-label={effIsLinked ? `Vinculado ao cliente: ${effLinkedName}` : "Contato sem cliente vinculado"}
                   >
-                    {isLinked ? (
+                    {effIsLinked ? (
                       <Link2 className="h-3 w-3 text-green-500" />
                     ) : (
                       <AlertTriangle className="h-3 w-3 text-yellow-500" />
@@ -609,7 +632,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">
-                  {isLinked ? `Vinculado ao cliente: ${linkedClienteName}` : "Contato sem cliente vinculado"}
+                  {effIsLinked ? `Vinculado ao cliente: ${effLinkedName}` : "Contato sem cliente quizado vinculado"}
                 </TooltipContent>
               </Tooltip>
               {contact?.phone_number && (
