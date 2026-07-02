@@ -22,6 +22,10 @@ import type { ConversationWithContact } from "../hooks/useWhatsAppConversations"
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
 
 interface Props {
   conversation: ConversationWithContact;
@@ -32,21 +36,24 @@ interface Props {
 
 export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanceClosed = false, isAdminOrHead = false }: Props) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const phoneNumber = conversation.contact?.phone_number || "";
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
   const autoLinkBlocked = metadata?.auto_link_blocked === true;
+  const isGroup = (conversation as any)?.is_group === true;
+  const groupContactId = (conversation as any)?.contact_id ?? conversation.contact?.id ?? null;
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   const {
-    linkedCliente,
+    linkedCliente: indLinkedCliente,
     suggestedCliente,
-    isLinked,
-    linkCliente,
+    isLinked: indIsLinked,
+    linkCliente: indLinkCliente,
     unlinkCliente,
-    isLinking,
-    isUnlinking,
+    isLinking: indIsLinking,
+    isUnlinking: indIsUnlinking,
     candidates,
     isAmbiguous,
   } = useClienteLinkSuggestion(conversation.id, phoneNumber, metadata, attendanceId, conversation.tenant_id);
@@ -54,17 +61,64 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
 
   const canEdit = !isAttendanceClosed || isAdminOrHead;
 
-  const clienteId = isLinked ? (metadata?.cliente_id as string) : null;
+  // Group mode: fetch linked cliente via whatsapp_contacts.cliente_id
+  const { data: groupLinkedCliente } = useQuery({
+    queryKey: ["group-linked-cliente", groupContactId],
+    enabled: isGroup && !!groupContactId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data: contactRow } = await (supabase.from("whatsapp_contacts" as any) as any)
+        .select("cliente_id")
+        .eq("id", groupContactId)
+        .maybeSingle();
+      const cid = (contactRow as any)?.cliente_id ?? null;
+      if (!cid) return null;
+      const { data: cli } = await (supabase.from("clientes" as any) as any)
+        .select("id, codigo_sequencial, nome_fantasia, razao_social")
+        .eq("id", cid)
+        .maybeSingle();
+      return (cli as any) ?? null;
+    },
+  });
+
+  const groupLinkMutation = useMutation({
+    mutationFn: async (clienteId: string | null) => {
+      const { error } = await (supabase.rpc as any)("set_group_cliente", {
+        p_conversation_id: conversation.id,
+        p_cliente_id: clienteId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_data, clienteId) => {
+      queryClient.invalidateQueries({ queryKey: ["group-linked-cliente"] });
+      toast.success(clienteId ? "Cliente vinculado ao grupo" : "Vínculo do grupo removido");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao atualizar vínculo do grupo"),
+  });
+
+  const isLinked = isGroup ? !!groupLinkedCliente : indIsLinked;
+  const linkedCliente = isGroup ? (groupLinkedCliente as any) : indLinkedCliente;
+  const isLinking = isGroup ? groupLinkMutation.isPending : indIsLinking;
+  const isUnlinking = isGroup ? groupLinkMutation.isPending : indIsUnlinking;
+  const linkCliente = (id: string) => {
+    if (isGroup) groupLinkMutation.mutate(id);
+    else indLinkCliente(id);
+  };
+
+  const clienteId = isGroup
+    ? ((groupLinkedCliente as any)?.id ?? null)
+    : (indIsLinked ? (metadata?.cliente_id as string) : null);
   const { data: clienteDetails } = useLinkedClienteDetails(clienteId);
   const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen ? searchTerm : "");
 
-  // Auto-link silencioso: 1 candidato + permissão para editar
+  // Auto-link silencioso: apenas fluxo individual
   useEffect(() => {
-    if (suggestedCliente && canEdit && !isLinking && !isLinked && !autoLinkBlocked) {
-      linkCliente(suggestedCliente.id);
+    if (!isGroup && suggestedCliente && canEdit && !indIsLinking && !indIsLinked && !autoLinkBlocked) {
+      indLinkCliente(suggestedCliente.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestedCliente?.id, canEdit, isLinked, autoLinkBlocked]);
+  }, [suggestedCliente?.id, canEdit, indIsLinked, autoLinkBlocked, isGroup]);
+
 
   if (isLinked && linkedCliente) {
     const isBirthday = clienteDetails?.contato_aniversario
@@ -196,21 +250,28 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Desvincular cliente</AlertDialogTitle>
+                  <AlertDialogTitle>{isGroup ? "Desvincular grupo" : "Desvincular cliente"}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    O vínculo com este cliente será removido e o número será excluído do cadastro de contatos. Deseja continuar?
+                    {isGroup
+                      ? "O vínculo deste grupo com o cliente será removido. Deseja continuar?"
+                      : "O vínculo com este cliente será removido e o número será excluído do cadastro de contatos. Deseja continuar?"}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="gap-2">
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => { unlinkCliente(true); setUnlinkDialogOpen(false); }}
+                    onClick={() => {
+                      if (isGroup) groupLinkMutation.mutate(null);
+                      else unlinkCliente(true);
+                      setUnlinkDialogOpen(false);
+                    }}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     Desvincular
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
+
             </AlertDialog>
           )}
         </div>
@@ -218,7 +279,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
     );
   }
 
-  if (isAmbiguous && canEdit) {
+  if (!isGroup && isAmbiguous && canEdit) {
     return (
       <div className="bg-accent/40 border border-accent rounded-md p-3 space-y-2">
         <div className="flex items-center gap-2">
@@ -256,7 +317,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
     );
   }
 
-  if (isAmbiguous && !canEdit) {
+  if (!isGroup && isAmbiguous && !canEdit) {
     return (
       <div className="bg-muted/50 border border-border rounded-md p-3">
         <div className="flex items-center gap-2">
@@ -268,7 +329,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
     );
   }
 
-  if (suggestedCliente) {
+  if (!isGroup && suggestedCliente) {
     return (
       <div className="bg-accent/50 border border-accent rounded-md p-3 space-y-2">
         <div className="flex items-center gap-2">
