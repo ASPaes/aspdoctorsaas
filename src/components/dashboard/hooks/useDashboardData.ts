@@ -475,6 +475,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         else if (m.tipo === 'cross_sell') prevCrossSellMrr += Number(m.valor_delta) || 0;
       });
 
+      if (seq !== fetchSeqRef.current) return;
       setMetrics({
         faturamentoTotal: mrrTotalAtual, faturamentoPorUnidade, clientesAtivos: clientesCount,
         mrr: mrrTotalAtual, ticketMedio: ticketMedioAjustado, arr: mrrTotalAtual * 12,
