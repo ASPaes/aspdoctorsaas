@@ -288,7 +288,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     ? attendance
     : null;
 
-  const startGroupAttendance = useCallback(async () => {
+  const startGroupAttendance = useCallback(async (includePrevious: number = 0) => {
     if (!user?.id) return;
     setIsStartingGroupAtt(true);
     try {
@@ -296,16 +296,19 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         p_conversation_id: conversation.id,
         p_agent_id: user.id,
         p_created_from: "group_manual",
+        p_include_previous: Number.isFinite(includePrevious) ? Math.max(0, Math.min(50, Number(includePrevious))) : 0,
       });
       if (error) throw error;
       const res = data as any;
       if (res?.success) {
         toast.success(`Atendimento ${res.attendance_code} iniciado`);
         queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+        setGroupStartPopoverOpen(false);
         return;
       }
       if (res?.error === "no_client") {
         setShowGroupLinkModal(true);
+        setGroupStartPopoverOpen(false);
         return;
       }
       if (res?.error === "active_exists") {
@@ -321,9 +324,33 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   }, [conversation.id, user?.id, queryClient]);
 
   const handleGroupLinked = useCallback(async () => {
-    // Vinculou cliente ao grupo → tentar iniciar atendimento novamente
-    await startGroupAttendance();
-  }, [startGroupAttendance]);
+    // Vinculou cliente ao grupo → tentar iniciar atendimento novamente com o mesmo valor escolhido
+    queryClient.invalidateQueries({ queryKey: ["group-linked-cliente"] });
+    await startGroupAttendance(groupIncludePrevious);
+  }, [startGroupAttendance, groupIncludePrevious, queryClient]);
+
+  // Cliente vinculado ao grupo (via whatsapp_contacts.cliente_id)
+  const groupContactId = (conversation as any)?.contact_id ?? conversation.contact?.id ?? null;
+  const isGroupConvForQuery = (conversation as any)?.is_group === true;
+  const { data: groupLinkedCliente } = useQuery({
+    queryKey: ["group-linked-cliente", groupContactId, tid],
+    enabled: isGroupConvForQuery && !!groupContactId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data: contactRow } = await (supabase.from("whatsapp_contacts" as any) as any)
+        .select("cliente_id")
+        .eq("id", groupContactId)
+        .maybeSingle();
+      const cid = (contactRow as any)?.cliente_id ?? null;
+      if (!cid) return null;
+      let q = (supabase.from("clientes" as any) as any)
+        .select("id, nome_fantasia, razao_social")
+        .eq("id", cid);
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data: cli } = await q.maybeSingle();
+      return (cli as any) ?? null;
+    },
+  });
 
 
 
