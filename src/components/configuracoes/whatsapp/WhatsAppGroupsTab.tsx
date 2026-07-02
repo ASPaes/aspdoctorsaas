@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RefreshCw, Users, Calendar, Loader2 } from "lucide-react";
+import { RefreshCw, Users, Calendar, Loader2, Ticket } from "lucide-react";
 import { toast } from "sonner";
 
 interface WhatsAppInstance {
@@ -75,6 +75,35 @@ export default function WhatsAppGroupsTab() {
         .order("group_name");
       if (error) throw error;
       return (data ?? []) as WhatsAppGroup[];
+    },
+  });
+
+  const { data: groupAttendanceConfig } = useQuery({
+    queryKey: ["group-attendance-config", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("configuracoes" as any) as any)
+        .select("group_require_ticket_on_close")
+        .eq("tenant_id", tid)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { group_require_ticket_on_close?: boolean } | null;
+    },
+  });
+
+  const updateGroupRequireTicketMutation = useMutation({
+    mutationFn: async (value: boolean) => {
+      const { error } = await (supabase.from("configuracoes" as any) as any)
+        .update({ group_require_ticket_on_close: value, updated_at: new Date().toISOString() })
+        .eq("tenant_id", tid);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["group-attendance-config", tid] });
+      toast.success("Configuração atualizada");
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Erro ao atualizar configuração");
     },
   });
 
@@ -228,6 +257,36 @@ export default function WhatsAppGroupsTab() {
 
   return (
     <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
+          <Ticket className="h-5 w-5 text-muted-foreground" />
+          <div>
+            <CardTitle>Atendimento em Grupos</CardTitle>
+            <CardDescription>
+              Configure regras para atendimento dentro de grupos WhatsApp.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-0.5">
+              <div className="text-sm font-medium">
+                Ticket obrigatório ao encerrar atendimento
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Ao encerrar um atendimento de grupo sem ticket vinculado, o operador precisa classificar e
+                criar o ticket antes de concluir.
+              </div>
+            </div>
+            <Switch
+              checked={!!groupAttendanceConfig?.group_require_ticket_on_close}
+              onCheckedChange={(checked) => updateGroupRequireTicketMutation.mutate(checked)}
+              disabled={updateGroupRequireTicketMutation.isPending || !tid}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Grupos WhatsApp</CardTitle>
