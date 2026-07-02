@@ -210,7 +210,8 @@ export default function Clientes() {
 
       const cpRows = await fetchAllRows<any>(() => {
         let q = (supabase.from("cliente_produtos" as any) as any)
-          .select("id, cliente_id");
+          .select("id, cliente_id")
+          .eq("ativo", true);
         if (tid) q = q.eq("tenant_id", tid);
         if (fornecedorId) q = q.eq("fornecedor_id", Number(fornecedorId));
         if (produtoId) q = q.eq("produto_id", Number(produtoId));
@@ -422,7 +423,7 @@ export default function Clientes() {
 
   // Query "Novos no Mês"
   const { data: novosNoMes } = useQuery({
-    queryKey: ["clientes_novos_mes", filterKey],
+    queryKey: ["clientes_novos_mes", filterKey, hasProductStructureFilters ? productFilterClientIds?.size ?? "loading" : null],
     queryFn: async () => {
       if (hasDateOrValueFilters) {
         const rows = await fetchClientesFilteredRows({ forNovosNoMes: true });
@@ -472,7 +473,7 @@ export default function Clientes() {
   });
 
   const { data: queryResult, isLoading, isPlaceholderData } = useQuery({
-    queryKey: ["clientes_lista", filterKey, page, somenteMatrizes ? matrizIdsSet?.size ?? "loading" : null],
+    queryKey: ["clientes_lista", filterKey, page, somenteMatrizes ? matrizIdsSet?.size ?? "loading" : null, hasProductStructureFilters ? productFilterClientIds?.size ?? "loading" : null],
     queryFn: async () => {
       if (hasDateOrValueFilters) {
         const rows = await fetchClientesFilteredRows();
@@ -571,7 +572,7 @@ export default function Clientes() {
   // dividido por todos os clientes (incluindo MRR=0), mesma fórmula do Dashboard:
   //   ticket_medio = SUM(mensalidade + deltas_ativos) / COUNT(clientes)
   const { data: ticketMedioFull } = useQuery({
-    queryKey: ["clientes_ticket_medio", filterKey, somenteMatrizes ? matrizIdsSet?.size ?? "loading" : null],
+    queryKey: ["clientes_ticket_medio", filterKey, somenteMatrizes ? matrizIdsSet?.size ?? "loading" : null, hasProductStructureFilters ? productFilterClientIds?.size ?? "loading" : null],
     queryFn: async () => {
       let allRows: Array<{ id: string; mensalidade: number | null }>;
       if (hasDateOrValueFilters) {
