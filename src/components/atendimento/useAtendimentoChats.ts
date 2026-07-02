@@ -34,9 +34,10 @@ export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: 
   const { closedReasons, hasTicket } = opts;
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
-  const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds } = useAtendimentoFilter();
+  const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, tipoAtendimento } = useAtendimentoFilter();
+  const pIsGroup = tipoAtendimento === 'all' ? null : tipoAtendimento === 'group';
   return useQuery<AtendimentoChats>({
-    queryKey: ["atendimento-chats", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, closedReasons, hasTicket],
+    queryKey: ["atendimento-chats", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, closedReasons, hasTicket, tipoAtendimento],
     enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -52,6 +53,7 @@ export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: 
         p_cidade_ids: orNull(cidadeIds), p_fornecedor_ids: orNull(fornecedorIds), p_produto_ids: orNull(produtoIds),
         p_closed_reasons: closedReasons.length ? closedReasons : null,
         p_has_ticket: hasTicket === "all" ? null : hasTicket === "with",
+        p_is_group: pIsGroup,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
