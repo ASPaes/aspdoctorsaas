@@ -217,6 +217,49 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             )}
           </div>
 
+          {/* ─── 3. Cliente Link ─── */}
+          <ClienteLinkCard
+            conversation={conversation}
+            attendanceId={relevantAttendanceId}
+            isAttendanceClosed={isRelevantClosed}
+            isAdminOrHead={isAdminOrHead}
+          />
+
+          {/* ─── 4. Histórico do Contato ─── */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-7 text-xs gap-1.5"
+            onClick={() => setHistoryOpen(true)}
+          >
+            <History className="h-3.5 w-3.5" />
+            Histórico do Contato
+          </Button>
+
+          <Separator />
+          {/* ─── 5. Últimos atendimentos (grupos) ─── */}
+          {isGroup && (
+            <GroupAttendancesSection
+              contactId={contact?.id ?? null}
+              open={groupAttendancesOpen}
+              onOpenChange={setGroupAttendancesOpen}
+              onSelect={setSelectedAttendance}
+            />
+          )}
+
+          {/* ─── 6. Histórico de Tickets ─── */}
+          <CollapsibleSection
+            icon={<Ticket className="h-3.5 w-3.5" />}
+            title="Histórico de Tickets"
+            open={ticketsOpen}
+            onOpenChange={setTicketsOpen}
+          >
+            <ContactTicketsSection clienteId={(metadata?.cliente_id as string) || null} />
+          </CollapsibleSection>
+
+
+          <Separator />
+
           {/* ─── 2. Anotações fixas do contato (persistem entre atendimentos) ─── */}
           <CollapsibleSection
             icon={<Pin className="h-3.5 w-3.5" />}
@@ -258,25 +301,6 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             </div>
           </CollapsibleSection>
 
-          {/* ─── 3. Cliente Link ─── */}
-          <ClienteLinkCard
-            conversation={conversation}
-            attendanceId={relevantAttendanceId}
-            isAttendanceClosed={isRelevantClosed}
-            isAdminOrHead={isAdminOrHead}
-          />
-
-          {/* ─── 4. Histórico do Contato ─── */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full h-7 text-xs gap-1.5"
-            onClick={() => setHistoryOpen(true)}
-          >
-            <History className="h-3.5 w-3.5" />
-            Histórico do Contato
-          </Button>
-
           {/* ─── 5. Notas desta conversa ─── */}
           <CollapsibleSection
             icon={<StickyNote className="h-3.5 w-3.5" />}
@@ -314,29 +338,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
 
           <Separator />
 
-          {/* ─── 5. Últimos atendimentos (grupos) ─── */}
-          {isGroup && (
-            <GroupAttendancesSection
-              contactId={contact?.id ?? null}
-              open={groupAttendancesOpen}
-              onOpenChange={setGroupAttendancesOpen}
-              onSelect={setSelectedAttendance}
-            />
-          )}
-
-          {/* ─── 6. Histórico de Tickets ─── */}
-          <CollapsibleSection
-            icon={<Ticket className="h-3.5 w-3.5" />}
-            title="Histórico de Tickets"
-            open={ticketsOpen}
-            onOpenChange={setTicketsOpen}
-          >
-            <ContactTicketsSection clienteId={(metadata?.cliente_id as string) || null} />
-          </CollapsibleSection>
-
-
           <Separator />
-
           {/* ─── 8. Sentimento IA ─── */}
           <CollapsibleSection
             icon={<MessageSquare className="h-3.5 w-3.5" />}
@@ -572,6 +574,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
 
           <Separator />
 
+          <Separator />
           {/* ─── 12. Monitor do grupo ─── */}
           {isGroup && (
             <GroupMonitorSection
