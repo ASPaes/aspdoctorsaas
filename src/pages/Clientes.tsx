@@ -213,8 +213,10 @@ export default function Clientes() {
           .select("id, cliente_id")
           .eq("ativo", true);
         if (tid) q = q.eq("tenant_id", tid);
-        if (fornecedorId) q = q.eq("fornecedor_id", Number(fornecedorId));
-        if (produtoId) q = q.eq("produto_id", Number(produtoId));
+        if (fornecedorId === "__null__") q = q.is("fornecedor_id", null);
+        else if (fornecedorId) q = q.eq("fornecedor_id", Number(fornecedorId));
+        if (produtoId === "__null__") q = q.is("produto_id", null);
+        else if (produtoId) q = q.eq("produto_id", Number(produtoId));
         return q;
       });
 
