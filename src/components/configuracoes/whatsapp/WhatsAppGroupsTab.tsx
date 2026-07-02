@@ -258,6 +258,36 @@ export default function WhatsAppGroupsTab() {
   return (
     <div className="space-y-4">
       <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
+          <Ticket className="h-5 w-5 text-muted-foreground" />
+          <div>
+            <CardTitle>Atendimento em Grupos</CardTitle>
+            <CardDescription>
+              Configure regras para atendimento dentro de grupos WhatsApp.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-0.5">
+              <div className="text-sm font-medium">
+                Ticket obrigatório ao encerrar atendimento
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Ao encerrar um atendimento de grupo sem ticket vinculado, o operador precisa classificar e
+                criar o ticket antes de concluir.
+              </div>
+            </div>
+            <Switch
+              checked={!!groupAttendanceConfig?.group_require_ticket_on_close}
+              onCheckedChange={(checked) => updateGroupRequireTicketMutation.mutate(checked)}
+              disabled={updateGroupRequireTicketMutation.isPending || !tid}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader>
           <CardTitle>Grupos WhatsApp</CardTitle>
           <CardDescription>
