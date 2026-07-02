@@ -179,11 +179,13 @@ export const useWhatsAppActions = () => {
 
       // Summary generation removed — finalize-attendance handles it
 
-      const { error } = await supabase
-        .from('whatsapp_conversations')
-        .update({ status: 'closed' })
-        .eq('id', conversationId);
-      if (error) throw error;
+      if (isGroup !== true) {
+        const { error } = await supabase
+          .from('whatsapp_conversations')
+          .update({ status: 'closed' })
+          .eq('id', conversationId);
+        if (error) throw error;
+      }
 
       // Close the active support_attendance (already fetched above)
       try {
@@ -200,9 +202,11 @@ export const useWhatsAppActions = () => {
             ? Math.round((now.getTime() - assumedAt.getTime()) / 1000)
             : 0;
 
+          const effSkipCsat = skipCsat || isGroup === true;
+
           const closureType = skipClosureMessage
             ? 'silent'
-            : skipCsat
+            : effSkipCsat
             ? 'closure_message_only'
             : 'csat_sent';
 
