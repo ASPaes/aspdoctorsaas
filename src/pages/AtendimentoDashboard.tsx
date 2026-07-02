@@ -104,6 +104,21 @@ function FiltrosGlobais({ cfg }: { cfg: FiltroConfig }) {
           </SelectContent>
         </Select>
       )}
+      {cfg.tipo && (
+        <Select
+          value={tipoAtendimento}
+          onValueChange={(v) => setTipoAtendimento(v as any)}
+        >
+          <SelectTrigger className="w-[170px]">
+            <SelectValue placeholder="Tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os tipos</SelectItem>
+            <SelectItem value="individual">Individual</SelectItem>
+            <SelectItem value="group">Grupos</SelectItem>
+          </SelectContent>
+        </Select>
+      )}
       {cfg.cliente && (
         <>
           <MultiSelectFilter label="Segmento" options={opcoes.segmentos} selected={segmentoIds} onChange={setSegmentoIds} />
