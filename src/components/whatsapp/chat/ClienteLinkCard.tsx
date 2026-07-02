@@ -22,6 +22,10 @@ import type { ConversationWithContact } from "../hooks/useWhatsAppConversations"
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
 
 interface Props {
   conversation: ConversationWithContact;
