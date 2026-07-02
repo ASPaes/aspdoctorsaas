@@ -691,7 +691,7 @@ function GroupMonitorSection({
       let funcMap = new Map<string, string>();
       if (funcIds.length > 0) {
         const { data: funcs } = await supabase.from("funcionarios").select("id, nome").in("id", funcIds);
-        funcMap = new Map((funcs ?? []).map((f) => [f.id, f.nome]));
+        funcMap = new Map((funcs ?? []).map((f: any) => [String(f.id), f.nome as string]));
       }
       return active
         .map((u) => ({ user_id: u.user_id, nome: (u.funcionario_id && funcMap.get(u.funcionario_id)) || u.email }))
