@@ -302,6 +302,19 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
       const res = data as any;
       if (res?.success) {
         toast.success(`Atendimento ${res.attendance_code} iniciado`);
+        // Fire-and-forget: enviar notificação de abertura ao grupo
+        try {
+          supabase.functions.invoke('send-whatsapp-message', {
+            body: {
+              conversationId: conversation.id,
+              content: `\u2705 Atendimento *${res.attendance_code}* iniciado.`,
+              messageType: 'text',
+              systemMessage: true,
+            },
+          }).catch((e) => console.error('[ChatHeader][group] opening notify error:', e));
+        } catch (e) {
+          console.error('[ChatHeader][group] opening notify invoke error:', e);
+        }
         queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
         setGroupStartPopoverOpen(false);
         return;
