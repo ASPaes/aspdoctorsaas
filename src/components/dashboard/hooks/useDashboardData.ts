@@ -339,6 +339,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           descricao: m.descricao || '—',
         }))
         .sort((a, b) => b.valor - a.valor);
+      if (seq !== fetchSeqRef.current) return;
       setDownsellList(downsellListItems);
 
       // (Removido) churn por reversão — o MRR de churn agora usa o MRR Atual do cliente (base + movimentos ativos).
