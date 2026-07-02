@@ -88,10 +88,10 @@ function applyFullFilter(q: any, tid: string | null, filters?: ConversationsFilt
   q = applyBaseFilter(q, tid, filters);
   if (filters?.status) q = q.eq('status', filters.status);
   if (filters?.assignedTo) {
-    // Filtra apenas conversas atribuídas ao operador selecionado.
+    // Filtra conversas atribuídas ao operador OU grupos monitorados por ele.
     // A fila (assigned_to IS NULL) é visível pela pill "Fila" sem necessidade
     // de incluir aqui — o hook carrega a fila via query sem filtro de operador.
-    q = q.eq('assigned_to', filters.assignedTo);
+    q = q.or(`assigned_to.eq.${filters.assignedTo},monitor_user_id.eq.${filters.assignedTo}`);
   }
   if (filters?.unassigned) q = q.is('assigned_to', null);
   if (filters?.isGroup === true) q = q.eq('is_group', true).eq('group_enabled', true);
