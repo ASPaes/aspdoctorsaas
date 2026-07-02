@@ -523,15 +523,23 @@ export default function ClienteForm() {
         if (profile?.is_super_admin && !tid) {
           throw new Error("Selecione um tenant no seletor antes de criar um cliente.");
         }
-        // CRIAÇÃO: remove campos legacy/deprecated. Produto e contrato são adicionados depois via Sections.
-        const {
-          data_venda: _l1, data_reajuste: _l2, fornecedor_id: _l3, modelo_contrato_id: _l4,
-          recorrencia: _l5, produto_id: _l6, funcionario_id: _l7, origem_venda_id: _l8,
-          data_ativacao: _l9, codigo_fornecedor: _l10, link_portal_fornecedor: _l11,
-          valor_ativacao: _l12, forma_pagamento_ativacao_id: _l13, mensalidade: _l14,
-          forma_pagamento_mensalidade_id: _l15, custo_operacao: _l16,
-          ...insertPayload
-        } = payload;
+        // CRIAÇÃO: whitelist explícito. Campos legacy foram migrados para cliente_produtos.
+        const ALLOWED_INSERT_COLS = [
+          "data_cadastro","razao_social","nome_fantasia","cnpj","email",
+          "telefone_contato","telefone_whatsapp","telefone_whatsapp_contato",
+          "estado_id","cidade_id","area_atuacao_id","segmento_id",
+          "observacao_cliente","observacao_negociacao",
+          "imposto_percentual","custo_fixo_percentual",
+          "cert_a1_vencimento","cert_a1_ultima_venda_em","cert_a1_ultimo_vendedor_id",
+          "contato_nome","contato_cpf","contato_fone","contato_aniversario",
+          "unidade_base_id","matriz_id",
+          "cep","endereco","numero","complemento","bairro",
+          "dia_vencimento_mrr",
+        ] as const;
+        const insertPayload: Record<string, any> = {};
+        for (const k of ALLOWED_INSERT_COLS) {
+          if (k in payload) insertPayload[k] = payload[k];
+        }
         const { data, error } = await supabase.from("clientes").insert({ ...insertPayload, tenant_id: tid }).select("id").single();
         if (error) throw error;
         return (data as any)?.id as string;
