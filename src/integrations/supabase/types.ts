@@ -6298,6 +6298,7 @@ export type Database = {
           last_message_at: string | null
           last_message_preview: string | null
           metadata: Json | null
+          monitor_user_id: string | null
           opened_out_of_hours: boolean
           opened_out_of_hours_at: string | null
           out_of_hours_cleared_at: string | null
@@ -6331,6 +6332,7 @@ export type Database = {
           last_message_at?: string | null
           last_message_preview?: string | null
           metadata?: Json | null
+          monitor_user_id?: string | null
           opened_out_of_hours?: boolean
           opened_out_of_hours_at?: string | null
           out_of_hours_cleared_at?: string | null
@@ -6364,6 +6366,7 @@ export type Database = {
           last_message_at?: string | null
           last_message_preview?: string | null
           metadata?: Json | null
+          monitor_user_id?: string | null
           opened_out_of_hours?: boolean
           opened_out_of_hours_at?: string | null
           out_of_hours_cleared_at?: string | null
@@ -6431,6 +6434,7 @@ export type Database = {
           id: string
           instance_id: string
           last_synced_at: string | null
+          monitor_user_id: string | null
           participant_count: number | null
           participants: Json | null
           retention_days: number
@@ -6446,6 +6450,7 @@ export type Database = {
           id?: string
           instance_id: string
           last_synced_at?: string | null
+          monitor_user_id?: string | null
           participant_count?: number | null
           participants?: Json | null
           retention_days?: number
@@ -6461,6 +6466,7 @@ export type Database = {
           id?: string
           instance_id?: string
           last_synced_at?: string | null
+          monitor_user_id?: string | null
           participant_count?: number | null
           participants?: Json | null
           retention_days?: number
@@ -9234,6 +9240,10 @@ export type Database = {
       }
       set_group_cliente: {
         Args: { p_cliente_id: string; p_conversation_id: string }
+        Returns: Json
+      }
+      set_group_monitor: {
+        Args: { p_conversation_id: string; p_user_id: string }
         Returns: Json
       }
       set_unidade_default_filter: {
