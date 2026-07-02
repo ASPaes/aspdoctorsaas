@@ -364,9 +364,11 @@ export const useWhatsAppActions = () => {
 
       return conversationId;
     },
-    onMutate: async ({ conversationId }) => {
+    onMutate: async ({ conversationId, isGroup }) => {
       // Optimistic: mark closed immediately in sidebar + attendance cache
-      patchConversation(queryClient, conversationId, { status: 'closed' });
+      if (isGroup !== true) {
+        patchConversation(queryClient, conversationId, { status: 'closed' });
+      }
       queryClient.setQueriesData<Map<string, any>>(
         { queryKey: ["attendance-status"] },
         (oldMap) => {
@@ -379,11 +381,11 @@ export const useWhatsAppActions = () => {
         }
       );
     },
-    onSuccess: (conversationId) => {
-      toast.success('Conversa encerrada com sucesso');
+    onSuccess: (_conversationId, variables) => {
+      toast.success(variables.isGroup === true ? 'Atendimento do grupo encerrado' : 'Conversa encerrada com sucesso');
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
-      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', conversationId] });
-      queryClient.invalidateQueries({ queryKey: ['latest-closed-attendance', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', _conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['latest-closed-attendance', _conversationId] });
       queryClient.invalidateQueries({ queryKey: ['kb-draft'] });
     },
     onError: (err: any) => {
