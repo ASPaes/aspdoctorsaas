@@ -70,6 +70,7 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
   const [dateRange, setDateRange] = useState<AtendimentoDateRange>(defaultRange);
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
+  const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento>('all');
   const [segmentoIds, setSegmentoIds] = useState<number[]>([]);
   const [areaIds, setAreaIds] = useState<number[]>([]);
   const [estadoIds, setEstadoIds] = useState<number[]>([]);
