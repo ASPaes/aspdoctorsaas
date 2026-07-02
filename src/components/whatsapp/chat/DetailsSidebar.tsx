@@ -266,7 +266,18 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             isAdminOrHead={isAdminOrHead}
           />
 
-          {/* ─── 4. Notas desta conversa ─── */}
+          {/* ─── 4. Histórico do Contato ─── */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-7 text-xs gap-1.5"
+            onClick={() => setHistoryOpen(true)}
+          >
+            <History className="h-3.5 w-3.5" />
+            Histórico do Contato
+          </Button>
+
+          {/* ─── 5. Notas desta conversa ─── */}
           <CollapsibleSection
             icon={<StickyNote className="h-3.5 w-3.5" />}
             title="Notas desta conversa"
