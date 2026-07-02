@@ -140,7 +140,7 @@ export const useWhatsAppActions = () => {
   });
 
   const closeMutation = useMutation({
-    mutationFn: async ({ conversationId, generateSummary, skipCsat, skipClosureMessage }: { conversationId: string; generateSummary: boolean; skipCsat?: boolean; skipClosureMessage?: boolean }) => {
+    mutationFn: async ({ conversationId, generateSummary, skipCsat, skipClosureMessage, isGroup }: { conversationId: string; generateSummary: boolean; skipCsat?: boolean; skipClosureMessage?: boolean; isGroup?: boolean }) => {
       // Fetch active attendance early so we can scope the summary
       const { data: activeAtt } = await supabase
         .from('support_attendances')
@@ -179,11 +179,13 @@ export const useWhatsAppActions = () => {
 
       // Summary generation removed — finalize-attendance handles it
 
-      const { error } = await supabase
-        .from('whatsapp_conversations')
-        .update({ status: 'closed' })
-        .eq('id', conversationId);
-      if (error) throw error;
+      if (isGroup !== true) {
+        const { error } = await supabase
+          .from('whatsapp_conversations')
+          .update({ status: 'closed' })
+          .eq('id', conversationId);
+        if (error) throw error;
+      }
 
       // Close the active support_attendance (already fetched above)
       try {
@@ -200,9 +202,11 @@ export const useWhatsAppActions = () => {
             ? Math.round((now.getTime() - assumedAt.getTime()) / 1000)
             : 0;
 
+          const effSkipCsat = skipCsat || isGroup === true;
+
           const closureType = skipClosureMessage
             ? 'silent'
-            : skipCsat
+            : effSkipCsat
             ? 'closure_message_only'
             : 'csat_sent';
 
@@ -235,7 +239,7 @@ export const useWhatsAppActions = () => {
                   .maybeSingle();
 
                 const houveAtendimentoHumano = !!activeAtt.assumed_at || (activeAtt.msg_agent_count ?? 0) > 0;
-                if (config?.support_csat_enabled && !skipCsat && houveAtendimentoHumano) {
+                if (config?.support_csat_enabled && !effSkipCsat && houveAtendimentoHumano) {
                   csatEnabled = true;
 
                   // Get contact name for template
@@ -318,7 +322,7 @@ export const useWhatsAppActions = () => {
 
                 const internalText = skipClosureMessage
                   ? `🔇 Atendimento encerrado sem envio de mensagem ao cliente.`
-                  : skipCsat
+                  : effSkipCsat
                   ? `💬 Atendimento encerrado com mensagem de encerramento (sem CSAT).`
                   : `✅ Atendimento encerrado com pesquisa CSAT enviada ao cliente.`;
 
@@ -360,9 +364,11 @@ export const useWhatsAppActions = () => {
 
       return conversationId;
     },
-    onMutate: async ({ conversationId }) => {
+    onMutate: async ({ conversationId, isGroup }) => {
       // Optimistic: mark closed immediately in sidebar + attendance cache
-      patchConversation(queryClient, conversationId, { status: 'closed' });
+      if (isGroup !== true) {
+        patchConversation(queryClient, conversationId, { status: 'closed' });
+      }
       queryClient.setQueriesData<Map<string, any>>(
         { queryKey: ["attendance-status"] },
         (oldMap) => {
@@ -375,11 +381,11 @@ export const useWhatsAppActions = () => {
         }
       );
     },
-    onSuccess: (conversationId) => {
-      toast.success('Conversa encerrada com sucesso');
+    onSuccess: (_conversationId, variables) => {
+      toast.success(variables.isGroup === true ? 'Atendimento do grupo encerrado' : 'Conversa encerrada com sucesso');
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
-      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', conversationId] });
-      queryClient.invalidateQueries({ queryKey: ['latest-closed-attendance', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', _conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['latest-closed-attendance', _conversationId] });
       queryClient.invalidateQueries({ queryKey: ['kb-draft'] });
     },
     onError: (err: any) => {
