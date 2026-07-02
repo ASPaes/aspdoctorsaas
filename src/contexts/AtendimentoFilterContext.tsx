@@ -140,6 +140,7 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
       dateRange, setDateRange,
       departmentId, setDepartmentId,
       agentId, setAgentId,
+      tipoAtendimento, setTipoAtendimento,
       segmentoIds, setSegmentoIds,
       areaIds, setAreaIds,
       estadoIds, setEstadoIds,
@@ -149,7 +150,7 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
       setores, agentes, opcoes,
       isLoading: loadingSet || loadingAg || loadingOpc,
     }),
-    [dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, setores, agentes, opcoes, loadingSet, loadingAg, loadingOpc]
+    [dateRange, departmentId, agentId, tipoAtendimento, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, setores, agentes, opcoes, loadingSet, loadingAg, loadingOpc]
   );
 
   return (
