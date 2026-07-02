@@ -1077,25 +1077,27 @@ export default function Clientes() {
                   </PopoverContent>
                 </Popover>
               </div>
-              <div className="flex items-center gap-2 pt-5">
-                <Checkbox
-                  id="somente-matrizes"
-                  checked={somenteMatrizes}
-                  onCheckedChange={(v) => updateFilter("somenteMatrizes", !!v)}
-                />
-                <label htmlFor="somente-matrizes" className="text-sm cursor-pointer select-none whitespace-nowrap">
-                  Somente Matrizes
-                </label>
-              </div>
-              <div className="flex items-center gap-2 pt-5">
-                <Checkbox
-                  id="apenas-setup-incompleto"
-                  checked={apenasSetupIncompleto}
-                  onCheckedChange={(v) => updateFilter("apenasSetupIncompleto", !!v)}
-                />
-                <label htmlFor="apenas-setup-incompleto" className="text-sm cursor-pointer select-none whitespace-nowrap">
-                  Apenas setup incompleto
-                </label>
+              <div className="flex flex-col gap-2 pt-5">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="somente-matrizes"
+                    checked={somenteMatrizes}
+                    onCheckedChange={(v) => updateFilter("somenteMatrizes", !!v)}
+                  />
+                  <label htmlFor="somente-matrizes" className="text-sm cursor-pointer select-none whitespace-nowrap">
+                    Somente Matrizes
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="apenas-setup-incompleto"
+                    checked={apenasSetupIncompleto}
+                    onCheckedChange={(v) => updateFilter("apenasSetupIncompleto", !!v)}
+                  />
+                  <label htmlFor="apenas-setup-incompleto" className="text-sm cursor-pointer select-none whitespace-nowrap">
+                    Apenas setup incompleto
+                  </label>
+                </div>
               </div>
             </div>
           </div>
