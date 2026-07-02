@@ -19,14 +19,15 @@ import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoR
 import { MultiSelectFilter } from "@/components/atendimento/MultiSelectFilter";
 
 const ALL = "__all__";
-type FiltroConfig = { date: boolean; setor: boolean; agente: boolean; cliente?: boolean };
+type FiltroConfig = { date: boolean; setor: boolean; agente: boolean; cliente?: boolean; tipo?: boolean };
 const FILTROS_POR_ABA: Record<string, FiltroConfig> = {
-  velocidade: { date: true, setor: true, agente: true },
-  agentes:    { date: true, setor: true, agente: true },
-  satisfacao: { date: true, setor: true, agente: true },
-  volume:     { date: true, setor: true, agente: true },
+  "tempo-real": { date: false, setor: false, agente: false, tipo: true },
+  velocidade: { date: true, setor: true, agente: true, tipo: true },
+  agentes:    { date: true, setor: true, agente: true, tipo: true },
+  satisfacao: { date: true, setor: true, agente: true, tipo: true },
+  volume:     { date: true, setor: true, agente: true, tipo: true },
   ura:        { date: true, setor: true, agente: false },
-  chats:      { date: true, setor: true, agente: true, cliente: true },
+  chats:      { date: true, setor: true, agente: true, cliente: true, tipo: true },
   taxonomia:  { date: true, setor: true, agente: true, cliente: true },
   backlog:    { date: true, setor: true, agente: true, cliente: true },
   clientes:   { date: true, setor: false, agente: false, cliente: true },
