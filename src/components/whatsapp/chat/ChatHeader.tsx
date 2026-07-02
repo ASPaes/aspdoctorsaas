@@ -16,6 +16,7 @@ import { ScheduleAttendanceDialog } from "./ScheduleAttendanceDialog";
 import GroupParticipantsSheet from "./GroupParticipantsSheet";
 import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CreateCSTicketFromChat } from "./CreateCSTicketFromChat";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppActions } from "../hooks/useWhatsAppActions";
@@ -80,6 +81,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showParticipants, setShowParticipants] = useState(false);
   const [showGroupLinkModal, setShowGroupLinkModal] = useState(false);
   const [isStartingGroupAtt, setIsStartingGroupAtt] = useState(false);
+  const [groupStartPopoverOpen, setGroupStartPopoverOpen] = useState(false);
+  const [groupIncludePrevious, setGroupIncludePrevious] = useState<number>(2);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInChatSearch, setShowInChatSearch] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -285,7 +288,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     ? attendance
     : null;
 
-  const startGroupAttendance = useCallback(async () => {
+  const startGroupAttendance = useCallback(async (includePrevious: number = 0) => {
     if (!user?.id) return;
     setIsStartingGroupAtt(true);
     try {
@@ -293,16 +296,19 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         p_conversation_id: conversation.id,
         p_agent_id: user.id,
         p_created_from: "group_manual",
+        p_include_previous: Number.isFinite(includePrevious) ? Math.max(0, Math.min(50, Number(includePrevious))) : 0,
       });
       if (error) throw error;
       const res = data as any;
       if (res?.success) {
         toast.success(`Atendimento ${res.attendance_code} iniciado`);
         queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+        setGroupStartPopoverOpen(false);
         return;
       }
       if (res?.error === "no_client") {
         setShowGroupLinkModal(true);
+        setGroupStartPopoverOpen(false);
         return;
       }
       if (res?.error === "active_exists") {
@@ -318,9 +324,33 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   }, [conversation.id, user?.id, queryClient]);
 
   const handleGroupLinked = useCallback(async () => {
-    // Vinculou cliente ao grupo → tentar iniciar atendimento novamente
-    await startGroupAttendance();
-  }, [startGroupAttendance]);
+    // Vinculou cliente ao grupo → tentar iniciar atendimento novamente com o mesmo valor escolhido
+    queryClient.invalidateQueries({ queryKey: ["group-linked-cliente"] });
+    await startGroupAttendance(groupIncludePrevious);
+  }, [startGroupAttendance, groupIncludePrevious, queryClient]);
+
+  // Cliente vinculado ao grupo (via whatsapp_contacts.cliente_id)
+  const groupContactId = (conversation as any)?.contact_id ?? conversation.contact?.id ?? null;
+  const isGroupConvForQuery = (conversation as any)?.is_group === true;
+  const { data: groupLinkedCliente } = useQuery({
+    queryKey: ["group-linked-cliente", groupContactId, tid],
+    enabled: isGroupConvForQuery && !!groupContactId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data: contactRow } = await (supabase.from("whatsapp_contacts" as any) as any)
+        .select("cliente_id")
+        .eq("id", groupContactId)
+        .maybeSingle();
+      const cid = (contactRow as any)?.cliente_id ?? null;
+      if (!cid) return null;
+      let q = (supabase.from("clientes" as any) as any)
+        .select("id, nome_fantasia, razao_social")
+        .eq("id", cid);
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data: cli } = await q.maybeSingle();
+      return (cli as any) ?? null;
+    },
+  });
 
 
 
@@ -624,17 +654,75 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             )}
 
             {isGroupConv && !groupAttendance && (
-              <Button
-                size="sm"
-                variant="default"
-                className="h-8 gap-1.5"
-                onClick={startGroupAttendance}
-                disabled={isStartingGroupAtt}
-              >
-                <Play className="h-3.5 w-3.5" />
-                Iniciar atendimento
-              </Button>
+              <Popover open={groupStartPopoverOpen} onOpenChange={setGroupStartPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="h-8 gap-1.5"
+                    disabled={isStartingGroupAtt}
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                    Iniciar atendimento
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-64 p-3 space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="group-include-previous" className="text-xs">
+                      Incluir mensagens anteriores
+                    </Label>
+                    <Input
+                      id="group-include-previous"
+                      type="number"
+                      min={0}
+                      max={50}
+                      value={groupIncludePrevious}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        setGroupIncludePrevious(Number.isFinite(v) ? Math.max(0, Math.min(50, v)) : 0);
+                      }}
+                      className="h-8 px-2"
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      disabled={isStartingGroupAtt}
+                      onClick={() => startGroupAttendance(Number(groupIncludePrevious) || 0)}
+                    >
+                      Iniciar
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             )}
+
+            {isGroupConv && (() => {
+              const cliName = (groupLinkedCliente as any)?.nome_fantasia || (groupLinkedCliente as any)?.razao_social || null;
+              const hasActive = !!groupAttendance;
+              const clickable = !!cliName ? !hasActive : !hasActive;
+              const badgeInner = (
+                <Badge
+                  variant="outline"
+                  className={`gap-1 max-w-[180px] ${clickable ? "cursor-pointer hover:bg-accent" : "cursor-default"} ${cliName ? "" : "text-muted-foreground"}`}
+                  onClick={() => { if (clickable) setShowGroupLinkModal(true); }}
+                >
+                  <Building2 className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{cliName ?? "Sem cliente vinculado"}</span>
+                </Badge>
+              );
+              return (
+                <Tooltip>
+                  <TooltipTrigger asChild>{badgeInner}</TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    {hasActive
+                      ? "Encerre o atendimento para trocar o cliente"
+                      : (cliName ?? "Clique para vincular um cliente ao grupo")}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })()}
 
             {isGroupConv && groupAttendance && (
               <div className="flex items-center gap-1.5">
