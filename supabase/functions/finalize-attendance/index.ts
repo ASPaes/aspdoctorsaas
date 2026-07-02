@@ -86,12 +86,17 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
+    let kbAlreadyExists = false;
     if (existingKb) {
-      console.log(`[${FUNCTION_NAME}][${requestId}] KB já existe, skip`);
-      return new Response(
-        JSON.stringify({ success: true, skipped: true, reason: "kb_already_exists" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (att.sentiment_at) {
+        console.log(`[${FUNCTION_NAME}][${requestId}] KB já existe e sentimento já gravado, skip`);
+        return new Response(
+          JSON.stringify({ success: true, skipped: true, reason: "kb_already_exists" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      console.log(`[${FUNCTION_NAME}][${requestId}] KB já existe mas sentiment_at nulo — prosseguindo para gravar sentimento (pulará insert do KB)`);
+      kbAlreadyExists = true;
     }
 
     // 2.5 Regra determinística: cliente ficou sem resposta de humano
