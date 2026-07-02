@@ -7390,6 +7390,7 @@ export type Database = {
           conversation_status: string | null
           department_id: string | null
           first_agent_message_at: string | null
+          is_group: boolean | null
           last_message_at: string | null
           last_message_preview: string | null
           opened_out_of_hours: boolean | null
@@ -8054,6 +8055,7 @@ export type Database = {
           p_date_from: string
           p_date_to: string
           p_department_id?: string
+          p_is_group?: boolean
           p_tenant_id: string
           p_unidade_base_id?: number
         }
@@ -8088,6 +8090,7 @@ export type Database = {
           p_estado_ids?: number[]
           p_fornecedor_ids?: number[]
           p_has_ticket?: boolean
+          p_is_group?: boolean
           p_produto_ids?: number[]
           p_segmento_ids?: number[]
           p_tenant_id: string
@@ -8097,6 +8100,7 @@ export type Database = {
       }
       get_atendimento_chats_timeline: {
         Args: {
+          p_is_group?: boolean
           p_meses?: number
           p_tenant_id: string
           p_unidade_base_id?: number
@@ -8132,6 +8136,7 @@ export type Database = {
           p_date_from: string
           p_date_to: string
           p_department_id?: string
+          p_is_group?: boolean
           p_tenant_id: string
         }
         Returns: Json
@@ -8139,6 +8144,7 @@ export type Database = {
       get_atendimento_realtime: {
         Args: {
           p_department_id?: string
+          p_is_group?: boolean
           p_sla_threshold_min?: number
           p_tenant_id: string
           p_unidade_base_id?: number
@@ -8149,6 +8155,7 @@ export type Database = {
         Args: {
           p_bucket: string
           p_department_id?: string
+          p_is_group?: boolean
           p_sla_threshold_min?: number
           p_tenant_id: string
           p_unidade_base_id?: number
@@ -8161,6 +8168,7 @@ export type Database = {
           p_date_from: string
           p_date_to: string
           p_department_id?: string
+          p_is_group?: boolean
           p_tenant_id: string
           p_unidade_base_id?: number
         }
@@ -8199,6 +8207,7 @@ export type Database = {
           p_date_from: string
           p_date_to: string
           p_department_id?: string
+          p_is_group?: boolean
           p_sla_frt_seconds?: number
           p_tenant_id: string
           p_unidade_base_id?: number
@@ -8212,6 +8221,7 @@ export type Database = {
           p_date_from: string
           p_date_to: string
           p_department_id?: string
+          p_is_group?: boolean
           p_sla_frt_seconds?: number
           p_tenant_id: string
           p_unidade_base_id?: number
@@ -8224,6 +8234,7 @@ export type Database = {
           p_date_from: string
           p_date_to: string
           p_department_id?: string
+          p_is_group?: boolean
           p_tenant_id: string
           p_unidade_base_id?: number
         }
