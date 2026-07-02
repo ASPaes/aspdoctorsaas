@@ -322,7 +322,7 @@ export const useWhatsAppActions = () => {
 
                 const internalText = skipClosureMessage
                   ? `🔇 Atendimento encerrado sem envio de mensagem ao cliente.`
-                  : skipCsat
+                  : effSkipCsat
                   ? `💬 Atendimento encerrado com mensagem de encerramento (sem CSAT).`
                   : `✅ Atendimento encerrado com pesquisa CSAT enviada ao cliente.`;
 
