@@ -363,7 +363,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
     // Fluxo normal: não exige ticket
     if (!csatEnabled) {
-      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true, isGroup: isGroupConv });
     } else {
       setShowCloseModal(true);
     }
@@ -372,7 +372,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const handleClassifyCompleted = useCallback(() => {
     setShowClassifyModal(false);
     if (!csatEnabled) {
-      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true, isGroup: isGroupConv });
     } else {
       setShowCloseModal(true);
     }
@@ -411,7 +411,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const handleAdditionalTicketCreated = useCallback(() => {
     setShowCreateAdditional(false);
     if (!csatEnabled) {
-      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true, isGroup: isGroupConv });
     } else {
       setShowCloseModal(true);
     }
@@ -421,7 +421,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
   const proceedCloseAfterAttach = useCallback(() => {
     if (!csatEnabled) {
-      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true, isGroup: isGroupConv });
     } else {
       setShowCloseModal(true);
     }
@@ -1238,7 +1238,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               variant="default"
               onClick={() => {
                 setShowCloseModal(false);
-                closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: false });
+                closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: false, isGroup: isGroupConv });
               }}
             >
               ✅ Encerrar e enviar CSAT
@@ -1247,7 +1247,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               variant="secondary"
               onClick={() => {
                 setShowCloseModal(false);
-                closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+                closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true, isGroup: isGroupConv });
               }}
             >
               💬 Encerrar com mensagem de encerramento
@@ -1256,7 +1256,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               variant="outline"
               onClick={() => {
                 setShowCloseModal(false);
-                closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true, skipClosureMessage: true });
+                closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true, skipClosureMessage: true, isGroup: isGroupConv });
               }}
             >
               🔇 Encerrar sem enviar mensagem ao cliente
@@ -1278,7 +1278,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         onConfirmPause={({ close }) => {
           pauseAutoReply({ conversationId: conversation.id });
           if (close) {
-            closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true, skipClosureMessage: true });
+            closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true, skipClosureMessage: true, isGroup: isGroupConv });
           }
         }}
       />
