@@ -9267,6 +9267,7 @@ export type Database = {
           p_agent_id: string
           p_conversation_id: string
           p_created_from?: string
+          p_include_previous?: number
         }
         Returns: Json
       }
