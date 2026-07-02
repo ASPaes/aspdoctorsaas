@@ -635,7 +635,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                   {effIsLinked ? `Vinculado ao cliente: ${effLinkedName}` : "Contato sem cliente vinculado"}
                 </TooltipContent>
               </Tooltip>
-              {contact?.phone_number && (
+              {!isGroupConv && contact?.phone_number && (
                 <span className="text-[11px] text-muted-foreground truncate hidden sm:inline ml-1">
                   {formatBRPhone(contact.phone_number)}
                 </span>

@@ -38,6 +38,7 @@ interface Props {
 
 export function DetailsSidebar({ conversation, onClose, onNavigateToConversation }: Props) {
   const contact = conversation.contact;
+  const isGroup = (conversation as any)?.is_group === true;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
   const { notes, createNote, deleteNote, isCreating } = useConversationNotes(conversation.id);
   const { summary: conversationSummary, generateSummary, isGenerating } = useConversationSummaries(conversation.id);
@@ -297,7 +298,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
           )}
 
           {/* ─── Avisos e bloqueios do contato ─── */}
-          {isAdminOrHead && contact?.id && (
+          {!isGroup && isAdminOrHead && contact?.id && (
             <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
               <div className="flex items-center gap-1.5">
                 <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
