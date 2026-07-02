@@ -289,6 +289,16 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             isAdminOrHead={isAdminOrHead}
           />
 
+          {/* ─── Monitor do grupo ─── */}
+          {isGroup && (
+            <GroupMonitorSection
+              conversationId={conversation.id}
+              tenantId={(conversation as any).tenant_id}
+              monitorUserId={(conversation as any).monitor_user_id ?? null}
+              isAdminOrHead={!!isAdminOrHead}
+            />
+          )}
+
           {/* ─── Últimos atendimentos (grupos) ─── */}
           {isGroup && (
             <GroupAttendancesSection
