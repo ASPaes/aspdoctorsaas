@@ -264,20 +264,10 @@ REGRAS:
     } catch (aiError: any) {
       const msg = aiError?.message || "";
       if (msg.includes("429") || msg.includes("insufficient_quota") || msg.includes("rate") || msg.includes("quota")) {
-        console.warn(`[${FUNCTION_NAME}][${requestId}] IA indisponível (quota/rate limit), criando KB básico`);
-        await supabase.from("support_kb_articles").insert({
-          tenant_id: att.tenant_id,
-          source_attendance_id: attendanceId,
-          title: "Atendimento (IA indisponível - sem créditos)",
-          problem: "",
-          solution: "",
-          tags: [],
-          area_id: att.area_id || null,
-          status: "draft",
-        });
+        console.warn(`[${FUNCTION_NAME}][${requestId}] IA indisponível (quota/rate limit) — retornando 503 para re-tentativa da fila`);
         return new Response(
-          JSON.stringify({ success: true, ai: false, reason: "ai_quota_exceeded" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ success: false, reason: "ai_quota_exceeded" }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       throw aiError;
