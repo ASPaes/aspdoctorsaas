@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      _backup_cp_ativo_fix_20260701: {
+        Row: {
+          ativo_orig: boolean | null
+          backup_em: string | null
+          data_cancel_orig: string | null
+          id: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          ativo_orig?: boolean | null
+          backup_em?: string | null
+          data_cancel_orig?: string | null
+          id?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          ativo_orig?: boolean | null
+          backup_em?: string | null
+          data_cancel_orig?: string | null
+          id?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
       access_invites: {
         Row: {
           accepted_at: string | null
@@ -7439,6 +7463,7 @@ export type Database = {
           origem_venda_id: number | null
           produto_id: number | null
           qtde_contratos_ativos: number | null
+          qtde_produtos_ativos: number | null
           razao_social: string | null
           reativado_por_user_id: string | null
           recorrencia: Database["public"]["Enums"]["recorrencia_tipo"] | null

@@ -340,7 +340,7 @@ export default function Clientes() {
     };
     applyDateRange("data_cadastro", periodoCadastro);
     applyDateRange("data_cancelamento", periodoCancelamento);
-    applyDateRange("data_venda", periodoVenda);
+    applyDateRange("data_venda_efetiva", periodoVenda);
     applyDateRange("data_ativacao", periodoAtivacao);
 
     if (valueFilters.mensalidadeMin !== null) q = q.gte("mensalidade", valueFilters.mensalidadeMin);
@@ -356,7 +356,7 @@ export default function Clientes() {
 
   const fetchClientesFilteredRows = useCallback(async (options?: { forNovosNoMes?: boolean }) => {
     const selectFields = [
-      "id", "codigo_sequencial", "razao_social", "nome_fantasia", "cnpj", "produto_id",
+      "id", "codigo_sequencial", "razao_social", "nome_fantasia", "cnpj", "produto_id", "qtde_produtos_ativos",
       "mensalidade", "data_ativacao", "data_cadastro", "cancelado", "data_venda", "data_venda_efetiva", "unidade_base_id",
       "custo_operacao", "imposto_percentual", "custo_fixo_percentual", "telefone_whatsapp", "telefone_contato", "setup_completo",
     ].join(",");
@@ -482,7 +482,7 @@ export default function Clientes() {
         };
       }
 
-      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, data_cadastro, cancelado, lucro_real, margem_bruta_percent, data_venda, qtde_contratos_ativos, unidade_base_id, telefone_whatsapp, telefone_contato, setup_completo";
+      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, data_cadastro, cancelado, lucro_real, margem_bruta_percent, data_venda, qtde_contratos_ativos, qtde_produtos_ativos, unidade_base_id, telefone_whatsapp, telefone_contato, setup_completo";
       let q = tf((supabase as any).from("vw_clientes_financeiro").select(selectFields, { count: "exact" })) as any;
 
       if (status === "ativos") q = q.eq("cancelado", false);
@@ -1151,7 +1151,18 @@ export default function Clientes() {
                     {c.nome_fantasia && <div className="text-xs text-muted-foreground">{c.nome_fantasia}</div>}
                   </TableCell>
                   <TableCell className="font-mono text-xs">{c.cnpj ? (c.cnpj.replace(/\D/g, "").length === 11 ? maskCPF(c.cnpj) : maskCNPJ(c.cnpj)) : "—"}</TableCell>
-                  <TableCell>{c.produto_id ? produtoMap.get(c.produto_id) || "—" : "—"}</TableCell>
+                  <TableCell>
+                    {c.produto_id ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>{produtoMap.get(c.produto_id) || "—"}</span>
+                        {Number((c as any).qtde_produtos_ativos ?? 0) > 1 && (
+                          <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-medium">
+                            +{Number((c as any).qtde_produtos_ativos) - 1}
+                          </Badge>
+                        )}
+                      </span>
+                    ) : "—"}
+                  </TableCell>
                   <TableCell>{getMrrAtual(c) > 0 ? `R$ ${getMrrAtual(c).toFixed(2)}` : "—"}</TableCell>
                   <TableCell className="text-xs">{c.data_cadastro ? format(parseISO(c.data_cadastro), "dd/MM/yyyy") : "—"}</TableCell>
                   <TableCell className="text-xs">{(c as any).qtde_contratos_ativos != null ? (c as any).qtde_contratos_ativos : "—"}</TableCell>
