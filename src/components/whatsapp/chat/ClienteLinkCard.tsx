@@ -317,7 +317,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
     );
   }
 
-  if (isAmbiguous && !canEdit) {
+  if (!isGroup && isAmbiguous && !canEdit) {
     return (
       <div className="bg-muted/50 border border-border rounded-md p-3">
         <div className="flex items-center gap-2">
