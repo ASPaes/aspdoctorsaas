@@ -19,7 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUnidadeFilter } from '@/contexts/UnidadeFilterContext';
 
 export default function Dashboard() {
-  const { selectedUnidadeId } = useUnidadeFilter();
+  const { selectedUnidadeId, unidadeFilterReady } = useUnidadeFilter();
   const { filters, setFilters } = useDashboardFilters(selectedUnidadeId);
   const { profile } = useAuth();
   const navigate = useNavigate();
