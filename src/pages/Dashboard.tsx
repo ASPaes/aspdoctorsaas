@@ -19,7 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUnidadeFilter } from '@/contexts/UnidadeFilterContext';
 
 export default function Dashboard() {
-  const { selectedUnidadeId } = useUnidadeFilter();
+  const { selectedUnidadeId, unidadeFilterReady } = useUnidadeFilter();
   const { filters, setFilters } = useDashboardFilters(selectedUnidadeId);
   const { profile } = useAuth();
   const navigate = useNavigate();
@@ -33,7 +33,7 @@ export default function Dashboard() {
   const [tvMode, setTvMode] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(0);
 
-  const { loading, metrics, timeSeries, distributions, canceladosList, novosClientesList, downsellList, refetch } = useDashboardData(filters);
+  const { loading, metrics, timeSeries, distributions, canceladosList, novosClientesList, downsellList, refetch } = useDashboardData(filters, unidadeFilterReady);
   const { data: mcData } = useMargemContribuicaoDashboard(filters);
   const { fornecedores, unidadesBase } = useLookups();
 

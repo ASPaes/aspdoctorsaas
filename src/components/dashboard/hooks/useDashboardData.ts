@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, subMonths, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -19,7 +19,7 @@ const defaultMetrics: KPIMetrics = {
   funcionariosRanking: [], quickRatio: 0, revenuePerFuncionario: 0,
 };
 
-export function useDashboardData(filters: DashboardFilters) {
+export function useDashboardData(filters: DashboardFilters, ready: boolean = true) {
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState<KPIMetrics>(defaultMetrics);
   const [canceladosList, setCanceladosList] = useState<CanceladoListItem[]>([]);
@@ -37,7 +37,11 @@ export function useDashboardData(filters: DashboardFilters) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
 
+  const fetchSeqRef = useRef(0);
+
   const fetchData = useCallback(async () => {
+    if (!ready) return;
+    const seq = ++fetchSeqRef.current;
     setLoading(true);
     try {
       const periodoInicio = filters.showAllData ? new Date('2000-01-01') : (filters.periodoInicio || startOfMonth(new Date()));
@@ -335,6 +339,7 @@ export function useDashboardData(filters: DashboardFilters) {
           descricao: m.descricao || '—',
         }))
         .sort((a, b) => b.valor - a.valor);
+      if (seq !== fetchSeqRef.current) return;
       setDownsellList(downsellListItems);
 
       // (Removido) churn por reversão — o MRR de churn agora usa o MRR Atual do cliente (base + movimentos ativos).
@@ -470,6 +475,7 @@ export function useDashboardData(filters: DashboardFilters) {
         else if (m.tipo === 'cross_sell') prevCrossSellMrr += Number(m.valor_delta) || 0;
       });
 
+      if (seq !== fetchSeqRef.current) return;
       setMetrics({
         faturamentoTotal: mrrTotalAtual, faturamentoPorUnidade, clientesAtivos: clientesCount,
         mrr: mrrTotalAtual, ticketMedio: ticketMedioAjustado, arr: mrrTotalAtual * 12,
@@ -591,6 +597,7 @@ export function useDashboardData(filters: DashboardFilters) {
         ltvCacEvolution.push({ month: m.month, monthFull: m.monthFull, value: Math.round(ltvCacMes * 100) / 100 });
       });
 
+      if (seq !== fetchSeqRef.current) return;
       setTimeSeries({ mrrEvolution, faturamentoEvolution, churnQtdEvolution, churnMrrEvolution, ltvMesesEvolution, ltvCacEvolution });
 
       // === DISTRIBUTIONS ===
@@ -768,6 +775,7 @@ export function useDashboardData(filters: DashboardFilters) {
       const areaAtuacaoByEstado = buildByEstado('area_atuacao_id', areaMap);
       const fornecedorByEstado = buildByEstado('fornecedor_id', fornecedorMap);
 
+      if (seq !== fetchSeqRef.current) return;
       setDistributions({
         porCidade, porEstado: porEstadoSigla, porFornecedor, porMotivoCancelamento,
         porOrigemVenda, porSegmento, porAreaAtuacao, topCidadesByEstado,
@@ -801,6 +809,7 @@ export function useDashboardData(filters: DashboardFilters) {
           };
         })
         .sort((a, b) => new Date(b.dataCancelamento).getTime() - new Date(a.dataCancelamento).getTime());
+      if (seq !== fetchSeqRef.current) return;
       setCanceladosList(canceladosListItems);
 
       // Novos clientes list
@@ -816,13 +825,14 @@ export function useDashboardData(filters: DashboardFilters) {
           mensalidade: Number(c.mensalidade) || 0,
         }))
         .sort((a, b) => new Date(b.dataVenda).getTime() - new Date(a.dataVenda).getTime());
+      if (seq !== fetchSeqRef.current) return;
       setNovosClientesList(novosListItems);
     } catch (err) {
       console.error('Dashboard data error:', err);
     } finally {
-      setLoading(false);
+      if (seq === fetchSeqRef.current) setLoading(false);
     }
-  }, [filters, tid]);
+  }, [filters, tid, ready]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
