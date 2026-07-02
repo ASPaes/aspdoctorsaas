@@ -66,7 +66,7 @@ serve(async (req) => {
     // 1. Fetch attendance
     const { data: att, error: attErr } = await supabase
       .from("support_attendances")
-      .select("id, tenant_id, conversation_id, opened_at, closed_at, area_id, ai_summary, first_human_response_at, msg_customer_count, closure_type")
+      .select("id, tenant_id, conversation_id, opened_at, closed_at, area_id, ai_summary, first_human_response_at, msg_customer_count, closure_type, is_group")
       .eq("id", attendanceId)
       .single();
 
@@ -146,7 +146,7 @@ serve(async (req) => {
 
     let msgQuery = supabase
       .from("whatsapp_messages")
-      .select("content, timestamp, is_from_me, audio_transcription, message_type")
+      .select("content, timestamp, is_from_me, audio_transcription, message_type, sender_name")
       .eq("conversation_id", att.conversation_id)
       .order("timestamp", { ascending: false })
       .limit(40);
@@ -178,7 +178,10 @@ serve(async (req) => {
     const messagesText = messages
       .reverse()
       .map((m: any) => {
-        const role = m.is_from_me ? "Técnico" : "Cliente";
+        const base = m.is_from_me ? "Técnico" : "Cliente";
+        const role = att.is_group === true && m.sender_name
+          ? `${base} - ${m.sender_name}`
+          : base;
         const text =
           m.message_type === "audio" && m.audio_transcription
             ? `[Áudio]: "${m.audio_transcription}"`
