@@ -162,17 +162,31 @@ serve(async (req) => {
     const { data: messages } = await msgQuery;
 
     if (!messages || messages.length < 2) {
-      console.log(`[${FUNCTION_NAME}][${requestId}] Poucas mensagens (${messages?.length || 0}), criando KB básico`);
-      await supabase.from("support_kb_articles").insert({
-        tenant_id: att.tenant_id,
-        source_attendance_id: attendanceId,
-        title: "Atendimento com poucas mensagens",
-        problem: "",
-        solution: "",
-        tags: [],
-        area_id: att.area_id || null,
-        status: "draft",
-      });
+      console.log(`[${FUNCTION_NAME}][${requestId}] Poucas mensagens (${messages?.length || 0}), gravando veredito determinístico neutral/parcial`);
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from("support_attendances")
+        .update({
+          sentiment_score: 0,
+          sentiment_final: "neutral",
+          resolucao: "parcial",
+          sentiment_at: nowIso,
+          sentiment_model: "deterministic",
+          updated_at: nowIso,
+        })
+        .eq("id", attendanceId);
+      if (!kbAlreadyExists) {
+        await supabase.from("support_kb_articles").insert({
+          tenant_id: att.tenant_id,
+          source_attendance_id: attendanceId,
+          title: "Atendimento com poucas mensagens",
+          problem: "",
+          solution: "",
+          tags: [],
+          area_id: att.area_id || null,
+          status: "draft",
+        });
+      }
       return new Response(
         JSON.stringify({ success: true, ai: false, reason: "too_few_messages" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
