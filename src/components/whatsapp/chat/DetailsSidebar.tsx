@@ -74,8 +74,8 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const rulesDisabledEffective = rulesDisabledLocal ?? rulesDisabledFromProp;
 
   // Collapsible section states
-  const [topicsOpen, setTopicsOpen] = useState(true);
-  const [sentimentOpen, setSentimentOpen] = useState(true);
+  const [topicsOpen, setTopicsOpen] = useState(false);
+  const [sentimentOpen, setSentimentOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(true);
   const [summariesOpen, setSummariesOpen] = useState(false);
   const [kbOpen, setKbOpen] = useState(true);
@@ -185,7 +185,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
 
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
         <div className="p-4 space-y-4 min-w-0">
-          {/* ─── Contact Info ─── */}
+          {/* ─── 1. Contact Info ─── */}
           <div className="flex items-start gap-3 min-w-0">
             <Avatar className="h-12 w-12 shrink-0">
               {contact?.profile_picture_url && <AvatarImage src={contact.profile_picture_url} />}
@@ -217,28 +217,15 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             )}
           </div>
 
-  {/* History button — todos os perfis */}
-  <Button
-    variant="outline"
-    size="sm"
-    className="w-full h-7 text-xs gap-1.5"
-    onClick={() => setHistoryOpen(true)}
-  >
-    <History className="h-3.5 w-3.5" />
-    Histórico do Contato
-  </Button>
+          {/* ─── 2. Cliente Link ─── */}
+          <ClienteLinkCard
+            conversation={conversation}
+            attendanceId={relevantAttendanceId}
+            isAttendanceClosed={isRelevantClosed}
+            isAdminOrHead={isAdminOrHead}
+          />
 
-          {/* ─── Histórico de Tickets do cliente ─── */}
-          <CollapsibleSection
-            icon={<Ticket className="h-3.5 w-3.5" />}
-            title="Histórico de Tickets"
-            open={ticketsOpen}
-            onOpenChange={setTicketsOpen}
-          >
-            <ContactTicketsSection clienteId={(metadata?.cliente_id as string) || null} />
-          </CollapsibleSection>
-
-          {/* ─── Anotações fixas do contato (persistem entre atendimentos) ─── */}
+          {/* ─── 3. Anotações fixas do contato (persistem entre atendimentos) ─── */}
           <CollapsibleSection
             icon={<Pin className="h-3.5 w-3.5" />}
             title="Anotações fixas do contato"
@@ -279,27 +266,44 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             </div>
           </CollapsibleSection>
 
+          {/* ─── 4. Notas desta conversa ─── */}
+          <CollapsibleSection
+            icon={<StickyNote className="h-3.5 w-3.5" />}
+            title="Notas desta conversa"
+            badge={notes.length > 0 ? notes.length : undefined}
+            open={notesOpen}
+            onOpenChange={setNotesOpen}
+          >
+            <div className="space-y-2 min-w-0">
+              {notes.map((note) => (
+                <div key={note.id} className="bg-muted rounded-md p-2 text-xs relative group min-w-0">
+                  <p className="whitespace-normal break-words" style={{ overflowWrap: 'anywhere' }}>{note.content}</p>
+                  <button
+                    className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-destructive transition-opacity"
+                    onClick={() => deleteNote(note.id)}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              <div className="flex gap-1">
+                <Textarea
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  placeholder="Adicionar nota..."
+                  className="text-xs min-h-[32px]"
+                  rows={1}
+                />
+                <Button size="icon" className="h-8 w-8 shrink-0" onClick={handleAddNote} disabled={isCreating || !newNote.trim()}>
+                  {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                </Button>
+              </div>
+            </div>
+          </CollapsibleSection>
 
+          <Separator />
 
-          {/* ─── Cliente Link ─── */}
-          <ClienteLinkCard
-            conversation={conversation}
-            attendanceId={relevantAttendanceId}
-            isAttendanceClosed={isRelevantClosed}
-            isAdminOrHead={isAdminOrHead}
-          />
-
-          {/* ─── Monitor do grupo ─── */}
-          {isGroup && (
-            <GroupMonitorSection
-              conversationId={conversation.id}
-              tenantId={(conversation as any).tenant_id}
-              monitorUserId={(conversation as any).monitor_user_id ?? null}
-              isAdminOrHead={!!isAdminOrHead}
-            />
-          )}
-
-          {/* ─── Últimos atendimentos (grupos) ─── */}
+          {/* ─── 5. Últimos atendimentos (grupos) ─── */}
           {isGroup && (
             <GroupAttendancesSection
               contactId={contact?.id ?? null}
@@ -309,76 +313,30 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             />
           )}
 
-
-          {/* ─── Tags ─── */}
-          {contact?.tags && contact.tags.length > 0 && (
-            <div className="min-w-0">
-              <div className="flex items-center gap-1 mb-1.5">
-                <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <span className="text-xs font-medium text-muted-foreground">Tags</span>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {contact.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="text-[10px] max-w-full truncate">{tag}</Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ─── Avisos e bloqueios do contato ─── */}
-          {!isGroup && isAdminOrHead && contact?.id && (
-            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
-              <div className="flex items-center gap-1.5">
-                <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <span className="text-xs font-medium">Avisos e bloqueios</span>
-              </div>
-              <ClientAlertsManager contactId={contact.id} canManage={isAdminOrHead} />
-            </div>
-          )}
-
-          <Separator />
-
-          {/* ─── Tópicos IA ─── */}
+          {/* ─── 6. Histórico de Tickets ─── */}
           <CollapsibleSection
-            icon={<Sparkles className="h-3.5 w-3.5" />}
-            title="Tópicos IA"
-            open={topicsOpen}
-            onOpenChange={setTopicsOpen}
-            action={
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-6 text-[10px] gap-1"
-                onClick={(e) => { e.stopPropagation(); categorizeMutation.mutate(conversation.id); }}
-                disabled={categorizeMutation.isPending}
-              >
-                {categorizeMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                {topicsData?.topics?.length ? "Recategorizar" : "Categorizar"}
-              </Button>
-            }
+            icon={<Ticket className="h-3.5 w-3.5" />}
+            title="Histórico de Tickets"
+            open={ticketsOpen}
+            onOpenChange={setTicketsOpen}
           >
-            {topicsData?.topics && topicsData.topics.length > 0 ? (
-              <div className="space-y-2 min-w-0">
-                <TopicBadges topics={topicsData.topics} size="default" showIcon={false} maxTopics={10} />
-                {topicsData.primary_topic && (
-                  <p className="text-[10px] text-muted-foreground whitespace-normal break-words">
-                    Principal: <span className="font-medium">{topicsData.primary_topic.replace(/_/g, ' ')}</span>
-                  </p>
-                )}
-                {topicsData.ai_confidence != null && (
-                  <p className="text-[10px] text-muted-foreground">
-                    Confiança: {Math.round(topicsData.ai_confidence * 100)}%
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">Nenhum tópico identificado.</p>
-            )}
+            <ContactTicketsSection clienteId={(metadata?.cliente_id as string) || null} />
           </CollapsibleSection>
 
+          {/* ─── 7. Histórico do Contato ─── */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-7 text-xs gap-1.5"
+            onClick={() => setHistoryOpen(true)}
+          >
+            <History className="h-3.5 w-3.5" />
+            Histórico do Contato
+          </Button>
+
           <Separator />
 
-          {/* ─── Sentimento IA ─── */}
+          {/* ─── 8. Sentimento IA ─── */}
           <CollapsibleSection
             icon={<MessageSquare className="h-3.5 w-3.5" />}
             title="Sentimento IA"
@@ -463,78 +421,45 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             )}
           </CollapsibleSection>
 
-          {/* ─── Regras do sistema ─── */}
-          {!isGroup && (
-            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <ShieldOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span className="text-xs font-medium">Tirar regras do chat</span>
-                </div>
-                <Switch
-                  checked={rulesDisabledEffective}
-                  disabled={isTogglingRulesDisabled || !contact?.id}
-                  onCheckedChange={(v) => {
-                    if (!contact?.id) return;
-                    setRulesDisabledLocal(v);
-                    toggleRulesDisabled({ contactId: contact.id, rulesDisabled: v });
-                  }}
-                />
-              </div>
-              <p className="text-[10px] text-muted-foreground leading-relaxed">
-                Desativa todas as automações do DoctorSaaS para este número:
-                encerramento automático, avisos/lembretes, URA, auto-resposta fora do
-                horário, atribuição automática e categorização IA.
-                {" "}A configuração vale para todas as conversas deste número, em qualquer instância.
-              </p>
-              {rulesDisabledEffective && (contact as any)?.rules_disabled_at && (
-                <p className="text-[10px] text-amber-600 dark:text-amber-400">
-                  Ativado em {new Date((contact as any).rules_disabled_at).toLocaleString('pt-BR')}
-                </p>
-              )}
-            </div>
-          )}
-
-          <Separator />
-
-          {/* ─── Notes ─── */}
+          {/* ─── 9. Tópicos IA ─── */}
           <CollapsibleSection
-            icon={<StickyNote className="h-3.5 w-3.5" />}
-            title="Notas desta conversa"
-            badge={notes.length > 0 ? notes.length : undefined}
-            open={notesOpen}
-            onOpenChange={setNotesOpen}
+            icon={<Sparkles className="h-3.5 w-3.5" />}
+            title="Tópicos IA"
+            open={topicsOpen}
+            onOpenChange={setTopicsOpen}
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 text-[10px] gap-1"
+                onClick={(e) => { e.stopPropagation(); categorizeMutation.mutate(conversation.id); }}
+                disabled={categorizeMutation.isPending}
+              >
+                {categorizeMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                {topicsData?.topics?.length ? "Recategorizar" : "Categorizar"}
+              </Button>
+            }
           >
-            <div className="space-y-2 min-w-0">
-              {notes.map((note) => (
-                <div key={note.id} className="bg-muted rounded-md p-2 text-xs relative group min-w-0">
-                  <p className="whitespace-normal break-words" style={{ overflowWrap: 'anywhere' }}>{note.content}</p>
-                  <button
-                    className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-destructive transition-opacity"
-                    onClick={() => deleteNote(note.id)}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-              <div className="flex gap-1">
-                <Textarea
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  placeholder="Adicionar nota..."
-                  className="text-xs min-h-[32px]"
-                  rows={1}
-                />
-                <Button size="icon" className="h-8 w-8 shrink-0" onClick={handleAddNote} disabled={isCreating || !newNote.trim()}>
-                  {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-                </Button>
+            {topicsData?.topics && topicsData.topics.length > 0 ? (
+              <div className="space-y-2 min-w-0">
+                <TopicBadges topics={topicsData.topics} size="default" showIcon={false} maxTopics={10} />
+                {topicsData.primary_topic && (
+                  <p className="text-[10px] text-muted-foreground whitespace-normal break-words">
+                    Principal: <span className="font-medium">{topicsData.primary_topic.replace(/_/g, ' ')}</span>
+                  </p>
+                )}
+                {topicsData.ai_confidence != null && (
+                  <p className="text-[10px] text-muted-foreground">
+                    Confiança: {Math.round(topicsData.ai_confidence * 100)}%
+                  </p>
+                )}
               </div>
-            </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">Nenhum tópico identificado.</p>
+            )}
           </CollapsibleSection>
 
-          <Separator />
-
-          {/* ─── Summaries ─── */}
+          {/* ─── 10. Resumos ─── */}
           <CollapsibleSection
             icon={<FileText className="h-3.5 w-3.5" />}
             title="Resumos"
@@ -577,10 +502,9 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             </div>
           </CollapsibleSection>
 
-          {/* ─── Base de Conhecimento (KB) ─── */}
+          {/* ─── 11. Base de Conhecimento (KB) ─── */}
           {closedAttendanceId && (
             <>
-              <Separator />
               <CollapsibleSection
                 icon={<BookOpen className="h-3.5 w-3.5" />}
                 title="Base de Conhecimento"
@@ -643,6 +567,76 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
                 />
               )}
             </>
+          )}
+
+          <Separator />
+
+          {/* ─── 12. Monitor do grupo ─── */}
+          {isGroup && (
+            <GroupMonitorSection
+              conversationId={conversation.id}
+              tenantId={(conversation as any).tenant_id}
+              monitorUserId={(conversation as any).monitor_user_id ?? null}
+              isAdminOrHead={!!isAdminOrHead}
+            />
+          )}
+
+          {/* ─── 13. Avisos e bloqueios do contato ─── */}
+          {!isGroup && isAdminOrHead && contact?.id && (
+            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs font-medium">Avisos e bloqueios</span>
+              </div>
+              <ClientAlertsManager contactId={contact.id} canManage={isAdminOrHead} />
+            </div>
+          )}
+
+          {/* ─── 14. Regras do sistema ─── */}
+          {!isGroup && (
+            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <ShieldOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-xs font-medium">Tirar regras do chat</span>
+                </div>
+                <Switch
+                  checked={rulesDisabledEffective}
+                  disabled={isTogglingRulesDisabled || !contact?.id}
+                  onCheckedChange={(v) => {
+                    if (!contact?.id) return;
+                    setRulesDisabledLocal(v);
+                    toggleRulesDisabled({ contactId: contact.id, rulesDisabled: v });
+                  }}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                Desativa todas as automações do DoctorSaaS para este número:
+                encerramento automático, avisos/lembretes, URA, auto-resposta fora do
+                horário, atribuição automática e categorização IA.
+                {" "}A configuração vale para todas as conversas deste número, em qualquer instância.
+              </p>
+              {rulesDisabledEffective && (contact as any)?.rules_disabled_at && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                  Ativado em {new Date((contact as any).rules_disabled_at).toLocaleString('pt-BR')}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ─── 15. Tags ─── */}
+          {contact?.tags && contact.tags.length > 0 && (
+            <div className="min-w-0">
+              <div className="flex items-center gap-1 mb-1.5">
+                <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs font-medium text-muted-foreground">Tags</span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {contact.tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="text-[10px] max-w-full truncate">{tag}</Badge>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>
