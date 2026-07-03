@@ -123,6 +123,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   const [ticketFilter, setTicketFilter] = useState<string>("all");
   const [sentimentFilter, setSentimentFilter] = useState<string>("all");
   const [instanceFilter, setInstanceFilter] = useState<string>("all");
+  const [resolucaoFilter, setResolucaoFilter] = useState<string>("all");
+  const [tipoFilter, setTipoFilter] = useState<string>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
