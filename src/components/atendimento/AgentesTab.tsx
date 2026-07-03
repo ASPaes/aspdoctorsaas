@@ -66,7 +66,11 @@ export function AgentesTab() {
               label="CSAT da Equipe"
               helpKey="atendimento_csat_equipe"
               value={data.csat_equipe !== null ? data.csat_equipe.toFixed(1) : "—"}
-              subtitle={`${data.csat_equipe_n} respostas`}
+              subtitle={
+                data.csat_equipe_sent_n > 0
+                  ? `${data.csat_equipe_sent_n} enviadas · ${data.csat_equipe_n} respostas (${Math.round(100 * data.csat_equipe_n / data.csat_equipe_sent_n)}%)`
+                  : `${data.csat_equipe_n} respostas`
+              }
               icon={<Star className="h-4 w-4" />}
             />
             <KPICardEnhanced
@@ -146,10 +150,12 @@ export function AgentesTab() {
                           )}
                         </td>
                         <td className="py-2 px-3 text-right tabular-nums">
-                          {a.csat !== null ? (
+                          {a.csat_sent_n > 0 ? (
                             <span>
-                              {a.csat.toFixed(1)}{" "}
-                              <span className="text-xs text-muted-foreground">({a.csat_n})</span>
+                              {a.csat !== null ? a.csat.toFixed(1) : "—"}{" "}
+                              <span className="text-xs text-muted-foreground">
+                                ({a.csat_sent_n}/{a.csat_n}/{Math.round(100 * a.csat_n / a.csat_sent_n)}%)
+                              </span>
                             </span>
                           ) : (
                             "—"

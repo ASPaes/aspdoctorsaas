@@ -13,6 +13,7 @@ export interface AgenteRow {
   frt_p50: number | null;
   csat: number | null;
   csat_n: number;
+  csat_sent_n: number;
   reabertura_pct: number | null;
   pico_simultaneos: number;
   latencia_p50: number | null;
@@ -25,6 +26,7 @@ export interface AtendimentoAgentes {
   agentes_ativos: number;
   csat_equipe: number | null;
   csat_equipe_n: number;
+  csat_equipe_sent_n: number;
   reabertura_equipe_pct: number | null;
   agentes: AgenteRow[];
 }
@@ -55,6 +57,7 @@ export function useAtendimentoAgentes() {
         agentes_ativos: Number(d.agentes_ativos ?? 0),
         csat_equipe: num(d.csat_equipe),
         csat_equipe_n: Number(d.csat_equipe_n ?? 0),
+        csat_equipe_sent_n: Number(d.csat_equipe_sent_n ?? 0),
         reabertura_equipe_pct: num(d.reabertura_equipe_pct),
         agentes: ((d.agentes ?? []) as any[]).map((r) => ({
           agent_id: String(r.agent_id),
@@ -65,6 +68,7 @@ export function useAtendimentoAgentes() {
           frt_p50: num(r.frt_p50),
           csat: num(r.csat),
           csat_n: Number(r.csat_n ?? 0),
+          csat_sent_n: Number(r.csat_sent_n ?? 0),
           reabertura_pct: num(r.reabertura_pct),
           pico_simultaneos: Number(r.pico_simultaneos ?? 0),
           latencia_p50: num(r.latencia_p50),
