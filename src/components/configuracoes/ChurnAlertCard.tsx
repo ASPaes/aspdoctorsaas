@@ -418,7 +418,7 @@ export default function ChurnAlertCard() {
                     )}
                     {adminOptions.map((a) => (
                       <SelectItem key={a.user_id} value={a.user_id}>
-                        {a.nome}
+                        {a.role === "head" ? `${a.nome} (Head)` : a.nome}
                       </SelectItem>
                     ))}
                   </SelectContent>
