@@ -26,6 +26,7 @@ export interface AtendimentoAgentes {
   agentes_ativos: number;
   csat_equipe: number | null;
   csat_equipe_n: number;
+  csat_equipe_sent_n: number;
   reabertura_equipe_pct: number | null;
   agentes: AgenteRow[];
 }
