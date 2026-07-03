@@ -27,8 +27,8 @@ export function SatisfacaoTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { dateRange, departmentId, agentId, tipoAtendimento } = useAtendimentoFilter();
   const { profile } = useAuth();
-  const navigate = useNavigate();
   const [csatModalOpen, setCsatModalOpen] = useState(false);
+  const [detailAttendanceId, setDetailAttendanceId] = useState<string | null>(null);
 
   const { data: scoreMax = 5 } = useQuery({
     queryKey: ["csat-scale-att", tid],
