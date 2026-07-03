@@ -87,8 +87,28 @@ export function MessageBubble({
   const isPending = deleteStatus === 'pending';
   const isFailed = deleteStatus === 'failed';
 
-  const hasTranscription = msg.message_type === 'audio' && msg.audio_transcription;
-  const isTranscribing = msg.message_type === 'audio' && msg.transcription_status === 'processing';
+  const isAudio = msg.message_type === 'audio' || msg.message_type === 'ptt' || (msg.media_mimetype?.startsWith('audio/') ?? false);
+  const hasTranscription = isAudio && !!msg.audio_transcription;
+  const transcriptionStatus = msg.transcription_status;
+  const isTranscribing = isAudio && (transcriptionStatus === 'processing' || transcriptionStatus === 'pending');
+  const [requestingTranscription, setRequestingTranscription] = useState(false);
+
+  const handleRequestTranscription = async () => {
+    if (requestingTranscription || isTranscribing) return;
+    setRequestingTranscription(true);
+    try {
+      const { error } = await supabase.functions.invoke('transcribe-whatsapp-audio', {
+        body: { messageId: msg.id },
+      });
+      if (error) throw error;
+      toast.success('Transcrição solicitada');
+    } catch (e: any) {
+      toast.error(e?.message || 'Falha ao transcrever áudio');
+    } finally {
+      setRequestingTranscription(false);
+    }
+  };
+
 
   if (isSystem) {
     const isInactivityWarning = (msg as any).metadata?.inactivity_warning === true;
