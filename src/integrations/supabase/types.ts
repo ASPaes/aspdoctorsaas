@@ -1637,6 +1637,7 @@ export type Database = {
           churn_alert_instance_id: string | null
           churn_alert_keywords: string[]
           churn_alert_phone_numbers: string[]
+          churn_alert_recipients: Json
           created_at: string
           custo_fixo_percentual: number
           group_require_ticket_on_close: boolean
@@ -1697,6 +1698,7 @@ export type Database = {
           churn_alert_instance_id?: string | null
           churn_alert_keywords?: string[]
           churn_alert_phone_numbers?: string[]
+          churn_alert_recipients?: Json
           created_at?: string
           custo_fixo_percentual?: number
           group_require_ticket_on_close?: boolean
@@ -1757,6 +1759,7 @@ export type Database = {
           churn_alert_instance_id?: string | null
           churn_alert_keywords?: string[]
           churn_alert_phone_numbers?: string[]
+          churn_alert_recipients?: Json
           created_at?: string
           custo_fixo_percentual?: number
           group_require_ticket_on_close?: boolean
