@@ -248,7 +248,7 @@ export default function ConfiguracoesNotificacoes() {
         </p>
       </header>
 
-      {(profile?.role === 'admin' || profile?.is_super_admin) && <ChurnAlertCard />}
+
 
       {/* Geral */}
       <Card>
