@@ -37,6 +37,7 @@ interface Props {
 interface Contrato {
   id: string;
   numero: string;
+  created_at?: string | null;
   tipo: "base" | "aditivo";
   contrato_pai_id: string | null;
   data_venda: string | null;
