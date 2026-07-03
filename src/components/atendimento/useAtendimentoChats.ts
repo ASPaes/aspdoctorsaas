@@ -22,6 +22,8 @@ export interface AtendimentoChats {
   total: number;
   por_status: ChatStatusRow[];
   por_sentimento: ChatSentRow[];
+  por_resolucao: ChatResolucaoRow[];
+
   csat: ChatCsat;
   por_atendente: ChatAtendenteRow[];
   heatmap: ChatHeatRow[];
