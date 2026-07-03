@@ -225,7 +225,7 @@ export default function AISettingsTab() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("Sessão expirada");
 
-      const { data, error } = await supabase.functions.invoke("test-ai-config", {
+      const { data, error } = await supabase.functions.invoke("test-ai-config-v2", {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (error) throw error;
