@@ -1690,6 +1690,11 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
       }
     }
 
+    // Alerta de churn por keywords também vale em grupos (mensagens de participantes)
+    if (!fromMe && content) {
+      checkChurnKeywords(supabase, tenantId, conversationId, content, supabaseUrl);
+    }
+
     return;
   }
 
