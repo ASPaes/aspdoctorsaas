@@ -24,6 +24,25 @@ const SCORE_COLOR: Record<number, string> = {
 
 export function SatisfacaoTab() {
   const { data, isLoading, isError, error } = useAtendimentoSatisfacao();
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const { dateRange, departmentId } = useAtendimentoFilter();
+  const { profile } = useAuth();
+  const navigate = useNavigate();
+  const [csatModalOpen, setCsatModalOpen] = useState(false);
+
+  const { data: scoreMax = 5 } = useQuery({
+    queryKey: ["csat-scale-att", tid],
+    enabled: !!tid,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("configuracoes" as any) as any)
+        .select("support_csat_score_max")
+        .eq("tenant_id", tid)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.support_csat_score_max ?? 5) as number;
+    },
+  });
 
   const divPct =
     data && data.div_neg_total > 0
