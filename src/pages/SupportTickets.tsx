@@ -155,6 +155,8 @@ export default function SupportTickets() {
   const [attTicketFilter, setAttTicketFilter] = useState<string>("all");
   const [attSentimentFilter, setAttSentimentFilter] = useState<string>("all");
   const [attInstanceFilter, setAttInstanceFilter] = useState<string>("all");
+  const [attResolucaoFilter, setAttResolucaoFilter] = useState<string>("all");
+  const [attTipoFilter, setAttTipoFilter] = useState<string>("all");
   const [clienteFilterId, setClienteFilterId] = useState<string | null>(null);
   const [clienteFilterName, setClienteFilterName] = useState<string>("");
   const [clienteSearchTerm, setClienteSearchTerm] = useState<string>("");
