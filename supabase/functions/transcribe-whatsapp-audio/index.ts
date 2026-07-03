@@ -171,8 +171,22 @@ Deno.serve(async (req) => {
         const errText = await res.text();
         console.error(`[${FUNCTION_NAME}][${requestId}] Whisper error:`, errText);
         await supabase.from("whatsapp_messages").update({ transcription_status: "failed" }).eq("id", messageId);
+        if (res.status === 429 || res.status === 401 || res.status === 402) {
+          await notifyEvent(
+            supabase,
+            convData.tenant_id,
+            "ai_quota_exceeded",
+            convData.tenant_id,
+            "IA sem crédito ou chave inválida",
+            `A chave OpenAI do seu workspace está falhando (HTTP ${res.status}). Transcrições de áudio e análises de atendimento estão paradas até regularizar.`,
+            { source: "transcribe-whatsapp-audio", http_status: res.status }
+          );
+        }
         if (res.status === 401) {
           return new Response(JSON.stringify({ error: "ai_key_invalid", message: "Chave OpenAI inválida." }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        if (res.status === 429) {
+          return new Response(JSON.stringify({ error: "Transcription failed" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
         return new Response(JSON.stringify({ error: "Transcription failed" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
