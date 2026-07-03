@@ -241,6 +241,31 @@ export default function OmiePadroesTab() {
     }
   }
 
+  async function salvarDataCorte() {
+    setSavingDataCorte(true);
+    try {
+      const { error } = await (supabase as any).rpc("salvar_data_corte_omie", {
+        p_tenant_id: tid,
+        p_data: dataCorte || null,
+      });
+      if (error) throw error;
+      toast({ title: "Data de ativação salva" });
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar data", description: err?.message || "Tente novamente.", variant: "destructive" });
+    } finally {
+      setSavingDataCorte(false);
+    }
+  }
+
+  function toggleModelo(nome: string, checked: boolean) {
+    setModelosPermitidos((prev) => {
+      const set = new Set(prev);
+      if (checked) set.add(nome);
+      else set.delete(nome);
+      return Array.from(set);
+    });
+  }
+
   if (loading) {
     return (
       <div className="space-y-4 max-w-3xl">
