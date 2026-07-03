@@ -83,6 +83,7 @@ serve(async (req) => {
     const textMessages =
       messages
         ?.filter((m) => m.content && m.message_type === "text")
+        .reverse()
         .map((m) => `${m.is_from_me ? "Atendente" : "Cliente"}: ${m.content}`) || [];
 
     if (textMessages.length === 0) {
@@ -94,12 +95,33 @@ serve(async (req) => {
 
     const recentMessages = textMessages.slice(-50);
 
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "categorize_conversation",
+          description: "Categoriza a conversa de atendimento",
+          parameters: {
+            type: "object",
+            properties: {
+              primary_topic: { type: "string" },
+              secondary_topics: { type: "array", items: { type: "string" } },
+              confidence: { type: "number" },
+              reasoning: { type: "string" },
+              custom_topic: { type: "string" },
+            },
+            required: ["primary_topic", "confidence"],
+          },
+        },
+      },
+    ];
+
     let result: any;
     try {
       const rawResult = await callAI(aiConfig, [
         { role: "system", content: systemPrompt },
         { role: "user", content: `CONVERSA:\n\n${recentMessages.join("\n")}` },
-      ]);
+      ], tools);
       const clean = (rawResult.content ?? "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       result = JSON.parse(clean);
     } catch (aiError: any) {
