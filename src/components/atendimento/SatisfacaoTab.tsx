@@ -204,6 +204,8 @@ export function SatisfacaoTab() {
         dateFrom={dateRange.from}
         dateTo={dateRange.to}
         initialDepartmentId={departmentId ?? undefined}
+        initialAgentId={agentId ?? undefined}
+        initialTipo={tipoAtendimento}
         scoreMax={scoreMax}
         isAdmin={profile?.role === "admin" || profile?.is_super_admin}
         onNavigateToAttendance={(code) => {
