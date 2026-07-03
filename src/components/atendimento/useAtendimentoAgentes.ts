@@ -68,6 +68,7 @@ export function useAtendimentoAgentes() {
           frt_p50: num(r.frt_p50),
           csat: num(r.csat),
           csat_n: Number(r.csat_n ?? 0),
+          csat_sent_n: Number(r.csat_sent_n ?? 0),
           reabertura_pct: num(r.reabertura_pct),
           pico_simultaneos: Number(r.pico_simultaneos ?? 0),
           latencia_p50: num(r.latencia_p50),
