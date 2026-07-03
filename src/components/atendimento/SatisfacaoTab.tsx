@@ -78,7 +78,7 @@ export function SatisfacaoTab() {
               <KPICardEnhanced
                 label="CSAT Médio"
                 helpKey="atendimento_csat_media"
-                value={data.media !== null ? data.media.toFixed(1) : "—"}
+                value={data.media !== null ? data.media.toFixed(2) : "—"}
                 subtitle={`${data.respostas} respostas`}
                 icon={<Star className="h-4 w-4" />}
               />
