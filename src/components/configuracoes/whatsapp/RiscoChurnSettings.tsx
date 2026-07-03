@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ShieldAlert, RotateCcw } from "lucide-react";
 import { toast as sonnerToast } from "sonner";
+import ChurnAlertCard from "@/components/configuracoes/ChurnAlertCard";
 
 type CampoKey = "risk_dens_mult" | "risk_neg_pct" | "risk_reinc_min" | "risk_csat_min_n";
 
