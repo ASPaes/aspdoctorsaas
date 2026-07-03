@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Bell, Volume2, Loader2 } from "lucide-react";
-import ChurnAlertCard from "@/components/configuracoes/ChurnAlertCard";
+
 
 const SOUND_URL =
   "https://vbngjzovjhkmietztffo.supabase.co/storage/v1/object/public/notification-sounds/padrao.mp3";
