@@ -287,7 +287,7 @@ export function ChatsTab() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
             <div className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs text-muted-foreground">Total de Atendimentos</p>
               <p className="text-2xl font-semibold tabular-nums">{data.total.toLocaleString("pt-BR")}</p>
@@ -307,11 +307,20 @@ export function ChatsTab() {
               <p className="text-2xl font-semibold tabular-nums">{(() => { const ts = data.por_sentimento.reduce((a, s) => a + s.qtd, 0); const neg = data.por_sentimento.find((s) => s.sentimento === "negative")?.qtd ?? 0; return Math.round(ts > 0 ? (100 * neg) / ts : 0); })()}%</p>
               <p className="text-xs text-muted-foreground mt-1">dos atendimentos analisados</p>
             </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="text-sm font-semibold mb-3">Sentimento</h3>
+              <p className="text-xs text-muted-foreground">Sem solução</p>
+              <p className="text-2xl font-semibold tabular-nums">{(() => { const analisados = data.por_resolucao.filter((r) => r.resolucao !== "(sem)").reduce((a, r) => a + r.qtd, 0); const semSol = data.por_resolucao.filter((r) => r.resolucao === "nao_resolvido" || r.resolucao === "sem_resposta_agente").reduce((a, r) => a + r.qtd, 0); return Math.round(analisados > 0 ? (100 * semSol) / analisados : 0); })()}%</p>
+              <p className="text-xs text-muted-foreground mt-1">dos atendimentos analisados</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-3">Por sentimento</h3>
               <Barras rows={data.por_sentimento.map((r) => ({ key: r.sentimento, nome: SENT_LABEL[r.sentimento] ?? r.sentimento, qtd: r.qtd, pct: r.pct, color: sentColor(r.sentimento) }))} />
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-3">Por resolução</h3>
+              <Barras rows={data.por_resolucao.map((r) => ({ key: r.resolucao, nome: RESOL_LABEL[r.resolucao] ?? r.resolucao, qtd: r.qtd, pct: r.pct, color: resolColor(r.resolucao) }))} />
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-3">CSAT — distribuição das notas</h3>
@@ -323,6 +332,7 @@ export function ChatsTab() {
               <p className="text-xs text-muted-foreground mt-3">{data.csat.enviados.toLocaleString("pt-BR")} enviados → {data.csat.respondidos.toLocaleString("pt-BR")} respondidos ({data.csat.response_rate}%)</p>
             </div>
           </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-3">Atendimentos por Atendente</h3>
