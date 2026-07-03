@@ -25,7 +25,7 @@ const SCORE_COLOR: Record<number, string> = {
 export function SatisfacaoTab() {
   const { data, isLoading, isError, error } = useAtendimentoSatisfacao();
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { dateRange, departmentId } = useAtendimentoFilter();
+  const { dateRange, departmentId, agentId, tipoAtendimento } = useAtendimentoFilter();
   const { profile } = useAuth();
   const navigate = useNavigate();
   const [csatModalOpen, setCsatModalOpen] = useState(false);
