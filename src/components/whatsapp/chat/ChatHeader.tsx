@@ -135,13 +135,20 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     },
   });
 
-  const canPickAttendance = useCallback((a: any) => {
+  const getPickMode = useCallback((a: any): 'classificacao' | 'demanda_externa' => {
     const isClosed = a?.status === 'closed' || a?.status === 'inactive_closed';
-    if (!isClosed) return false;
-    if (a?.ticket_id) return false;
+    if (isClosed && !a?.ticket_id) return 'classificacao';
+    return 'demanda_externa';
+  }, []);
+
+  const canPickAttendance = useCallback((a: any) => {
+    if (!a) return false;
+    const mode = getPickMode(a);
+    if (mode === 'demanda_externa') return true;
+    // classificacao: mantém regra original (admin/head ou assigned_to)
     if (isAdmin) return true;
     return !!user?.id && a?.assigned_to === user.id;
-  }, [isAdmin, user?.id]);
+  }, [isAdmin, user?.id, getPickMode]);
 
   // Carimba cliente no atendimento (se faltar) antes de abrir o modal
   const openTicketForAttendance = useCallback(async (target: any) => {
