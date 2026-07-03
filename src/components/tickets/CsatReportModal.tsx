@@ -25,6 +25,7 @@ interface Props {
   scoreMax: number;
   isAdmin?: boolean;
   onNavigateToAttendance?: (attendanceCode: string) => void;
+  onOpenAttendance?: (attendanceId: string) => void;
 }
 
 interface SetorRow {
