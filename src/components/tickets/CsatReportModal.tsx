@@ -25,6 +25,7 @@ interface Props {
   scoreMax: number;
   isAdmin?: boolean;
   onNavigateToAttendance?: (attendanceCode: string) => void;
+  onOpenAttendance?: (attendanceId: string) => void;
 }
 
 interface SetorRow {
@@ -68,7 +69,7 @@ function scoreColor(score: number, max: number): { bg: string; fg: string } {
   return { bg: "#E1F5EE", fg: "#0F6E56" };
 }
 
-export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo, initialDepartmentId, initialAgentId, initialTipo, scoreMax, isAdmin, onNavigateToAttendance }: Props) {
+export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo, initialDepartmentId, initialAgentId, initialTipo, scoreMax, isAdmin, onNavigateToAttendance, onOpenAttendance }: Props) {
   const queryClient = useQueryClient();
   const fromISO = toISODate(dateFrom);
   const toISO = toISODate(dateTo);
@@ -563,7 +564,9 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
                         <button
                           type="button"
                           onClick={() => {
-                            if (onNavigateToAttendance) {
+                            if (onOpenAttendance) {
+                              onOpenAttendance(a.attendance_id);
+                            } else if (onNavigateToAttendance) {
                               onNavigateToAttendance(a.attendance_code);
                               onOpenChange(false);
                             }

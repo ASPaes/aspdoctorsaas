@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import { Loader2, Star, Reply, AlertTriangle, Zap } from "lucide-react";
 import { useAtendimentoSatisfacao } from "./useAtendimentoSatisfacao";
 import { fmtEspera } from "./TempoRealTab";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 import { CsatReportModal } from "@/components/tickets/CsatReportModal";
+import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
@@ -27,8 +27,8 @@ export function SatisfacaoTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { dateRange, departmentId, agentId, tipoAtendimento } = useAtendimentoFilter();
   const { profile } = useAuth();
-  const navigate = useNavigate();
   const [csatModalOpen, setCsatModalOpen] = useState(false);
+  const [detailAttendanceId, setDetailAttendanceId] = useState<string | null>(null);
 
   const { data: scoreMax = 5 } = useQuery({
     queryKey: ["csat-scale-att", tid],
@@ -208,10 +208,12 @@ export function SatisfacaoTab() {
         initialTipo={tipoAtendimento}
         scoreMax={scoreMax}
         isAdmin={profile?.role === "admin" || profile?.is_super_admin}
-        onNavigateToAttendance={(code) => {
-          setCsatModalOpen(false);
-          navigate("/tickets");
-        }}
+        onOpenAttendance={(id) => setDetailAttendanceId(id)}
+      />
+      <AttendanceDetailModal
+        attendanceId={detailAttendanceId}
+        open={!!detailAttendanceId}
+        onOpenChange={(o) => !o && setDetailAttendanceId(null)}
       />
     </div>
   );
