@@ -31,6 +31,12 @@ import { TopicBadges } from "./TopicBadges";
 import { ClienteLinkCard } from "./ClienteLinkCard";
 import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
 import { useRelevantAttendance } from "../hooks/useRelevantAttendance";
+import {
+  useLatestAttendanceResolucao,
+  RESOLUCAO_LABEL,
+  RESOLUCAO_EMOJI,
+  RESOLUCAO_CLASS,
+} from "../hooks/useLatestAttendanceResolucao";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { Input } from "@/components/ui/input";
 import KBEditDialog from "@/components/configuracoes/kb/KBEditDialog";
