@@ -17,6 +17,7 @@ import { CohortTab } from '@/components/dashboard/tabs/CohortTab';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnidadeFilter } from '@/contexts/UnidadeFilterContext';
+import { NotificationSetupBanner } from '@/components/NotificationSetupBanner';
 
 export default function Dashboard() {
   const { selectedUnidadeId, unidadeFilterReady } = useUnidadeFilter();
