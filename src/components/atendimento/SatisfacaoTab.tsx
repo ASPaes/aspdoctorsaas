@@ -1,8 +1,16 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Loader2, Star, Reply, AlertTriangle, Zap } from "lucide-react";
 import { useAtendimentoSatisfacao } from "./useAtendimentoSatisfacao";
 import { fmtEspera } from "./TempoRealTab";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
+import { CsatReportModal } from "@/components/tickets/CsatReportModal";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 const SCORE_COLOR: Record<number, string> = {
@@ -16,6 +24,25 @@ const SCORE_COLOR: Record<number, string> = {
 
 export function SatisfacaoTab() {
   const { data, isLoading, isError, error } = useAtendimentoSatisfacao();
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const { dateRange, departmentId } = useAtendimentoFilter();
+  const { profile } = useAuth();
+  const navigate = useNavigate();
+  const [csatModalOpen, setCsatModalOpen] = useState(false);
+
+  const { data: scoreMax = 5 } = useQuery({
+    queryKey: ["csat-scale-att", tid],
+    enabled: !!tid,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("configuracoes" as any) as any)
+        .select("support_csat_score_max")
+        .eq("tenant_id", tid)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.support_csat_score_max ?? 5) as number;
+    },
+  });
 
   const divPct =
     data && data.div_neg_total > 0
@@ -42,13 +69,20 @@ export function SatisfacaoTab() {
       ) : (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <KPICardEnhanced
-              label="CSAT Médio"
-              helpKey="atendimento_csat_media"
-              value={data.media !== null ? data.media.toFixed(1) : "—"}
-              subtitle={`${data.respostas} respostas`}
-              icon={<Star className="h-4 w-4" />}
-            />
+            <button
+              type="button"
+              onClick={() => setCsatModalOpen(true)}
+              className="block w-full text-left cursor-pointer rounded-xl border border-transparent hover:border-primary/50 transition-colors"
+              title="Ver avaliações"
+            >
+              <KPICardEnhanced
+                label="CSAT Médio"
+                helpKey="atendimento_csat_media"
+                value={data.media !== null ? data.media.toFixed(1) : "—"}
+                subtitle={`${data.respostas} respostas`}
+                icon={<Star className="h-4 w-4" />}
+              />
+            </button>
             <KPICardEnhanced
               label="Taxa de Resposta"
               helpKey="atendimento_response_rate"
@@ -163,6 +197,20 @@ export function SatisfacaoTab() {
           </div>
         </>
       )}
+      <CsatReportModal
+        open={csatModalOpen}
+        onOpenChange={setCsatModalOpen}
+        tenantId={tid}
+        dateFrom={dateRange.from}
+        dateTo={dateRange.to}
+        initialDepartmentId={departmentId ?? undefined}
+        scoreMax={scoreMax}
+        isAdmin={profile?.role === "admin" || profile?.is_super_admin}
+        onNavigateToAttendance={(code) => {
+          setCsatModalOpen(false);
+          navigate("/tickets");
+        }}
+      />
     </div>
   );
 }
