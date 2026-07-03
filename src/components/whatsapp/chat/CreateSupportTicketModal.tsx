@@ -220,7 +220,7 @@ export function CreateSupportTicketModal({
 
       if (error) throw error;
 
-      toast.success("Ticket criado com sucesso!");
+      toast.success(mode === 'demanda_externa' ? 'Ticket de demanda externa aberto!' : 'Ticket criado com sucesso!');
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err?.message || "Erro ao criar ticket");
