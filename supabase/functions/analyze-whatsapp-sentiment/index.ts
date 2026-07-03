@@ -156,10 +156,11 @@ serve(async (req) => {
 Mensagens (mais antigas para mais recentes):
 ${messagesText}
 
-Critérios de Análise de Sentimento:
-- positive: Cliente satisfeito, agradecido, animado, elogios
-- neutral: Tom profissional, dúvidas técnicas, informações
-- negative: Frustrado, insatisfeito, reclamando, impaciente
+Critérios de Análise de Sentimento (avalie o CLIENTE, usando as respostas do atendente como contexto):
+- positive: cliente satisfeito, agradecido, elogiando o atendimento ou a empresa
+- neutral: tom profissional, dúvidas técnicas, relato de problemas/erros do sistema SEM insatisfação com o atendimento ou com a empresa. Relatar um problema técnico é NORMAL e NÃO é negativo — inclusive se o problema ainda não foi resolvido.
+- negative: insatisfação dirigida ao ATENDIMENTO ou à EMPRESA: reclamação de demora ou descaso, frustração recorrente ("de novo isso", "sempre a mesma coisa"), tom hostil, ameaça de cancelamento/troca.
+
 
 Critérios para abertura de Ticket CS (needs_cs_ticket = true):
 - Cliente demonstra insatisfação persistente ou crescente
