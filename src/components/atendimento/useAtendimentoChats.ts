@@ -70,6 +70,8 @@ export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: 
         total: Number(d.total ?? 0),
         por_status: ((d.por_status ?? []) as any[]).map((r) => ({ status: r.status ?? "(sem)", qtd: Number(r.qtd ?? 0), pct: Number(r.pct ?? 0) })),
         por_sentimento: ((d.por_sentimento ?? []) as any[]).map((r) => ({ sentimento: r.sentimento ?? "(sem)", qtd: Number(r.qtd ?? 0), pct: Number(r.pct ?? 0) })),
+        por_resolucao: ((d.por_resolucao ?? []) as any[]).map((r) => ({ resolucao: r.resolucao ?? "(sem)", qtd: Number(r.qtd ?? 0), pct: Number(r.pct ?? 0) })),
+
         csat: {
           enviados: Number(d.csat?.enviados ?? 0),
           respondidos: Number(d.csat?.respondidos ?? 0),
