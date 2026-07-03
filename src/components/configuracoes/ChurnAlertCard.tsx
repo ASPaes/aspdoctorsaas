@@ -102,13 +102,13 @@ export default function ChurnAlertCard() {
     queryFn: async () => {
       const { data: profs, error } = await (supabase as any)
         .from("profiles")
-        .select("user_id, email, funcionario_id")
+        .select("user_id, role, funcionario_id")
         .eq("tenant_id", tid)
-        .eq("role", "admin");
+        .in("role", ["admin", "head"]);
       if (error) throw error;
       const list = (profs ?? []) as Array<{
         user_id: string;
-        email: string | null;
+        role: string;
         funcionario_id: string | null;
       }>;
       const funcIds = list.map((p) => p.funcionario_id).filter(Boolean) as string[];
