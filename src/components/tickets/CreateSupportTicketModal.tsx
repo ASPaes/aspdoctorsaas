@@ -456,7 +456,7 @@ export function CreateSupportTicketModal({
 
   useEffect(() => {
     if (ticketStatuses.length > 0) {
-      if (fromClosure) {
+      if (fromClosure && mode !== "demanda_externa") {
         const terminal = ticketStatuses.find((s) => s.is_terminal);
         if (terminal) setStatusId(terminal.id);
         else setStatusId(ticketStatuses[ticketStatuses.length - 1].id);
@@ -468,7 +468,7 @@ export function CreateSupportTicketModal({
     } else {
       setStatusId("");
     }
-  }, [ticketStatuses, fromClosure]);
+  }, [ticketStatuses, fromClosure, mode]);
 
   const addChecklistItem = () => {
     const t = newChecklistItem.trim();
@@ -662,9 +662,9 @@ export function CreateSupportTicketModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 pr-12 pt-4 pb-3 border-b">
           <h3 className="text-base font-medium">
-            {fromClosure
+          {fromClosure
               ? mode === "demanda_externa"
-                ? "Novo ticket — demanda externa"
+                ? "Novo ticket"
                 : "Classificar atendimento"
               : "Novo ticket"}
           </h3>
