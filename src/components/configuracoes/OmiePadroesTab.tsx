@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Save, AlertCircle } from "lucide-react";
 
 type Opt = { codigo: string | number; descricao: string; cod_lc116?: string | null };
