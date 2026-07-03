@@ -5231,6 +5231,7 @@ export type Database = {
           motivo_cancelamento: string | null
           observacao_agente: string | null
           observacao_ia: string | null
+          origem_criacao: string | null
           parent_ticket_id: string | null
           previsao_encerramento: string | null
           prioridade: Database["public"]["Enums"]["support_ticket_prioridade"]
@@ -5278,6 +5279,7 @@ export type Database = {
           motivo_cancelamento?: string | null
           observacao_agente?: string | null
           observacao_ia?: string | null
+          origem_criacao?: string | null
           parent_ticket_id?: string | null
           previsao_encerramento?: string | null
           prioridade?: Database["public"]["Enums"]["support_ticket_prioridade"]
@@ -5325,6 +5327,7 @@ export type Database = {
           motivo_cancelamento?: string | null
           observacao_agente?: string | null
           observacao_ia?: string | null
+          origem_criacao?: string | null
           parent_ticket_id?: string | null
           previsao_encerramento?: string | null
           prioridade?: Database["public"]["Enums"]["support_ticket_prioridade"]
@@ -7798,6 +7801,21 @@ export type Database = {
           p_dados: Json
           p_link_to_contrato_id?: string
           p_produto_id: number
+        }
+        Returns: string
+      }
+      create_demand_ticket_from_attendance: {
+        Args: {
+          p_attendance_id: string
+          p_category_id: string
+          p_department_id?: string
+          p_observacao_agente: string
+          p_observacao_ia: string
+          p_produto_id: number
+          p_responsavel_user_id?: string
+          p_service_type_id: string
+          p_subcategory_id: string
+          p_tipo_horario: string
         }
         Returns: string
       }

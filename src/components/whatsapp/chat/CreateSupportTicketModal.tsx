@@ -29,6 +29,7 @@ interface Props {
   sentimentLabel?: string | null;
   sentimentConfidence?: number | null;
   sentimentSummary?: string | null;
+  mode?: 'classificacao' | 'demanda_externa';
 }
 
 export function CreateSupportTicketModal({
@@ -45,6 +46,7 @@ export function CreateSupportTicketModal({
   sentimentLabel,
   sentimentConfidence,
   sentimentSummary,
+  mode = 'classificacao',
 }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
@@ -204,7 +206,8 @@ export function CreateSupportTicketModal({
 
     setIsSubmitting(true);
     try {
-      const { data, error } = await (supabase.rpc as any)("create_ticket_from_closure", {
+      const rpcName = mode === 'demanda_externa' ? 'create_demand_ticket_from_attendance' : 'create_ticket_from_closure';
+      const { data, error } = await (supabase.rpc as any)(rpcName, {
         p_attendance_id: attendanceId,
         p_produto_id: Number(produtoId),
         p_category_id: categoryId,
@@ -217,7 +220,7 @@ export function CreateSupportTicketModal({
 
       if (error) throw error;
 
-      toast.success("Ticket criado com sucesso!");
+      toast.success(mode === 'demanda_externa' ? 'Ticket de demanda externa aberto!' : 'Ticket criado com sucesso!');
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err?.message || "Erro ao criar ticket");
@@ -232,7 +235,7 @@ export function CreateSupportTicketModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <Ticket className="h-5 w-5 text-primary" />
-            Classificar atendimento
+            {mode === 'demanda_externa' ? 'Novo ticket — demanda externa' : 'Classificar atendimento'}
           </DialogTitle>
         </DialogHeader>
 
