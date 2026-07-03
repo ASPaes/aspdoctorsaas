@@ -917,6 +917,7 @@ export default function ClienteForm() {
           open={mrrModalOpen}
           onOpenChange={setMrrModalOpen}
           clienteId={id}
+          tenantId={tid}
           clienteNome={form.watch("razao_social") || form.watch("nome_fantasia") || ""}
           mensalidadeBase={form.watch("mensalidade") ?? 0}
           custoBase={form.watch("custo_operacao") ?? 0}

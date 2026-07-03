@@ -71,6 +71,7 @@ interface MovimentosMrrModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clienteId: string;
+  tenantId?: string | null;
   clienteNome: string;
   mensalidadeBase: number;
   custoBase: number;
@@ -173,6 +174,7 @@ export function MovimentosMrrModal({
   open,
   onOpenChange,
   clienteId,
+  tenantId,
   clienteNome,
   mensalidadeBase,
   custoBase,
@@ -406,6 +408,7 @@ export function MovimentosMrrModal({
     setSaving(true);
     try {
       let insertData: any = {
+        tenant_id: tenantId ?? profile?.tenant_id ?? null,
         cliente_id: clienteId,
         tipo,
         data_movimento: dataMovimento,
