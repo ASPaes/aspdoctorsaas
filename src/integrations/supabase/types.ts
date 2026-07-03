@@ -1633,6 +1633,10 @@ export type Database = {
           business_hours_outside_prompt: string | null
           business_hours_timezone: string
           chat_timezone: string
+          churn_alert_enabled: boolean
+          churn_alert_instance_id: string | null
+          churn_alert_keywords: string[]
+          churn_alert_phone_numbers: string[]
           created_at: string
           custo_fixo_percentual: number
           group_require_ticket_on_close: boolean
@@ -1689,6 +1693,10 @@ export type Database = {
           business_hours_outside_prompt?: string | null
           business_hours_timezone?: string
           chat_timezone?: string
+          churn_alert_enabled?: boolean
+          churn_alert_instance_id?: string | null
+          churn_alert_keywords?: string[]
+          churn_alert_phone_numbers?: string[]
           created_at?: string
           custo_fixo_percentual?: number
           group_require_ticket_on_close?: boolean
@@ -1745,6 +1753,10 @@ export type Database = {
           business_hours_outside_prompt?: string | null
           business_hours_timezone?: string
           chat_timezone?: string
+          churn_alert_enabled?: boolean
+          churn_alert_instance_id?: string | null
+          churn_alert_keywords?: string[]
+          churn_alert_phone_numbers?: string[]
           created_at?: string
           custo_fixo_percentual?: number
           group_require_ticket_on_close?: boolean
@@ -7136,6 +7148,7 @@ export type Database = {
       }
       whatsapp_sentiment_analysis: {
         Row: {
+          churn_alerted_at: string | null
           confidence: number | null
           contact_id: string | null
           conversation_id: string
@@ -7151,6 +7164,7 @@ export type Database = {
           topics: string[] | null
         }
         Insert: {
+          churn_alerted_at?: string | null
           confidence?: number | null
           contact_id?: string | null
           conversation_id: string
@@ -7166,6 +7180,7 @@ export type Database = {
           topics?: string[] | null
         }
         Update: {
+          churn_alerted_at?: string | null
           confidence?: number | null
           contact_id?: string | null
           conversation_id?: string
@@ -9031,6 +9046,15 @@ export type Database = {
       }
       next_ticket_code: { Args: { p_tenant_id: string }; Returns: string }
       norm_txt: { Args: { t: string }; Returns: string }
+      notify_churn_alert: {
+        Args: {
+          p_body: string
+          p_conversation_id: string
+          p_tenant_id: string
+          p_title: string
+        }
+        Returns: string
+      }
       obter_chave_omie: { Args: { p_tenant_id?: string }; Returns: string }
       preparar_reajuste: {
         Args: {

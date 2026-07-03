@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getAIConfig, callAI } from "../_shared/ai-client.ts";
+import { getAdapter, getInstanceSecrets } from "../_shared/providers/index.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,17 +61,23 @@ serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData, error: userError } = await anonClient.auth.getUser(authHeader.replace("Bearer ", ""));
-    if (userError || !userData?.user) {
-      return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const token = authHeader.replace("Bearer ", "");
+    const isInternalCall = token === serviceKey;
+
+    if (!isInternalCall) {
+      const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
       });
+      const { data: userData, error: userError } = await anonClient.auth.getUser(token);
+      if (userError || !userData?.user) {
+        return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
-    const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const supabase = createClient(supabaseUrl, serviceKey);
     const { conversationId } = await req.json();
     if (!conversationId) {
       return new Response(JSON.stringify({ success: false, error: "conversationId is required" }), {
@@ -208,6 +215,13 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
       throw new Error("Invalid sentiment value");
     }
 
+    // Capturar registro anterior (para cooldown do alerta)
+    const { data: prevAnalysis } = await supabase
+      .from("whatsapp_sentiment_analysis")
+      .select("churn_alerted_at, needs_cs_ticket")
+      .eq("conversation_id", conversationId)
+      .maybeSingle();
+
     const { data: analysis, error: upsertError } = await supabase
       .from("whatsapp_sentiment_analysis")
       .upsert({
@@ -225,6 +239,85 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
       .single();
 
     if (upsertError) throw upsertError;
+
+    // Alerta de churn
+    if (result.needs_cs_ticket === true) {
+      try {
+        const { data: cfg } = await supabase
+          .from("configuracoes")
+          .select("churn_alert_enabled, churn_alert_phone_numbers, churn_alert_instance_id")
+          .eq("tenant_id", convData.tenant_id)
+          .maybeSingle();
+
+        if (cfg?.churn_alert_enabled) {
+          const lastAlertMs = prevAnalysis?.churn_alerted_at ? new Date(prevAnalysis.churn_alerted_at).getTime() : 0;
+          const cooldownOk = !lastAlertMs || (Date.now() - lastAlertMs) > 24 * 60 * 60 * 1000;
+
+          if (cooldownOk) {
+            const contact: any = (convData as any).whatsapp_contacts || {};
+            const contactName = contact.name || contact.phone_number || "Cliente";
+            const contactPhone = contact.phone_number || "";
+            const reason = (result.cs_ticket_reason || result.summary || "Sinal de churn detectado").toString();
+
+            const title = `\u26A0\uFE0F Risco de churn: ${contactName}`;
+            const body = reason.substring(0, 500);
+
+            const { error: notifErr } = await supabase.rpc("notify_churn_alert", {
+              p_tenant_id: convData.tenant_id,
+              p_conversation_id: conversationId,
+              p_title: title,
+              p_body: body,
+            });
+            if (notifErr) console.error("[churn-alert] notify_churn_alert error:", notifErr.message);
+
+            const phones: string[] = Array.isArray(cfg.churn_alert_phone_numbers) ? cfg.churn_alert_phone_numbers : [];
+            if (cfg.churn_alert_instance_id && phones.length > 0) {
+              try {
+                const { data: inst } = await supabase
+                  .from("whatsapp_instances")
+                  .select("id, instance_name, provider_type, instance_id_external, meta_phone_number_id")
+                  .eq("id", cfg.churn_alert_instance_id)
+                  .maybeSingle();
+
+                if (inst) {
+                  const secrets = await getInstanceSecrets(supabase, inst.id);
+                  const adapter = getAdapter(inst.provider_type);
+                  const alertText = `\u26A0\uFE0F ALERTA DE CHURN\nCliente: ${contactName} (${contactPhone})\nMotivo: ${reason}\nAbra o DoctorSaaS para ver a conversa.`;
+
+                  for (const rawPhone of phones) {
+                    const to = String(rawPhone).replace(/\D/g, "");
+                    if (!to) continue;
+                    try {
+                      await adapter.send(secrets as any, inst as any, {
+                        to,
+                        messageType: "text",
+                        content: alertText,
+                      });
+                      console.log(`[churn-alert] sent to ${to}`);
+                    } catch (sendErr: any) {
+                      console.error(`[churn-alert] send error to ${to}:`, sendErr?.message || sendErr);
+                    }
+                  }
+                }
+              } catch (instErr: any) {
+                console.error("[churn-alert] instance send block error:", instErr?.message || instErr);
+              }
+            }
+
+            await supabase
+              .from("whatsapp_sentiment_analysis")
+              .update({ churn_alerted_at: new Date().toISOString() })
+              .eq("conversation_id", conversationId);
+
+            console.log(`[churn-alert] fired for conversation ${conversationId} tenant ${convData.tenant_id}`);
+          } else {
+            console.log(`[churn-alert] cooldown active for conversation ${conversationId}`);
+          }
+        }
+      } catch (alertErr: any) {
+        console.error("[churn-alert] unexpected error:", alertErr?.message || alertErr);
+      }
+    }
 
     return new Response(JSON.stringify({ success: true, analysis }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
