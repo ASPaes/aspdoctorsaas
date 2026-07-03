@@ -277,9 +277,16 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
         onOpenChange={setNovoReajusteOpen}
         tenantId={tenantId}
         reajusteId={selectedReajusteId}
-        onSuccess={() =>
-          queryClient.invalidateQueries({ queryKey: ["reajustes_list", tenantId] })
-        }
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["reajustes_list", tenantId] });
+          // Reajuste altera mensalidade dos clientes e gera movimentos_mrr tipo 'reajuste'.
+          // Invalida caches que alimentam o "MRR Atual" no cadastro do cliente.
+          queryClient.invalidateQueries({ queryKey: ["movimentos_mrr_totals"] });
+          queryClient.invalidateQueries({ queryKey: ["cliente"] });
+          queryClient.invalidateQueries({ queryKey: ["contratos_cliente"] });
+          queryClient.invalidateQueries({ queryKey: ["contrato_itens_cliente"] });
+          queryClient.invalidateQueries({ queryKey: ["cliente_produtos"] });
+        }}
       />
 
       <AlertDialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
