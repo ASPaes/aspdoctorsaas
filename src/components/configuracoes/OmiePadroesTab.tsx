@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Save, AlertCircle } from "lucide-react";
 
 type Opt = { codigo: string | number; descricao: string; cod_lc116?: string | null };
@@ -39,7 +40,10 @@ type Padroes = {
   postergar_finais_semana?: boolean | null;
   adicionar_periodo_referencia?: boolean | null;
   adicionar_vencimento_parcela?: boolean | null;
+  modelos_permitidos?: string[] | null;
 };
+
+type ModeloContrato = { id: string; nome: string };
 
 type LerResp = {
   ok: boolean;
@@ -78,6 +82,14 @@ export default function OmiePadroesTab() {
   const [postergarFds, setPostergarFds] = useState(false);
   const [addPeriodoRef, setAddPeriodoRef] = useState(false);
   const [addVencParcela, setAddVencParcela] = useState(false);
+
+  // Seção: Data de ativação
+  const [dataCorte, setDataCorte] = useState<string>("");
+  const [savingDataCorte, setSavingDataCorte] = useState(false);
+
+  // Seção: Modelos de contrato permitidos
+  const [modelos, setModelos] = useState<ModeloContrato[]>([]);
+  const [modelosPermitidos, setModelosPermitidos] = useState<string[]>([]);
 
   useEffect(() => {
     void carregar();
@@ -141,6 +153,22 @@ export default function OmiePadroesTab() {
       setPostergarFds(!!p.postergar_finais_semana);
       setAddPeriodoRef(!!p.adicionar_periodo_referencia);
       setAddVencParcela(!!p.adicionar_vencimento_parcela);
+      setModelosPermitidos(Array.isArray(p.modelos_permitidos) ? p.modelos_permitidos.filter((n): n is string => typeof n === "string") : []);
+
+      // Data de corte + lista de modelos (paralelo)
+      const [omieRow, modelosRes] = await Promise.all([
+        (supabase.from("omie_integration" as any) as any)
+          .select("integrar_a_partir_de")
+          .eq("tenant_id", tid)
+          .maybeSingle(),
+        (supabase.from("modelos_contrato" as any) as any)
+          .select("id, nome")
+          .eq("tenant_id", tid)
+          .order("nome"),
+      ]);
+      const dc = (omieRow?.data as any)?.integrar_a_partir_de ?? null;
+      setDataCorte(dc ? String(dc).slice(0, 10) : "");
+      setModelos(((modelosRes?.data as any[]) ?? []).map((m) => ({ id: String(m.id), nome: String(m.nome) })));
     } catch (err: any) {
       setErro(err?.message || "Erro ao carregar padrões.");
     } finally {
@@ -196,6 +224,7 @@ export default function OmiePadroesTab() {
         postergar_finais_semana: postergarFds,
         adicionar_periodo_referencia: addPeriodoRef,
         adicionar_vencimento_parcela: addVencParcela,
+        modelos_permitidos: modelosPermitidos,
       };
 
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
@@ -210,6 +239,31 @@ export default function OmiePadroesTab() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function salvarDataCorte() {
+    setSavingDataCorte(true);
+    try {
+      const { error } = await (supabase as any).rpc("salvar_data_corte_omie", {
+        p_tenant_id: tid,
+        p_data: dataCorte || null,
+      });
+      if (error) throw error;
+      toast({ title: "Data de ativação salva" });
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar data", description: err?.message || "Tente novamente.", variant: "destructive" });
+    } finally {
+      setSavingDataCorte(false);
+    }
+  }
+
+  function toggleModelo(nome: string, checked: boolean) {
+    setModelosPermitidos((prev) => {
+      const set = new Set(prev);
+      if (checked) set.add(nome);
+      else set.delete(nome);
+      return Array.from(set);
+    });
   }
 
   if (loading) {
@@ -369,6 +423,62 @@ export default function OmiePadroesTab() {
           ))}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Data de ativação da integração</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <Label>Integrar contratos criados a partir de</Label>
+            <Input
+              type="date"
+              value={dataCorte}
+              onChange={(e) => setDataCorte(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Somente contratos criados a partir desta data poderão ser enviados ao Omie. Contratos anteriores não são afetados. Deixe em branco para manter a integração desligada.
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={salvarDataCorte} disabled={savingDataCorte}>
+              {savingDataCorte ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar data de ativação
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Modelos de contrato permitidos</CardTitle>
+          <CardDescription>
+            Selecione quais modelos de contrato podem ser enviados ao Omie. Se nenhum for selecionado, nenhum contrato será enviado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {modelos.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum modelo de contrato cadastrado.</p>
+          ) : (
+            modelos.map((m) => {
+              const checked = modelosPermitidos.includes(m.nome);
+              return (
+                <div key={m.id} className="flex items-center gap-2 rounded-md border p-3">
+                  <Checkbox
+                    id={`modelo-${m.id}`}
+                    checked={checked}
+                    onCheckedChange={(v) => toggleModelo(m.nome, v === true)}
+                  />
+                  <Label htmlFor={`modelo-${m.id}`} className="text-sm font-normal cursor-pointer">
+                    {m.nome}
+                  </Label>
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
 
       <div className="flex justify-end">
         <Button onClick={salvar} disabled={saving}>
