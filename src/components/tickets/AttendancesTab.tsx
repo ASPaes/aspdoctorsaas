@@ -273,7 +273,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveInstanceFilter, page, isAdminOrHead, userId, debouncedSearch, clienteIdOverride ?? null, selectedUnidadeId],
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveInstanceFilter, effectiveResolucaoFilter, effectiveTipoFilter, page, isAdminOrHead, userId, debouncedSearch, clienteIdOverride ?? null, selectedUnidadeId],
     enabled: !!tid,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
@@ -283,7 +283,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
           wait_seconds, handle_seconds, first_response_time_seconds,
           msg_customer_count, msg_agent_count, assigned_to,
           ai_summary, ai_category, ai_problem, ai_solution, ticket_id, cliente_id, contact_id, department_id,
-          csat_sent, csat_score, last_sentiment,
+          csat_sent, csat_score, last_sentiment, resolucao, is_group,
           contact_name, contact_phone, instance_id, unidade_base_id,
           whatsapp_contacts:contact_id(name, phone_number),
           clientes:cliente_id(nome_fantasia),
