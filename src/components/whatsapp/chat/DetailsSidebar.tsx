@@ -344,8 +344,6 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
           </CollapsibleSection>
 
           <Separator />
-
-          <Separator />
           {/* ─── 8. Sentimento IA ─── */}
           <CollapsibleSection
             icon={<MessageSquare className="h-3.5 w-3.5" />}
@@ -584,8 +582,6 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               )}
             </>
           )}
-
-          <Separator />
 
           <Separator />
           {/* ─── 12. Monitor do grupo ─── */}
