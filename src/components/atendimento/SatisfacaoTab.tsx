@@ -69,13 +69,20 @@ export function SatisfacaoTab() {
       ) : (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <KPICardEnhanced
-              label="CSAT Médio"
-              helpKey="atendimento_csat_media"
-              value={data.media !== null ? data.media.toFixed(1) : "—"}
-              subtitle={`${data.respostas} respostas`}
-              icon={<Star className="h-4 w-4" />}
-            />
+            <button
+              type="button"
+              onClick={() => setCsatModalOpen(true)}
+              className="block w-full text-left cursor-pointer rounded-xl border border-transparent hover:border-primary/50 transition-colors"
+              title="Ver avaliações"
+            >
+              <KPICardEnhanced
+                label="CSAT Médio"
+                helpKey="atendimento_csat_media"
+                value={data.media !== null ? data.media.toFixed(1) : "—"}
+                subtitle={`${data.respostas} respostas`}
+                icon={<Star className="h-4 w-4" />}
+              />
+            </button>
             <KPICardEnhanced
               label="Taxa de Resposta"
               helpKey="atendimento_response_rate"
