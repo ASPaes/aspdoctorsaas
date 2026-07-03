@@ -153,6 +153,22 @@ export default function OmiePadroesTab() {
       setPostergarFds(!!p.postergar_finais_semana);
       setAddPeriodoRef(!!p.adicionar_periodo_referencia);
       setAddVencParcela(!!p.adicionar_vencimento_parcela);
+      setModelosPermitidos(Array.isArray(p.modelos_permitidos) ? p.modelos_permitidos.filter((n): n is string => typeof n === "string") : []);
+
+      // Data de corte + lista de modelos (paralelo)
+      const [omieRow, modelosRes] = await Promise.all([
+        (supabase.from("omie_integration" as any) as any)
+          .select("integrar_a_partir_de")
+          .eq("tenant_id", tid)
+          .maybeSingle(),
+        (supabase.from("modelos_contrato" as any) as any)
+          .select("id, nome")
+          .eq("tenant_id", tid)
+          .order("nome"),
+      ]);
+      const dc = (omieRow?.data as any)?.integrar_a_partir_de ?? null;
+      setDataCorte(dc ? String(dc).slice(0, 10) : "");
+      setModelos(((modelosRes?.data as any[]) ?? []).map((m) => ({ id: String(m.id), nome: String(m.nome) })));
     } catch (err: any) {
       setErro(err?.message || "Erro ao carregar padrões.");
     } finally {
