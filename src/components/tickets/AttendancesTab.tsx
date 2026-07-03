@@ -836,6 +836,11 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
                     </Popover>
                   )}
                   <div className="flex-1" />
+                  {att.is_group && (
+                    <Badge variant="outline" className="text-[10px] shrink-0 gap-1">
+                      <Users className="h-3 w-3" /> Grupo
+                    </Badge>
+                  )}
                   <Badge variant="outline" className={`text-[10px] shrink-0 ${STATUS_CLASSES[att.status] ?? ""}`}>
                     {STATUS_LABELS[att.status] ?? att.status}
                   </Badge>
