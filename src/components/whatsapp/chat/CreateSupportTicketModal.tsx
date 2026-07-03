@@ -206,7 +206,8 @@ export function CreateSupportTicketModal({
 
     setIsSubmitting(true);
     try {
-      const { data, error } = await (supabase.rpc as any)("create_ticket_from_closure", {
+      const rpcName = mode === 'demanda_externa' ? 'create_demand_ticket_from_attendance' : 'create_ticket_from_closure';
+      const { data, error } = await (supabase.rpc as any)(rpcName, {
         p_attendance_id: attendanceId,
         p_produto_id: Number(produtoId),
         p_category_id: categoryId,
