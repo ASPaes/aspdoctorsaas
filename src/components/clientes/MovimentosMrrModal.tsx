@@ -237,6 +237,10 @@ export function MovimentosMrrModal({
 
       if (error) throw error;
       setMovimentos((data as unknown as MovimentoMrr[]) || []);
+      // Invalidate downstream caches (MRR Atual em FinanceiroCard, financeiro tab, cliente header)
+      qc.invalidateQueries({ queryKey: ['movimentos_mrr_totals', clienteId] });
+      qc.invalidateQueries({ queryKey: ['cliente', clienteId] });
+      qc.invalidateQueries({ queryKey: ['cliente_produtos_ativacao', clienteId] });
     } catch (error) {
       console.error('Error fetching movimentos:', error);
       toast.error('Erro ao carregar movimentos');
