@@ -57,6 +57,7 @@ export function useAtendimentoAgentes() {
         agentes_ativos: Number(d.agentes_ativos ?? 0),
         csat_equipe: num(d.csat_equipe),
         csat_equipe_n: Number(d.csat_equipe_n ?? 0),
+        csat_equipe_sent_n: Number(d.csat_equipe_sent_n ?? 0),
         reabertura_equipe_pct: num(d.reabertura_equipe_pct),
         agentes: ((d.agentes ?? []) as any[]).map((r) => ({
           agent_id: String(r.agent_id),
