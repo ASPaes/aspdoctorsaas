@@ -249,7 +249,7 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
       try {
         const { data: cfg } = await supabase
           .from("configuracoes")
-          .select("churn_alert_enabled, churn_alert_phone_numbers, churn_alert_instance_id")
+          .select("churn_alert_enabled")
           .eq("tenant_id", convData.tenant_id)
           .maybeSingle();
 
@@ -266,47 +266,16 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
             const title = `\u26A0\uFE0F Risco de churn: ${contactName}`;
             const body = reason.substring(0, 500);
 
-            const { error: notifErr } = await supabase.rpc("notify_churn_alert", {
-              p_tenant_id: convData.tenant_id,
-              p_conversation_id: conversationId,
-              p_title: title,
-              p_body: body,
-            });
-            if (notifErr) console.error("[churn-alert] notify_churn_alert error:", notifErr.message);
-
-            const phones: string[] = Array.isArray(cfg.churn_alert_phone_numbers) ? cfg.churn_alert_phone_numbers : [];
-            if (cfg.churn_alert_instance_id && phones.length > 0) {
-              try {
-                const { data: inst } = await supabase
-                  .from("whatsapp_instances")
-                  .select("id, instance_name, provider_type, instance_id_external, meta_phone_number_id")
-                  .eq("id", cfg.churn_alert_instance_id)
-                  .maybeSingle();
-
-                if (inst) {
-                  const secrets = await getInstanceSecrets(supabase, inst.id);
-                  const adapter = getAdapter(inst.provider_type);
-                  const alertText = `\u26A0\uFE0F ALERTA DE CHURN\nCliente: ${contactName} (${contactPhone})\nMotivo: ${reason}\nAbra o DoctorSaaS para ver a conversa.`;
-
-                  for (const rawPhone of phones) {
-                    const to = String(rawPhone).replace(/\D/g, "");
-                    if (!to) continue;
-                    try {
-                      await adapter.send(secrets as any, inst as any, {
-                        to,
-                        messageType: "text",
-                        content: alertText,
-                      });
-                      console.log(`[churn-alert] sent to ${to}`);
-                    } catch (sendErr: any) {
-                      console.error(`[churn-alert] send error to ${to}:`, sendErr?.message || sendErr);
-                    }
-                  }
-                }
-              } catch (instErr: any) {
-                console.error("[churn-alert] instance send block error:", instErr?.message || instErr);
-              }
-            }
+            await notifyEvent(
+              supabase,
+              convData.tenant_id,
+              "churn_alert",
+              conversationId,
+              title,
+              `Cliente: ${contactName} (${contactPhone})\nMotivo: ${reason.substring(0, 400)}\nAbra o DoctorSaaS para ver a conversa.`,
+              { source: "churn_alert", conversation_id: conversationId, contact_name: contactName, contact_phone: contactPhone },
+              `/whatsapp?conversation=${conversationId}`
+            );
 
             await supabase
               .from("whatsapp_sentiment_analysis")
