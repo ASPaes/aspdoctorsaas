@@ -320,12 +320,19 @@ export function ChatsTab() {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="text-sm font-semibold mb-3">Por sentimento</h3>
-              <Barras rows={data.por_sentimento.map((r) => ({ key: r.sentimento, nome: SENT_LABEL[r.sentimento] ?? r.sentimento, qtd: r.qtd, pct: r.pct, color: sentColor(r.sentimento) }))} />
+              <h3 className="text-sm font-semibold mb-1">Por sentimento</h3>
+              <p className="text-xs text-muted-foreground mb-3">% sobre os atendimentos analisados ({sentimentTotal.toLocaleString("pt-BR")} de {data.total.toLocaleString("pt-BR")})</p>
+              <Barras rows={data.por_sentimento.map((r) => ({ key: r.sentimento, nome: SENT_LABEL[r.sentimento] ?? r.sentimento, qtd: r.qtd, pct: sentimentTotal > 0 ? (100 * r.qtd) / sentimentTotal : 0, color: sentColor(r.sentimento) }))} />
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="text-sm font-semibold mb-3">Por resolução</h3>
-              <Barras rows={data.por_resolucao.map((r) => ({ key: r.resolucao, nome: RESOL_LABEL[r.resolucao] ?? r.resolucao, qtd: r.qtd, pct: r.pct, color: resolColor(r.resolucao) }))} />
+              <h3 className="text-sm font-semibold mb-1">Por resolução</h3>
+              <p className="text-xs text-muted-foreground mb-3">% sobre os atendimentos analisados ({resolucaoTotal.toLocaleString("pt-BR")} de {data.total.toLocaleString("pt-BR")})</p>
+              <Barras rows={resolucaoRows.map((r) => ({ key: r.resolucao, nome: RESOL_LABEL[r.resolucao] ?? r.resolucao, qtd: r.qtd, pct: resolucaoTotal > 0 ? (100 * r.qtd) / resolucaoTotal : 0, color: resolColor(r.resolucao) }))} />
+              {semAnaliseQtd > 0 && (
+                <p className="text-xs text-muted-foreground mt-3">
+                  Sem análise: {semAnaliseQtd.toLocaleString("pt-BR")} atendimentos ({Math.round((100 * semAnaliseQtd) / data.total)}% do total)
+                </p>
+              )}
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-3">CSAT — distribuição das notas</h3>
