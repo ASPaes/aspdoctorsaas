@@ -210,7 +210,16 @@ async function downloadAndUploadMedia(
 
 // ── Helpers de status / revoke / edit ────────────────────────────────────────
 
+// Cache in-memory de resolução de instância (TTL 5 min).
+// Evita 1 query por evento de webhook — ACKs de status são o grosso do volume.
+// Só cacheia resultados positivos: instância não encontrada sempre re-consulta.
+const instanceResolveCache = new Map<string, { value: { instanceId: string; tenantId: string }; expiresAt: number }>();
+const INSTANCE_CACHE_TTL_MS = 5 * 60 * 1000;
+
 async function resolveInstanceTenant(supabase: any, instance: string): Promise<{ instanceId: string; tenantId: string } | null> {
+  const cached = instanceResolveCache.get(instance);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
   let { data } = await supabase.from('whatsapp_instances')
     .select('id, tenant_id').eq('instance_name', instance).maybeSingle();
   if (!data) {
@@ -219,7 +228,9 @@ async function resolveInstanceTenant(supabase: any, instance: string): Promise<{
     data = cloud;
   }
   if (!data) return null;
-  return { instanceId: data.id, tenantId: data.tenant_id };
+  const value = { instanceId: data.id, tenantId: data.tenant_id };
+  instanceResolveCache.set(instance, { value, expiresAt: Date.now() + INSTANCE_CACHE_TTL_MS });
+  return value;
 }
 
 async function refreshConversationPreviewAfterRevoke(supabase: any, conversationId: string): Promise<void> {
