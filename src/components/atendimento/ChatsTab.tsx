@@ -173,6 +173,11 @@ export function ChatsTab() {
   const { data, isLoading, isError, error } = useAtendimentoChats({ closedReasons, hasTicket, sentiments, resolucoes });
 
   const { data: timeline } = useAtendimentoChatsTimeline();
+  const sentimentTotal = data ? data.por_sentimento.reduce((a, s) => a + s.qtd, 0) : 0;
+  const resolucaoRows = data ? data.por_resolucao.filter((r) => r.resolucao !== "(sem)") : [];
+  const resolucaoTotal = resolucaoRows.reduce((a, r) => a + r.qtd, 0);
+  const semAnaliseRow = data?.por_resolucao.find((r) => r.resolucao === "(sem)");
+  const semAnaliseQtd = semAnaliseRow?.qtd ?? 0;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
@@ -305,12 +310,12 @@ export function ChatsTab() {
             <div className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs text-muted-foreground">Sentimento negativo</p>
               <p className="text-2xl font-semibold tabular-nums">{(() => { const ts = data.por_sentimento.reduce((a, s) => a + s.qtd, 0); const neg = data.por_sentimento.find((s) => s.sentimento === "negative")?.qtd ?? 0; return Math.round(ts > 0 ? (100 * neg) / ts : 0); })()}%</p>
-              <p className="text-xs text-muted-foreground mt-1">dos atendimentos analisados</p>
+              <p className="text-xs text-muted-foreground mt-1">dos {sentimentTotal.toLocaleString("pt-BR")} analisados</p>
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs text-muted-foreground">Sem solução</p>
               <p className="text-2xl font-semibold tabular-nums">{(() => { const analisados = data.por_resolucao.filter((r) => r.resolucao !== "(sem)").reduce((a, r) => a + r.qtd, 0); const semSol = data.por_resolucao.filter((r) => r.resolucao === "nao_resolvido" || r.resolucao === "sem_resposta_agente").reduce((a, r) => a + r.qtd, 0); return Math.round(analisados > 0 ? (100 * semSol) / analisados : 0); })()}%</p>
-              <p className="text-xs text-muted-foreground mt-1">dos atendimentos analisados</p>
+              <p className="text-xs text-muted-foreground mt-1">dos {resolucaoTotal.toLocaleString("pt-BR")} analisados</p>
             </div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
