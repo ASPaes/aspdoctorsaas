@@ -116,10 +116,11 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
   const scoreParam = scoreFilter !== "all" ? parseInt(scoreFilter) : null;
   const commentParam = commentFilter === "with" ? true : commentFilter === "without" ? false : null;
   const clienteParam = clienteFilterId ?? null;
+  const tipoParam: boolean | null = tipoFilter === "group" ? true : tipoFilter === "individual" ? false : null;
 
   useEffect(() => {
     setAiAnalysis(null);
-  }, [deptFilter, agentFilter, scoreFilter, commentFilter, clienteFilterId]);
+  }, [deptFilter, agentFilter, scoreFilter, commentFilter, clienteFilterId, tipoFilter]);
 
   const { data: departments = [] } = useQuery({
     queryKey: ["csat-departments", tenantId],
