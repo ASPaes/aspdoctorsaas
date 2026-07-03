@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { useProfile } from "@/hooks/useProfile";
+import EnviarContratoOmieButton from "./EnviarContratoOmieButton";
 
 interface Props {
   clienteId: string;
