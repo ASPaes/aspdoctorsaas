@@ -123,17 +123,17 @@ serve(async (req) => {
 
     const { data: messages, error: messagesError } = await supabase
       .from("whatsapp_messages")
-      .select("content, timestamp, audio_transcription, message_type")
+      .select("content, timestamp, audio_transcription, message_type, is_from_me")
       .eq("conversation_id", conversationId)
-      .eq("is_from_me", false)
       .order("timestamp", { ascending: false })
-      .limit(10);
+      .limit(20);
 
     if (messagesError) throw messagesError;
 
-    if (!messages || messages.length < 3) {
+    const clientMessagesCount = (messages || []).filter((m: any) => !m.is_from_me).length;
+    if (!messages || clientMessagesCount < 3) {
       return new Response(
-        JSON.stringify({ success: false, error: "insufficient_messages", message: `Mínimo 3 mensagens do cliente necessário para análise (encontradas: ${messages?.length || 0}).` }),
+        JSON.stringify({ success: false, error: "insufficient_messages", message: `Mínimo 3 mensagens do cliente necessário para análise (encontradas: ${clientMessagesCount}).` }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -141,23 +141,26 @@ serve(async (req) => {
     const orderedMessages = [...messages].reverse();
     const messagesText = orderedMessages
       .map((msg: any, index: number) => {
+        const role = msg.is_from_me ? "[Atendente]" : "[Cliente]";
         const text =
           msg.message_type === "audio" && msg.audio_transcription
             ? `[Áudio transcrito]: "${msg.audio_transcription}"`
             : `"${msg.content}"`;
-        return `${index + 1}. [${new Date(msg.timestamp).toLocaleString("pt-BR")}]: ${text}`;
+        return `${index + 1}. ${role} [${new Date(msg.timestamp).toLocaleString("pt-BR")}]: ${text}`;
       })
       .join("\n");
+
 
     const prompt = `Analise o sentimento das últimas mensagens deste cliente de WhatsApp e avalie se é necessário abrir um ticket de Customer Success (CS).
 
 Mensagens (mais antigas para mais recentes):
 ${messagesText}
 
-Critérios de Análise de Sentimento:
-- positive: Cliente satisfeito, agradecido, animado, elogios
-- neutral: Tom profissional, dúvidas técnicas, informações
-- negative: Frustrado, insatisfeito, reclamando, impaciente
+Critérios de Análise de Sentimento (avalie o CLIENTE, usando as respostas do atendente como contexto):
+- positive: cliente satisfeito, agradecido, elogiando o atendimento ou a empresa
+- neutral: tom profissional, dúvidas técnicas, relato de problemas/erros do sistema SEM insatisfação com o atendimento ou com a empresa. Relatar um problema técnico é NORMAL e NÃO é negativo — inclusive se o problema ainda não foi resolvido.
+- negative: insatisfação dirigida ao ATENDIMENTO ou à EMPRESA: reclamação de demora ou descaso, frustração recorrente ("de novo isso", "sempre a mesma coisa"), tom hostil, ameaça de cancelamento/troca.
+
 
 Critérios para abertura de Ticket CS (needs_cs_ticket = true):
 - Cliente demonstra insatisfação persistente ou crescente

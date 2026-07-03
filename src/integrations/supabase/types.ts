@@ -8107,7 +8107,9 @@ export type Database = {
           p_has_ticket?: boolean
           p_is_group?: boolean
           p_produto_ids?: number[]
+          p_resolucoes?: string[]
           p_segmento_ids?: number[]
+          p_sentiments?: string[]
           p_tenant_id: string
           p_unidade_base_id?: number
         }
