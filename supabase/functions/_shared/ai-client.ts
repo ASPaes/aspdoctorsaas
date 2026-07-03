@@ -110,7 +110,7 @@ export async function callAI(
         ? `${baseUrl}/chat/completions`
         : "https://api.openai.com/v1/chat/completions";
 
-    const body: any = { model, messages: enrichedMessages, max_completion_tokens: 1500 };
+    const body: any = { model, messages: enrichedMessages, max_completion_tokens: tools && tools.length > 0 ? 4000 : 1500 };
     if (tools && tools.length > 0) {
       body.tools = tools;
       body.tool_choice = { type: "function", function: { name: tools[0].function.name } };
@@ -156,6 +156,14 @@ export async function callAI(
     if (systemParts.length > 0) {
       body.system = systemParts.join("\n\n---\n\n");
     }
+    if (tools && tools.length > 0) {
+      body.tools = tools.map((t: any) => ({
+        name: t.function.name,
+        description: t.function.description,
+        input_schema: t.function.parameters,
+      }));
+      body.tool_choice = { type: "tool", name: tools[0].function.name };
+    }
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -171,7 +179,9 @@ export async function callAI(
     const data = await res.json();
     const inputTokens = data.usage?.input_tokens ?? 0;
     const outputTokens = data.usage?.output_tokens ?? 0;
-    return { content: data.content?.[0]?.text ?? "", usage: { inputTokens, outputTokens, estimatedCostUsd: calcCost(config.model, inputTokens, outputTokens) } };
+    const toolUse = Array.isArray(data.content) ? data.content.find((b: any) => b.type === "tool_use") : null;
+    const content = toolUse ? JSON.stringify(toolUse.input) : (data.content?.find((b: any) => b.type === "text")?.text ?? "");
+    return { content, usage: { inputTokens, outputTokens, estimatedCostUsd: calcCost(config.model, inputTokens, outputTokens) } };
   }
 
   if (provider === "gemini") {
