@@ -187,6 +187,10 @@ export function useNotifications() {
   return {
     unreadCount,
     notifications,
+    systemNotifications,
+    operationNotifications,
+    systemUnreadCount,
+    operationUnreadCount,
     isLoading,
     markRead: markReadMutation.mutate,
     dismiss: dismissMutation.mutate,
