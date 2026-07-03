@@ -14,7 +14,7 @@ export interface AgentAvailability {
 }
 
 export function useAgentAvailability(): AgentAvailability {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const { data: supportConfig } = useSupportConfig();
 
@@ -22,14 +22,14 @@ export function useAgentAvailability(): AgentAvailability {
     (supportConfig as any)?.distribution_enabled_globally === true;
 
   const { data, isLoading } = useQuery({
-    queryKey: ['agent-availability', user?.id],
-    enabled: !!user?.id,
+    queryKey: ['agent-availability', user?.id, (profile as any)?.tenant_id],
+    enabled: !!user?.id && !!(profile as any)?.tenant_id,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const [currentRes, limitRes] = await Promise.all([
-        supabase.rpc('fn_current_chat_count' as any, { p_user_id: user!.id }),
-        supabase.rpc('fn_effective_chat_limit' as any, { p_user_id: user!.id }),
+        supabase.rpc('fn_current_chat_count' as any, { p_user_id: user!.id, p_tenant_id: (profile as any)!.tenant_id }),
+        supabase.rpc('fn_effective_chat_limit' as any, { p_user_id: user!.id, p_tenant_id: (profile as any)!.tenant_id }),
       ]);
 
       if (currentRes.error) throw currentRes.error;
