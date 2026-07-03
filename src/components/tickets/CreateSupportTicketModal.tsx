@@ -22,10 +22,11 @@ interface Props {
   // Closure mode props
   fromClosure?: boolean;
   /**
-   * 'initial'    → create_ticket_from_closure (atendimento sem ticket vinculado)
-   * 'additional' → create_additional_ticket_from_attendance (atendimento reaberto, novo ticket adicional)
+   * 'initial'         → create_ticket_from_closure (atendimento sem ticket vinculado)
+   * 'additional'      → create_additional_ticket_from_attendance (atendimento reaberto, novo ticket adicional)
+   * 'demanda_externa' → create_demand_ticket_from_attendance (ticket avulso aberto a partir de atendimento, inclusive em andamento)
    */
-  mode?: "initial" | "additional";
+  mode?: "initial" | "additional" | "demanda_externa";
   attendanceId?: string | null;
   closureClienteId?: string | null;
   closureClienteNome?: string | null;
