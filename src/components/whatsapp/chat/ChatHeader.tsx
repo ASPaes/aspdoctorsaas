@@ -135,13 +135,20 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     },
   });
 
-  const canPickAttendance = useCallback((a: any) => {
+  const getPickMode = useCallback((a: any): 'classificacao' | 'demanda_externa' => {
     const isClosed = a?.status === 'closed' || a?.status === 'inactive_closed';
-    if (!isClosed) return false;
-    if (a?.ticket_id) return false;
+    if (isClosed && !a?.ticket_id) return 'classificacao';
+    return 'demanda_externa';
+  }, []);
+
+  const canPickAttendance = useCallback((a: any) => {
+    if (!a) return false;
+    const mode = getPickMode(a);
+    if (mode === 'demanda_externa') return true;
+    // classificacao: mantém regra original (admin/head ou assigned_to)
     if (isAdmin) return true;
     return !!user?.id && a?.assigned_to === user.id;
-  }, [isAdmin, user?.id]);
+  }, [isAdmin, user?.id, getPickMode]);
 
   // Carimba cliente no atendimento (se faltar) antes de abrir o modal
   const openTicketForAttendance = useCallback(async (target: any) => {
@@ -1149,36 +1156,33 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             )}
             {!isLoadingAttendanceList && filteredAttendanceList.map((a) => {
               const hasTicket = !!a.ticket_id;
-              const noPermission = !isAdmin && a.assigned_to !== user?.id;
               const isOpen = a.status !== 'closed' && a.status !== 'inactive_closed';
-              // Atendimento em andamento bloqueia somente quando NÃO há ticket vinculado.
-              // Quando há ticket vinculado, o item é clicável para abrir o ticket em modo leitura.
-              const isOpenWithoutTicket = isOpen && !hasTicket;
-              const isOpenWithTicket = isOpen && hasTicket;
-              const disabled = isOpenWithoutTicket || noPermission || (hasTicket && !isOpenWithTicket);
+              const pickMode = getPickMode(a);
+              const allowed = canPickAttendance(a);
               const selected = pickerSelectedId === a.id;
+              const noPermissionClassif = pickMode === 'classificacao' && !allowed;
 
               const handleClick = () => {
-                if (isOpenWithTicket) {
-                  // Apenas visualização read-only do ticket vinculado
-                  setShowAttendanceTicketPicker(false);
-                  setReadOnlyTicketId(a.ticket_id);
-                  return;
-                }
-                if (!disabled) setPickerSelectedId(a.id);
+                if (!allowed) return;
+                setPickerSelectedId(a.id);
               };
 
-              const clickable = isOpenWithTicket || !disabled;
+              const handleViewTicket = (e: React.MouseEvent) => {
+                e.stopPropagation();
+                setShowAttendanceTicketPicker(false);
+                setReadOnlyTicketId(a.ticket_id);
+              };
 
               const row = (
-                <button
+                <div
                   key={a.id}
-                  type="button"
-                  disabled={!clickable}
+                  role="button"
+                  tabIndex={allowed ? 0 : -1}
                   onClick={handleClick}
-                  className={`w-full text-left rounded-md border px-3 py-2 transition-colors ${
-                    selected && !disabled ? 'border-primary bg-primary/5' : 'border-border'
-                  } ${!clickable ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted/50'}`}
+                  onKeyDown={(e) => { if (allowed && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); handleClick(); } }}
+                  className={`group w-full text-left rounded-md border px-3 py-2 transition-colors ${
+                    selected && allowed ? 'border-primary bg-primary/5' : 'border-border'
+                  } ${!allowed ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted/50 cursor-pointer'}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
@@ -1188,36 +1192,44 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                       <p className="text-[11px] text-muted-foreground">
                         {format(new Date(a.created_at), 'dd/MM/yyyy HH:mm')} · {a.status}
                       </p>
-                      {isOpenWithoutTicket && (
-                        <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
-                          Encerre o atendimento para gerar o ticket.
-                        </p>
-                      )}
-                      {isOpenWithTicket && (
-                        <p className="text-[11px] text-muted-foreground mt-1">
-                          Clique para abrir o ticket vinculado (somente leitura).
+                      {pickMode === 'demanda_externa' && allowed && (
+                        <p className={`text-[11px] text-muted-foreground mt-1 ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                          Abre um ticket de demanda externa (não encerra o atendimento).
                         </p>
                       )}
                     </div>
-                    {isOpenWithTicket ? (
-                      <Badge variant="secondary" className="text-[10px] shrink-0 whitespace-nowrap">
-                        Ticket vinculado
-                      </Badge>
-                    ) : isOpen ? (
-                      <Badge variant="outline" className="text-[10px] shrink-0 border-amber-500/50 text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                        Em atendimento
-                      </Badge>
-                    ) : hasTicket ? (
-                      <Badge variant="secondary" className="text-[10px] shrink-0">Ticket já criado</Badge>
-                    ) : null}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isOpen && !hasTicket ? (
+                        <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                          Em atendimento
+                        </Badge>
+                      ) : isOpen && hasTicket ? (
+                        <Badge variant="secondary" className="text-[10px] whitespace-nowrap">
+                          Ticket vinculado
+                        </Badge>
+                      ) : hasTicket ? (
+                        <Badge variant="secondary" className="text-[10px]">Ticket já criado</Badge>
+                      ) : null}
+                      {hasTicket && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-6 px-2 text-[11px]"
+                          onClick={handleViewTicket}
+                        >
+                          Ver ticket
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </button>
+                </div>
               );
-              if (noPermission && !hasTicket && !isOpen) {
+              if (noPermissionClassif) {
                 return (
                   <Tooltip key={a.id}>
                     <TooltipTrigger asChild><div>{row}</div></TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">Sem permissão</TooltipContent>
+                    <TooltipContent side="top" className="text-xs">Sem permissão para classificar este atendimento</TooltipContent>
                   </Tooltip>
                 );
               }
@@ -1248,6 +1260,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           }}
           onCreated={handleAttendanceTicketCreated}
           fromClosure
+          mode={getPickMode(attendanceTicketTarget) as any}
           attendanceId={attendanceTicketTarget.id}
           closureClienteId={attendanceTicketTarget.clientes?.id ?? closureClienteIdEff}
           closureClienteNome={attendanceTicketTarget.clientes?.nome_fantasia ?? closureClienteNomeEff}
