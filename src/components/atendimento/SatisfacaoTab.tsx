@@ -158,9 +158,10 @@ export function SatisfacaoTab() {
                         <span className="text-xs text-muted-foreground tabular-nums">
                           n={s.respostas}
                         </span>
-                        <span className="font-semibold tabular-nums w-10 text-right">
-                          {s.media !== null ? s.media.toFixed(1) : "—"}
+                        <span className="font-semibold tabular-nums w-12 text-right">
+                          {s.media !== null ? s.media.toFixed(2) : "—"}
                         </span>
+
                       </div>
                     </div>
                   ))}
