@@ -1,4 +1,4 @@
-import { useEffect, useState, KeyboardEvent } from "react";
+import { useEffect, useState, KeyboardEvent, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -15,13 +16,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertTriangle, X, Loader2 } from "lucide-react";
+import { AlertTriangle, X, Loader2, Plus } from "lucide-react";
+
+interface Recipient {
+  user_id: string | null;
+  nome: string | null;
+  phone: string;
+}
 
 interface ChurnConfig {
   churn_alert_enabled: boolean;
   churn_alert_keywords: string[];
   churn_alert_phone_numbers: string[];
   churn_alert_instance_id: string | null;
+  churn_alert_recipients: Recipient[];
 }
 
 const NONE_VALUE = "__none__";
@@ -31,6 +39,7 @@ export default function ChurnAlertCard() {
   const queryClient = useQueryClient();
   const [keywordInput, setKeywordInput] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
+  const [selectedAdmin, setSelectedAdmin] = useState<string>("");
 
   const configQueryKey = ["churn-alert-config", tid];
   const usageQueryKey = ["churn-alert-usage", tid];
@@ -41,20 +50,29 @@ export default function ChurnAlertCard() {
     queryFn: async () => {
       const { data, error } = await (supabase.from("configuracoes" as any) as any)
         .select(
-          "churn_alert_enabled, churn_alert_keywords, churn_alert_phone_numbers, churn_alert_instance_id"
+          "churn_alert_enabled, churn_alert_keywords, churn_alert_phone_numbers, churn_alert_instance_id, churn_alert_recipients"
         )
         .eq("tenant_id", tid)
         .maybeSingle();
       if (error) throw error;
+      const rawRecipients = Array.isArray(data?.churn_alert_recipients)
+        ? (data.churn_alert_recipients as Recipient[])
+        : [];
+      const phones = Array.isArray(data?.churn_alert_phone_numbers)
+        ? (data.churn_alert_phone_numbers as string[])
+        : [];
+      let recipients: Recipient[] = rawRecipients;
+      if (recipients.length === 0 && phones.length > 0) {
+        recipients = phones.map((p) => ({ user_id: null, nome: null, phone: p }));
+      }
       return {
         churn_alert_enabled: !!data?.churn_alert_enabled,
         churn_alert_keywords: Array.isArray(data?.churn_alert_keywords)
           ? data.churn_alert_keywords
           : [],
-        churn_alert_phone_numbers: Array.isArray(data?.churn_alert_phone_numbers)
-          ? data.churn_alert_phone_numbers
-          : [],
+        churn_alert_phone_numbers: phones,
         churn_alert_instance_id: data?.churn_alert_instance_id ?? null,
+        churn_alert_recipients: recipients,
       };
     },
   });
@@ -75,6 +93,41 @@ export default function ChurnAlertCard() {
         instance_name: string;
         display_name?: string | null;
       }>;
+    },
+  });
+
+  const { data: admins } = useQuery({
+    queryKey: ["churn-alert-admins", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data: profs, error } = await (supabase as any)
+        .from("profiles")
+        .select("user_id, email, funcionario_id")
+        .eq("tenant_id", tid)
+        .eq("role", "admin");
+      if (error) throw error;
+      const list = (profs ?? []) as Array<{
+        user_id: string;
+        email: string | null;
+        funcionario_id: string | null;
+      }>;
+      const funcIds = list.map((p) => p.funcionario_id).filter(Boolean) as string[];
+      let nomesById: Record<string, string> = {};
+      if (funcIds.length > 0) {
+        const { data: funcs } = await (supabase as any)
+          .from("funcionarios")
+          .select("id, nome")
+          .in("id", funcIds);
+        for (const f of (funcs ?? []) as Array<{ id: string; nome: string }>) {
+          nomesById[f.id] = f.nome;
+        }
+      }
+      return list
+        .map((p) => ({
+          user_id: p.user_id,
+          nome: (p.funcionario_id && nomesById[p.funcionario_id]) || p.email || p.user_id,
+        }))
+        .sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
     },
   });
 
@@ -129,6 +182,12 @@ export default function ChurnAlertCard() {
     if (config) setLocal(config);
   }, [config]);
 
+  const adminOptions = useMemo(() => {
+    if (!admins) return [];
+    const used = new Set((local?.churn_alert_recipients ?? []).map((r) => r.user_id).filter(Boolean));
+    return admins.filter((a) => !used.has(a.user_id));
+  }, [admins, local?.churn_alert_recipients]);
+
   if (configLoading || !local) {
     return (
       <Card>
@@ -170,23 +229,44 @@ export default function ChurnAlertCard() {
     await persist({ churn_alert_keywords: next });
   };
 
-  const addPhone = async () => {
-    const p = phoneInput.replace(/\D/g, "");
-    if (!p) return;
-    if (local.churn_alert_phone_numbers.includes(p)) {
-      setPhoneInput("");
-      return;
-    }
-    const next = [...local.churn_alert_phone_numbers, p];
-    setLocal({ ...local, churn_alert_phone_numbers: next });
-    setPhoneInput("");
-    await persist({ churn_alert_phone_numbers: next });
+  const persistRecipients = async (next: Recipient[]) => {
+    const phones = next.map((r) => r.phone);
+    setLocal({
+      ...local,
+      churn_alert_recipients: next,
+      churn_alert_phone_numbers: phones,
+    });
+    await persist({
+      churn_alert_recipients: next as any,
+      churn_alert_phone_numbers: phones,
+    });
   };
 
-  const removePhone = async (p: string) => {
-    const next = local.churn_alert_phone_numbers.filter((x) => x !== p);
-    setLocal({ ...local, churn_alert_phone_numbers: next });
-    await persist({ churn_alert_phone_numbers: next });
+  const addRecipient = async () => {
+    const phone = phoneInput.replace(/\D/g, "");
+    if (!phone) {
+      toast.error("Informe um número de WhatsApp");
+      return;
+    }
+    if (local.churn_alert_recipients.some((r) => r.phone === phone)) {
+      toast.error("Número já cadastrado");
+      return;
+    }
+    const admin = admins?.find((a) => a.user_id === selectedAdmin);
+    const rec: Recipient = {
+      user_id: admin?.user_id ?? null,
+      nome: admin?.nome ?? null,
+      phone,
+    };
+    const next = [...local.churn_alert_recipients, rec];
+    setPhoneInput("");
+    setSelectedAdmin("");
+    await persistRecipients(next);
+  };
+
+  const removeRecipient = async (phone: string) => {
+    const next = local.churn_alert_recipients.filter((r) => r.phone !== phone);
+    await persistRecipients(next);
   };
 
   const changeInstance = async (v: string) => {
@@ -205,7 +285,7 @@ export default function ChurnAlertCard() {
   const onPhoneKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      addPhone();
+      addRecipient();
     }
   };
 
@@ -299,36 +379,59 @@ export default function ChurnAlertCard() {
               </Select>
             </div>
 
-            {/* Telefones */}
+            {/* Destinatários */}
             <div className="space-y-2">
-              <Label className="text-sm">Números que recebem o aviso</Label>
+              <Label className="text-sm">Administradores que recebem o aviso</Label>
               <div className="flex flex-wrap gap-2">
-                {local.churn_alert_phone_numbers.map((p) => (
-                  <Badge key={p} variant="secondary" className="gap-1 pr-1">
-                    {p}
+                {local.churn_alert_recipients.map((r) => (
+                  <Badge key={r.phone} variant="secondary" className="gap-1 pr-1">
+                    {(r.nome ?? "(sem admin)") + " · " + r.phone}
                     <button
                       type="button"
-                      onClick={() => removePhone(p)}
+                      onClick={() => removeRecipient(r.phone)}
                       className="rounded-full hover:bg-muted-foreground/20 p-0.5"
-                      aria-label={`Remover ${p}`}
+                      aria-label={`Remover ${r.phone}`}
                     >
                       <X className="h-3 w-3" />
                     </button>
                   </Badge>
                 ))}
-                {local.churn_alert_phone_numbers.length === 0 && (
+                {local.churn_alert_recipients.length === 0 && (
                   <span className="text-xs text-muted-foreground">
-                    Nenhum número cadastrado.
+                    Nenhum destinatário cadastrado.
                   </span>
                 )}
               </div>
-              <Input
-                value={phoneInput}
-                onChange={(e) => setPhoneInput(e.target.value)}
-                onKeyDown={onPhoneKeyDown}
-                placeholder="5547999999999"
-                inputMode="numeric"
-              />
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Select value={selectedAdmin} onValueChange={setSelectedAdmin}>
+                  <SelectTrigger className="sm:w-[240px]">
+                    <SelectValue placeholder="Selecione um administrador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {adminOptions.length === 0 && (
+                      <SelectItem value="__empty__" disabled>
+                        Nenhum admin disponível
+                      </SelectItem>
+                    )}
+                    {adminOptions.map((a) => (
+                      <SelectItem key={a.user_id} value={a.user_id}>
+                        {a.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ""))}
+                  onKeyDown={onPhoneKeyDown}
+                  placeholder="5547999999999"
+                  inputMode="numeric"
+                  className="sm:flex-1"
+                />
+                <Button type="button" onClick={addRecipient} variant="secondary">
+                  <Plus className="h-4 w-4 mr-1" /> Adicionar
+                </Button>
+              </div>
             </div>
           </div>
         )}
