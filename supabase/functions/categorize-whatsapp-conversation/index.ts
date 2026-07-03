@@ -75,7 +75,8 @@ serve(async (req) => {
       .from("whatsapp_messages")
       .select("content, is_from_me, message_type")
       .eq("conversation_id", conversationId)
-      .order("timestamp", { ascending: true });
+      .order("timestamp", { ascending: false })
+      .limit(100);
 
     if (msgError) throw msgError;
 
