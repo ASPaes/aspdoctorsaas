@@ -367,6 +367,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
               onClick={() => {
                 setDeptFilter("all");
                 setAgentFilter("all");
+                setTipoFilter("all");
                 setScoreFilter("all");
                 setCommentFilter("all");
                 setClienteFilterId(null);
