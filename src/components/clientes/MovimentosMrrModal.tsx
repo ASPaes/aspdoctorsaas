@@ -179,6 +179,7 @@ export function MovimentosMrrModal({
   funcionarios,
 }: MovimentosMrrModalProps) {
   const { user, profile } = useAuth();
+  const qc = useQueryClient();
   const draftKey = `draft:mov_mrr:${profile?.tenant_id ?? "t"}:${user?.id ?? "u"}:new:${clienteId}`;
 
   const { data: origensCatalogo = [], isLoading: loadingOrigens } = useQuery<OrigemOption[]>({
