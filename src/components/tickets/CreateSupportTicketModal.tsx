@@ -22,10 +22,11 @@ interface Props {
   // Closure mode props
   fromClosure?: boolean;
   /**
-   * 'initial'    → create_ticket_from_closure (atendimento sem ticket vinculado)
-   * 'additional' → create_additional_ticket_from_attendance (atendimento reaberto, novo ticket adicional)
+   * 'initial'         → create_ticket_from_closure (atendimento sem ticket vinculado)
+   * 'additional'      → create_additional_ticket_from_attendance (atendimento reaberto, novo ticket adicional)
+   * 'demanda_externa' → create_demand_ticket_from_attendance (ticket avulso aberto a partir de atendimento, inclusive em andamento)
    */
-  mode?: "initial" | "additional";
+  mode?: "initial" | "additional" | "demanda_externa";
   attendanceId?: string | null;
   closureClienteId?: string | null;
   closureClienteNome?: string | null;
@@ -527,7 +528,9 @@ export function CreateSupportTicketModal({
         const closureRpcName =
           mode === "additional"
             ? "create_additional_ticket_from_attendance"
-            : "create_ticket_from_closure";
+            : mode === "demanda_externa"
+              ? "create_demand_ticket_from_attendance"
+              : "create_ticket_from_closure";
         const { data: rpcData, error } = await (supabase.rpc as any)(closureRpcName, {
           p_attendance_id: attendanceId,
           p_produto_id: Number(produtoId),
@@ -594,7 +597,11 @@ export function CreateSupportTicketModal({
 
       }
 
-      toast.success("Ticket criado com sucesso");
+      toast.success(
+        fromClosure && mode === "demanda_externa"
+          ? "Ticket de demanda externa aberto!"
+          : "Ticket criado com sucesso"
+      );
       onCreated?.();
       onOpenChange(false);
     } catch (err: any) {
@@ -654,7 +661,13 @@ export function CreateSupportTicketModal({
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 pr-12 pt-4 pb-3 border-b">
-          <h3 className="text-base font-medium">{fromClosure ? "Classificar atendimento" : "Novo ticket"}</h3>
+          <h3 className="text-base font-medium">
+            {fromClosure
+              ? mode === "demanda_externa"
+                ? "Novo ticket — demanda externa"
+                : "Classificar atendimento"
+              : "Novo ticket"}
+          </h3>
           <div className="flex items-center gap-1.5">
             {(() => {
               const currentStatus = ticketStatuses.find(s => s.id === statusId);
