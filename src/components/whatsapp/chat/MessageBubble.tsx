@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
-import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare, EyeOff, Loader2, AlertCircle, RotateCcw, MoreVertical, Reply } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare, EyeOff, Loader2, AlertCircle, RotateCcw, MoreVertical, Reply, FileText } from "lucide-react";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { MediaContent } from "./MediaContent";
 import { ContactCard } from "./ContactCard";
@@ -86,8 +87,28 @@ export function MessageBubble({
   const isPending = deleteStatus === 'pending';
   const isFailed = deleteStatus === 'failed';
 
-  const hasTranscription = msg.message_type === 'audio' && msg.audio_transcription;
-  const isTranscribing = msg.message_type === 'audio' && msg.transcription_status === 'processing';
+  const isAudio = msg.message_type === 'audio' || msg.message_type === 'ptt' || (msg.media_mimetype?.startsWith('audio/') ?? false);
+  const hasTranscription = isAudio && !!msg.audio_transcription;
+  const transcriptionStatus = msg.transcription_status;
+  const isTranscribing = isAudio && (transcriptionStatus === 'processing' || transcriptionStatus === 'pending');
+  const [requestingTranscription, setRequestingTranscription] = useState(false);
+
+  const handleRequestTranscription = async () => {
+    if (requestingTranscription || isTranscribing) return;
+    setRequestingTranscription(true);
+    try {
+      const { error } = await supabase.functions.invoke('transcribe-whatsapp-audio', {
+        body: { messageId: msg.id },
+      });
+      if (error) throw error;
+      toast.success('Transcrição solicitada');
+    } catch (e: any) {
+      toast.error(e?.message || 'Falha ao transcrever áudio');
+    } finally {
+      setRequestingTranscription(false);
+    }
+  };
+
 
   if (isSystem) {
     const isInactivityWarning = (msg as any).metadata?.inactivity_warning === true;
@@ -316,33 +337,49 @@ export function MessageBubble({
       )}
       {msg.content && msg.message_type !== 'contact' && msg.message_type !== 'contacts' && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{msg.content}</p>}
 
-      {hasTranscription && (
+      {isAudio && (
         <div className="mt-1 min-w-0">
-          <button
-            onClick={() => setShowTranscription(!showTranscription)}
-            className={cn(
-              "flex items-center gap-1 text-[10px] font-medium opacity-70 hover:opacity-100 transition-opacity",
-              isFromMe ? "text-primary-foreground" : "text-foreground"
-            )}
-          >
-            {showTranscription ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            Transcrição
-          </button>
-          {showTranscription && (
-            <p className={cn(
-              "text-[11px] mt-0.5 whitespace-pre-wrap break-words italic opacity-80",
-              isFromMe ? "text-primary-foreground" : "text-foreground"
-            )}>
-              {msg.audio_transcription}
+          {hasTranscription ? (
+            <>
+              <button
+                onClick={() => setShowTranscription(!showTranscription)}
+                className={cn(
+                  "flex items-center gap-1 text-[10px] font-medium opacity-70 hover:opacity-100 transition-opacity",
+                  isFromMe ? "text-primary-foreground" : "text-foreground"
+                )}
+              >
+                {showTranscription ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                Transcrição
+              </button>
+              {showTranscription && (
+                <p className={cn(
+                  "text-[11px] mt-0.5 whitespace-pre-wrap break-words italic opacity-80",
+                  isFromMe ? "text-primary-foreground" : "text-foreground"
+                )}>
+                  {msg.audio_transcription}
+                </p>
+              )}
+            </>
+          ) : isTranscribing || requestingTranscription ? (
+            <p className={cn("flex items-center gap-1 text-[10px] italic opacity-60", isFromMe ? "text-primary-foreground" : "text-foreground")}>
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Transcrevendo áudio...
             </p>
+          ) : (
+            <button
+              onClick={handleRequestTranscription}
+              className={cn(
+                "flex items-center gap-1 text-[10px] font-medium opacity-70 hover:opacity-100 transition-opacity",
+                isFromMe ? "text-primary-foreground" : "text-foreground"
+              )}
+            >
+              <FileText className="h-3 w-3" />
+              Transcrever áudio
+            </button>
           )}
         </div>
       )}
-      {isTranscribing && (
-        <p className={cn("text-[10px] mt-0.5 italic opacity-50", isFromMe ? "text-primary-foreground" : "text-foreground")}>
-          Transcrevendo áudio...
-        </p>
-      )}
+
 
       <div className={cn("flex items-center gap-1 mt-0.5", isFromMe ? "justify-end" : "justify-start")}>
         <span className="text-[10px] opacity-60">{time}</span>
