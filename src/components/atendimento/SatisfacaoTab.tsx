@@ -172,6 +172,58 @@ export function SatisfacaoTab() {
 
           <div className="rounded-lg border border-border bg-card p-4">
             <div className="mb-3 flex items-center gap-2">
+              <h3 className="text-sm font-semibold">CSAT por Agente</h3>
+              <KpiHelpPopover kpiKey="atendimento_csat_por_agente" />
+            </div>
+            {data.por_agente.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sem pesquisas no período.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs uppercase text-muted-foreground border-b border-border/50">
+                      <th className="text-left font-medium py-2 pr-3">Agente</th>
+                      <th className="text-right font-medium py-2 px-3">Enviadas</th>
+                      <th className="text-right font-medium py-2 px-3">Respondidas</th>
+                      <th className="text-right font-medium py-2 px-3">Taxa de Resposta</th>
+                      <th className="text-right font-medium py-2 pl-3">Nota</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.por_agente.map((a) => (
+                      <tr
+                        key={a.agent_id ?? a.nome}
+                        className="border-b border-border/50 last:border-0"
+                      >
+                        <td className="py-2 pr-3 truncate">{a.nome}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">{a.enviadas}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">{a.respondidas}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">
+                          <div className="flex items-center justify-end gap-2">
+                            <span>{a.taxa_pct !== null ? `${a.taxa_pct}%` : "—"}</span>
+                            <div className="h-2 w-24 rounded bg-muted overflow-hidden">
+                              <div
+                                className="h-full bg-primary"
+                                style={{ width: `${a.taxa_pct ?? 0}%` }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2 pl-3 text-right font-semibold tabular-nums">
+                          {a.media !== null ? a.media.toFixed(2) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+
+
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="mb-3 flex items-center gap-2">
               <h3 className="text-sm font-semibold">Tempo de Resolução por Nota</h3>
               <KpiHelpPopover kpiKey="atendimento_resol_csat" />
             </div>
