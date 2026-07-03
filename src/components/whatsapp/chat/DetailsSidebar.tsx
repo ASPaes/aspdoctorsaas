@@ -55,6 +55,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const { summary: conversationSummary, generateSummary, isGenerating } = useConversationSummaries(conversation.id);
   const { sentiment: sentimentRaw, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const sentiment = sentimentRaw as any;
+  const { data: latestResolucao } = useLatestAttendanceResolucao(conversation.id);
   const { data: topicsData } = useConversationTopics(conversation.id);
   const categorizeMutation = useCategorizeConversation();
   const { updateContact, isUpdatingContact, toggleRulesDisabled, isTogglingRulesDisabled } = useWhatsAppActions();
