@@ -40,7 +40,10 @@ type Padroes = {
   postergar_finais_semana?: boolean | null;
   adicionar_periodo_referencia?: boolean | null;
   adicionar_vencimento_parcela?: boolean | null;
+  modelos_permitidos?: string[] | null;
 };
+
+type ModeloContrato = { id: string; nome: string };
 
 type LerResp = {
   ok: boolean;
