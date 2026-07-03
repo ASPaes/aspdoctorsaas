@@ -241,6 +241,10 @@ export function MovimentosMrrModal({
       qc.invalidateQueries({ queryKey: ['movimentos_mrr_totals', clienteId] });
       qc.invalidateQueries({ queryKey: ['cliente', clienteId] });
       qc.invalidateQueries({ queryKey: ['cliente_produtos_ativacao', clienteId] });
+      // Listagem de clientes (MRR Atual/Ticket Médio na tela /clientes)
+      qc.invalidateQueries({ queryKey: ['clientes_lista'] });
+      qc.invalidateQueries({ queryKey: ['clientes_ticket_medio'] });
+      qc.invalidateQueries({ queryKey: ['movimentos_mrr_deltas_lista'] });
     } catch (error) {
       console.error('Error fetching movimentos:', error);
       toast.error('Erro ao carregar movimentos');
