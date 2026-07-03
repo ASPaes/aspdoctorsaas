@@ -226,6 +226,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
   
   const invalidateThrottleRef = useRef<number>(0);
   const insertDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const softRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const channelName = `conversations-rt-${tid ?? 'none'}`;
@@ -248,11 +249,14 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           if (!old?.conversations) return old;
           const existing = old.conversations.find((c: any) => c.id === updated.id);
           if (!existing) {
-            // Conversation not in current page — schedule a soft refetch
-            setTimeout(() => {
-              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
-              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
-            }, 500);
+            // Conversation not in current page — coalesce em 1 refetch a cada 2s no máximo
+            if (!softRefetchTimerRef.current) {
+              softRefetchTimerRef.current = setTimeout(() => {
+                softRefetchTimerRef.current = null;
+                queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+                queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
+              }, 2000);
+            }
             return old;
           }
 
@@ -318,7 +322,10 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (softRefetchTimerRef.current) { clearTimeout(softRefetchTimerRef.current); softRefetchTimerRef.current = null; }
+      supabase.removeChannel(channel);
+    };
   }, [queryClient, tid]);
 
   return {
