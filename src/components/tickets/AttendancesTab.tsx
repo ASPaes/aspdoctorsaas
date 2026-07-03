@@ -173,7 +173,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
 
   useEffect(() => {
     setPage(0);
-  }, [dateRange, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, instanceFilter, debouncedSearch]);
+  }, [dateRange, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, instanceFilter, resolucaoFilter, tipoFilter, debouncedSearch]);
 
   const { data: agentes = [] } = useQuery({
     queryKey: ["attendances_agentes", tid],
