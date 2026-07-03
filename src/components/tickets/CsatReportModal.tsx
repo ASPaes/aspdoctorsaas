@@ -564,7 +564,9 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
                         <button
                           type="button"
                           onClick={() => {
-                            if (onNavigateToAttendance) {
+                            if (onOpenAttendance) {
+                              onOpenAttendance(a.attendance_id);
+                            } else if (onNavigateToAttendance) {
                               onNavigateToAttendance(a.attendance_code);
                               onOpenChange(false);
                             }
