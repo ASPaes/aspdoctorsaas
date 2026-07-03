@@ -41,7 +41,15 @@ Deno.serve(async (req) => {
       throw new Error("Acesso negado: apenas admins podem testar IA");
     }
 
-    const tenantId = profile.tenant_id;
+    let requestedTenantId: string | null = null;
+    try {
+      const body = await req.json();
+      requestedTenantId = body?.tenant_id || null;
+    } catch { /* body vazio ou inválido — segue com o tenant do profile */ }
+
+    const tenantId = profile.is_super_admin && requestedTenantId
+      ? requestedTenantId
+      : profile.tenant_id;
 
     const { data: settings, error: settingsErr } = await supabase
       .from("ai_settings")
