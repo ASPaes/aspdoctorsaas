@@ -52,6 +52,9 @@ export default function Dashboard() {
         <p className="mt-1 text-muted-foreground">Visão completa dos indicadores de performance.</p>
       </div>
 
+      <NotificationSetupBanner />
+
+
       <DashboardFilters
         filters={filters}
         onFiltersChange={setFilters}
