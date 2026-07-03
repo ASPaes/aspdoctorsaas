@@ -66,7 +66,11 @@ export function AgentesTab() {
               label="CSAT da Equipe"
               helpKey="atendimento_csat_equipe"
               value={data.csat_equipe !== null ? data.csat_equipe.toFixed(1) : "—"}
-              subtitle={`${data.csat_equipe_n} respostas`}
+              subtitle={
+                data.csat_equipe_sent_n > 0
+                  ? `${data.csat_equipe_sent_n} enviadas · ${data.csat_equipe_n} respostas (${Math.round(100 * data.csat_equipe_n / data.csat_equipe_sent_n)}%)`
+                  : `${data.csat_equipe_n} respostas`
+              }
               icon={<Star className="h-4 w-4" />}
             />
             <KPICardEnhanced
