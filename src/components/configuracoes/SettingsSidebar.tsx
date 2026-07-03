@@ -35,6 +35,7 @@ export const SECTION_TO_RESOURCE: Record<string, string> = {
   // Sistema
   "geral": "cfg.geral",
   "setup": "cfg.setup",
+  "notificacoes": "cfg.notificacoes",
   // Atendimento
   "canais": "cfg.canais",
   "distribuicao": "cfg.distribuicao",
@@ -119,6 +120,7 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
         {
           items: [
             { value: "geral", label: "Geral" },
+            { value: "notificacoes", label: "Notificações" },
             { value: "setup", label: "Guia de configuração" },
           ],
         },
