@@ -454,6 +454,8 @@ export default function Configuracoes() {
         return <ChatTimezoneSelector />;
       case "setup":
         return <SetupGuideCollapsible />;
+      case "notificacoes":
+        return <NotificacoesTab />;
       case "integracoes-omie":
         return <OmieIntegrationTab />;
       default:
