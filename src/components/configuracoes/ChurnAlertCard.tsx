@@ -102,13 +102,13 @@ export default function ChurnAlertCard() {
     queryFn: async () => {
       const { data: profs, error } = await (supabase as any)
         .from("profiles")
-        .select("user_id, email, funcionario_id")
+        .select("user_id, role, funcionario_id")
         .eq("tenant_id", tid)
-        .eq("role", "admin");
+        .in("role", ["admin", "head"]);
       if (error) throw error;
       const list = (profs ?? []) as Array<{
         user_id: string;
-        email: string | null;
+        role: string;
         funcionario_id: string | null;
       }>;
       const funcIds = list.map((p) => p.funcionario_id).filter(Boolean) as string[];
@@ -125,7 +125,10 @@ export default function ChurnAlertCard() {
       return list
         .map((p) => ({
           user_id: p.user_id,
-          nome: (p.funcionario_id && nomesById[p.funcionario_id]) || p.email || p.user_id,
+          role: p.role,
+          nome:
+            (p.funcionario_id && nomesById[p.funcionario_id]) ||
+            "Usuário " + p.user_id.slice(0, 8),
         }))
         .sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
     },
@@ -381,7 +384,7 @@ export default function ChurnAlertCard() {
 
             {/* Destinatários */}
             <div className="space-y-2">
-              <Label className="text-sm">Administradores que recebem o aviso</Label>
+              <Label className="text-sm">Administradores e Heads que recebem o aviso</Label>
               <div className="flex flex-wrap gap-2">
                 {local.churn_alert_recipients.map((r) => (
                   <Badge key={r.phone} variant="secondary" className="gap-1 pr-1">
@@ -415,7 +418,7 @@ export default function ChurnAlertCard() {
                     )}
                     {adminOptions.map((a) => (
                       <SelectItem key={a.user_id} value={a.user_id}>
-                        {a.nome}
+                        {a.role === "head" ? `${a.nome} (Head)` : a.nome}
                       </SelectItem>
                     ))}
                   </SelectContent>
