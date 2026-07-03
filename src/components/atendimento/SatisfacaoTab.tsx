@@ -208,10 +208,12 @@ export function SatisfacaoTab() {
         initialTipo={tipoAtendimento}
         scoreMax={scoreMax}
         isAdmin={profile?.role === "admin" || profile?.is_super_admin}
-        onNavigateToAttendance={(code) => {
-          setCsatModalOpen(false);
-          navigate("/tickets");
-        }}
+        onOpenAttendance={(id) => setDetailAttendanceId(id)}
+      />
+      <AttendanceDetailModal
+        attendanceId={detailAttendanceId}
+        open={!!detailAttendanceId}
+        onOpenChange={(o) => !o && setDetailAttendanceId(null)}
       />
     </div>
   );
