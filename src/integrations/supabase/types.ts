@@ -8278,6 +8278,8 @@ export type Database = {
           p_date_from: string
           p_date_to: string
           p_department_id?: string
+          p_is_group?: boolean
+          p_resolucao?: string
           p_sentiment_filter?: string
           p_status?: string
           p_tenant_id?: string
@@ -9129,6 +9131,10 @@ export type Database = {
       resolve_user_notification_settings: {
         Args: { p_user_id: string }
         Returns: Json
+      }
+      salvar_data_corte_omie: {
+        Args: { p_data: string; p_tenant_id: string }
+        Returns: string
       }
       salvar_integracao_omie: {
         Args: { p_chave: string; p_tenant_id?: string }

@@ -18,8 +18,26 @@ import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
 import { subDays } from "date-fns";
 import {
   Search, Inbox, SlidersHorizontal, X, Clock, MessageCircle, User,
-  ChevronLeft, ChevronRight, Headphones, Plus, TicketCheck, Building2,
+  ChevronLeft, ChevronRight, Headphones, Plus, TicketCheck, Building2, Users,
 } from "lucide-react";
+
+const RESOLUCAO_LABELS: Record<string, string> = {
+  resolvido: "✅ Resolvido",
+  parcial: "🟡 Parcial",
+  nao_resolvido: "🟠 Sem solução",
+  sem_resposta_agente: "🔴 Sem resposta",
+  "(sem)": "Sem análise",
+};
+const RESOLUCAO_CLASSES: Record<string, string> = {
+  resolvido: "bg-green-500/10 text-green-400 border-green-500/20",
+  parcial: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  nao_resolvido: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+  sem_resposta_agente: "bg-red-500/10 text-red-400 border-red-500/20",
+};
+const TIPO_LABELS: Record<string, string> = {
+  individual: "Individual",
+  group: "Grupos",
+};
 
 const PAGE_SIZE = 100;
 
@@ -72,11 +90,13 @@ interface Props {
   ticketFilterOverride?: string;
   sentimentFilterOverride?: string;
   instanceFilterOverride?: string;
+  resolucaoFilterOverride?: string;
+  tipoFilterOverride?: string;
   clienteIdOverride?: string | null;
   searchOverride?: string;
 }
 
-function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride, closureTypeOverride, csatFilterOverride, csatScoreFilterOverride, ticketFilterOverride, sentimentFilterOverride, instanceFilterOverride, clienteIdOverride, searchOverride }: Props = {}) {
+function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride, closureTypeOverride, csatFilterOverride, csatScoreFilterOverride, ticketFilterOverride, sentimentFilterOverride, instanceFilterOverride, resolucaoFilterOverride, tipoFilterOverride, clienteIdOverride, searchOverride }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
   const [internalDateRange, setInternalDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
@@ -103,6 +123,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   const [ticketFilter, setTicketFilter] = useState<string>("all");
   const [sentimentFilter, setSentimentFilter] = useState<string>("all");
   const [instanceFilter, setInstanceFilter] = useState<string>("all");
+  const [resolucaoFilter, setResolucaoFilter] = useState<string>("all");
+  const [tipoFilter, setTipoFilter] = useState<string>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -151,7 +173,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
 
   useEffect(() => {
     setPage(0);
-  }, [dateRange, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, instanceFilter, debouncedSearch]);
+  }, [dateRange, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, instanceFilter, resolucaoFilter, tipoFilter, debouncedSearch]);
 
   const { data: agentes = [] } = useQuery({
     queryKey: ["attendances_agentes", tid],
@@ -204,6 +226,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   const effectiveTicketFilter = embedded && ticketFilterOverride && ticketFilterOverride !== "all" ? ticketFilterOverride : ticketFilter;
   const effectiveSentimentFilter = embedded && sentimentFilterOverride && sentimentFilterOverride !== "all" ? sentimentFilterOverride : sentimentFilter;
   const effectiveInstanceFilter = embedded && instanceFilterOverride && instanceFilterOverride !== "all" ? instanceFilterOverride : instanceFilter;
+  const effectiveResolucaoFilter = embedded && resolucaoFilterOverride && resolucaoFilterOverride !== "all" ? resolucaoFilterOverride : resolucaoFilter;
+  const effectiveTipoFilter = embedded && tipoFilterOverride && tipoFilterOverride !== "all" ? tipoFilterOverride : tipoFilter;
 
   const fromISO = dateRange.from.toISOString();
   const toDate = new Date(dateRange.to);
@@ -211,7 +235,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   const toISO = toDate.toISOString();
 
   const { data: metrics } = useQuery({
-    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, isAdminOrHead, userId, clienteIdOverride ?? null, selectedUnidadeId],
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveResolucaoFilter, effectiveTipoFilter, isAdminOrHead, userId, clienteIdOverride ?? null, selectedUnidadeId],
     enabled: !!tid,
     queryFn: async () => {
       const toEnd = new Date(dateRange.to);
@@ -230,6 +254,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
         p_sentiment_filter: effectiveSentimentFilter !== "all" ? effectiveSentimentFilter : null,
         p_cliente_id: clienteIdOverride ?? null,
         p_unidade_base_id: selectedUnidadeId ?? null,
+        p_resolucao: effectiveResolucaoFilter !== "all" ? effectiveResolucaoFilter : null,
+        p_is_group: effectiveTipoFilter === "all" ? null : effectiveTipoFilter === "group",
       });
       if (error) throw error;
       return data as {
@@ -247,7 +273,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveInstanceFilter, page, isAdminOrHead, userId, debouncedSearch, clienteIdOverride ?? null, selectedUnidadeId],
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveInstanceFilter, effectiveResolucaoFilter, effectiveTipoFilter, page, isAdminOrHead, userId, debouncedSearch, clienteIdOverride ?? null, selectedUnidadeId],
     enabled: !!tid,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
@@ -257,7 +283,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
           wait_seconds, handle_seconds, first_response_time_seconds,
           msg_customer_count, msg_agent_count, assigned_to,
           ai_summary, ai_category, ai_problem, ai_solution, ticket_id, cliente_id, contact_id, department_id,
-          csat_sent, csat_score, last_sentiment,
+          csat_sent, csat_score, last_sentiment, resolucao, is_group,
           contact_name, contact_phone, instance_id, unidade_base_id,
           whatsapp_contacts:contact_id(name, phone_number),
           clientes:cliente_id(nome_fantasia),
@@ -282,6 +308,11 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
       if (effectiveTicketFilter === "without") q = q.is("ticket_id", null);
       if (effectiveSentimentFilter !== "all") q = q.eq("last_sentiment", effectiveSentimentFilter);
       if (effectiveInstanceFilter !== "all") q = q.eq("instance_id", effectiveInstanceFilter);
+      if (effectiveResolucaoFilter !== "all") {
+        q = effectiveResolucaoFilter === "(sem)" ? q.is("resolucao", null) : q.eq("resolucao", effectiveResolucaoFilter);
+      }
+      if (effectiveTipoFilter === "group") q = q.eq("is_group", true);
+      if (effectiveTipoFilter === "individual") q = q.eq("is_group", false);
       if (clienteIdOverride) q = q.eq("cliente_id", clienteIdOverride);
       if (selectedUnidadeId) q = q.eq("unidade_base_id", selectedUnidadeId);
       if (debouncedSearch.trim().length >= 2) {
@@ -314,8 +345,10 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
     if (ticketFilter !== "all") c++;
     if (sentimentFilter !== "all") c++;
     if (instanceFilter !== "all") c++;
+    if (resolucaoFilter !== "all") c++;
+    if (tipoFilter !== "all") c++;
     return c;
-  }, [atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, instanceFilter]);
+  }, [atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, instanceFilter, resolucaoFilter, tipoFilter]);
 
   const clearAdvancedFilters = () => {
     setAtendenteFilter("all");
@@ -326,6 +359,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
     setTicketFilter("all");
     setSentimentFilter("all");
     setInstanceFilter("all");
+    setResolucaoFilter("all");
+    setTipoFilter("all");
   };
 
   const CSAT_FILTER_LABELS: Record<string, string> = {
@@ -356,6 +391,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
       const i = instances.find((x: any) => x.id === value);
       return i ? (i.display_name || i.instance_name) : value;
     }
+    if (type === "resolucao") return `Resolução: ${RESOLUCAO_LABELS[value] ?? value}`;
+    if (type === "tipo") return `Tipo: ${TIPO_LABELS[value] ?? value}`;
     return value;
   };
 
@@ -474,6 +511,31 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">Resolução</label>
+            <Select value={resolucaoFilter} onValueChange={setResolucaoFilter}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="resolvido">✅ Resolvido</SelectItem>
+                <SelectItem value="parcial">🟡 Parcial</SelectItem>
+                <SelectItem value="nao_resolvido">🟠 Sem solução</SelectItem>
+                <SelectItem value="sem_resposta_agente">🔴 Sem resposta</SelectItem>
+                <SelectItem value="(sem)">Sem análise</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">Tipo</label>
+            <Select value={tipoFilter} onValueChange={setTipoFilter}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="individual">Individual</SelectItem>
+                <SelectItem value="group">Grupos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         {activeFilterCount > 0 && (
           <div className="flex justify-end mt-3 pt-3 border-t">
@@ -558,6 +620,24 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
         >
           {getFilterLabel("instance", instanceFilter)}
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      {resolucaoFilter !== "all" && (
+        <button
+          onClick={() => setResolucaoFilter("all")}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+        >
+          {getFilterLabel("resolucao", resolucaoFilter)}
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      {tipoFilter !== "all" && (
+        <button
+          onClick={() => setTipoFilter("all")}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+        >
+          {getFilterLabel("tipo", tipoFilter)}
           <X className="h-3 w-3" />
         </button>
       )}
@@ -756,6 +836,11 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
                     </Popover>
                   )}
                   <div className="flex-1" />
+                  {att.is_group && (
+                    <Badge variant="outline" className="text-[10px] shrink-0 gap-1">
+                      <Users className="h-3 w-3" /> Grupo
+                    </Badge>
+                  )}
                   <Badge variant="outline" className={`text-[10px] shrink-0 ${STATUS_CLASSES[att.status] ?? ""}`}>
                     {STATUS_LABELS[att.status] ?? att.status}
                   </Badge>
@@ -774,6 +859,11 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
                   {att.status === "closed" && att.closure_type && (
                     <Badge variant="outline" className={`text-[10px] shrink-0 ${CLOSURE_CLASSES[att.closure_type] ?? ""}`}>
                       {CLOSURE_LABELS[att.closure_type] ?? att.closure_type}
+                    </Badge>
+                  )}
+                  {att.status === "closed" && att.resolucao && (
+                    <Badge variant="outline" className={`text-[10px] shrink-0 ${RESOLUCAO_CLASSES[att.resolucao] ?? ""}`}>
+                      {RESOLUCAO_LABELS[att.resolucao] ?? att.resolucao}
                     </Badge>
                   )}
                   <div className="flex-1" />
