@@ -235,7 +235,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   const toISO = toDate.toISOString();
 
   const { data: metrics } = useQuery({
-    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, isAdminOrHead, userId, clienteIdOverride ?? null, selectedUnidadeId],
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveResolucaoFilter, effectiveTipoFilter, isAdminOrHead, userId, clienteIdOverride ?? null, selectedUnidadeId],
     enabled: !!tid,
     queryFn: async () => {
       const toEnd = new Date(dateRange.to);
@@ -254,6 +254,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
         p_sentiment_filter: effectiveSentimentFilter !== "all" ? effectiveSentimentFilter : null,
         p_cliente_id: clienteIdOverride ?? null,
         p_unidade_base_id: selectedUnidadeId ?? null,
+        p_resolucao: effectiveResolucaoFilter !== "all" ? effectiveResolucaoFilter : null,
+        p_is_group: effectiveTipoFilter === "all" ? null : effectiveTipoFilter === "group",
       });
       if (error) throw error;
       return data as {
