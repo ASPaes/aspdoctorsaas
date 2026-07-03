@@ -308,6 +308,11 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
       if (effectiveTicketFilter === "without") q = q.is("ticket_id", null);
       if (effectiveSentimentFilter !== "all") q = q.eq("last_sentiment", effectiveSentimentFilter);
       if (effectiveInstanceFilter !== "all") q = q.eq("instance_id", effectiveInstanceFilter);
+      if (effectiveResolucaoFilter !== "all") {
+        q = effectiveResolucaoFilter === "(sem)" ? q.is("resolucao", null) : q.eq("resolucao", effectiveResolucaoFilter);
+      }
+      if (effectiveTipoFilter === "group") q = q.eq("is_group", true);
+      if (effectiveTipoFilter === "individual") q = q.eq("is_group", false);
       if (clienteIdOverride) q = q.eq("cliente_id", clienteIdOverride);
       if (selectedUnidadeId) q = q.eq("unidade_base_id", selectedUnidadeId);
       if (debouncedSearch.trim().length >= 2) {
