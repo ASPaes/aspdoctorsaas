@@ -94,9 +94,11 @@ function calcCost(model: string, inputTokens: number, outputTokens: number): num
 export async function callAI(
   config: AIConfig,
   messages: { role: string; content: string }[],
-  tools?: any[]
+  tools?: any[],
+  options?: { maxTokens?: number }
 ): Promise<AIResult> {
   const { provider, apiKey, model, baseUrl, systemPrompt } = config;
+  const maxTokens = options?.maxTokens ?? (tools && tools.length > 0 ? 4000 : 1500);
 
   // Injeta o systemPrompt do tenant como primeiro system message
   // se já existir um system no array, o do tenant vem antes (maior prioridade)
@@ -110,7 +112,7 @@ export async function callAI(
         ? `${baseUrl}/chat/completions`
         : "https://api.openai.com/v1/chat/completions";
 
-    const body: any = { model, messages: enrichedMessages, max_completion_tokens: tools && tools.length > 0 ? 4000 : 1500 };
+    const body: any = { model, messages: enrichedMessages, max_completion_tokens: maxTokens };
     if (tools && tools.length > 0) {
       body.tools = tools;
       body.tool_choice = { type: "function", function: { name: tools[0].function.name } };
@@ -150,7 +152,7 @@ export async function callAI(
 
     const body: any = {
       model,
-      max_tokens: 1500,
+      max_tokens: maxTokens,
       messages: userMessages,
     };
     if (systemParts.length > 0) {
@@ -199,7 +201,7 @@ export async function callAI(
         parts: [{ text: m.content }],
       }));
 
-    const body: any = { contents };
+    const body: any = { contents, generationConfig: { maxOutputTokens: maxTokens } };
     if (systemParts.length > 0) {
       body.systemInstruction = { parts: [{ text: systemParts.join("\n\n---\n\n") }] };
     }
