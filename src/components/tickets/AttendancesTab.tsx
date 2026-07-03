@@ -623,6 +623,24 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
           <X className="h-3 w-3" />
         </button>
       )}
+      {resolucaoFilter !== "all" && (
+        <button
+          onClick={() => setResolucaoFilter("all")}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+        >
+          {getFilterLabel("resolucao", resolucaoFilter)}
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      {tipoFilter !== "all" && (
+        <button
+          onClick={() => setTipoFilter("all")}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+        >
+          {getFilterLabel("tipo", tipoFilter)}
+          <X className="h-3 w-3" />
+        </button>
+      )}
       <button
         onClick={clearAdvancedFilters}
         className="text-[11px] text-muted-foreground hover:text-foreground ml-1 transition-colors"
