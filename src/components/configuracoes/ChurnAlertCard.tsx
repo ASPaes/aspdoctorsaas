@@ -125,7 +125,10 @@ export default function ChurnAlertCard() {
       return list
         .map((p) => ({
           user_id: p.user_id,
-          nome: (p.funcionario_id && nomesById[p.funcionario_id]) || p.email || p.user_id,
+          role: p.role,
+          nome:
+            (p.funcionario_id && nomesById[p.funcionario_id]) ||
+            "Usuário " + p.user_id.slice(0, 8),
         }))
         .sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
     },
