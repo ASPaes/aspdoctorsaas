@@ -226,7 +226,7 @@ export default function AISettingsTab() {
       if (!session?.access_token) throw new Error("Sessão expirada");
 
       const { data, error } = await supabase.functions.invoke("test-ai-config-v2", {
-        body: {},
+        body: { tenant_id: tid },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (error) throw error;
@@ -252,6 +252,7 @@ export default function AISettingsTab() {
       if (!session?.access_token) throw new Error("Sessão expirada. Faça login novamente.");
 
       const body: Record<string, string | undefined> = {
+        tenant_id: tid || undefined,
         provider: values.provider,
         model: values.model || undefined,
         base_url: values.provider === "custom" ? values.base_url || undefined : undefined,
