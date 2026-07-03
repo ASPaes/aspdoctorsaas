@@ -141,13 +141,28 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
     enabled: open && !!tenantId,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data } = await (supabase.from("profiles" as any) as any)
-        .select("user_id, full_name")
+      const { data: profs } = await (supabase.from("profiles" as any) as any)
+        .select("user_id, role, funcionario_id")
         .eq("tenant_id", tenantId)
         .in("role", ["admin", "head", "user"])
-        .not("full_name", "is", null)
-        .order("full_name");
-      return (data ?? []) as Array<{ user_id: string; full_name: string }>;
+        .not("funcionario_id", "is", null);
+      const rows = (profs ?? []) as Array<{ user_id: string; role: string; funcionario_id: number }>;
+      const funcIds = Array.from(new Set(rows.map((r) => r.funcionario_id).filter(Boolean)));
+      let nameById = new Map<number, string>();
+      if (funcIds.length) {
+        const { data: funcs } = await (supabase.from("funcionarios" as any) as any)
+          .select("id, nome")
+          .in("id", funcIds);
+        for (const f of (funcs ?? []) as Array<{ id: number; nome: string }>) {
+          nameById.set(f.id, f.nome);
+        }
+      }
+      return rows
+        .map((r) => ({
+          user_id: r.user_id,
+          full_name: nameById.get(r.funcionario_id) ?? `Usuário ${r.user_id.slice(0, 8)}`,
+        }))
+        .sort((a, b) => a.full_name.localeCompare(b.full_name)) as Array<{ user_id: string; full_name: string }>;
     },
   });
 
