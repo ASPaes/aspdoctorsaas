@@ -18,8 +18,26 @@ import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
 import { subDays } from "date-fns";
 import {
   Search, Inbox, SlidersHorizontal, X, Clock, MessageCircle, User,
-  ChevronLeft, ChevronRight, Headphones, Plus, TicketCheck, Building2,
+  ChevronLeft, ChevronRight, Headphones, Plus, TicketCheck, Building2, Users,
 } from "lucide-react";
+
+const RESOLUCAO_LABELS: Record<string, string> = {
+  resolvido: "✅ Resolvido",
+  parcial: "🟡 Parcial",
+  nao_resolvido: "🟠 Sem solução",
+  sem_resposta_agente: "🔴 Sem resposta",
+  "(sem)": "Sem análise",
+};
+const RESOLUCAO_CLASSES: Record<string, string> = {
+  resolvido: "bg-green-500/10 text-green-400 border-green-500/20",
+  parcial: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  nao_resolvido: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+  sem_resposta_agente: "bg-red-500/10 text-red-400 border-red-500/20",
+};
+const TIPO_LABELS: Record<string, string> = {
+  individual: "Individual",
+  group: "Grupos",
+};
 
 const PAGE_SIZE = 100;
 
