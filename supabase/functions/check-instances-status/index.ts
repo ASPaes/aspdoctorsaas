@@ -94,80 +94,29 @@ Deno.serve(async (req) => {
             });
         }
 
-        // ===== Alerta in-app: notificação para admins/heads do tenant =====
-        // Dispara em duas situações:
-        //   1) Transição connected -> disconnected (alerta imediato)
-        //   2) Permanece disconnected há mais de 60min desde o último alerta (re-alerta)
+        // Alerta in-app via notifyEvent (dedupe/cooldown de 60min gerenciado pela RPC)
         if (newStatus === 'disconnected' && tenantId) {
-          const prevAlertAt = (instance as any).disconnected_alert_at
-            ? new Date((instance as any).disconnected_alert_at).getTime()
-            : 0;
-          const justDisconnected = prevStatus === 'connected';
-          const staleAlert = !prevAlertAt || (Date.now() - prevAlertAt) > 60 * 60 * 1000;
+          try {
+            await notifyEvent(
+              supabaseAdmin,
+              tenantId,
+              'whatsapp_instance_disconnected',
+              instance.id,
+              `Instância desconectada: ${instance.instance_name}`,
+              `O WhatsApp da instância "${instance.instance_name}" caiu. Mensagens não estão sendo recebidas nem enviadas. Reconecte no painel de Configurações.`,
+              { instance_id: instance.id, instance_name: instance.instance_name },
+              '/configuracoes?tab=whatsapp'
+            );
+          } catch (inappErr) {
+            console.error(`[check-instances-status] Erro ao enviar notificação in-app para ${instance.instance_name}:`, inappErr);
+          }
+        }
 
-          if (justDisconnected || staleAlert) {
-            try {
-              const { data: admins } = await supabaseAdmin
-                .from('profiles')
-                .select('user_id')
-                .eq('tenant_id', tenantId)
-                .in('role', ['admin', 'head'])
-                .eq('access_status', 'approved');
-
-              if (admins && admins.length > 0) {
-                const { data: tenantData } = await supabaseAdmin
-                  .from('tenants')
-                  .select('nome')
-                  .eq('id', tenantId)
-                  .single();
-
-                const title = justDisconnected
-                  ? `Instância desconectada: ${instance.instance_name}`
-                  : `Instância segue desconectada: ${instance.instance_name}`;
-                const body = justDisconnected
-                  ? `O WhatsApp da instância "${instance.instance_name}" caiu agora. Mensagens não estão sendo recebidas nem enviadas. Reconecte no painel de Configurações.`
-                  : `A instância "${instance.instance_name}" continua desconectada. Reconecte no painel de Configurações para retomar o recebimento e envio de mensagens.`;
-
-                const { data: notif } = await supabaseAdmin
-                  .from('notifications')
-                  .insert({
-                    tenant_id: tenantId,
-                    type: 'whatsapp_instance_disconnected',
-                    severity: 'error',
-                    title,
-                    body,
-                    action_url: '/configuracoes?tab=whatsapp',
-                    metadata: {
-                      instance_id: instance.id,
-                      instance_name: instance.instance_name,
-                      tenant_name: tenantData?.nome || null,
-                      re_alert: !justDisconnected,
-                    },
-                  })
-                  .select('id')
-                  .single();
-
-                if (notif?.id) {
-                  const recipients = admins.map((a: any) => ({
-                    notification_id: notif.id,
-                    tenant_id: tenantId,
-                    user_id: a.user_id,
-                    delivered_at: new Date().toISOString(),
-                    silent_mode: false,
-                  }));
-                  await supabaseAdmin.from('notification_recipients').insert(recipients);
-                }
-
-                await supabaseAdmin
-                  .from('whatsapp_instances')
-                  .update({ disconnected_alert_at: new Date().toISOString() })
-                  .eq('id', instance.id);
-
-                console.log(`[check-instances-status] Notificação in-app enviada para ${admins.length} admins (${instance.instance_name}) - ${justDisconnected ? 'inicial' : 're-alerta'}`);
-              }
-            } catch (inappErr) {
-              console.error(`[check-instances-status] Erro ao enviar notificação in-app para ${instance.instance_name}:`, inappErr);
-            }
+        if (newStatus === 'connected' && prevStatus === 'disconnected' && tenantId) {
+          try {
+            await resolveIncident(supabaseAdmin, tenantId, 'whatsapp_instance_disconnected', instance.id);
+          } catch (resolveErr) {
+            console.error(`[check-instances-status] Erro ao resolver incidente para ${instance.instance_name}:`, resolveErr);
           }
         }
 
