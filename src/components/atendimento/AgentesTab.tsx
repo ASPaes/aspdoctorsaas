@@ -152,9 +152,9 @@ export function AgentesTab() {
                         <td className="py-2 px-3 text-right tabular-nums">
                           {a.csat_sent_n > 0 ? (
                             <span>
-                              {a.csat !== null ? a.csat.toFixed(1) : "—"}{" "}
+                              {a.csat !== null ? a.csat.toFixed(2) : "—"}{" "}
                               <span className="text-xs text-muted-foreground">
-                                ({a.csat_sent_n}/{a.csat_n}/{Math.round(100 * a.csat_n / a.csat_sent_n)}%)
+                                ({Math.round(100 * a.csat_n / a.csat_sent_n)}%)
                               </span>
                             </span>
                           ) : (
