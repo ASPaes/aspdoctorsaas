@@ -10,6 +10,14 @@ export interface CsatSetorRow {
   media: number | null;
   respostas: number;
 }
+export interface CsatAgenteRow {
+  agent_id: string | null;
+  nome: string;
+  enviadas: number;
+  respondidas: number;
+  taxa_pct: number | null;
+  media: number | null;
+}
 export interface CsatDistRow {
   score: number;
   qtd: number;
@@ -26,6 +34,7 @@ export interface AtendimentoSatisfacao {
   response_rate_pct: number | null;
   distribuicao: CsatDistRow[];
   por_setor: CsatSetorRow[];
+  por_agente: CsatAgenteRow[];
   div_neg_total: number;
   div_neg_nota_alta: number;
   resolucao_por_nota: CsatResolRow[];
@@ -33,6 +42,7 @@ export interface AtendimentoSatisfacao {
   atendeu_na_hora: number;
   atendeu_na_hora_pct: number | null;
 }
+
 
 export function useAtendimentoSatisfacao() {
   const { effectiveTenantId: tid } = useTenantFilter();
