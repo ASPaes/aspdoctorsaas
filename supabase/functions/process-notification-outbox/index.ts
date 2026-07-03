@@ -17,14 +17,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization") || "";
-    const token = authHeader.replace("Bearer ", "").trim();
-    if (!token || token !== SERVICE_ROLE_KEY) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Sem auth de entrada: a proteção real está na fila (RLS: só service_role insere no outbox).
+    // Este processador só drena itens legítimos — mesmo padrão do process-finalize-queue.
 
     const { data: rows, error: fetchErr } = await supabase
       .from("notification_whatsapp_outbox")
