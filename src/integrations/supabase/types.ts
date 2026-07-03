@@ -8590,6 +8590,7 @@ export type Database = {
           p_date_to: string
           p_department_id?: string
           p_has_comment?: boolean
+          p_is_group?: boolean
           p_limit?: number
           p_score?: number
           p_tenant_id: string
@@ -8614,6 +8615,7 @@ export type Database = {
           p_date_to: string
           p_department_id?: string
           p_has_comment?: boolean
+          p_is_group?: boolean
           p_score?: number
           p_tenant_id: string
         }

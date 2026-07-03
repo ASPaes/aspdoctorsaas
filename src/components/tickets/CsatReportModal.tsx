@@ -20,6 +20,8 @@ interface Props {
   dateFrom: Date;
   dateTo: Date;
   initialDepartmentId?: string | null;
+  initialAgentId?: string | null;
+  initialTipo?: 'all' | 'individual' | 'group';
   scoreMax: number;
   isAdmin?: boolean;
   onNavigateToAttendance?: (attendanceCode: string) => void;
@@ -66,13 +68,14 @@ function scoreColor(score: number, max: number): { bg: string; fg: string } {
   return { bg: "#E1F5EE", fg: "#0F6E56" };
 }
 
-export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo, initialDepartmentId, scoreMax, isAdmin, onNavigateToAttendance }: Props) {
+export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo, initialDepartmentId, initialAgentId, initialTipo, scoreMax, isAdmin, onNavigateToAttendance }: Props) {
   const queryClient = useQueryClient();
   const fromISO = toISODate(dateFrom);
   const toISO = toISODate(dateTo);
 
   const [deptFilter, setDeptFilter] = useState<string>(initialDepartmentId && initialDepartmentId !== "all" ? initialDepartmentId : "all");
-  const [agentFilter, setAgentFilter] = useState<string>("all");
+  const [agentFilter, setAgentFilter] = useState<string>(initialAgentId ?? "all");
+  const [tipoFilter, setTipoFilter] = useState<'all' | 'individual' | 'group'>(initialTipo ?? "all");
   const [scoreFilter, setScoreFilter] = useState<string>("all");
   const [commentFilter, setCommentFilter] = useState<string>("all");
   const [clienteFilterId, setClienteFilterId] = useState<string | null>(null);
@@ -82,6 +85,14 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editScore, setEditScore] = useState<number>(0);
+
+  useEffect(() => {
+    if (open) {
+      setDeptFilter(initialDepartmentId && initialDepartmentId !== "all" ? initialDepartmentId : "all");
+      setAgentFilter(initialAgentId ?? "all");
+      setTipoFilter(initialTipo ?? "all");
+    }
+  }, [open]);
 
   const updateScore = useMutation({
     mutationFn: async ({ csatId, newScore }: { csatId: string; newScore: number }) => {
@@ -105,10 +116,11 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
   const scoreParam = scoreFilter !== "all" ? parseInt(scoreFilter) : null;
   const commentParam = commentFilter === "with" ? true : commentFilter === "without" ? false : null;
   const clienteParam = clienteFilterId ?? null;
+  const tipoParam: boolean | null = tipoFilter === "group" ? true : tipoFilter === "individual" ? false : null;
 
   useEffect(() => {
     setAiAnalysis(null);
-  }, [deptFilter, agentFilter, scoreFilter, commentFilter, clienteFilterId]);
+  }, [deptFilter, agentFilter, scoreFilter, commentFilter, clienteFilterId, tipoFilter]);
 
   const { data: departments = [] } = useQuery({
     queryKey: ["csat-departments", tenantId],
@@ -129,18 +141,33 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
     enabled: open && !!tenantId,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data } = await (supabase.from("profiles" as any) as any)
-        .select("user_id, full_name")
+      const { data: profs } = await (supabase.from("profiles" as any) as any)
+        .select("user_id, role, funcionario_id")
         .eq("tenant_id", tenantId)
         .in("role", ["admin", "head", "user"])
-        .not("full_name", "is", null)
-        .order("full_name");
-      return (data ?? []) as Array<{ user_id: string; full_name: string }>;
+        .not("funcionario_id", "is", null);
+      const rows = (profs ?? []) as Array<{ user_id: string; role: string; funcionario_id: number }>;
+      const funcIds = Array.from(new Set(rows.map((r) => r.funcionario_id).filter(Boolean)));
+      let nameById = new Map<number, string>();
+      if (funcIds.length) {
+        const { data: funcs } = await (supabase.from("funcionarios" as any) as any)
+          .select("id, nome")
+          .in("id", funcIds);
+        for (const f of (funcs ?? []) as Array<{ id: number; nome: string }>) {
+          nameById.set(f.id, f.nome);
+        }
+      }
+      return rows
+        .map((r) => ({
+          user_id: r.user_id,
+          full_name: nameById.get(r.funcionario_id) ?? `Usuário ${r.user_id.slice(0, 8)}`,
+        }))
+        .sort((a, b) => a.full_name.localeCompare(b.full_name)) as Array<{ user_id: string; full_name: string }>;
     },
   });
 
   const { data: summary, isLoading: loadingSummary } = useQuery({
-    queryKey: ["csat-report-summary", tenantId, fromISO, toISO, deptParam, agentParam, scoreParam, commentParam, clienteParam],
+    queryKey: ["csat-report-summary", tenantId, fromISO, toISO, deptParam, agentParam, scoreParam, commentParam, clienteParam, tipoParam],
     enabled: open && !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_csat_report_summary", {
@@ -152,6 +179,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
         p_score: scoreParam,
         p_has_comment: commentParam,
         p_cliente_id: clienteParam,
+        p_is_group: tipoParam,
       });
       if (error) throw error;
       return data as SummaryData;
@@ -159,7 +187,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
   });
 
   const { data: list = [], isLoading: loadingList } = useQuery({
-    queryKey: ["csat-report-list", tenantId, fromISO, toISO, deptParam, agentParam, scoreParam, commentParam, clienteParam],
+    queryKey: ["csat-report-list", tenantId, fromISO, toISO, deptParam, agentParam, scoreParam, commentParam, clienteParam, tipoParam],
     enabled: open && !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_csat_report_list", {
@@ -172,6 +200,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
         p_score: scoreParam,
         p_has_comment: commentParam,
         p_cliente_id: clienteParam,
+        p_is_group: tipoParam,
       });
       if (error) throw error;
       return (data ?? []) as AvalRow[];
@@ -223,7 +252,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
     ? Math.round((summary.respostas / summary.enviadas) * 100)
     : 0;
 
-  const hasActiveFilter = deptFilter !== "all" || agentFilter !== "all" || scoreFilter !== "all" || commentFilter !== "all" || !!clienteFilterId;
+  const hasActiveFilter = deptFilter !== "all" || agentFilter !== "all" || tipoFilter !== "all" || scoreFilter !== "all" || commentFilter !== "all" || !!clienteFilterId;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -254,6 +283,15 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
               {agents.map((a: any) => (
                 <SelectItem key={a.user_id} value={a.user_id}>{a.full_name}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={tipoFilter} onValueChange={(v) => setTipoFilter(v as 'all' | 'individual' | 'group')}>
+            <SelectTrigger className="h-8 text-xs w-auto min-w-[120px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os tipos</SelectItem>
+              <SelectItem value="individual">Individual</SelectItem>
+              <SelectItem value="group">Grupos</SelectItem>
             </SelectContent>
           </Select>
 
@@ -329,6 +367,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
               onClick={() => {
                 setDeptFilter("all");
                 setAgentFilter("all");
+                setTipoFilter("all");
                 setScoreFilter("all");
                 setCommentFilter("all");
                 setClienteFilterId(null);

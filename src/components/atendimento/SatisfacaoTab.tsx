@@ -25,7 +25,7 @@ const SCORE_COLOR: Record<number, string> = {
 export function SatisfacaoTab() {
   const { data, isLoading, isError, error } = useAtendimentoSatisfacao();
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { dateRange, departmentId } = useAtendimentoFilter();
+  const { dateRange, departmentId, agentId, tipoAtendimento } = useAtendimentoFilter();
   const { profile } = useAuth();
   const navigate = useNavigate();
   const [csatModalOpen, setCsatModalOpen] = useState(false);
@@ -204,6 +204,8 @@ export function SatisfacaoTab() {
         dateFrom={dateRange.from}
         dateTo={dateRange.to}
         initialDepartmentId={departmentId ?? undefined}
+        initialAgentId={agentId ?? undefined}
+        initialTipo={tipoAtendimento}
         scoreMax={scoreMax}
         isAdmin={profile?.role === "admin" || profile?.is_super_admin}
         onNavigateToAttendance={(code) => {
