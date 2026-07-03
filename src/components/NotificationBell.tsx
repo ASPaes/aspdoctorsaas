@@ -55,6 +55,8 @@ export function NotificationBell() {
         return "🟡";
       case "error":
         return "🔴";
+      case "critical":
+        return "🔴";
       default:
         return "🔵";
     }
