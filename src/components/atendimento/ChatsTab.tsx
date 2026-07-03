@@ -173,6 +173,11 @@ export function ChatsTab() {
   const { data, isLoading, isError, error } = useAtendimentoChats({ closedReasons, hasTicket, sentiments, resolucoes });
 
   const { data: timeline } = useAtendimentoChatsTimeline();
+  const sentimentTotal = data ? data.por_sentimento.reduce((a, s) => a + s.qtd, 0) : 0;
+  const resolucaoRows = data ? data.por_resolucao.filter((r) => r.resolucao !== "(sem)") : [];
+  const resolucaoTotal = resolucaoRows.reduce((a, r) => a + r.qtd, 0);
+  const semAnaliseRow = data?.por_resolucao.find((r) => r.resolucao === "(sem)");
+  const semAnaliseQtd = semAnaliseRow?.qtd ?? 0;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
@@ -305,22 +310,29 @@ export function ChatsTab() {
             <div className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs text-muted-foreground">Sentimento negativo</p>
               <p className="text-2xl font-semibold tabular-nums">{(() => { const ts = data.por_sentimento.reduce((a, s) => a + s.qtd, 0); const neg = data.por_sentimento.find((s) => s.sentimento === "negative")?.qtd ?? 0; return Math.round(ts > 0 ? (100 * neg) / ts : 0); })()}%</p>
-              <p className="text-xs text-muted-foreground mt-1">dos atendimentos analisados</p>
+              <p className="text-xs text-muted-foreground mt-1">dos {sentimentTotal.toLocaleString("pt-BR")} analisados</p>
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs text-muted-foreground">Sem solução</p>
               <p className="text-2xl font-semibold tabular-nums">{(() => { const analisados = data.por_resolucao.filter((r) => r.resolucao !== "(sem)").reduce((a, r) => a + r.qtd, 0); const semSol = data.por_resolucao.filter((r) => r.resolucao === "nao_resolvido" || r.resolucao === "sem_resposta_agente").reduce((a, r) => a + r.qtd, 0); return Math.round(analisados > 0 ? (100 * semSol) / analisados : 0); })()}%</p>
-              <p className="text-xs text-muted-foreground mt-1">dos atendimentos analisados</p>
+              <p className="text-xs text-muted-foreground mt-1">dos {resolucaoTotal.toLocaleString("pt-BR")} analisados</p>
             </div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="text-sm font-semibold mb-3">Por sentimento</h3>
-              <Barras rows={data.por_sentimento.map((r) => ({ key: r.sentimento, nome: SENT_LABEL[r.sentimento] ?? r.sentimento, qtd: r.qtd, pct: r.pct, color: sentColor(r.sentimento) }))} />
+              <h3 className="text-sm font-semibold mb-1">Por sentimento</h3>
+              <p className="text-xs text-muted-foreground mb-3">% sobre os atendimentos analisados ({sentimentTotal.toLocaleString("pt-BR")} de {data.total.toLocaleString("pt-BR")})</p>
+              <Barras rows={data.por_sentimento.map((r) => ({ key: r.sentimento, nome: SENT_LABEL[r.sentimento] ?? r.sentimento, qtd: r.qtd, pct: sentimentTotal > 0 ? (100 * r.qtd) / sentimentTotal : 0, color: sentColor(r.sentimento) }))} />
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="text-sm font-semibold mb-3">Por resolução</h3>
-              <Barras rows={data.por_resolucao.map((r) => ({ key: r.resolucao, nome: RESOL_LABEL[r.resolucao] ?? r.resolucao, qtd: r.qtd, pct: r.pct, color: resolColor(r.resolucao) }))} />
+              <h3 className="text-sm font-semibold mb-1">Por resolução</h3>
+              <p className="text-xs text-muted-foreground mb-3">% sobre os atendimentos analisados ({resolucaoTotal.toLocaleString("pt-BR")} de {data.total.toLocaleString("pt-BR")})</p>
+              <Barras rows={resolucaoRows.map((r) => ({ key: r.resolucao, nome: RESOL_LABEL[r.resolucao] ?? r.resolucao, qtd: r.qtd, pct: resolucaoTotal > 0 ? (100 * r.qtd) / resolucaoTotal : 0, color: resolColor(r.resolucao) }))} />
+              {semAnaliseQtd > 0 && (
+                <p className="text-xs text-muted-foreground mt-3">
+                  Sem análise: {semAnaliseQtd.toLocaleString("pt-BR")} atendimentos ({Math.round((100 * semAnaliseQtd) / data.total)}% do total)
+                </p>
+              )}
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-3">CSAT — distribuição das notas</h3>
