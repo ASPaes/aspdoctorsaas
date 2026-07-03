@@ -300,7 +300,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
             <SelectTrigger className="h-8 text-xs w-auto min-w-[100px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas notas</SelectItem>
-              {Array.from({ length: scoreMax }, (_, i) => i + 1).map((n) => (
+              {Array.from({ length: scoreMax + 1 }, (_, i) => i).map((n) => (
                 <SelectItem key={n} value={String(n)}>⭐ {n}</SelectItem>
               ))}
             </SelectContent>
