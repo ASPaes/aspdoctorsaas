@@ -200,18 +200,3 @@ export function SatisfacaoTab() {
     </div>
   );
 }
-
-      <CsatReportModal
-        open={csatModalOpen}
-        onOpenChange={setCsatModalOpen}
-        tenantId={tid}
-        dateFrom={dateRange.from}
-        dateTo={dateRange.to}
-        initialDepartmentId={departmentId ?? undefined}
-        scoreMax={scoreMax}
-        isAdmin={profile?.role === "admin" || profile?.is_super_admin}
-        onNavigateToAttendance={(code) => {
-          setCsatModalOpen(false);
-          navigate("/tickets");
-        }}
-      />
