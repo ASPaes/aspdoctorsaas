@@ -241,6 +241,8 @@ Deno.serve(async (req) => {
 
     if (updateError) throw updateError;
 
+    await resolveIncident(supabase, convData.tenant_id, "ai_quota_exceeded", convData.tenant_id);
+
     console.log(`[${FUNCTION_NAME}][${requestId}] Success (${transcription.length} chars)`);
     return new Response(JSON.stringify({ success: true, transcription }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
