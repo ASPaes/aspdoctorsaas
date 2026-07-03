@@ -90,11 +90,13 @@ interface Props {
   ticketFilterOverride?: string;
   sentimentFilterOverride?: string;
   instanceFilterOverride?: string;
+  resolucaoFilterOverride?: string;
+  tipoFilterOverride?: string;
   clienteIdOverride?: string | null;
   searchOverride?: string;
 }
 
-function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride, closureTypeOverride, csatFilterOverride, csatScoreFilterOverride, ticketFilterOverride, sentimentFilterOverride, instanceFilterOverride, clienteIdOverride, searchOverride }: Props = {}) {
+function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride, closureTypeOverride, csatFilterOverride, csatScoreFilterOverride, ticketFilterOverride, sentimentFilterOverride, instanceFilterOverride, resolucaoFilterOverride, tipoFilterOverride, clienteIdOverride, searchOverride }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
   const [internalDateRange, setInternalDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
