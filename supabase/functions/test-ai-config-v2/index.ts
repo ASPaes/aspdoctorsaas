@@ -10,7 +10,7 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
-    return new Response("ok", { headers: corsHeaders, status: 204 });
+    return new Response(null, { headers: corsHeaders, status: 204 });
 
   const requestId = crypto.randomUUID().slice(0, 8);
   console.log(`[${FUNCTION_NAME}][${requestId}] Início`);
