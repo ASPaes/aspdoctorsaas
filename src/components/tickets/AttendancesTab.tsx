@@ -511,6 +511,31 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">Resolução</label>
+            <Select value={resolucaoFilter} onValueChange={setResolucaoFilter}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="resolvido">✅ Resolvido</SelectItem>
+                <SelectItem value="parcial">🟡 Parcial</SelectItem>
+                <SelectItem value="nao_resolvido">🟠 Sem solução</SelectItem>
+                <SelectItem value="sem_resposta_agente">🔴 Sem resposta</SelectItem>
+                <SelectItem value="(sem)">Sem análise</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">Tipo</label>
+            <Select value={tipoFilter} onValueChange={setTipoFilter}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="individual">Individual</SelectItem>
+                <SelectItem value="group">Grupos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         {activeFilterCount > 0 && (
           <div className="flex justify-end mt-3 pt-3 border-t">
