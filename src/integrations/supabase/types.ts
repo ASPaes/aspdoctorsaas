@@ -9259,6 +9259,7 @@ export type Database = {
       }
       notify_event: {
         Args: {
+          p_action_url?: string
           p_body: string
           p_dedupe_key: string
           p_event_type: string
