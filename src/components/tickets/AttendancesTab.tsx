@@ -391,6 +391,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
       const i = instances.find((x: any) => x.id === value);
       return i ? (i.display_name || i.instance_name) : value;
     }
+    if (type === "resolucao") return `Resolução: ${RESOLUCAO_LABELS[value] ?? value}`;
+    if (type === "tipo") return `Tipo: ${TIPO_LABELS[value] ?? value}`;
     return value;
   };
 
