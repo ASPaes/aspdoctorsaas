@@ -47,6 +47,18 @@ export function useNotifications() {
     },
   });
 
+  // System event type keys
+  const { data: eventTypeKeys = [] } = useQuery({
+    queryKey: ["notification-event-type-keys"],
+    staleTime: Infinity,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("notification_event_types" as any) as any)
+        .select("key");
+      if (error) throw error;
+      return (data ?? []).map((r: any) => r.key as string);
+    },
+  });
+
   // Notification list (last 50)
   const { data: notifications = [], isLoading } = useQuery<NotificationItem[]>({
     queryKey: ["notifications-list", tid, uid],
