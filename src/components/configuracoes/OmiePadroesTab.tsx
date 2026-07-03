@@ -224,6 +224,7 @@ export default function OmiePadroesTab() {
         postergar_finais_semana: postergarFds,
         adicionar_periodo_referencia: addPeriodoRef,
         adicionar_vencimento_parcela: addVencParcela,
+        modelos_permitidos: modelosPermitidos,
       };
 
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
