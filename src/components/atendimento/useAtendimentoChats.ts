@@ -6,7 +6,9 @@ import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 
 export interface ChatStatusRow { status: string; qtd: number; pct: number; }
 export interface ChatSentRow { sentimento: string; qtd: number; pct: number; }
+export interface ChatResolucaoRow { resolucao: string; qtd: number; pct: number; }
 export interface ChatCsatDistRow { nota: number; qtd: number; }
+
 export interface ChatCsat { enviados: number; respondidos: number; response_rate: number; media: number | null; distribuicao: ChatCsatDistRow[]; }
 export interface ChatAtendenteRow { nome: string; qtd: number; }
 export interface ChatHeatRow { dow: number; hora: number; qtd: number; }
@@ -20,6 +22,8 @@ export interface AtendimentoChats {
   total: number;
   por_status: ChatStatusRow[];
   por_sentimento: ChatSentRow[];
+  por_resolucao: ChatResolucaoRow[];
+
   csat: ChatCsat;
   por_atendente: ChatAtendenteRow[];
   heatmap: ChatHeatRow[];
@@ -30,14 +34,15 @@ export interface AtendimentoChats {
   media_atend_cliente: ChatMediaCliente;
 }
 
-export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: "all" | "with" | "without" }) {
-  const { closedReasons, hasTicket } = opts;
+export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: "all" | "with" | "without"; sentiments: string[]; resolucoes: string[] }) {
+  const { closedReasons, hasTicket, sentiments, resolucoes } = opts;
+
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, tipoAtendimento } = useAtendimentoFilter();
   const pIsGroup = tipoAtendimento === 'all' ? null : tipoAtendimento === 'group';
   return useQuery<AtendimentoChats>({
-    queryKey: ["atendimento-chats", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, closedReasons, hasTicket, tipoAtendimento],
+    queryKey: ["atendimento-chats", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, closedReasons, hasTicket, sentiments, resolucoes, tipoAtendimento],
     enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -53,8 +58,11 @@ export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: 
         p_cidade_ids: orNull(cidadeIds), p_fornecedor_ids: orNull(fornecedorIds), p_produto_ids: orNull(produtoIds),
         p_closed_reasons: closedReasons.length ? closedReasons : null,
         p_has_ticket: hasTicket === "all" ? null : hasTicket === "with",
+        p_sentiments: sentiments.length ? sentiments : null,
+        p_resolucoes: resolucoes.length ? resolucoes : null,
         p_is_group: pIsGroup,
       });
+
       if (error) throw error;
       const d = (data ?? {}) as any;
       const num = (v: any) => (v === null || v === undefined ? null : Number(v));
@@ -62,6 +70,8 @@ export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: 
         total: Number(d.total ?? 0),
         por_status: ((d.por_status ?? []) as any[]).map((r) => ({ status: r.status ?? "(sem)", qtd: Number(r.qtd ?? 0), pct: Number(r.pct ?? 0) })),
         por_sentimento: ((d.por_sentimento ?? []) as any[]).map((r) => ({ sentimento: r.sentimento ?? "(sem)", qtd: Number(r.qtd ?? 0), pct: Number(r.pct ?? 0) })),
+        por_resolucao: ((d.por_resolucao ?? []) as any[]).map((r) => ({ resolucao: r.resolucao ?? "(sem)", qtd: Number(r.qtd ?? 0), pct: Number(r.pct ?? 0) })),
+
         csat: {
           enviados: Number(d.csat?.enviados ?? 0),
           respondidos: Number(d.csat?.respondidos ?? 0),

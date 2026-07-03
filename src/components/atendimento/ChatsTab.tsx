@@ -14,6 +14,32 @@ const TICKET_OPTS: { v: "all" | "with" | "without"; label: string }[] = [
   { v: "with", label: "Com ticket" },
   { v: "without", label: "Sem ticket" },
 ];
+const SENT_OPTS: { v: string; label: string }[] = [
+  { v: "positive", label: "Positivo" },
+  { v: "neutral", label: "Neutro" },
+  { v: "negative", label: "Negativo" },
+];
+const RESOL_OPTS: { v: string; label: string }[] = [
+  { v: "resolvido", label: "Resolvido" },
+  { v: "parcial", label: "Parcial" },
+  { v: "nao_resolvido", label: "Sem solução" },
+  { v: "sem_resposta_agente", label: "Sem resposta" },
+  { v: "(sem)", label: "Sem análise" },
+];
+const RESOL_LABEL: Record<string, string> = {
+  resolvido: "Resolvido",
+  parcial: "Parcial",
+  nao_resolvido: "Sem solução",
+  sem_resposta_agente: "Sem resposta",
+  "(sem)": "Sem análise",
+};
+const resolColor = (r: string) =>
+  r === "resolvido" ? "hsl(142 71% 45%)"
+    : r === "parcial" ? "hsl(38 92% 50%)"
+    : r === "nao_resolvido" ? "hsl(24 95% 53%)"
+    : r === "sem_resposta_agente" ? "hsl(0 72% 51%)"
+    : "hsl(var(--muted-foreground))";
+
 
 type BarRow = { key: string; nome: string; qtd: number; pct: number; color?: string };
 
@@ -142,7 +168,10 @@ function LinhaTemporal({ rows }: { rows: { mes: string; atendimentos: number; mr
 export function ChatsTab() {
   const [closedReasons, setClosedReasons] = useState<string[]>([]);
   const [hasTicket, setHasTicket] = useState<"all" | "with" | "without">("all");
-  const { data, isLoading, isError, error } = useAtendimentoChats({ closedReasons, hasTicket });
+  const [sentiments, setSentiments] = useState<string[]>([]);
+  const [resolucoes, setResolucoes] = useState<string[]>([]);
+  const { data, isLoading, isError, error } = useAtendimentoChats({ closedReasons, hasTicket, sentiments, resolucoes });
+
   const { data: timeline } = useAtendimentoChatsTimeline();
   return (
     <div className="space-y-4">
@@ -193,7 +222,57 @@ export function ChatsTab() {
             })}
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Sentimento:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {SENT_OPTS.map((o) => {
+              const on = sentiments.includes(o.v);
+              return (
+                <button
+                  key={o.v}
+                  onClick={() =>
+                    setSentiments((p) => (p.includes(o.v) ? p.filter((x) => x !== o.v) : [...p, o.v]))
+                  }
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                    on
+                      ? "border-primary bg-primary/10 text-primary font-medium"
+                      : "border-border text-muted-foreground hover:bg-muted/50"
+                  )}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Resolução:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {RESOL_OPTS.map((o) => {
+              const on = resolucoes.includes(o.v);
+              return (
+                <button
+                  key={o.v}
+                  onClick={() =>
+                    setResolucoes((p) => (p.includes(o.v) ? p.filter((x) => x !== o.v) : [...p, o.v]))
+                  }
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                    on
+                      ? "border-primary bg-primary/10 text-primary font-medium"
+                      : "border-border text-muted-foreground hover:bg-muted/50"
+                  )}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
+
+
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -208,7 +287,7 @@ export function ChatsTab() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
             <div className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs text-muted-foreground">Total de Atendimentos</p>
               <p className="text-2xl font-semibold tabular-nums">{data.total.toLocaleString("pt-BR")}</p>
@@ -228,11 +307,20 @@ export function ChatsTab() {
               <p className="text-2xl font-semibold tabular-nums">{(() => { const ts = data.por_sentimento.reduce((a, s) => a + s.qtd, 0); const neg = data.por_sentimento.find((s) => s.sentimento === "negative")?.qtd ?? 0; return Math.round(ts > 0 ? (100 * neg) / ts : 0); })()}%</p>
               <p className="text-xs text-muted-foreground mt-1">dos atendimentos analisados</p>
             </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="text-sm font-semibold mb-3">Sentimento</h3>
+              <p className="text-xs text-muted-foreground">Sem solução</p>
+              <p className="text-2xl font-semibold tabular-nums">{(() => { const analisados = data.por_resolucao.filter((r) => r.resolucao !== "(sem)").reduce((a, r) => a + r.qtd, 0); const semSol = data.por_resolucao.filter((r) => r.resolucao === "nao_resolvido" || r.resolucao === "sem_resposta_agente").reduce((a, r) => a + r.qtd, 0); return Math.round(analisados > 0 ? (100 * semSol) / analisados : 0); })()}%</p>
+              <p className="text-xs text-muted-foreground mt-1">dos atendimentos analisados</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-3">Por sentimento</h3>
               <Barras rows={data.por_sentimento.map((r) => ({ key: r.sentimento, nome: SENT_LABEL[r.sentimento] ?? r.sentimento, qtd: r.qtd, pct: r.pct, color: sentColor(r.sentimento) }))} />
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-3">Por resolução</h3>
+              <Barras rows={data.por_resolucao.map((r) => ({ key: r.resolucao, nome: RESOL_LABEL[r.resolucao] ?? r.resolucao, qtd: r.qtd, pct: r.pct, color: resolColor(r.resolucao) }))} />
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-3">CSAT — distribuição das notas</h3>
@@ -244,6 +332,7 @@ export function ChatsTab() {
               <p className="text-xs text-muted-foreground mt-3">{data.csat.enviados.toLocaleString("pt-BR")} enviados → {data.csat.respondidos.toLocaleString("pt-BR")} respondidos ({data.csat.response_rate}%)</p>
             </div>
           </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-3">Atendimentos por Atendente</h3>
