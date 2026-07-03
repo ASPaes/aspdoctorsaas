@@ -226,6 +226,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   const effectiveTicketFilter = embedded && ticketFilterOverride && ticketFilterOverride !== "all" ? ticketFilterOverride : ticketFilter;
   const effectiveSentimentFilter = embedded && sentimentFilterOverride && sentimentFilterOverride !== "all" ? sentimentFilterOverride : sentimentFilter;
   const effectiveInstanceFilter = embedded && instanceFilterOverride && instanceFilterOverride !== "all" ? instanceFilterOverride : instanceFilter;
+  const effectiveResolucaoFilter = embedded && resolucaoFilterOverride && resolucaoFilterOverride !== "all" ? resolucaoFilterOverride : resolucaoFilter;
+  const effectiveTipoFilter = embedded && tipoFilterOverride && tipoFilterOverride !== "all" ? tipoFilterOverride : tipoFilter;
 
   const fromISO = dateRange.from.toISOString();
   const toDate = new Date(dateRange.to);
