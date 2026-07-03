@@ -6,7 +6,9 @@ import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 
 export interface ChatStatusRow { status: string; qtd: number; pct: number; }
 export interface ChatSentRow { sentimento: string; qtd: number; pct: number; }
+export interface ChatResolucaoRow { resolucao: string; qtd: number; pct: number; }
 export interface ChatCsatDistRow { nota: number; qtd: number; }
+
 export interface ChatCsat { enviados: number; respondidos: number; response_rate: number; media: number | null; distribuicao: ChatCsatDistRow[]; }
 export interface ChatAtendenteRow { nome: string; qtd: number; }
 export interface ChatHeatRow { dow: number; hora: number; qtd: number; }
