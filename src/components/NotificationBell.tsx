@@ -5,16 +5,35 @@ import { Button } from "@/components/ui/button";
 
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export function NotificationBell() {
-  const { unreadCount, notifications, markRead, dismiss, markAllRead, dismissAll } = useNotifications();
+  const {
+    unreadCount,
+    notifications,
+    systemNotifications,
+    operationNotifications,
+    systemUnreadCount,
+    operationUnreadCount,
+    markRead,
+    dismiss,
+    markAllRead,
+    dismissAll,
+  } = useNotifications();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"operation" | "system">("operation");
+
+  useEffect(() => {
+    if (open && systemUnreadCount > 0 && operationUnreadCount === 0) {
+      setActiveTab("system");
+    }
+  }, [open, systemUnreadCount, operationUnreadCount]);
 
   const handleItemClick = (item: NotificationItem) => {
     // Se a notificação leva a uma conversa, dispensar (sumir do sino) ao navegar
@@ -39,6 +58,94 @@ export function NotificationBell() {
       default:
         return "🔵";
     }
+  };
+
+  const renderList = (items: NotificationItem[], isSystem: boolean) => {
+    if (items.length === 0) {
+      return (
+        <div className="p-6 text-center text-sm text-muted-foreground">
+          Nenhuma notificação
+        </div>
+      );
+    }
+    return (
+      <div className="max-h-[420px] overflow-y-auto divide-y">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className={cn(
+              "flex items-start gap-2 px-3 py-2 cursor-pointer hover:bg-accent/50 transition-colors",
+              !item.read_at && "bg-accent/20",
+              isSystem && item.notification.severity === "critical" && "border-l-2 border-destructive"
+            )}
+            onClick={() => handleItemClick(item)}
+          >
+            <span className="text-sm mt-0.5 shrink-0">{severityIcon(item.notification.severity)}</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1">
+                <p className={cn("text-sm leading-tight truncate flex-1", !item.read_at && "font-medium")}>
+                  {item.notification.title}
+                </p>
+                {item.silent_mode && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Eye className="h-3 w-3 text-muted-foreground shrink-0" />
+                    </TooltipTrigger>
+                    <TooltipContent className="text-xs">
+                      Monitorando outro setor
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+              {(() => {
+                const unreadCount = item.notification.metadata?.unread_count ?? 1;
+                const hasMultiple = unreadCount > 1;
+                return (
+                  <>
+                    {hasMultiple && (
+                      <p className="text-[10px] text-primary font-medium mt-0.5">
+                        {unreadCount} mensagens novas
+                      </p>
+                    )}
+                    {item.notification.body && (
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {item.notification.body}
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {formatDistanceToNow(new Date(item.delivered_at), { addSuffix: true, locale: ptBR })}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0 mt-0.5">
+              {!item.read_at && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markRead(item.id);
+                      }}
+                    >
+                      <Check className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Marcar como lida</TooltipContent>
+                </Tooltip>
+              )}
+              {item.notification.action_url && (
+                <ExternalLink className="h-3 w-3 text-muted-foreground" />
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -75,88 +182,32 @@ export function NotificationBell() {
           </div>
         </div>
 
-        {/* Lista */}
-        {notifications.length === 0 ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            Nenhuma notificação
-          </div>
-        ) : (
-          <div className="max-h-[420px] overflow-y-auto divide-y">
-            {notifications.map((item) => (
-              <div
-                key={item.id}
-                className={cn(
-                  "flex items-start gap-2 px-3 py-2 cursor-pointer hover:bg-accent/50 transition-colors",
-                  !item.read_at && "bg-accent/20"
-                )}
-                onClick={() => handleItemClick(item)}
-              >
-                <span className="text-sm mt-0.5 shrink-0">{severityIcon(item.notification.severity)}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1">
-                    <p className={cn("text-sm leading-tight truncate flex-1", !item.read_at && "font-medium")}>
-                      {item.notification.title}
-                    </p>
-                    {item.silent_mode && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Eye className="h-3 w-3 text-muted-foreground shrink-0" />
-                        </TooltipTrigger>
-                        <TooltipContent className="text-xs">
-                          Monitorando outro setor
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                  </div>
-                  {(() => {
-                    const unreadCount = item.notification.metadata?.unread_count ?? 1;
-                    const hasMultiple = unreadCount > 1;
-                    return (
-                      <>
-                        {hasMultiple && (
-                          <p className="text-[10px] text-primary font-medium mt-0.5">
-                            {unreadCount} mensagens novas
-                          </p>
-                        )}
-                        {item.notification.body && (
-                          <p className="text-xs text-muted-foreground truncate mt-0.5">
-                            {item.notification.body}
-                          </p>
-                        )}
-                      </>
-                    );
-                  })()}
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    {formatDistanceToNow(new Date(item.delivered_at), { addSuffix: true, locale: ptBR })}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 shrink-0 mt-0.5">
-                  {!item.read_at && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            markRead(item.id);
-                          }}
-                        >
-                          <Check className="h-3 w-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Marcar como lida</TooltipContent>
-                    </Tooltip>
-                  )}
-                  {item.notification.action_url && (
-                    <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "operation" | "system")} className="w-full">
+          <TabsList className="w-full rounded-none border-b bg-transparent h-9 px-2 gap-2">
+            <TabsTrigger value="operation" className="flex-1 text-xs data-[state=active]:bg-muted data-[state=active]:shadow-none rounded-sm">
+              Operação
+              {operationUnreadCount > 0 && (
+                <Badge variant="destructive" className="ml-1.5 h-4 min-w-4 px-1 text-[10px]">
+                  {operationUnreadCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="system" className="flex-1 text-xs data-[state=active]:bg-muted data-[state=active]:shadow-none rounded-sm">
+              Sistema
+              {systemUnreadCount > 0 && (
+                <Badge variant="destructive" className="ml-1.5 h-4 min-w-4 px-1 text-[10px]">
+                  {systemUnreadCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="operation" className="m-0 mt-0">
+            {renderList(operationNotifications, false)}
+          </TabsContent>
+          <TabsContent value="system" className="m-0 mt-0">
+            {renderList(systemNotifications, true)}
+          </TabsContent>
+        </Tabs>
       </PopoverContent>
     </Popover>
   );
