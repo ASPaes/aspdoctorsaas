@@ -86,6 +86,24 @@ export function useNotifications() {
     },
   });
 
+  // Partition notifications
+  const systemNotifications = useMemo(
+    () => notifications.filter((n) => eventTypeKeys.includes(n.notification.type)),
+    [notifications, eventTypeKeys]
+  );
+  const operationNotifications = useMemo(
+    () => notifications.filter((n) => !eventTypeKeys.includes(n.notification.type)),
+    [notifications, eventTypeKeys]
+  );
+  const systemUnreadCount = useMemo(
+    () => systemNotifications.filter((n) => n.read_at === null).length,
+    [systemNotifications]
+  );
+  const operationUnreadCount = useMemo(
+    () => operationNotifications.filter((n) => n.read_at === null).length,
+    [operationNotifications]
+  );
+
   // Realtime subscription
   useEffect(() => {
     if (!uid || !tid) return;
