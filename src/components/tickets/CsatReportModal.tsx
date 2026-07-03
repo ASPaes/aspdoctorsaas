@@ -68,13 +68,14 @@ function scoreColor(score: number, max: number): { bg: string; fg: string } {
   return { bg: "#E1F5EE", fg: "#0F6E56" };
 }
 
-export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo, initialDepartmentId, scoreMax, isAdmin, onNavigateToAttendance }: Props) {
+export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo, initialDepartmentId, initialAgentId, initialTipo, scoreMax, isAdmin, onNavigateToAttendance }: Props) {
   const queryClient = useQueryClient();
   const fromISO = toISODate(dateFrom);
   const toISO = toISODate(dateTo);
 
   const [deptFilter, setDeptFilter] = useState<string>(initialDepartmentId && initialDepartmentId !== "all" ? initialDepartmentId : "all");
-  const [agentFilter, setAgentFilter] = useState<string>("all");
+  const [agentFilter, setAgentFilter] = useState<string>(initialAgentId ?? "all");
+  const [tipoFilter, setTipoFilter] = useState<'all' | 'individual' | 'group'>(initialTipo ?? "all");
   const [scoreFilter, setScoreFilter] = useState<string>("all");
   const [commentFilter, setCommentFilter] = useState<string>("all");
   const [clienteFilterId, setClienteFilterId] = useState<string | null>(null);
@@ -84,6 +85,14 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editScore, setEditScore] = useState<number>(0);
+
+  useEffect(() => {
+    if (open) {
+      setDeptFilter(initialDepartmentId && initialDepartmentId !== "all" ? initialDepartmentId : "all");
+      setAgentFilter(initialAgentId ?? "all");
+      setTipoFilter(initialTipo ?? "all");
+    }
+  }, [open]);
 
   const updateScore = useMutation({
     mutationFn: async ({ csatId, newScore }: { csatId: string; newScore: number }) => {
