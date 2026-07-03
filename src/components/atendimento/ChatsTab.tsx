@@ -222,7 +222,57 @@ export function ChatsTab() {
             })}
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Sentimento:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {SENT_OPTS.map((o) => {
+              const on = sentiments.includes(o.v);
+              return (
+                <button
+                  key={o.v}
+                  onClick={() =>
+                    setSentiments((p) => (p.includes(o.v) ? p.filter((x) => x !== o.v) : [...p, o.v]))
+                  }
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                    on
+                      ? "border-primary bg-primary/10 text-primary font-medium"
+                      : "border-border text-muted-foreground hover:bg-muted/50"
+                  )}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Resolução:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {RESOL_OPTS.map((o) => {
+              const on = resolucoes.includes(o.v);
+              return (
+                <button
+                  key={o.v}
+                  onClick={() =>
+                    setResolucoes((p) => (p.includes(o.v) ? p.filter((x) => x !== o.v) : [...p, o.v]))
+                  }
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                    on
+                      ? "border-primary bg-primary/10 text-primary font-medium"
+                      : "border-border text-muted-foreground hover:bg-muted/50"
+                  )}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
+
+
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
