@@ -424,6 +424,62 @@ export default function OmiePadroesTab() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Data de ativação da integração</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <Label>Integrar contratos criados a partir de</Label>
+            <Input
+              type="date"
+              value={dataCorte}
+              onChange={(e) => setDataCorte(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Somente contratos criados a partir desta data poderão ser enviados ao Omie. Contratos anteriores não são afetados. Deixe em branco para manter a integração desligada.
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={salvarDataCorte} disabled={savingDataCorte}>
+              {savingDataCorte ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar data de ativação
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Modelos de contrato permitidos</CardTitle>
+          <CardDescription>
+            Selecione quais modelos de contrato podem ser enviados ao Omie. Se nenhum for selecionado, nenhum contrato será enviado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {modelos.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum modelo de contrato cadastrado.</p>
+          ) : (
+            modelos.map((m) => {
+              const checked = modelosPermitidos.includes(m.nome);
+              return (
+                <div key={m.id} className="flex items-center gap-2 rounded-md border p-3">
+                  <Checkbox
+                    id={`modelo-${m.id}`}
+                    checked={checked}
+                    onCheckedChange={(v) => toggleModelo(m.nome, v === true)}
+                  />
+                  <Label htmlFor={`modelo-${m.id}`} className="text-sm font-normal cursor-pointer">
+                    {m.nome}
+                  </Label>
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+
       <div className="flex justify-end">
         <Button onClick={salvar} disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
