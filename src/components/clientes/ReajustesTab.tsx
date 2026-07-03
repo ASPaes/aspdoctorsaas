@@ -286,6 +286,9 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
           queryClient.invalidateQueries({ queryKey: ["contratos_cliente"] });
           queryClient.invalidateQueries({ queryKey: ["contrato_itens_cliente"] });
           queryClient.invalidateQueries({ queryKey: ["cliente_produtos"] });
+          queryClient.invalidateQueries({ queryKey: ["clientes_lista"] });
+          queryClient.invalidateQueries({ queryKey: ["clientes_ticket_medio"] });
+          queryClient.invalidateQueries({ queryKey: ["movimentos_mrr_deltas_lista"] });
         }}
       />
 
