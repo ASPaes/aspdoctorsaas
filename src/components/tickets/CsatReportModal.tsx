@@ -20,6 +20,8 @@ interface Props {
   dateFrom: Date;
   dateTo: Date;
   initialDepartmentId?: string | null;
+  initialAgentId?: string | null;
+  initialTipo?: 'all' | 'individual' | 'group';
   scoreMax: number;
   isAdmin?: boolean;
   onNavigateToAttendance?: (attendanceCode: string) => void;
