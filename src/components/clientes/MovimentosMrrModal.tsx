@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -179,6 +179,7 @@ export function MovimentosMrrModal({
   funcionarios,
 }: MovimentosMrrModalProps) {
   const { user, profile } = useAuth();
+  const qc = useQueryClient();
   const draftKey = `draft:mov_mrr:${profile?.tenant_id ?? "t"}:${user?.id ?? "u"}:new:${clienteId}`;
 
   const { data: origensCatalogo = [], isLoading: loadingOrigens } = useQuery<OrigemOption[]>({
@@ -236,6 +237,10 @@ export function MovimentosMrrModal({
 
       if (error) throw error;
       setMovimentos((data as unknown as MovimentoMrr[]) || []);
+      // Invalidate downstream caches (MRR Atual em FinanceiroCard, financeiro tab, cliente header)
+      qc.invalidateQueries({ queryKey: ['movimentos_mrr_totals', clienteId] });
+      qc.invalidateQueries({ queryKey: ['cliente', clienteId] });
+      qc.invalidateQueries({ queryKey: ['cliente_produtos_ativacao', clienteId] });
     } catch (error) {
       console.error('Error fetching movimentos:', error);
       toast.error('Erro ao carregar movimentos');
