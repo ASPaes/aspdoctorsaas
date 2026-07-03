@@ -188,8 +188,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
   const { data: groupCountData } = useQuery({
     queryKey: ["whatsapp", "group-counts", tid],
-    staleTime: 10_000,
-    refetchInterval: 15_000,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
     queryFn: async () => {
       const { count: totalGroups } = await (supabase.from("whatsapp_conversations" as any) as any)
         .select("*", { count: "exact", head: true })
