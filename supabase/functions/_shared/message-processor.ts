@@ -1319,8 +1319,48 @@ async function triggerAutoSentiment(supabase: any, conversationId: string, supab
     let q = supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('is_from_me', false);
     if (last?.created_at) q = q.gt('timestamp', last.created_at);
     const { count } = await q;
-    if (count && count >= AUTO_SENTIMENT_THRESHOLD) fetch(`${supabaseUrl}/functions/v1/analyze-whatsapp-sentiment`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}` }, body: JSON.stringify({ conversationId }) }).catch(() => {});
+    if (count && count >= AUTO_SENTIMENT_THRESHOLD) fetch(`${supabaseUrl}/functions/v1/analyze-whatsapp-sentiment`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` }, body: JSON.stringify({ conversationId }) }).catch(() => {});
   } catch { }
+}
+
+async function checkChurnKeywords(
+  supabase: any,
+  tenantId: string,
+  conversationId: string,
+  content: string,
+  supabaseUrl: string,
+): Promise<void> {
+  try {
+    if (!content || !content.trim()) return;
+    const { data: cfg } = await supabase
+      .from('configuracoes')
+      .select('churn_alert_enabled, churn_alert_keywords')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (!cfg?.churn_alert_enabled) return;
+    const keywords: string[] = Array.isArray(cfg.churn_alert_keywords) ? cfg.churn_alert_keywords : [];
+    if (keywords.length === 0) return;
+
+    const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const nContent = normalize(content);
+    const hit = keywords.some(kw => {
+      const nkw = normalize(String(kw || '').trim());
+      return nkw.length > 0 && nContent.includes(nkw);
+    });
+    if (!hit) return;
+
+    console.log(`[churn-alert] keyword match on conversation ${conversationId} tenant ${tenantId}`);
+    fetch(`${supabaseUrl}/functions/v1/analyze-whatsapp-sentiment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      },
+      body: JSON.stringify({ conversationId }),
+    }).catch(() => {});
+  } catch (err) {
+    console.error('[churn-alert] checkChurnKeywords error:', err);
+  }
 }
 
 async function triggerAutoCategorization(supabase: any, conversationId: string, supabaseUrl: string): Promise<void> {
