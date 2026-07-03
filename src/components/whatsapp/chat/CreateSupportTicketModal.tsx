@@ -29,6 +29,7 @@ interface Props {
   sentimentLabel?: string | null;
   sentimentConfidence?: number | null;
   sentimentSummary?: string | null;
+  mode?: 'classificacao' | 'demanda_externa';
 }
 
 export function CreateSupportTicketModal({
@@ -45,6 +46,7 @@ export function CreateSupportTicketModal({
   sentimentLabel,
   sentimentConfidence,
   sentimentSummary,
+  mode = 'classificacao',
 }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
