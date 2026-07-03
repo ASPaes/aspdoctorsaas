@@ -244,8 +244,9 @@ Retorne APENAS JSON válido sem markdown:
 }
 
 REGRAS:
-- "sentiment_score": desfecho numa escala contínua. Perto de +100 = saiu satisfeito/resolvido; perto de -100 = saiu insatisfeito/sem solução; perto de 0 = neutro/indefinido. Baseie no DESFECHO e na trajetória, nunca em palavras isoladas como "problema" ou "erro".
-- "resolucao": "resolvido" = solucionado e/ou cliente confirmou; "parcial" = avançou mas ficou pendência; "nao_resolvido" = encerrou sem solução.
+- "sentiment_score": SATISFAÇÃO DO CLIENTE ao final, numa escala contínua. Perto de +100 = saiu satisfeito; perto de -100 = saiu insatisfeito com o atendimento/empresa; perto de 0 = neutro/indefinido. Baseie na trajetória e no tom final do cliente, nunca em palavras isoladas. IMPORTANTE: satisfação e resolução são eixos INDEPENDENTES — um atendimento sem solução com cliente compreensivo ("ok, aguardo a correção") é NEUTRO; um resolvido com cliente irritado pela demora pode ser negativo.
+- "resolucao": DESFECHO TÉCNICO, independente do humor do cliente. "resolvido" = problema solucionado e/ou cliente confirmou; "parcial" = avançou mas ficou pendência combinada; "nao_resolvido" = encerrou sem solução para o problema relatado.
+
 - "problem": apenas o relato inicial do cliente
 - "solution": orientação do técnico, forma instrucional
 - "tags": máximo 5, palavras curtas (1-2 termos)
