@@ -14,6 +14,32 @@ const TICKET_OPTS: { v: "all" | "with" | "without"; label: string }[] = [
   { v: "with", label: "Com ticket" },
   { v: "without", label: "Sem ticket" },
 ];
+const SENT_OPTS: { v: string; label: string }[] = [
+  { v: "positive", label: "Positivo" },
+  { v: "neutral", label: "Neutro" },
+  { v: "negative", label: "Negativo" },
+];
+const RESOL_OPTS: { v: string; label: string }[] = [
+  { v: "resolvido", label: "Resolvido" },
+  { v: "parcial", label: "Parcial" },
+  { v: "nao_resolvido", label: "Sem solução" },
+  { v: "sem_resposta_agente", label: "Sem resposta" },
+  { v: "(sem)", label: "Sem análise" },
+];
+const RESOL_LABEL: Record<string, string> = {
+  resolvido: "Resolvido",
+  parcial: "Parcial",
+  nao_resolvido: "Sem solução",
+  sem_resposta_agente: "Sem resposta",
+  "(sem)": "Sem análise",
+};
+const resolColor = (r: string) =>
+  r === "resolvido" ? "hsl(142 71% 45%)"
+    : r === "parcial" ? "hsl(38 92% 50%)"
+    : r === "nao_resolvido" ? "hsl(24 95% 53%)"
+    : r === "sem_resposta_agente" ? "hsl(0 72% 51%)"
+    : "hsl(var(--muted-foreground))";
+
 
 type BarRow = { key: string; nome: string; qtd: number; pct: number; color?: string };
 
