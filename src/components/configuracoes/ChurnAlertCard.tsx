@@ -384,7 +384,7 @@ export default function ChurnAlertCard() {
 
             {/* Destinatários */}
             <div className="space-y-2">
-              <Label className="text-sm">Administradores que recebem o aviso</Label>
+              <Label className="text-sm">Administradores e Heads que recebem o aviso</Label>
               <div className="flex flex-wrap gap-2">
                 {local.churn_alert_recipients.map((r) => (
                   <Badge key={r.phone} variant="secondary" className="gap-1 pr-1">
