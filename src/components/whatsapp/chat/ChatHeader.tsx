@@ -1260,6 +1260,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           }}
           onCreated={handleAttendanceTicketCreated}
           fromClosure
+          mode={getPickMode(attendanceTicketTarget) as any}
           attendanceId={attendanceTicketTarget.id}
           closureClienteId={attendanceTicketTarget.clientes?.id ?? closureClienteIdEff}
           closureClienteNome={attendanceTicketTarget.clientes?.nome_fantasia ?? closureClienteNomeEff}
