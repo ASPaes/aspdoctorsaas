@@ -365,6 +365,12 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               </Button>
             }
           >
+            {latestResolucao?.resolucao && (
+              <div className={`flex items-center gap-2 rounded-md border px-2 py-1.5 mb-2 text-[11px] ${RESOLUCAO_CLASS[latestResolucao.resolucao]}`}>
+                <span className="text-sm leading-none">{RESOLUCAO_EMOJI[latestResolucao.resolucao]}</span>
+                <span className="font-medium">Resolução do último atendimento: {RESOLUCAO_LABEL[latestResolucao.resolucao]}</span>
+              </div>
+            )}
             {sentiment ? (
               <div className="space-y-2.5 min-w-0">
                 {/* Emoji + label + confidence bar */}
