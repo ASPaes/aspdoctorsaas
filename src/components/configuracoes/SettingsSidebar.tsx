@@ -120,6 +120,7 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
         {
           items: [
             { value: "geral", label: "Geral" },
+            { value: "notificacoes", label: "Notificações" },
             { value: "setup", label: "Guia de configuração" },
           ],
         },
