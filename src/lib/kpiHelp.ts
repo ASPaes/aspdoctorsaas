@@ -1117,10 +1117,10 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   },
   atendimento_ag_csat: {
     title: "CSAT do Agente",
-    definition: "Nota média de satisfação dos atendimentos do agente que receberam avaliação. O número entre parênteses é a quantidade de respostas.",
-    why_it_matters: "Qualidade percebida pelo cliente. CSAT alto com poucas respostas (N baixo) é frágil — olhe sempre o N junto.",
-    formula: "média das notas de CSAT dos atendimentos do agente (escala 0–5)",
-    market_benchmark: "Escala 0–5; acima de 4,5 é forte.",
+    definition: "Nota média de satisfação dos atendimentos do agente que receberam avaliação. O percentual entre parênteses é a taxa de resposta das pesquisas (respondidas ÷ enviadas). Detalhamento completo por agente na aba Satisfação.",
+    why_it_matters: "Qualidade percebida pelo cliente. CSAT alto com taxa de resposta baixa é frágil — a nota reflete poucos clientes.",
+    formula: "média das notas de CSAT do agente (escala 0–5) · taxa = respondidas ÷ enviadas",
+    market_benchmark: "Escala 0–5; acima de 4,5 é forte. Taxa de resposta típica de CSAT em chat: 30–50%.",
   },
   atendimento_ag_reabertura: {
     title: "Taxa de Reabertura",
