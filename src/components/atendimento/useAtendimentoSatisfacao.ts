@@ -10,6 +10,14 @@ export interface CsatSetorRow {
   media: number | null;
   respostas: number;
 }
+export interface CsatAgenteRow {
+  agent_id: string | null;
+  nome: string;
+  enviadas: number;
+  respondidas: number;
+  taxa_pct: number | null;
+  media: number | null;
+}
 export interface CsatDistRow {
   score: number;
   qtd: number;
@@ -26,6 +34,7 @@ export interface AtendimentoSatisfacao {
   response_rate_pct: number | null;
   distribuicao: CsatDistRow[];
   por_setor: CsatSetorRow[];
+  por_agente: CsatAgenteRow[];
   div_neg_total: number;
   div_neg_nota_alta: number;
   resolucao_por_nota: CsatResolRow[];
@@ -33,6 +42,7 @@ export interface AtendimentoSatisfacao {
   atendeu_na_hora: number;
   atendeu_na_hora_pct: number | null;
 }
+
 
 export function useAtendimentoSatisfacao() {
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -80,6 +90,15 @@ export function useAtendimentoSatisfacao() {
           media: num(r.media),
           respostas: Number(r.respostas ?? 0),
         })),
+        por_agente: ((d.por_agente ?? []) as any[]).map((r) => ({
+          agent_id: r.agent_id ?? null,
+          nome: r.nome ?? "Sem agente",
+          enviadas: Number(r.enviadas ?? 0),
+          respondidas: Number(r.respondidas ?? 0),
+          taxa_pct: num(r.taxa_pct),
+          media: num(r.media),
+        })),
+
         div_neg_total: Number(d.div_neg_total ?? 0),
         div_neg_nota_alta: Number(d.div_neg_nota_alta ?? 0),
         resolucao_por_nota: ((d.resolucao_por_nota ?? []) as any[]).map((r) => ({

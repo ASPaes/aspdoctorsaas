@@ -1167,6 +1167,13 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Revela o que a média esconde — um punhado de notas baixas pode importar mais que a média alta.",
     formula: "contagem de respostas por nota",
   },
+  atendimento_csat_por_agente: {
+    title: "CSAT por Agente",
+    definition: "Desempenho de CSAT por agente no período: pesquisas enviadas, respondidas, taxa de resposta e nota média (0 a 5).",
+    why_it_matters: "Compara agentes por satisfação e representatividade — nota alta com poucas respostas engana.",
+    formula: "por agente: enviadas, respondidas, respondidas ÷ enviadas, média das notas respondidas",
+    market_benchmark: "Fonte: pesquisas enviadas (support_csat), atribuídas ao agente responsável pelo atendimento.",
+  },
   atendimento_resol_csat: {
     title: "Resolução por Nota",
     definition: "Tempo mediano de resolução dos atendimentos em cada nota de CSAT.",
