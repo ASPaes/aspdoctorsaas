@@ -1,8 +1,16 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Loader2, Star, Reply, AlertTriangle, Zap } from "lucide-react";
 import { useAtendimentoSatisfacao } from "./useAtendimentoSatisfacao";
 import { fmtEspera } from "./TempoRealTab";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
+import { CsatReportModal } from "@/components/tickets/CsatReportModal";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 const SCORE_COLOR: Record<number, string> = {
