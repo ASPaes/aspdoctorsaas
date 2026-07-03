@@ -638,10 +638,21 @@ function ContratoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{edit ? "Editar Contrato" : "Novo Contrato"}</DialogTitle>
-          <DialogDescription>
-            Cadastre dados de contrato. O número é gerado automaticamente.
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <DialogTitle>{edit ? "Editar Contrato" : "Novo Contrato"}</DialogTitle>
+              <DialogDescription>
+                Cadastre dados de contrato. O número é gerado automaticamente.
+              </DialogDescription>
+            </div>
+            {edit && (
+              <EnviarContratoOmieButton
+                tenantId={tid}
+                contratoId={edit.id}
+                createdAt={edit.created_at ?? null}
+              />
+            )}
+          </div>
         </DialogHeader>
 
         <div className="space-y-6">
