@@ -168,7 +168,10 @@ function LinhaTemporal({ rows }: { rows: { mes: string; atendimentos: number; mr
 export function ChatsTab() {
   const [closedReasons, setClosedReasons] = useState<string[]>([]);
   const [hasTicket, setHasTicket] = useState<"all" | "with" | "without">("all");
-  const { data, isLoading, isError, error } = useAtendimentoChats({ closedReasons, hasTicket });
+  const [sentiments, setSentiments] = useState<string[]>([]);
+  const [resolucoes, setResolucoes] = useState<string[]>([]);
+  const { data, isLoading, isError, error } = useAtendimentoChats({ closedReasons, hasTicket, sentiments, resolucoes });
+
   const { data: timeline } = useAtendimentoChatsTimeline();
   return (
     <div className="space-y-4">
