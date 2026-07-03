@@ -264,7 +264,6 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
             const reason = (result.cs_ticket_reason || result.summary || "Sinal de churn detectado").toString();
 
             const title = `\u26A0\uFE0F Risco de churn: ${contactName}`;
-            const body = reason.substring(0, 500);
 
             await notifyEvent(
               supabase,
