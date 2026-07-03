@@ -1753,6 +1753,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
 
   triggerAutoSentiment(supabase, conversationId, supabaseUrl);
   triggerAutoCategorization(supabase, conversationId, supabaseUrl);
+  if (content) checkChurnKeywords(supabase, tenantId, conversationId, content, supabaseUrl);
 
   const csatHandled = await handleCsatResponse(supabase, ctx, conversationId, tenantId, content);
   if (csatHandled) return;
