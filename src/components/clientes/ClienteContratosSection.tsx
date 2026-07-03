@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { useProfile } from "@/hooks/useProfile";
+import EnviarContratoOmieButton from "./EnviarContratoOmieButton";
 
 interface Props {
   clienteId: string;
@@ -37,6 +38,7 @@ interface Props {
 interface Contrato {
   id: string;
   numero: string;
+  created_at?: string | null;
   tipo: "base" | "aditivo";
   contrato_pai_id: string | null;
   data_venda: string | null;
@@ -636,10 +638,21 @@ function ContratoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{edit ? "Editar Contrato" : "Novo Contrato"}</DialogTitle>
-          <DialogDescription>
-            Cadastre dados de contrato. O número é gerado automaticamente.
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <DialogTitle>{edit ? "Editar Contrato" : "Novo Contrato"}</DialogTitle>
+              <DialogDescription>
+                Cadastre dados de contrato. O número é gerado automaticamente.
+              </DialogDescription>
+            </div>
+            {edit && (
+              <EnviarContratoOmieButton
+                tenantId={tid}
+                contratoId={edit.id}
+                createdAt={edit.created_at ?? null}
+              />
+            )}
+          </div>
         </DialogHeader>
 
         <div className="space-y-6">
