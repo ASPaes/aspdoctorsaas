@@ -65,7 +65,7 @@ export function AgentesTab() {
             <KPICardEnhanced
               label="CSAT da Equipe"
               helpKey="atendimento_csat_equipe"
-              value={data.csat_equipe !== null ? data.csat_equipe.toFixed(1) : "—"}
+              value={data.csat_equipe !== null ? data.csat_equipe.toFixed(2) : "—"}
               subtitle={
                 data.csat_equipe_sent_n > 0
                   ? `${data.csat_equipe_sent_n} enviadas · ${data.csat_equipe_n} respostas (${Math.round(100 * data.csat_equipe_n / data.csat_equipe_sent_n)}%)`
