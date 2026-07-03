@@ -90,6 +90,15 @@ export function useAtendimentoSatisfacao() {
           media: num(r.media),
           respostas: Number(r.respostas ?? 0),
         })),
+        por_agente: ((d.por_agente ?? []) as any[]).map((r) => ({
+          agent_id: r.agent_id ?? null,
+          nome: r.nome ?? "Sem agente",
+          enviadas: Number(r.enviadas ?? 0),
+          respondidas: Number(r.respondidas ?? 0),
+          taxa_pct: num(r.taxa_pct),
+          media: num(r.media),
+        })),
+
         div_neg_total: Number(d.div_neg_total ?? 0),
         div_neg_nota_alta: Number(d.div_neg_nota_alta ?? 0),
         resolucao_por_nota: ((d.resolucao_por_nota ?? []) as any[]).map((r) => ({
