@@ -861,6 +861,11 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
                       {CLOSURE_LABELS[att.closure_type] ?? att.closure_type}
                     </Badge>
                   )}
+                  {att.status === "closed" && att.resolucao && (
+                    <Badge variant="outline" className={`text-[10px] shrink-0 ${RESOLUCAO_CLASSES[att.resolucao] ?? ""}`}>
+                      {RESOLUCAO_LABELS[att.resolucao] ?? att.resolucao}
+                    </Badge>
+                  )}
                   <div className="flex-1" />
                   <span className="inline-flex items-center gap-1 shrink-0 font-mono">
                     <Clock className="h-3 w-3" />
