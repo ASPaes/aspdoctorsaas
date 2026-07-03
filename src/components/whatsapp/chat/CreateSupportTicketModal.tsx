@@ -234,7 +234,7 @@ export function CreateSupportTicketModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <Ticket className="h-5 w-5 text-primary" />
-            Classificar atendimento
+            {mode === 'demanda_externa' ? 'Novo ticket — demanda externa' : 'Classificar atendimento'}
           </DialogTitle>
         </DialogHeader>
 
