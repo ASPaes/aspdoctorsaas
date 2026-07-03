@@ -594,7 +594,16 @@ export function CreateSupportTicketModal({
             .update({ prioridade })
             .eq("id", ticketId);
         }
-
+        if (mode === "demanda_externa" && statusId) {
+          try {
+            await (supabase.rpc as any)("update_ticket_fields", {
+              p_ticket_id: ticketId,
+              p_fields: { status_id: statusId },
+            });
+          } catch (e) {
+            console.warn("Falha ao aplicar status no ticket de demanda externa:", e);
+          }
+        }
       }
 
       toast.success(
