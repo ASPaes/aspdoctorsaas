@@ -32,6 +32,7 @@ import { ChangeInstanceDialog } from "./ChangeInstanceDialog";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { SignatureControl } from "./SignatureControl";
 import { SentimentChip } from "./SentimentChip";
+import { ClimaResolucaoBadge } from "./ClimaResolucaoBadge";
 import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
 import { ConversationMuteButton } from "./ConversationMuteButton";
 import { ConfirmClienteModal } from "./ConfirmClienteModal";
@@ -1012,7 +1013,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             </Tooltip>
           )}
 
-          <SentimentChip sentiment={sentimentData} />
+          <ClimaResolucaoBadge
+            conversationId={conversation.id}
+            hasActiveAttendance={!!(attendance && (attendance.status === "waiting" || attendance.status === "in_progress"))}
+            sentiment={sentimentData}
+          />
         </div>
       </div>
 

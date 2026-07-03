@@ -31,6 +31,12 @@ import { TopicBadges } from "./TopicBadges";
 import { ClienteLinkCard } from "./ClienteLinkCard";
 import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
 import { useRelevantAttendance } from "../hooks/useRelevantAttendance";
+import {
+  useLatestAttendanceResolucao,
+  RESOLUCAO_LABEL,
+  RESOLUCAO_EMOJI,
+  RESOLUCAO_CLASS,
+} from "../hooks/useLatestAttendanceResolucao";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { Input } from "@/components/ui/input";
 import KBEditDialog from "@/components/configuracoes/kb/KBEditDialog";
@@ -49,6 +55,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const { summary: conversationSummary, generateSummary, isGenerating } = useConversationSummaries(conversation.id);
   const { sentiment: sentimentRaw, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const sentiment = sentimentRaw as any;
+  const { data: latestResolucao } = useLatestAttendanceResolucao(conversation.id);
   const { data: topicsData } = useConversationTopics(conversation.id);
   const categorizeMutation = useCategorizeConversation();
   const { updateContact, isUpdatingContact, toggleRulesDisabled, isTogglingRulesDisabled } = useWhatsAppActions();
@@ -358,6 +365,12 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               </Button>
             }
           >
+            {latestResolucao?.resolucao && (
+              <div className={`flex items-center gap-2 rounded-md border px-2 py-1.5 mb-2 text-[11px] ${RESOLUCAO_CLASS[latestResolucao.resolucao]}`}>
+                <span className="text-sm leading-none">{RESOLUCAO_EMOJI[latestResolucao.resolucao]}</span>
+                <span className="font-medium">Resolução do último atendimento: {RESOLUCAO_LABEL[latestResolucao.resolucao]}</span>
+              </div>
+            )}
             {sentiment ? (
               <div className="space-y-2.5 min-w-0">
                 {/* Emoji + label + confidence bar */}
