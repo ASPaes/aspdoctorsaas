@@ -56,6 +56,7 @@ import PermissoesPapeisContent from "@/components/configuracoes/PermissoesPapeis
 import { usePermissions } from "@/hooks/usePermissions";
 import AccessDenied from "@/pages/AccessDenied";
 import { SECTION_TO_RESOURCE } from "@/components/configuracoes/SettingsSidebar";
+import NotificacoesTab from "@/components/configuracoes/NotificacoesTab";
 
 
 const schema = z.object({
