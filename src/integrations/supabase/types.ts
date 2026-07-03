@@ -3297,6 +3297,90 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_event_types: {
+        Row: {
+          ativo: boolean
+          categoria: string
+          cooldown_minutes: number
+          created_at: string
+          default_severity: string
+          descricao: string | null
+          key: string
+          label: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string
+          cooldown_minutes?: number
+          created_at?: string
+          default_severity?: string
+          descricao?: string | null
+          key: string
+          label: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string
+          cooldown_minutes?: number
+          created_at?: string
+          default_severity?: string
+          descricao?: string | null
+          key?: string
+          label?: string
+        }
+        Relationships: []
+      }
+      notification_incidents: {
+        Row: {
+          dedupe_key: string
+          event_type_key: string
+          first_seen_at: string
+          id: string
+          last_notified_at: string | null
+          last_seen_at: string
+          occurrences: number
+          resolved_at: string | null
+          tenant_id: string
+        }
+        Insert: {
+          dedupe_key: string
+          event_type_key: string
+          first_seen_at?: string
+          id?: string
+          last_notified_at?: string | null
+          last_seen_at?: string
+          occurrences?: number
+          resolved_at?: string | null
+          tenant_id: string
+        }
+        Update: {
+          dedupe_key?: string
+          event_type_key?: string
+          first_seen_at?: string
+          id?: string
+          last_notified_at?: string | null
+          last_seen_at?: string
+          occurrences?: number
+          resolved_at?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_incidents_event_type_key_fkey"
+            columns: ["event_type_key"]
+            isOneToOne: false
+            referencedRelation: "notification_event_types"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "notification_incidents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_recipients: {
         Row: {
           delivered_at: string
@@ -3349,6 +3433,121 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      notification_subscriptions: {
+        Row: {
+          ativo: boolean
+          channels: string[]
+          created_at: string
+          event_type_key: string
+          id: string
+          tenant_id: string
+          updated_at: string
+          user_id: string
+          whatsapp_phone: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          channels?: string[]
+          created_at?: string
+          event_type_key: string
+          id?: string
+          tenant_id: string
+          updated_at?: string
+          user_id: string
+          whatsapp_phone?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          channels?: string[]
+          created_at?: string
+          event_type_key?: string
+          id?: string
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+          whatsapp_phone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_subscriptions_event_type_key_fkey"
+            columns: ["event_type_key"]
+            isOneToOne: false
+            referencedRelation: "notification_event_types"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "notification_subscriptions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      notification_whatsapp_outbox: {
+        Row: {
+          attempts: number
+          created_at: string
+          error: string | null
+          id: string
+          message: string
+          notification_id: string | null
+          phone: string
+          processed_at: string | null
+          status: string
+          tenant_id: string
+          user_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          error?: string | null
+          id?: string
+          message: string
+          notification_id?: string | null
+          phone: string
+          processed_at?: string | null
+          status?: string
+          tenant_id: string
+          user_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          error?: string | null
+          id?: string
+          message?: string
+          notification_id?: string | null
+          phone?: string
+          processed_at?: string | null
+          status?: string
+          tenant_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_whatsapp_outbox_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_whatsapp_outbox_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -9058,6 +9257,17 @@ export type Database = {
         }
         Returns: string
       }
+      notify_event: {
+        Args: {
+          p_body: string
+          p_dedupe_key: string
+          p_event_type: string
+          p_metadata?: Json
+          p_tenant_id: string
+          p_title: string
+        }
+        Returns: Json
+      }
       obter_chave_omie: { Args: { p_tenant_id?: string }; Returns: string }
       preparar_reajuste: {
         Args: {
@@ -9126,6 +9336,14 @@ export type Database = {
           p_tenant_id: string
         }
         Returns: string
+      }
+      resolve_notification_incident: {
+        Args: {
+          p_dedupe_key: string
+          p_event_type: string
+          p_tenant_id: string
+        }
+        Returns: boolean
       }
       resolve_user_notification_settings: {
         Args: { p_user_id: string }
