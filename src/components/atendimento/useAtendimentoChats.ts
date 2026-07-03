@@ -34,8 +34,9 @@ export interface AtendimentoChats {
   media_atend_cliente: ChatMediaCliente;
 }
 
-export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: "all" | "with" | "without" }) {
-  const { closedReasons, hasTicket } = opts;
+export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: "all" | "with" | "without"; sentiments: string[]; resolucoes: string[] }) {
+  const { closedReasons, hasTicket, sentiments, resolucoes } = opts;
+
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, tipoAtendimento } = useAtendimentoFilter();
