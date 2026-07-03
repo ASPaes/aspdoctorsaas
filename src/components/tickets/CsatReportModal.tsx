@@ -167,7 +167,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
   });
 
   const { data: summary, isLoading: loadingSummary } = useQuery({
-    queryKey: ["csat-report-summary", tenantId, fromISO, toISO, deptParam, agentParam, scoreParam, commentParam, clienteParam],
+    queryKey: ["csat-report-summary", tenantId, fromISO, toISO, deptParam, agentParam, scoreParam, commentParam, clienteParam, tipoParam],
     enabled: open && !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_csat_report_summary", {
@@ -179,6 +179,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
         p_score: scoreParam,
         p_has_comment: commentParam,
         p_cliente_id: clienteParam,
+        p_is_group: tipoParam,
       });
       if (error) throw error;
       return data as SummaryData;
@@ -186,7 +187,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
   });
 
   const { data: list = [], isLoading: loadingList } = useQuery({
-    queryKey: ["csat-report-list", tenantId, fromISO, toISO, deptParam, agentParam, scoreParam, commentParam, clienteParam],
+    queryKey: ["csat-report-list", tenantId, fromISO, toISO, deptParam, agentParam, scoreParam, commentParam, clienteParam, tipoParam],
     enabled: open && !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_csat_report_list", {
@@ -199,6 +200,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
         p_score: scoreParam,
         p_has_comment: commentParam,
         p_cliente_id: clienteParam,
+        p_is_group: tipoParam,
       });
       if (error) throw error;
       return (data ?? []) as AvalRow[];
