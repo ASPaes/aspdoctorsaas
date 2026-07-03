@@ -1,6 +1,6 @@
-export async function notifyEvent(supabase: any, tenantId: string, eventType: string, dedupeKey: string, title: string, body: string, metadata: Record<string, unknown> = {}) {
+export async function notifyEvent(supabase: any, tenantId: string, eventType: string, dedupeKey: string, title: string, body: string, metadata: Record<string, unknown> = {}, actionUrl?: string) {
   try {
-    const { data, error } = await supabase.rpc("notify_event", { p_tenant_id: tenantId, p_event_type: eventType, p_dedupe_key: dedupeKey, p_title: title, p_body: body, p_metadata: metadata });
+    const { data, error } = await supabase.rpc("notify_event", { p_tenant_id: tenantId, p_event_type: eventType, p_dedupe_key: dedupeKey, p_title: title, p_body: body, p_metadata: metadata, p_action_url: actionUrl ?? null });
     if (error) console.error("[notify] rpc error:", error.message);
     return data ?? null;
   } catch (e) { console.error("[notify] exception:", e); return null; }
