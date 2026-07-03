@@ -1412,8 +1412,33 @@ export default function SupportTickets() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Resolução</label>
+                    <Select value={attResolucaoFilter} onValueChange={setAttResolucaoFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="resolvido">✅ Resolvido</SelectItem>
+                        <SelectItem value="parcial">🟡 Parcial</SelectItem>
+                        <SelectItem value="nao_resolvido">🟠 Sem solução</SelectItem>
+                        <SelectItem value="sem_resposta_agente">🔴 Sem resposta</SelectItem>
+                        <SelectItem value="(sem)">Sem análise</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Tipo</label>
+                    <Select value={attTipoFilter} onValueChange={setAttTipoFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="individual">Individual</SelectItem>
+                        <SelectItem value="group">Grupos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                {(attClosureTypeFilter !== "all" || attCsatFilter !== "all" || attCsatScoreFilter !== "all" || attTicketFilter !== "all" || attSentimentFilter !== "all" || attInstanceFilter !== "all") && (
+                {(attClosureTypeFilter !== "all" || attCsatFilter !== "all" || attCsatScoreFilter !== "all" || attTicketFilter !== "all" || attSentimentFilter !== "all" || attInstanceFilter !== "all" || attResolucaoFilter !== "all" || attTipoFilter !== "all") && (
                   <div className="flex justify-end pt-2 border-t">
                     <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => {
                       setAttClosureTypeFilter("all");
@@ -1422,6 +1447,8 @@ export default function SupportTickets() {
                       setAttTicketFilter("all");
                       setAttSentimentFilter("all");
                       setAttInstanceFilter("all");
+                      setAttResolucaoFilter("all");
+                      setAttTipoFilter("all");
                     }}>Limpar filtros</Button>
                   </div>
                 )}
