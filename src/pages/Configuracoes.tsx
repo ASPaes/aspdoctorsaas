@@ -100,6 +100,7 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   importacao: { breadcrumb: ["Dados", "Importação"], title: "Importação de Dados", description: "Importe sua base de clientes a partir de um arquivo CSV ou planilha." },
   geral: { breadcrumb: ["Sistema", "Geral"], title: "Geral", description: "Fuso horário e configurações globais do sistema." },
   setup: { breadcrumb: ["Sistema", "Guia de configuração"], title: "Guia de configuração", description: "Passos recomendados para configurar a plataforma." },
+  notificacoes: { breadcrumb: ["Sistema", "Notificações"], title: "Notificações", description: "Configure quem recebe cada tipo de alerta e por quais canais." },
   "integracoes-omie": { breadcrumb: ["Integrações", "Omie"], title: "Omie", description: "Conecte o sistema ao Omie para sincronizar clientes e contratos." },
 };
 
