@@ -65,7 +65,7 @@ export function AgentesTab() {
             <KPICardEnhanced
               label="CSAT da Equipe"
               helpKey="atendimento_csat_equipe"
-              value={data.csat_equipe !== null ? data.csat_equipe.toFixed(1) : "—"}
+              value={data.csat_equipe !== null ? data.csat_equipe.toFixed(2) : "—"}
               subtitle={
                 data.csat_equipe_sent_n > 0
                   ? `${data.csat_equipe_sent_n} enviadas · ${data.csat_equipe_n} respostas (${Math.round(100 * data.csat_equipe_n / data.csat_equipe_sent_n)}%)`
@@ -152,9 +152,9 @@ export function AgentesTab() {
                         <td className="py-2 px-3 text-right tabular-nums">
                           {a.csat_sent_n > 0 ? (
                             <span>
-                              {a.csat !== null ? a.csat.toFixed(1) : "—"}{" "}
+                              {a.csat !== null ? a.csat.toFixed(2) : "—"}{" "}
                               <span className="text-xs text-muted-foreground">
-                                ({a.csat_sent_n}/{a.csat_n}/{Math.round(100 * a.csat_n / a.csat_sent_n)}%)
+                                ({Math.round(100 * a.csat_n / a.csat_sent_n)}%)
                               </span>
                             </span>
                           ) : (
