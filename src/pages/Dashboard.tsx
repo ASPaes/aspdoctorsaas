@@ -17,6 +17,7 @@ import { CohortTab } from '@/components/dashboard/tabs/CohortTab';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnidadeFilter } from '@/contexts/UnidadeFilterContext';
+import { NotificationSetupBanner } from '@/components/NotificationSetupBanner';
 
 export default function Dashboard() {
   const { selectedUnidadeId, unidadeFilterReady } = useUnidadeFilter();
@@ -50,6 +51,9 @@ export default function Dashboard() {
         <h1 className={`font-bold ${tvMode ? 'text-4xl' : 'text-2xl'}`}>Dashboard</h1>
         <p className="mt-1 text-muted-foreground">Visão completa dos indicadores de performance.</p>
       </div>
+
+      <NotificationSetupBanner />
+
 
       <DashboardFilters
         filters={filters}
