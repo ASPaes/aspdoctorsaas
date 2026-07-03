@@ -130,16 +130,16 @@ Considere: tempo de resposta, resolução de problemas, tom de comunicação, sa
 
     let result: import("../_shared/ai-client.ts").AIResult;
     try {
-      // Try with tools first (OpenAI/custom)
-      if (aiConfig.provider === "openai" || aiConfig.provider === "custom") {
-        result = await callAI(aiConfig, aiMessages, tools);
-      } else {
-        // For Anthropic/Gemini, use plain text and parse JSON
+      if (aiConfig.provider === "gemini") {
+        // Gemini ainda não suporta tools no ai-client: plain text + parse defensivo
         const plainPrompt = systemPrompt + "\n\nResponda APENAS com JSON válido no formato: {\"resumo\": \"...\", \"sentimento\": \"positive|neutral|negative\", \"pontos_chave\": [...], \"itens_acao\": [...], \"nota\": N}";
         result = await callAI(aiConfig, [
           { role: "system", content: plainPrompt },
           { role: "user", content: userContent },
         ]);
+      } else {
+        // OpenAI, custom e Anthropic: tools com tool_choice forçado
+        result = await callAI(aiConfig, aiMessages, tools);
       }
     } catch (aiError: any) {
       console.error(`[${FUNCTION_NAME}][${requestId}] AI error:`, aiError.message);
