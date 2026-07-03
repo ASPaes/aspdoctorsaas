@@ -253,14 +253,40 @@ REGRAS:
 - "topics": máximo 5
 - "suggested_area": escolha entre as áreas disponíveis ou null`;
 
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "submit_analysis",
+          description: "Submete a análise estruturada do atendimento",
+          parameters: {
+            type: "object",
+            properties: {
+              sentiment_score: { type: "integer", minimum: -100, maximum: 100 },
+              resolucao: { type: "string", enum: ["resolvido", "parcial", "nao_resolvido"] },
+              topics: { type: "array", items: { type: "string" } },
+              summary: { type: "string" },
+              title: { type: "string" },
+              problem: { type: "string" },
+              solution: { type: "string" },
+              tags: { type: "array", items: { type: "string" } },
+              suggested_area: { type: "string" },
+            },
+            required: ["sentiment_score", "resolucao", "summary", "title", "problem", "solution"],
+          },
+        },
+      },
+    ];
+
     let rawResult: import("../_shared/ai-client.ts").AIResult;
     try {
       rawResult = await callAI(
-        { ...aiConfig, ...(aiConfig.provider === "openai" || aiConfig.provider === "custom" ? {} : {}) },
+        aiConfig,
         [
           { role: "system", content: "Analista de suporte técnico. Responda apenas JSON válido, sem markdown." },
           { role: "user", content: prompt },
-        ]
+        ],
+        tools
       );
     } catch (aiError: any) {
       const msg = aiError?.message || "";
