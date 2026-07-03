@@ -554,7 +554,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         open={mrrDialog.open}
         onOpenChange={(o) => setMrrDialog(prev => ({ ...prev, open: o }))}
         clienteId={clienteId}
-        tenantId={tid}
+        tenantId={lookupTenantId}
         tipo={mrrDialog.tipo}
         valorDelta={mrrDialog.valorDelta}
         custoDelta={mrrDialog.custoDelta}
