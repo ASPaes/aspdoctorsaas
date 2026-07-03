@@ -286,6 +286,15 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
             </SelectContent>
           </Select>
 
+          <Select value={tipoFilter} onValueChange={(v) => setTipoFilter(v as 'all' | 'individual' | 'group')}>
+            <SelectTrigger className="h-8 text-xs w-auto min-w-[120px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os tipos</SelectItem>
+              <SelectItem value="individual">Individual</SelectItem>
+              <SelectItem value="group">Grupos</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Select value={scoreFilter} onValueChange={setScoreFilter}>
             <SelectTrigger className="h-8 text-xs w-auto min-w-[100px]"><SelectValue /></SelectTrigger>
             <SelectContent>
