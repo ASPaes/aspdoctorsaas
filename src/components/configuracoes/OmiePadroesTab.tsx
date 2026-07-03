@@ -83,6 +83,14 @@ export default function OmiePadroesTab() {
   const [addPeriodoRef, setAddPeriodoRef] = useState(false);
   const [addVencParcela, setAddVencParcela] = useState(false);
 
+  // Seção: Data de ativação
+  const [dataCorte, setDataCorte] = useState<string>("");
+  const [savingDataCorte, setSavingDataCorte] = useState(false);
+
+  // Seção: Modelos de contrato permitidos
+  const [modelos, setModelos] = useState<ModeloContrato[]>([]);
+  const [modelosPermitidos, setModelosPermitidos] = useState<string[]>([]);
+
   useEffect(() => {
     void carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
