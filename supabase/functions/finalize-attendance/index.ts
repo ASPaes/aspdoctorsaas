@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getAIConfig, callAI } from "../_shared/ai-client.ts";
+import { notifyEvent, resolveIncident } from "../_shared/notify.ts";
 
 const FUNCTION_NAME = "finalize-attendance";
 
@@ -287,11 +288,21 @@ REGRAS:
           { role: "user", content: prompt },
         ],
         tools
-      );
+    );
+      await resolveIncident(supabase, att.tenant_id, "ai_quota_exceeded", att.tenant_id);
     } catch (aiError: any) {
       const msg = aiError?.message || "";
       if (msg.includes("429") || msg.includes("insufficient_quota") || msg.includes("rate") || msg.includes("quota")) {
         console.warn(`[${FUNCTION_NAME}][${requestId}] IA indisponível (quota/rate limit) — retornando 503 para re-tentativa da fila`);
+        await notifyEvent(
+          supabase,
+          att.tenant_id,
+          "ai_quota_exceeded",
+          att.tenant_id,
+          "IA sem crédito ou chave inválida",
+          "A chave de IA do seu workspace está falhando (quota/billing). Análises de atendimento e transcrições estão paradas até regularizar.",
+          { source: "finalize-attendance" }
+        );
         return new Response(
           JSON.stringify({ success: false, reason: "ai_quota_exceeded" }),
           { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
