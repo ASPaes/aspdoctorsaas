@@ -252,7 +252,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
     ? Math.round((summary.respostas / summary.enviadas) * 100)
     : 0;
 
-  const hasActiveFilter = deptFilter !== "all" || agentFilter !== "all" || scoreFilter !== "all" || commentFilter !== "all" || !!clienteFilterId;
+  const hasActiveFilter = deptFilter !== "all" || agentFilter !== "all" || tipoFilter !== "all" || scoreFilter !== "all" || commentFilter !== "all" || !!clienteFilterId;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
