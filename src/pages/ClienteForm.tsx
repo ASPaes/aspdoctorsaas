@@ -516,7 +516,7 @@ export default function ClienteForm() {
           if (k in payload) updatePayload[k] = payload[k];
         }
 
-        const { error } = await supabase.from("clientes").update(updatePayload).eq("id", id!);
+        const { error } = await supabase.from("clientes").update(updatePayload as any).eq("id", id!);
         if (error) throw error;
       } else {
 

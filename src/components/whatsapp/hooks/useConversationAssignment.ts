@@ -196,7 +196,7 @@ export const useConversationAssignment = () => {
       };
       const { error: convErr } = await supabase
         .from('whatsapp_conversations')
-        .update(convUpdate)
+        .update(convUpdate as any)
         .eq('id', conversationId);
       if (convErr) throw convErr;
 
