@@ -325,6 +325,14 @@ export default function NotificacoesTab() {
               <p className="text-sm text-muted-foreground">
                 Sou o conselheiro executivo da sua operação. Acompanho seus números todos os dias, levo ao Conselho DS e volto com leitura e recomendação. E quando algo pede ação imediata, aviso na hora.
               </p>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Badge variant="outline" className="border-sky-500/30 text-sky-400">
+                  Em breve
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  Logo você também vai poder conversar comigo por aqui — perguntar qualquer coisa sobre a sua operação e receber resposta na hora.
+                </span>
+              </div>
               <div className="flex flex-wrap gap-2 pt-1">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-xs text-sky-400">
                   <Clock className="h-3 w-3" />
