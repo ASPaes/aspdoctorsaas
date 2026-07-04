@@ -49,6 +49,7 @@ import {
   KeyRound,
   Unplug,
   Bell,
+  Phone,
 } from "lucide-react";
 
 type EventType = {
