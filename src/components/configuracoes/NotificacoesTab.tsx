@@ -49,6 +49,7 @@ import {
   KeyRound,
   Unplug,
   Bell,
+  Phone,
 } from "lucide-react";
 
 type EventType = {
@@ -288,6 +289,56 @@ export default function NotificacoesTab() {
       toast({ title: "Erro ao remover", description: err.message, variant: "destructive" }),
   });
 
+  const instancesQuery = useQuery({
+    queryKey: ["whatsapp_instances_notif", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("whatsapp_instances" as any) as any)
+        .select("id, instance_name")
+        .eq("tenant_id", tid)
+        .order("instance_name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; instance_name: string | null }>;
+    },
+  });
+
+  const configQuery = useQuery({
+    queryKey: ["configuracoes_notif", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("configuracoes" as any) as any)
+        .select("id, churn_alert_instance_id")
+        .eq("tenant_id", tid)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; churn_alert_instance_id: string | null } | null;
+    },
+  });
+
+  const updateConfig = useMutation({
+    mutationFn: async (instanceId: string | null) => {
+      if (configQuery.data?.id) {
+        const { error } = await (supabase.from("configuracoes" as any) as any)
+          .update({ churn_alert_instance_id: instanceId })
+          .eq("id", configQuery.data.id)
+          .eq("tenant_id", tid);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase.from("configuracoes" as any) as any).insert({
+          tenant_id: tid,
+          churn_alert_instance_id: instanceId,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["configuracoes_notif", tid] });
+      toast({ title: "Canal de envio atualizado" });
+    },
+    onError: (err: any) =>
+      toast({ title: "Erro ao salvar canal", description: err.message, variant: "destructive" }),
+  });
+
   const [addingFor, setAddingFor] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [confirmDelete, setConfirmDelete] = useState<Subscription | null>(null);
@@ -324,6 +375,14 @@ export default function NotificacoesTab() {
               <p className="text-sm text-muted-foreground">
                 Sou o conselheiro executivo da sua operação. Acompanho seus números todos os dias, levo ao Conselho DS e volto com leitura e recomendação. E quando algo pede ação imediata, aviso na hora.
               </p>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Badge variant="outline" className="border-sky-500/30 text-sky-400">
+                  Em breve
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  Logo você também vai poder conversar comigo por aqui — perguntar qualquer coisa sobre a sua operação e receber resposta na hora.
+                </span>
+              </div>
               <div className="flex flex-wrap gap-2 pt-1">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-xs text-sky-400">
                   <Clock className="h-3 w-3" />
@@ -336,6 +395,43 @@ export default function NotificacoesTab() {
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Canal de envio */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-green-500/10">
+              <Phone className="h-4 w-4 text-green-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Por onde eu falo com você</p>
+              <p className="text-xs text-muted-foreground">
+                Com um único número cadastrado, eu uso ele automaticamente. Com mais de um, escolha aqui por qual eu envio.
+              </p>
+            </div>
+          </div>
+          <Select
+            value={configQuery.data?.churn_alert_instance_id ?? "__auto__"}
+            onValueChange={async (val) => {
+              const instanceId = val === "__auto__" ? null : val;
+              await updateConfig.mutateAsync(instanceId);
+            }}
+            disabled={!instancesQuery.data || instancesQuery.data.length === 0 || updateConfig.isPending}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione a instância" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__auto__">Automático (número único)</SelectItem>
+              {instancesQuery.data?.map((inst) => (
+                <SelectItem key={inst.id} value={inst.id}>
+                  {inst.instance_name ?? inst.id}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
 
