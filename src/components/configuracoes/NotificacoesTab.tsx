@@ -289,6 +289,56 @@ export default function NotificacoesTab() {
       toast({ title: "Erro ao remover", description: err.message, variant: "destructive" }),
   });
 
+  const instancesQuery = useQuery({
+    queryKey: ["whatsapp_instances_notif", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("whatsapp_instances" as any) as any)
+        .select("id, instance_name")
+        .eq("tenant_id", tid)
+        .order("instance_name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; instance_name: string | null }>;
+    },
+  });
+
+  const configQuery = useQuery({
+    queryKey: ["configuracoes_notif", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("configuracoes" as any) as any)
+        .select("id, churn_alert_instance_id")
+        .eq("tenant_id", tid)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; churn_alert_instance_id: string | null } | null;
+    },
+  });
+
+  const updateConfig = useMutation({
+    mutationFn: async (instanceId: string | null) => {
+      if (configQuery.data?.id) {
+        const { error } = await (supabase.from("configuracoes" as any) as any)
+          .update({ churn_alert_instance_id: instanceId })
+          .eq("id", configQuery.data.id)
+          .eq("tenant_id", tid);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase.from("configuracoes" as any) as any).insert({
+          tenant_id: tid,
+          churn_alert_instance_id: instanceId,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["configuracoes_notif", tid] });
+      toast({ title: "Canal de envio atualizado" });
+    },
+    onError: (err: any) =>
+      toast({ title: "Erro ao salvar canal", description: err.message, variant: "destructive" }),
+  });
+
   const [addingFor, setAddingFor] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [confirmDelete, setConfirmDelete] = useState<Subscription | null>(null);
