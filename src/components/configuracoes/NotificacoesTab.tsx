@@ -36,7 +36,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Trash2, Loader2, Save } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Loader2,
+  Save,
+  Clock,
+  Calendar,
+  MessageCircle,
+  Compass,
+  UserX,
+  KeyRound,
+  Unplug,
+  Bell,
+} from "lucide-react";
 
 type EventType = {
   key: string;
@@ -60,10 +73,82 @@ type Subscription = {
 
 type TenantUser = { user_id: string; email: string | null; name: string | null };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  gestao: "Gestão",
-  sistema: "Sistema",
+const REPORT_KEYS = ["weekly_management_digest", "theo_weekly_report"];
+
+const REPORT_META: Record<string, { icon: React.ElementType; timeLabel: string }> = {
+  weekly_management_digest: { icon: MessageCircle, timeLabel: "Seg\u2013sex \u00b7 18h" },
+  theo_weekly_report: { icon: Compass, timeLabel: "Segunda \u00b7 07:45" },
 };
+
+const ALERT_ICONS: Record<string, React.ElementType> = {
+  churn_alert: UserX,
+  ai_quota_exceeded: KeyRound,
+  whatsapp_instance_disconnected: Unplug,
+};
+
+function AlertEventIcon({ eventKey }: { eventKey: string }) {
+  const Icon = ALERT_ICONS[eventKey] ?? Bell;
+  return <Icon className="h-4 w-4 text-red-500" />;
+}
+
+function EventRecipients({
+  event,
+  subs,
+  usersById,
+  users,
+  onAdd,
+  onSave,
+  onDelete,
+}: {
+  event: EventType;
+  subs: Subscription[];
+  usersById: Map<string, TenantUser>;
+  users: TenantUser[];
+  onAdd: (eventKey: string) => void;
+  onSave: (sub: Subscription, patch: Partial<Subscription>) => Promise<void>;
+  onDelete: (sub: Subscription) => void;
+}) {
+  const userLabel = (u?: TenantUser | null) =>
+    u ? u.name || u.email || u.user_id.slice(0, 8) : "Usu\u00e1rio";
+
+  const takenUserIds = new Set(subs.map((s) => s.user_id));
+  const availableUsers = users.filter((u) => !takenUserIds.has(u.user_id));
+
+  return (
+    <div className="space-y-3">
+      {subs.length === 0 && (
+        <p className="text-xs text-muted-foreground italic">
+          Ningu\u00e9m recebe este {REPORT_KEYS.includes(event.key) ? "relat\u00f3rio" : "aviso"} ainda.
+        </p>
+      )}
+      {subs.map((sub) => (
+        <SubscriptionRow
+          key={sub.id}
+          sub={sub}
+          user={usersById.get(sub.user_id) ?? null}
+          userLabel={userLabel}
+          onSave={(patch) => onSave(sub, patch)}
+          onDelete={() => onDelete(sub)}
+        />
+      ))}
+      <Button
+        size="sm"
+        variant="outline"
+        className="w-full border-dashed"
+        onClick={() => onAdd(event.key)}
+        disabled={availableUsers.length === 0}
+      >
+        <Plus className="h-4 w-4 mr-1" />
+        Adicionar destinat\u00e1rio
+      </Button>
+      {availableUsers.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          Todos os usu\u00e1rios j\u00e1 est\u00e3o cadastrados.
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function NotificacoesTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -134,7 +219,7 @@ export default function NotificacoesTab() {
   });
 
   const userLabel = (u?: TenantUser | null) =>
-    u ? u.name || u.email || u.user_id.slice(0, 8) : "Usuário";
+    u ? u.name || u.email || u.user_id.slice(0, 8) : "Usu\u00e1rio";
 
   const usersById = useMemo(() => {
     const m = new Map<string, TenantUser>();
@@ -181,7 +266,7 @@ export default function NotificacoesTab() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["notification_subscriptions", tid] });
-      toast({ title: "Destinatário adicionado" });
+      toast({ title: "Destinat\u00e1rio adicionado" });
     },
     onError: (err: any) =>
       toast({ title: "Erro ao adicionar", description: err.message, variant: "destructive" }),
@@ -197,7 +282,7 @@ export default function NotificacoesTab() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["notification_subscriptions", tid] });
-      toast({ title: "Destinatário removido" });
+      toast({ title: "Destinat\u00e1rio removido" });
     },
     onError: (err: any) =>
       toast({ title: "Erro ao remover", description: err.message, variant: "destructive" }),
@@ -217,99 +302,171 @@ export default function NotificacoesTab() {
   }
 
   const events = eventsQuery.data ?? [];
-  const grouped: Record<string, EventType[]> = { gestao: [], sistema: [] };
-  for (const e of events) (grouped[e.categoria] ??= []).push(e);
+  const reportEvents = events.filter((e) => REPORT_KEYS.includes(e.key));
+  const alertEvents = events.filter((e) => !REPORT_KEYS.includes(e.key));
 
   return (
     <div className="space-y-8 max-w-4xl">
-      {(["gestao", "sistema"] as const).map((cat) => {
-        const list = grouped[cat] ?? [];
-        if (!list.length) return null;
-        return (
-          <div key={cat} className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              {CATEGORY_LABELS[cat]}
-            </h3>
-            {list.map((event) => {
-              const subs = subsByEvent.get(event.key) ?? [];
-              const takenUserIds = new Set(subs.map((s) => s.user_id));
-              const availableUsers = (usersQuery.data ?? []).filter(
-                (u) => !takenUserIds.has(u.user_id),
-              );
+      {/* 1. Hero do Th\u00e9o */}
+      <Card>
+        <CardContent className="p-5">
+          <div className="flex items-start gap-4">
+            <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-green-500">
+              <span className="text-lg font-semibold text-green-950">T</span>
+            </div>
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-medium">Th\u00e9o</h2>
+                <Badge variant="outline" className="border-green-500/30 text-green-400">
+                  S\u00f3cio executivo \u00b7 Conselho DS
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Sou o conselheiro executivo da sua opera\u00e7\u00e3o. Acompanho seus n\u00fameros todos os dias, levo ao Conselho DS e volto com leitura e recomenda\u00e7\u00e3o. E quando algo pede a\u00e7\u00e3o imediata, aviso na hora.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-xs text-sky-400">
+                  <Clock className="h-3 w-3" />
+                  Pulso di\u00e1rio \u00b7 seg\u2013sex 18h
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-xs text-sky-400">
+                  <Calendar className="h-3 w-3" />
+                  Retrato da semana \u00b7 segunda 07:45
+                </span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-              return (
-                <Card key={event.key}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <CardTitle className="text-base">{event.label}</CardTitle>
-                        {event.descricao && (
-                          <CardDescription className="mt-1">{event.descricao}</CardDescription>
+      {/* 2. O que eu reporto a voc\u00ea */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold">O que eu reporto a voc\u00ea</h3>
+          <p className="text-xs text-muted-foreground">
+            Minhas conversas recorrentes com quem gere a opera\u00e7\u00e3o.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {reportEvents.map((event) => {
+            const meta = REPORT_META[event.key];
+            const Icon = meta?.icon ?? MessageCircle;
+            const subs = subsByEvent.get(event.key) ?? [];
+            return (
+              <Card key={event.key}>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-green-500/10">
+                      <Icon className="h-4 w-4 text-green-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{event.label}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{meta?.timeLabel ?? ""}</p>
+                    </div>
+                  </div>
+                  {event.descricao && (
+                    <p className="text-xs text-muted-foreground">{event.descricao}</p>
+                  )}
+                  <div className="border-t pt-3">
+                    <EventRecipients
+                      event={event}
+                      subs={subs}
+                      usersById={usersById}
+                      users={usersQuery.data ?? []}
+                      onAdd={(key) => {
+                        setAddingFor(key);
+                        setSelectedUser("");
+                      }}
+                      onSave={async (sub, patch) => {
+                        await updateSub.mutateAsync({ id: sub.id, ...patch });
+                      }}
+                      onDelete={(sub) => setConfirmDelete(sub)}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 3. Quando eu n\u00e3o espero o relat\u00f3rio */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold">Quando eu n\u00e3o espero o relat\u00f3rio</h3>
+          <p className="text-xs text-muted-foreground">
+            Avisos imediatos \u2014 se acontecer, eu falo na hora.
+          </p>
+        </div>
+        <div className="space-y-3">
+          {alertEvents.map((event) => {
+            const subs = subsByEvent.get(event.key) ?? [];
+            const isCritical = event.default_severity === "critical";
+            return (
+              <Card
+                key={event.key}
+                className={
+                  isCritical
+                    ? "border-l-2 border-l-red-500"
+                    : "border-l-2 border-l-amber-500"
+                }
+              >
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-md bg-red-500/10">
+                      <AlertEventIcon eventKey={event.key} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium">{event.label}</p>
+                        {event.default_severity && (
+                          <Badge variant="outline" className="shrink-0">
+                            {event.default_severity}
+                          </Badge>
                         )}
                       </div>
-                      {event.default_severity && (
-                        <Badge variant="outline" className="shrink-0">
-                          {event.default_severity}
-                        </Badge>
+                      {event.descricao && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{event.descricao}</p>
                       )}
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {subs.length === 0 && (
-                      <p className="text-sm text-muted-foreground italic">
-                        Nenhum destinatário configurado.
-                      </p>
-                    )}
-                    {subs.map((sub) => (
-                      <SubscriptionRow
-                        key={sub.id}
-                        sub={sub}
-                        user={usersById.get(sub.user_id) ?? null}
-                        userLabel={userLabel}
-                        onSave={(patch) => updateSub.mutateAsync({ id: sub.id, ...patch })}
-                        onDelete={() => setConfirmDelete(sub)}
-                      />
-                    ))}
-                    <div className="pt-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setAddingFor(event.key);
-                          setSelectedUser("");
-                        }}
-                        disabled={availableUsers.length === 0}
-                      >
-                        <Plus className="h-4 w-4" />
-                        Adicionar destinatário
-                      </Button>
-                      {availableUsers.length === 0 && (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          Todos os usuários já estão cadastrados.
-                        </span>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        );
-      })}
+                  </div>
+                  <EventRecipients
+                    event={event}
+                    subs={subs}
+                    usersById={usersById}
+                    users={usersQuery.data ?? []}
+                    onAdd={(key) => {
+                      setAddingFor(key);
+                      setSelectedUser("");
+                    }}
+                    onSave={async (sub, patch) => {
+                      await updateSub.mutateAsync({ id: sub.id, ...patch });
+                    }}
+                    onDelete={(sub) => setConfirmDelete(sub)}
+                  />
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
 
+      {/* Dialogs mantidos intactos */}
       <Dialog open={!!addingFor} onOpenChange={(o) => !o && setAddingFor(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Adicionar destinatário</DialogTitle>
+            <DialogTitle>Adicionar destinat\u00e1rio</DialogTitle>
             <DialogDescription>
-              Selecione o usuário que receberá este alerta no sistema.
+              Selecione o usu\u00e1rio que receber\u00e1 este alerta no sistema.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label>Usuário</Label>
+            <Label>Usu\u00e1rio</Label>
             <Select value={selectedUser} onValueChange={setSelectedUser}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione um usuário" />
+                <SelectValue placeholder="Selecione um usu\u00e1rio" />
               </SelectTrigger>
               <SelectContent>
                 {(usersQuery.data ?? [])
@@ -351,9 +508,9 @@ export default function NotificacoesTab() {
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remover destinatário?</AlertDialogTitle>
+            <AlertDialogTitle>Remover destinat\u00e1rio?</AlertDialogTitle>
             <AlertDialogDescription>
-              O usuário deixará de receber notificações deste evento.
+              O usu\u00e1rio deixar\u00e1 de receber notifica\u00e7\u00f5es deste evento.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -406,8 +563,8 @@ function SubscriptionRow({
     if (whatsapp) channels.push("whatsapp");
     if (whatsapp && !/^55\d{10,11}$/.test(digits)) {
       toast({
-        title: "Telefone inválido",
-        description: "Use DDI+DDD+número, ex: 5549999999999 (celular) ou 554932221111 (fixo).",
+        title: "Telefone inv\u00e1lido",
+        description: "Use DDI+DDD+n\u00famero, ex: 5549999999999 (celular) ou 554932221111 (fixo).",
         variant: "destructive",
       });
       return;
@@ -464,7 +621,7 @@ function SubscriptionRow({
           <Input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="DDI+DDD+número, ex: 5549999999999"
+            placeholder="DDI+DDD+n\u00famero, ex: 5549999999999"
           />
         </div>
       )}
