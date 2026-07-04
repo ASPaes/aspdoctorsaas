@@ -5927,6 +5927,145 @@ export type Database = {
         }
         Relationships: []
       }
+      theo_config: {
+        Row: {
+          alertas_enabled: boolean
+          apresentado_em: string | null
+          destino_phones: string[]
+          dia_semana: number
+          enabled: boolean
+          hora: string
+          instance_id: string | null
+          last_run_at: string | null
+          tenant_id: string
+          thresholds: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          alertas_enabled?: boolean
+          apresentado_em?: string | null
+          destino_phones?: string[]
+          dia_semana?: number
+          enabled?: boolean
+          hora?: string
+          instance_id?: string | null
+          last_run_at?: string | null
+          tenant_id: string
+          thresholds?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          alertas_enabled?: boolean
+          apresentado_em?: string | null
+          destino_phones?: string[]
+          dia_semana?: number
+          enabled?: boolean
+          hora?: string
+          instance_id?: string | null
+          last_run_at?: string | null
+          tenant_id?: string
+          thresholds?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theo_config_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theo_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theo_envios: {
+        Row: {
+          analise_id: string | null
+          created_at: string
+          destino_phones: string[]
+          enviado_em: string | null
+          error_message: string | null
+          id: string
+          instance_id: string | null
+          janela_fim: string | null
+          janela_inicio: string | null
+          mensagem_texto: string | null
+          payload_kpis: Json
+          sinal_geral: string | null
+          status: string
+          tenant_id: string
+          tipo: string
+          whatsapp_message_ids: Json
+        }
+        Insert: {
+          analise_id?: string | null
+          created_at?: string
+          destino_phones?: string[]
+          enviado_em?: string | null
+          error_message?: string | null
+          id?: string
+          instance_id?: string | null
+          janela_fim?: string | null
+          janela_inicio?: string | null
+          mensagem_texto?: string | null
+          payload_kpis?: Json
+          sinal_geral?: string | null
+          status?: string
+          tenant_id: string
+          tipo: string
+          whatsapp_message_ids?: Json
+        }
+        Update: {
+          analise_id?: string | null
+          created_at?: string
+          destino_phones?: string[]
+          enviado_em?: string | null
+          error_message?: string | null
+          id?: string
+          instance_id?: string | null
+          janela_fim?: string | null
+          janela_inicio?: string | null
+          mensagem_texto?: string | null
+          payload_kpis?: Json
+          sinal_geral?: string | null
+          status?: string
+          tenant_id?: string
+          tipo?: string
+          whatsapp_message_ids?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theo_envios_analise_id_fkey"
+            columns: ["analise_id"]
+            isOneToOne: false
+            referencedRelation: "conselho_analises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theo_envios_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theo_envios_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_mentions: {
         Row: {
           created_at: string
@@ -7883,6 +8022,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      build_management_digest_block: {
+        Args: { p_end: string; p_start: string; p_tenant_id: string }
+        Returns: string
+      }
       calc_proximo_reajuste: {
         Args: { p_data_inicio: string; p_prazo_meses?: number }
         Returns: string
@@ -8112,6 +8255,7 @@ export type Database = {
       estornar_reajuste: { Args: { p_reajuste_id: string }; Returns: Json }
       exec_db_health_query: { Args: { query_text: string }; Returns: Json }
       exec_db_maintenance: { Args: { action: string }; Returns: string }
+      fmt_brl: { Args: { n: number }; Returns: string }
       fn_assign_conversation_if_ready: {
         Args: { p_conversation_id: string }
         Returns: Json
@@ -9248,15 +9392,6 @@ export type Database = {
       }
       next_ticket_code: { Args: { p_tenant_id: string }; Returns: string }
       norm_txt: { Args: { t: string }; Returns: string }
-      notify_churn_alert: {
-        Args: {
-          p_body: string
-          p_conversation_id: string
-          p_tenant_id: string
-          p_title: string
-        }
-        Returns: string
-      }
       notify_event: {
         Args: {
           p_action_url?: string
@@ -9498,6 +9633,8 @@ export type Database = {
         }
         Returns: number
       }
+      send_theo_weekly_report: { Args: never; Returns: Json }
+      send_weekly_management_digest: { Args: never; Returns: Json }
       set_attendance_cliente: {
         Args: { p_attendance_id: string; p_cliente_id: string }
         Returns: undefined
@@ -9550,6 +9687,23 @@ export type Database = {
         Returns: undefined
       }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
+      theo_daily_payload: {
+        Args: { p_date?: string; p_tenant: string }
+        Returns: Json
+      }
+      theo_emoji: { Args: { p_sinal: string }; Returns: string }
+      theo_kpis_janela: {
+        Args: { p_fim: string; p_ini: string; p_tenant: string }
+        Returns: Json
+      }
+      theo_sinais_semana: {
+        Args: { p_ref_date?: string; p_tenant: string }
+        Returns: Json
+      }
+      theo_weekly_payload: {
+        Args: { p_ref_date?: string; p_tenant: string }
+        Returns: Json
+      }
       transfer_conversation_to_agent: {
         Args: {
           p_conversation_id: string
