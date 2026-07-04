@@ -37,26 +37,32 @@ function json(obj: any, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json" } });
 }
 
-// Aceita: igualdade com o env OU claim role=service_role.
-// Seguro porque verify_jwt=true garante que o gateway já validou a ASSINATURA do JWT.
-function isServiceRole(token: string): boolean {
+// Aceita: igualdade com o env OU JWT com claim role=service_role e ASSINATURA válida.
+// A assinatura é verificada via probe no PostgREST — imune a verify_jwt=false no gateway
+// (deploys automáticos de CI/Lovable podem flipar essa flag; o código não depende dela).
+async function isServiceRole(token: string): Promise<boolean> {
   if (!token) return false;
   if (token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) return true;
   try {
     const part = token.split(".")[1];
     if (!part) return false;
     const payload = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/")));
-    return payload?.role === "service_role";
+    if (payload?.role !== "service_role") return false;
   } catch {
     return false;
   }
+  // PostgREST rejeita assinatura inválida com 401 — ninguém forja role=service_role sem o JWT secret
+  const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/rest/v1/tenants?select=id&limit=1`, {
+    headers: { apikey: token, Authorization: `Bearer ${token}` },
+  });
+  return res.ok;
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204 });
 
   const auth = (req.headers.get("Authorization") || "").replace("Bearer ", "");
-  if (!isServiceRole(auth)) return json({ error: "unauthorized" }, 401);
+  if (!(await isServiceRole(auth))) return json({ error: "unauthorized" }, 401);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
