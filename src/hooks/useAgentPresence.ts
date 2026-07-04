@@ -1,8 +1,14 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
+
+const presenceChannels = new Map<
+  string,
+  { channel: RealtimeChannel; refCount: number; listeners: Set<() => void> }
+>();
 
 /** Allowed presence statuses — must match DB check constraint */
 export type AgentStatus = "active" | "paused" | "offline";
@@ -101,17 +107,38 @@ export function useAgentPresence() {
 
   useEffect(() => {
     if (!tid || !userId) return;
-    const channel = supabase
-      .channel(`agent-presence-${userId}`)
-      .on("postgres_changes", {
-        event: "UPDATE",
-        schema: "public",
-        table: "support_agent_presence",
-        filter: `user_id=eq.${userId}`,
-      }, () => invalidate())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const key = `agent-presence-${userId}`;
+    let entry = presenceChannels.get(key);
+    if (!entry) {
+      const listeners = new Set<() => void>();
+      const channel = supabase
+        .channel(key)
+        .on("postgres_changes", {
+          event: "UPDATE",
+          schema: "public",
+          table: "support_agent_presence",
+          filter: `user_id=eq.${userId}`,
+        }, () => {
+          listeners.forEach((fn) => fn());
+        });
+      channel.subscribe();
+      entry = { channel, refCount: 0, listeners };
+      presenceChannels.set(key, entry);
+    }
+    entry.refCount += 1;
+    entry.listeners.add(invalidate);
+    return () => {
+      const e = presenceChannels.get(key);
+      if (!e) return;
+      e.listeners.delete(invalidate);
+      e.refCount -= 1;
+      if (e.refCount <= 0) {
+        supabase.removeChannel(e.channel);
+        presenceChannels.delete(key);
+      }
+    };
   }, [tid, userId, invalidate]);
+
 
   // ── Auto-activate only if no record exists + heartbeat every 30s ──
   const didAutoActivateRef = useRef(false);
