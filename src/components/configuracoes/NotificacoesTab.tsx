@@ -398,6 +398,43 @@ export default function NotificacoesTab() {
         </CardContent>
       </Card>
 
+      {/* Canal de envio */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-green-500/10">
+              <Phone className="h-4 w-4 text-green-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Por onde eu falo com você</p>
+              <p className="text-xs text-muted-foreground">
+                Com um único número cadastrado, eu uso ele automaticamente. Com mais de um, escolha aqui por qual eu envio.
+              </p>
+            </div>
+          </div>
+          <Select
+            value={configQuery.data?.churn_alert_instance_id ?? "__auto__"}
+            onValueChange={async (val) => {
+              const instanceId = val === "__auto__" ? null : val;
+              await updateConfig.mutateAsync(instanceId);
+            }}
+            disabled={!instancesQuery.data || instancesQuery.data.length === 0 || updateConfig.isPending}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione a instância" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__auto__">Automático (número único)</SelectItem>
+              {instancesQuery.data?.map((inst) => (
+                <SelectItem key={inst.id} value={inst.id}>
+                  {inst.instance_name ?? inst.id}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
       {/* 2. O que eu reporto a você */}
       <div className="space-y-3">
         <div>
