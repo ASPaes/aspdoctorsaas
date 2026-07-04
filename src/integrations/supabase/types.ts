@@ -5987,85 +5987,6 @@ export type Database = {
           },
         ]
       }
-      theo_envios: {
-        Row: {
-          analise_id: string | null
-          created_at: string
-          destino_phones: string[]
-          enviado_em: string | null
-          error_message: string | null
-          id: string
-          instance_id: string | null
-          janela_fim: string | null
-          janela_inicio: string | null
-          mensagem_texto: string | null
-          payload_kpis: Json
-          sinal_geral: string | null
-          status: string
-          tenant_id: string
-          tipo: string
-          whatsapp_message_ids: Json
-        }
-        Insert: {
-          analise_id?: string | null
-          created_at?: string
-          destino_phones?: string[]
-          enviado_em?: string | null
-          error_message?: string | null
-          id?: string
-          instance_id?: string | null
-          janela_fim?: string | null
-          janela_inicio?: string | null
-          mensagem_texto?: string | null
-          payload_kpis?: Json
-          sinal_geral?: string | null
-          status?: string
-          tenant_id: string
-          tipo: string
-          whatsapp_message_ids?: Json
-        }
-        Update: {
-          analise_id?: string | null
-          created_at?: string
-          destino_phones?: string[]
-          enviado_em?: string | null
-          error_message?: string | null
-          id?: string
-          instance_id?: string | null
-          janela_fim?: string | null
-          janela_inicio?: string | null
-          mensagem_texto?: string | null
-          payload_kpis?: Json
-          sinal_geral?: string | null
-          status?: string
-          tenant_id?: string
-          tipo?: string
-          whatsapp_message_ids?: Json
-        }
-        Relationships: [
-          {
-            foreignKeyName: "theo_envios_analise_id_fkey"
-            columns: ["analise_id"]
-            isOneToOne: false
-            referencedRelation: "conselho_analises"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "theo_envios_instance_id_fkey"
-            columns: ["instance_id"]
-            isOneToOne: false
-            referencedRelation: "whatsapp_instances"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "theo_envios_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       ticket_mentions: {
         Row: {
           created_at: string
@@ -9460,6 +9381,7 @@ export type Database = {
         }
         Returns: string
       }
+      remind_ai_disabled: { Args: never; Returns: Json }
       require_active_profile: { Args: never; Returns: boolean }
       reset_tenant_permissions_to_default: {
         Args: { p_role?: string; p_tenant_id?: string }
