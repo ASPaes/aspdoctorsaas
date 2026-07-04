@@ -1,8 +1,14 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
+
+const presenceChannels = new Map<
+  string,
+  { channel: RealtimeChannel; refCount: number; listeners: Set<() => void> }
+>();
 
 /** Allowed presence statuses — must match DB check constraint */
 export type AgentStatus = "active" | "paused" | "offline";
