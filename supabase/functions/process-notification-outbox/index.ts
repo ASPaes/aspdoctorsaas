@@ -50,6 +50,18 @@ Deno.serve(async (req) => {
             .eq("tenant_id", row.tenant_id)
             .maybeSingle();
           instanceId = (cfg?.churn_alert_instance_id as string | null) ?? null;
+
+          // Fallback: sem instância configurada e o tenant tem EXATAMENTE 1 cadastrada => usa ela.
+          // Deliberadamente SEM filtro de status: o remetente não pode oscilar conforme a conexão.
+          // 2+ instâncias => exige escolha explícita na tela do Théo (não chutamos entre números).
+          if (!instanceId) {
+            const { data: insts } = await supabase
+              .from("whatsapp_instances")
+              .select("id")
+              .eq("tenant_id", row.tenant_id)
+              .limit(2);
+            if (insts?.length === 1) instanceId = insts[0].id as string;
+          }
           instanceCache.set(row.tenant_id, instanceId);
         }
 
