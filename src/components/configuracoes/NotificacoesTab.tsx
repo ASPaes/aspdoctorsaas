@@ -76,8 +76,8 @@ type TenantUser = { user_id: string; email: string | null; name: string | null }
 const REPORT_KEYS = ["weekly_management_digest", "theo_weekly_report"];
 
 const REPORT_META: Record<string, { icon: React.ElementType; timeLabel: string }> = {
-  weekly_management_digest: { icon: MessageCircle, timeLabel: "Seg\u2013sex \u00b7 18h" },
-  theo_weekly_report: { icon: Compass, timeLabel: "Segunda \u00b7 07:45" },
+  weekly_management_digest: { icon: MessageCircle, timeLabel: "Seg–sex · 18h" },
+  theo_weekly_report: { icon: Compass, timeLabel: "Segunda · 07:45" },
 };
 
 const ALERT_ICONS: Record<string, React.ElementType> = {
@@ -109,7 +109,7 @@ function EventRecipients({
   onDelete: (sub: Subscription) => void;
 }) {
   const userLabel = (u?: TenantUser | null) =>
-    u ? u.name || u.email || u.user_id.slice(0, 8) : "Usu\u00e1rio";
+    u ? u.name || u.email || u.user_id.slice(0, 8) : "Usuário";
 
   const takenUserIds = new Set(subs.map((s) => s.user_id));
   const availableUsers = users.filter((u) => !takenUserIds.has(u.user_id));
@@ -118,7 +118,7 @@ function EventRecipients({
     <div className="space-y-3">
       {subs.length === 0 && (
         <p className="text-xs text-muted-foreground italic">
-          Ningu\u00e9m recebe este {REPORT_KEYS.includes(event.key) ? "relat\u00f3rio" : "aviso"} ainda.
+          Ninguém recebe este {REPORT_KEYS.includes(event.key) ? "relatório" : "aviso"} ainda.
         </p>
       )}
       {subs.map((sub) => (
@@ -139,11 +139,11 @@ function EventRecipients({
         disabled={availableUsers.length === 0}
       >
         <Plus className="h-4 w-4 mr-1" />
-        Adicionar destinat\u00e1rio
+        Adicionar destinatário
       </Button>
       {availableUsers.length === 0 && (
         <p className="text-xs text-muted-foreground">
-          Todos os usu\u00e1rios j\u00e1 est\u00e3o cadastrados.
+          Todos os usuários já estão cadastrados.
         </p>
       )}
     </div>
@@ -219,7 +219,7 @@ export default function NotificacoesTab() {
   });
 
   const userLabel = (u?: TenantUser | null) =>
-    u ? u.name || u.email || u.user_id.slice(0, 8) : "Usu\u00e1rio";
+    u ? u.name || u.email || u.user_id.slice(0, 8) : "Usuário";
 
   const usersById = useMemo(() => {
     const m = new Map<string, TenantUser>();
@@ -266,7 +266,7 @@ export default function NotificacoesTab() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["notification_subscriptions", tid] });
-      toast({ title: "Destinat\u00e1rio adicionado" });
+      toast({ title: "Destinatário adicionado" });
     },
     onError: (err: any) =>
       toast({ title: "Erro ao adicionar", description: err.message, variant: "destructive" }),
@@ -282,7 +282,7 @@ export default function NotificacoesTab() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["notification_subscriptions", tid] });
-      toast({ title: "Destinat\u00e1rio removido" });
+      toast({ title: "Destinatário removido" });
     },
     onError: (err: any) =>
       toast({ title: "Erro ao remover", description: err.message, variant: "destructive" }),
@@ -307,7 +307,7 @@ export default function NotificacoesTab() {
 
   return (
     <div className="space-y-8 max-w-4xl">
-      {/* 1. Hero do Th\u00e9o */}
+      {/* 1. Hero do Théo */}
       <Card>
         <CardContent className="p-5">
           <div className="flex items-start gap-4">
@@ -316,22 +316,22 @@ export default function NotificacoesTab() {
             </div>
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-medium">Th\u00e9o</h2>
+                <h2 className="text-lg font-medium">Théo</h2>
                 <Badge variant="outline" className="border-green-500/30 text-green-400">
-                  S\u00f3cio executivo \u00b7 Conselho DS
+                  Sócio executivo · Conselho DS
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Sou o conselheiro executivo da sua opera\u00e7\u00e3o. Acompanho seus n\u00fameros todos os dias, levo ao Conselho DS e volto com leitura e recomenda\u00e7\u00e3o. E quando algo pede a\u00e7\u00e3o imediata, aviso na hora.
+                Sou o conselheiro executivo da sua operação. Acompanho seus números todos os dias, levo ao Conselho DS e volto com leitura e recomendação. E quando algo pede ação imediata, aviso na hora.
               </p>
               <div className="flex flex-wrap gap-2 pt-1">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-xs text-sky-400">
                   <Clock className="h-3 w-3" />
-                  Pulso di\u00e1rio \u00b7 seg\u2013sex 18h
+                  Pulso diário · seg–sex 18h
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-xs text-sky-400">
                   <Calendar className="h-3 w-3" />
-                  Retrato da semana \u00b7 segunda 07:45
+                  Retrato da semana · segunda 07:45
                 </span>
               </div>
             </div>
@@ -339,12 +339,12 @@ export default function NotificacoesTab() {
         </CardContent>
       </Card>
 
-      {/* 2. O que eu reporto a voc\u00ea */}
+      {/* 2. O que eu reporto a você */}
       <div className="space-y-3">
         <div>
-          <h3 className="text-sm font-semibold">O que eu reporto a voc\u00ea</h3>
+          <h3 className="text-sm font-semibold">O que eu reporto a você</h3>
           <p className="text-xs text-muted-foreground">
-            Minhas conversas recorrentes com quem gere a opera\u00e7\u00e3o.
+            Minhas conversas recorrentes com quem gere a operação.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -392,12 +392,12 @@ export default function NotificacoesTab() {
         </div>
       </div>
 
-      {/* 3. Quando eu n\u00e3o espero o relat\u00f3rio */}
+      {/* 3. Quando eu não espero o relatório */}
       <div className="space-y-3">
         <div>
-          <h3 className="text-sm font-semibold">Quando eu n\u00e3o espero o relat\u00f3rio</h3>
+          <h3 className="text-sm font-semibold">Quando eu não espero o relatório</h3>
           <p className="text-xs text-muted-foreground">
-            Avisos imediatos \u2014 se acontecer, eu falo na hora.
+            Avisos imediatos — se acontecer, eu falo na hora.
           </p>
         </div>
         <div className="space-y-3">
@@ -457,16 +457,16 @@ export default function NotificacoesTab() {
       <Dialog open={!!addingFor} onOpenChange={(o) => !o && setAddingFor(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Adicionar destinat\u00e1rio</DialogTitle>
+            <DialogTitle>Adicionar destinatário</DialogTitle>
             <DialogDescription>
-              Selecione o usu\u00e1rio que receber\u00e1 este alerta no sistema.
+              Selecione o usuário que receberá este alerta no sistema.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label>Usu\u00e1rio</Label>
+            <Label>Usuário</Label>
             <Select value={selectedUser} onValueChange={setSelectedUser}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione um usu\u00e1rio" />
+                <SelectValue placeholder="Selecione um usuário" />
               </SelectTrigger>
               <SelectContent>
                 {(usersQuery.data ?? [])
@@ -508,9 +508,9 @@ export default function NotificacoesTab() {
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remover destinat\u00e1rio?</AlertDialogTitle>
+            <AlertDialogTitle>Remover destinatário?</AlertDialogTitle>
             <AlertDialogDescription>
-              O usu\u00e1rio deixar\u00e1 de receber notifica\u00e7\u00f5es deste evento.
+              O usuário deixará de receber notificações deste evento.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -563,8 +563,8 @@ function SubscriptionRow({
     if (whatsapp) channels.push("whatsapp");
     if (whatsapp && !/^55\d{10,11}$/.test(digits)) {
       toast({
-        title: "Telefone inv\u00e1lido",
-        description: "Use DDI+DDD+n\u00famero, ex: 5549999999999 (celular) ou 554932221111 (fixo).",
+        title: "Telefone inválido",
+        description: "Use DDI+DDD+número, ex: 5549999999999 (celular) ou 554932221111 (fixo).",
         variant: "destructive",
       });
       return;
@@ -621,7 +621,7 @@ function SubscriptionRow({
           <Input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="DDI+DDD+n\u00famero, ex: 5549999999999"
+            placeholder="DDI+DDD+número, ex: 5549999999999"
           />
         </div>
       )}
