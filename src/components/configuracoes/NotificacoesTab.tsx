@@ -400,13 +400,14 @@ function SubscriptionRow({
     (phone ?? "") !== (sub.whatsapp_phone ?? "");
 
   const handleSave = async () => {
+    const digits = phone.replace(/\D/g, "");
     const channels: string[] = [];
     if (inApp) channels.push("in_app");
     if (whatsapp) channels.push("whatsapp");
-    if (whatsapp && !phone.trim()) {
+    if (whatsapp && !/^55\d{10,11}$/.test(digits)) {
       toast({
-        title: "Telefone obrigatório",
-        description: "Informe o número do WhatsApp para este canal.",
+        title: "Telefone inválido",
+        description: "Use DDI+DDD+número, ex: 5549999999999 (celular) ou 554932221111 (fixo).",
         variant: "destructive",
       });
       return;
@@ -424,7 +425,7 @@ function SubscriptionRow({
       await onSave({
         ativo,
         channels,
-        whatsapp_phone: whatsapp ? phone.trim() : null,
+        whatsapp_phone: whatsapp ? digits : null,
       });
     } finally {
       setSaving(false);
