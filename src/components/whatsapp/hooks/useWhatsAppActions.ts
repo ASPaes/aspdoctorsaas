@@ -449,7 +449,7 @@ export const useWhatsAppActions = () => {
       if (data.phone_number) patch.phone_number = data.phone_number;
       const { error } = await supabase
         .from('whatsapp_contacts')
-        .update(patch)
+        .update(patch as any)
         .eq('id', contactId);
       if (error) throw error;
     },

@@ -36,7 +36,7 @@ export const useSignatureMode = (conversationId: string | undefined) => {
 
       const { error } = await supabase
         .from('whatsapp_conversations')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', conversationId!);
       if (error) throw error;
     },
