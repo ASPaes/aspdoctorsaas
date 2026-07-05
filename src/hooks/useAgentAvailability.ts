@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSupportConfig } from '@/hooks/useSupportConfig';
 import { supabase } from '@/integrations/supabase/client';
+import { subscribeSharedChannel } from '@/lib/realtimeChannelPool';
 
 export interface AgentAvailability {
   current: number;
