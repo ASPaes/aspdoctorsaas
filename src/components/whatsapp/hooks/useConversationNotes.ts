@@ -75,11 +75,9 @@ export const useConversationNotes = (conversationId: string | null) => {
 
   useEffect(() => {
     if (!conversationId) return;
-    const channel = supabase
-      .channel(`notes-realtime-${conversationId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversation_notes', filter: `conversation_id=eq.${conversationId}` }, () => refetch())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return subscribeSharedChannel(`notes-realtime-${conversationId}`, (channel) => {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversation_notes', filter: `conversation_id=eq.${conversationId}` }, () => refetch());
+    });
   }, [conversationId, refetch]);
 
   const createNote = useMutation({
