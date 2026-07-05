@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { subscribeSharedChannel } from '@/lib/realtimeChannelPool';
 
 export type MessageUiType = 'text' | 'media' | 'audio' | 'document' | 'image' | 'system' | string;
 
