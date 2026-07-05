@@ -222,8 +222,6 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
 
   
   const newMessageCallbackRef = useRef<((msg: Message) => void) | null>(null);
-  const retryCountRef = useRef(0);
-  const mountedRef = useRef(true);
   const lastInvalidateRef = useRef(0);
 
   const onNewMessage = useCallback((cb: (msg: Message) => void) => {
@@ -233,79 +231,54 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
   useEffect(() => {
     if (!conversationId) return;
 
-    mountedRef.current = true;
-    retryCountRef.current = 0;
-
     const channelName = `msgs-${conversationId}`;
 
-    if (import.meta.env.DEV) {
-    }
-
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'whatsapp_messages',
-        filter: `conversation_id=eq.${conversationId}`,
-      }, (payload) => {
-        const incoming = normalizeMessage(payload.new as any);
-        if (import.meta.env.DEV) {
-        }
-        queryClient.setQueryData<MsgPages>(
-          ['whatsapp', 'messages', conversationId],
-          (old) => upsertInfinite(old, incoming)
-        );
-        newMessageCallbackRef.current?.(incoming);
-        // Conversa está aberta — não incrementar unread, apenas atualizar preview
-        patchConversationPreview(queryClient, conversationId, incoming, true);
-        // Zerar unread no banco (conversa visível)
-        if (!incoming.is_from_me) {
-          supabase
-            .from('whatsapp_conversations')
-            .update({ unread_count: 0 })
-            .eq('id', conversationId)
-            .then();
-        }
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'whatsapp_messages',
-        filter: `conversation_id=eq.${conversationId}`,
-      }, (payload) => {
-        const updated = normalizeMessage(payload.new as any);
-        queryClient.setQueryData<MsgPages>(
-          ['whatsapp', 'messages', conversationId],
-          (old) => upsertInfinite(old, updated)
-        );
-      })
-      .subscribe((status) => {
-        if (import.meta.env.DEV) {
-        }
-        if (status === 'SUBSCRIBED') {
-          retryCountRef.current = 0;
-        }
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn(`[realtime] channel ${channelName} failed (${status}). Retry ${retryCountRef.current + 1}/3`);
-          retryCountRef.current += 1;
-          if (retryCountRef.current <= 3) {
-            const delay = retryCountRef.current * 3000;
-            setTimeout(() => {
-              if (!mountedRef.current) return;
-              supabase.removeChannel(channel);
-              queryClient.invalidateQueries({
-                queryKey: ['whatsapp', 'messages', conversationId],
-              });
-            }, delay);
+    return subscribeSharedChannel(
+      channelName,
+      (channel) => {
+        channel.on('postgres_changes' as any, {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'whatsapp_messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        }, (payload: any) => {
+          const incoming = normalizeMessage(payload.new as any);
+          queryClient.setQueryData<MsgPages>(
+            ['whatsapp', 'messages', conversationId],
+            (old) => upsertInfinite(old, incoming)
+          );
+          newMessageCallbackRef.current?.(incoming);
+          patchConversationPreview(queryClient, conversationId, incoming, true);
+          if (!incoming.is_from_me) {
+            supabase
+              .from('whatsapp_conversations')
+              .update({ unread_count: 0 })
+              .eq('id', conversationId)
+              .then();
           }
+        });
+        channel.on('postgres_changes' as any, {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'whatsapp_messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        }, (payload: any) => {
+          const updated = normalizeMessage(payload.new as any);
+          queryClient.setQueryData<MsgPages>(
+            ['whatsapp', 'messages', conversationId],
+            (old) => upsertInfinite(old, updated)
+          );
+        });
+      },
+      (status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn(`[realtime] channel ${channelName} failed (${status})`);
+          queryClient.invalidateQueries({
+            queryKey: ['whatsapp', 'messages', conversationId],
+          });
         }
-      });
-
-    return () => {
-      mountedRef.current = false;
-      supabase.removeChannel(channel);
-    };
+      }
+    );
   }, [conversationId, queryClient]);
 
   return { messages, isLoading, error, onNewMessage, fetchNextPage, hasNextPage, isFetchingNextPage };
