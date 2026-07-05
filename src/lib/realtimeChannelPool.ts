@@ -17,13 +17,14 @@ const pool = new Map<string, PoolEntry>();
  */
 export function subscribeSharedChannel(
   topic: string,
-  configure: (channel: RealtimeChannel) => void
+  configure: (channel: RealtimeChannel) => void,
+  onStatus?: (status: string) => void
 ): () => void {
   let entry = pool.get(topic);
   if (!entry) {
     const channel = supabase.channel(topic);
     configure(channel);
-    channel.subscribe();
+    channel.subscribe(onStatus as any);
     entry = { channel, refCount: 0 };
     pool.set(topic, entry);
   }
