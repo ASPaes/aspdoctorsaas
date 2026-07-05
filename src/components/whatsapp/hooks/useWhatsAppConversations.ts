@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
+import { subscribeSharedChannel } from '@/lib/realtimeChannelPool';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
@@ -222,17 +223,16 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
     },
   });
 
-  // Realtime: unique channel per hook instance to avoid collision
-  
-  const invalidateThrottleRef = useRef<number>(0);
-  const insertDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const softRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Realtime: shared channel with ref-count to avoid collision across multiple mounts
 
   useEffect(() => {
     const channelName = `conversations-rt-${tid ?? 'none'}`;
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', {
+    return subscribeSharedChannel(channelName, (channel) => {
+      let invalidateThrottle = 0;
+      let insertDebounce: ReturnType<typeof setTimeout> | null = null;
+      let softRefetchTimer: ReturnType<typeof setTimeout> | null = null;
+
+      channel.on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'whatsapp_conversations',
@@ -250,9 +250,9 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           const existing = old.conversations.find((c: any) => c.id === updated.id);
           if (!existing) {
             // Conversation not in current page — coalesce em 1 refetch a cada 2s no máximo
-            if (!softRefetchTimerRef.current) {
-              softRefetchTimerRef.current = setTimeout(() => {
-                softRefetchTimerRef.current = null;
+            if (!softRefetchTimer) {
+              softRefetchTimer = setTimeout(() => {
+                softRefetchTimer = null;
                 queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
                 queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
               }, 2000);
@@ -265,8 +265,8 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           const deptChanged = existing.department_id !== updated.department_id;
           if (assignedChanged || deptChanged) {
             const now = Date.now();
-            if (now - invalidateThrottleRef.current > 500) {
-              invalidateThrottleRef.current = now;
+            if (now - invalidateThrottle > 500) {
+              invalidateThrottle = now;
               // Invalidação imediata sem delay para atribuições automáticas
               queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
               queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
@@ -291,8 +291,9 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           });
           return { ...old, conversations: patched };
         });
-      })
-      .on('postgres_changes', {
+      });
+
+      channel.on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'whatsapp_conversations',
@@ -302,30 +303,26 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         if (inserted?.is_group === true) {
           queryClient.invalidateQueries({ queryKey: ['whatsapp', 'group-counts'] });
         }
-        if (insertDebounceRef.current) clearTimeout(insertDebounceRef.current);
-        insertDebounceRef.current = setTimeout(() => {
+        if (insertDebounce) clearTimeout(insertDebounce);
+        insertDebounce = setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
           queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
         }, 800);
-      })
-      .on('postgres_changes', {
+      });
+
+      channel.on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'whatsapp_sentiment_analysis',
         filter: tid ? `tenant_id=eq.${tid}` : undefined,
       } as any, () => {
         const now = Date.now();
-        if (now - invalidateThrottleRef.current > 1000) {
-          invalidateThrottleRef.current = now;
+        if (now - invalidateThrottle > 1000) {
+          invalidateThrottle = now;
           queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
         }
-      })
-      .subscribe();
-
-    return () => {
-      if (softRefetchTimerRef.current) { clearTimeout(softRefetchTimerRef.current); softRefetchTimerRef.current = null; }
-      supabase.removeChannel(channel);
-    };
+      });
+    });
   }, [queryClient, tid]);
 
   return {
