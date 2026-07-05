@@ -109,26 +109,24 @@ export function useNotifications() {
   useEffect(() => {
     if (!uid || !tid) return;
 
-    const channel = supabase
-      .channel(`notif-${uid}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "notification_recipients",
-          filter: `user_id=eq.${uid}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
-          queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return subscribeSharedChannel(
+      `notif-${uid}`,
+      (channel) => {
+        channel.on(
+          "postgres_changes" as any,
+          {
+            event: "*",
+            schema: "public",
+            table: "notification_recipients",
+            filter: `user_id=eq.${uid}`,
+          },
+          () => {
+            queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+            queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
+          }
+        );
+      }
+    );
   }, [uid, tid, queryClient]);
 
   // Mark single as read
