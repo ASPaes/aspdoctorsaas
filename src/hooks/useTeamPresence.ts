@@ -146,26 +146,23 @@ export function useTeamPresence() {
   useEffect(() => {
     if (!tid || !isAdmin) return;
 
-    const channel = supabase
-      .channel(`team-presence-${tid}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "support_agent_presence",
-          filter: `tenant_id=eq.${tid}`,
-        },
-        () => {
-          // Refetch full query to resolve names/reasons properly
-          queryClient.invalidateQueries({ queryKey: ["team_presence", tid] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return subscribeSharedChannel(
+      `team-presence-${tid}`,
+      (channel) => {
+        channel.on(
+          "postgres_changes" as any,
+          {
+            event: "*",
+            schema: "public",
+            table: "support_agent_presence",
+            filter: `tenant_id=eq.${tid}`,
+          },
+          () => {
+            queryClient.invalidateQueries({ queryKey: ["team_presence", tid] });
+          }
+        );
+      }
+    );
   }, [tid, isAdmin, queryClient]);
 
   return { members, isLoading, isAdmin: !!isAdmin, refetch };
