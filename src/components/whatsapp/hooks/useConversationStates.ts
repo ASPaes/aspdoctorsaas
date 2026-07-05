@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribeSharedChannel } from "@/lib/realtimeChannelPool";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import type { ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
 
@@ -75,25 +76,27 @@ export function useConversationStates(conversationIds: string[]) {
       if (hasRelevantChange) debouncedInvalidate();
     };
 
-    const channel = supabase
-      .channel(`conv-states-${tid ?? 'none'}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "whatsapp_conversations",
-        filter: `tenant_id=eq.${tid}`,
-      }, handleConversationChange)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "support_attendances",
-        filter: `tenant_id=eq.${tid}`,
-      }, debouncedInvalidate)
-      .subscribe();
+    const cleanup = subscribeSharedChannel(
+      `conv-states-${tid ?? 'none'}`,
+      (channel) => {
+        channel.on("postgres_changes" as any, {
+          event: "*",
+          schema: "public",
+          table: "whatsapp_conversations",
+          filter: `tenant_id=eq.${tid}`,
+        }, handleConversationChange);
+        channel.on("postgres_changes" as any, {
+          event: "*",
+          schema: "public",
+          table: "support_attendances",
+          filter: `tenant_id=eq.${tid}`,
+        }, debouncedInvalidate);
+      }
+    );
 
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      supabase.removeChannel(channel);
+      cleanup();
     };
   }, [queryClient, tid]);
 
