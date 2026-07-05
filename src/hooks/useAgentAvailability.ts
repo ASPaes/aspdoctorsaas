@@ -49,27 +49,25 @@ export function useAgentAvailability(): AgentAvailability {
   useEffect(() => {
     if (!user?.id) return;
 
-    const channel = supabase
-      .channel('agent-availability-' + user.id)
-      .on(
-        'postgres_changes' as any,
-        {
-          event: '*',
-          schema: 'public',
-          table: 'support_attendances',
-          filter: `assigned_to=eq.${user.id}`,
-        },
-        () => {
-          queryClient.invalidateQueries({
-            queryKey: ['agent-availability', user.id],
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return subscribeSharedChannel(
+      'agent-availability-' + user.id,
+      (channel) => {
+        channel.on(
+          'postgres_changes' as any,
+          {
+            event: '*',
+            schema: 'public',
+            table: 'support_attendances',
+            filter: `assigned_to=eq.${user.id}`,
+          },
+          () => {
+            queryClient.invalidateQueries({
+              queryKey: ['agent-availability', user.id],
+            });
+          }
+        );
+      }
+    );
   }, [user?.id, queryClient]);
 
   const current = data?.current ?? 0;
