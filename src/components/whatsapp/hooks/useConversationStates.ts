@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { subscribeSharedChannel } from "@/lib/realtimeChannelPool";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import type { ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
 
