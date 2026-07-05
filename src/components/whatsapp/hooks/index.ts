@@ -25,7 +25,7 @@ export { useContactDetails } from './useContactDetails';
 export type { ContactDetails } from './useContactDetails';
 export { useAssignmentRules } from './useAssignmentRules';
 export type { AssignmentRule } from './useAssignmentRules';
-export { useMessageReactions } from './useMessageReactions';
+
 export { useMessageReaction } from './useMessageReaction';
 export { useMessageEditHistory } from './useMessageEditHistory';
 export { useEditMessage } from './useEditMessage';
