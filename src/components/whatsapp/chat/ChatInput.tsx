@@ -34,6 +34,9 @@ interface Props {
   onCancelReply?: () => void;
   initialMessage?: string;
   disabled?: boolean;
+  isGroup?: boolean;
+  groupJid?: string | null;
+  instanceId?: string | null;
 }
 
 function getMessageType(mimeType: string): MediaSendParams['messageType'] {
