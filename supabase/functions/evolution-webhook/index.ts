@@ -1050,15 +1050,22 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         .filter(Boolean)
         .join(', ');
     }
-    const quotedMessageId = message.reactionMessage?.key?.id
-      || message.extendedTextMessage?.contextInfo?.stanzaId
+    const hoistedCtx = (data as any)?.contextInfo || null;
+
+    const msgCtx = message.extendedTextMessage?.contextInfo
+      || message.imageMessage?.contextInfo
+      || message.videoMessage?.contextInfo
+      || message.documentMessage?.contextInfo
+      || message.audioMessage?.contextInfo
+      || message.stickerMessage?.contextInfo
       || null;
 
-    const rawMentions = message.extendedTextMessage?.contextInfo?.mentionedJid
-      || message.imageMessage?.contextInfo?.mentionedJid
-      || message.videoMessage?.contextInfo?.mentionedJid
-      || message.documentMessage?.contextInfo?.mentionedJid
+    const quotedMessageId = message.reactionMessage?.key?.id
+      || hoistedCtx?.stanzaId
+      || msgCtx?.stanzaId
       || null;
+
+    const rawMentions = hoistedCtx?.mentionedJid || msgCtx?.mentionedJid || null;
     const mentions = (Array.isArray(rawMentions) && rawMentions.length > 0 && rawMentions.every((m: any) => typeof m === 'string'))
       ? (rawMentions as string[])
       : null;
