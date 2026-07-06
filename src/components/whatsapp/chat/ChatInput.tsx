@@ -891,10 +891,23 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           )}
 
           <div className="relative flex-1">
+            {mentionsEnabled && mentionQuery && filteredMentionParticipants.length > 0 && (
+              <MentionSuggestions
+                participants={filteredMentionParticipants}
+                selectedIndex={mentionIndex}
+                onSelect={insertMention}
+              />
+            )}
             <Textarea
               ref={textareaRef}
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                setCursorPos(e.target.selectionStart ?? e.target.value.length);
+              }}
+              onKeyUp={(e) => setCursorPos(e.currentTarget.selectionStart ?? 0)}
+              onClick={(e) => setCursorPos(e.currentTarget.selectionStart ?? 0)}
+              onSelect={(e) => setCursorPos(e.currentTarget.selectionStart ?? 0)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={
