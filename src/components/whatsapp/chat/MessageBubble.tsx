@@ -3,6 +3,8 @@ import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Message } from "../hooks/useWhatsAppMessages";
+import type { GroupParticipant } from "../hooks/useGroupParticipants";
+import { renderMentions } from "./mentionUtils";
 import { MediaContent } from "./MediaContent";
 import { ContactCard } from "./ContactCard";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
@@ -39,6 +41,7 @@ interface Props {
   onContactSave?: (phone: string, name: string) => void;
   onReplyClick?: (quotedMessageId: string) => void;
   quotedMessage?: Message | null;
+  groupParticipants?: GroupParticipant[];
 }
 
 function canDeletePanelOnly(msg: Message): boolean {
@@ -64,6 +67,7 @@ export function MessageBubble({
   onContactSave,
   onReplyClick,
   quotedMessage,
+  groupParticipants,
 }: Props) {
   const isFromMe = Boolean(msg.isFromMe ?? msg.is_from_me ?? (msg as any).fromMe ?? (msg as any).key?.fromMe ?? false);
   const rawKind = (msg.message_type ?? (msg as any).messageType ?? (msg as any).type ?? 'text') as string;
@@ -198,7 +202,7 @@ export function MessageBubble({
             "rounded-lg px-3 py-1.5 text-sm relative w-full min-w-0",
             isFromMe ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-muted text-foreground rounded-bl-sm"
           )}>
-            {msg.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
+            {msg.content && <p className="whitespace-pre-wrap break-words">{groupParticipants && groupParticipants.length > 0 ? renderMentions(msg.content, groupParticipants) : msg.content}</p>}
             <div className={cn("flex items-center gap-1 mt-0.5", isFromMe ? "justify-end" : "justify-start")}>
               <span className="text-[10px] opacity-60">{time}</span>
               {statusIcon}
@@ -335,7 +339,7 @@ export function MessageBubble({
           <MediaContent messageId={msg.id} messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} mediaFilename={msg.media_filename} mediaExt={msg.media_ext} mediaSizeBytes={msg.media_size_bytes} mediaKind={msg.media_kind} mediaMimetype={msg.media_mimetype} />
         </div>
       )}
-      {msg.content && msg.message_type !== 'contact' && msg.message_type !== 'contacts' && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{msg.content}</p>}
+      {msg.content && msg.message_type !== 'contact' && msg.message_type !== 'contacts' && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{groupParticipants && groupParticipants.length > 0 ? renderMentions(msg.content, groupParticipants) : msg.content}</p>}
 
       {isAudio && (
         <div className="mt-1 min-w-0">

@@ -1,6 +1,3 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Sheet,
   SheetContent,
@@ -12,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Users } from "lucide-react";
 import { formatBRPhone } from "@/lib/phoneBR";
+import { useGroupParticipants } from "../hooks/useGroupParticipants";
 
 interface Props {
   open: boolean;
@@ -20,53 +18,17 @@ interface Props {
   instanceId: string;
 }
 
-interface Participant {
-  phone: string;
-  name: string | null;
-  admin: boolean;
-  isLid?: boolean;
-}
-
 export default function GroupParticipantsSheet({
   open,
   onOpenChange,
   groupJid,
   instanceId,
 }: Props) {
-  const { data: groupData } = useQuery({
-    queryKey: ["whatsapp-group-participants", groupJid, instanceId],
-    enabled: open && !!groupJid && !!instanceId,
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("whatsapp_groups")
-        .select("participants, group_name, participant_count")
-        .eq("group_jid", groupJid)
-        .eq("instance_id", instanceId)
-        .maybeSingle();
-      if (error) throw error;
-      return data as {
-        group_name: string | null;
-        participant_count: number | null;
-        participants: any;
-      } | null;
-    },
-  });
-
-  const participants: Participant[] = useMemo(() => {
-    if (!groupData?.participants) return [];
-    try {
-      const parsed =
-        typeof groupData.participants === "string"
-          ? JSON.parse(groupData.participants)
-          : groupData.participants;
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }, [groupData?.participants]);
+  const { groupData, participants } = useGroupParticipants(groupJid, instanceId, open);
 
   const groupName = groupData?.group_name || groupJid;
   const count = groupData?.participant_count ?? participants.length;
+
 
   const getInitials = (name: string | null, phone: string) => {
     if (name) {

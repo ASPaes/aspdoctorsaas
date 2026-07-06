@@ -26,6 +26,7 @@ export interface Message {
   timestamp: string;
   edited_at: string | null;
   quoted_message_id: string | null;
+  mentions: string[] | null;
   metadata: Record<string, any> | null;
   audio_transcription: string | null;
   transcription_status: string | null;
@@ -91,7 +92,7 @@ const MESSAGE_SELECT = [
   'id', 'conversation_id', 'message_id', 'remote_jid', 'content', 'message_type',
   'media_url', 'media_mimetype', 'media_path', 'media_filename', 'media_ext',
   'media_size_bytes', 'media_kind', 'status', 'is_from_me', 'timestamp', 'edited_at',
-  'quoted_message_id', 'metadata', 'audio_transcription', 'transcription_status',
+  'quoted_message_id', 'mentions', 'metadata', 'audio_transcription', 'transcription_status',
   'sent_by_user_id', 'instance_id', 'sender_name', 'sender_role',
   'delete_status', 'delete_scope', 'delete_error',
 ].join(',');

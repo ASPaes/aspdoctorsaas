@@ -11,6 +11,7 @@ import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { formatDateLabel, formatTime } from "@/lib/formatDateWithTimezone";
 import { useConversationAssignmentHistory, type AssignmentEvent } from "../hooks/useConversationAssignmentHistory";
 import { useConversationNotes, type ConversationNote } from "../hooks/useConversationNotes";
+import { useGroupParticipants } from "../hooks/useGroupParticipants";
 import { ArrowRightLeft, ChevronDown, Loader2, StickyNote, Trash2 } from "lucide-react";
 
 interface Props {
@@ -32,6 +33,8 @@ interface Props {
   highlightMessageId?: string | null;
   onHighlightShown?: () => void;
   isGroup?: boolean;
+  groupJid?: string | null;
+  instanceId?: string | null;
 }
 
 type TimelineItem =
@@ -61,8 +64,15 @@ export function ChatMessages({
   highlightMessageId,
   onHighlightShown,
   isGroup,
+  groupJid,
+  instanceId,
 }: Props) {
   const { messages, isLoading, onNewMessage, fetchNextPage, hasNextPage, isFetchingNextPage } = useWhatsAppMessages(conversationId);
+  const { participants: groupParticipants } = useGroupParticipants(
+    groupJid ?? null,
+    instanceId ?? null,
+    Boolean(isGroup),
+  );
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
   const { notes, deleteNote } = useConversationNotes(conversationId);
   const { timezone } = useAppTimezone();
@@ -398,6 +408,7 @@ export function ChatMessages({
                         onEnterSelectionMode={onEnterSelectionMode}
                         onContactChat={onContactChat}
                         onContactSave={onContactSave}
+                        groupParticipants={isGroup ? groupParticipants : undefined}
                       />
                     </div>
                   );
