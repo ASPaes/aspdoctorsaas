@@ -39,13 +39,21 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const unreadCount = parseInt(String(conv.unread_count ?? 0), 10) || 0;
   const hasUnread = unreadCount > 0;
 
+  const isGroup = (conv as any).is_group === true;
+  const { lookup: groupMentionLookup } = isGroup ? useGroupMentionLookup() : { lookup: null as any };
+
   const MAX_PREVIEW = 45;
+  const basePreview = conv.last_message_preview || "Sem mensagens";
+  const resolvedPreview = isGroup && groupMentionLookup
+    ? resolveMentionsToText(basePreview, groupMentionLookup)
+    : basePreview;
   const rawPreview = conv.isLastMessageFromMe
-    ? `Você: ${conv.last_message_preview || "Sem mensagens"}`
-    : (conv.last_message_preview || "Sem mensagens");
+    ? `Você: ${resolvedPreview}`
+    : resolvedPreview;
   const previewText = rawPreview.length > MAX_PREVIEW
     ? rawPreview.substring(0, MAX_PREVIEW) + "…"
     : rawPreview;
+
 
   const getInitials = (n: string) => n.substring(0, 2).toUpperCase();
 
