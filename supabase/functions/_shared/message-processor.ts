@@ -1377,7 +1377,7 @@ async function triggerAutoCategorization(supabase: any, conversationId: string, 
 
 export async function processInboundMessage(supabase: any, msg: NormalizedInboundMessage): Promise<void> {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const { instanceId, tenantId, providerType, instanceInfo, secrets, messageId, remoteJid, fromMe, pushName, content, messageType, timestamp, mediaUrl, mediaMimetype, mediaFilename, mediaStoragePath, quotedMessageId } = msg;
+  const { instanceId, tenantId, providerType, instanceInfo, secrets, messageId, remoteJid, fromMe, pushName, content, messageType, timestamp, mediaUrl, mediaMimetype, mediaFilename, mediaStoragePath, quotedMessageId, mentions } = msg;
 
   // ─────────────────────────────────────────────────────────────────────────
   // EDIÇÃO / REVOGAÇÃO de mensagens (Evolution API)
@@ -1512,7 +1512,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
     media_url: mediaStoragePath || mediaUrl || null, media_mimetype: mediaMimetype || null, media_path: mediaStoragePath || null,
     media_filename: mediaFilename || null, media_ext: mediaFilename?.split('.').pop()?.toLowerCase() || null,
     media_kind: mediaKind(messageType), is_from_me: fromMe, status: fromMe ? 'sent' : 'received',
-    quoted_message_id: quotedMessageId || null, timestamp, tenant_id: tenantId, instance_id: instanceId,
+    quoted_message_id: quotedMessageId || null, mentions: (mentions && mentions.length > 0) ? mentions : null, timestamp, tenant_id: tenantId, instance_id: instanceId,
     sender_name: !fromMe ? (pushName || null) : null,
     metadata: (() => {
       const base: Record<string, any> = { source: providerType };

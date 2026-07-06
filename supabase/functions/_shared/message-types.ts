@@ -58,6 +58,7 @@ export interface NormalizedInboundMessage {
 
   // Contexto (opcional)
   quotedMessageId?: string | null;
+  mentions?: string[] | null;
   reactionEmoji?: string | null;
   reactionTargetMessageId?: string | null;
 

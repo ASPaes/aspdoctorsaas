@@ -1054,6 +1054,15 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       || message.extendedTextMessage?.contextInfo?.stanzaId
       || null;
 
+    const rawMentions = message.extendedTextMessage?.contextInfo?.mentionedJid
+      || message.imageMessage?.contextInfo?.mentionedJid
+      || message.videoMessage?.contextInfo?.mentionedJid
+      || message.documentMessage?.contextInfo?.mentionedJid
+      || null;
+    const mentions = (Array.isArray(rawMentions) && rawMentions.length > 0 && rawMentions.every((m: any) => typeof m === 'string'))
+      ? (rawMentions as string[])
+      : null;
+
     const instanceInfo: InstanceInfo = {
       id: instanceData.id,
       instance_name: instanceData.instance_name,
@@ -1087,6 +1096,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       mediaFilename,
       mediaStoragePath,
       quotedMessageId,
+      mentions,
       rawPayload: data,
     };
 
