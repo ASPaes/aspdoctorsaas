@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { GroupParticipant } from "../hooks/useGroupParticipants";
+import { formatBRPhone } from "@/lib/phoneBR";
 
 const MENTION_RE = /@(\d{8,20})/g;
 
