@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { GroupParticipant } from "../hooks/useGroupParticipants";
+import { formatBRPhone } from "@/lib/phoneBR";
 
 const MENTION_RE = /@(\d{8,20})/g;
 
@@ -21,17 +22,17 @@ function brVariants(digits: string): string[] {
 function buildLookup(participants: GroupParticipant[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const p of participants) {
-    const name = (p.name && p.name.trim()) || null;
-    if (!name) continue;
+    const display = p.name?.trim() || (p.phone ? formatBRPhone(p.phone) : null);
+    if (!display) continue;
     if (p.lid) {
       const lidDigits = String(p.lid).replace(/\D/g, "");
-      if (lidDigits) map.set(lidDigits, name);
+      if (lidDigits) map.set(lidDigits, display);
     }
     if (p.phone) {
       const phoneDigits = String(p.phone).replace(/\D/g, "");
       if (phoneDigits) {
         for (const v of brVariants(phoneDigits)) {
-          if (!map.has(v)) map.set(v, name);
+          if (!map.has(v)) map.set(v, display);
         }
       }
     }
