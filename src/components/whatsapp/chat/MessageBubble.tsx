@@ -3,6 +3,7 @@ import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Message } from "../hooks/useWhatsAppMessages";
+import { getSendErrorInfo } from "@/lib/metaSendErrors";
 import type { GroupParticipant } from "../hooks/useGroupParticipants";
 import { renderMentions } from "./mentionUtils";
 import { MediaContent } from "./MediaContent";
@@ -90,6 +91,7 @@ export function MessageBubble({
   const isDeleted = msg.status === 'deleted' || deleteStatus === 'revoked' || msg.message_type === 'revoked';
   const isPending = deleteStatus === 'pending';
   const isFailed = deleteStatus === 'failed';
+  const sendError = isFromMe && msg.status === 'failed' ? getSendErrorInfo(msg.metadata) : null;
 
   const isAudio = msg.message_type === 'audio' || msg.message_type === 'ptt' || (msg.media_mimetype?.startsWith('audio/') ?? false);
   const hasTranscription = isAudio && !!msg.audio_transcription;
@@ -410,6 +412,17 @@ export function MessageBubble({
   const messageContent = (
     <div className="flex flex-col max-w-[75%]">
       {bubbleContent}
+      {sendError && (
+        <div className={cn(
+          "mt-1 text-[11px] leading-snug rounded-md px-2 py-1 border",
+          isFromMe
+            ? "bg-red-950/40 text-red-200 border-red-900/40"
+            : "bg-red-50 text-red-800 border-red-200"
+        )}>
+          <span className="font-semibold">{sendError.titulo}</span>
+          <span className="opacity-80"> — {sendError.motivo}</span>
+        </div>
+      )}
       {reactions && reactions.length > 0 && (
         <div className={cn("flex gap-0.5 mt-0.5", isFromMe ? "justify-end" : "justify-start")}>
           <div className="flex items-center gap-0.5 bg-card/80 backdrop-blur-sm border border-border/50 rounded-full px-1.5 py-0.5 shadow-sm -mt-2 relative z-10">
@@ -483,7 +496,7 @@ export function MessageBubble({
           </DropdownMenuItem>
         )}
         {canDeletePanelOnly(msg) && <DropdownMenuSeparator />}
-        {isFromMe && msg.status === 'failed' && onResendFailed && (
+        {isFromMe && msg.status === 'failed' && onResendFailed && (sendError?.retryable ?? true) && (
           <>
             <DropdownMenuItem
               onClick={() => onResendFailed(msg.id)}
