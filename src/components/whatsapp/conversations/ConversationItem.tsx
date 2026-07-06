@@ -40,7 +40,8 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const hasUnread = unreadCount > 0;
 
   const isGroup = (conv as any).is_group === true;
-  const { lookup: groupMentionLookup } = isGroup ? useGroupMentionLookup() : { lookup: null as any };
+  const { lookup: groupMentionLookup } = useGroupMentionLookup();
+
 
   const MAX_PREVIEW = 45;
   const basePreview = conv.last_message_preview || "Sem mensagens";
