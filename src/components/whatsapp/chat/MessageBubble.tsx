@@ -41,6 +41,7 @@ interface Props {
   onContactSave?: (phone: string, name: string) => void;
   onReplyClick?: (quotedMessageId: string) => void;
   quotedMessage?: Message | null;
+  groupParticipants?: GroupParticipant[];
 }
 
 function canDeletePanelOnly(msg: Message): boolean {
