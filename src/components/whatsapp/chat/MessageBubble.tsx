@@ -202,7 +202,7 @@ export function MessageBubble({
             "rounded-lg px-3 py-1.5 text-sm relative w-full min-w-0",
             isFromMe ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-muted text-foreground rounded-bl-sm"
           )}>
-            {msg.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
+            {msg.content && <p className="whitespace-pre-wrap break-words">{groupParticipants && groupParticipants.length > 0 ? renderMentions(msg.content, groupParticipants) : msg.content}</p>}
             <div className={cn("flex items-center gap-1 mt-0.5", isFromMe ? "justify-end" : "justify-start")}>
               <span className="text-[10px] opacity-60">{time}</span>
               {statusIcon}
