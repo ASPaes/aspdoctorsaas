@@ -17,6 +17,7 @@ interface SendMessageRequest {
   fileName?: string;
   mediaSizeBytes?: number; // tamanho informado pelo cliente quando vem storagePath
   quotedMessageId?: string;
+  mentioned?: string[] | null;
   instanceId?: string; // NEW: optional instance override for cross-instance conversations
   systemMessage?: boolean; // Skip attendance logic (used for closure/system notifications)
 }
