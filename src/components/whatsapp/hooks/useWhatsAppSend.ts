@@ -13,6 +13,7 @@ interface SendMessageParams {
   fileName?: string;
   quotedMessageId?: string;
   instanceId?: string;
+  mentioned?: string[];
 }
 
 let tempCounter = 0;
