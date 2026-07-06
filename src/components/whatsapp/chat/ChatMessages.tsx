@@ -33,6 +33,8 @@ interface Props {
   highlightMessageId?: string | null;
   onHighlightShown?: () => void;
   isGroup?: boolean;
+  groupJid?: string | null;
+  instanceId?: string | null;
 }
 
 type TimelineItem =
