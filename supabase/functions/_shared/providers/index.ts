@@ -214,6 +214,7 @@ class ZApiAdapter implements ProviderAdapter {
         endpoint = `${base}/send-text`;
         body = { phone, message: msg.content };
         if (msg.quotedMessageId) body.messageId = msg.quotedMessageId;
+        if (Array.isArray(msg.mentioned) && msg.mentioned.length > 0) body.mentioned = msg.mentioned;
         break;
       }
       case 'image': {
