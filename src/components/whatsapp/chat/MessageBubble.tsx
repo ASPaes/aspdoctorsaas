@@ -3,6 +3,8 @@ import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Message } from "../hooks/useWhatsAppMessages";
+import type { GroupParticipant } from "../hooks/useGroupParticipants";
+import { renderMentions } from "./mentionUtils";
 import { MediaContent } from "./MediaContent";
 import { ContactCard } from "./ContactCard";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
