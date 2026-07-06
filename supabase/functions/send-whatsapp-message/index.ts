@@ -541,6 +541,9 @@ Deno.serve(async (req) => {
     }
 
     // --- Now send the agent's actual message via adapter ---
+    const validMentioned = Array.isArray(body.mentioned)
+      ? body.mentioned.filter((m): m is string => typeof m === 'string' && m.length > 0)
+      : [];
     const sendRequest = {
       to: destinationNumber,
       messageType: body.messageType,
@@ -550,6 +553,7 @@ Deno.serve(async (req) => {
       mediaMimetype: body.mediaMimetype,
       fileName: body.fileName,
       quotedMessageId: body.quotedMessageId,
+      mentioned: validMentioned.length > 0 ? validMentioned : undefined,
     };
 
     let sendResult: { messageId: string; raw: unknown };
