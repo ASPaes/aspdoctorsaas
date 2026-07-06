@@ -445,19 +445,39 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     const content = message.trim();
     if (!content) return;
 
+    // Resolve menções ativas presentes no texto → substitui "@<display>" por "@<number>"
+    let finalContent = content;
+    const mentionedNumbers: string[] = [];
+    if (mentionsEnabled && activeMentions.length > 0) {
+      for (const m of activeMentions) {
+        const token = `@${m.display}`;
+        if (finalContent.includes(token)) {
+          finalContent = finalContent.split(token).join(`@${m.number}`);
+          if (!mentionedNumbers.includes(m.number)) mentionedNumbers.push(m.number);
+        }
+      }
+    }
+
     setMessage("");
+    setActiveMentions([]);
     onCancelReply?.();
     // Refocus imediato + fallback para garantir foco após re-render
     requestAnimationFrame(() => textareaRef.current?.focus());
     setTimeout(() => textareaRef.current?.focus(), 100);
 
     sendMutation.mutate(
-      { conversationId, content, messageType: "text", quotedMessageId: replyTo?.message_id || undefined },
+      {
+        conversationId,
+        content: finalContent,
+        messageType: "text",
+        quotedMessageId: replyTo?.message_id || undefined,
+        mentioned: mentionedNumbers.length > 0 ? mentionedNumbers : undefined,
+      },
       {
         onError: (err: any) => { toast.error(err.message || "Erro ao enviar mensagem"); },
       }
     );
-  }, [isDraftMode, isInternalNote, isCreatingNote, createNote, attachedFiles, sendAttachedFilesAll, message, isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
+  }, [isDraftMode, isInternalNote, isCreatingNote, createNote, attachedFiles, sendAttachedFilesAll, message, isBlocked, sendMutation, conversationId, replyTo, onCancelReply, mentionsEnabled, activeMentions]);
 
 
   const handleSendMedia = useCallback((params: MediaSendParams) => {
