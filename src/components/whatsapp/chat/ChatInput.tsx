@@ -60,7 +60,7 @@ const setDraft = (id: string, mode: ComposerMode, val: string) => {
   } catch { /* noop */ }
 };
 
-export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled }: Props) {
+export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled, isGroup, groupJid, instanceId }: Props) {
   const [mode, setMode] = useState<ComposerMode>("message");
   const [message, setMessage] = useState(() => initialMessage || getDraft(conversationId, "message") || "");
 
