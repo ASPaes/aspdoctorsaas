@@ -6738,6 +6738,7 @@ export type Database = {
           id: string
           instance_id: string
           last_synced_at: string | null
+          missing_since: string | null
           monitor_user_id: string | null
           participant_count: number | null
           participants: Json | null
@@ -6754,6 +6755,7 @@ export type Database = {
           id?: string
           instance_id: string
           last_synced_at?: string | null
+          missing_since?: string | null
           monitor_user_id?: string | null
           participant_count?: number | null
           participants?: Json | null
@@ -6770,6 +6772,7 @@ export type Database = {
           id?: string
           instance_id?: string
           last_synced_at?: string | null
+          missing_since?: string | null
           monitor_user_id?: string | null
           participant_count?: number | null
           participants?: Json | null

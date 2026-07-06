@@ -332,27 +332,60 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Disable groups no longer present in provider
-    const presentJids = new Set(groups.map((g) => g.jid));
-    const { data: existing, error: exErr } = await supabase
-      .from('whatsapp_groups')
-      .select('group_jid')
-      .eq('tenant_id', instance.tenant_id)
-      .eq('instance_id', instance.id);
-    if (exErr) throw new Error(`select existing error: ${exErr.message}`);
-
-    const toDisable = (existing ?? [])
-      .map((r: any) => r.group_jid)
-      .filter((jid: string) => !presentJids.has(jid));
-
-    if (toDisable.length > 0) {
-      const { error: disErr } = await supabase
+    // Two-strike disable: nunca desabilitar grupos com base em UMA resposta do provider.
+    // - Fetch vazio => provavelmente falha da Evolution: não tocar em nada.
+    // - Grupo presente => limpa missing_since. NUNCA tocar em enabled de grupo presente.
+    // - Grupo ausente pela 1ª vez => marca missing_since, mantém enabled.
+    // - Grupo ausente de novo após 24h+ => aí sim enabled=false.
+    if (groups.length === 0) {
+      console.warn(`${LOG} Provider retornou 0 grupos — pulando etapa de disable (possível falha/instabilidade do provider)`);
+    } else {
+      const presentJids = new Set(groups.map((g) => g.jid));
+      const { data: existing, error: exErr } = await supabase
         .from('whatsapp_groups')
-        .update({ enabled: false, updated_at: nowIso })
+        .select('group_jid, missing_since, enabled')
         .eq('tenant_id', instance.tenant_id)
-        .eq('instance_id', instance.id)
-        .in('group_jid', toDisable);
-      if (disErr) console.error(`${LOG} disable error:`, disErr.message);
+        .eq('instance_id', instance.id);
+      if (exErr) throw new Error(`select existing error: ${exErr.message}`);
+
+      const rows = existing ?? [];
+      const presentToClear = rows
+        .filter((r: any) => presentJids.has(r.group_jid) && r.missing_since !== null)
+        .map((r: any) => r.group_jid);
+      const absentRows = rows.filter((r: any) => !presentJids.has(r.group_jid));
+      const firstStrike = absentRows
+        .filter((r: any) => r.missing_since === null)
+        .map((r: any) => r.group_jid);
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+      const secondStrike = absentRows
+        .filter((r: any) => r.missing_since !== null && new Date(r.missing_since).getTime() < cutoff && r.enabled)
+        .map((r: any) => r.group_jid);
+
+      if (presentToClear.length > 0) {
+        const { error } = await supabase.from('whatsapp_groups')
+          .update({ missing_since: null, updated_at: nowIso })
+          .eq('tenant_id', instance.tenant_id).eq('instance_id', instance.id)
+          .in('group_jid', presentToClear);
+        if (error) console.error(`${LOG} clear missing_since error:`, error.message);
+      }
+
+      if (firstStrike.length > 0) {
+        const { error } = await supabase.from('whatsapp_groups')
+          .update({ missing_since: nowIso, updated_at: nowIso })
+          .eq('tenant_id', instance.tenant_id).eq('instance_id', instance.id)
+          .in('group_jid', firstStrike);
+        if (error) console.error(`${LOG} set missing_since error:`, error.message);
+        console.log(`${LOG} ${firstStrike.length} grupo(s) ausente(s) marcados com missing_since (1º strike, enabled intacto)`);
+      }
+
+      if (secondStrike.length > 0) {
+        const { error } = await supabase.from('whatsapp_groups')
+          .update({ enabled: false, updated_at: nowIso })
+          .eq('tenant_id', instance.tenant_id).eq('instance_id', instance.id)
+          .in('group_jid', secondStrike);
+        if (error) console.error(`${LOG} disable error:`, error.message);
+        console.log(`${LOG} ${secondStrike.length} grupo(s) desabilitado(s) após 2º strike (ausentes por 24h+): ${secondStrike.join(', ')}`);
+      }
     }
 
     return jsonResponse({
