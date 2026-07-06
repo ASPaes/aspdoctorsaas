@@ -283,6 +283,68 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     setMacroSelectedIndex(0);
   }, [filteredMacros]);
 
+  // Detecta gatilho de menção (@) antes do cursor no modo "message" em grupo
+  useEffect(() => {
+    if (!mentionsEnabled) {
+      setMentionQuery(null);
+      return;
+    }
+    const pos = Math.min(cursorPos, message.length);
+    const before = message.substring(0, pos);
+    const m = before.match(/(?:^|\s)@([^\s@]*)$/);
+    if (m) {
+      const term = (m[1] || "").toLowerCase();
+      const start = pos - m[1].length - 1; // posição do "@"
+      setMentionQuery({ term, start });
+    } else {
+      setMentionQuery(null);
+    }
+  }, [message, cursorPos, mentionsEnabled]);
+
+  const filteredMentionParticipants = useMemo(() => {
+    if (!mentionQuery) return [];
+    const term = mentionQuery.term;
+    const list = groupParticipants.filter((p) => {
+      if (!p.phone && !p.lid) return false;
+      if (!term) return true;
+      const name = (p.name || "").toLowerCase();
+      const phone = (p.phone || "").toLowerCase();
+      return name.includes(term) || phone.includes(term);
+    });
+    return list.slice(0, 8);
+  }, [mentionQuery, groupParticipants]);
+
+  useEffect(() => {
+    setMentionIndex(0);
+  }, [filteredMentionParticipants]);
+
+  const insertMention = useCallback((p: GroupParticipant) => {
+    if (!mentionQuery) return;
+    const display = displayFor(p);
+    const rawNumber = (p.phone && p.phone.replace(/\D/g, "")) || (p.lid ? p.lid.replace(/\D/g, "") : "");
+    if (!display || !rawNumber) return;
+    const pos = Math.min(cursorPos, message.length);
+    const before = message.substring(0, mentionQuery.start);
+    const after = message.substring(pos);
+    const insert = `@${display} `;
+    const newText = before + insert + after;
+    setMessage(newText);
+    setActiveMentions((prev) => {
+      const others = prev.filter((m) => m.display !== display);
+      return [...others, { display, number: rawNumber }];
+    });
+    setMentionQuery(null);
+    const newCursor = (before + insert).length;
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.selectionStart = newCursor;
+        textareaRef.current.selectionEnd = newCursor;
+        textareaRef.current.focus();
+        setCursorPos(newCursor);
+      }
+    }, 0);
+  }, [mentionQuery, cursorPos, message]);
+
   // Send a single attached file as media
   const sendOneFile = useCallback(async (file: File, caption?: string) => {
     const messageType = getMessageType(file.type || 'application/octet-stream');
