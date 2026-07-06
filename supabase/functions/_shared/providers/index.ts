@@ -40,6 +40,7 @@ export interface SendRequest {
   mediaMimetype?: string;
   fileName?: string;
   quotedMessageId?: string;
+  mentioned?: string[] | null;
 }
 
 export interface SendResult {
