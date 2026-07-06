@@ -495,6 +495,28 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   }, [conversationId, sendMutation, replyTo, onCancelReply]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionQuery && filteredMentionParticipants.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex((prev) => Math.min(prev + 1, filteredMentionParticipants.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex((prev) => Math.max(prev - 1, 0));
+        return;
+      }
+      if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+        e.preventDefault();
+        insertMention(filteredMentionParticipants[mentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionQuery(null);
+        return;
+      }
+    }
     if (showMacroSuggestions && filteredMacros.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
