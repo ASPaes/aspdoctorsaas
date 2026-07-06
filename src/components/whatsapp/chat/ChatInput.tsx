@@ -100,13 +100,14 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const isDraftMode = mode === "draft";
   const { createNote, isCreating: isCreatingNote } = useConversationNotes(conversationId);
 
-  // Menções em grupo (apenas modo "message" em conversas de grupo)
+  // Menções em grupo (autocomplete só no modo "message"; lookup carregado sempre que for grupo)
   const mentionsEnabled = !!isGroup && mode === "message";
   const { participants: groupParticipants } = useGroupParticipants(
-    mentionsEnabled ? groupJid : null,
-    mentionsEnabled ? instanceId : null,
-    mentionsEnabled,
+    isGroup ? groupJid : null,
+    isGroup ? instanceId : null,
+    !!isGroup,
   );
+
   const [cursorPos, setCursorPos] = useState(0);
   const [mentionQuery, setMentionQuery] = useState<{ term: string; start: number } | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
@@ -718,7 +719,14 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         </div>
       )}
 
-      {replyTo && onCancelReply && <ReplyPreview message={replyTo} onCancel={onCancelReply} />}
+      {replyTo && onCancelReply && (
+        <ReplyPreview
+          message={replyTo}
+          onCancel={onCancelReply}
+          groupParticipants={isGroup ? groupParticipants : undefined}
+        />
+      )}
+
 
       <SmartReplySuggestions
         suggestions={suggestions}

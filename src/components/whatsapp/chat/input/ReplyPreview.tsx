@@ -1,13 +1,16 @@
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Message } from "../../hooks/useWhatsAppMessages";
+import type { GroupParticipant } from "../../hooks/useGroupParticipants";
+import { renderMentions } from "../mentionUtils";
 
 interface ReplyPreviewProps {
   message: Message;
   onCancel: () => void;
+  groupParticipants?: GroupParticipant[];
 }
 
-export const ReplyPreview = ({ message, onCancel }: ReplyPreviewProps) => {
+export const ReplyPreview = ({ message, onCancel, groupParticipants }: ReplyPreviewProps) => {
   const getSenderName = () => message.is_from_me ? 'Você' : 'Contato';
 
   const getPreviewContent = () => {
@@ -17,7 +20,11 @@ export const ReplyPreview = ({ message, onCancel }: ReplyPreviewProps) => {
     if (message.message_type === 'document') return '📄 Documento';
     if (message.message_type === 'sticker') return '🎨 Sticker';
     const content = message.content || '';
-    return content.length > 50 ? content.substring(0, 50) + '...' : content;
+    const truncated = content.length > 50 ? content.substring(0, 50) + '...' : content;
+    if (groupParticipants && groupParticipants.length > 0) {
+      return renderMentions(truncated, groupParticipants);
+    }
+    return truncated;
   };
 
   return (

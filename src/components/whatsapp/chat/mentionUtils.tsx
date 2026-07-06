@@ -19,7 +19,7 @@ function brVariants(digits: string): string[] {
   return Array.from(out);
 }
 
-function buildLookup(participants: GroupParticipant[]): Map<string, string> {
+export function buildLookup(participants: GroupParticipant[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const p of participants) {
     const display = p.name?.trim() || (p.phone ? formatBRPhone(p.phone) : null);
@@ -39,6 +39,28 @@ function buildLookup(participants: GroupParticipant[]): Map<string, string> {
   }
   return map;
 }
+
+/**
+ * Versão texto-puro de renderMentions. Mesma regex e fallbacks.
+ */
+export function resolveMentionsToText(
+  text: string | null | undefined,
+  lookup: Map<string, string>,
+): string {
+  if (!text) return text ?? "";
+  if (!lookup || lookup.size === 0) return text;
+  const re = new RegExp(MENTION_RE.source, "g");
+  return text.replace(re, (_full, digits: string) => {
+    const name = lookup.get(digits);
+    if (name) return `@${name}`;
+    if (digits.length >= 13 && digits.startsWith("55")) {
+      const alt = brVariants(digits).map((v) => lookup.get(v)).find(Boolean);
+      if (alt) return `@${alt}`;
+    }
+    return `@+${digits}`;
+  });
+}
+
 
 /**
  * Substitui tokens @<digitos> por <span> estilizado com o nome do
