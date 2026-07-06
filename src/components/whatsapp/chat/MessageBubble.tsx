@@ -317,9 +317,14 @@ export function MessageBubble({
           ? "🎨 Sticker"
           : quotedMessage.message_type === "contact" || quotedMessage.message_type === "contacts"
           ? "👤 Contato"
-          : (quotedMessage.content && quotedMessage.content.length > 80
-              ? quotedMessage.content.substring(0, 80) + "..."
-              : (quotedMessage.content || "Mensagem"))}
+          : (() => {
+              const raw = quotedMessage.content || "Mensagem";
+              const truncated = raw.length > 80 ? raw.substring(0, 80) + "..." : raw;
+              return groupParticipants && groupParticipants.length > 0
+                ? renderMentions(truncated, groupParticipants)
+                : truncated;
+            })()}
+
       </p>
     </button>
   )}
