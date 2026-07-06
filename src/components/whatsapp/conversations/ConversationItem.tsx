@@ -9,6 +9,9 @@ import { useAppTimezone } from "@/hooks/useAppTimezone";
 import type { AttendanceInfo } from "../hooks/useAttendanceStatus";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
+import { useGroupMentionLookup } from "../hooks/useGroupMentionLookup";
+import { resolveMentionsToText } from "../chat/mentionUtils";
+
 
 interface Props {
   conversation: ConversationWithContact;
