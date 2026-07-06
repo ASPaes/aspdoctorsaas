@@ -115,7 +115,7 @@ export function useNotifications() {
         channel.on(
           "postgres_changes" as any,
           {
-            event: "*",
+            event: "INSERT",
             schema: "public",
             table: "notification_recipients",
             filter: `user_id=eq.${uid}`,
