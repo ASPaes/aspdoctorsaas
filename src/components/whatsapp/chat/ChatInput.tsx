@@ -26,6 +26,8 @@ import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import type { MediaSendParams } from "./input/types";
+import { useGroupParticipants, type GroupParticipant } from "../hooks/useGroupParticipants";
+import { MentionSuggestions, displayFor } from "./input/MentionSuggestions";
 import { toast } from "sonner";
 
 interface Props {
