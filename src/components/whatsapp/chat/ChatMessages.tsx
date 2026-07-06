@@ -408,6 +408,7 @@ export function ChatMessages({
                         onEnterSelectionMode={onEnterSelectionMode}
                         onContactChat={onContactChat}
                         onContactSave={onContactSave}
+                        groupParticipants={isGroup ? groupParticipants : undefined}
                       />
                     </div>
                   );
