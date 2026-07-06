@@ -274,6 +274,8 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           onContactChat={handleContactChat}
           onContactSave={handleContactSave}
           isGroup={(conversation as any)?.is_group === true}
+          groupJid={(conversation as any)?.group_jid ?? null}
+          instanceId={(conversation as any)?.instance_id ?? null}
         />
 
         {/* Selection action bar */}
