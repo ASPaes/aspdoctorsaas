@@ -339,6 +339,9 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
             onCancelReply={() => setReplyTo(null)}
             initialMessage={initialGreeting}
             disabled={presenceBlocked}
+            isGroup={(conversation as any)?.is_group === true}
+            groupJid={(conversation as any)?.group_jid ?? null}
+            instanceId={(conversation as any)?.instance_id ?? null}
           />
         )}
       </div>

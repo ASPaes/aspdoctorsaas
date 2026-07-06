@@ -26,6 +26,8 @@ import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import type { MediaSendParams } from "./input/types";
+import { useGroupParticipants, type GroupParticipant } from "../hooks/useGroupParticipants";
+import { MentionSuggestions, displayFor } from "./input/MentionSuggestions";
 import { toast } from "sonner";
 
 interface Props {
@@ -34,6 +36,9 @@ interface Props {
   onCancelReply?: () => void;
   initialMessage?: string;
   disabled?: boolean;
+  isGroup?: boolean;
+  groupJid?: string | null;
+  instanceId?: string | null;
 }
 
 function getMessageType(mimeType: string): MediaSendParams['messageType'] {
@@ -57,7 +62,7 @@ const setDraft = (id: string, mode: ComposerMode, val: string) => {
   } catch { /* noop */ }
 };
 
-export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled }: Props) {
+export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled, isGroup, groupJid, instanceId }: Props) {
   const [mode, setMode] = useState<ComposerMode>("message");
   const [message, setMessage] = useState(() => initialMessage || getDraft(conversationId, "message") || "");
 
@@ -94,6 +99,18 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const isInternalNote = mode === "note";
   const isDraftMode = mode === "draft";
   const { createNote, isCreating: isCreatingNote } = useConversationNotes(conversationId);
+
+  // Menções em grupo (apenas modo "message" em conversas de grupo)
+  const mentionsEnabled = !!isGroup && mode === "message";
+  const { participants: groupParticipants } = useGroupParticipants(
+    mentionsEnabled ? groupJid : null,
+    mentionsEnabled ? instanceId : null,
+    mentionsEnabled,
+  );
+  const [cursorPos, setCursorPos] = useState(0);
+  const [mentionQuery, setMentionQuery] = useState<{ term: string; start: number } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [activeMentions, setActiveMentions] = useState<{ display: string; number: string }[]>([]);
 
   const MAX_FILE_SIZE_MB = 100;
   const WARN_FILE_SIZE_MB = 60;
@@ -266,6 +283,68 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     setMacroSelectedIndex(0);
   }, [filteredMacros]);
 
+  // Detecta gatilho de menção (@) antes do cursor no modo "message" em grupo
+  useEffect(() => {
+    if (!mentionsEnabled) {
+      setMentionQuery(null);
+      return;
+    }
+    const pos = Math.min(cursorPos, message.length);
+    const before = message.substring(0, pos);
+    const m = before.match(/(?:^|\s)@([^\s@]*)$/);
+    if (m) {
+      const term = (m[1] || "").toLowerCase();
+      const start = pos - m[1].length - 1; // posição do "@"
+      setMentionQuery({ term, start });
+    } else {
+      setMentionQuery(null);
+    }
+  }, [message, cursorPos, mentionsEnabled]);
+
+  const filteredMentionParticipants = useMemo(() => {
+    if (!mentionQuery) return [];
+    const term = mentionQuery.term;
+    const list = groupParticipants.filter((p) => {
+      if (!p.phone && !p.lid) return false;
+      if (!term) return true;
+      const name = (p.name || "").toLowerCase();
+      const phone = (p.phone || "").toLowerCase();
+      return name.includes(term) || phone.includes(term);
+    });
+    return list.slice(0, 8);
+  }, [mentionQuery, groupParticipants]);
+
+  useEffect(() => {
+    setMentionIndex(0);
+  }, [filteredMentionParticipants]);
+
+  const insertMention = useCallback((p: GroupParticipant) => {
+    if (!mentionQuery) return;
+    const display = displayFor(p);
+    const rawNumber = (p.phone && p.phone.replace(/\D/g, "")) || (p.lid ? p.lid.replace(/\D/g, "") : "");
+    if (!display || !rawNumber) return;
+    const pos = Math.min(cursorPos, message.length);
+    const before = message.substring(0, mentionQuery.start);
+    const after = message.substring(pos);
+    const insert = `@${display} `;
+    const newText = before + insert + after;
+    setMessage(newText);
+    setActiveMentions((prev) => {
+      const others = prev.filter((m) => m.display !== display);
+      return [...others, { display, number: rawNumber }];
+    });
+    setMentionQuery(null);
+    const newCursor = (before + insert).length;
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.selectionStart = newCursor;
+        textareaRef.current.selectionEnd = newCursor;
+        textareaRef.current.focus();
+        setCursorPos(newCursor);
+      }
+    }, 0);
+  }, [mentionQuery, cursorPos, message]);
+
   // Send a single attached file as media
   const sendOneFile = useCallback(async (file: File, caption?: string) => {
     const messageType = getMessageType(file.type || 'application/octet-stream');
@@ -366,19 +445,39 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     const content = message.trim();
     if (!content) return;
 
+    // Resolve menções ativas presentes no texto → substitui "@<display>" por "@<number>"
+    let finalContent = content;
+    const mentionedNumbers: string[] = [];
+    if (mentionsEnabled && activeMentions.length > 0) {
+      for (const m of activeMentions) {
+        const token = `@${m.display}`;
+        if (finalContent.includes(token)) {
+          finalContent = finalContent.split(token).join(`@${m.number}`);
+          if (!mentionedNumbers.includes(m.number)) mentionedNumbers.push(m.number);
+        }
+      }
+    }
+
     setMessage("");
+    setActiveMentions([]);
     onCancelReply?.();
     // Refocus imediato + fallback para garantir foco após re-render
     requestAnimationFrame(() => textareaRef.current?.focus());
     setTimeout(() => textareaRef.current?.focus(), 100);
 
     sendMutation.mutate(
-      { conversationId, content, messageType: "text", quotedMessageId: replyTo?.message_id || undefined },
+      {
+        conversationId,
+        content: finalContent,
+        messageType: "text",
+        quotedMessageId: replyTo?.message_id || undefined,
+        mentioned: mentionedNumbers.length > 0 ? mentionedNumbers : undefined,
+      },
       {
         onError: (err: any) => { toast.error(err.message || "Erro ao enviar mensagem"); },
       }
     );
-  }, [isDraftMode, isInternalNote, isCreatingNote, createNote, attachedFiles, sendAttachedFilesAll, message, isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
+  }, [isDraftMode, isInternalNote, isCreatingNote, createNote, attachedFiles, sendAttachedFilesAll, message, isBlocked, sendMutation, conversationId, replyTo, onCancelReply, mentionsEnabled, activeMentions]);
 
 
   const handleSendMedia = useCallback((params: MediaSendParams) => {
@@ -396,6 +495,28 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   }, [conversationId, sendMutation, replyTo, onCancelReply]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionQuery && filteredMentionParticipants.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex((prev) => Math.min(prev + 1, filteredMentionParticipants.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex((prev) => Math.max(prev - 1, 0));
+        return;
+      }
+      if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+        e.preventDefault();
+        insertMention(filteredMentionParticipants[mentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionQuery(null);
+        return;
+      }
+    }
     if (showMacroSuggestions && filteredMacros.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -770,10 +891,23 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           )}
 
           <div className="relative flex-1">
+            {mentionsEnabled && mentionQuery && filteredMentionParticipants.length > 0 && (
+              <MentionSuggestions
+                participants={filteredMentionParticipants}
+                selectedIndex={mentionIndex}
+                onSelect={insertMention}
+              />
+            )}
             <Textarea
               ref={textareaRef}
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                setCursorPos(e.target.selectionStart ?? e.target.value.length);
+              }}
+              onKeyUp={(e) => setCursorPos(e.currentTarget.selectionStart ?? 0)}
+              onClick={(e) => setCursorPos(e.currentTarget.selectionStart ?? 0)}
+              onSelect={(e) => setCursorPos(e.currentTarget.selectionStart ?? 0)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={

@@ -13,6 +13,7 @@ interface SendMessageParams {
   fileName?: string;
   quotedMessageId?: string;
   instanceId?: string;
+  mentioned?: string[];
 }
 
 let tempCounter = 0;
@@ -55,6 +56,7 @@ export const useWhatsAppSend = () => {
         mediaSizeBytes,
         quotedMessageId: params.quotedMessageId,
         instanceId: params.instanceId,
+        mentioned: params.mentioned && params.mentioned.length > 0 ? params.mentioned : undefined,
       };
 
       const { data, error } = await supabase.functions.invoke('send-whatsapp-message', {
