@@ -339,7 +339,7 @@ export function MessageBubble({
           <MediaContent messageId={msg.id} messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} mediaFilename={msg.media_filename} mediaExt={msg.media_ext} mediaSizeBytes={msg.media_size_bytes} mediaKind={msg.media_kind} mediaMimetype={msg.media_mimetype} />
         </div>
       )}
-      {msg.content && msg.message_type !== 'contact' && msg.message_type !== 'contacts' && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{msg.content}</p>}
+      {msg.content && msg.message_type !== 'contact' && msg.message_type !== 'contacts' && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{groupParticipants && groupParticipants.length > 0 ? renderMentions(msg.content, groupParticipants) : msg.content}</p>}
 
       {isAudio && (
         <div className="mt-1 min-w-0">
