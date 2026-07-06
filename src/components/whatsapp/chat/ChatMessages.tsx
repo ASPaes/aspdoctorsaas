@@ -64,8 +64,15 @@ export function ChatMessages({
   highlightMessageId,
   onHighlightShown,
   isGroup,
+  groupJid,
+  instanceId,
 }: Props) {
   const { messages, isLoading, onNewMessage, fetchNextPage, hasNextPage, isFetchingNextPage } = useWhatsAppMessages(conversationId);
+  const { participants: groupParticipants } = useGroupParticipants(
+    groupJid ?? null,
+    instanceId ?? null,
+    Boolean(isGroup),
+  );
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
   const { notes, deleteNote } = useConversationNotes(conversationId);
   const { timezone } = useAppTimezone();
