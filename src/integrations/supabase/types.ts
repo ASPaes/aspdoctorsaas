@@ -3613,6 +3613,9 @@ export type Database = {
           ativo: boolean
           id: string
           integrar_a_partir_de: string | null
+          sync_automatica_ativa: boolean
+          sync_lote_tamanho: number
+          sync_max_tentativas: number
           tenant_id: string
           ultimo_status: string
           ultimo_teste_at: string | null
@@ -3623,6 +3626,9 @@ export type Database = {
           ativo?: boolean
           id?: string
           integrar_a_partir_de?: string | null
+          sync_automatica_ativa?: boolean
+          sync_lote_tamanho?: number
+          sync_max_tentativas?: number
           tenant_id: string
           ultimo_status?: string
           ultimo_teste_at?: string | null
@@ -3633,11 +3639,53 @@ export type Database = {
           ativo?: boolean
           id?: string
           integrar_a_partir_de?: string | null
+          sync_automatica_ativa?: boolean
+          sync_lote_tamanho?: number
+          sync_max_tentativas?: number
           tenant_id?: string
           ultimo_status?: string
           ultimo_teste_at?: string | null
           updated_at?: string
           vault_secret_id?: string | null
+        }
+        Relationships: []
+      }
+      omie_sync_fila: {
+        Row: {
+          contrato_id: string
+          enfileirado_em: string
+          id: string
+          origem: string | null
+          processado_em: string | null
+          proxima_tentativa_em: string
+          status: string
+          tenant_id: string
+          tentativas: number
+          ultimo_erro: string | null
+        }
+        Insert: {
+          contrato_id: string
+          enfileirado_em?: string
+          id?: string
+          origem?: string | null
+          processado_em?: string | null
+          proxima_tentativa_em?: string
+          status?: string
+          tenant_id: string
+          tentativas?: number
+          ultimo_erro?: string | null
+        }
+        Update: {
+          contrato_id?: string
+          enfileirado_em?: string
+          id?: string
+          origem?: string | null
+          processado_em?: string | null
+          proxima_tentativa_em?: string
+          status?: string
+          tenant_id?: string
+          tentativas?: number
+          ultimo_erro?: string | null
         }
         Relationships: []
       }
@@ -7139,6 +7187,7 @@ export type Database = {
           media_path: string | null
           media_size_bytes: number | null
           media_url: string | null
+          mentions: Json | null
           message_id: string
           message_type: string
           metadata: Json | null
@@ -7174,6 +7223,7 @@ export type Database = {
           media_path?: string | null
           media_size_bytes?: number | null
           media_url?: string | null
+          mentions?: Json | null
           message_id: string
           message_type?: string
           metadata?: Json | null
@@ -7209,6 +7259,7 @@ export type Database = {
           media_path?: string | null
           media_size_bytes?: number | null
           media_url?: string | null
+          mentions?: Json | null
           message_id?: string
           message_type?: string
           metadata?: Json | null
@@ -8172,6 +8223,10 @@ export type Database = {
       encrypt_api_key: {
         Args: { p_encryption_key: string; p_key: string }
         Returns: string
+      }
+      enfileirar_sync_omie: {
+        Args: { p_contrato_id: string; p_origem?: string }
+        Returns: undefined
       }
       estornar_reajuste: { Args: { p_reajuste_id: string }; Returns: Json }
       exec_db_health_query: { Args: { query_text: string }; Returns: Json }

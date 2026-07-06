@@ -13,7 +13,7 @@ interface SyncedGroup {
   name: string;
   pictureUrl?: string | null;
   participantCount?: number | null;
-  participants?: { phone: string; name: string | null; admin: boolean; isLid?: boolean }[];
+  participants?: { phone: string; name: string | null; admin: boolean; isLid?: boolean; lid?: string | null }[];
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -28,7 +28,7 @@ async function fetchGroupParticipantsEvolution(
   identifier: string,
   providerType: string,
   groupJid: string,
-): Promise<{ phone: string; name: string | null; admin: boolean; isLid: boolean }[]> {
+): Promise<{ phone: string; name: string | null; admin: boolean; isLid: boolean; lid: string | null }[]> {
   try {
     const baseUrl = (secrets.api_url || '').replace(/\/$/, '').replace(/\/manager$/, '');
     const headers: Record<string, string> = {};
@@ -54,12 +54,15 @@ async function fetchGroupParticipantsEvolution(
       const rawPhone = p.phoneNumber || p.id || '';
       const phone = rawPhone.replace('@s.whatsapp.net', '').replace('@lid', '').replace(/@.*/, '').replace(/:\d+$/, '');
       const isRealPhone = rawPhone.includes('@s.whatsapp.net');
+      const rawId = String(p.id || '');
+      const lid = /@lid(:\d+)?$/.test(rawId) ? rawId.replace(/@lid(:\d+)?$/, '').replace(/:\d+$/, '') : null;
 
       return {
         phone,
         name: p.pushName || p.name || p.notify || null,
         admin: p.admin === 'admin' || p.admin === 'superadmin',
         isLid: !isRealPhone,
+        lid,
       };
     });
   } catch (err) {
@@ -127,6 +130,7 @@ async function fetchZapiGroups(secrets: InstanceSecrets): Promise<SyncedGroup[]>
           phone: (p.phone || p.id || '').replace(/\D/g, ''),
           name: p.name || p.displayName || null,
           admin: p.admin === true || p.isAdmin === true,
+          lid: null,
         })),
       };
     })
