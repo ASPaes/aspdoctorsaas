@@ -435,6 +435,31 @@ export async function findOrCreateConversation(
   supabase: any, instanceId: string, contactId: string, tenantId: string, isFromMe: boolean = false, isGroup: boolean = false, groupJid: string | null = null
 ): Promise<string | null> {
   try {
+    // GRUPOS: identidade canônica da conversa = (tenant_id, instance_id, group_jid).
+    // Nunca confiar só no contact_id — contato pode dessincronizar e o INSERT abaixo
+    // estoura o unique uq_wa_conv_tenant_instance_groupjid, dropando a mensagem em silêncio.
+    if (isGroup && groupJid) {
+      const { data: existingByJid } = await supabase.from('whatsapp_conversations')
+        .select('id, contact_id, department_id')
+        .eq('tenant_id', tenantId).eq('instance_id', instanceId)
+        .eq('group_jid', groupJid).eq('is_group', true)
+        .maybeSingle();
+      if (existingByJid) {
+        // Self-healing: repointa pro contato canônico se divergente.
+        if (existingByJid.contact_id !== contactId) {
+          const { error: repointErr } = await supabase.from('whatsapp_conversations')
+            .update({ contact_id: contactId, updated_at: new Date().toISOString() })
+            .eq('id', existingByJid.id);
+          if (repointErr) console.error('[processor] Group conv repoint failed (non-fatal):', repointErr);
+        }
+        if (!existingByJid.department_id) {
+          const deptId = await resolveDepartmentForInstance(supabase, instanceId, tenantId);
+          if (deptId) await supabase.from('whatsapp_conversations').update({ department_id: deptId }).eq('id', existingByJid.id);
+        }
+        return existingByJid.id;
+      }
+    }
+
     const { data: existing } = await supabase.from('whatsapp_conversations').select('id, department_id, status').eq('tenant_id', tenantId).eq('instance_id', instanceId).eq('contact_id', contactId).maybeSingle();
     if (existing) {
       if (!existing.department_id) {
@@ -446,7 +471,23 @@ export async function findOrCreateConversation(
 
     const departmentId = await resolveDepartmentForInstance(supabase, instanceId, tenantId);
     const { data: newConv, error } = await supabase.from('whatsapp_conversations').insert({ instance_id: instanceId, contact_id: contactId, status: isFromMe ? 'closed' : 'active', tenant_id: tenantId, is_group: isGroup, group_jid: groupJid, ...(departmentId ? { department_id: departmentId } : {}) }).select('id').single();
-    if (error) { console.error('[processor] Error creating conversation:', error); return null; }
+    if (error) {
+      // 23505 = corrida entre requests ou conversa existente sob outro contato.
+      // Re-lookup em vez de return null — return null aqui descarta a mensagem inbound.
+      if (error.code === '23505') {
+        if (isGroup && groupJid) {
+          const { data: retryByJid } = await supabase.from('whatsapp_conversations').select('id')
+            .eq('tenant_id', tenantId).eq('instance_id', instanceId)
+            .eq('group_jid', groupJid).eq('is_group', true).maybeSingle();
+          if (retryByJid) return retryByJid.id;
+        }
+        const { data: retryByContact } = await supabase.from('whatsapp_conversations').select('id')
+          .eq('tenant_id', tenantId).eq('instance_id', instanceId).eq('contact_id', contactId).maybeSingle();
+        if (retryByContact) return retryByContact.id;
+      }
+      console.error('[processor] Error creating conversation:', error);
+      return null;
+    }
 
     // Auto-assignment is now handled by database triggers on support_attendances (Phase 1 distribution engine).
     // When an attendance is created by ensureAttendanceForIncomingMessage / ensureAttendanceForBilling,
