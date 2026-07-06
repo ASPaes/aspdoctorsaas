@@ -17,6 +17,7 @@ interface SendMessageRequest {
   fileName?: string;
   mediaSizeBytes?: number; // tamanho informado pelo cliente quando vem storagePath
   quotedMessageId?: string;
+  mentioned?: string[] | null;
   instanceId?: string; // NEW: optional instance override for cross-instance conversations
   systemMessage?: boolean; // Skip attendance logic (used for closure/system notifications)
 }
@@ -540,6 +541,9 @@ Deno.serve(async (req) => {
     }
 
     // --- Now send the agent's actual message via adapter ---
+    const validMentioned = Array.isArray(body.mentioned)
+      ? body.mentioned.filter((m): m is string => typeof m === 'string' && m.length > 0)
+      : [];
     const sendRequest = {
       to: destinationNumber,
       messageType: body.messageType,
@@ -549,6 +553,7 @@ Deno.serve(async (req) => {
       mediaMimetype: body.mediaMimetype,
       fileName: body.fileName,
       quotedMessageId: body.quotedMessageId,
+      mentioned: validMentioned.length > 0 ? validMentioned : undefined,
     };
 
     let sendResult: { messageId: string; raw: unknown };
@@ -659,6 +664,7 @@ Deno.serve(async (req) => {
           is_from_me: persistedIsFromMe,
           timestamp: messageTimestamp,
           quoted_message_id: body.quotedMessageId || null,
+          mentions: validMentioned.length > 0 ? validMentioned : null,
           metadata: {
             ...(body.fileName ? { fileName: body.fileName } : {}),
             sender_signature_mode: sigMode,

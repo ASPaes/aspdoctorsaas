@@ -40,6 +40,7 @@ export interface SendRequest {
   mediaMimetype?: string;
   fileName?: string;
   quotedMessageId?: string;
+  mentioned?: string[] | null;
 }
 
 export interface SendResult {
@@ -107,6 +108,7 @@ class EvolutionAdapter implements ProviderAdapter {
         endpoint = `${base}/message/sendText/${id}`;
         body = { number: msg.to, text: msg.content };
         if (msg.quotedMessageId) body.quoted = { key: { id: msg.quotedMessageId } };
+        if (Array.isArray(msg.mentioned) && msg.mentioned.length > 0) body.mentioned = msg.mentioned;
         break;
       }
       case 'audio': {
@@ -212,6 +214,7 @@ class ZApiAdapter implements ProviderAdapter {
         endpoint = `${base}/send-text`;
         body = { phone, message: msg.content };
         if (msg.quotedMessageId) body.messageId = msg.quotedMessageId;
+        if (Array.isArray(msg.mentioned) && msg.mentioned.length > 0) body.mentioned = msg.mentioned;
         break;
       }
       case 'image': {
