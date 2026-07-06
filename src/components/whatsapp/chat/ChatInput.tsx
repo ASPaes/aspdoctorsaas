@@ -100,6 +100,18 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const isDraftMode = mode === "draft";
   const { createNote, isCreating: isCreatingNote } = useConversationNotes(conversationId);
 
+  // Menções em grupo (apenas modo "message" em conversas de grupo)
+  const mentionsEnabled = !!isGroup && mode === "message";
+  const { participants: groupParticipants } = useGroupParticipants(
+    mentionsEnabled ? groupJid : null,
+    mentionsEnabled ? instanceId : null,
+    mentionsEnabled,
+  );
+  const [cursorPos, setCursorPos] = useState(0);
+  const [mentionQuery, setMentionQuery] = useState<{ term: string; start: number } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [activeMentions, setActiveMentions] = useState<{ display: string; number: string }[]>([]);
+
   const MAX_FILE_SIZE_MB = 100;
   const WARN_FILE_SIZE_MB = 60;
   const MAX_FILES = 10;
