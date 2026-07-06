@@ -719,7 +719,14 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         </div>
       )}
 
-      {replyTo && onCancelReply && <ReplyPreview message={replyTo} onCancel={onCancelReply} />}
+      {replyTo && onCancelReply && (
+        <ReplyPreview
+          message={replyTo}
+          onCancel={onCancelReply}
+          groupParticipants={isGroup ? groupParticipants : undefined}
+        />
+      )}
+
 
       <SmartReplySuggestions
         suggestions={suggestions}
