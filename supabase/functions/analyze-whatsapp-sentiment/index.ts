@@ -122,12 +122,27 @@ serve(async (req) => {
       );
     }
 
-    const { data: messages, error: messagesError } = await supabase
+    const { data: att } = await supabase
+      .from("support_attendances")
+      .select("opened_at")
+      .eq("conversation_id", conversationId)
+      .is("closed_at", null)
+      .order("opened_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let messagesQuery = supabase
       .from("whatsapp_messages")
       .select("content, timestamp, audio_transcription, message_type, is_from_me")
       .eq("conversation_id", conversationId)
       .order("timestamp", { ascending: false })
       .limit(20);
+
+    if (att?.opened_at) {
+      messagesQuery = messagesQuery.gte("timestamp", att.opened_at);
+    }
+
+    const { data: messages, error: messagesError } = await messagesQuery;
 
     if (messagesError) throw messagesError;
 
