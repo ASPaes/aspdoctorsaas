@@ -10,7 +10,9 @@ export interface SupportConfig {
   support_inactivity_warning_before_minutes: number;
   support_inactivity_warning_template: string;
   support_agent_alert_minutes: number;
+  support_agent_alert_enabled: boolean;
   support_agent_no_response_close_minutes: number;
+  support_agent_no_response_close_enabled: boolean;
   support_csat_enabled: boolean;
   support_csat_prompt_template: string;
   support_csat_timeout_minutes: number;
