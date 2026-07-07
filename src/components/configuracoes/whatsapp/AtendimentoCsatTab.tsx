@@ -547,6 +547,19 @@ export default function AtendimentoCsatTab() {
                   </FormItem>
                 )} />
 
+                <FormField control={form.control} name="support_waiting_ack_limit" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Limite de mensagens de 'aguarde'</FormLabel>
+                    <FormControl>
+                      <NumericInput value={field.value} onChange={field.onChange} placeholder="3" />
+                    </FormControl>
+                    <FormDescription>
+                      Máximo de respostas automáticas de 'aguarde um momento' por atendimento enquanto o cliente espera um agente. 0 = nunca enviar.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
                 <Separator />
 
                 <UraOptionsManager />
