@@ -36,9 +36,9 @@ const DEFAULTS: SupportConfig = {
   support_inactivity_warning_template:
     '⚠️ Por falta de interação, este atendimento será encerrado em {{minutes}} minutos. Se ainda precisar de ajuda, responda esta mensagem.',
   support_agent_alert_minutes: 5,
-  support_agent_alert_enabled: true,
+  support_agent_alert_enabled: false,
   support_agent_no_response_close_minutes: 60,
-  support_agent_no_response_close_enabled: true,
+  support_agent_no_response_close_enabled: false,
   support_csat_enabled: true,
   support_csat_prompt_template:
     'Oi {{customer_name}}, para encerrar este atendimento é muito importante entender como foi sua experiência. De 0 a 5, como você avalia este atendimento? (Responda apenas a nota)',
