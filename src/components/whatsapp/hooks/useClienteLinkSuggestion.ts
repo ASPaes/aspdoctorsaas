@@ -29,7 +29,26 @@ export function useClienteLinkSuggestion(
   tenantId: string | null,
 ) {
   const queryClient = useQueryClient();
-  const linkedClienteId = (currentMetadata as any)?.cliente_id as string | undefined;
+  const metadataClienteId = (currentMetadata as any)?.cliente_id as string | undefined;
+
+  // 0) Fonte de verdade: cliente_id do attendance
+  const attendanceClienteQuery = useQuery({
+    queryKey: ['attendance-cliente', attendanceId],
+    queryFn: async (): Promise<string | null> => {
+      if (!attendanceId) return null;
+      const { data } = await supabase
+        .from('support_attendances')
+        .select('cliente_id')
+        .eq('id', attendanceId)
+        .maybeSingle();
+      return (data as any)?.cliente_id ?? null;
+    },
+    enabled: !!attendanceId,
+    staleTime: 30_000,
+  });
+
+  const linkedClienteId: string | null =
+    (attendanceClienteQuery.data ?? null) ?? (attendanceId ? null : (metadataClienteId ?? null));
 
   // 1) Cliente já vinculado (carrega detalhes leves)
   const linkedQuery = useQuery({
