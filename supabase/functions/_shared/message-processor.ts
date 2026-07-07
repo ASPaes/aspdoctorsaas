@@ -1265,7 +1265,12 @@ export async function handleUraResponse(supabase: any, ctx: SendContext, convers
   if (selectedDept) updatePayload.department_id = selectedDept.id;
   await supabase.from('support_attendances').update(updatePayload).eq('id', att.id);
   if (selectedDept) await supabase.from('whatsapp_conversations').update({ department_id: selectedDept.id, updated_at: nowIso }).eq('id', conversationId);
-  await sendAndPersistAutoMessage(supabase, ctx, conversationId, `\u{2705} Você escolheu *${deptName}*. Aguarde, em breve um atendente irá te ajudar!`, { ura: true, ura_confirmed: true, department_id: selectedDept?.id || null });
+  const confirmTemplate = supportConfig.support_ura_confirmation_template ||
+    '\u{2705} Você escolheu *{{department}}*. Aguarde, em breve um atendente irá te ajudar!';
+  const confirmMsg = confirmTemplate
+    .replace(/\{\{department\}\}/g, deptName)
+    .replace(/\{\{customer_name\}\}/g, ctx.contactName || '');
+  await sendAndPersistAutoMessage(supabase, ctx, conversationId, confirmMsg, { ura: true, ura_confirmed: true, department_id: selectedDept?.id || null });
   return true;
 }
 

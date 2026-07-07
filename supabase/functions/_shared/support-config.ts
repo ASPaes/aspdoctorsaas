@@ -25,6 +25,7 @@ export interface SupportConfig {
   support_ura_enabled: boolean;
   support_ura_welcome_template: string;
   support_ura_invalid_option_template: string;
+  support_ura_confirmation_template: string;
 
   // URA v2 (department-based routing)
   ura_enabled: boolean;
@@ -80,6 +81,8 @@ const DEFAULTS: SupportConfig = {
     'Olá {{customer_name}}! 👋 Para te direcionar melhor, escolha uma opção:',
   support_ura_invalid_option_template:
     'Não entendi sua resposta 😅. Por favor, envie apenas o número de uma das opções acima.',
+  support_ura_confirmation_template:
+    '✅ Você escolheu *{{department}}*. Aguarde, em breve um atendente irá te ajudar!',
 
   // URA v2 defaults
   ura_enabled: false,
@@ -130,6 +133,7 @@ const SELECT_FIELDS = [
   'support_ura_enabled',
   'support_ura_welcome_template',
   'support_ura_invalid_option_template',
+  'support_ura_confirmation_template',
   // URA v2 fields
   'ura_enabled',
   'ura_welcome_template',
