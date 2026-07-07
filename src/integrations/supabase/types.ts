@@ -1652,6 +1652,7 @@ export type Database = {
           support_ura_invalid_option_template: string
           support_ura_timeout_minutes: number
           support_ura_welcome_template: string
+          support_waiting_ack_limit: number
           tenant_id: string | null
           updated_at: string
           ura_default_department_id: string | null
@@ -1714,6 +1715,7 @@ export type Database = {
           support_ura_invalid_option_template?: string
           support_ura_timeout_minutes?: number
           support_ura_welcome_template?: string
+          support_waiting_ack_limit?: number
           tenant_id?: string | null
           updated_at?: string
           ura_default_department_id?: string | null
@@ -1776,6 +1778,7 @@ export type Database = {
           support_ura_invalid_option_template?: string
           support_ura_timeout_minutes?: number
           support_ura_welcome_template?: string
+          support_waiting_ack_limit?: number
           tenant_id?: string | null
           updated_at?: string
           ura_default_department_id?: string | null
@@ -4673,6 +4676,7 @@ export type Database = {
           ura_sent_at: string | null
           ura_state: string
           wait_seconds: number
+          waiting_ack_count: number
         }
         Insert: {
           acceptance_deadline_at?: string | null
@@ -4751,6 +4755,7 @@ export type Database = {
           ura_sent_at?: string | null
           ura_state?: string
           wait_seconds?: number
+          waiting_ack_count?: number
         }
         Update: {
           acceptance_deadline_at?: string | null
@@ -4829,6 +4834,7 @@ export type Database = {
           ura_sent_at?: string | null
           ura_state?: string
           wait_seconds?: number
+          waiting_ack_count?: number
         }
         Relationships: [
           {

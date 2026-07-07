@@ -1159,16 +1159,24 @@ export async function sendUraWelcome(supabase: any, ctx: SendContext, conversati
 export async function handleUraResponse(supabase: any, ctx: SendContext, conversationId: string, tenantId: string, messageContent: string, supportConfig: any): Promise<boolean> {
   const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
   if (!uraEnabled) return false;
-  const { data: att } = await supabase.from('support_attendances').select('id, attendance_code, ura_sent_at, ura_state, ura_asked_at, department_id, ura_option_selected, ura_invalid_count, ura_human_fallback, assigned_to').eq('conversation_id', conversationId).eq('status', 'waiting').limit(1).maybeSingle();
+  const { data: att } = await supabase.from('support_attendances').select('id, attendance_code, ura_sent_at, ura_state, ura_asked_at, department_id, ura_option_selected, ura_invalid_count, ura_human_fallback, assigned_to, waiting_ack_count').eq('conversation_id', conversationId).eq('status', 'waiting').limit(1).maybeSingle();
   if (!att) return false;
+  const ackLimit = supportConfig.support_waiting_ack_limit ?? 3;
+  const sendWaitingAck = async () => {
+    const current = att.waiting_ack_count ?? 0;
+    if (ackLimit <= 0 || current >= ackLimit) return;
+    await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(WAITING_AGENT_MESSAGES));
+    await supabase.from('support_attendances').update({ waiting_ack_count: current + 1 }).eq('id', att.id);
+    att.waiting_ack_count = current + 1;
+  };
   const isUraPending = att.ura_state === 'pending' || (att.ura_sent_at && att.ura_state === 'none');
   if (!isUraPending && att.ura_state !== 'pending') {
-    if ((att.department_id || att.ura_option_selected !== null) && !att.assigned_to) { await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(WAITING_AGENT_MESSAGES)); return true; }
+    if ((att.department_id || att.ura_option_selected !== null) && !att.assigned_to) { await sendWaitingAck(); return true; }
     return false;
   }
   if (att.assigned_to) return false;
-  if (att.ura_human_fallback) { await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(WAITING_AGENT_MESSAGES)); return true; }
-  if (att.ura_option_selected !== null) { await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(WAITING_AGENT_MESSAGES)); return true; }
+  if (att.ura_human_fallback) { await sendWaitingAck(); return true; }
+  if (att.ura_option_selected !== null) { await sendWaitingAck(); return true; }
   if (att.ura_asked_at) {
     const elapsed = (Date.now() - new Date(att.ura_asked_at).getTime()) / (1000 * 60);
     if (elapsed > (supportConfig.ura_timeout_minutes ?? 2)) { await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig); return false; }
