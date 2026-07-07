@@ -54,6 +54,7 @@ const schema = z.object({
   support_ura_welcome_template: z.string().min(1, "Obrigatório"),
   support_ura_invalid_option_template: z.string().min(1, "Obrigatório"),
   support_ura_confirmation_template: z.string().min(1, "Obrigatório"),
+  support_waiting_ack_limit: z.number().min(0).max(20),
   support_ura_timeout_minutes: z.number().min(1).max(60),
   support_ura_default_department_id: z.string().nullable(),
 });
