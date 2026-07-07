@@ -558,9 +558,10 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
     // Busca o CSAT pendente DA CONVERSA (não exige attendance closed+manual:
     // a resposta pode chegar antes do fechamento consolidar ou após reabertura).
     const { data: convAtts } = await supabase
-      .from('support_attendances').select('id').eq('conversation_id', conversationId);
+      .from('support_attendances').select('id, status').eq('conversation_id', conversationId);
     const attIds = (convAtts ?? []).map((a: any) => a.id);
     if (attIds.length === 0) return false;
+    const attStatusById = new Map<string, string>((convAtts ?? []).map((a: any) => [a.id, a.status]));
 
     const { data: csat } = await supabase
       .from('support_csat')
@@ -573,6 +574,16 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
     if (!csat) return false;
 
     const attendanceId = csat.attendance_id;
+    // Fecha o atendimento SOMENTE se ainda estiver aberto. No fluxo normal de CSAT o
+    // encerramento manual já fechou o atendimento antes de enviar a pesquisa, então esta
+    // rpc seria redundante (early-return 'already_closed') — e é nela que uma exceção
+    // transitória sob carga derrubava o fluxo e reabria o atendimento. Pular quando já
+    // fechado elimina o ponto de falha; quando aberto (raro), fecha normalmente.
+    const attClosed = ['closed', 'inactive_closed'].includes(attStatusById.get(attendanceId) ?? '');
+    const closeAttendanceIfOpen = async (reason: string, ctype: string) => {
+      if (attClosed) return;
+      await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: reason, p_closure_type: ctype });
+    };
     const supportConfig = await getSupportConfig(supabase, tenantId);
 
     const { data: csatConv } = await supabase
@@ -586,7 +597,7 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
     if (elapsedMinutes > supportConfig.support_csat_timeout_minutes) {
       await supabase.from('support_csat').update({ status: 'expired', responded_at: new Date().toISOString() }).eq('id', csat.id);
       try {
-        await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_timeout', p_closure_type: 'csat_timeout' });
+        await closeAttendanceIfOpen('csat_timeout', 'csat_timeout');
         await sendAndPersistAutoMessage(supabase, ctx, conversationId, 'Que pena que você não deu uma nota, mas da próxima vez contamos com sua colaboração! 😊', { csat: true, csat_timeout: true });
         await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
       } catch (sideErr) {
@@ -623,7 +634,7 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
         if (needsReason) {
           await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.reason_prompt_template || 'Entendi. Pode me dizer em poucas palavras o motivo da sua nota?', { csat: true });
         } else {
-          await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_completed', p_closure_type: 'csat_completed' });
+          await closeAttendanceIfOpen('csat_completed', 'csat_completed');
           await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.', { csat: true });
           await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
         }
@@ -636,7 +647,7 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
     if (csat.status === 'awaiting_reason') {
       await supabase.from('support_csat').update({ reason: trimmed, status: 'completed', responded_at: new Date().toISOString() }).eq('id', csat.id);
       try {
-        await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_completed', p_closure_type: 'csat_completed' });
+        await closeAttendanceIfOpen('csat_completed', 'csat_completed');
         await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.', { csat: true });
         await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
       } catch (sideErr) {
