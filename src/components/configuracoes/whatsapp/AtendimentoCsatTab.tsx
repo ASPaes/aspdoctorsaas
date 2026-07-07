@@ -54,6 +54,7 @@ const schema = z.object({
   support_ura_welcome_template: z.string().min(1, "Obrigatório"),
   support_ura_invalid_option_template: z.string().min(1, "Obrigatório"),
   support_ura_confirmation_template: z.string().min(1, "Obrigatório"),
+  support_waiting_ack_limit: z.number().min(0).max(20),
   support_ura_timeout_minutes: z.number().min(1).max(60),
   support_ura_default_department_id: z.string().nullable(),
 });
@@ -91,6 +92,7 @@ export default function AtendimentoCsatTab() {
       support_ura_welcome_template: "",
       support_ura_invalid_option_template: "",
       support_ura_confirmation_template: "",
+      support_waiting_ack_limit: 3,
       support_ura_timeout_minutes: 2,
       support_ura_default_department_id: null,
     },
@@ -117,7 +119,7 @@ export default function AtendimentoCsatTab() {
     queryKey: ["configuracoes-atendimento", tid],
     queryFn: async () => {
       let q = supabase.from("configuracoes").select(
-        "id, support_reopen_window_minutes, support_auto_close_inactivity_minutes, support_send_inactivity_warning, support_inactivity_warning_before_minutes, support_inactivity_warning_template, support_agent_alert_enabled, support_agent_alert_minutes, support_agent_no_response_close_enabled, support_agent_no_response_close_minutes, support_csat_enabled, support_csat_prompt_template, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template, support_ura_enabled, support_ura_welcome_template, support_ura_invalid_option_template, support_ura_confirmation_template, support_ura_timeout_minutes, support_ura_default_department_id"
+        "id, support_reopen_window_minutes, support_auto_close_inactivity_minutes, support_send_inactivity_warning, support_inactivity_warning_before_minutes, support_inactivity_warning_template, support_agent_alert_enabled, support_agent_alert_minutes, support_agent_no_response_close_enabled, support_agent_no_response_close_minutes, support_csat_enabled, support_csat_prompt_template, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template, support_ura_enabled, support_ura_welcome_template, support_ura_invalid_option_template, support_ura_confirmation_template, support_waiting_ack_limit, support_ura_timeout_minutes, support_ura_default_department_id"
       );
       if (tid) q = q.eq("tenant_id", tid);
       const { data, error } = await q.limit(1).maybeSingle();
@@ -152,6 +154,7 @@ export default function AtendimentoCsatTab() {
         support_ura_welcome_template: config.support_ura_welcome_template,
         support_ura_invalid_option_template: config.support_ura_invalid_option_template,
         support_ura_confirmation_template: config.support_ura_confirmation_template,
+        support_waiting_ack_limit: config.support_waiting_ack_limit ?? 3,
         support_ura_timeout_minutes: config.support_ura_timeout_minutes ?? 2,
         support_ura_default_department_id: config.support_ura_default_department_id ?? null,
       });
@@ -539,6 +542,19 @@ export default function AtendimentoCsatTab() {
                     </FormControl>
                     <FormDescription>
                       Variáveis: {"{{department}}"} (setor escolhido), {"{{customer_name}}"}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="support_waiting_ack_limit" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Limite de mensagens de 'aguarde'</FormLabel>
+                    <FormControl>
+                      <NumericInput value={field.value} onChange={field.onChange} placeholder="3" />
+                    </FormControl>
+                    <FormDescription>
+                      Máximo de respostas automáticas de 'aguarde um momento' por atendimento enquanto o cliente espera um agente. 0 = nunca enviar.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
