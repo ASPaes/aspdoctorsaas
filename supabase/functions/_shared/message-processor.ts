@@ -636,9 +636,13 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
 
     if (csat.status === 'awaiting_reason') {
       await supabase.from('support_csat').update({ reason: trimmed, status: 'completed', responded_at: new Date().toISOString() }).eq('id', csat.id);
-      await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_completed', p_closure_type: 'csat_completed' });
-      await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.', { csat: true });
-      await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
+      try {
+        await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_completed', p_closure_type: 'csat_completed' });
+        await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.', { csat: true });
+        await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
+      } catch (sideErr) {
+        console.error('[processor] CSAT reason side-effects failed after completion (não reabrir):', sideErr);
+      }
       return true;
     }
 
