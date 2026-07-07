@@ -398,11 +398,8 @@ export async function findOrCreateContact(
         keep = exact ?? found[0];
         for (const other of found) {
           if (other.id === keep.id) continue;
-          try {
-            await supabase.rpc('merge_whatsapp_contacts', { p_keep_id: keep.id, p_merge_id: other.id, p_tenant_id: tenantId });
-          } catch (err) {
-            console.error('[processor] auto-merge duplicate contact failed:', err);
-          }
+          const { error: mergeErr } = await supabase.rpc('merge_whatsapp_contacts', { p_keep_id: keep.id, p_merge_id: other.id, p_tenant_id: tenantId });
+          if (mergeErr) console.error('[processor] auto-merge duplicate contact failed:', mergeErr);
         }
       }
 
