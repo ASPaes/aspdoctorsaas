@@ -48,6 +48,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
 
   const {
     linkedCliente: indLinkedCliente,
+    linkedClienteId: indLinkedClienteId,
     suggestedCliente,
     isLinked: indIsLinked,
     linkCliente: indLinkCliente,
