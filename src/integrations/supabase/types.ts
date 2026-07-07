@@ -3613,7 +3613,9 @@ export type Database = {
           ativo: boolean
           id: string
           integrar_a_partir_de: string | null
+          omie_bloqueado_ate: string | null
           sync_automatica_ativa: boolean
+          sync_contratos_teste: string[] | null
           sync_lote_tamanho: number
           sync_max_tentativas: number
           tenant_id: string
@@ -3626,7 +3628,9 @@ export type Database = {
           ativo?: boolean
           id?: string
           integrar_a_partir_de?: string | null
+          omie_bloqueado_ate?: string | null
           sync_automatica_ativa?: boolean
+          sync_contratos_teste?: string[] | null
           sync_lote_tamanho?: number
           sync_max_tentativas?: number
           tenant_id: string
@@ -3639,7 +3643,9 @@ export type Database = {
           ativo?: boolean
           id?: string
           integrar_a_partir_de?: string | null
+          omie_bloqueado_ate?: string | null
           sync_automatica_ativa?: boolean
+          sync_contratos_teste?: string[] | null
           sync_lote_tamanho?: number
           sync_max_tentativas?: number
           tenant_id?: string
@@ -9384,6 +9390,10 @@ export type Database = {
         Returns: Json
       }
       obter_chave_omie: { Args: { p_tenant_id?: string }; Returns: string }
+      obter_chave_omie_sistema: {
+        Args: { p_tenant_id: string }
+        Returns: string
+      }
       preparar_reajuste: {
         Args: {
           p_percentual: number
