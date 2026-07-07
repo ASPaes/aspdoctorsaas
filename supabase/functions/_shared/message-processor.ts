@@ -383,37 +383,39 @@ export async function findOrCreateContact(
     // o mesmo número pode falar com várias instâncias do tenant; filtrar por instância
     // fazia o lookup não achar o contato → INSERT falho (23505) + retry em todo inbound
     // cross-instância. Busca exata pela chave canônica; só cai em variantes (legado).
-    let existing: { id: string; name: string; phone_number: string } | null = null;
-    {
-      const { data } = await supabase.from('whatsapp_contacts')
-        .select('id, name, phone_number')
-        .eq('tenant_id', tenantId)
-        .eq('phone_number', phoneNumber)
-        .maybeSingle();
-      existing = data ?? null;
-    }
-    if (!existing) {
-      const { data } = await supabase.from('whatsapp_contacts')
-        .select('id, name, phone_number')
-        .eq('tenant_id', tenantId)
-        .in('phone_number', variants)
-        .limit(1)
-        .maybeSingle();
-      existing = data ?? null;
-    }
+    const { data: rows } = await supabase.from('whatsapp_contacts')
+      .select('id, name, phone_number')
+      .eq('tenant_id', tenantId)
+      .in('phone_number', variants)
+      .limit(3);
 
-    if (existing) {
-      if (existing.phone_number !== phoneNumber) {
-        const { error: upErr } = await supabase.from('whatsapp_contacts').update({ phone_number: phoneNumber, updated_at: new Date().toISOString() }).eq('id', existing.id);
-        // Se já existe registro canônico com esse phone_number (variante legada duplicada),
-        // o UPDATE colide (23505). Ignora e mantém o contato encontrado — sem derrubar a mensagem.
+    const found: Array<{ id: string; name: string; phone_number: string }> = rows ?? [];
+
+    if (found.length >= 1) {
+      let keep = found[0];
+      if (found.length > 1) {
+        const exact = found.find((r) => r.phone_number === phoneNumber);
+        keep = exact ?? found[0];
+        for (const other of found) {
+          if (other.id === keep.id) continue;
+          try {
+            await supabase.rpc('merge_whatsapp_contacts', { p_keep_id: keep.id, p_merge_id: other.id, p_tenant_id: tenantId });
+          } catch (err) {
+            console.error('[processor] auto-merge duplicate contact failed:', err);
+          }
+        }
+      }
+
+      if (keep.phone_number !== phoneNumber) {
+        const { error: upErr } = await supabase.from('whatsapp_contacts').update({ phone_number: phoneNumber, updated_at: new Date().toISOString() }).eq('id', keep.id);
         if (upErr && upErr.code !== '23505') console.error('[processor] Error updating contact phone:', upErr);
       }
       if (!isGroup) {
-        if (!isFromMe && name !== phoneNumber && existing.name === phoneNumber) await supabase.from('whatsapp_contacts').update({ name, updated_at: new Date().toISOString() }).eq('id', existing.id);
+        if (!isFromMe && name !== phoneNumber && keep.name === phoneNumber) await supabase.from('whatsapp_contacts').update({ name, updated_at: new Date().toISOString() }).eq('id', keep.id);
       }
-      return existing.id;
+      return keep.id;
     }
+
 
     const { data: newContact, error } = await supabase.from('whatsapp_contacts').insert({ instance_id: instanceId, phone_number: phoneNumber, name: isFromMe ? phoneNumber : (name || phoneNumber), is_group: isGroup, tenant_id: tenantId }).select('id').single();
     if (error) {
