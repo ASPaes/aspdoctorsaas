@@ -586,9 +586,13 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
     // Timeout: cliente não respondeu a tempo -> expira + encerra como csat_timeout (NUNCA inatividade)
     if (elapsedMinutes > supportConfig.support_csat_timeout_minutes) {
       await supabase.from('support_csat').update({ status: 'expired', responded_at: new Date().toISOString() }).eq('id', csat.id);
-      await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_timeout', p_closure_type: 'csat_timeout' });
-      await sendAndPersistAutoMessage(supabase, ctx, conversationId, 'Que pena que você não deu uma nota, mas da próxima vez contamos com sua colaboração! 😊', { csat: true, csat_timeout: true });
-      await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
+      try {
+        await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_timeout', p_closure_type: 'csat_timeout' });
+        await sendAndPersistAutoMessage(supabase, ctx, conversationId, 'Que pena que você não deu uma nota, mas da próxima vez contamos com sua colaboração! 😊', { csat: true, csat_timeout: true });
+        await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
+      } catch (sideErr) {
+        console.error('[processor] CSAT timeout side-effects failed (não reabrir):', sideErr);
+      }
       return true;
     }
 
@@ -616,21 +620,29 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
 
       const needsReason = scoreNum <= supportConfig.support_csat_reason_threshold;
       await supabase.from('support_csat').update({ score: scoreNum, responded_at: new Date().toISOString(), status: needsReason ? 'awaiting_reason' : 'completed' }).eq('id', csat.id);
-      if (needsReason) {
-        await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.reason_prompt_template || 'Entendi. Pode me dizer em poucas palavras o motivo da sua nota?', { csat: true });
-      } else {
-        await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_completed', p_closure_type: 'csat_completed' });
-        await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.', { csat: true });
-        await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
+      try {
+        if (needsReason) {
+          await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.reason_prompt_template || 'Entendi. Pode me dizer em poucas palavras o motivo da sua nota?', { csat: true });
+        } else {
+          await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_completed', p_closure_type: 'csat_completed' });
+          await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.', { csat: true });
+          await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
+        }
+      } catch (sideErr) {
+        console.error('[processor] CSAT score side-effects failed after persist (não reabrir):', sideErr);
       }
       return true;
     }
 
     if (csat.status === 'awaiting_reason') {
       await supabase.from('support_csat').update({ reason: trimmed, status: 'completed', responded_at: new Date().toISOString() }).eq('id', csat.id);
-      await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_completed', p_closure_type: 'csat_completed' });
-      await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.', { csat: true });
-      await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
+      try {
+        await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_completed', p_closure_type: 'csat_completed' });
+        await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.', { csat: true });
+        await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
+      } catch (sideErr) {
+        console.error('[processor] CSAT reason side-effects failed after completion (não reabrir):', sideErr);
+      }
       return true;
     }
 
