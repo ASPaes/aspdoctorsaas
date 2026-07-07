@@ -179,11 +179,9 @@ Critérios de Análise de Sentimento (avalie o CLIENTE, usando as respostas do a
 
 
 Critérios para abertura de Ticket CS (needs_cs_ticket = true):
-- Cliente demonstra insatisfação persistente ou crescente
-- Menção a cancelamento, troca de fornecedor, ou saída
-- Reclamações sobre qualidade, preço ou atendimento
-- Tom agressivo ou ameaçador
-- Palavras-chave: cancelar, trocar, insatisfeito, péssimo, nunca mais, vou sair`;
+- needs_cs_ticket = true SOMENTE com sinal EXPLÍCITO do cliente: (a) menção direta a cancelar, trocar de fornecedor ou encerrar contrato; (b) reclamação dirigida à EMPRESA ou ao ATENDIMENTO (demora, descaso, "sempre a mesma coisa"); (c) tom hostil/agressivo.
+- Relato de problema técnico NÃO é sinal de churn, mesmo grave, mesmo não resolvido, mesmo com frustração pontual ou menção a "falar com o dono/responsável".
+- Se needs_cs_ticket=true, preencher churn_evidence com a citação LITERAL (copiada) da mensagem do cliente que comprova o sinal. Se não existir frase literal que comprove, retornar needs_cs_ticket=false.`;
 
     const tools = [
       {
