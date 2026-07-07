@@ -122,12 +122,27 @@ serve(async (req) => {
       );
     }
 
-    const { data: messages, error: messagesError } = await supabase
+    const { data: att } = await supabase
+      .from("support_attendances")
+      .select("opened_at")
+      .eq("conversation_id", conversationId)
+      .is("closed_at", null)
+      .order("opened_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let messagesQuery = supabase
       .from("whatsapp_messages")
       .select("content, timestamp, audio_transcription, message_type, is_from_me")
       .eq("conversation_id", conversationId)
       .order("timestamp", { ascending: false })
       .limit(20);
+
+    if (att?.opened_at) {
+      messagesQuery = messagesQuery.gte("timestamp", att.opened_at);
+    }
+
+    const { data: messages, error: messagesError } = await messagesQuery;
 
     if (messagesError) throw messagesError;
 
@@ -164,11 +179,9 @@ Critérios de Análise de Sentimento (avalie o CLIENTE, usando as respostas do a
 
 
 Critérios para abertura de Ticket CS (needs_cs_ticket = true):
-- Cliente demonstra insatisfação persistente ou crescente
-- Menção a cancelamento, troca de fornecedor, ou saída
-- Reclamações sobre qualidade, preço ou atendimento
-- Tom agressivo ou ameaçador
-- Palavras-chave: cancelar, trocar, insatisfeito, péssimo, nunca mais, vou sair`;
+- needs_cs_ticket = true SOMENTE com sinal EXPLÍCITO do cliente: (a) menção direta a cancelar, trocar de fornecedor ou encerrar contrato; (b) reclamação dirigida à EMPRESA ou ao ATENDIMENTO (demora, descaso, "sempre a mesma coisa"); (c) tom hostil/agressivo.
+- Relato de problema técnico NÃO é sinal de churn, mesmo grave, mesmo não resolvido, mesmo com frustração pontual ou menção a "falar com o dono/responsável".
+- Se needs_cs_ticket=true, preencher churn_evidence com a citação LITERAL (copiada) da mensagem do cliente que comprova o sinal. Se não existir frase literal que comprove, retornar needs_cs_ticket=false.`;
 
     const tools = [
       {
@@ -185,6 +198,7 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
               keywords: { type: "array", items: { type: "string" } },
               needs_cs_ticket: { type: "boolean" },
               cs_ticket_reason: { type: "string" },
+              churn_evidence: { type: "string", description: "Citação literal da mensagem do cliente que evidencia risco de churn" },
             },
             required: ["sentiment", "confidence", "summary", "needs_cs_ticket"],
           },
@@ -222,7 +236,7 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
     // Capturar registro anterior (para cooldown do alerta)
     const { data: prevAnalysis } = await supabase
       .from("whatsapp_sentiment_analysis")
-      .select("churn_alerted_at, needs_cs_ticket")
+      .select("churn_alerted_at, needs_cs_ticket, sentiment")
       .eq("conversation_id", conversationId)
       .maybeSingle();
 
@@ -245,7 +259,14 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
     if (upsertError) throw upsertError;
 
     // Alerta de churn
-    if (result.needs_cs_ticket === true) {
+    const churnGate =
+      result.needs_cs_ticket === true &&
+      result.sentiment === "negative" &&
+      Number(result.confidence) >= 0.85 &&
+      typeof result.churn_evidence === "string" && result.churn_evidence.trim().length > 0 &&
+      prevAnalysis?.needs_cs_ticket === true;
+
+    if (churnGate) {
       try {
         const { data: cfg } = await supabase
           .from("configuracoes")
@@ -254,10 +275,15 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
           .maybeSingle();
 
         if (cfg?.churn_alert_enabled) {
-          const lastAlertMs = prevAnalysis?.churn_alerted_at ? new Date(prevAnalysis.churn_alerted_at).getTime() : 0;
-          const cooldownOk = !lastAlertMs || (Date.now() - lastAlertMs) > 24 * 60 * 60 * 1000;
+          const cutoffIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          const { data: claimed } = await supabase
+            .from("whatsapp_sentiment_analysis")
+            .update({ churn_alerted_at: new Date().toISOString() })
+            .eq("conversation_id", conversationId)
+            .or(`churn_alerted_at.is.null,churn_alerted_at.lt.${cutoffIso}`)
+            .select("id");
 
-          if (cooldownOk) {
+          if (claimed && claimed.length > 0) {
             const contact: any = (convData as any).whatsapp_contacts || {};
             const contactName = contact.name || contact.phone_number || "Cliente";
             const contactPhone = contact.phone_number || "";
@@ -271,15 +297,10 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
               "churn_alert",
               conversationId,
               title,
-              `Cliente: ${contactName} (${contactPhone})\nMotivo: ${reason.substring(0, 400)}\nAbra o DoctorSaaS para ver a conversa.`,
+              `Cliente: ${contactName} (${contactPhone})\nMotivo: ${reason.substring(0, 400)}\nTrecho: "${(result.churn_evidence || "").substring(0, 200)}"\nAbra o DoctorSaaS para ver a conversa.`,
               { source: "churn_alert", conversation_id: conversationId, contact_name: contactName, contact_phone: contactPhone },
               `/whatsapp?conversation=${conversationId}`
             );
-
-            await supabase
-              .from("whatsapp_sentiment_analysis")
-              .update({ churn_alerted_at: new Date().toISOString() })
-              .eq("conversation_id", conversationId);
 
             console.log(`[churn-alert] fired for conversation ${conversationId} tenant ${convData.tenant_id}`);
           } else {
