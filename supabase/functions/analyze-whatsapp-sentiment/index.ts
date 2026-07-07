@@ -259,7 +259,14 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
     if (upsertError) throw upsertError;
 
     // Alerta de churn
-    if (result.needs_cs_ticket === true) {
+    const churnGate =
+      result.needs_cs_ticket === true &&
+      result.sentiment === "negative" &&
+      Number(result.confidence) >= 0.85 &&
+      typeof result.churn_evidence === "string" && result.churn_evidence.trim().length > 0 &&
+      prevAnalysis?.needs_cs_ticket === true;
+
+    if (churnGate) {
       try {
         const { data: cfg } = await supabase
           .from("configuracoes")
@@ -268,10 +275,15 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
           .maybeSingle();
 
         if (cfg?.churn_alert_enabled) {
-          const lastAlertMs = prevAnalysis?.churn_alerted_at ? new Date(prevAnalysis.churn_alerted_at).getTime() : 0;
-          const cooldownOk = !lastAlertMs || (Date.now() - lastAlertMs) > 24 * 60 * 60 * 1000;
+          const cutoffIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          const { data: claimed } = await supabase
+            .from("whatsapp_sentiment_analysis")
+            .update({ churn_alerted_at: new Date().toISOString() })
+            .eq("conversation_id", conversationId)
+            .or(`churn_alerted_at.is.null,churn_alerted_at.lt.${cutoffIso}`)
+            .select("id");
 
-          if (cooldownOk) {
+          if (claimed && claimed.length > 0) {
             const contact: any = (convData as any).whatsapp_contacts || {};
             const contactName = contact.name || contact.phone_number || "Cliente";
             const contactPhone = contact.phone_number || "";
@@ -285,15 +297,10 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
               "churn_alert",
               conversationId,
               title,
-              `Cliente: ${contactName} (${contactPhone})\nMotivo: ${reason.substring(0, 400)}\nAbra o DoctorSaaS para ver a conversa.`,
+              `Cliente: ${contactName} (${contactPhone})\nMotivo: ${reason.substring(0, 400)}\nTrecho: "${(result.churn_evidence || "").substring(0, 200)}"\nAbra o DoctorSaaS para ver a conversa.`,
               { source: "churn_alert", conversation_id: conversationId, contact_name: contactName, contact_phone: contactPhone },
               `/whatsapp?conversation=${conversationId}`
             );
-
-            await supabase
-              .from("whatsapp_sentiment_analysis")
-              .update({ churn_alerted_at: new Date().toISOString() })
-              .eq("conversation_id", conversationId);
 
             console.log(`[churn-alert] fired for conversation ${conversationId} tenant ${convData.tenant_id}`);
           } else {
