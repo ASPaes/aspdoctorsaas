@@ -10,6 +10,7 @@ export interface SupportConfig {
   support_send_inactivity_warning: boolean;
   support_inactivity_warning_before_minutes: number;
   support_inactivity_warning_template: string;
+  support_waiting_ack_limit: number;
 
   // CSAT
   support_csat_enabled: boolean;
