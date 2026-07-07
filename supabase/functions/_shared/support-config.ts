@@ -66,6 +66,7 @@ const DEFAULTS: SupportConfig = {
   support_inactivity_warning_before_minutes: 5,
   support_inactivity_warning_template:
     '⚠️ Por falta de interação, este atendimento será encerrado em {{minutes}} minutos. Se ainda precisar de ajuda, responda esta mensagem.',
+  support_waiting_ack_limit: 3,
 
   support_csat_enabled: true,
   support_csat_prompt_template:
