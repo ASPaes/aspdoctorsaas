@@ -38,8 +38,8 @@ export default function SetoresInstanciasTab() {
   const globalWarnMin = supportConfig?.support_inactivity_warning_before_minutes;
   const globalAgentAlertMin = supportConfig?.support_agent_alert_minutes;
   const globalAgentCloseMin = supportConfig?.support_agent_no_response_close_minutes;
-  const globalAgentAlertEnabled = supportConfig?.support_agent_alert_enabled ?? true;
-  const globalAgentCloseEnabled = supportConfig?.support_agent_no_response_close_enabled ?? true;
+  const globalAgentAlertEnabled = supportConfig?.support_agent_alert_enabled ?? false;
+  const globalAgentCloseEnabled = supportConfig?.support_agent_no_response_close_enabled ?? false;
 
   const { data: departments = [] } = useQuery({
     queryKey: ["support_departments_wa", tid],
