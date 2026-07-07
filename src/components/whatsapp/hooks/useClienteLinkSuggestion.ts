@@ -204,6 +204,7 @@ export function useClienteLinkSuggestion(
       queryClient.invalidateQueries({ queryKey: ['cliente-linked'] });
       queryClient.invalidateQueries({ queryKey: ['cliente-candidatos-by-phone'] });
       queryClient.invalidateQueries({ queryKey: ['relevant-attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-cliente'] });
     },
     onError: (err: any) => toast.error(`Erro ao desvincular: ${err?.message ?? 'desconhecido'}`),
   });
