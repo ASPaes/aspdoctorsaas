@@ -586,9 +586,13 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
     // Timeout: cliente não respondeu a tempo -> expira + encerra como csat_timeout (NUNCA inatividade)
     if (elapsedMinutes > supportConfig.support_csat_timeout_minutes) {
       await supabase.from('support_csat').update({ status: 'expired', responded_at: new Date().toISOString() }).eq('id', csat.id);
-      await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_timeout', p_closure_type: 'csat_timeout' });
-      await sendAndPersistAutoMessage(supabase, ctx, conversationId, 'Que pena que você não deu uma nota, mas da próxima vez contamos com sua colaboração! 😊', { csat: true, csat_timeout: true });
-      await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
+      try {
+        await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_timeout', p_closure_type: 'csat_timeout' });
+        await sendAndPersistAutoMessage(supabase, ctx, conversationId, 'Que pena que você não deu uma nota, mas da próxima vez contamos com sua colaboração! 😊', { csat: true, csat_timeout: true });
+        await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
+      } catch (sideErr) {
+        console.error('[processor] CSAT timeout side-effects failed (não reabrir):', sideErr);
+      }
       return true;
     }
 
