@@ -192,38 +192,45 @@ export default function AtendimentoCsatTab() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-6">
-        {/* ── Atendimento ── */}
+        {/* ── Ciclo de Vida do Atendimento ── */}
         <Card>
           <CardHeader>
             <CardTitle>Ciclo de Vida do Atendimento</CardTitle>
+            <CardDescription>Regras gerais do atendimento.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FormField control={form.control} name="support_reopen_window_minutes" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Janela de reabertura (min)</FormLabel>
+                <FormControl>
+                  <NumericInput value={field.value} onChange={field.onChange} placeholder="10" suffix="min" />
+                </FormControl>
+                <FormDescription>Tempo após fechamento em que nova msg do cliente reabre o mesmo atendimento.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </CardContent>
+        </Card>
+
+        {/* ── Cliente sem responder ── */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Cliente sem responder</CardTitle>
             <CardDescription>
-              Controle de reabertura e encerramento automático por inatividade.
+              Corre APENAS quando a última mensagem é do seu time (bola com o cliente). O cliente é avisado antes do encerramento. Apenas uma régua corre por vez — se a última mensagem é do cliente, quem vale é a régua "Agente sem responder" abaixo.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField control={form.control} name="support_reopen_window_minutes" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Janela de reabertura (min)</FormLabel>
-                  <FormControl>
-                    <NumericInput value={field.value} onChange={field.onChange} placeholder="10" suffix="min" />
-                  </FormControl>
-                  <FormDescription>Tempo após fechamento em que nova msg do cliente reabre o mesmo atendimento.</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )} />
-
-              <FormField control={form.control} name="support_auto_close_inactivity_minutes" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Encerramento por inatividade (min)</FormLabel>
-                  <FormControl>
-                    <NumericInput value={field.value} onChange={field.onChange} placeholder="30" suffix="min" />
-                  </FormControl>
-                  <FormDescription>Minutos de inatividade para fechar automaticamente.</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            </div>
+            <FormField control={form.control} name="support_auto_close_inactivity_minutes" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Encerrar após (min)</FormLabel>
+                <FormControl>
+                  <NumericInput value={field.value} onChange={field.onChange} placeholder="30" suffix="min" />
+                </FormControl>
+                <FormDescription>Minutos de inatividade para fechar automaticamente.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )} />
 
             <Separator />
 
@@ -266,13 +273,12 @@ export default function AtendimentoCsatTab() {
           </CardContent>
         </Card>
 
-        {/* ── Ausência do Agente ── */}
-
+        {/* ── Agente sem responder ── */}
         <Card>
           <CardHeader>
-            <CardTitle>Ausência do Agente</CardTitle>
+            <CardTitle>Agente sem responder</CardTitle>
             <CardDescription>
-              Quando o cliente envia mensagem e fica aguardando resposta do agente. Os tempos são em minutos úteis (descontam o horário de expediente).
+              Corre APENAS quando a última mensagem é do cliente e ele aguarda resposta do agente (bola com o agente). Tempos em minutos úteis (descontam horário de expediente). O encerramento é silencioso — o cliente NÃO é notificado nem culpado.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
