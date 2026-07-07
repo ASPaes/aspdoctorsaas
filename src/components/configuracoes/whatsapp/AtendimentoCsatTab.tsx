@@ -92,6 +92,7 @@ export default function AtendimentoCsatTab() {
       support_ura_welcome_template: "",
       support_ura_invalid_option_template: "",
       support_ura_confirmation_template: "",
+      support_waiting_ack_limit: 3,
       support_ura_timeout_minutes: 2,
       support_ura_default_department_id: null,
     },
