@@ -187,9 +187,9 @@ Deno.serve(async (req) => {
 
     const filename = msg.media_filename || storagePath.split('/').pop() || 'file';
     const mime = guessMime(msg.media_ext, msg.media_mimetype);
-    const disposition = mode === 'attachment'
-      ? `attachment; filename="${filename}"`
-      : `inline; filename="${filename}"`;
+    const asciiName = filename.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7E]/g, '_').replace(/"/g, "'");
+    const encodedName = encodeURIComponent(filename);
+    const disposition = `${mode === 'attachment' ? 'attachment' : 'inline'}; filename="${asciiName}"; filename*=UTF-8''${encodedName}`;
 
     // Lazy backfill size + path if needed
     if (!msg.media_size_bytes || !msg.media_path) {
