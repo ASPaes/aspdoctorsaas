@@ -374,10 +374,17 @@ export default function SetoresInstanciasTab() {
                   </div>
                 )}
 
-                <div className="space-y-2 pt-4 border-t">
+                <div className="pt-4 border-t">
+                  <h4 className="text-sm font-medium">Cliente sem responder (bola com o cliente)</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Régua que corre quando a última mensagem é do time e estamos aguardando o cliente responder.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
-                    <Label>Tempo de inatividade (minutos)</Label>
+                    <Label>Encerrar após (minutos)</Label>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Fecha conversas automaticamente após este período sem atividade. Deixe vazio para usar o padrão global do tenant{globalCloseMin != null ? ` (atualmente ${globalCloseMin} min)` : ""}.
@@ -402,10 +409,10 @@ export default function SetoresInstanciasTab() {
                   </div>
                 </div>
 
-                <div className="space-y-2 pt-4 border-t">
+                <div className="space-y-2 pt-4 border-t border-dashed">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
-                    <Label>Tempo de aviso de inatividade (minutos)</Label>
+                    <Label>Aviso antes de encerrar (minutos)</Label>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Quanto tempo antes do encerramento o aviso é enviado ao cliente. Deixe em branco para usar o padrão do sistema{globalWarnMin != null ? ` (atualmente ${globalWarnMin} min)` : ""}.
@@ -431,50 +438,105 @@ export default function SetoresInstanciasTab() {
                   </div>
                 </div>
 
-
-                <div className="space-y-2 pt-4 border-t">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <Label>Alerta de ausência do agente (minutos)</Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Minutos úteis aguardando o agente antes de destacar o chat. Vazio = padrão global{globalAgentAlertMin != null ? ` (atualmente ${globalAgentAlertMin} min)` : ""}.
+                <div className="pt-4 border-t">
+                  <h4 className="text-sm font-medium">Agente sem responder (bola com o agente)</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Régua que corre quando o cliente está aguardando um agente responder.
                   </p>
-                  <div className="flex items-center gap-2">
-                    <Input type="number" min={1} step={1} className="w-32"
-                      placeholder={globalAgentAlertMin != null ? `${globalAgentAlertMin} (global)` : "Global"}
-                      value={agentAlertMinutes}
-                      onChange={(e) => setAgentAlertMinutes(e.target.value)} />
-                    <span className="text-xs text-muted-foreground">min</span>
-                    <Button size="sm"
-                      disabled={saveAgentAlert.isPending || agentAlertMinutes === (selectedDept?.agent_alert_minutes?.toString() ?? "")}
-                      onClick={() => saveAgentAlert.mutate(agentAlertMinutes)}>
-                      {saveAgentAlert.isPending ? "Salvando..." : "Salvar"}
-                    </Button>
-                  </div>
                 </div>
 
-                <div className="space-y-2 pt-4 border-t">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <Label>Encerrar por ausência do agente (minutos)</Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Minutos úteis aguardando o agente antes de encerrar (silencioso, sem notificar o cliente). Vazio = padrão global{globalAgentCloseMin != null ? ` (atualmente ${globalAgentCloseMin} min)` : ""}.
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Input type="number" min={1} step={1} className="w-32"
-                      placeholder={globalAgentCloseMin != null ? `${globalAgentCloseMin} (global)` : "Global"}
-                      value={agentCloseMinutes}
-                      onChange={(e) => setAgentCloseMinutes(e.target.value)} />
-                    <span className="text-xs text-muted-foreground">min</span>
-                    <Button size="sm"
-                      disabled={saveAgentClose.isPending || agentCloseMinutes === (selectedDept?.agent_no_response_close_minutes?.toString() ?? "")}
-                      onClick={() => saveAgentClose.mutate(agentCloseMinutes)}>
-                      {saveAgentClose.isPending ? "Salvando..." : "Salvar"}
-                    </Button>
-                  </div>
-                </div>
+                {(() => {
+                  const alertOverride = selectedDept?.agent_alert_enabled;
+                  const alertEffective = alertOverride ?? globalAgentAlertEnabled;
+                  const alertSelectValue = alertOverride === null || alertOverride === undefined ? "inherit" : alertOverride ? "on" : "off";
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <Label>Alerta de ausência do agente</Label>
+                      </div>
+                      <Select
+                        value={alertSelectValue}
+                        onValueChange={(v) => saveAgentAlertEnabled.mutate(v === "inherit" ? null : v === "on")}
+                      >
+                        <SelectTrigger className="w-[320px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="inherit">Padrão global (atualmente {globalAgentAlertEnabled ? "ligado" : "desligado"})</SelectItem>
+                          <SelectItem value="on">Ligado</SelectItem>
+                          <SelectItem value="off">Desligado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Minutos úteis aguardando o agente antes de destacar o chat. Vazio = padrão global{globalAgentAlertMin != null ? ` (atualmente ${globalAgentAlertMin} min)` : ""}.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" min={1} step={1} className="w-32"
+                          disabled={!alertEffective}
+                          placeholder={globalAgentAlertMin != null ? `${globalAgentAlertMin} (global)` : "Global"}
+                          value={agentAlertMinutes}
+                          onChange={(e) => setAgentAlertMinutes(e.target.value)} />
+                        <span className="text-xs text-muted-foreground">min</span>
+                        <Button size="sm"
+                          disabled={saveAgentAlert.isPending || agentAlertMinutes === (selectedDept?.agent_alert_minutes?.toString() ?? "")}
+                          onClick={() => saveAgentAlert.mutate(agentAlertMinutes)}>
+                          {saveAgentAlert.isPending ? "Salvando..." : "Salvar"}
+                        </Button>
+                      </div>
+                      {!alertEffective && (
+                        <p className="text-xs text-muted-foreground italic">Desligado — este tempo não terá efeito.</p>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {(() => {
+                  const closeOverride = selectedDept?.agent_no_response_close_enabled;
+                  const closeEffective = closeOverride ?? globalAgentCloseEnabled;
+                  const closeSelectValue = closeOverride === null || closeOverride === undefined ? "inherit" : closeOverride ? "on" : "off";
+                  return (
+                    <div className="space-y-2 pt-4 border-t border-dashed">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <Label>Encerrar por ausência do agente</Label>
+                      </div>
+                      <Select
+                        value={closeSelectValue}
+                        onValueChange={(v) => saveAgentCloseEnabled.mutate(v === "inherit" ? null : v === "on")}
+                      >
+                        <SelectTrigger className="w-[320px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="inherit">Padrão global (atualmente {globalAgentCloseEnabled ? "ligado" : "desligado"})</SelectItem>
+                          <SelectItem value="on">Ligado</SelectItem>
+                          <SelectItem value="off">Desligado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Minutos úteis aguardando o agente antes de encerrar (silencioso, sem notificar o cliente). Vazio = padrão global{globalAgentCloseMin != null ? ` (atualmente ${globalAgentCloseMin} min)` : ""}.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" min={1} step={1} className="w-32"
+                          disabled={!closeEffective}
+                          placeholder={globalAgentCloseMin != null ? `${globalAgentCloseMin} (global)` : "Global"}
+                          value={agentCloseMinutes}
+                          onChange={(e) => setAgentCloseMinutes(e.target.value)} />
+                        <span className="text-xs text-muted-foreground">min</span>
+                        <Button size="sm"
+                          disabled={saveAgentClose.isPending || agentCloseMinutes === (selectedDept?.agent_no_response_close_minutes?.toString() ?? "")}
+                          onClick={() => saveAgentClose.mutate(agentCloseMinutes)}>
+                          {saveAgentClose.isPending ? "Salvando..." : "Salvar"}
+                        </Button>
+                      </div>
+                      {!closeEffective && (
+                        <p className="text-xs text-muted-foreground italic">Desligado — este tempo não terá efeito.</p>
+                      )}
+                    </div>
+                  );
+                })()}
+
 
                 <div className="space-y-2 pt-4 border-t">
                   <div className="flex items-center gap-2">
