@@ -124,6 +124,7 @@ const SELECT_FIELDS = [
   'support_send_inactivity_warning',
   'support_inactivity_warning_before_minutes',
   'support_inactivity_warning_template',
+  'support_waiting_ack_limit',
   'support_csat_enabled',
   'support_csat_prompt_template',
   'support_csat_timeout_minutes',
