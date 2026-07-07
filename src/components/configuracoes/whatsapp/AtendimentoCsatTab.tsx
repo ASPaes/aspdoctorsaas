@@ -273,13 +273,12 @@ export default function AtendimentoCsatTab() {
           </CardContent>
         </Card>
 
-        {/* ── Ausência do Agente ── */}
-
+        {/* ── Agente sem responder ── */}
         <Card>
           <CardHeader>
-            <CardTitle>Ausência do Agente</CardTitle>
+            <CardTitle>Agente sem responder</CardTitle>
             <CardDescription>
-              Quando o cliente envia mensagem e fica aguardando resposta do agente. Os tempos são em minutos úteis (descontam o horário de expediente).
+              Corre APENAS quando a última mensagem é do cliente e ele aguarda resposta do agente (bola com o agente). Tempos em minutos úteis (descontam horário de expediente). O encerramento é silencioso — o cliente NÃO é notificado nem culpado.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
