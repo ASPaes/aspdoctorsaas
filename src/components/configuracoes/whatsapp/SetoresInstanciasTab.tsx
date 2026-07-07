@@ -230,6 +230,38 @@ export default function SetoresInstanciasTab() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  const saveAgentAlertEnabled = useMutation({
+    mutationFn: async (value: boolean | null) => {
+      if (!selectedId) return;
+      const { error } = await supabase
+        .from("support_departments")
+        .update({ agent_alert_enabled: value } as any)
+        .eq("id", selectedId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
+      toast.success("Preferência de alerta salva");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const saveAgentCloseEnabled = useMutation({
+    mutationFn: async (value: boolean | null) => {
+      if (!selectedId) return;
+      const { error } = await supabase
+        .from("support_departments")
+        .update({ agent_no_response_close_enabled: value } as any)
+        .eq("id", selectedId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
+      toast.success("Preferência de encerramento salva");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
