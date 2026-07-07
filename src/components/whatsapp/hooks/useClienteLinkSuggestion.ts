@@ -210,6 +210,7 @@ export function useClienteLinkSuggestion(
   });
   return {
     linkedCliente: linkedQuery.data || null,
+    linkedClienteId,
     suggestedCliente: linkedClienteId ? null : suggestedCliente,
     isLinked: !!linkedClienteId,
     linkCliente: (clienteId: string) => linkMutation.mutate(clienteId),
