@@ -198,6 +198,7 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
               keywords: { type: "array", items: { type: "string" } },
               needs_cs_ticket: { type: "boolean" },
               cs_ticket_reason: { type: "string" },
+              churn_evidence: { type: "string", description: "Citação literal da mensagem do cliente que evidencia risco de churn" },
             },
             required: ["sentiment", "confidence", "summary", "needs_cs_ticket"],
           },
