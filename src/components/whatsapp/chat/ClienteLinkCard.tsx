@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +48,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
 
   const {
     linkedCliente: indLinkedCliente,
+    linkedClienteId: indLinkedClienteId,
     suggestedCliente,
     isLinked: indIsLinked,
     linkCliente: indLinkCliente,
@@ -107,17 +108,11 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
 
   const clienteId = isGroup
     ? ((groupLinkedCliente as any)?.id ?? null)
-    : (indIsLinked ? (metadata?.cliente_id as string) : null);
+    : (indLinkedClienteId ?? null);
   const { data: clienteDetails } = useLinkedClienteDetails(clienteId);
   const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen ? searchTerm : "");
 
-  // Auto-link silencioso: apenas fluxo individual
-  useEffect(() => {
-    if (!isGroup && suggestedCliente && canEdit && !indIsLinking && !indIsLinked && !autoLinkBlocked) {
-      indLinkCliente(suggestedCliente.id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestedCliente?.id, canEdit, indIsLinked, autoLinkBlocked, isGroup]);
+
 
 
   if (isLinked && linkedCliente) {
