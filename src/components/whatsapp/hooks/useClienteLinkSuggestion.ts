@@ -48,7 +48,7 @@ export function useClienteLinkSuggestion(
   });
 
   const linkedClienteId: string | null =
-    (attendanceClienteQuery.data ?? null) ?? (attendanceId ? null : (metadataClienteId ?? null));
+    attendanceClienteQuery.data ?? (attendanceId ? null : (metadataClienteId ?? null));
 
   // 1) Cliente já vinculado (carrega detalhes leves)
   const linkedQuery = useQuery({
