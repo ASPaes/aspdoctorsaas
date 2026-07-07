@@ -1646,6 +1646,7 @@ export type Database = {
           support_inactivity_warning_template: string
           support_reopen_window_minutes: number
           support_send_inactivity_warning: boolean
+          support_ura_confirmation_template: string
           support_ura_default_department_id: string | null
           support_ura_enabled: boolean
           support_ura_invalid_option_template: string
@@ -1707,6 +1708,7 @@ export type Database = {
           support_inactivity_warning_template?: string
           support_reopen_window_minutes?: number
           support_send_inactivity_warning?: boolean
+          support_ura_confirmation_template?: string
           support_ura_default_department_id?: string | null
           support_ura_enabled?: boolean
           support_ura_invalid_option_template?: string
@@ -1768,6 +1770,7 @@ export type Database = {
           support_inactivity_warning_template?: string
           support_reopen_window_minutes?: number
           support_send_inactivity_warning?: boolean
+          support_ura_confirmation_template?: string
           support_ura_default_department_id?: string | null
           support_ura_enabled?: boolean
           support_ura_invalid_option_template?: string
