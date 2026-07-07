@@ -236,7 +236,7 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
     // Capturar registro anterior (para cooldown do alerta)
     const { data: prevAnalysis } = await supabase
       .from("whatsapp_sentiment_analysis")
-      .select("churn_alerted_at, needs_cs_ticket")
+      .select("churn_alerted_at, needs_cs_ticket, sentiment")
       .eq("conversation_id", conversationId)
       .maybeSingle();
 
