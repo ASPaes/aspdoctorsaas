@@ -1,10 +1,10 @@
-// Watchdog de silêncio de eventos (sessão zumbi Evolution) — v2
-// Regra rápida (ACK ausente): mensagem enviada gera eventos de webhook em segundos.
-//   Se há 2+ outbound enviadas entre 12 e 2 min atrás e NENHUM evento chegou há 10+ min → morta. (~10-12 min de detecção)
-//   Requer last_event_at alimentado pelo evolution-webhook; até lá fica inerte.
-// Regra fallback (assimetria): 5+ outbound e 0 inbound em 30 min.
-// Ação: SÓ ALERTA — notify_event (event type whatsapp_instance_disconnected → painel Theo + número próprio de cada tenant)
-//        + WhatsApp direto pros números de ai_alert_config (admin_phone + extra_alert_phones), com fallback de emissora.
+// Watchdog de silêncio de eventos (sessão zumbi Evolution) — v3
+// Sinal mestre: last_event_at (alimentado pelo evolution-webhook a cada evento, throttle 60s).
+// Regra rápida (ACK ausente): 2+ outbound entre 12 e 2 min atrás E nenhum evento há 10+ min → morta (~10-12 min).
+// Regra assimetria: 5+ outbound / 0 inbound em 30 min — SÓ dispara se os eventos TAMBÉM sumiram
+//   (last_event_at nulo ou 10+ min). Eventos frescos = instância viva = clientes só não responderam (v2 gerava falso positivo aqui).
+// Ação: SÓ ALERTA — notify_event (whatsapp_instance_disconnected → painel Theo + número próprio de cada tenant)
+//        + WhatsApp direto pros números de ai_alert_config, com fallback de emissora.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
@@ -14,9 +14,9 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-const MIN_OUT_RECENT = 2;    // outbound entre 12 e 2 min atrás (regra rápida)
-const EVENT_SILENCE_MIN = 10; // last_event_at mais velho que isso = pipeline morto
-const MIN_OUT_30M = 5;       // regra fallback de assimetria
+const MIN_OUT_RECENT = 2;
+const EVENT_SILENCE_MIN = 10;
+const MIN_OUT_30M = 5;
 const COOLDOWN_MIN = 60;
 
 Deno.serve(async (req) => {
@@ -46,14 +46,13 @@ Deno.serve(async (req) => {
       if (inst.is_active === false) continue;
       const s = sigMap.get(inst.id) ?? { out_30m: 0, in_30m: 0, out_recent: 0 };
       const lastEventAge = inst.last_event_at ? now - Date.parse(inst.last_event_at) : null;
+      const eventsStale = lastEventAge === null || lastEventAge > EVENT_SILENCE_MIN * 60_000;
 
-      // regra rápida: enviamos há pouco e NENHUM evento (nem ACK) chegou
-      const noAck = lastEventAge !== null
-        && s.out_recent >= MIN_OUT_RECENT
-        && lastEventAge > EVENT_SILENCE_MIN * 60_000;
+      // regra rápida: enviamos há pouco e NENHUM evento (nem ACK) voltou
+      const noAck = lastEventAge !== null && s.out_recent >= MIN_OUT_RECENT && eventsStale;
 
-      // fallback: assimetria em 30 min
-      const asymmetry = s.out_30m >= MIN_OUT_30M && s.in_30m === 0;
+      // assimetria: só conta se os eventos TAMBÉM sumiram — evento fresco = instância viva
+      const asymmetry = s.out_30m >= MIN_OUT_30M && s.in_30m === 0 && eventsStale;
 
       if (noAck || asymmetry) {
         const lastAlert = inst.silence_alert_at ? Date.parse(inst.silence_alert_at) : 0;
@@ -88,9 +87,8 @@ Deno.serve(async (req) => {
       const { data: tenant } = await supabaseAdmin.from('tenants').select('nome').eq('id', inst.tenant_id).single();
       const detail = reason === 'no_ack'
         ? `enviou ${s.out_recent} mensagens há poucos minutos e nenhum evento de entrega retornou há mais de ${EVENT_SILENCE_MIN} min`
-        : `enviou ${s.out_30m} mensagens nos últimos 30 min mas não recebeu NENHUMA`;
+        : `enviou ${s.out_30m} mensagens nos últimos 30 min sem receber nada e sem eventos do servidor há ${EVENT_SILENCE_MIN}+ min`;
 
-      // 1) painel Theo + número próprio de cada tenant (via subscriptions do evento de instância)
       await supabaseAdmin.rpc('notify_event', {
         p_tenant_id: inst.tenant_id,
         p_event_type: 'whatsapp_instance_disconnected',
@@ -101,7 +99,6 @@ Deno.serve(async (req) => {
         p_action_url: '/configuracoes?tab=whatsapp',
       });
 
-      // 2) WhatsApp direto pros números de plataforma (Alexandre)
       try {
         if (alertConfig?.admin_instance_name && alertConfig?.admin_phone) {
           let senderName = alertConfig.admin_instance_name;
@@ -136,7 +133,7 @@ Deno.serve(async (req) => {
                 `📊 *Sinal:* ${detail}`,
                 `🕒 *Horário:* ${new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}`,
                 ``,
-                `A instância consta CONECTADA, mas pode ter parado de receber (sessão travada — mesmo padrão do incidente de 08/07).`,
+                `A instância consta CONECTADA, mas parou de emitir eventos — mesmo padrão do incidente de 08/07.`,
                 ``,
                 `💡 *Ação:* Reiniciar instância em Configurações > Canais. Se não resolver, reiniciar o serviço Evolution no Hostinger. Depois, usar Reestabelecer mensagens.`,
               ].join('\n');
