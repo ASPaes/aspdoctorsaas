@@ -1205,6 +1205,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
 async function handleEvolutionEvent(payload: EvolutionWebhookPayload): Promise<void> {
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  if (payload?.instance) touchLastEvent(supabase, payload.instance);
   console.log(`${LOG} Event: ${payload.event} Instance: ${payload.instance}`);
 
   // Diagnostico amplo: loga payload bruto de upsert/update do remetente alvo (cliente)
