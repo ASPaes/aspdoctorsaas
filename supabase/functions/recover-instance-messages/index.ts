@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
       stats.found = candidates.length;
 
       if (candidates.length > 0) {
-        // dedupe por message_id
+        // dedupe por TENANT (a unicidade real é uq_wa_msg_tenant_message_id: tenant_id + message_id)
         const ids = candidates.map((c) => c.key?.id).filter(Boolean) as string[];
         const existing = new Set<string>();
         for (let i = 0; i < ids.length; i += 500) {
@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
           const { data: rows } = await supabaseAdmin
             .from('whatsapp_messages')
             .select('message_id')
-            .eq('instance_id', instanceId)
+            .eq('tenant_id', instance.tenant_id)
             .in('message_id', chunk);
           for (const r of rows ?? []) existing.add(r.message_id);
         }
@@ -200,12 +200,17 @@ Deno.serve(async (req) => {
           });
         }
 
-        // insert em lotes — SEM side effects: nenhum update em conversations, sem auto-reply, sem notificação
+        // upsert idempotente em lotes — SEM side effects; duplicatas são ignoradas, nunca erro
         for (let i = 0; i < toInsert.length; i += 200) {
           const chunk = toInsert.slice(i, i + 200);
-          const { error: insErr } = await supabaseAdmin.from('whatsapp_messages').insert(chunk);
+          const { data: insertedRows, error: insErr } = await supabaseAdmin
+            .from('whatsapp_messages')
+            .upsert(chunk as any, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true })
+            .select('id');
           if (insErr) throw new Error(`Insert falhou: ${insErr.message}`);
-          stats.inserted += chunk.length;
+          const actuallyInserted = insertedRows?.length ?? 0;
+          stats.inserted += actuallyInserted;
+          stats.existing += chunk.length - actuallyInserted;
         }
       }
 
