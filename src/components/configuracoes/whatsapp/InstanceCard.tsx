@@ -102,6 +102,32 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
     }
   };
 
+  const handleRestart = async () => {
+    setRestarting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('restart-whatsapp-instance', {
+        body: { instanceId: instance.id },
+      });
+      if (error) {
+        toast.error("Falha ao reiniciar: " + (error.message || "Erro desconhecido"));
+        return;
+      }
+      const result = data as any;
+      if (result?.event_confirmed === true) {
+        toast.success("Restart confirmado — instância reconectou e os eventos voltaram a chegar.");
+      } else if (result?.restarted === true) {
+        toast.warning(result?.message || "Instância reiniciada, mas a reconexão não foi confirmada.", { duration: 10000 });
+      } else {
+        toast.error("Falha ao reiniciar: " + (result?.message || "Resposta inesperada"));
+      }
+    } catch (e: any) {
+      toast.error("Falha ao reiniciar: " + (e?.message || "Erro desconhecido"));
+    } finally {
+      setRestarting(false);
+      setShowRestartDialog(false);
+    }
+  };
+
   const handleDelete = async () => {
     try {
       await deleteInstance.mutateAsync(instance.id);
