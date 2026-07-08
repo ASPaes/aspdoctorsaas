@@ -3614,6 +3614,63 @@ export type Database = {
           },
         ]
       }
+      omie_espelho_cadastro: {
+        Row: {
+          atualizado_em: string
+          cnpj_norm: string | null
+          codigo_cliente_integracao: string | null
+          codigo_cliente_omie: number
+          codigo_contrato_omie: number | null
+          dia_venc_omie: number | null
+          id: string
+          omie_inativo: boolean | null
+          origem_codigo: string | null
+          qtd_contratos_ativos_omie: number | null
+          razao_social_omie: string | null
+          situacao_contrato: string | null
+          tenant_id: string
+          valor_omie: number | null
+          vigencia_final_omie: string | null
+          vigencia_inicial_omie: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          cnpj_norm?: string | null
+          codigo_cliente_integracao?: string | null
+          codigo_cliente_omie: number
+          codigo_contrato_omie?: number | null
+          dia_venc_omie?: number | null
+          id?: string
+          omie_inativo?: boolean | null
+          origem_codigo?: string | null
+          qtd_contratos_ativos_omie?: number | null
+          razao_social_omie?: string | null
+          situacao_contrato?: string | null
+          tenant_id: string
+          valor_omie?: number | null
+          vigencia_final_omie?: string | null
+          vigencia_inicial_omie?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          cnpj_norm?: string | null
+          codigo_cliente_integracao?: string | null
+          codigo_cliente_omie?: number
+          codigo_contrato_omie?: number | null
+          dia_venc_omie?: number | null
+          id?: string
+          omie_inativo?: boolean | null
+          origem_codigo?: string | null
+          qtd_contratos_ativos_omie?: number | null
+          razao_social_omie?: string | null
+          situacao_contrato?: string | null
+          tenant_id?: string
+          valor_omie?: number | null
+          vigencia_final_omie?: string | null
+          vigencia_inicial_omie?: string | null
+        }
+        Relationships: []
+      }
       omie_integration: {
         Row: {
           ativo: boolean
@@ -4128,6 +4185,108 @@ export type Database = {
           vlr_mensal_total_antes?: number
           vlr_mensal_total_depois?: number
           vlr_reajuste_total?: number
+        }
+        Relationships: []
+      }
+      reconciliacao_cadastro: {
+        Row: {
+          acao_sugerida: string | null
+          candidato_escolhido: number | null
+          cnpj_norm: string | null
+          codigo_cliente_omie: number | null
+          codigo_contrato_omie: number | null
+          dia_venc_ds: number | null
+          dia_venc_omie: number | null
+          diffs: Json | null
+          ds_contract_id: string
+          ds_customer_id: string | null
+          estado_match: string
+          estado_valor: string | null
+          gerado_em: string
+          id: string
+          modelo_ds: string | null
+          multi_contrato: boolean | null
+          omie_inativo: boolean | null
+          origem_codigo: string | null
+          passa_validacao: boolean | null
+          qtd_candidatos_omie: number | null
+          razao_ds: string | null
+          resolvido_em: string | null
+          resolvido_por: string | null
+          status_usuario: string
+          tenant_id: string
+          valor_mrr_ds: number | null
+          valor_omie: number | null
+          vigencia_final_ds: string | null
+          vigencia_final_omie: string | null
+          vigencia_inicial_ds: string | null
+          vigencia_inicial_omie: string | null
+        }
+        Insert: {
+          acao_sugerida?: string | null
+          candidato_escolhido?: number | null
+          cnpj_norm?: string | null
+          codigo_cliente_omie?: number | null
+          codigo_contrato_omie?: number | null
+          dia_venc_ds?: number | null
+          dia_venc_omie?: number | null
+          diffs?: Json | null
+          ds_contract_id: string
+          ds_customer_id?: string | null
+          estado_match: string
+          estado_valor?: string | null
+          gerado_em?: string
+          id?: string
+          modelo_ds?: string | null
+          multi_contrato?: boolean | null
+          omie_inativo?: boolean | null
+          origem_codigo?: string | null
+          passa_validacao?: boolean | null
+          qtd_candidatos_omie?: number | null
+          razao_ds?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          status_usuario?: string
+          tenant_id: string
+          valor_mrr_ds?: number | null
+          valor_omie?: number | null
+          vigencia_final_ds?: string | null
+          vigencia_final_omie?: string | null
+          vigencia_inicial_ds?: string | null
+          vigencia_inicial_omie?: string | null
+        }
+        Update: {
+          acao_sugerida?: string | null
+          candidato_escolhido?: number | null
+          cnpj_norm?: string | null
+          codigo_cliente_omie?: number | null
+          codigo_contrato_omie?: number | null
+          dia_venc_ds?: number | null
+          dia_venc_omie?: number | null
+          diffs?: Json | null
+          ds_contract_id?: string
+          ds_customer_id?: string | null
+          estado_match?: string
+          estado_valor?: string | null
+          gerado_em?: string
+          id?: string
+          modelo_ds?: string | null
+          multi_contrato?: boolean | null
+          omie_inativo?: boolean | null
+          origem_codigo?: string | null
+          passa_validacao?: boolean | null
+          qtd_candidatos_omie?: number | null
+          razao_ds?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          status_usuario?: string
+          tenant_id?: string
+          valor_mrr_ds?: number | null
+          valor_omie?: number | null
+          vigencia_final_ds?: string | null
+          vigencia_final_omie?: string | null
+          vigencia_inicial_ds?: string | null
+          vigencia_inicial_omie?: string | null
         }
         Relationships: []
       }
@@ -6945,6 +7104,7 @@ export type Database = {
           instance_id_external: string | null
           instance_name: string
           is_active: boolean
+          last_event_at: string | null
           meta_business_id: string | null
           meta_phone_number_id: string | null
           meta_waba_id: string | null
@@ -6969,6 +7129,7 @@ export type Database = {
           instance_id_external?: string | null
           instance_name: string
           is_active?: boolean
+          last_event_at?: string | null
           meta_business_id?: string | null
           meta_phone_number_id?: string | null
           meta_waba_id?: string | null
@@ -6993,6 +7154,7 @@ export type Database = {
           instance_id_external?: string | null
           instance_name?: string
           is_active?: boolean
+          last_event_at?: string | null
           meta_business_id?: string | null
           meta_phone_number_id?: string | null
           meta_waba_id?: string | null
@@ -7449,6 +7611,60 @@ export type Database = {
           },
           {
             foreignKeyName: "whatsapp_reactions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_recovery_runs: {
+        Row: {
+          created_at: string
+          finished_at: string | null
+          id: string
+          instance_id: string
+          requested_by: string
+          stats: Json
+          status: string
+          tenant_id: string
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          instance_id: string
+          requested_by: string
+          stats?: Json
+          status?: string
+          tenant_id: string
+          window_end: string
+          window_start: string
+        }
+        Update: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          instance_id?: string
+          requested_by?: string
+          stats?: Json
+          status?: string
+          tenant_id?: string
+          window_end?: string
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_recovery_runs_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_recovery_runs_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -8019,6 +8235,10 @@ export type Database = {
       calc_proximo_reajuste: {
         Args: { p_data_inicio: string; p_prazo_meses?: number }
         Returns: string
+      }
+      calcular_mrr_cliente: {
+        Args: { p_cliente_id: string; p_tenant_id: string }
+        Returns: number
       }
       can: { Args: { p_action: string; p_resource: string }; Returns: boolean }
       can_access_monitor: { Args: never; Returns: boolean }
@@ -9658,6 +9878,27 @@ export type Database = {
       should_create_recipient: {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: boolean
+      }
+      snapshot_reconciliacao_ds: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          cnpj_norm: string
+          dia_vencimento: number
+          ds_contract_id: string
+          ds_customer_id: string
+          modelo: string
+          multi_contrato: boolean
+          numero: string
+          passa_validacao: boolean
+          qtd_contratos_ativos_cliente: number
+          qtd_itens: number
+          razao_social: string
+          tem_datas: boolean
+          tem_modelo: boolean
+          valor_mrr: number
+          vigencia_final: string
+          vigencia_inicial: string
+        }[]
       }
       soft_delete_ticket: { Args: { p_ticket_id: string }; Returns: undefined }
       start_conversation_from_ticket: {

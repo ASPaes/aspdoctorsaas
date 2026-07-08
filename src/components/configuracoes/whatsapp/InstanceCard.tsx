@@ -6,7 +6,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
-import { RefreshCw, Pencil, Trash2, Copy, Link, PowerOff, QrCode } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { RefreshCw, Pencil, Trash2, Copy, Link, PowerOff, QrCode, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { EditInstanceDialog } from "./EditInstanceDialog";
 import { ReconnectInstanceDialog } from "./ReconnectInstanceDialog";
@@ -38,6 +39,8 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [showQrDialog, setShowQrDialog] = useState(false);
+  const [showRestartDialog, setShowRestartDialog] = useState(false);
+  const [restarting, setRestarting] = useState(false);
 
   const isActive = instance.is_active !== false;
   const supportsQr = instance.provider_type === 'self_hosted' || instance.provider_type === 'cloud';
@@ -96,6 +99,32 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
       toast.success("Conexão testada com sucesso!");
     } catch {
       toast.error("Falha ao testar conexão");
+    }
+  };
+
+  const handleRestart = async () => {
+    setRestarting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('restart-whatsapp-instance', {
+        body: { instanceId: instance.id },
+      });
+      if (error) {
+        toast.error("Falha ao reiniciar: " + (error.message || "Erro desconhecido"));
+        return;
+      }
+      const result = data as any;
+      if (result?.event_confirmed === true) {
+        toast.success("Restart confirmado — instância reconectou e os eventos voltaram a chegar.");
+      } else if (result?.restarted === true) {
+        toast.warning(result?.message || "Instância reiniciada, mas a reconexão não foi confirmada.", { duration: 10000 });
+      } else {
+        toast.error("Falha ao reiniciar: " + (result?.message || "Resposta inesperada"));
+      }
+    } catch (e: any) {
+      toast.error("Falha ao reiniciar: " + (e?.message || "Erro desconhecido"));
+    } finally {
+      setRestarting(false);
+      setShowRestartDialog(false);
     }
   };
 
@@ -222,6 +251,18 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
               <QrCode className="h-3.5 w-3.5" />
             </Button>
           )}
+          {supportsQr && isActive && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setShowRestartDialog(true)}
+              title="Reiniciar instância"
+              disabled={restarting}
+            >
+              <RotateCcw className={`h-3.5 w-3.5 ${restarting ? "animate-spin" : ""}`} />
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setShowDeleteDialog(true)}>
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
@@ -266,6 +307,23 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showRestartDialog} onOpenChange={setShowRestartDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reiniciar instância?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A sessão será reiniciada no servidor Evolution. As conversas e mensagens não são afetadas. A verificação leva até 30 segundos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restarting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRestart} disabled={restarting}>
+              {restarting ? "Reiniciando..." : "Reiniciar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
