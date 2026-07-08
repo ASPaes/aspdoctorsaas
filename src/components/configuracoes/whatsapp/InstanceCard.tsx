@@ -7,10 +7,11 @@ import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { supabase } from "@/integrations/supabase/client";
-import { RefreshCw, Pencil, Trash2, Copy, Link, PowerOff, QrCode, RotateCcw } from "lucide-react";
+import { RefreshCw, Pencil, Trash2, Copy, Link, PowerOff, QrCode, RotateCcw, History } from "lucide-react";
 import { toast } from "sonner";
 import { EditInstanceDialog } from "./EditInstanceDialog";
 import { ReconnectInstanceDialog } from "./ReconnectInstanceDialog";
+import { RecoverMessagesDialog } from "./RecoverMessagesDialog";
 
 interface Instance {
   id: string;
