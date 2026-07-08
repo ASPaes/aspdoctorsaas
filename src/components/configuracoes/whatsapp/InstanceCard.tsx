@@ -265,6 +265,17 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
               <RotateCcw className={`h-3.5 w-3.5 ${restarting ? "animate-spin" : ""}`} />
             </Button>
           )}
+          {supportsQr && isActive && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setShowRecoverDialog(true)}
+              title="Reestabelecer mensagens"
+            >
+              <History className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setShowDeleteDialog(true)}>
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
