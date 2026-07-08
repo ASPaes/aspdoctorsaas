@@ -312,6 +312,23 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={showRestartDialog} onOpenChange={setShowRestartDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reiniciar instância?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A sessão será reiniciada no servidor Evolution. As conversas e mensagens não são afetadas. A verificação leva até 30 segundos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restarting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRestart} disabled={restarting}>
+              {restarting ? "Reiniciando..." : "Reiniciar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <EditInstanceDialog instance={instance} open={showEditDialog} onOpenChange={setShowEditDialog} />
 
       <ReconnectInstanceDialog instance={instance} open={showQrDialog} onOpenChange={setShowQrDialog} />
