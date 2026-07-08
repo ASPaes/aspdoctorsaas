@@ -251,6 +251,18 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
               <QrCode className="h-3.5 w-3.5" />
             </Button>
           )}
+          {supportsQr && isActive && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setShowRestartDialog(true)}
+              title="Reiniciar instância"
+              disabled={restarting}
+            >
+              <RotateCcw className={`h-3.5 w-3.5 ${restarting ? "animate-spin" : ""}`} />
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setShowDeleteDialog(true)}>
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
