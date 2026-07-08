@@ -345,6 +345,9 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
       <EditInstanceDialog instance={instance} open={showEditDialog} onOpenChange={setShowEditDialog} />
 
       <ReconnectInstanceDialog instance={instance} open={showQrDialog} onOpenChange={setShowQrDialog} />
+
+      <RecoverMessagesDialog instance={instance} open={showRecoverDialog} onOpenChange={setShowRecoverDialog} />
     </>
+
   );
 };
