@@ -69,6 +69,7 @@ export type Database = {
           check_interval_minutes: number
           created_at: string | null
           critical_threshold: number
+          extra_alert_phones: string[]
           id: string
           updated_at: string | null
           warning_threshold: number
@@ -79,6 +80,7 @@ export type Database = {
           check_interval_minutes?: number
           created_at?: string | null
           critical_threshold?: number
+          extra_alert_phones?: string[]
           id?: string
           updated_at?: string | null
           warning_threshold?: number
@@ -89,6 +91,7 @@ export type Database = {
           check_interval_minutes?: number
           created_at?: string | null
           critical_threshold?: number
+          extra_alert_phones?: string[]
           id?: string
           updated_at?: string | null
           warning_threshold?: number
@@ -7110,6 +7113,7 @@ export type Database = {
           meta_waba_id: string | null
           phone_number: string | null
           provider_type: string
+          silence_alert_at: string | null
           skip_ura: boolean
           status: string
           tenant_id: string
@@ -7135,6 +7139,7 @@ export type Database = {
           meta_waba_id?: string | null
           phone_number?: string | null
           provider_type?: string
+          silence_alert_at?: string | null
           skip_ura?: boolean
           status?: string
           tenant_id: string
@@ -7160,6 +7165,7 @@ export type Database = {
           meta_waba_id?: string | null
           phone_number?: string | null
           provider_type?: string
+          silence_alert_at?: string | null
           skip_ura?: boolean
           status?: string
           tenant_id?: string
@@ -8598,6 +8604,14 @@ export type Database = {
           fixed: number
         }[]
       }
+      fn_instance_traffic: {
+        Args: { p_minutes?: number }
+        Returns: {
+          inbound: number
+          instance_id: string
+          outbound: number
+        }[]
+      }
       fn_is_business_hours: { Args: { p_tenant_id: string }; Returns: boolean }
       fn_process_ura_timeouts: { Args: never; Returns: Json }
       fn_retry_waiting_conversations: { Args: never; Returns: Json }
@@ -8613,6 +8627,15 @@ export type Database = {
       fn_user_owns_whatsapp_media_path: {
         Args: { object_name: string }
         Returns: boolean
+      }
+      fn_watchdog_signals: {
+        Args: never
+        Returns: {
+          in_30m: number
+          instance_id: string
+          out_30m: number
+          out_recent: number
+        }[]
       }
       get_ai_cost_metrics: {
         Args: { p_date_from?: string; p_date_to?: string; p_tenant_id?: string }
