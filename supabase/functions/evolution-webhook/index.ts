@@ -17,6 +17,19 @@ interface EvolutionWebhookPayload {
   data: any;
 }
 
+const lastEventTouch = new Map<string, number>();
+
+function touchLastEvent(supabase: any, instanceName: string) {
+  const now = Date.now();
+  const prev = lastEventTouch.get(instanceName) ?? 0;
+  if (now - prev < 60_000) return;
+  lastEventTouch.set(instanceName, now);
+  supabase.from('whatsapp_instances')
+    .update({ last_event_at: new Date().toISOString() })
+    .eq('instance_name', instanceName)
+    .then(() => {}, (e: any) => console.error('[evolution-webhook] touchLastEvent:', e?.message));
+}
+
 // ── Helpers de tipo de mensagem ───────────────────────────────────────────────
 
 function getMessageType(message: any): NormalizedInboundMessage['messageType'] {
@@ -1192,6 +1205,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
 async function handleEvolutionEvent(payload: EvolutionWebhookPayload): Promise<void> {
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  if (payload?.instance) touchLastEvent(supabase, payload.instance);
   console.log(`${LOG} Event: ${payload.event} Instance: ${payload.instance}`);
 
   // Diagnostico amplo: loga payload bruto de upsert/update do remetente alvo (cliente)
