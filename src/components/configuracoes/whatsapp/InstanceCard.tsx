@@ -41,6 +41,7 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [showRestartDialog, setShowRestartDialog] = useState(false);
+  const [showRecoverDialog, setShowRecoverDialog] = useState(false);
   const [restarting, setRestarting] = useState(false);
 
   const isActive = instance.is_active !== false;
