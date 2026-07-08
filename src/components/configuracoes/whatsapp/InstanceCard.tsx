@@ -7,10 +7,11 @@ import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { supabase } from "@/integrations/supabase/client";
-import { RefreshCw, Pencil, Trash2, Copy, Link, PowerOff, QrCode, RotateCcw } from "lucide-react";
+import { RefreshCw, Pencil, Trash2, Copy, Link, PowerOff, QrCode, RotateCcw, History } from "lucide-react";
 import { toast } from "sonner";
 import { EditInstanceDialog } from "./EditInstanceDialog";
 import { ReconnectInstanceDialog } from "./ReconnectInstanceDialog";
+import { RecoverMessagesDialog } from "./RecoverMessagesDialog";
 
 interface Instance {
   id: string;
@@ -40,6 +41,7 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [showRestartDialog, setShowRestartDialog] = useState(false);
+  const [showRecoverDialog, setShowRecoverDialog] = useState(false);
   const [restarting, setRestarting] = useState(false);
 
   const isActive = instance.is_active !== false;
@@ -263,6 +265,17 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
               <RotateCcw className={`h-3.5 w-3.5 ${restarting ? "animate-spin" : ""}`} />
             </Button>
           )}
+          {supportsQr && isActive && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setShowRecoverDialog(true)}
+              title="Reestabelecer mensagens"
+            >
+              <History className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setShowDeleteDialog(true)}>
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
@@ -332,6 +345,9 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
       <EditInstanceDialog instance={instance} open={showEditDialog} onOpenChange={setShowEditDialog} />
 
       <ReconnectInstanceDialog instance={instance} open={showQrDialog} onOpenChange={setShowQrDialog} />
+
+      <RecoverMessagesDialog instance={instance} open={showRecoverDialog} onOpenChange={setShowRecoverDialog} />
     </>
+
   );
 };
