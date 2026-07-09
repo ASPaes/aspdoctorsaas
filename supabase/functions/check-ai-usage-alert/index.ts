@@ -6,6 +6,41 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+async function sendAdminWhatsApp(
+  supabase: any,
+  adminInstanceName: string,
+  adminPhone: string,
+  text: string
+): Promise<boolean> {
+  const { data: instance } = await supabase
+    .from('whatsapp_instances')
+    .select('id, instance_name')
+    .eq('instance_name', adminInstanceName)
+    .limit(1)
+    .maybeSingle();
+  if (!instance) {
+    console.error('[check-ai-usage-alert] Instancia admin nao encontrada:', adminInstanceName);
+    return false;
+  }
+  const secrets = await getInstanceSecrets(supabase, instance.id);
+  if (!secrets.api_key || !secrets.api_url) {
+    console.error('[check-ai-usage-alert] Secrets ausentes para instancia:', adminInstanceName);
+    return false;
+  }
+  const baseUrl = secrets.api_url.replace(/\/$/, '').replace(/\/manager$/, '');
+  const endpoint = `${baseUrl}/message/sendText/${adminInstanceName}`;
+  const evoResp = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: secrets.api_key },
+    body: JSON.stringify({ number: adminPhone, text }),
+  });
+  if (!evoResp.ok) {
+    console.error('[check-ai-usage-alert] Falha ao enviar WhatsApp:', await evoResp.text());
+    return false;
+  }
+  return true;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -15,7 +50,6 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Buscar configuração de alertas
     const { data: alertConfig } = await supabase
       .from('ai_alert_config')
       .select('*')
@@ -23,22 +57,21 @@ Deno.serve(async (req) => {
       .single();
 
     if (!alertConfig) {
-      console.error('[check-ai-usage-alert] Configuração de alerta não encontrada');
+      console.error('[check-ai-usage-alert] Configuracao de alerta nao encontrada');
       return new Response(JSON.stringify({ ok: false, error: 'config_not_found' }), { status: 200 });
     }
 
     const { admin_phone, admin_instance_name, warning_threshold, critical_threshold } = alertConfig;
+    const alertsSent: string[] = [];
 
-    // Buscar limites configurados
+    // ============================================================
+    // BLOCO 1 — Teto de CHAMADAS (rate limit) — comportamento existente
+    // ============================================================
     const { data: limitConfigs } = await supabase
       .from('ai_rate_limit_config')
       .select('tenant_id, function_name, max_calls, window_seconds');
 
-    if (!limitConfigs || limitConfigs.length === 0) return new Response(JSON.stringify({ ok: true }), { status: 200 });
-
-    const alertsSent: string[] = [];
-
-    for (const config of limitConfigs) {
+    for (const config of (limitConfigs || [])) {
       const windowStart = new Date(Date.now() - config.window_seconds * 1000).toISOString();
 
       const { count } = await supabase
@@ -57,7 +90,6 @@ Deno.serve(async (req) => {
 
       if (!level) continue;
 
-      // Anti-spam: verificar se já enviamos esse nível nos últimos 15 min (exceto blocked/critical que repetem)
       const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
       const { count: recentAlert } = await supabase
         .from('ai_alert_log')
@@ -67,92 +99,124 @@ Deno.serve(async (req) => {
         .gte('sent_at', fifteenMinAgo)
         .is('resolved_at', null);
 
-      // Warning: só manda 1x por ciclo. Critical/Blocked: manda a cada 15min
       if (level === 'warning' && (recentAlert ?? 0) > 0) continue;
 
-      // Mapear nome da função para português
       const funcNames: Record<string, string> = {
-        'suggest-smart-replies': 'Sugestão de Respostas',
-        'compose-whatsapp-message': 'Composição de Mensagem',
-        'analyze-whatsapp-sentiment': 'Análise de Sentimento',
+        'suggest-smart-replies': 'Sugestao de Respostas',
+        'compose-whatsapp-message': 'Composicao de Mensagem',
+        'analyze-whatsapp-sentiment': 'Analise de Sentimento',
         'generate-conversation-summary': 'Resumo de Conversa',
-        'transcribe-whatsapp-audio': 'Transcrição de Áudio',
+        'transcribe-whatsapp-audio': 'Transcricao de Audio',
       };
       const funcName = funcNames[config.function_name] || config.function_name;
-
-      // Montar mensagem por nível
       const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
       let message = '';
 
       if (level === 'warning') {
         message = `🟡 *DoctorSaaS — Aviso de Uso de IA*\n\n` +
-          `▪ Função: *${funcName}*\n` +
+          `▪ Funcao: *${funcName}*\n` +
           `▪ Uso: ${usage}/${config.max_calls} chamadas (${pct}%)\n` +
-          `▪ Horário: ${now}\n\n` +
+          `▪ Horario: ${now}\n\n` +
           `💡 *O que fazer agora:*\n` +
-          `Nenhuma ação urgente. Monitore o próximo ciclo de 15 minutos.\n\n` +
-          `_Próximo alerta apenas se piorar._`;
+          `Nenhuma acao urgente. Monitore o proximo ciclo de 15 minutos.\n\n` +
+          `_Proximo alerta apenas se piorar._`;
       } else if (level === 'critical') {
-        message = `🔴 *DoctorSaaS — USO CRÍTICO DE IA*\n\n` +
-          `▪ Função: *${funcName}*\n` +
+        message = `🔴 *DoctorSaaS — USO CRITICO DE IA*\n\n` +
+          `▪ Funcao: *${funcName}*\n` +
           `▪ Uso: ${usage}/${config.max_calls} chamadas (${pct}%)\n` +
-          `▪ Horário: ${now}\n\n` +
-          `⚡ *Ação imediata — aumente o limite respondendo:*\n\n` +
+          `▪ Horario: ${now}\n\n` +
+          `⚡ *Acao imediata — aumente o limite respondendo:*\n\n` +
           `LIMIT UP ${config.function_name}\n\n` +
-          `_Efeito imediato. Próximo alerta em 15 min se não resolver._`;
+          `_Efeito imediato. Proximo alerta em 15 min se nao resolver._`;
       } else if (level === 'blocked') {
         message = `⛔ *DoctorSaaS — LIMITE ATINGIDO*\n\n` +
-          `Usuários estão recebendo ERRO agora!\n\n` +
-          `▪ Função: *${funcName}*\n` +
+          `Usuarios estao recebendo ERRO agora!\n\n` +
+          `▪ Funcao: *${funcName}*\n` +
           `▪ Uso: ${usage}/${config.max_calls} — *BLOQUEADO*\n` +
-          `▪ Horário: ${now}\n\n` +
-          `🔧 *Solução imediata — responda agora:*\n\n` +
+          `▪ Horario: ${now}\n\n` +
+          `🔧 *Solucao imediata — responda agora:*\n\n` +
           `LIMIT UP ${config.function_name}\n\n` +
-          `_Para dobrar o limite de todas as funções: responda_ LIMIT UP ALL\n` +
-          `_Próximo alerta em 15 min se não resolver._`;
+          `_Para dobrar o limite de todas as funcoes: responda_ LIMIT UP ALL\n` +
+          `_Proximo alerta em 15 min se nao resolver._`;
       }
 
-      // Buscar secrets da instância
-      const { data: instance } = await supabase
-        .from('whatsapp_instances')
-        .select('id, instance_name')
-        .eq('instance_name', admin_instance_name)
-        .limit(1)
-        .maybeSingle();
-
-      if (!instance) {
-        console.error('[check-ai-usage-alert] Instância não encontrada:', admin_instance_name);
-        continue;
-      }
-
-      const secrets = await getInstanceSecrets(supabase, instance.id);
-
-      if (!secrets.api_key || !secrets.api_url) {
-        console.error('[check-ai-usage-alert] Secrets não encontrados para instância:', admin_instance_name);
-        continue;
-      }
-
-      // Enviar via Evolution API (direto, sem criar conversa no DoctorSaaS)
-      const baseUrl = secrets.api_url.replace(/\/$/, '').replace(/\/manager$/, '');
-      const endpoint = `${baseUrl}/message/sendText/${admin_instance_name}`;
-
-      const evoResp = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: secrets.api_key },
-        body: JSON.stringify({ number: admin_phone, text: message }),
-      });
-
-      if (evoResp.ok) {
-        // Registrar alerta enviado
+      const ok = await sendAdminWhatsApp(supabase, admin_instance_name, admin_phone, message);
+      if (ok) {
         await supabase.from('ai_alert_log').insert({
           tenant_id: config.tenant_id,
           function_name: config.function_name,
           level,
         });
         alertsSent.push(`${config.function_name}:${level}`);
-        console.log(`[check-ai-usage-alert] ✅ Alerta ${level} enviado para ${config.function_name}`);
+      }
+    }
+
+    // ============================================================
+    // BLOCO 2 — Teto de GASTO ($) mensal por tenant (novo)
+    // ============================================================
+    const { data: budgetRows } = await supabase
+      .from('configuracoes')
+      .select('tenant_id, ai_monthly_budget_usd, ai_budget_alert_pct')
+      .not('ai_monthly_budget_usd', 'is', null);
+
+    // Nomes dos tenants sem depender de FK/embed (nao existe FK configuracoes->tenants)
+    const tenantIds = (budgetRows || []).map((r: any) => r.tenant_id);
+    const nameMap: Record<string, string> = {};
+    if (tenantIds.length > 0) {
+      const { data: tnames } = await supabase.from('tenants').select('id, nome').in('id', tenantIds);
+      for (const t of (tnames || [])) nameMap[t.id] = t.nome;
+    }
+
+    for (const row of (budgetRows || [])) {
+      const budget = Number(row.ai_monthly_budget_usd);
+      if (!(budget > 0)) continue;
+
+      const { data: spendData } = await supabase.rpc('ai_month_spend_usd', { p_tenant_id: row.tenant_id });
+      const spend = Number(spendData) || 0;
+      const pct = Math.round((spend / budget) * 100);
+      const alertPct = row.ai_budget_alert_pct ?? 80;
+
+      let level: string | null = null;
+      if (spend >= budget) level = 'blocked';
+      else if (pct >= alertPct) level = 'warning';
+      if (!level) continue;
+
+      const windowAgo = new Date(Date.now() - (level === 'blocked' ? 6 : 24) * 60 * 60 * 1000).toISOString();
+      const { count: recent } = await supabase
+        .from('ai_alert_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', row.tenant_id)
+        .eq('function_name', 'monthly_budget')
+        .eq('level', level)
+        .gte('sent_at', windowAgo);
+      if ((recent ?? 0) > 0) continue;
+
+      const nome = nameMap[row.tenant_id] || row.tenant_id;
+      const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+      let message = '';
+
+      if (level === 'warning') {
+        message = `🟡 *DoctorSaaS — Gasto de IA em ${pct}%*\n\n` +
+          `▪ Tenant: *${nome}*\n` +
+          `▪ Gasto do mes: US$ ${spend.toFixed(2)} / US$ ${budget.toFixed(2)}\n` +
+          `▪ Horario: ${now}\n\n` +
+          `💡 Acompanhe. Ao atingir 100%, a analise de sentimento deste tenant e pausada automaticamente ate virar o mes ou aumentar o teto.`;
       } else {
-        console.error('[check-ai-usage-alert] Falha ao enviar WhatsApp:', await evoResp.text());
+        message = `⛔ *DoctorSaaS — TETO DE IA ATINGIDO*\n\n` +
+          `▪ Tenant: *${nome}*\n` +
+          `▪ Gasto do mes: US$ ${spend.toFixed(2)} / US$ ${budget.toFixed(2)} (${pct}%)\n` +
+          `▪ Horario: ${now}\n\n` +
+          `🔧 A analise de sentimento deste tenant esta PAUSADA. Para religar: aumente o teto em Configuracoes ou aguarde virar o mes.`;
+      }
+
+      const ok = await sendAdminWhatsApp(supabase, admin_instance_name, admin_phone, message);
+      if (ok) {
+        await supabase.from('ai_alert_log').insert({
+          tenant_id: row.tenant_id,
+          function_name: 'monthly_budget',
+          level,
+        });
+        alertsSent.push(`monthly_budget:${nome}:${level}`);
       }
     }
 
