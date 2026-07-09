@@ -397,6 +397,7 @@ export default function OmieConferenciaTab() {
   const [bucketAtivo, setBucketAtivo] = useState<Bucket | null>(null);
   const [busca, setBusca] = useState("");
   const [page, setPage] = useState(0);
+  const [nomeFiltro, setNomeFiltro] = useState<"todos" | "diferentes">("todos");
 
   const { data: resumo, isLoading: loadingResumo } = useQuery({
     queryKey: ["omie-conf-resumo", tid],
