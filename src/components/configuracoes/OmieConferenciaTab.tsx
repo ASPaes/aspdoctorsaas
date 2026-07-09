@@ -353,6 +353,16 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
             <>
               <div className="mt-0.5 text-sm flex items-center gap-2 flex-wrap">
                 <span className="font-medium">{formatBRL(row.valor_omie)}</span>
+                {row.situacao_contrato === "90" && (
+                  <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-900">
+                    Suspenso
+                  </Badge>
+                )}
+                {row.situacao_contrato === "99" && (
+                  <Badge variant="destructive" className="text-[10px]">
+                    Cancelado
+                  </Badge>
+                )}
                 {valoresBatem ? (
                   <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-900">
                     ✓ bate
@@ -366,6 +376,7 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
                   </span>
                 ) : null}
               </div>
+
               <div className="text-[11px] text-muted-foreground/80 mt-0.5">
                 cód. {row.codigo_contrato_omie}
               </div>
