@@ -923,12 +923,18 @@ export default function OmieConferenciaTab() {
         </CardContent>
       </Card>
 
-      {/* Busca + lista */}
+      {/* Conteúdo principal: Visão Geral ou Busca + lista do balde */}
+      {bucketAtivo === "visao_geral" ? (
+        <VisaoGeralPanel
+          tid={tid}
+          onIrParaBalde={(b) => { setPage(0); setNomeFiltro("todos"); setBucketAtivo(b); }}
+        />
+      ) : (
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <CardTitle className="text-base">
-              {bucketAtivo ? BUCKETS.find(b => b.key === bucketAtivo)?.label : "Todas as divergências"}
+              {BUCKETS.find(b => b.key === bucketAtivo)?.label ?? "Divergências"}
               <span className="text-sm font-normal text-muted-foreground ml-2">({total})</span>
             </CardTitle>
             {bucketAtivo === "vinculo_auto_ok" && (
