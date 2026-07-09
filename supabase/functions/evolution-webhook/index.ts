@@ -11,6 +11,26 @@ const corsHeaders = {
 
 const LOG = '[evolution-webhook]';
 
+// Teto do caminho de download de mídia em base64 dentro do isolate.
+// Acima disto NÃO baixamos a mídia inline (o atob/Blob de arquivos grandes
+// estoura a memória do worker e a mensagem some sem ser inserida). A mensagem
+// é persistida mesmo assim (filename + tamanho, sem media_url) para nunca sumir.
+// Elevável/removível quando o Evolution entregar mediaUrl via S3 (Fase B).
+const MAX_INLINE_MEDIA_BYTES = 12 * 1024 * 1024; // 12 MB
+
+// fileLength do WhatsApp pode vir como number, string ou Long { low, high }.
+function readDeclaredMediaSize(mediaMessage: any): number | null {
+  const fl = mediaMessage?.fileLength;
+  if (fl == null) return null;
+  if (typeof fl === 'number') return Number.isFinite(fl) ? fl : null;
+  if (typeof fl === 'string') { const n = Number(fl); return Number.isFinite(n) ? n : null; }
+  if (typeof fl === 'object' && typeof fl.low === 'number') {
+    const high = typeof fl.high === 'number' ? fl.high : 0;
+    return high * 4294967296 + (fl.low >>> 0);
+  }
+  return null;
+}
+
 interface EvolutionWebhookPayload {
   event: string;
   instance: string;
@@ -1032,6 +1052,8 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     let mediaStoragePath: string | null = null;
     let mediaMimetype: string | null = null;
     let mediaFilename: string | null = null;
+    let mediaSizeBytes: number | null = null;
+    let mediaOversized = false;
 
     if (messageType !== 'text' && messageType !== 'reaction' && messageType !== 'revoke') {
       // PATCH: use resolveDocumentMessage for documents, fallback to standard path
@@ -1041,10 +1063,21 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       if (mediaMessage?.mimetype) {
         mediaMimetype = mediaMessage.mimetype;
         mediaFilename = mediaMessage.fileName || mediaMessage.filename || null;
-        mediaStoragePath = await downloadAndUploadMedia(
-          secrets.api_url || '', secrets.api_key || '', evolutionInstanceId,
-          key, supabase, mediaMimetype as string, instanceData.provider_type || 'self_hosted'
-        );
+        mediaSizeBytes = readDeclaredMediaSize(mediaMessage);
+
+        // Guard de tamanho: baixar mídia grande em base64 dentro do isolate estoura
+        // a memória (OOM) e a mensagem some SEM ser inserida. Acima do teto NÃO
+        // baixamos — mas seguimos o fluxo para persistir a mensagem (filename +
+        // tamanho, sem media_url).
+        if (mediaSizeBytes != null && mediaSizeBytes > MAX_INLINE_MEDIA_BYTES) {
+          mediaOversized = true;
+          console.warn(`${LOG} Media oversized (${mediaSizeBytes} > ${MAX_INLINE_MEDIA_BYTES}) msg ${key?.id} — pulando download inline`);
+        } else {
+          mediaStoragePath = await downloadAndUploadMedia(
+            secrets.api_url || '', secrets.api_key || '', evolutionInstanceId,
+            key, supabase, mediaMimetype as string, instanceData.provider_type || 'self_hosted'
+          );
+        }
       }
     }
 
@@ -1122,6 +1155,15 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
     console.log(`${LOG} Delegando para processInboundMessage: ${phone} fromMe=${fromMe}`);
     await processInboundMessage(supabase, normalized);
+
+    // Mídia grande não baixada: grava o tamanho na linha já inserida, para o card
+    // exibir "arquivo (29 MB) — abrir no WhatsApp" em vez de nada.
+    if (mediaOversized && mediaSizeBytes != null) {
+      await supabase.from('whatsapp_messages')
+        .update({ media_size_bytes: mediaSizeBytes })
+        .eq('tenant_id', tenantId)
+        .eq('message_id', key.id);
+    }
 
   } catch (processingError) {
     // PATCH: Fallback — salva mensagem placeholder pro agente ver que algo chegou
