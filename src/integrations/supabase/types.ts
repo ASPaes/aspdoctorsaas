@@ -9693,7 +9693,7 @@ export type Database = {
         }[]
       }
       reconciliacao_resumo: {
-        Args: { p_tenant_id: string }
+        Args: { p_fornecedor_id?: number; p_tenant_id: string }
         Returns: {
           acao_sugerida: string
           gerado_em: string
