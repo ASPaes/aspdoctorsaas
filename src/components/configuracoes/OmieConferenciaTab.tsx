@@ -561,6 +561,23 @@ export default function OmieConferenciaTab() {
               {bucketAtivo ? BUCKETS.find(b => b.key === bucketAtivo)?.label : "Todas as divergências"}
               <span className="text-sm font-normal text-muted-foreground ml-2">({total})</span>
             </CardTitle>
+            {bucketAtivo === "vinculo_auto_ok" && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button size="sm" disabled className="pointer-events-none flex-col items-start h-auto py-1.5 px-3">
+                        <span>Vincular todos os prontos ({contadores.get("vinculo_auto_ok") ?? 0})</span>
+                        <span className="text-[10px] font-normal opacity-80">
+                          {nomeDivergeCount ?? 0} com nome diferente ficam de fora — confira e vincule manualmente
+                        </span>
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>disponível em breve</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -571,6 +588,38 @@ export default function OmieConferenciaTab() {
               />
             </div>
           </div>
+          {bucketAtivo === "vinculo_auto_ok" && (
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => { setNomeFiltro("todos"); setPage(0); }}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition ${
+                  nomeFiltro === "todos"
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border bg-background text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Todos
+                <Badge variant={nomeFiltro === "todos" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+                  {loadingResumo ? <Skeleton className="h-3 w-4" /> : contadores.get("vinculo_auto_ok") ?? 0}
+                </Badge>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setNomeFiltro("diferentes"); setPage(0); }}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition ${
+                  nomeFiltro === "diferentes"
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border bg-background text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Só nomes diferentes
+                <Badge variant={nomeFiltro === "diferentes" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+                  {loadingNomeDivergeCount ? <Skeleton className="h-3 w-4" /> : nomeDivergeCount ?? 0}
+                </Badge>
+              </button>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-2">
           {loadingLista ? (
