@@ -410,6 +410,7 @@ export default function OmieConferenciaTab() {
   const [busca, setBusca] = useState("");
   const [page, setPage] = useState(0);
   const [nomeFiltro, setNomeFiltro] = useState<"todos" | "diferentes">("todos");
+  const [fornecedorFiltro, setFornecedorFiltro] = useState<string>("__all__");
 
   const { data: resumo, isLoading: loadingResumo } = useQuery({
     queryKey: ["omie-conf-resumo", tid],
