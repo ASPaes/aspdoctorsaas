@@ -144,7 +144,9 @@ type ReconciliacaoRow = {
   nome_diverge: boolean | null;
   fornecedor_ds: string | null;
   fornecedor_id: number | null;
+  situacao_contrato: string | null;
 };
+
 
 function normNome(s?: string | null): string {
   return (s || "")
