@@ -4205,6 +4205,8 @@ export type Database = {
           ds_customer_id: string | null
           estado_match: string
           estado_valor: string | null
+          fornecedor_ds: string | null
+          fornecedor_id: number | null
           gerado_em: string
           id: string
           modelo_ds: string | null
@@ -4240,6 +4242,8 @@ export type Database = {
           ds_customer_id?: string | null
           estado_match: string
           estado_valor?: string | null
+          fornecedor_ds?: string | null
+          fornecedor_id?: number | null
           gerado_em?: string
           id?: string
           modelo_ds?: string | null
@@ -4275,6 +4279,8 @@ export type Database = {
           ds_customer_id?: string | null
           estado_match?: string
           estado_valor?: string | null
+          fornecedor_ds?: string | null
+          fornecedor_id?: number | null
           gerado_em?: string
           id?: string
           modelo_ds?: string | null
