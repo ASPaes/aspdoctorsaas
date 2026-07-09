@@ -1,6 +1,17 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -749,6 +760,10 @@ export default function OmieConferenciaTab() {
     );
   };
 
+  const queryClient = useQueryClient();
+  const [confirmVincularOpen, setConfirmVincularOpen] = useState(false);
+  const [vinculandoLote, setVinculandoLote] = useState(false);
+
   const { data: resumo, isLoading: loadingResumo } = useQuery({
     queryKey: ["omie-conf-resumo", tid, fornecedorParam],
     enabled: !!tid,
@@ -778,14 +793,26 @@ export default function OmieConferenciaTab() {
   }, [resumo]);
 
   const { data: nomeDivergeCount, isLoading: loadingNomeDivergeCount } = useQuery({
-    queryKey: ["omie-conf-nome-diverge-count", tid],
+    queryKey: ["omie-conf-nome-diverge-count", tid, fornecedorParam],
     enabled: !!tid,
     queryFn: async () => {
-      const { count, error } = await supabase
+      let q = supabase
         .from("reconciliacao_cadastro")
         .select("*", { count: "exact", head: true })
         .eq("acao_sugerida", "vinculo_auto_ok")
         .eq("nome_diverge", true);
+      if (fornecedorParam != null && fornecedorParam.length > 0) {
+        const ids = fornecedorParam.filter((n) => n !== -1);
+        const incluirNull = fornecedorParam.includes(-1);
+        if (incluirNull && ids.length > 0) {
+          q = q.or(`fornecedor_id.in.(${ids.join(",")}),fornecedor_id.is.null`);
+        } else if (incluirNull) {
+          q = q.is("fornecedor_id", null);
+        } else {
+          q = q.in("fornecedor_id", ids);
+        }
+      }
+      const { count, error } = await q;
       if (error) throw error;
       return count ?? 0;
     },
@@ -1005,23 +1032,26 @@ export default function OmieConferenciaTab() {
               {BUCKETS.find(b => b.key === bucketAtivo)?.label ?? "Divergências"}
               <span className="text-sm font-normal text-muted-foreground ml-2">({total})</span>
             </CardTitle>
-            {bucketAtivo === "vinculo_auto_ok" && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span tabIndex={0}>
-                      <Button size="sm" disabled className="pointer-events-none flex-col items-start h-auto py-1.5 px-3">
-                        <span>Vincular todos os prontos ({contadores.get("vinculo_auto_ok") ?? 0})</span>
-                        <span className="text-[10px] font-normal opacity-80">
-                          {nomeDivergeCount ?? 0} com nome diferente ficam de fora — confira e vincule manualmente
-                        </span>
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>disponível em breve</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
+            {bucketAtivo === "vinculo_auto_ok" && (() => {
+              const totalProntos = contadores.get("vinculo_auto_ok") ?? 0;
+              const mDiff = nomeDivergeCount ?? 0;
+              const nOk = Math.max(0, totalProntos - mDiff);
+              return (
+                <Button
+                  size="sm"
+                  disabled={vinculandoLote || nOk === 0}
+                  onClick={() => setConfirmVincularOpen(true)}
+                  className="flex-col items-start h-auto py-1.5 px-3"
+                >
+                  <span>
+                    {vinculandoLote ? "Vinculando..." : `Vincular todos os prontos (${nOk})`}
+                  </span>
+                  <span className="text-[10px] font-normal opacity-80">
+                    {mDiff} com nome diferente ficam de fora — confira e vincule manualmente
+                  </span>
+                </Button>
+              );
+            })()}
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -1092,6 +1122,66 @@ export default function OmieConferenciaTab() {
         </CardContent>
       </Card>
       )}
+
+      <AlertDialog open={confirmVincularOpen} onOpenChange={setConfirmVincularOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Vincular em lote</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const totalProntos = contadores.get("vinculo_auto_ok") ?? 0;
+                const mDiff = nomeDivergeCount ?? 0;
+                const nOk = Math.max(0, totalProntos - mDiff);
+                return `Serão vinculados os ${nOk} contratos prontos (nome, CNPJ e valor batendo). Os ${mDiff} com nome diferente NÃO entram — ficam para vínculo manual. Isso cria a ligação DoctorSaaS ↔ Omie e NÃO altera nada no Omie.`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={vinculandoLote}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={vinculandoLote}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!tid) return;
+                setVinculandoLote(true);
+                try {
+                  const body: Record<string, unknown> = { tenant_id: tid };
+                  if (fornecedorParam && fornecedorParam.length > 0) {
+                    body.fornecedor_ids = fornecedorParam;
+                  }
+                  const { data, error } = await supabase.functions.invoke(
+                    "recon-vincular-lote",
+                    { body }
+                  );
+                  if (error) throw error;
+                  const res = data as { ok?: boolean; vinculados?: number; error?: string } | null;
+                  if (res?.ok) {
+                    toast.success(`${res.vinculados ?? 0} contratos vinculados com sucesso.`);
+                    setConfirmVincularOpen(false);
+                    await Promise.all([
+                      queryClient.invalidateQueries({ queryKey: ["omie-conf-resumo"] }),
+                      queryClient.invalidateQueries({ queryKey: ["omie-conf-lista"] }),
+                      queryClient.invalidateQueries({ queryKey: ["omie-conf-nome-diverge-count"] }),
+                      queryClient.invalidateQueries({ queryKey: ["omie-conf-fornecedores"] }),
+                      queryClient.invalidateQueries({ queryKey: ["omie-conf-visao-geral"] }),
+                    ]);
+                  } else {
+                    toast.error(res?.error ?? "Falha ao vincular em lote.");
+                  }
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Falha ao vincular em lote.");
+                } finally {
+                  setVinculandoLote(false);
+                }
+              }}
+            >
+              {vinculandoLote
+                ? "Vinculando..."
+                : `Vincular ${Math.max(0, (contadores.get("vinculo_auto_ok") ?? 0) - (nomeDivergeCount ?? 0))}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
