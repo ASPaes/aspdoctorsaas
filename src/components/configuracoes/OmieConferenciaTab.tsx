@@ -129,6 +129,7 @@ type ReconciliacaoRow = {
   estado_valor: string | null;
   diffs: any;
   acao_sugerida: string | null;
+  nome_diverge: boolean | null;
 };
 
 function normNome(s?: string | null): string {
