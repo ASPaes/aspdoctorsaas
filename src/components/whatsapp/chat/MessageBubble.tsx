@@ -341,9 +341,10 @@ export function MessageBubble({
         />
       )}
 
-      {msg.media_url && msg.message_type !== "text" && msg.message_type !== "contact" && msg.message_type !== "contacts" && (
+      {((msg.media_url && msg.message_type !== "text" && msg.message_type !== "contact" && msg.message_type !== "contacts") ||
+        (msg.message_type === "document" && (msg.media_filename || msg.media_size_bytes))) && (
         <div className="min-w-0">
-          <MediaContent messageId={msg.id} messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} mediaFilename={msg.media_filename} mediaExt={msg.media_ext} mediaSizeBytes={msg.media_size_bytes} mediaKind={msg.media_kind} mediaMimetype={msg.media_mimetype} />
+          <MediaContent messageId={msg.id} messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} mediaFilename={msg.media_filename} mediaExt={msg.media_ext} mediaSizeBytes={msg.media_size_bytes} mediaKind={msg.media_kind} mediaMimetype={msg.media_mimetype} mediaPath={msg.media_path} />
         </div>
       )}
       {msg.content && msg.message_type !== 'contact' && msg.message_type !== 'contacts' && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{groupParticipants && groupParticipants.length > 0 ? renderMentions(msg.content, groupParticipants) : msg.content}</p>}
