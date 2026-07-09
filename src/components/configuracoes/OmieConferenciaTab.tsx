@@ -807,10 +807,18 @@ export default function OmieConferenciaTab() {
       if (bucketAtivo === "vinculo_auto_ok" && nomeFiltro === "diferentes") {
         q = q.eq("nome_diverge", true);
       }
-      if (fornecedorParam != null) {
-        if (fornecedorParam === -1) q = q.is("fornecedor_id", null);
-        else q = q.eq("fornecedor_id", fornecedorParam);
+      if (fornecedorParam != null && fornecedorParam.length > 0) {
+        const ids = fornecedorParam.filter((n) => n !== -1);
+        const incluirNull = fornecedorParam.includes(-1);
+        if (incluirNull && ids.length > 0) {
+          q = q.or(`fornecedor_id.in.(${ids.join(",")}),fornecedor_id.is.null`);
+        } else if (incluirNull) {
+          q = q.is("fornecedor_id", null);
+        } else {
+          q = q.in("fornecedor_id", ids);
+        }
       }
+
       if (buscaTrim) {
         const digits = buscaTrim.replace(/\D/g, "");
         if (digits.length >= 8) {
