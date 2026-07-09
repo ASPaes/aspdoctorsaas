@@ -181,6 +181,7 @@ export default function RiscoChurnSettings() {
           <div className="h-px flex-1 bg-border" />
         </div>
         <ChurnAlertCard />
+        <AICostControlCard />
       </div>
     </div>
   );
