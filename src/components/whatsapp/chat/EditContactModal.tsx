@@ -31,7 +31,7 @@ interface EditContactModalProps {
 
 interface ContactFormData { name: string; notes: string; phone: string; }
 
-export function EditContactModal({ open, onOpenChange, contactId, contactName, contactPhone, contactNotes, onSuccess, isNewContact, conversationId, attendanceId }: EditContactModalProps) {
+export function EditContactModal({ open, onOpenChange, contactId, contactName, contactPhone, contactNotes, onSuccess, isNewContact, conversationId, attendanceId, isGroup = false }: EditContactModalProps) {
   const { updateContact, isUpdatingContact } = useWhatsAppActions();
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
