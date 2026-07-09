@@ -218,7 +218,9 @@ export function AttendanceChatHistoryModal({
                   msg.message_type === "audio" ||
                   msg.message_type === "video" ||
                   msg.message_type === "document") &&
-                !!msg.media_url;
+                (!!msg.media_url ||
+                  (msg.message_type === "document" &&
+                    (msg.media_filename || msg.media_size_bytes)));
               const isSystem =
                 msg.message_type === "system" ||
                 (!msg.sender_name && !msg.is_from_me && !msg.content?.trim() && !hasMedia);
