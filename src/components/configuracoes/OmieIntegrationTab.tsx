@@ -13,6 +13,7 @@ import { Loader2, Save, Plug, RefreshCw, KeyRound } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OmieVinculosTab from "./OmieVinculosTab";
 import OmiePadroesTab from "./OmiePadroesTab";
+import OmieConferenciaTab from "./OmieConferenciaTab";
 
 export default function OmieIntegrationTab() {
   const { toast } = useToast();
@@ -114,6 +115,7 @@ export default function OmieIntegrationTab() {
         <TabsTrigger value="conexao">Conexão</TabsTrigger>
         <TabsTrigger value="vinculos" disabled={!configurado}>Vínculos</TabsTrigger>
         <TabsTrigger value="padroes" disabled={!configurado}>Padrões Omie</TabsTrigger>
+        <TabsTrigger value="conferencia" disabled={!configurado}>Conferência</TabsTrigger>
       </TabsList>
 
       <TabsContent value="conexao" className="space-y-4 max-w-xl">
@@ -223,6 +225,14 @@ export default function OmieIntegrationTab() {
           <OmiePadroesTab />
         ) : (
           <p className="text-sm text-muted-foreground">Conecte a integração antes de configurar os padrões.</p>
+        )}
+      </TabsContent>
+
+      <TabsContent value="conferencia">
+        {configurado ? (
+          <OmieConferenciaTab />
+        ) : (
+          <p className="text-sm text-muted-foreground">Conecte a integração antes de acessar a conferência.</p>
         )}
       </TabsContent>
     </Tabs>

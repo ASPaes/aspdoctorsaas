@@ -9673,6 +9673,14 @@ export type Database = {
         Args: { p_contrato_id: string; p_observacao?: string }
         Returns: Json
       }
+      reconciliacao_resumo: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          acao_sugerida: string
+          gerado_em: string
+          qtd: number
+        }[]
+      }
       register_conselho_analise: {
         Args: {
           p_alertas_factuais: Json
@@ -9726,6 +9734,10 @@ export type Database = {
       resolve_user_notification_settings: {
         Args: { p_user_id: string }
         Returns: Json
+      }
+      rodar_deteccao_reconciliacao: {
+        Args: { p_tenant_id: string }
+        Returns: number
       }
       salvar_data_corte_omie: {
         Args: { p_data: string; p_tenant_id: string }
