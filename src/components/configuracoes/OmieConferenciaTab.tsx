@@ -531,6 +531,39 @@ export default function OmieConferenciaTab() {
         </AlertDescription>
       </Alert>
 
+      {/* Filtro global de fornecedor */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Label className="text-sm text-muted-foreground">Fornecedor:</Label>
+        <Select
+          value={fornecedorFiltro}
+          onValueChange={(v) => { setFornecedorFiltro(v); setPage(0); }}
+          disabled={loadingFornecedores}
+        >
+          <SelectTrigger className="h-9 w-auto min-w-[220px]">
+            <SelectValue placeholder="Todos os fornecedores" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">
+              Todos ({(fornecedores ?? []).reduce((s, f) => s + Number(f.qtd || 0), 0)})
+            </SelectItem>
+            {(fornecedores ?? []).map((f) => {
+              const key = f.fornecedor_ds ?? "__null__";
+              const label = f.fornecedor_ds ?? "Sem fornecedor";
+              return (
+                <SelectItem key={key} value={key}>
+                  {label} ({f.qtd})
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+        {fornecedorFiltro !== "__all__" && (
+          <Button variant="ghost" size="sm" onClick={() => { setFornecedorFiltro("__all__"); setPage(0); }}>
+            Limpar
+          </Button>
+        )}
+      </div>
+
       {/* Cartões resumo */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
         {BUCKETS.map(b => {
