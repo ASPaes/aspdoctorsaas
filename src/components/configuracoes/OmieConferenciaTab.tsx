@@ -94,7 +94,12 @@ type ReconciliacaoRow = {
 };
 
 function normNome(s?: string | null): string {
-  return (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
 }
 
 
