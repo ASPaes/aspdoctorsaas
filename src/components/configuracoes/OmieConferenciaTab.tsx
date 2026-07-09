@@ -856,8 +856,22 @@ export default function OmieConferenciaTab() {
         )}
       </div>
 
-      {/* Cartões resumo */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+      {/* Cartões resumo (Visão Geral + baldes) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
+        <button
+          type="button"
+          onClick={() => { setPage(0); setNomeFiltro("todos"); setBucketAtivo("visao_geral"); }}
+          className={`text-left rounded-lg border p-3 transition hover:border-primary ${
+            bucketAtivo === "visao_geral" ? "border-primary bg-primary/5" : ""
+          }`}
+        >
+          <div className="flex items-start gap-1">
+            <span className="text-xs text-muted-foreground line-clamp-2 min-h-[2rem] flex-1 font-medium">
+              Visão geral
+            </span>
+          </div>
+          <div className="text-2xl font-semibold mt-1 text-primary">★</div>
+        </button>
         {BUCKETS.map(b => {
           const ativo = bucketAtivo === b.key;
           const qtd = contadores.get(b.key) ?? 0;
@@ -865,7 +879,7 @@ export default function OmieConferenciaTab() {
             <button
               key={b.key}
               type="button"
-              onClick={() => { setPage(0); setNomeFiltro("todos"); setBucketAtivo(ativo ? null : b.key); }}
+              onClick={() => { setPage(0); setNomeFiltro("todos"); setBucketAtivo(b.key); }}
               className={`text-left rounded-lg border p-3 transition hover:border-primary ${ativo ? "border-primary bg-primary/5" : ""}`}
             >
               <div className="flex items-start gap-1">
