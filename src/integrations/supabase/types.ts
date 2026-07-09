@@ -4220,6 +4220,7 @@ export type Database = {
           razao_omie: string | null
           resolvido_em: string | null
           resolvido_por: string | null
+          situacao_contrato: string | null
           status_usuario: string
           tenant_id: string
           valor_mrr_ds: number | null
@@ -4257,6 +4258,7 @@ export type Database = {
           razao_omie?: string | null
           resolvido_em?: string | null
           resolvido_por?: string | null
+          situacao_contrato?: string | null
           status_usuario?: string
           tenant_id: string
           valor_mrr_ds?: number | null
@@ -4294,6 +4296,7 @@ export type Database = {
           razao_omie?: string | null
           resolvido_em?: string | null
           resolvido_por?: string | null
+          situacao_contrato?: string | null
           status_usuario?: string
           tenant_id?: string
           valor_mrr_ds?: number | null

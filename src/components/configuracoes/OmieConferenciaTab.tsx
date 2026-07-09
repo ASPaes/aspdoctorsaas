@@ -24,7 +24,9 @@ type Bucket =
   | "pendente_assuncao"
   | "escolher_candidato"
   | "criar"
-  | "criar_contrato";
+  | "criar_contrato"
+  | "contrato_suspenso"
+  | "contrato_cancelado";
 
 type View = "visao_geral" | Bucket;
 
@@ -36,6 +38,8 @@ const BUCKETS: { key: Bucket; label: string }[] = [
   { key: "escolher_candidato", label: "Ambíguos" },
   { key: "criar", label: "A criar no Omie" },
   { key: "criar_contrato", label: "Criar contrato" },
+  { key: "contrato_suspenso", label: "Contrato suspenso no Omie" },
+  { key: "contrato_cancelado", label: "Contrato cancelado no Omie" },
 ];
 
 const BUCKET_HELP: Record<Bucket, string> = {
@@ -53,7 +57,12 @@ const BUCKET_HELP: Record<Bucket, string> = {
     "Clientes do DoctorSaaS que não existem no Omie. Estão prontos (têm modelo, valor e dados válidos) para serem criados no Omie — cliente e contrato — quando você liberar.",
   criar_contrato:
     "O cliente já existe no Omie, mas não tem contrato ativo lá. Aqui será criado apenas o contrato, vinculado ao cliente que já existe (não duplica o cliente).",
+  contrato_suspenso:
+    "O cliente tem um contrato no Omie, mas está SUSPENSO. Não deve ser criado um novo contrato (duplicaria) — a ação é reativar/revisar o existente.",
+  contrato_cancelado:
+    "O cliente tinha um contrato no Omie, mas foi CANCELADO. Avalie reativar o cancelado ou criar um novo.",
 };
+
 
 const PAGE_SIZE = 25;
 
@@ -135,7 +144,9 @@ type ReconciliacaoRow = {
   nome_diverge: boolean | null;
   fornecedor_ds: string | null;
   fornecedor_id: number | null;
+  situacao_contrato: string | null;
 };
+
 
 function normNome(s?: string | null): string {
   return (s || "")
@@ -253,10 +264,14 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
             Escolher cadastro Omie ({row.qtd_candidatos_omie ?? 0})
           </DisabledActionButton>
         );
+      case "contrato_suspenso":
+      case "contrato_cancelado":
+        return <DisabledActionButton>Reativar/Revisar no Omie</DisabledActionButton>;
       default:
         return null;
     }
   }
+
 
   return (
     <div className="rounded-lg border overflow-hidden">
@@ -338,6 +353,16 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
             <>
               <div className="mt-0.5 text-sm flex items-center gap-2 flex-wrap">
                 <span className="font-medium">{formatBRL(row.valor_omie)}</span>
+                {row.situacao_contrato === "90" && (
+                  <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-900">
+                    Suspenso
+                  </Badge>
+                )}
+                {row.situacao_contrato === "99" && (
+                  <Badge variant="destructive" className="text-[10px]">
+                    Cancelado
+                  </Badge>
+                )}
                 {valoresBatem ? (
                   <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-900">
                     ✓ bate
@@ -351,6 +376,7 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
                   </span>
                 ) : null}
               </div>
+
               <div className="text-[11px] text-muted-foreground/80 mt-0.5">
                 cód. {row.codigo_contrato_omie}
               </div>
@@ -767,7 +793,7 @@ export default function OmieConferenciaTab() {
       let q = supabase
         .from("reconciliacao_cadastro")
         .select(
-          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id",
+          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id, situacao_contrato",
           { count: "exact" }
         );
       if (bucketAtivo !== "visao_geral") q = q.eq("acao_sugerida", bucketAtivo);
