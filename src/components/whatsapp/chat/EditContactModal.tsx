@@ -26,11 +26,12 @@ interface EditContactModalProps {
   isNewContact?: boolean;
   conversationId?: string | null;
   attendanceId?: string | null;
+  isGroup?: boolean;
 }
 
 interface ContactFormData { name: string; notes: string; phone: string; }
 
-export function EditContactModal({ open, onOpenChange, contactId, contactName, contactPhone, contactNotes, onSuccess, isNewContact, conversationId, attendanceId }: EditContactModalProps) {
+export function EditContactModal({ open, onOpenChange, contactId, contactName, contactPhone, contactNotes, onSuccess, isNewContact, conversationId, attendanceId, isGroup = false }: EditContactModalProps) {
   const { updateContact, isUpdatingContact } = useWhatsAppActions();
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
@@ -202,21 +203,26 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
         setIsSaving(false);
       }
     } else {
-      const normalized = normalizeBRPhone(data.phone || '');
-      const originalNormalized = normalizeBRPhone(contactPhone || '');
-      const phoneChanged = normalized !== originalNormalized;
-      if (phoneChanged && !isValidBRPhone(normalized)) {
-        toast.error('Telefone inválido');
-        return;
+      const updatePayload: { name: string; notes: string | null; phone_number?: string } = {
+        name: data.name,
+        notes: data.notes || null,
+      };
+      const normalized = isGroup ? '' : normalizeBRPhone(data.phone || '');
+
+      if (!isGroup) {
+        const originalNormalized = normalizeBRPhone(contactPhone || '');
+        const phoneChanged = normalized !== originalNormalized;
+        if (phoneChanged && !isValidBRPhone(normalized)) {
+          toast.error('Telefone inválido');
+          return;
+        }
+        if (phoneChanged) updatePayload.phone_number = normalized;
       }
+
       updateContact(
         {
           contactId,
-          data: {
-            name: data.name,
-            notes: data.notes || null,
-            ...(phoneChanged ? { phone_number: normalized } : {}),
-          },
+          data: updatePayload,
         },
         {
           onSuccess: async () => {
@@ -276,28 +282,36 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
-            <DialogTitle>{isNewContact ? 'Salvar Contato' : 'Editar Contato'}</DialogTitle>
+            <DialogTitle>
+              {isNewContact
+                ? 'Salvar Contato'
+                : isGroup
+                ? 'Editar Grupo'
+                : 'Editar Contato'}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="phone">Telefone {!isNewContact && '*'}</Label>
-              {isNewContact ? (
-                <Input value={contactPhone ? maskPhoneBR(contactPhone) : ''} disabled className="bg-muted" />
-              ) : (
-                <>
-                  <Input
-                    id="phone"
-                    value={watch('phone') || ''}
-                    onChange={(e) => setValue('phone', maskBRPhoneLive(e.target.value), { shouldDirty: true })}
-                    placeholder="+55 (DD) 9XXXX-XXXX"
-                    inputMode="tel"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Edite caso o número esteja com um dígito a mais (ex: 9 extra) e impeça o envio.
-                  </p>
-                </>
-              )}
-            </div>
+            {!isGroup && (
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefone {!isNewContact && '*'}</Label>
+                {isNewContact ? (
+                  <Input value={contactPhone ? maskPhoneBR(contactPhone) : ''} disabled className="bg-muted" />
+                ) : (
+                  <>
+                    <Input
+                      id="phone"
+                      value={watch('phone') || ''}
+                      onChange={(e) => setValue('phone', maskBRPhoneLive(e.target.value), { shouldDirty: true })}
+                      placeholder="+55 (DD) 9XXXX-XXXX"
+                      inputMode="tel"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Edite caso o número esteja com um dígito a mais (ex: 9 extra) e impeça o envio.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="name">Nome *</Label>
               <Input id="name" {...register('name', { required: 'Nome é obrigatório', minLength: { value: 2, message: 'Mínimo 2 caracteres' } })} />
