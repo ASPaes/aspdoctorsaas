@@ -413,11 +413,22 @@ export default function OmieConferenciaTab() {
   const [nomeFiltro, setNomeFiltro] = useState<"todos" | "diferentes">("todos");
   const [fornecedorFiltro, setFornecedorFiltro] = useState<string>("__all__");
 
+  // fornecedorFiltro: "__all__" (todos) | "__null__" (sem fornecedor) | id numérico em string
+  const fornecedorParam = useMemo<number | null>(() => {
+    if (fornecedorFiltro === "__all__") return null;
+    if (fornecedorFiltro === "__null__") return -1;
+    const n = Number(fornecedorFiltro);
+    return Number.isFinite(n) ? n : null;
+  }, [fornecedorFiltro]);
+
   const { data: resumo, isLoading: loadingResumo } = useQuery({
-    queryKey: ["omie-conf-resumo", tid],
+    queryKey: ["omie-conf-resumo", tid, fornecedorParam],
     enabled: !!tid,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("reconciliacao_resumo" as any, { p_tenant_id: tid });
+      const { data, error } = await supabase.rpc("reconciliacao_resumo" as any, {
+        p_tenant_id: tid,
+        p_fornecedor_id: fornecedorParam,
+      });
       if (error) throw error;
       return (data ?? []) as ResumoLinha[];
     },
@@ -460,7 +471,7 @@ export default function OmieConferenciaTab() {
         { p_tenant_id: tid }
       );
       if (error) throw error;
-      return (data ?? []) as { fornecedor_ds: string | null; qtd: number }[];
+      return (data ?? []) as { fornecedor_id: number | null; fornecedor_ds: string | null; qtd: number }[];
     },
   });
 
