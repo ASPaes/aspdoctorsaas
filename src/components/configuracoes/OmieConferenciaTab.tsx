@@ -75,6 +75,7 @@ type ReconciliacaoRow = {
   razao_ds: string | null;
   razao_omie: string | null;
   codigo_cliente_omie: string | number | null;
+  codigo_contrato_omie: string | number | null;
   cnpj_norm: string | null;
   valor_mrr_ds: number | null;
   valor_omie: number | null;
