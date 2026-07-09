@@ -507,7 +507,7 @@ export default function OmieConferenciaTab() {
             <button
               key={b.key}
               type="button"
-              onClick={() => { setPage(0); setBucketAtivo(ativo ? null : b.key); }}
+              onClick={() => { setPage(0); setNomeFiltro("todos"); setBucketAtivo(ativo ? null : b.key); }}
               className={`text-left rounded-lg border p-3 transition hover:border-primary ${ativo ? "border-primary bg-primary/5" : ""}`}
             >
               <div className="flex items-start gap-1">
