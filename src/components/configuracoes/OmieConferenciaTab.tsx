@@ -26,6 +26,8 @@ type Bucket =
   | "criar"
   | "criar_contrato";
 
+type View = "visao_geral" | Bucket;
+
 const BUCKETS: { key: Bucket; label: string }[] = [
   { key: "vinculo_auto_ok", label: "Prontos para vincular" },
   { key: "resolver", label: "Divergências de valor" },
