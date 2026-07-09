@@ -210,9 +210,7 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
 
   const clienteNoOmie = row.codigo_cliente_omie != null && String(row.codigo_cliente_omie) !== "";
   const contratoNoOmie = row.codigo_contrato_omie != null && String(row.codigo_contrato_omie) !== "";
-  const nomesDiferem =
-    clienteNoOmie && !!row.razao_ds && !!row.razao_omie &&
-    normNome(row.razao_ds) !== normNome(row.razao_omie);
+  const nomesDiferem = row.nome_diverge === true;
   const valoresBatem =
     row.valor_mrr_ds != null && row.valor_omie != null &&
     Number(row.valor_mrr_ds) === Number(row.valor_omie);
