@@ -35,7 +35,45 @@ const BUCKETS: { key: Bucket; label: string }[] = [
   { key: "criar_contrato", label: "Criar contrato" },
 ];
 
+const BUCKET_HELP: Record<Bucket, string> = {
+  vinculo_auto_ok:
+    "Clientes que já existem no Omie (mesmo CNPJ) e cujo valor mensal bate com o DoctorSaaS. Falta só criar o vínculo (de/para) entre os dois cadastros, para que futuras alterações no DoctorSaaS cheguem ao contrato certo no Omie. Vincular não altera nada no Omie — só registra a ligação.",
+  resolver:
+    "Clientes que existem nos dois lados (mesmo CNPJ), mas o valor mensal é diferente entre DoctorSaaS e Omie. Normalmente porque o valor no Omie foi definido por outro sistema. Aqui você decide qual valor vale e atualiza.",
+  atribuir_modelo:
+    "Contratos ativos no DoctorSaaS que não têm um modelo de contrato definido. Sem modelo, não é possível enviá-los ao Omie. O ajuste é feito no próprio DoctorSaaS: defina o modelo para liberar o envio.",
+  pendente_assuncao:
+    "Clientes que já estão no Omie, mas sob o controle de outra integração (Ploomes, DIGI, etc.). Assumir agora sobrescreveria o código dessa integração e poderia duplicar o cadastro. Ficam travados até a integração de origem ser desligada.",
+  escolher_candidato:
+    "Clientes cujo CNPJ aparece em mais de um cadastro — seja no Omie (cadastros duplicados) ou no DoctorSaaS. Como não dá para saber automaticamente qual é o certo, você escolhe manualmente o cadastro correto.",
+  criar:
+    "Clientes do DoctorSaaS que não existem no Omie. Estão prontos (têm modelo, valor e dados válidos) para serem criados no Omie — cliente e contrato — quando você liberar.",
+  criar_contrato:
+    "O cliente já existe no Omie, mas não tem contrato ativo lá. Aqui será criado apenas o contrato, vinculado ao cliente que já existe (não duplica o cliente).",
+};
+
 const PAGE_SIZE = 25;
+
+function BucketHelpIcon({ bucket }: { bucket: Bucket }) {
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            tabIndex={0}
+            className="inline-flex items-center justify-center rounded-full p-0.5 text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+          {BUCKET_HELP[bucket]}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 function formatCNPJ(v?: string | null): string {
   if (!v) return "—";
