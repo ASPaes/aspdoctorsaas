@@ -9701,6 +9701,10 @@ export type Database = {
           qtd: number
         }[]
       }
+      reconciliacao_visao_geral: {
+        Args: { p_tenant_id: string }
+        Returns: Json
+      }
       register_conselho_analise: {
         Args: {
           p_alertas_factuais: Json

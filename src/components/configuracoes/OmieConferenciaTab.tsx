@@ -26,6 +26,8 @@ type Bucket =
   | "criar"
   | "criar_contrato";
 
+type View = "visao_geral" | Bucket;
+
 const BUCKETS: { key: Bucket; label: string }[] = [
   { key: "vinculo_auto_ok", label: "Prontos para vincular" },
   { key: "resolver", label: "Divergências de valor" },
@@ -405,9 +407,288 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
 }
 
 
+type VisaoGeralData = {
+  gerado_em?: string | null;
+  ds?: { clientes?: number; contratos_ativos?: number; mrr_total?: number; mrr_conciliavel?: number };
+  omie?: { clientes?: number; contratos_ativos?: number; mrr_total_ativos?: number };
+  conciliado?: {
+    contratos_casados?: number;
+    com_contrato_omie?: number;
+    mrr_casado_ds?: number;
+    mrr_casado_omie?: number;
+    mrr_divergencia?: number;
+    divergencia_valor_qtd?: number;
+    divergencia_valor_montante?: number;
+    pendente_assuncao_mrr_omie?: number;
+  };
+  baldes?: Record<string, number>;
+  total_contratos?: number;
+};
+
+function num(v: any): number {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function VisaoGeralPanel({
+  tid,
+  onIrParaBalde,
+}: {
+  tid: string | null | undefined;
+  onIrParaBalde: (b: Bucket) => void;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["omie-conf-visao-geral", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc(
+        "reconciliacao_visao_geral" as any,
+        { p_tenant_id: tid }
+      );
+      if (error) throw error;
+      return (data ?? {}) as VisaoGeralData;
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
+
+  const ds = data?.ds ?? {};
+  const omie = data?.omie ?? {};
+  const c = data?.conciliado ?? {};
+  const baldes = data?.baldes ?? {};
+
+  const mrrCasadoDs = num(c.mrr_casado_ds);
+  const mrrCasadoOmie = num(c.mrr_casado_omie);
+  const mrrDivergencia = num(c.mrr_divergencia);
+  const alinhamentoPct =
+    mrrCasadoDs > 0
+      ? Math.max(0, Math.min(1, 1 - Math.abs(mrrDivergencia) / mrrCasadoDs))
+      : 1;
+  const alinhamentoStr = alinhamentoPct.toLocaleString("pt-BR", {
+    style: "percent",
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+
+  // Barra: proporção DS x Omie sobre o maior dos dois
+  const maxCasado = Math.max(mrrCasadoDs, mrrCasadoOmie, 1);
+  const larguraDs = (mrrCasadoDs / maxCasado) * 100;
+  const larguraOmie = (mrrCasadoOmie / maxCasado) * 100;
+
+  const somaBaldeCriar = num(baldes.criar) + num(baldes.criar_contrato);
+
+  const chips: { label: string; qtd: number; bucket: Bucket; tone: "emerald" | "amber" | "red" | "muted" }[] = [
+    { label: "Prontos para vincular", qtd: num(baldes.vinculo_auto_ok), bucket: "vinculo_auto_ok", tone: "emerald" },
+    { label: "Sem modelo", qtd: num(baldes.atribuir_modelo), bucket: "atribuir_modelo", tone: "amber" },
+    { label: "Ambíguos", qtd: num(baldes.escolher_candidato), bucket: "escolher_candidato", tone: "amber" },
+    { label: "Pendente assunção", qtd: num(baldes.pendente_assuncao), bucket: "pendente_assuncao", tone: "muted" },
+    { label: "A criar", qtd: somaBaldeCriar, bucket: "criar", tone: "amber" },
+  ];
+
+  const chipToneClass: Record<string, string> = {
+    emerald: "border-emerald-300 hover:border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-900",
+    amber: "border-amber-300 hover:border-amber-500 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-900",
+    red: "border-red-300 hover:border-red-500 bg-red-50/50 dark:bg-red-950/20 dark:border-red-900",
+    muted: "border-border hover:border-primary bg-muted/30",
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Topo */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="text-sm text-muted-foreground">
+          Conferido em{" "}
+          <span className="font-medium text-foreground">{formatDateTime(data?.gerado_em)}</span>
+        </div>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={0}>
+                <Button variant="outline" size="sm" disabled className="gap-1 pointer-events-none">
+                  <RefreshCw className="h-4 w-4" /> Reconferir agora
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>disponível em breve</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
+      {/* Retrato das bases */}
+      <div>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          Retrato das bases
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Card className="border-primary/40 bg-primary/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs uppercase tracking-wide text-primary">DoctorSaaS</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-3 gap-3">
+              <div>
+                <div className="text-[11px] text-muted-foreground">Clientes</div>
+                <div className="text-xl font-semibold">{num(ds.clientes).toLocaleString("pt-BR")}</div>
+              </div>
+              <div>
+                <div className="text-[11px] text-muted-foreground">Contratos ativos</div>
+                <div className="text-xl font-semibold">{num(ds.contratos_ativos).toLocaleString("pt-BR")}</div>
+              </div>
+              <div>
+                <div className="text-[11px] text-muted-foreground">MRR total</div>
+                <div className="text-xl font-semibold">{formatBRL(ds.mrr_total)}</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  Conciliável: <span className="font-medium">{formatBRL(ds.mrr_conciliavel)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Omie</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-3 gap-3">
+              <div>
+                <div className="text-[11px] text-muted-foreground">Clientes</div>
+                <div className="text-xl font-semibold">{num(omie.clientes).toLocaleString("pt-BR")}</div>
+              </div>
+              <div>
+                <div className="text-[11px] text-muted-foreground">Contratos ativos</div>
+                <div className="text-xl font-semibold">{num(omie.contratos_ativos).toLocaleString("pt-BR")}</div>
+              </div>
+              <div>
+                <div className="text-[11px] text-muted-foreground">MRR ativo</div>
+                <div className="text-xl font-semibold">{formatBRL(omie.mrr_total_ativos)}</div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-2 italic">
+          As bases têm escopos diferentes (o Omie tem cadastros legados; o DoctorSaaS tem contratos sem
+          modelo). Compare pela conciliação abaixo.
+        </p>
+      </div>
+
+      {/* Conciliação — herói */}
+      <Card className="border-2">
+        <CardHeader className="pb-3">
+          <div className="flex items-baseline justify-between flex-wrap gap-2">
+            <CardTitle className="text-base">
+              <span className="text-2xl font-bold text-foreground">
+                {num(c.com_contrato_omie).toLocaleString("pt-BR")}
+              </span>{" "}
+              <span className="font-normal text-muted-foreground">contratos existem nos dois sistemas</span>
+            </CardTitle>
+            <Badge
+              variant="outline"
+              className="text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-900 text-sm px-3 py-1"
+            >
+              ✓ {alinhamentoStr} alinhado
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Medidor DS x Omie */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-primary font-medium">DS · {formatBRL(mrrCasadoDs)}</span>
+              <span className="text-muted-foreground font-medium">Omie · {formatBRL(mrrCasadoOmie)}</span>
+            </div>
+            <div className="space-y-1">
+              <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+                <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${larguraDs}%` }} />
+              </div>
+              <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-foreground/60 rounded-full transition-all"
+                  style={{ width: `${larguraOmie}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Divergência */}
+          <div className="rounded-lg border p-3 flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wide">Divergência total</div>
+              <div
+                className={`text-3xl font-bold ${
+                  Math.abs(mrrDivergencia) < 0.01
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-red-600 dark:text-red-500"
+                }`}
+              >
+                {formatBRL(mrrDivergencia)}
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground max-w-xs text-right">
+              Percentual de alinhamento entre o MRR conciliado do DoctorSaaS e do Omie.
+            </div>
+          </div>
+
+          {/* Mini-indicadores */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50/40 dark:bg-red-950/20 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-red-700 dark:text-red-400">
+                Divergências de valor a resolver
+              </div>
+              <div className="mt-1 flex items-baseline gap-2 flex-wrap">
+                <span className="text-2xl font-semibold text-red-700 dark:text-red-400">
+                  {num(c.divergencia_valor_qtd).toLocaleString("pt-BR")}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  ({formatBRL(c.divergencia_valor_montante)})
+                </span>
+              </div>
+            </div>
+            <div className="rounded-lg border border-muted bg-muted/30 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Sob outra integração (assunção pendente)
+              </div>
+              <div className="mt-1 text-2xl font-semibold">
+                {formatBRL(c.pendente_assuncao_mrr_omie)}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* O que falta conciliar */}
+      <div>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          O que falta conciliar
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+          {chips.map((chip) => (
+            <button
+              key={chip.label}
+              type="button"
+              onClick={() => onIrParaBalde(chip.bucket)}
+              className={`text-left rounded-lg border p-3 transition ${chipToneClass[chip.tone]}`}
+            >
+              <div className="text-xs text-muted-foreground line-clamp-2 min-h-[2rem]">{chip.label}</div>
+              <div className="text-2xl font-semibold mt-1">{chip.qtd.toLocaleString("pt-BR")}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function OmieConferenciaTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const [bucketAtivo, setBucketAtivo] = useState<Bucket | null>(null);
+  const [bucketAtivo, setBucketAtivo] = useState<View>("visao_geral");
   const [busca, setBusca] = useState("");
   const [page, setPage] = useState(0);
   const [nomeFiltro, setNomeFiltro] = useState<"todos" | "diferentes">("todos");
@@ -481,7 +762,7 @@ export default function OmieConferenciaTab() {
 
   const { data: lista, isLoading: loadingLista } = useQuery({
     queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro, fornecedorParam],
-    enabled: !!tid,
+    enabled: !!tid && bucketAtivo !== "visao_geral",
     queryFn: async () => {
       let q = supabase
         .from("reconciliacao_cadastro")
@@ -489,7 +770,7 @@ export default function OmieConferenciaTab() {
           "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id",
           { count: "exact" }
         );
-      if (bucketAtivo) q = q.eq("acao_sugerida", bucketAtivo);
+      if (bucketAtivo !== "visao_geral") q = q.eq("acao_sugerida", bucketAtivo);
       if (bucketAtivo === "vinculo_auto_ok" && nomeFiltro === "diferentes") {
         q = q.eq("nome_diverge", true);
       }
@@ -575,8 +856,22 @@ export default function OmieConferenciaTab() {
         )}
       </div>
 
-      {/* Cartões resumo */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+      {/* Cartões resumo (Visão Geral + baldes) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
+        <button
+          type="button"
+          onClick={() => { setPage(0); setNomeFiltro("todos"); setBucketAtivo("visao_geral"); }}
+          className={`text-left rounded-lg border p-3 transition hover:border-primary ${
+            bucketAtivo === "visao_geral" ? "border-primary bg-primary/5" : ""
+          }`}
+        >
+          <div className="flex items-start gap-1">
+            <span className="text-xs text-muted-foreground line-clamp-2 min-h-[2rem] flex-1 font-medium">
+              Visão geral
+            </span>
+          </div>
+          <div className="text-2xl font-semibold mt-1 text-primary">★</div>
+        </button>
         {BUCKETS.map(b => {
           const ativo = bucketAtivo === b.key;
           const qtd = contadores.get(b.key) ?? 0;
@@ -584,7 +879,7 @@ export default function OmieConferenciaTab() {
             <button
               key={b.key}
               type="button"
-              onClick={() => { setPage(0); setNomeFiltro("todos"); setBucketAtivo(ativo ? null : b.key); }}
+              onClick={() => { setPage(0); setNomeFiltro("todos"); setBucketAtivo(b.key); }}
               className={`text-left rounded-lg border p-3 transition hover:border-primary ${ativo ? "border-primary bg-primary/5" : ""}`}
             >
               <div className="flex items-start gap-1">
@@ -628,12 +923,18 @@ export default function OmieConferenciaTab() {
         </CardContent>
       </Card>
 
-      {/* Busca + lista */}
+      {/* Conteúdo principal: Visão Geral ou Busca + lista do balde */}
+      {bucketAtivo === "visao_geral" ? (
+        <VisaoGeralPanel
+          tid={tid}
+          onIrParaBalde={(b) => { setPage(0); setNomeFiltro("todos"); setBucketAtivo(b); }}
+        />
+      ) : (
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <CardTitle className="text-base">
-              {bucketAtivo ? BUCKETS.find(b => b.key === bucketAtivo)?.label : "Todas as divergências"}
+              {BUCKETS.find(b => b.key === bucketAtivo)?.label ?? "Divergências"}
               <span className="text-sm font-normal text-muted-foreground ml-2">({total})</span>
             </CardTitle>
             {bucketAtivo === "vinculo_auto_ok" && (
@@ -722,6 +1023,7 @@ export default function OmieConferenciaTab() {
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }
