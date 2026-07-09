@@ -718,15 +718,20 @@ export default function OmieConferenciaTab() {
   const [busca, setBusca] = useState("");
   const [page, setPage] = useState(0);
   const [nomeFiltro, setNomeFiltro] = useState<"todos" | "diferentes">("todos");
-  const [fornecedorFiltro, setFornecedorFiltro] = useState<string>("__all__");
+  const [fornecedorSel, setFornecedorSel] = useState<number[]>([]);
 
-  // fornecedorFiltro: "__all__" (todos) | "__null__" (sem fornecedor) | id numérico em string
-  const fornecedorParam = useMemo<number | null>(() => {
-    if (fornecedorFiltro === "__all__") return null;
-    if (fornecedorFiltro === "__null__") return -1;
-    const n = Number(fornecedorFiltro);
-    return Number.isFinite(n) ? n : null;
-  }, [fornecedorFiltro]);
+  // Array de IDs (usar -1 para "Sem fornecedor"). Vazio = todos.
+  const fornecedorParam = useMemo<number[] | null>(
+    () => (fornecedorSel.length === 0 ? null : fornecedorSel),
+    [fornecedorSel]
+  );
+
+  const toggleFornecedor = (id: number) => {
+    setPage(0);
+    setFornecedorSel((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   const { data: resumo, isLoading: loadingResumo } = useQuery({
     queryKey: ["omie-conf-resumo", tid, fornecedorParam],
@@ -734,12 +739,13 @@ export default function OmieConferenciaTab() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("reconciliacao_resumo" as any, {
         p_tenant_id: tid,
-        p_fornecedor_id: fornecedorParam,
+        p_fornecedor_ids: fornecedorParam,
       });
       if (error) throw error;
       return (data ?? []) as ResumoLinha[];
     },
   });
+
 
   const contadores = useMemo(() => {
     const map = new Map<string, number>();
