@@ -56,6 +56,7 @@ interface MediaContentProps {
   mediaSizeBytes?: number | null;
   mediaKind?: string | null;
   mediaMimetype?: string | null;
+  mediaPath?: string | null;
 }
 
 function useProxyUrl(messageId: string, mediaUrl: string | null | undefined, mode: "inline" | "attachment" = "inline"): string | null {
@@ -95,6 +96,7 @@ export function MediaContent({
   mediaSizeBytes,
   mediaKind,
   mediaMimetype,
+  mediaPath,
 }: MediaContentProps) {
   const resolvedInlineUrl = useProxyUrl(messageId, mediaUrl, "inline");
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -109,6 +111,7 @@ export function MediaContent({
         mediaKind={mediaKind || "document"}
         mediaMimetype={mediaMimetype}
         mediaUrl={mediaUrl}
+        mediaPath={mediaPath}
       />
     );
   }
