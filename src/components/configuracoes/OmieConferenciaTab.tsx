@@ -299,6 +299,10 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
                 </div>
               )}
             </>
+          ) : bucket === "atribuir_modelo" ? (
+            <div className="text-sm text-muted-foreground italic mt-1">
+              Este cliente ainda não existe no Omie — será criado ao definir o modelo e enviar.
+            </div>
           ) : (
             <div className="text-sm text-muted-foreground italic mt-1">— não está no Omie —</div>
           )}
