@@ -1122,6 +1122,66 @@ export default function OmieConferenciaTab() {
         </CardContent>
       </Card>
       )}
+
+      <AlertDialog open={confirmVincularOpen} onOpenChange={setConfirmVincularOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Vincular em lote</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const totalProntos = contadores.get("vinculo_auto_ok") ?? 0;
+                const mDiff = nomeDivergeCount ?? 0;
+                const nOk = Math.max(0, totalProntos - mDiff);
+                return `Serão vinculados os ${nOk} contratos prontos (nome, CNPJ e valor batendo). Os ${mDiff} com nome diferente NÃO entram — ficam para vínculo manual. Isso cria a ligação DoctorSaaS ↔ Omie e NÃO altera nada no Omie.`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={vinculandoLote}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={vinculandoLote}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!tid) return;
+                setVinculandoLote(true);
+                try {
+                  const body: Record<string, unknown> = { tenant_id: tid };
+                  if (fornecedorParam && fornecedorParam.length > 0) {
+                    body.fornecedor_ids = fornecedorParam;
+                  }
+                  const { data, error } = await supabase.functions.invoke(
+                    "recon-vincular-lote",
+                    { body }
+                  );
+                  if (error) throw error;
+                  const res = data as { ok?: boolean; vinculados?: number; error?: string } | null;
+                  if (res?.ok) {
+                    toast.success(`${res.vinculados ?? 0} contratos vinculados com sucesso.`);
+                    setConfirmVincularOpen(false);
+                    await Promise.all([
+                      queryClient.invalidateQueries({ queryKey: ["omie-conf-resumo"] }),
+                      queryClient.invalidateQueries({ queryKey: ["omie-conf-lista"] }),
+                      queryClient.invalidateQueries({ queryKey: ["omie-conf-nome-diverge-count"] }),
+                      queryClient.invalidateQueries({ queryKey: ["omie-conf-fornecedores"] }),
+                      queryClient.invalidateQueries({ queryKey: ["omie-conf-visao-geral"] }),
+                    ]);
+                  } else {
+                    toast.error(res?.error ?? "Falha ao vincular em lote.");
+                  }
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Falha ao vincular em lote.");
+                } finally {
+                  setVinculandoLote(false);
+                }
+              }}
+            >
+              {vinculandoLote
+                ? "Vinculando..."
+                : `Vincular ${Math.max(0, (contadores.get("vinculo_auto_ok") ?? 0) - (nomeDivergeCount ?? 0))}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
