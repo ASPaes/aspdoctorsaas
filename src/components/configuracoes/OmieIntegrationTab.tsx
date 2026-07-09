@@ -13,6 +13,7 @@ import { Loader2, Save, Plug, RefreshCw, KeyRound } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OmieVinculosTab from "./OmieVinculosTab";
 import OmiePadroesTab from "./OmiePadroesTab";
+import OmieConferenciaTab from "./OmieConferenciaTab";
 
 export default function OmieIntegrationTab() {
   const { toast } = useToast();
