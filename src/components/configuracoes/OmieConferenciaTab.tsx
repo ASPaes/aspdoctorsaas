@@ -442,16 +442,19 @@ export default function OmieConferenciaTab() {
   const to = from + PAGE_SIZE - 1;
 
   const { data: lista, isLoading: loadingLista } = useQuery({
-    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page],
+    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro],
     enabled: !!tid,
     queryFn: async () => {
       let q = supabase
         .from("reconciliacao_cadastro")
         .select(
-          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida",
+          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge",
           { count: "exact" }
         );
       if (bucketAtivo) q = q.eq("acao_sugerida", bucketAtivo);
+      if (bucketAtivo === "vinculo_auto_ok" && nomeFiltro === "diferentes") {
+        q = q.eq("nome_diverge", true);
+      }
       if (buscaTrim) {
         const digits = buscaTrim.replace(/\D/g, "");
         if (digits.length >= 8) {
