@@ -26,6 +26,7 @@ interface EditContactModalProps {
   isNewContact?: boolean;
   conversationId?: string | null;
   attendanceId?: string | null;
+  isGroup?: boolean;
 }
 
 interface ContactFormData { name: string; notes: string; phone: string; }
