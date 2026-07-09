@@ -423,6 +423,20 @@ export default function OmieConferenciaTab() {
     }, null);
   }, [resumo]);
 
+  const { data: nomeDivergeCount, isLoading: loadingNomeDivergeCount } = useQuery({
+    queryKey: ["omie-conf-nome-diverge-count", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("reconciliacao_cadastro")
+        .select("*", { count: "exact", head: true })
+        .eq("acao_sugerida", "vinculo_auto_ok")
+        .eq("nome_diverge", true);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
   const buscaTrim = busca.trim();
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
