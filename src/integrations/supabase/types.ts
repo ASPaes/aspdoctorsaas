@@ -4214,6 +4214,7 @@ export type Database = {
           passa_validacao: boolean | null
           qtd_candidatos_omie: number | null
           razao_ds: string | null
+          razao_omie: string | null
           resolvido_em: string | null
           resolvido_por: string | null
           status_usuario: string
@@ -4247,6 +4248,7 @@ export type Database = {
           passa_validacao?: boolean | null
           qtd_candidatos_omie?: number | null
           razao_ds?: string | null
+          razao_omie?: string | null
           resolvido_em?: string | null
           resolvido_por?: string | null
           status_usuario?: string
@@ -4280,6 +4282,7 @@ export type Database = {
           passa_validacao?: boolean | null
           qtd_candidatos_omie?: number | null
           razao_ds?: string | null
+          razao_omie?: string | null
           resolvido_em?: string | null
           resolvido_por?: string | null
           status_usuario?: string

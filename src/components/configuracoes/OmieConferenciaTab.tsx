@@ -73,6 +73,8 @@ type ResumoLinha = { acao_sugerida: Bucket | string; qtd: number; gerado_em: str
 type ReconciliacaoRow = {
   ds_contract_id: string | null;
   razao_ds: string | null;
+  razao_omie: string | null;
+  codigo_cliente_omie: string | null;
   cnpj_norm: string | null;
   valor_mrr_ds: number | null;
   valor_omie: number | null;
@@ -89,6 +91,11 @@ type ReconciliacaoRow = {
   diffs: any;
   acao_sugerida: string | null;
 };
+
+function normNome(s?: string | null): string {
+  return (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 
 function DisabledActionButton({
   children, tip = "disponível em breve", icon,
