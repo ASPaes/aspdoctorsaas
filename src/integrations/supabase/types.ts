@@ -1602,6 +1602,8 @@ export type Database = {
       }
       configuracoes: {
         Row: {
+          ai_budget_alert_pct: number
+          ai_monthly_budget_usd: number | null
           billing_skip_ura_enabled: boolean
           billing_skip_ura_minutes: number
           business_hours: Json
@@ -1630,6 +1632,7 @@ export type Database = {
           oncall_phone_number: string | null
           oncall_repeat_cooldown_minutes: number
           oncall_urgency_keywords: Json
+          sentiment_analysis_enabled: boolean
           support_agent_alert_enabled: boolean
           support_agent_alert_minutes: number
           support_agent_no_response_close_enabled: boolean
@@ -1665,6 +1668,8 @@ export type Database = {
           ura_welcome_template: string
         }
         Insert: {
+          ai_budget_alert_pct?: number
+          ai_monthly_budget_usd?: number | null
           billing_skip_ura_enabled?: boolean
           billing_skip_ura_minutes?: number
           business_hours?: Json
@@ -1693,6 +1698,7 @@ export type Database = {
           oncall_phone_number?: string | null
           oncall_repeat_cooldown_minutes?: number
           oncall_urgency_keywords?: Json
+          sentiment_analysis_enabled?: boolean
           support_agent_alert_enabled?: boolean
           support_agent_alert_minutes?: number
           support_agent_no_response_close_enabled?: boolean
@@ -1728,6 +1734,8 @@ export type Database = {
           ura_welcome_template?: string
         }
         Update: {
+          ai_budget_alert_pct?: number
+          ai_monthly_budget_usd?: number | null
           billing_skip_ura_enabled?: boolean
           billing_skip_ura_minutes?: number
           business_hours?: Json
@@ -1756,6 +1764,7 @@ export type Database = {
           oncall_phone_number?: string | null
           oncall_repeat_cooldown_minutes?: number
           oncall_urgency_keywords?: Json
+          sentiment_analysis_enabled?: boolean
           support_agent_alert_enabled?: boolean
           support_agent_alert_minutes?: number
           support_agent_no_response_close_enabled?: boolean
@@ -8234,6 +8243,7 @@ export type Database = {
         Args: { p_minutes: number; p_reason_id: string; p_tenant_id: string }
         Returns: undefined
       }
+      ai_month_spend_usd: { Args: { p_tenant_id: string }; Returns: number }
       aplicar_reajuste: { Args: { p_reajuste_id: string }; Returns: Json }
       attach_attendance_to_ticket: {
         Args: { p_attendance_id: string; p_nota?: string }
