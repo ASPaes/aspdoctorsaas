@@ -1067,6 +1067,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         contactNotes={contact?.notes}
         conversationId={conversation.id}
         attendanceId={attendance?.id ?? null}
+        isGroup={contact?.is_group ?? false}
       />
 
       <TransferDialog
