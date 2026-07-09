@@ -386,6 +386,21 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
                   Divergências: {diffKeys.join(", ")}
                 </div>
               )}
+              {row.tem_cancelado_omie === true && (
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="mt-1.5 inline-flex items-center gap-1.5 rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-2 py-1 text-[11px] text-amber-700 dark:text-amber-400 cursor-help">
+                        <History className="h-3 w-3 shrink-0" />
+                        <span>há também contrato(s) cancelado(s) no Omie</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
+                      Este cliente tem um ou mais contratos cancelados no Omie. Se precisar reativar, faça pelo cadastro do cliente no DoctorSaaS (botão Reativar) — não é feito por este painel.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </>
           ) : (
             <div className="text-sm text-muted-foreground italic mt-1">— sem contrato no Omie —</div>
