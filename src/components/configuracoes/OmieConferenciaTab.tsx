@@ -780,13 +780,14 @@ export default function OmieConferenciaTab() {
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await supabase.rpc(
-        "reconciliacao_fornecedores_count" as any,
+        "reconciliacao_fornecedores" as any,
         { p_tenant_id: tid }
       );
       if (error) throw error;
       return (data ?? []) as { fornecedor_id: number | null; fornecedor_ds: string | null; qtd: number }[];
     },
   });
+
 
   const buscaTrim = busca.trim();
   const from = page * PAGE_SIZE;
