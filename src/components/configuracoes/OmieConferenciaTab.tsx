@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
-  AlertCircle, ChevronDown, ChevronRight, HelpCircle, Lock, RefreshCw, Search,
+  AlertCircle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, HelpCircle, Lock, RefreshCw, Search,
 } from "lucide-react";
 
 type Bucket =
@@ -351,18 +351,34 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
       </div>
 
       {/* Ação */}
-      <div className="border-t bg-muted/10 px-3 py-2 flex items-center justify-end gap-2">
-        {bucket === "escolher_candidato" && row.cnpj_norm && (
-          <Collapsible open={open} onOpenChange={setOpen}>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-1 h-8 px-2">
-                {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                Ver candidatos
-              </Button>
-            </CollapsibleTrigger>
-          </Collapsible>
+      <div className={`border-t bg-muted/10 px-3 py-2 flex items-center gap-2 ${bucket === "resolver" ? "justify-between" : "justify-end"}`}>
+        {bucket === "resolver" ? (
+          <>
+            <DisabledActionButton
+              icon={<ArrowLeft className="h-3 w-3" />}
+              tip="O valor no DoctorSaaS é calculado a partir dos produtos e movimentos do cliente. Ajustar aqui altera a base financeira e afeta relatórios de MRR."
+            >
+              Atualizar valor no DoctorSaaS
+            </DisabledActionButton>
+            <DisabledActionButton icon={<ArrowRight className="h-3 w-3" />}>
+              Atualizar valor no Omie
+            </DisabledActionButton>
+          </>
+        ) : (
+          <>
+            {bucket === "escolher_candidato" && row.cnpj_norm && (
+              <Collapsible open={open} onOpenChange={setOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1 h-8 px-2">
+                    {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    Ver candidatos
+                  </Button>
+                </CollapsibleTrigger>
+              </Collapsible>
+            )}
+            {renderBotao()}
+          </>
         )}
-        {renderBotao()}
       </div>
 
       {bucket === "escolher_candidato" && row.cnpj_norm && open && (
