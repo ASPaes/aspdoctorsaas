@@ -203,21 +203,26 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
         setIsSaving(false);
       }
     } else {
-      const normalized = normalizeBRPhone(data.phone || '');
-      const originalNormalized = normalizeBRPhone(contactPhone || '');
-      const phoneChanged = normalized !== originalNormalized;
-      if (phoneChanged && !isValidBRPhone(normalized)) {
-        toast.error('Telefone inválido');
-        return;
+      const updatePayload: { name: string; notes: string | null; phone_number?: string } = {
+        name: data.name,
+        notes: data.notes || null,
+      };
+
+      if (!isGroup) {
+        const normalized = normalizeBRPhone(data.phone || '');
+        const originalNormalized = normalizeBRPhone(contactPhone || '');
+        const phoneChanged = normalized !== originalNormalized;
+        if (phoneChanged && !isValidBRPhone(normalized)) {
+          toast.error('Telefone inválido');
+          return;
+        }
+        if (phoneChanged) updatePayload.phone_number = normalized;
       }
+
       updateContact(
         {
           contactId,
-          data: {
-            name: data.name,
-            notes: data.notes || null,
-            ...(phoneChanged ? { phone_number: normalized } : {}),
-          },
+          data: updatePayload,
         },
         {
           onSuccess: async () => {
