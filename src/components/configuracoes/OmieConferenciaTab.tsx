@@ -864,38 +864,49 @@ export default function OmieConferenciaTab() {
         </AlertDescription>
       </Alert>
 
-      {/* Filtro global de fornecedor */}
+      {/* Filtro global de fornecedor (multi-seleção) */}
       <div className="flex flex-wrap items-center gap-2">
-        <Label className="text-sm text-muted-foreground">Fornecedor:</Label>
-        <Select
-          value={fornecedorFiltro}
-          onValueChange={(v) => { setFornecedorFiltro(v); setPage(0); }}
-          disabled={loadingFornecedores}
-        >
-          <SelectTrigger className="h-9 w-auto min-w-[220px]">
-            <SelectValue placeholder="Todos os fornecedores" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">
-              Todos ({(fornecedores ?? []).reduce((s, f) => s + Number(f.qtd || 0), 0)})
-            </SelectItem>
+        <Label className="text-sm text-muted-foreground shrink-0">Fornecedor:</Label>
+        {loadingFornecedores ? (
+          <Skeleton className="h-7 w-64" />
+        ) : (
+          <>
             {(fornecedores ?? []).map((f) => {
-              const value = f.fornecedor_id != null ? String(f.fornecedor_id) : "__null__";
+              const id = f.fornecedor_id != null ? Number(f.fornecedor_id) : -1;
               const label = f.fornecedor_ds ?? "Sem fornecedor";
+              const ativo = fornecedorSel.includes(id);
               return (
-                <SelectItem key={value} value={value}>
-                  {label} ({f.qtd})
-                </SelectItem>
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => toggleFornecedor(id)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition ${
+                    ativo
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                  <Badge variant={ativo ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+                    {Number(f.qtd || 0)}
+                  </Badge>
+                </button>
               );
             })}
-          </SelectContent>
-        </Select>
-        {fornecedorFiltro !== "__all__" && (
-          <Button variant="ghost" size="sm" onClick={() => { setFornecedorFiltro("__all__"); setPage(0); }}>
-            Limpar
-          </Button>
+            {fornecedorSel.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => { setFornecedorSel([]); setPage(0); }}
+              >
+                Limpar
+              </Button>
+            )}
+          </>
         )}
       </div>
+
 
       {/* Cartões resumo (Visão Geral + baldes) */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
