@@ -169,7 +169,7 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
   const diffKeys = Object.keys(diffs);
   const origem = originLabel(row.origem_codigo);
 
-  const clienteNoOmie = !!(row.razao_omie || row.codigo_cliente_omie);
+  const clienteNoOmie = row.codigo_cliente_omie != null && String(row.codigo_cliente_omie) !== "";
   const contratoNoOmie = row.codigo_contrato_omie != null && String(row.codigo_contrato_omie) !== "";
   const nomesDiferem =
     clienteNoOmie && !!row.razao_ds && !!row.razao_omie &&
