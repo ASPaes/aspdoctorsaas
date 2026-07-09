@@ -9688,6 +9688,14 @@ export type Database = {
         Args: { p_contrato_id: string; p_observacao?: string }
         Returns: Json
       }
+      reconciliacao_fornecedores: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          fornecedor_ds: string
+          fornecedor_id: number
+          qtd: number
+        }[]
+      }
       reconciliacao_fornecedores_count: {
         Args: { p_tenant_id: string }
         Returns: {
@@ -9697,7 +9705,7 @@ export type Database = {
         }[]
       }
       reconciliacao_resumo: {
-        Args: { p_fornecedor_id?: number; p_tenant_id: string }
+        Args: { p_fornecedor_ids?: number[]; p_tenant_id: string }
         Returns: {
           acao_sugerida: string
           gerado_em: string
