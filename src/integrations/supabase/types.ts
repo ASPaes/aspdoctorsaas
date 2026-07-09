@@ -4209,6 +4209,7 @@ export type Database = {
           id: string
           modelo_ds: string | null
           multi_contrato: boolean | null
+          nome_diverge: boolean | null
           omie_inativo: boolean | null
           origem_codigo: string | null
           passa_validacao: boolean | null
@@ -4243,6 +4244,7 @@ export type Database = {
           id?: string
           modelo_ds?: string | null
           multi_contrato?: boolean | null
+          nome_diverge?: boolean | null
           omie_inativo?: boolean | null
           origem_codigo?: string | null
           passa_validacao?: boolean | null
@@ -4277,6 +4279,7 @@ export type Database = {
           id?: string
           modelo_ds?: string | null
           multi_contrato?: boolean | null
+          nome_diverge?: boolean | null
           omie_inativo?: boolean | null
           origem_codigo?: string | null
           passa_validacao?: boolean | null

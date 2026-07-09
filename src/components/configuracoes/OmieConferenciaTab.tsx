@@ -129,6 +129,7 @@ type ReconciliacaoRow = {
   estado_valor: string | null;
   diffs: any;
   acao_sugerida: string | null;
+  nome_diverge: boolean | null;
 };
 
 function normNome(s?: string | null): string {
@@ -209,9 +210,7 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
 
   const clienteNoOmie = row.codigo_cliente_omie != null && String(row.codigo_cliente_omie) !== "";
   const contratoNoOmie = row.codigo_contrato_omie != null && String(row.codigo_contrato_omie) !== "";
-  const nomesDiferem =
-    clienteNoOmie && !!row.razao_ds && !!row.razao_omie &&
-    normNome(row.razao_ds) !== normNome(row.razao_omie);
+  const nomesDiferem = row.nome_diverge === true;
   const valoresBatem =
     row.valor_mrr_ds != null && row.valor_omie != null &&
     Number(row.valor_mrr_ds) === Number(row.valor_omie);
@@ -396,6 +395,7 @@ export default function OmieConferenciaTab() {
   const [bucketAtivo, setBucketAtivo] = useState<Bucket | null>(null);
   const [busca, setBusca] = useState("");
   const [page, setPage] = useState(0);
+  const [nomeFiltro, setNomeFiltro] = useState<"todos" | "diferentes">("todos");
 
   const { data: resumo, isLoading: loadingResumo } = useQuery({
     queryKey: ["omie-conf-resumo", tid],
@@ -421,21 +421,38 @@ export default function OmieConferenciaTab() {
     }, null);
   }, [resumo]);
 
+  const { data: nomeDivergeCount, isLoading: loadingNomeDivergeCount } = useQuery({
+    queryKey: ["omie-conf-nome-diverge-count", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("reconciliacao_cadastro")
+        .select("*", { count: "exact", head: true })
+        .eq("acao_sugerida", "vinculo_auto_ok")
+        .eq("nome_diverge", true);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
   const buscaTrim = busca.trim();
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
   const { data: lista, isLoading: loadingLista } = useQuery({
-    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page],
+    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro],
     enabled: !!tid,
     queryFn: async () => {
       let q = supabase
         .from("reconciliacao_cadastro")
         .select(
-          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida",
+          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge",
           { count: "exact" }
         );
       if (bucketAtivo) q = q.eq("acao_sugerida", bucketAtivo);
+      if (bucketAtivo === "vinculo_auto_ok" && nomeFiltro === "diferentes") {
+        q = q.eq("nome_diverge", true);
+      }
       if (buscaTrim) {
         const digits = buscaTrim.replace(/\D/g, "");
         if (digits.length >= 8) {
@@ -490,7 +507,7 @@ export default function OmieConferenciaTab() {
             <button
               key={b.key}
               type="button"
-              onClick={() => { setPage(0); setBucketAtivo(ativo ? null : b.key); }}
+              onClick={() => { setPage(0); setNomeFiltro("todos"); setBucketAtivo(ativo ? null : b.key); }}
               className={`text-left rounded-lg border p-3 transition hover:border-primary ${ativo ? "border-primary bg-primary/5" : ""}`}
             >
               <div className="flex items-start gap-1">
@@ -542,6 +559,23 @@ export default function OmieConferenciaTab() {
               {bucketAtivo ? BUCKETS.find(b => b.key === bucketAtivo)?.label : "Todas as divergências"}
               <span className="text-sm font-normal text-muted-foreground ml-2">({total})</span>
             </CardTitle>
+            {bucketAtivo === "vinculo_auto_ok" && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button size="sm" disabled className="pointer-events-none flex-col items-start h-auto py-1.5 px-3">
+                        <span>Vincular todos os prontos ({contadores.get("vinculo_auto_ok") ?? 0})</span>
+                        <span className="text-[10px] font-normal opacity-80">
+                          {nomeDivergeCount ?? 0} com nome diferente ficam de fora — confira e vincule manualmente
+                        </span>
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>disponível em breve</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -552,6 +586,38 @@ export default function OmieConferenciaTab() {
               />
             </div>
           </div>
+          {bucketAtivo === "vinculo_auto_ok" && (
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => { setNomeFiltro("todos"); setPage(0); }}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition ${
+                  nomeFiltro === "todos"
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border bg-background text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Todos
+                <Badge variant={nomeFiltro === "todos" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+                  {loadingResumo ? <Skeleton className="h-3 w-4" /> : contadores.get("vinculo_auto_ok") ?? 0}
+                </Badge>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setNomeFiltro("diferentes"); setPage(0); }}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition ${
+                  nomeFiltro === "diferentes"
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border bg-background text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Só nomes diferentes
+                <Badge variant={nomeFiltro === "diferentes" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+                  {loadingNomeDivergeCount ? <Skeleton className="h-3 w-4" /> : nomeDivergeCount ?? 0}
+                </Badge>
+              </button>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-2">
           {loadingLista ? (
