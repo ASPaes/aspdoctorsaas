@@ -207,9 +207,9 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
         name: data.name,
         notes: data.notes || null,
       };
+      const normalized = isGroup ? '' : normalizeBRPhone(data.phone || '');
 
       if (!isGroup) {
-        const normalized = normalizeBRPhone(data.phone || '');
         const originalNormalized = normalizeBRPhone(contactPhone || '');
         const phoneChanged = normalized !== originalNormalized;
         if (phoneChanged && !isValidBRPhone(normalized)) {
