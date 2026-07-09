@@ -284,6 +284,7 @@ export function AttendanceChatHistoryModal({
                           messageId={msg.id}
                           messageType={msg.message_type}
                           mediaUrl={msg.media_url}
+                          mediaPath={msg.media_path}
                           mediaFilename={msg.media_filename}
                           mediaExt={msg.media_ext}
                           mediaSizeBytes={msg.media_size_bytes}
