@@ -1032,23 +1032,26 @@ export default function OmieConferenciaTab() {
               {BUCKETS.find(b => b.key === bucketAtivo)?.label ?? "Divergências"}
               <span className="text-sm font-normal text-muted-foreground ml-2">({total})</span>
             </CardTitle>
-            {bucketAtivo === "vinculo_auto_ok" && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span tabIndex={0}>
-                      <Button size="sm" disabled className="pointer-events-none flex-col items-start h-auto py-1.5 px-3">
-                        <span>Vincular todos os prontos ({contadores.get("vinculo_auto_ok") ?? 0})</span>
-                        <span className="text-[10px] font-normal opacity-80">
-                          {nomeDivergeCount ?? 0} com nome diferente ficam de fora — confira e vincule manualmente
-                        </span>
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>disponível em breve</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
+            {bucketAtivo === "vinculo_auto_ok" && (() => {
+              const totalProntos = contadores.get("vinculo_auto_ok") ?? 0;
+              const mDiff = nomeDivergeCount ?? 0;
+              const nOk = Math.max(0, totalProntos - mDiff);
+              return (
+                <Button
+                  size="sm"
+                  disabled={vinculandoLote || nOk === 0}
+                  onClick={() => setConfirmVincularOpen(true)}
+                  className="flex-col items-start h-auto py-1.5 px-3"
+                >
+                  <span>
+                    {vinculandoLote ? "Vinculando..." : `Vincular todos os prontos (${nOk})`}
+                  </span>
+                  <span className="text-[10px] font-normal opacity-80">
+                    {mDiff} com nome diferente ficam de fora — confira e vincule manualmente
+                  </span>
+                </Button>
+              );
+            })()}
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
