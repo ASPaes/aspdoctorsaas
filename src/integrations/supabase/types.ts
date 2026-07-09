@@ -3631,6 +3631,7 @@ export type Database = {
           qtd_contratos_ativos_omie: number | null
           razao_social_omie: string | null
           situacao_contrato: string | null
+          tem_cancelado_omie: boolean | null
           tenant_id: string
           valor_omie: number | null
           vigencia_final_omie: string | null
@@ -3649,6 +3650,7 @@ export type Database = {
           qtd_contratos_ativos_omie?: number | null
           razao_social_omie?: string | null
           situacao_contrato?: string | null
+          tem_cancelado_omie?: boolean | null
           tenant_id: string
           valor_omie?: number | null
           vigencia_final_omie?: string | null
@@ -3667,6 +3669,7 @@ export type Database = {
           qtd_contratos_ativos_omie?: number | null
           razao_social_omie?: string | null
           situacao_contrato?: string | null
+          tem_cancelado_omie?: boolean | null
           tenant_id?: string
           valor_omie?: number | null
           vigencia_final_omie?: string | null
@@ -4222,6 +4225,7 @@ export type Database = {
           resolvido_por: string | null
           situacao_contrato: string | null
           status_usuario: string
+          tem_cancelado_omie: boolean | null
           tenant_id: string
           valor_mrr_ds: number | null
           valor_omie: number | null
@@ -4260,6 +4264,7 @@ export type Database = {
           resolvido_por?: string | null
           situacao_contrato?: string | null
           status_usuario?: string
+          tem_cancelado_omie?: boolean | null
           tenant_id: string
           valor_mrr_ds?: number | null
           valor_omie?: number | null
@@ -4298,6 +4303,7 @@ export type Database = {
           resolvido_por?: string | null
           situacao_contrato?: string | null
           status_usuario?: string
+          tem_cancelado_omie?: boolean | null
           tenant_id?: string
           valor_mrr_ds?: number | null
           valor_omie?: number | null
