@@ -718,15 +718,20 @@ export default function OmieConferenciaTab() {
   const [busca, setBusca] = useState("");
   const [page, setPage] = useState(0);
   const [nomeFiltro, setNomeFiltro] = useState<"todos" | "diferentes">("todos");
-  const [fornecedorFiltro, setFornecedorFiltro] = useState<string>("__all__");
+  const [fornecedorSel, setFornecedorSel] = useState<number[]>([]);
 
-  // fornecedorFiltro: "__all__" (todos) | "__null__" (sem fornecedor) | id numérico em string
-  const fornecedorParam = useMemo<number | null>(() => {
-    if (fornecedorFiltro === "__all__") return null;
-    if (fornecedorFiltro === "__null__") return -1;
-    const n = Number(fornecedorFiltro);
-    return Number.isFinite(n) ? n : null;
-  }, [fornecedorFiltro]);
+  // Array de IDs (usar -1 para "Sem fornecedor"). Vazio = todos.
+  const fornecedorParam = useMemo<number[] | null>(
+    () => (fornecedorSel.length === 0 ? null : fornecedorSel),
+    [fornecedorSel]
+  );
+
+  const toggleFornecedor = (id: number) => {
+    setPage(0);
+    setFornecedorSel((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   const { data: resumo, isLoading: loadingResumo } = useQuery({
     queryKey: ["omie-conf-resumo", tid, fornecedorParam],
@@ -734,12 +739,13 @@ export default function OmieConferenciaTab() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("reconciliacao_resumo" as any, {
         p_tenant_id: tid,
-        p_fornecedor_id: fornecedorParam,
+        p_fornecedor_ids: fornecedorParam,
       });
       if (error) throw error;
       return (data ?? []) as ResumoLinha[];
     },
   });
+
 
   const contadores = useMemo(() => {
     const map = new Map<string, number>();
@@ -774,13 +780,14 @@ export default function OmieConferenciaTab() {
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await supabase.rpc(
-        "reconciliacao_fornecedores_count" as any,
+        "reconciliacao_fornecedores" as any,
         { p_tenant_id: tid }
       );
       if (error) throw error;
       return (data ?? []) as { fornecedor_id: number | null; fornecedor_ds: string | null; qtd: number }[];
     },
   });
+
 
   const buscaTrim = busca.trim();
   const from = page * PAGE_SIZE;
@@ -800,10 +807,18 @@ export default function OmieConferenciaTab() {
       if (bucketAtivo === "vinculo_auto_ok" && nomeFiltro === "diferentes") {
         q = q.eq("nome_diverge", true);
       }
-      if (fornecedorParam != null) {
-        if (fornecedorParam === -1) q = q.is("fornecedor_id", null);
-        else q = q.eq("fornecedor_id", fornecedorParam);
+      if (fornecedorParam != null && fornecedorParam.length > 0) {
+        const ids = fornecedorParam.filter((n) => n !== -1);
+        const incluirNull = fornecedorParam.includes(-1);
+        if (incluirNull && ids.length > 0) {
+          q = q.or(`fornecedor_id.in.(${ids.join(",")}),fornecedor_id.is.null`);
+        } else if (incluirNull) {
+          q = q.is("fornecedor_id", null);
+        } else {
+          q = q.in("fornecedor_id", ids);
+        }
       }
+
       if (buscaTrim) {
         const digits = buscaTrim.replace(/\D/g, "");
         if (digits.length >= 8) {
@@ -849,38 +864,49 @@ export default function OmieConferenciaTab() {
         </AlertDescription>
       </Alert>
 
-      {/* Filtro global de fornecedor */}
+      {/* Filtro global de fornecedor (multi-seleção) */}
       <div className="flex flex-wrap items-center gap-2">
-        <Label className="text-sm text-muted-foreground">Fornecedor:</Label>
-        <Select
-          value={fornecedorFiltro}
-          onValueChange={(v) => { setFornecedorFiltro(v); setPage(0); }}
-          disabled={loadingFornecedores}
-        >
-          <SelectTrigger className="h-9 w-auto min-w-[220px]">
-            <SelectValue placeholder="Todos os fornecedores" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">
-              Todos ({(fornecedores ?? []).reduce((s, f) => s + Number(f.qtd || 0), 0)})
-            </SelectItem>
+        <Label className="text-sm text-muted-foreground shrink-0">Fornecedor:</Label>
+        {loadingFornecedores ? (
+          <Skeleton className="h-7 w-64" />
+        ) : (
+          <>
             {(fornecedores ?? []).map((f) => {
-              const value = f.fornecedor_id != null ? String(f.fornecedor_id) : "__null__";
+              const id = f.fornecedor_id != null ? Number(f.fornecedor_id) : -1;
               const label = f.fornecedor_ds ?? "Sem fornecedor";
+              const ativo = fornecedorSel.includes(id);
               return (
-                <SelectItem key={value} value={value}>
-                  {label} ({f.qtd})
-                </SelectItem>
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => toggleFornecedor(id)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition ${
+                    ativo
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                  <Badge variant={ativo ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+                    {Number(f.qtd || 0)}
+                  </Badge>
+                </button>
               );
             })}
-          </SelectContent>
-        </Select>
-        {fornecedorFiltro !== "__all__" && (
-          <Button variant="ghost" size="sm" onClick={() => { setFornecedorFiltro("__all__"); setPage(0); }}>
-            Limpar
-          </Button>
+            {fornecedorSel.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => { setFornecedorSel([]); setPage(0); }}
+              >
+                Limpar
+              </Button>
+            )}
+          </>
         )}
       </div>
+
 
       {/* Cartões resumo (Visão Geral + baldes) */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
