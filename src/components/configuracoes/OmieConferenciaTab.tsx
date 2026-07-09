@@ -477,7 +477,10 @@ export default function OmieConferenciaTab() {
               onClick={() => { setPage(0); setBucketAtivo(ativo ? null : b.key); }}
               className={`text-left rounded-lg border p-3 transition hover:border-primary ${ativo ? "border-primary bg-primary/5" : ""}`}
             >
-              <div className="text-xs text-muted-foreground line-clamp-2 min-h-[2rem]">{b.label}</div>
+              <div className="flex items-start gap-1">
+                <span className="text-xs text-muted-foreground line-clamp-2 min-h-[2rem] flex-1">{b.label}</span>
+                <BucketHelpIcon bucket={b.key} />
+              </div>
               <div className="text-2xl font-semibold mt-1">
                 {loadingResumo ? <Skeleton className="h-7 w-10" /> : qtd}
               </div>
