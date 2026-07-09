@@ -9,6 +9,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// === Modelo utilitario decidido pela PLATAFORMA (nunca pelo tenant) ===
+// Classificacao de sentimento roda num modelo barato, independente do modelo
+// premium que o tenant configurou. Para provider 'custom'/desconhecido nao
+// arrisca trocar (pode nao existir no endpoint), usa o fallback do proprio tenant.
+function utilityModelFor(provider: string, fallback: string): string {
+  switch (provider) {
+    case "openai": return "gpt-4o-mini";
+    case "anthropic": return "claude-3-5-haiku-20241022";
+    case "gemini": return "gemini-1.5-flash";
+    default: return fallback;
+  }
+}
+
 async function checkRateLimit(
   supabase: any,
   tenantId: string,
@@ -98,6 +111,32 @@ serve(async (req) => {
       });
     }
 
+    // === GATE 1: chave liga/desliga + teto de gasto (por tenant) ===
+    const { data: cfg } = await supabase
+      .from("configuracoes")
+      .select("sentiment_analysis_enabled, ai_monthly_budget_usd, churn_alert_enabled")
+      .eq("tenant_id", convData.tenant_id)
+      .maybeSingle();
+
+    if (cfg && cfg.sentiment_analysis_enabled === false) {
+      return new Response(
+        JSON.stringify({ success: false, error: "sentiment_disabled", message: "Analise de sentimento desativada para este tenant." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const budget = cfg?.ai_monthly_budget_usd != null ? Number(cfg.ai_monthly_budget_usd) : null;
+    if (budget != null && budget > 0) {
+      const { data: spendData } = await supabase.rpc("ai_month_spend_usd", { p_tenant_id: convData.tenant_id });
+      const spend = Number(spendData) || 0;
+      if (spend >= budget) {
+        return new Response(
+          JSON.stringify({ success: false, error: "budget_exceeded", message: `Teto de gasto de IA do mes atingido (US$ ${spend.toFixed(2)} / US$ ${budget.toFixed(2)}).` }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     const rateLimit = await checkRateLimit(supabase, convData.tenant_id, 'analyze-whatsapp-sentiment');
     if (!rateLimit.allowed) {
       return new Response(
@@ -116,7 +155,7 @@ serve(async (req) => {
         JSON.stringify({
           success: false,
           error: "ai_not_configured",
-          message: "Nenhuma IA configurada para este tenant. Acesse Configurações > Inteligência Artificial para configurar.",
+          message: "Nenhuma IA configurada para este tenant. Acesse Configuracoes > Inteligencia Artificial para configurar.",
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -149,7 +188,7 @@ serve(async (req) => {
     const clientMessagesCount = (messages || []).filter((m: any) => !m.is_from_me).length;
     if (!messages || clientMessagesCount < 3) {
       return new Response(
-        JSON.stringify({ success: false, error: "insufficient_messages", message: `Mínimo 3 mensagens do cliente necessário para análise (encontradas: ${clientMessagesCount}).` }),
+        JSON.stringify({ success: false, error: "insufficient_messages", message: `Minimo 3 mensagens do cliente necessario para analise (encontradas: ${clientMessagesCount}).` }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -160,28 +199,28 @@ serve(async (req) => {
         const role = msg.is_from_me ? "[Atendente]" : "[Cliente]";
         const text =
           msg.message_type === "audio" && msg.audio_transcription
-            ? `[Áudio transcrito]: "${msg.audio_transcription}"`
+            ? `[Audio transcrito]: "${msg.audio_transcription}"`
             : `"${msg.content}"`;
         return `${index + 1}. ${role} [${new Date(msg.timestamp).toLocaleString("pt-BR")}]: ${text}`;
       })
       .join("\n");
 
 
-    const prompt = `Analise o sentimento das últimas mensagens deste cliente de WhatsApp e avalie se é necessário abrir um ticket de Customer Success (CS).
+    const prompt = `Analise o sentimento das ultimas mensagens deste cliente de WhatsApp e avalie se e necessario abrir um ticket de Customer Success (CS).
 
 Mensagens (mais antigas para mais recentes):
 ${messagesText}
 
-Critérios de Análise de Sentimento (avalie o CLIENTE, usando as respostas do atendente como contexto):
+Criterios de Analise de Sentimento (avalie o CLIENTE, usando as respostas do atendente como contexto):
 - positive: cliente satisfeito, agradecido, elogiando o atendimento ou a empresa
-- neutral: tom profissional, dúvidas técnicas, relato de problemas/erros do sistema SEM insatisfação com o atendimento ou com a empresa. Relatar um problema técnico é NORMAL e NÃO é negativo — inclusive se o problema ainda não foi resolvido.
-- negative: insatisfação dirigida ao ATENDIMENTO ou à EMPRESA: reclamação de demora ou descaso, frustração recorrente ("de novo isso", "sempre a mesma coisa"), tom hostil, ameaça de cancelamento/troca.
+- neutral: tom profissional, duvidas tecnicas, relato de problemas/erros do sistema SEM insatisfacao com o atendimento ou com a empresa. Relatar um problema tecnico e NORMAL e NAO e negativo — inclusive se o problema ainda nao foi resolvido.
+- negative: insatisfacao dirigida ao ATENDIMENTO ou a EMPRESA: reclamacao de demora ou descaso, frustracao recorrente ("de novo isso", "sempre a mesma coisa"), tom hostil, ameaca de cancelamento/troca.
 
 
-Critérios para abertura de Ticket CS (needs_cs_ticket = true):
-- needs_cs_ticket = true SOMENTE com sinal EXPLÍCITO do cliente: (a) menção direta a cancelar, trocar de fornecedor ou encerrar contrato; (b) reclamação dirigida à EMPRESA ou ao ATENDIMENTO (demora, descaso, "sempre a mesma coisa"); (c) tom hostil/agressivo.
-- Relato de problema técnico NÃO é sinal de churn, mesmo grave, mesmo não resolvido, mesmo com frustração pontual ou menção a "falar com o dono/responsável".
-- Se needs_cs_ticket=true, preencher churn_evidence com a citação LITERAL (copiada) da mensagem do cliente que comprova o sinal. Se não existir frase literal que comprove, retornar needs_cs_ticket=false.`;
+Criterios para abertura de Ticket CS (needs_cs_ticket = true):
+- needs_cs_ticket = true SOMENTE com sinal EXPLICITO do cliente: (a) mencao direta a cancelar, trocar de fornecedor ou encerrar contrato; (b) reclamacao dirigida a EMPRESA ou ao ATENDIMENTO (demora, descaso, "sempre a mesma coisa"); (c) tom hostil/agressivo.
+- Relato de problema tecnico NAO e sinal de churn, mesmo grave, mesmo nao resolvido, mesmo com frustracao pontual ou mencao a "falar com o dono/responsavel".
+- Se needs_cs_ticket=true, preencher churn_evidence com a citacao LITERAL (copiada) da mensagem do cliente que comprova o sinal. Se nao existir frase literal que comprove, retornar needs_cs_ticket=false.`;
 
     const tools = [
       {
@@ -198,7 +237,7 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
               keywords: { type: "array", items: { type: "string" } },
               needs_cs_ticket: { type: "boolean" },
               cs_ticket_reason: { type: "string" },
-              churn_evidence: { type: "string", description: "Citação literal da mensagem do cliente que evidencia risco de churn" },
+              churn_evidence: { type: "string", description: "Citacao literal da mensagem do cliente que evidencia risco de churn" },
             },
             required: ["sentiment", "confidence", "summary", "needs_cs_ticket"],
           },
@@ -206,25 +245,51 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
       },
     ];
 
+    // Acumuladores de custo (tier1 + tier2)
+    let totalIn = 0, totalOut = 0, totalCost = 0;
+    let modelsUsed = "";
     let result: any;
     try {
-      const aiResult = await callAI(aiConfig, [{ role: "user", content: prompt }], tools);
+      // === TIER 1: modelo utilitario barato (mini) — roda em 100% das chamadas ===
+      const tier1Model = utilityModelFor(aiConfig.provider, aiConfig.model);
+      const tier1Config = { ...aiConfig, model: tier1Model };
+      const r1 = await callAI(tier1Config, [{ role: "user", content: prompt }], tools);
+      totalIn += r1.usage.inputTokens; totalOut += r1.usage.outputTokens; totalCost += r1.usage.estimatedCostUsd;
+      modelsUsed = tier1Model;
+      result = JSON.parse(r1.content);
+
+      // === TIER 2: so escala para o modelo premium quando o mini sinaliza
+      // candidato a churn — confirma antes de considerar o alerta. Raro => custo desprezivel.
+      const isChurnCandidate = result?.needs_cs_ticket === true && result?.sentiment === "negative";
+      const premiumModel = aiConfig.model;
+      if (isChurnCandidate && premiumModel && premiumModel !== tier1Model) {
+        try {
+          const r2 = await callAI(aiConfig, [{ role: "user", content: prompt }], tools);
+          totalIn += r2.usage.inputTokens; totalOut += r2.usage.outputTokens; totalCost += r2.usage.estimatedCostUsd;
+          modelsUsed = `${tier1Model}+${premiumModel}`;
+          const confirmed = JSON.parse(r2.content);
+          // Veredito do premium prevalece (mais preciso para o high-stakes)
+          result = confirmed;
+        } catch (e2: any) {
+          console.error("[analyze-sentiment] tier2 confirm falhou, mantendo tier1:", e2?.message || e2);
+        }
+      }
+
       await supabase.from('ai_usage_log').update({
-        input_tokens: aiResult.usage.inputTokens,
-        output_tokens: aiResult.usage.outputTokens,
-        estimated_cost_usd: aiResult.usage.estimatedCostUsd,
-        model: aiConfig.model,
+        input_tokens: totalIn,
+        output_tokens: totalOut,
+        estimated_cost_usd: totalCost,
+        model: modelsUsed,
         provider: aiConfig.provider,
       }).eq('tenant_id', convData.tenant_id).eq('function_name', 'analyze-whatsapp-sentiment').order('called_at', { ascending: false }).limit(1);
-      result = JSON.parse(aiResult.content);
     } catch (aiError: any) {
       const msg = aiError.message || "";
       console.error("[analyze-sentiment] AI error:", msg);
       if (msg.includes("401") || msg.includes("invalid_api_key")) {
-        return new Response(JSON.stringify({ success: false, error: "ai_key_invalid", message: "Chave de API inválida. Verifique em Configurações > Inteligência Artificial." }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: false, error: "ai_key_invalid", message: "Chave de API invalida. Verifique em Configuracoes > Inteligencia Artificial." }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (msg.includes("429") || msg.includes("insufficient_quota") || msg.includes("quota")) {
-        return new Response(JSON.stringify({ success: false, error: "rate_limit", message: "Limite/créditos da API esgotados. Verifique seu plano no provedor de IA." }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: false, error: "rate_limit", message: "Limite/creditos da API esgotados. Verifique seu plano no provedor de IA." }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       return new Response(JSON.stringify({ success: false, error: "ai_error", message: `Erro na IA: ${msg.substring(0, 200)}` }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -268,12 +333,6 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
 
     if (churnGate) {
       try {
-        const { data: cfg } = await supabase
-          .from("configuracoes")
-          .select("churn_alert_enabled")
-          .eq("tenant_id", convData.tenant_id)
-          .maybeSingle();
-
         if (cfg?.churn_alert_enabled) {
           const cutoffIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
           const { data: claimed } = await supabase
@@ -289,7 +348,7 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
             const contactPhone = contact.phone_number || "";
             const reason = (result.cs_ticket_reason || result.summary || "Sinal de churn detectado").toString();
 
-            const title = `\u26A0\uFE0F Risco de churn: ${contactName}`;
+            const title = `⚠️ Risco de churn: ${contactName}`;
 
             await notifyEvent(
               supabase,
