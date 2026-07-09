@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
-  AlertCircle, ChevronDown, ChevronRight, Lock, RefreshCw, Search,
+  AlertCircle, ChevronDown, ChevronRight, HelpCircle, Lock, RefreshCw, Search,
 } from "lucide-react";
 
 type Bucket =
