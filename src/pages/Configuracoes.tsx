@@ -321,7 +321,7 @@ export default function Configuracoes() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { imposto_percentual: 13.5, custo_fixo_percentual: 8 },
+    defaultValues: { imposto_percentual: 8, custo_fixo_percentual: 25 },
   });
 
   const { data: config, isLoading } = useQuery({
