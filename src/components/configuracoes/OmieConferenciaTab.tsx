@@ -760,6 +760,10 @@ export default function OmieConferenciaTab() {
     );
   };
 
+  const queryClient = useQueryClient();
+  const [confirmVincularOpen, setConfirmVincularOpen] = useState(false);
+  const [vinculandoLote, setVinculandoLote] = useState(false);
+
   const { data: resumo, isLoading: loadingResumo } = useQuery({
     queryKey: ["omie-conf-resumo", tid, fornecedorParam],
     enabled: !!tid,
