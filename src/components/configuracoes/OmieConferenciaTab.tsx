@@ -480,7 +480,7 @@ export default function OmieConferenciaTab() {
   const to = from + PAGE_SIZE - 1;
 
   const { data: lista, isLoading: loadingLista } = useQuery({
-    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro, fornecedorFiltro],
+    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro, fornecedorParam],
     enabled: !!tid,
     queryFn: async () => {
       let q = supabase
