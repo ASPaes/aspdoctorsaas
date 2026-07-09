@@ -266,9 +266,17 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
           </div>
           <div className="font-medium truncate mt-0.5">{row.razao_ds || "—"}</div>
           <div className="text-xs text-muted-foreground mt-0.5 font-mono">{cnpjFmt}</div>
-          {row.modelo_ds && (
-            <Badge variant="outline" className="text-[10px] mt-1">{row.modelo_ds}</Badge>
-          )}
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            <Badge
+              variant={row.fornecedor_ds ? "secondary" : "outline"}
+              className="text-[10px] font-normal"
+            >
+              {row.fornecedor_ds ? `Fornecedor: ${row.fornecedor_ds}` : "sem fornecedor"}
+            </Badge>
+            {row.modelo_ds && (
+              <Badge variant="outline" className="text-[10px]">{row.modelo_ds}</Badge>
+            )}
+          </div>
         </div>
         {/* Omie cliente */}
         <div className="p-3 min-w-0 bg-muted/20">
