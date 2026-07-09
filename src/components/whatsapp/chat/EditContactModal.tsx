@@ -277,7 +277,13 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
-            <DialogTitle>{isNewContact ? 'Salvar Contato' : 'Editar Contato'}</DialogTitle>
+            <DialogTitle>
+              {isNewContact
+                ? 'Salvar Contato'
+                : isGroup
+                ? 'Editar Grupo'
+                : 'Editar Contato'}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
