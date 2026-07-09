@@ -264,10 +264,14 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
             Escolher cadastro Omie ({row.qtd_candidatos_omie ?? 0})
           </DisabledActionButton>
         );
+      case "contrato_suspenso":
+      case "contrato_cancelado":
+        return <DisabledActionButton>Reativar/Revisar no Omie</DisabledActionButton>;
       default:
         return null;
     }
   }
+
 
   return (
     <div className="rounded-lg border overflow-hidden">
