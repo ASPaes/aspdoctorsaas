@@ -163,24 +163,97 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
   const diffKeys = Object.keys(diffs);
   const origem = originLabel(row.origem_codigo);
 
+  const soNoDs = ["criar", "atribuir_modelo", "criar_contrato", "corrigir_ds"].includes(bucket as string);
+  const temOmie = !soNoDs && (row.razao_omie || row.codigo_cliente_omie);
+  const nomesDiferem =
+    !!temOmie && !!row.razao_ds && !!row.razao_omie &&
+    normNome(row.razao_ds) !== normNome(row.razao_omie);
+  const valoresBatem =
+    row.valor_mrr_ds != null && row.valor_omie != null &&
+    Number(row.valor_mrr_ds) === Number(row.valor_omie);
+  const delta =
+    row.valor_mrr_ds != null && row.valor_omie != null
+      ? Number(row.valor_omie) - Number(row.valor_mrr_ds)
+      : null;
+
   return (
     <div className="rounded-lg border p-3 space-y-2">
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="min-w-0 flex-1">
-          <div className="font-medium truncate">{row.razao_ds || "—"}</div>
-          <div className="text-xs text-muted-foreground flex flex-wrap gap-2 mt-0.5">
-            <span>{formatCNPJ(row.cnpj_norm)}</span>
-            {row.modelo_ds && <Badge variant="outline" className="text-[10px]">{row.modelo_ds}</Badge>}
-            {row.omie_inativo && <Badge variant="destructive" className="text-[10px]">Omie inativo</Badge>}
+        <div className="min-w-0 flex-1 space-y-2">
+          {/* Blocos DS × Omie */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {/* DS */}
+            <div className="rounded border bg-muted/30 p-2 min-w-0">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">DoctorSaaS</div>
+              <div className="font-medium truncate">{row.razao_ds || "—"}</div>
+              <div className="text-xs text-muted-foreground flex flex-wrap gap-2 mt-0.5">
+                <span>{formatCNPJ(row.cnpj_norm)}</span>
+                <span>MRR: <span className="font-medium text-foreground">{formatBRL(row.valor_mrr_ds)}</span></span>
+                {row.modelo_ds && <Badge variant="outline" className="text-[10px]">{row.modelo_ds}</Badge>}
+              </div>
+            </div>
+            {/* Omie */}
+            <div className="rounded border bg-muted/30 p-2 min-w-0">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                Omie
+                {bucket === "pendente_assuncao" && (
+                  <Badge variant={origem.variant} className="text-[10px]">{origem.label}</Badge>
+                )}
+              </div>
+              {temOmie ? (
+                <>
+                  <div className="font-medium truncate">{row.razao_omie || "—"}</div>
+                  <div className="text-xs text-muted-foreground flex flex-wrap gap-2 mt-0.5">
+                    {row.codigo_cliente_omie && <span>cód. {row.codigo_cliente_omie}</span>}
+                    <span>Valor: <span className="font-medium text-foreground">{formatBRL(row.valor_omie)}</span></span>
+                    {row.omie_inativo && <Badge variant="destructive" className="text-[10px]">Inativo</Badge>}
+                  </div>
+                </>
+              ) : (
+                <div className="text-sm text-muted-foreground italic mt-1">— não está no Omie —</div>
+              )}
+            </div>
           </div>
+
+          {/* Alerta nomes diferentes */}
+          {nomesDiferem && (
+            <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded px-2 py-1">
+              ⚠ Nomes diferentes — confira antes de vincular.
+            </div>
+          )}
+
+          {/* Comparativo de valor */}
+          {temOmie && (
+            <div className="text-sm">
+              {valoresBatem ? (
+                <span className="text-muted-foreground">
+                  Valor DS = Omie: <span className="font-medium text-foreground">{formatBRL(row.valor_mrr_ds)}</span>
+                </span>
+              ) : row.valor_mrr_ds != null && row.valor_omie != null ? (
+                <span className="text-muted-foreground">
+                  DS: <span className="font-medium text-foreground">{formatBRL(row.valor_mrr_ds)}</span>
+                  {" → "}
+                  Omie: <span className="font-medium text-foreground">{formatBRL(row.valor_omie)}</span>
+                  {delta != null && (
+                    <span className={`ml-2 font-medium ${delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                      ({delta > 0 ? "+" : ""}{formatBRL(delta)})
+                    </span>
+                  )}
+                </span>
+              ) : null}
+              {diffKeys.length > 0 && (
+                <span className="ml-2 text-xs text-muted-foreground">· Divergências: {diffKeys.join(", ")}</span>
+              )}
+            </div>
+          )}
         </div>
+
         <div className="flex items-center gap-2 flex-wrap">
           {bucket === "resolver" && (
             <DisabledActionButton>Atualizar no Omie</DisabledActionButton>
           )}
           {bucket === "pendente_assuncao" && (
             <>
-              <Badge variant={origem.variant}>{origem.label}</Badge>
               <Badge variant="outline">Pendente assunção</Badge>
               <DisabledActionButton
                 icon={<Lock className="h-3 w-3" />}
@@ -195,38 +268,16 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
           )}
           {bucket === "criar" && <DisabledActionButton>Enviar ao Omie</DisabledActionButton>}
           {bucket === "criar_contrato" && <DisabledActionButton>Enviar ao Omie</DisabledActionButton>}
-          {bucket === "vinculo_auto_ok" && <DisabledActionButton>Vincular</DisabledActionButton>}
+          {bucket === "vinculo_auto_ok" && (
+            <DisabledActionButton>Vincular a este cadastro Omie</DisabledActionButton>
+          )}
           {bucket === "escolher_candidato" && (
             <Badge variant="outline">{row.qtd_candidatos_omie ?? 0} candidatos</Badge>
           )}
         </div>
       </div>
 
-      {bucket === "resolver" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm bg-muted/40 rounded p-2">
-          <div>
-            <div className="text-xs text-muted-foreground">DoctorSaaS</div>
-            <div>Valor MRR: <span className="font-medium">{formatBRL(row.valor_mrr_ds)}</span></div>
-            {row.dia_venc_ds != null && <div>Dia venc.: {row.dia_venc_ds}</div>}
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground">Omie</div>
-            <div>Valor: <span className="font-medium">{formatBRL(row.valor_omie)}</span></div>
-            {row.dia_venc_omie != null && <div>Dia venc.: {row.dia_venc_omie}</div>}
-          </div>
-          {diffKeys.length > 0 && (
-            <div className="sm:col-span-2 text-xs text-muted-foreground">
-              Divergências: {diffKeys.join(", ")}
-            </div>
-          )}
-        </div>
-      )}
 
-      {bucket === "vinculo_auto_ok" && (
-        <div className="text-sm text-muted-foreground">
-          Valor DS = Valor Omie: <span className="font-medium text-foreground">{formatBRL(row.valor_mrr_ds)}</span>
-        </div>
-      )}
 
       {bucket === "escolher_candidato" && row.cnpj_norm && (
         <Collapsible open={open} onOpenChange={setOpen}>
