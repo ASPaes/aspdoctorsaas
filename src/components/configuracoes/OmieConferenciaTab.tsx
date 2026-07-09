@@ -14,7 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  AlertCircle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, HelpCircle, Lock, RefreshCw, Search,
+  AlertCircle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, HelpCircle, History, Lock, RefreshCw, Search,
 } from "lucide-react";
 
 type Bucket =
@@ -145,6 +145,7 @@ type ReconciliacaoRow = {
   fornecedor_ds: string | null;
   fornecedor_id: number | null;
   situacao_contrato: string | null;
+  tem_cancelado_omie: boolean | null;
 };
 
 
@@ -384,6 +385,21 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
                 <div className="text-[11px] text-muted-foreground mt-0.5">
                   Divergências: {diffKeys.join(", ")}
                 </div>
+              )}
+              {row.tem_cancelado_omie === true && (
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="mt-1.5 inline-flex items-center gap-1.5 rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-2 py-1 text-[11px] text-amber-700 dark:text-amber-400 cursor-help">
+                        <History className="h-3 w-3 shrink-0" />
+                        <span>há também contrato(s) cancelado(s) no Omie</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
+                      Este cliente tem um ou mais contratos cancelados no Omie. Se precisar reativar, faça pelo cadastro do cliente no DoctorSaaS (botão Reativar) — não é feito por este painel.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </>
           ) : (
@@ -800,7 +816,7 @@ export default function OmieConferenciaTab() {
       let q = supabase
         .from("reconciliacao_cadastro")
         .select(
-          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id, situacao_contrato",
+          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id, situacao_contrato, tem_cancelado_omie",
           { count: "exact" }
         );
       if (bucketAtivo !== "visao_geral") q = q.eq("acao_sugerida", bucketAtivo);
