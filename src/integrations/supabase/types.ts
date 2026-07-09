@@ -4205,6 +4205,8 @@ export type Database = {
           ds_customer_id: string | null
           estado_match: string
           estado_valor: string | null
+          fornecedor_ds: string | null
+          fornecedor_id: number | null
           gerado_em: string
           id: string
           modelo_ds: string | null
@@ -4240,6 +4242,8 @@ export type Database = {
           ds_customer_id?: string | null
           estado_match: string
           estado_valor?: string | null
+          fornecedor_ds?: string | null
+          fornecedor_id?: number | null
           gerado_em?: string
           id?: string
           modelo_ds?: string | null
@@ -4275,6 +4279,8 @@ export type Database = {
           ds_customer_id?: string | null
           estado_match?: string
           estado_valor?: string | null
+          fornecedor_ds?: string | null
+          fornecedor_id?: number | null
           gerado_em?: string
           id?: string
           modelo_ds?: string | null
@@ -9678,6 +9684,13 @@ export type Database = {
       reativar_contrato: {
         Args: { p_contrato_id: string; p_observacao?: string }
         Returns: Json
+      }
+      reconciliacao_fornecedores_count: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          fornecedor_ds: string
+          qtd: number
+        }[]
       }
       reconciliacao_resumo: {
         Args: { p_tenant_id: string }

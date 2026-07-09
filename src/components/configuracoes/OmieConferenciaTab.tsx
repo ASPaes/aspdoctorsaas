@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertCircle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, HelpCircle, Lock, RefreshCw, Search,
 } from "lucide-react";
@@ -130,6 +131,8 @@ type ReconciliacaoRow = {
   diffs: any;
   acao_sugerida: string | null;
   nome_diverge: boolean | null;
+  fornecedor_ds: string | null;
+  fornecedor_id: number | null;
 };
 
 function normNome(s?: string | null): string {
@@ -264,9 +267,17 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
           </div>
           <div className="font-medium truncate mt-0.5">{row.razao_ds || "—"}</div>
           <div className="text-xs text-muted-foreground mt-0.5 font-mono">{cnpjFmt}</div>
-          {row.modelo_ds && (
-            <Badge variant="outline" className="text-[10px] mt-1">{row.modelo_ds}</Badge>
-          )}
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            <Badge
+              variant={row.fornecedor_ds ? "secondary" : "outline"}
+              className="text-[10px] font-normal"
+            >
+              {row.fornecedor_ds ? `Fornecedor: ${row.fornecedor_ds}` : "sem fornecedor"}
+            </Badge>
+            {row.modelo_ds && (
+              <Badge variant="outline" className="text-[10px]">{row.modelo_ds}</Badge>
+            )}
+          </div>
         </div>
         {/* Omie cliente */}
         <div className="p-3 min-w-0 bg-muted/20">
@@ -289,6 +300,10 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
                 </div>
               )}
             </>
+          ) : bucket === "atribuir_modelo" ? (
+            <div className="text-sm text-muted-foreground italic mt-1">
+              Este cliente ainda não existe no Omie — será criado ao definir o modelo e enviar.
+            </div>
           ) : (
             <div className="text-sm text-muted-foreground italic mt-1">— não está no Omie —</div>
           )}
@@ -396,6 +411,7 @@ export default function OmieConferenciaTab() {
   const [busca, setBusca] = useState("");
   const [page, setPage] = useState(0);
   const [nomeFiltro, setNomeFiltro] = useState<"todos" | "diferentes">("todos");
+  const [fornecedorFiltro, setFornecedorFiltro] = useState<string>("__all__");
 
   const { data: resumo, isLoading: loadingResumo } = useQuery({
     queryKey: ["omie-conf-resumo", tid],
@@ -435,23 +451,40 @@ export default function OmieConferenciaTab() {
     },
   });
 
+  const { data: fornecedores, isLoading: loadingFornecedores } = useQuery({
+    queryKey: ["omie-conf-fornecedores", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc(
+        "reconciliacao_fornecedores_count" as any,
+        { p_tenant_id: tid }
+      );
+      if (error) throw error;
+      return (data ?? []) as { fornecedor_ds: string | null; qtd: number }[];
+    },
+  });
+
   const buscaTrim = busca.trim();
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
   const { data: lista, isLoading: loadingLista } = useQuery({
-    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro],
+    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro, fornecedorFiltro],
     enabled: !!tid,
     queryFn: async () => {
       let q = supabase
         .from("reconciliacao_cadastro")
         .select(
-          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge",
+          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id",
           { count: "exact" }
         );
       if (bucketAtivo) q = q.eq("acao_sugerida", bucketAtivo);
       if (bucketAtivo === "vinculo_auto_ok" && nomeFiltro === "diferentes") {
         q = q.eq("nome_diverge", true);
+      }
+      if (fornecedorFiltro !== "__all__") {
+        if (fornecedorFiltro === "__null__") q = q.is("fornecedor_ds", null);
+        else q = q.eq("fornecedor_ds", fornecedorFiltro);
       }
       if (buscaTrim) {
         const digits = buscaTrim.replace(/\D/g, "");
@@ -497,6 +530,39 @@ export default function OmieConferenciaTab() {
           Painel em conferência — ações de escrita desabilitadas.
         </AlertDescription>
       </Alert>
+
+      {/* Filtro global de fornecedor */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Label className="text-sm text-muted-foreground">Fornecedor:</Label>
+        <Select
+          value={fornecedorFiltro}
+          onValueChange={(v) => { setFornecedorFiltro(v); setPage(0); }}
+          disabled={loadingFornecedores}
+        >
+          <SelectTrigger className="h-9 w-auto min-w-[220px]">
+            <SelectValue placeholder="Todos os fornecedores" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">
+              Todos ({(fornecedores ?? []).reduce((s, f) => s + Number(f.qtd || 0), 0)})
+            </SelectItem>
+            {(fornecedores ?? []).map((f) => {
+              const key = f.fornecedor_ds ?? "__null__";
+              const label = f.fornecedor_ds ?? "Sem fornecedor";
+              return (
+                <SelectItem key={key} value={key}>
+                  {label} ({f.qtd})
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+        {fornecedorFiltro !== "__all__" && (
+          <Button variant="ghost" size="sm" onClick={() => { setFornecedorFiltro("__all__"); setPage(0); }}>
+            Limpar
+          </Button>
+        )}
+      </div>
 
       {/* Cartões resumo */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
