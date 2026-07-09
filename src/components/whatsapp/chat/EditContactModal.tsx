@@ -286,25 +286,27 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="phone">Telefone {!isNewContact && '*'}</Label>
-              {isNewContact ? (
-                <Input value={contactPhone ? maskPhoneBR(contactPhone) : ''} disabled className="bg-muted" />
-              ) : (
-                <>
-                  <Input
-                    id="phone"
-                    value={watch('phone') || ''}
-                    onChange={(e) => setValue('phone', maskBRPhoneLive(e.target.value), { shouldDirty: true })}
-                    placeholder="+55 (DD) 9XXXX-XXXX"
-                    inputMode="tel"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Edite caso o número esteja com um dígito a mais (ex: 9 extra) e impeça o envio.
-                  </p>
-                </>
-              )}
-            </div>
+            {!isGroup && (
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefone {!isNewContact && '*'}</Label>
+                {isNewContact ? (
+                  <Input value={contactPhone ? maskPhoneBR(contactPhone) : ''} disabled className="bg-muted" />
+                ) : (
+                  <>
+                    <Input
+                      id="phone"
+                      value={watch('phone') || ''}
+                      onChange={(e) => setValue('phone', maskBRPhoneLive(e.target.value), { shouldDirty: true })}
+                      placeholder="+55 (DD) 9XXXX-XXXX"
+                      inputMode="tel"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Edite caso o número esteja com um dígito a mais (ex: 9 extra) e impeça o envio.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="name">Nome *</Label>
               <Input id="name" {...register('name', { required: 'Nome é obrigatório', minLength: { value: 2, message: 'Mínimo 2 caracteres' } })} />
