@@ -118,7 +118,7 @@ function PercentuaisCard({
     <Card className="max-w-lg">
       <CardHeader>
         <CardTitle>Percentuais Financeiros</CardTitle>
-        <CardDescription>Valores padrão aplicados a novos clientes. Insira o percentual diretamente (ex: 13,5 para 13,5%).</CardDescription>
+        <CardDescription>Valores padrão aplicados a novos clientes. Insira o percentual diretamente (ex: 8 para 8%).</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -127,9 +127,9 @@ function PercentuaisCard({
               <FormItem>
                 <FormLabel>Imposto %</FormLabel>
                 <FormControl>
-                  <NumericInput value={field.value} onChange={field.onChange} placeholder="13,50" suffix="%" />
+                  <NumericInput value={field.value} onChange={field.onChange} placeholder="8,00" suffix="%" />
                 </FormControl>
-                <FormDescription>Ex: 13,50 para 13,5%</FormDescription>
+                <FormDescription>Faixa típica de mercado: 8% a 12,5%</FormDescription>
                 <FormMessage />
               </FormItem>
             )} />
@@ -138,7 +138,7 @@ function PercentuaisCard({
                 <FormLabel>Custo Fixo %</FormLabel>
                 <div className="flex items-center gap-2">
                   <FormControl>
-                    <NumericInput value={field.value} onChange={field.onChange} placeholder="8,00" suffix="%" />
+                    <NumericInput value={field.value} onChange={field.onChange} placeholder="25,00" suffix="%" />
                   </FormControl>
                   <TooltipProvider>
                     <Tooltip>
@@ -171,7 +171,7 @@ function PercentuaisCard({
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <FormDescription>Ex: 8,00 para 8%</FormDescription>
+                <FormDescription>Faixa típica de mercado: 25% a 35%</FormDescription>
                 <FormMessage />
               </FormItem>
             )} />
