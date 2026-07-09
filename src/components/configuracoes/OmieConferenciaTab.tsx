@@ -24,7 +24,9 @@ type Bucket =
   | "pendente_assuncao"
   | "escolher_candidato"
   | "criar"
-  | "criar_contrato";
+  | "criar_contrato"
+  | "contrato_suspenso"
+  | "contrato_cancelado";
 
 type View = "visao_geral" | Bucket;
 
@@ -36,6 +38,8 @@ const BUCKETS: { key: Bucket; label: string }[] = [
   { key: "escolher_candidato", label: "Ambíguos" },
   { key: "criar", label: "A criar no Omie" },
   { key: "criar_contrato", label: "Criar contrato" },
+  { key: "contrato_suspenso", label: "Contrato suspenso no Omie" },
+  { key: "contrato_cancelado", label: "Contrato cancelado no Omie" },
 ];
 
 const BUCKET_HELP: Record<Bucket, string> = {
@@ -53,7 +57,12 @@ const BUCKET_HELP: Record<Bucket, string> = {
     "Clientes do DoctorSaaS que não existem no Omie. Estão prontos (têm modelo, valor e dados válidos) para serem criados no Omie — cliente e contrato — quando você liberar.",
   criar_contrato:
     "O cliente já existe no Omie, mas não tem contrato ativo lá. Aqui será criado apenas o contrato, vinculado ao cliente que já existe (não duplica o cliente).",
+  contrato_suspenso:
+    "O cliente tem um contrato no Omie, mas está SUSPENSO. Não deve ser criado um novo contrato (duplicaria) — a ação é reativar/revisar o existente.",
+  contrato_cancelado:
+    "O cliente tinha um contrato no Omie, mas foi CANCELADO. Avalie reativar o cancelado ou criar um novo.",
 };
+
 
 const PAGE_SIZE = 25;
 
