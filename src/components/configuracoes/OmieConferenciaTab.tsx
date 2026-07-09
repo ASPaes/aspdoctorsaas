@@ -493,9 +493,9 @@ export default function OmieConferenciaTab() {
       if (bucketAtivo === "vinculo_auto_ok" && nomeFiltro === "diferentes") {
         q = q.eq("nome_diverge", true);
       }
-      if (fornecedorFiltro !== "__all__") {
-        if (fornecedorFiltro === "__null__") q = q.is("fornecedor_ds", null);
-        else q = q.eq("fornecedor_ds", fornecedorFiltro);
+      if (fornecedorParam != null) {
+        if (fornecedorParam === -1) q = q.is("fornecedor_id", null);
+        else q = q.eq("fornecedor_id", fornecedorParam);
       }
       if (buscaTrim) {
         const digits = buscaTrim.replace(/\D/g, "");
