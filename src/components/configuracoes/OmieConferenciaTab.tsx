@@ -762,7 +762,7 @@ export default function OmieConferenciaTab() {
 
   const { data: lista, isLoading: loadingLista } = useQuery({
     queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro, fornecedorParam],
-    enabled: !!tid,
+    enabled: !!tid && bucketAtivo !== "visao_geral",
     queryFn: async () => {
       let q = supabase
         .from("reconciliacao_cadastro")
@@ -770,7 +770,7 @@ export default function OmieConferenciaTab() {
           "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id",
           { count: "exact" }
         );
-      if (bucketAtivo) q = q.eq("acao_sugerida", bucketAtivo);
+      if (bucketAtivo !== "visao_geral") q = q.eq("acao_sugerida", bucketAtivo);
       if (bucketAtivo === "vinculo_auto_ok" && nomeFiltro === "diferentes") {
         q = q.eq("nome_diverge", true);
       }
