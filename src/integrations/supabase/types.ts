@@ -9689,6 +9689,7 @@ export type Database = {
         Args: { p_tenant_id: string }
         Returns: {
           fornecedor_ds: string
+          fornecedor_id: number
           qtd: number
         }[]
       }
