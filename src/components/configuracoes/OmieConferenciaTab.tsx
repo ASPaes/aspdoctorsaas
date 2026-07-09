@@ -450,7 +450,19 @@ export default function OmieConferenciaTab() {
     },
   });
 
-  const buscaTrim = busca.trim();
+  const { data: fornecedores, isLoading: loadingFornecedores } = useQuery({
+    queryKey: ["omie-conf-fornecedores", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc(
+        "reconciliacao_fornecedores_count" as any,
+        { p_tenant_id: tid }
+      );
+      if (error) throw error;
+      return (data ?? []) as { fornecedor_ds: string | null; qtd: number }[];
+    },
+  });
+
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
