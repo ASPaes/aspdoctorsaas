@@ -789,14 +789,26 @@ export default function OmieConferenciaTab() {
   }, [resumo]);
 
   const { data: nomeDivergeCount, isLoading: loadingNomeDivergeCount } = useQuery({
-    queryKey: ["omie-conf-nome-diverge-count", tid],
+    queryKey: ["omie-conf-nome-diverge-count", tid, fornecedorParam],
     enabled: !!tid,
     queryFn: async () => {
-      const { count, error } = await supabase
+      let q = supabase
         .from("reconciliacao_cadastro")
         .select("*", { count: "exact", head: true })
         .eq("acao_sugerida", "vinculo_auto_ok")
         .eq("nome_diverge", true);
+      if (fornecedorParam != null && fornecedorParam.length > 0) {
+        const ids = fornecedorParam.filter((n) => n !== -1);
+        const incluirNull = fornecedorParam.includes(-1);
+        if (incluirNull && ids.length > 0) {
+          q = q.or(`fornecedor_id.in.(${ids.join(",")}),fornecedor_id.is.null`);
+        } else if (incluirNull) {
+          q = q.is("fornecedor_id", null);
+        } else {
+          q = q.in("fornecedor_id", ids);
+        }
+      }
+      const { count, error } = await q;
       if (error) throw error;
       return count ?? 0;
     },
