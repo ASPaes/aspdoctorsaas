@@ -130,6 +130,8 @@ type ReconciliacaoRow = {
   diffs: any;
   acao_sugerida: string | null;
   nome_diverge: boolean | null;
+  fornecedor_ds: string | null;
+  fornecedor_id: number | null;
 };
 
 function normNome(s?: string | null): string {
