@@ -558,10 +558,10 @@ export default function OmieConferenciaTab() {
               Todos ({(fornecedores ?? []).reduce((s, f) => s + Number(f.qtd || 0), 0)})
             </SelectItem>
             {(fornecedores ?? []).map((f) => {
-              const key = f.fornecedor_ds ?? "__null__";
+              const value = f.fornecedor_id != null ? String(f.fornecedor_id) : "__null__";
               const label = f.fornecedor_ds ?? "Sem fornecedor";
               return (
-                <SelectItem key={key} value={key}>
+                <SelectItem key={value} value={value}>
                   {label} ({f.qtd})
                 </SelectItem>
               );
