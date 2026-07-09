@@ -413,11 +413,22 @@ export default function OmieConferenciaTab() {
   const [nomeFiltro, setNomeFiltro] = useState<"todos" | "diferentes">("todos");
   const [fornecedorFiltro, setFornecedorFiltro] = useState<string>("__all__");
 
+  // fornecedorFiltro: "__all__" (todos) | "__null__" (sem fornecedor) | id numérico em string
+  const fornecedorParam = useMemo<number | null>(() => {
+    if (fornecedorFiltro === "__all__") return null;
+    if (fornecedorFiltro === "__null__") return -1;
+    const n = Number(fornecedorFiltro);
+    return Number.isFinite(n) ? n : null;
+  }, [fornecedorFiltro]);
+
   const { data: resumo, isLoading: loadingResumo } = useQuery({
-    queryKey: ["omie-conf-resumo", tid],
+    queryKey: ["omie-conf-resumo", tid, fornecedorParam],
     enabled: !!tid,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("reconciliacao_resumo" as any, { p_tenant_id: tid });
+      const { data, error } = await supabase.rpc("reconciliacao_resumo" as any, {
+        p_tenant_id: tid,
+        p_fornecedor_id: fornecedorParam,
+      });
       if (error) throw error;
       return (data ?? []) as ResumoLinha[];
     },
@@ -460,7 +471,7 @@ export default function OmieConferenciaTab() {
         { p_tenant_id: tid }
       );
       if (error) throw error;
-      return (data ?? []) as { fornecedor_ds: string | null; qtd: number }[];
+      return (data ?? []) as { fornecedor_id: number | null; fornecedor_ds: string | null; qtd: number }[];
     },
   });
 
@@ -469,7 +480,7 @@ export default function OmieConferenciaTab() {
   const to = from + PAGE_SIZE - 1;
 
   const { data: lista, isLoading: loadingLista } = useQuery({
-    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro, fornecedorFiltro],
+    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro, fornecedorParam],
     enabled: !!tid,
     queryFn: async () => {
       let q = supabase
@@ -482,9 +493,9 @@ export default function OmieConferenciaTab() {
       if (bucketAtivo === "vinculo_auto_ok" && nomeFiltro === "diferentes") {
         q = q.eq("nome_diverge", true);
       }
-      if (fornecedorFiltro !== "__all__") {
-        if (fornecedorFiltro === "__null__") q = q.is("fornecedor_ds", null);
-        else q = q.eq("fornecedor_ds", fornecedorFiltro);
+      if (fornecedorParam != null) {
+        if (fornecedorParam === -1) q = q.is("fornecedor_id", null);
+        else q = q.eq("fornecedor_id", fornecedorParam);
       }
       if (buscaTrim) {
         const digits = buscaTrim.replace(/\D/g, "");
@@ -547,10 +558,10 @@ export default function OmieConferenciaTab() {
               Todos ({(fornecedores ?? []).reduce((s, f) => s + Number(f.qtd || 0), 0)})
             </SelectItem>
             {(fornecedores ?? []).map((f) => {
-              const key = f.fornecedor_ds ?? "__null__";
+              const value = f.fornecedor_id != null ? String(f.fornecedor_id) : "__null__";
               const label = f.fornecedor_ds ?? "Sem fornecedor";
               return (
-                <SelectItem key={key} value={key}>
+                <SelectItem key={value} value={value}>
                   {label} ({f.qtd})
                 </SelectItem>
               );
