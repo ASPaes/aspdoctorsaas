@@ -169,10 +169,10 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
   const diffKeys = Object.keys(diffs);
   const origem = originLabel(row.origem_codigo);
 
-  const soNoDs = ["criar", "atribuir_modelo", "criar_contrato", "corrigir_ds"].includes(bucket as string);
-  const temOmie = !soNoDs && (row.razao_omie || row.codigo_cliente_omie);
+  const clienteNoOmie = !!(row.razao_omie || row.codigo_cliente_omie);
+  const contratoNoOmie = row.codigo_contrato_omie != null && String(row.codigo_contrato_omie) !== "";
   const nomesDiferem =
-    !!temOmie && !!row.razao_ds && !!row.razao_omie &&
+    clienteNoOmie && !!row.razao_ds && !!row.razao_omie &&
     normNome(row.razao_ds) !== normNome(row.razao_omie);
   const valoresBatem =
     row.valor_mrr_ds != null && row.valor_omie != null &&
@@ -182,125 +182,160 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
       ? Number(row.valor_omie) - Number(row.valor_mrr_ds)
       : null;
 
+  const cnpjFmt = formatCNPJ(row.cnpj_norm);
+
+  function renderBotao() {
+    switch (bucket) {
+      case "vinculo_auto_ok":
+        return <DisabledActionButton>Vincular cliente + contrato</DisabledActionButton>;
+      case "resolver":
+        return <DisabledActionButton>Atualizar valor no Omie</DisabledActionButton>;
+      case "criar":
+        return <DisabledActionButton>Criar cliente + contrato no Omie</DisabledActionButton>;
+      case "criar_contrato":
+        return <DisabledActionButton>Criar contrato (cliente já existe)</DisabledActionButton>;
+      case "atribuir_modelo":
+        return <DisabledActionButton>Definir modelo no DS</DisabledActionButton>;
+      case "pendente_assuncao":
+        return (
+          <DisabledActionButton
+            icon={<Lock className="h-3 w-3" />}
+            tip="requer corte da integração de origem"
+          >
+            Assumir
+          </DisabledActionButton>
+        );
+      case "escolher_candidato":
+        return (
+          <DisabledActionButton>
+            Escolher cadastro Omie ({row.qtd_candidatos_omie ?? 0})
+          </DisabledActionButton>
+        );
+      default:
+        return null;
+    }
+  }
+
   return (
-    <div className="rounded-lg border p-3 space-y-2">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="min-w-0 flex-1 space-y-2">
-          {/* Blocos DS × Omie */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {/* DS */}
-            <div className="rounded border bg-muted/30 p-2 min-w-0">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">DoctorSaaS</div>
-              <div className="font-medium truncate">{row.razao_ds || "—"}</div>
-              <div className="text-xs text-muted-foreground flex flex-wrap gap-2 mt-0.5">
-                <span>{formatCNPJ(row.cnpj_norm)}</span>
-                <span>MRR: <span className="font-medium text-foreground">{formatBRL(row.valor_mrr_ds)}</span></span>
-                {row.modelo_ds && <Badge variant="outline" className="text-[10px]">{row.modelo_ds}</Badge>}
-              </div>
-            </div>
-            {/* Omie */}
-            <div className="rounded border bg-muted/30 p-2 min-w-0">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-                Omie
-                {bucket === "pendente_assuncao" && (
-                  <Badge variant={origem.variant} className="text-[10px]">{origem.label}</Badge>
-                )}
-              </div>
-              {temOmie ? (
-                <>
-                  <div className="font-medium truncate">{row.razao_omie || "—"}</div>
-                  <div className="text-xs text-muted-foreground flex flex-wrap gap-2 mt-0.5">
-                    {row.codigo_cliente_omie && <span>cód. {row.codigo_cliente_omie}</span>}
-                    <span>Valor: <span className="font-medium text-foreground">{formatBRL(row.valor_omie)}</span></span>
-                    {row.omie_inativo && <Badge variant="destructive" className="text-[10px]">Inativo</Badge>}
-                  </div>
-                </>
-              ) : (
-                <div className="text-sm text-muted-foreground italic mt-1">— não está no Omie —</div>
-              )}
-            </div>
+    <div className="rounded-lg border overflow-hidden">
+      {/* Camada CLIENTE */}
+      <div className="grid grid-cols-2 divide-x">
+        {/* DS */}
+        <div className="p-3 min-w-0 bg-muted/20">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+            DoctorSaaS
           </div>
-
-          {/* Alerta nomes diferentes */}
-          {nomesDiferem && (
-            <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded px-2 py-1">
-              ⚠ Nomes diferentes — confira antes de vincular.
-            </div>
-          )}
-
-          {/* Comparativo de valor */}
-          {temOmie && (
-            <div className="text-sm">
-              {valoresBatem ? (
-                <span className="text-muted-foreground">
-                  Valor DS = Omie: <span className="font-medium text-foreground">{formatBRL(row.valor_mrr_ds)}</span>
-                </span>
-              ) : row.valor_mrr_ds != null && row.valor_omie != null ? (
-                <span className="text-muted-foreground">
-                  DS: <span className="font-medium text-foreground">{formatBRL(row.valor_mrr_ds)}</span>
-                  {" → "}
-                  Omie: <span className="font-medium text-foreground">{formatBRL(row.valor_omie)}</span>
-                  {delta != null && (
-                    <span className={`ml-2 font-medium ${delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
-                      ({delta > 0 ? "+" : ""}{formatBRL(delta)})
-                    </span>
-                  )}
-                </span>
-              ) : null}
-              {diffKeys.length > 0 && (
-                <span className="ml-2 text-xs text-muted-foreground">· Divergências: {diffKeys.join(", ")}</span>
-              )}
-            </div>
+          <div className="font-medium truncate mt-0.5">{row.razao_ds || "—"}</div>
+          <div className="text-xs text-muted-foreground mt-0.5 font-mono">{cnpjFmt}</div>
+          {row.modelo_ds && (
+            <Badge variant="outline" className="text-[10px] mt-1">{row.modelo_ds}</Badge>
           )}
         </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {bucket === "resolver" && (
-            <DisabledActionButton>Atualizar no Omie</DisabledActionButton>
-          )}
-          {bucket === "pendente_assuncao" && (
+        {/* Omie cliente */}
+        <div className="p-3 min-w-0 bg-muted/20">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-2">
+            Omie
+            {bucket === "pendente_assuncao" && (
+              <Badge variant={origem.variant} className="text-[10px] normal-case">{origem.label}</Badge>
+            )}
+            {row.omie_inativo && clienteNoOmie && (
+              <Badge variant="destructive" className="text-[10px] normal-case">Inativo</Badge>
+            )}
+          </div>
+          {clienteNoOmie ? (
             <>
-              <Badge variant="outline">Pendente assunção</Badge>
-              <DisabledActionButton
-                icon={<Lock className="h-3 w-3" />}
-                tip="requer corte da integração de origem"
-              >
-                Assumir
-              </DisabledActionButton>
+              <div className="font-medium truncate mt-0.5">{row.razao_omie || "—"}</div>
+              <div className="text-xs text-muted-foreground mt-0.5 font-mono">{cnpjFmt}</div>
+              {row.codigo_cliente_omie != null && (
+                <div className="text-[11px] text-muted-foreground/80 mt-0.5">
+                  cód. {row.codigo_cliente_omie}
+                </div>
+              )}
             </>
-          )}
-          {bucket === "atribuir_modelo" && (
-            <DisabledActionButton>Definir modelo</DisabledActionButton>
-          )}
-          {bucket === "criar" && <DisabledActionButton>Enviar ao Omie</DisabledActionButton>}
-          {bucket === "criar_contrato" && <DisabledActionButton>Enviar ao Omie</DisabledActionButton>}
-          {bucket === "vinculo_auto_ok" && (
-            <DisabledActionButton>Vincular a este cadastro Omie</DisabledActionButton>
-          )}
-          {bucket === "escolher_candidato" && (
-            <Badge variant="outline">{row.qtd_candidatos_omie ?? 0} candidatos</Badge>
+          ) : (
+            <div className="text-sm text-muted-foreground italic mt-1">— não está no Omie —</div>
           )}
         </div>
       </div>
 
+      {nomesDiferem && (
+        <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border-t border-amber-200 dark:border-amber-900 px-3 py-1.5">
+          ⚠ Nomes diferentes — confira antes de vincular.
+        </div>
+      )}
 
+      {/* Camada CONTRATO */}
+      <div className="grid grid-cols-2 divide-x border-t">
+        {/* DS contrato */}
+        <div className="p-3 min-w-0">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+            Contrato · DoctorSaaS
+          </div>
+          <div className="mt-0.5 text-sm">
+            MRR: <span className="font-medium">{formatBRL(row.valor_mrr_ds)}</span>
+          </div>
+        </div>
+        {/* Omie contrato */}
+        <div className="p-3 min-w-0">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+            Contrato · Omie
+          </div>
+          {contratoNoOmie ? (
+            <>
+              <div className="mt-0.5 text-sm flex items-center gap-2 flex-wrap">
+                <span className="font-medium">{formatBRL(row.valor_omie)}</span>
+                {valoresBatem ? (
+                  <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-900">
+                    ✓ bate
+                  </Badge>
+                ) : delta != null ? (
+                  <span className="text-xs text-muted-foreground">
+                    DS {formatBRL(row.valor_mrr_ds)} → Omie {formatBRL(row.valor_omie)}
+                    <span className={`ml-1 font-medium ${delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                      (Δ {delta > 0 ? "+" : ""}{formatBRL(delta)})
+                    </span>
+                  </span>
+                ) : null}
+              </div>
+              <div className="text-[11px] text-muted-foreground/80 mt-0.5">
+                cód. {row.codigo_contrato_omie}
+              </div>
+              {diffKeys.length > 0 && (
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  Divergências: {diffKeys.join(", ")}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-sm text-muted-foreground italic mt-1">— sem contrato no Omie —</div>
+          )}
+        </div>
+      </div>
 
-      {bucket === "escolher_candidato" && row.cnpj_norm && (
-        <Collapsible open={open} onOpenChange={setOpen}>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-1 h-7 px-2">
-              {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              Ver candidatos
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-2">
-            <CandidatosLinha cnpj={row.cnpj_norm} />
-          </CollapsibleContent>
-        </Collapsible>
+      {/* Ação */}
+      <div className="border-t bg-muted/10 px-3 py-2 flex items-center justify-end gap-2">
+        {bucket === "escolher_candidato" && row.cnpj_norm && (
+          <Collapsible open={open} onOpenChange={setOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1 h-8 px-2">
+                {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                Ver candidatos
+              </Button>
+            </CollapsibleTrigger>
+          </Collapsible>
+        )}
+        {renderBotao()}
+      </div>
+
+      {bucket === "escolher_candidato" && row.cnpj_norm && open && (
+        <div className="border-t px-3 py-2">
+          <CandidatosLinha cnpj={row.cnpj_norm} />
+        </div>
       )}
     </div>
   );
 }
+
 
 export default function OmieConferenciaTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
