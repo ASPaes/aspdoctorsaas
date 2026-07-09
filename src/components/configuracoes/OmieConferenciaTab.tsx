@@ -360,21 +360,9 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
             >
               Atualizar valor no DoctorSaaS
             </DisabledActionButton>
-            <div className="flex items-center gap-2">
-              {bucket === "escolher_candidato" && row.cnpj_norm && (
-                <Collapsible open={open} onOpenChange={setOpen}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-1 h-8 px-2">
-                      {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                      Ver candidatos
-                    </Button>
-                  </CollapsibleTrigger>
-                </Collapsible>
-              )}
-              <DisabledActionButton icon={<ArrowRight className="h-3 w-3" />}>
-                Atualizar valor no Omie
-              </DisabledActionButton>
-            </div>
+            <DisabledActionButton icon={<ArrowRight className="h-3 w-3" />}>
+              Atualizar valor no Omie
+            </DisabledActionButton>
           </>
         ) : (
           <>
