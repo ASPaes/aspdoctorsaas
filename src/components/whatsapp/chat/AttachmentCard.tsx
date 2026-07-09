@@ -1,9 +1,14 @@
 import { useState } from 'react';
-import { FileText, Image, Music, Video, File, ExternalLink, Download, Loader2 } from 'lucide-react';
+import { FileText, Image, Music, Video, File, ExternalLink, Download, Loader2, Smartphone } from 'lucide-react';
 import { formatBytes } from '@/utils/whatsapp/formatBytes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useMediaMeta } from '@/components/whatsapp/hooks/useMediaMeta';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface AttachmentCardProps {
   messageId: string;
@@ -13,6 +18,7 @@ interface AttachmentCardProps {
   mediaKind?: string | null;
   mediaMimetype?: string | null;
   mediaUrl?: string | null;
+  mediaPath?: string | null;
 }
 
 const KIND_ICONS: Record<string, typeof FileText> = {
@@ -44,10 +50,12 @@ export function AttachmentCard({
   mediaKind,
   mediaMimetype,
   mediaUrl,
+  mediaPath,
 }: AttachmentCardProps) {
   // Lazy fetch metadata if missing
   const isTemp = messageId?.startsWith('temp-');
-  const needsMeta = !isTemp && !!mediaUrl && (!mediaFilename || mediaSizeBytes == null);
+  const hasMediaUrl = !!mediaUrl || !!mediaPath;
+  const needsMeta = !isTemp && hasMediaUrl && (!mediaFilename || mediaSizeBytes == null);
   const { data: meta } = useMediaMeta(needsMeta ? messageId : null);
 
   const filename = mediaFilename || meta?.filename || 'Arquivo';
@@ -113,6 +121,8 @@ export function AttachmentCard({
     }
   };
 
+  const showLargeFileWarning = kind === 'document' && !hasMediaUrl;
+
   return (
     <div className="flex items-center gap-3 rounded-lg bg-muted/50 border border-border/50 p-3 min-w-0 max-w-full">
       <div className="flex-shrink-0 h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -134,12 +144,27 @@ export function AttachmentCard({
         </div>
       </div>
       <div className="flex flex-col gap-1 flex-shrink-0">
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleOpen} title="Abrir">
-          <ExternalLink className="h-3.5 w-3.5" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDownload} title="Baixar" disabled={downloading}>
-          {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-        </Button>
+        {showLargeFileWarning ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center justify-center h-7 w-7 text-muted-foreground" title="Abrir pelo WhatsApp">
+                <Smartphone className="h-3.5 w-3.5" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="max-w-[16rem]">
+              <p>Arquivo grande — não carregado automaticamente. Abra pelo WhatsApp.</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleOpen} title="Abrir">
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDownload} title="Baixar" disabled={downloading}>
+              {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
