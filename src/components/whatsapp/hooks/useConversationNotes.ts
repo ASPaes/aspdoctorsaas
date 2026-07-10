@@ -14,6 +14,11 @@ export interface ConversationNote {
   updated_at: string;
   created_by?: string;
   author_name?: string;
+  media_path?: string | null;
+  media_type?: 'image' | 'video' | null;
+  media_mimetype?: string | null;
+  media_filename?: string | null;
+  media_size_bytes?: number | null;
 }
 
 export const useConversationNotes = (conversationId: string | null) => {
@@ -81,8 +86,28 @@ export const useConversationNotes = (conversationId: string | null) => {
   }, [conversationId, refetch]);
 
   const createNote = useMutation({
-    mutationFn: async (content: string) => {
-      const { error } = await supabase.from('whatsapp_conversation_notes').insert({ conversation_id: conversationId, content, created_by: user?.id } as any);
+    mutationFn: async ({ content, file }: { content: string; file?: File }) => {
+      let mediaFields: Record<string, any> = {};
+      if (file) {
+        const { data: up, error: upErr } = await supabase.functions.invoke('get-media-upload-url', {
+          body: { conversationId, mediaMimetype: file.type || 'application/octet-stream', fileName: file.name },
+        });
+        if (upErr || !up?.path || !up?.token) throw new Error('Falha ao preparar upload da mídia');
+        const { error: putErr } = await supabase.storage
+          .from('whatsapp-media')
+          .uploadToSignedUrl(up.path, up.token, file);
+        if (putErr) throw putErr;
+        mediaFields = {
+          media_path: up.path,
+          media_type: file.type.startsWith('video/') ? 'video' : 'image',
+          media_mimetype: file.type || null,
+          media_filename: file.name,
+          media_size_bytes: file.size,
+        };
+      }
+      const { error } = await supabase.from('whatsapp_conversation_notes').insert({
+        conversation_id: conversationId, content, created_by: user?.id, ...mediaFields,
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -109,7 +134,7 @@ export const useConversationNotes = (conversationId: string | null) => {
 
   const deleteNote = useMutation({
     mutationFn: async (noteId: string) => {
-      const { error } = await supabase.from('whatsapp_conversation_notes').delete().eq('id', noteId);
+      const { error } = await supabase.functions.invoke('delete-conversation-note', { body: { note_id: noteId } });
       if (error) throw error;
     },
     onSuccess: () => {

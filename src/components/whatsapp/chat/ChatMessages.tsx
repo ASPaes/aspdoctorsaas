@@ -13,6 +13,7 @@ import { useConversationAssignmentHistory, type AssignmentEvent } from "../hooks
 import { useConversationNotes, type ConversationNote } from "../hooks/useConversationNotes";
 import { useGroupParticipants } from "../hooks/useGroupParticipants";
 import { ArrowRightLeft, ChevronDown, Loader2, StickyNote, Trash2 } from "lucide-react";
+import { NoteMediaPreview } from "./NoteMediaPreview";
 
 interface Props {
   conversationId: string;
@@ -446,9 +447,14 @@ export function ChatMessages({
                             {formatTime(item.note.created_at, timezone)}
                           </span>
                         </div>
-                        <p className="text-sm whitespace-pre-wrap break-words text-foreground/90">
-                          {item.note.content}
-                        </p>
+                        {item.note.media_path && item.note.media_type && (
+                          <NoteMediaPreview noteId={item.note.id} mediaType={item.note.media_type} />
+                        )}
+                        {item.note.content && (
+                          <p className="text-sm whitespace-pre-wrap break-words text-foreground/90">
+                            {item.note.content}
+                          </p>
+                        )}
                       </div>
                       <button
                         type="button"

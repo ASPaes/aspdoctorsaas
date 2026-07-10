@@ -121,6 +121,23 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const validateAndAttachFiles = (incoming: FileList | File[]): File[] => {
     const arr = Array.from(incoming);
     if (arr.length === 0) return [];
+
+    // Modo nota: só 1 mídia por vez e apenas imagem/vídeo
+    if (mode === 'note') {
+      const visual = arr.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+      if (visual.length < arr.length) {
+        toast.warning('Nota interna aceita apenas imagem ou vídeo.');
+      }
+      if (attachedFiles.length >= 1) {
+        toast.error('Nota interna aceita apenas 1 mídia.');
+        return [];
+      }
+      const first = visual[0];
+      if (!first) return [];
+      setAttachedFiles([first]);
+      return [first];
+    }
+
     const maxBytes = MAX_FILE_SIZE_MB * 1024 * 1024;
     const warnBytes = WARN_FILE_SIZE_MB * 1024 * 1024;
 
@@ -174,10 +191,11 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [mediaPreviewOpen, setMediaPreviewOpen] = useState(false);
 
   const maybeOpenMediaPreview = (accepted: File[]) => {
-    if (mode !== "message") return;
+    if (mode !== "message" && mode !== "note") return;
     const hasVisual = accepted.some(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
     if (hasVisual) setMediaPreviewOpen(true);
   };
+
 
 
 
@@ -423,7 +441,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
       const content = message.trim();
       if (!content) return;
       if (isCreatingNote) return;
-      createNote(content);
+      createNote({ content });
       setMessage("");
       onCancelReply?.();
       requestAnimationFrame(() => textareaRef.current?.focus());
@@ -612,6 +630,17 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   }, [attachedFiles, mode]);
 
   const handleMediaPreviewConfirm = (caption: string) => {
+    if (mode === "note") {
+      if (isCreatingNote) return;
+      const file = attachedFiles[0];
+      if (!file) return;
+      setAttachedFiles([]);
+      setMessage("");
+      setMediaPreviewOpen(false);
+      createNote({ content: caption.trim(), file });
+      setTimeout(() => textareaRef.current?.focus(), 100);
+      return;
+    }
     if (isBlocked) {
       toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
       return;
@@ -903,15 +932,22 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           <EmojiPickerButton onEmojiSelect={handleEmojiSelect} disabled={sendMutation.isPending || isBlocked || isInternalNote} />
 
           {/* File attach button */}
-          <input ref={fileInputRef} type="file" accept="*/*" multiple onChange={handleFileSelect} className="hidden" />
-          {!isInternalNote && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={isInternalNote ? "image/*,video/*" : "*/*"}
+            multiple={!isInternalNote}
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          {!isDraftMode && (
             <Button
               type="button"
               size="icon"
               variant="ghost"
               onClick={() => fileInputRef.current?.click()}
-              disabled={sendMutation.isPending || isBlocked}
-              aria-label="Anexar arquivo"
+              disabled={sendMutation.isPending || (isBlocked && !isInternalNote)}
+              aria-label={isInternalNote ? "Anexar imagem ou vídeo à nota" : "Anexar arquivo"}
             >
               <Paperclip className="w-5 h-5" />
             </Button>
@@ -1043,9 +1079,9 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         initialCaption={message}
         onConfirm={handleMediaPreviewConfirm}
         onCancel={handleMediaPreviewCancel}
-        isSending={sendMutation.isPending}
-        disabled={isBlocked || requiresTemplate}
-        disabledReason={requiresTemplate ? "Janela de 24h fechada — use um template Meta." : (isBlocked ? "Você precisa estar ATIVO para enviar." : undefined)}
+        isSending={mode === "note" ? isCreatingNote : sendMutation.isPending}
+        disabled={mode === "note" ? false : (isBlocked || requiresTemplate)}
+        disabledReason={mode === "note" ? undefined : (requiresTemplate ? "Janela de 24h fechada — use um template Meta." : (isBlocked ? "Você precisa estar ATIVO para enviar." : undefined))}
       />
     </div>
   );

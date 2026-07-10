@@ -134,7 +134,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
 
   const handleAddNote = () => {
     if (!newNote.trim()) return;
-    createNote(newNote.trim());
+    createNote({ content: newNote.trim() });
     setNewNote("");
   };
 
