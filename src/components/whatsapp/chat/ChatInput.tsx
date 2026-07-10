@@ -123,20 +123,25 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     const arr = Array.from(incoming);
     if (arr.length === 0) return [];
 
-    // Modo nota: só 1 mídia por vez e apenas imagem/vídeo
+    // Modo nota: apenas imagem/vídeo (várias permitidas, respeitando MAX_FILES)
     if (mode === 'note') {
       const visual = arr.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
       if (visual.length < arr.length) {
-        toast.warning('Nota interna aceita apenas imagem ou vídeo.');
+        toast.warning('Nota interna aceita apenas imagem ou vídeo. Arquivos não suportados foram ignorados.');
       }
-      if (attachedFiles.length >= 1) {
-        toast.error('Nota interna aceita apenas 1 mídia.');
+      if (visual.length === 0) return [];
+      const remaining = MAX_FILES - attachedFiles.length;
+      if (remaining <= 0) {
+        toast.error('Limite de mídias atingido', { description: `Máximo de ${MAX_FILES} por nota.` });
         return [];
       }
-      const first = visual[0];
-      if (!first) return [];
-      setAttachedFiles([first]);
-      return [first];
+      const accepted = visual.slice(0, remaining);
+      const skipped = visual.length - accepted.length;
+      if (skipped > 0) {
+        toast.error('Limite de mídias excedido', { description: `Máximo de ${MAX_FILES} por nota. ${skipped} não foram adicionados.` });
+      }
+      setAttachedFiles((prev) => [...prev, ...accepted]);
+      return accepted;
     }
 
     const maxBytes = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -617,12 +622,16 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const handleMediaPreviewConfirm = (caption: string) => {
     if (mode === "note") {
       if (isCreatingNote) return;
-      const file = attachedFiles[0];
-      if (!file) return;
+      const filesSnapshot = attachedFiles;
+      if (filesSnapshot.length === 0) return;
+      const captionSnapshot = caption.trim();
       setAttachedFiles([]);
       setMessage("");
       setMediaPreviewOpen(false);
-      createNote({ content: caption.trim(), file });
+      // 1 nota por mídia; texto só na primeira (igual legenda do envio ao cliente)
+      filesSnapshot.forEach((file, i) => {
+        createNote({ content: i === 0 ? captionSnapshot : "", file });
+      });
       setTimeout(() => textareaRef.current?.focus(), 100);
       return;
     }
@@ -914,7 +923,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             ref={fileInputRef}
             type="file"
             accept={isInternalNote ? "image/*,video/*" : "*/*"}
-            multiple={!isInternalNote}
+            multiple
             onChange={handleFileSelect}
             className="hidden"
           />
