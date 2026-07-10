@@ -95,3 +95,10 @@ verify_jwt = false
 
 [functions.check-inactivity-timeout]
 verify_jwt = false
+
+[functions.get-note-media-url]
+verify_jwt = true
+
+[functions.delete-conversation-note]
+verify_jwt = true
+

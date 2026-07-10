@@ -6676,6 +6676,11 @@ export type Database = {
           created_by: string | null
           id: string
           is_pinned: boolean
+          media_filename: string | null
+          media_mimetype: string | null
+          media_path: string | null
+          media_size_bytes: number | null
+          media_type: string | null
           tenant_id: string
           updated_at: string
         }
@@ -6686,6 +6691,11 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_pinned?: boolean
+          media_filename?: string | null
+          media_mimetype?: string | null
+          media_path?: string | null
+          media_size_bytes?: number | null
+          media_type?: string | null
           tenant_id: string
           updated_at?: string
         }
@@ -6696,6 +6706,11 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_pinned?: boolean
+          media_filename?: string | null
+          media_mimetype?: string | null
+          media_path?: string | null
+          media_size_bytes?: number | null
+          media_type?: string | null
           tenant_id?: string
           updated_at?: string
         }
