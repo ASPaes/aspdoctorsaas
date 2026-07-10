@@ -1063,4 +1063,4 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       />
     </div>
   );
-}
+});
