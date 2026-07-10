@@ -224,7 +224,7 @@ export const useWhatsAppMessages = (
           queryClient.invalidateQueries({ queryKey: ['notifications-list'] });
         });
     }
-  }, [conversationId, queryClient]);
+  }, [conversationId, queryClient, readOnly]);
 
   
   const newMessageCallbackRef = useRef<((msg: Message) => void) | null>(null);
