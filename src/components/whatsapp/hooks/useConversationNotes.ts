@@ -134,7 +134,7 @@ export const useConversationNotes = (conversationId: string | null) => {
 
   const deleteNote = useMutation({
     mutationFn: async (noteId: string) => {
-      const { error } = await supabase.from('whatsapp_conversation_notes').delete().eq('id', noteId);
+      const { error } = await supabase.functions.invoke('delete-conversation-note', { body: { note_id: noteId } });
       if (error) throw error;
     },
     onSuccess: () => {
