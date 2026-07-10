@@ -151,7 +151,11 @@ export function mergeMessage(old: Message[], incoming: Message): Message[] {
   return [...old, incoming];
 }
 
-export const useWhatsAppMessages = (conversationId: string | null) => {
+export const useWhatsAppMessages = (
+  conversationId: string | null,
+  options?: { readOnly?: boolean }
+) => {
+  const readOnly = options?.readOnly ?? false;
   const queryClient = useQueryClient();
 
   const {
