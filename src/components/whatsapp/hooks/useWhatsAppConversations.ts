@@ -189,20 +189,39 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
 
       query = applyFullFilter(query, tid, filters);
 
-      // Hide conversations without messages, unless they are groups or in includeIds
-      const includeIds = filters?.includeIds;
-      if (filters?.isGroup) {
-        // Grupos: mostrar todos, mesmo sem mensagens
-      } else if (includeIds && includeIds.length > 0) {
-        query = query.or(`last_message_at.not.is.null,id.in.(${includeIds.join(',')})`);
-      } else {
+      // NÃO usar `.or(... id.in ...)` aqui: o OR anula o índice ordenado
+      // idx_wa_conv_tenant_lastmsg_active e força varrer+ordenar TODAS as conversas
+      // da tenant. Grupos mostram tudo; demais só com last_message_at preenchido.
+      if (!filters?.isGroup) {
         query = query.not('last_message_at', 'is', null);
       }
 
       const { data: conversationsData, error } = await query;
       if (error) throw error;
 
-      const result = ((conversationsData ?? []) as unknown as ConversationWithContact[]).map(conv => ({
+      // Conversas "forçadas" (ex.: recém-criadas, ainda sem last_message_at) não entram
+      // no filtro acima. Busca-as à parte por PK (lookup barato) e mescla no topo. Só
+      // dispara enquanto a conversa não tem mensagem — depois ela entra na query principal.
+      let rawConversations = (conversationsData ?? []) as any[];
+      const includeIds = filters?.includeIds;
+      if (!filters?.isGroup && includeIds && includeIds.length > 0) {
+        const presentIds = new Set(rawConversations.map((c: any) => c.id));
+        const missingIds = includeIds.filter((id) => !presentIds.has(id));
+        if (missingIds.length > 0) {
+          let forcedQuery = (supabase
+            .from('whatsapp_conversations')
+            .select(`*, contact:whatsapp_contacts(*)`)
+            .in('id', missingIds)) as any;
+          if (tid) forcedQuery = forcedQuery.eq('tenant_id', tid);
+          const { data: forcedData } = await forcedQuery;
+          if (forcedData && forcedData.length > 0) {
+            rawConversations = [...forcedData, ...rawConversations];
+          }
+        }
+      }
+
+      const result = (rawConversations as unknown as ConversationWithContact[]).map(conv => ({
+
         ...conv,
         unread_count: parseInt(String((conv as any).unread_count ?? 0), 10) || 0,
         last_message_at: conv.last_message_at || null,
