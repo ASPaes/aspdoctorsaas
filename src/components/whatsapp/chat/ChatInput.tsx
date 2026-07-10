@@ -763,16 +763,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   return (
     <div
       className="border-t border-border bg-card relative"
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
     >
-      {/* Drag overlay */}
-      {isDragging && (
-        <div className="absolute inset-0 z-10 bg-primary/10 border-2 border-dashed border-primary rounded-md flex items-center justify-center pointer-events-none">
-          <p className="text-sm font-medium text-primary">Solte o arquivo aqui</p>
-        </div>
-      )}
+
+
 
       {replyTo && onCancelReply && (
         <ReplyPreview
