@@ -13,6 +13,7 @@ import { useConversationAssignmentHistory, type AssignmentEvent } from "../hooks
 import { useConversationNotes, type ConversationNote } from "../hooks/useConversationNotes";
 import { useGroupParticipants } from "../hooks/useGroupParticipants";
 import { ArrowRightLeft, ChevronDown, Loader2, StickyNote, Trash2 } from "lucide-react";
+import { NoteMediaPreview } from "./NoteMediaPreview";
 
 interface Props {
   conversationId: string;
