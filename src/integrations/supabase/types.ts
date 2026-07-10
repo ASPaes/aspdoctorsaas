@@ -9839,10 +9839,16 @@ export type Database = {
         Returns: Json
       }
       search_clientes_for_link: {
-        Args: { p_tenant_id: string; p_term: string }
+        Args: {
+          p_include_cancelados?: boolean
+          p_tenant_id: string
+          p_term: string
+        }
         Returns: {
+          cancelado: boolean
           cnpj: string
           codigo_sequencial: number
+          data_cancelamento: string
           id: string
           nome_fantasia: string
           razao_social: string

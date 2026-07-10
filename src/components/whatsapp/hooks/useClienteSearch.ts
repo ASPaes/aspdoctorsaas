@@ -10,9 +10,11 @@ export interface ClienteSearchResult {
   telefone_whatsapp: string | null;
   cnpj: string | null;
   codigo_sequencial: number;
+  cancelado: boolean;
+  data_cancelamento: string | null;
 }
 
-export function useClienteSearch(searchTerm: string) {
+export function useClienteSearch(searchTerm: string, includeCancelados: boolean = false) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
 
