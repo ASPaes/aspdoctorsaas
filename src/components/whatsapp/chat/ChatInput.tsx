@@ -630,6 +630,17 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   }, [attachedFiles, mode]);
 
   const handleMediaPreviewConfirm = (caption: string) => {
+    if (mode === "note") {
+      if (isCreatingNote) return;
+      const file = attachedFiles[0];
+      if (!file) return;
+      setAttachedFiles([]);
+      setMessage("");
+      setMediaPreviewOpen(false);
+      createNote({ content: caption.trim(), file });
+      setTimeout(() => textareaRef.current?.focus(), 100);
+      return;
+    }
     if (isBlocked) {
       toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
       return;
