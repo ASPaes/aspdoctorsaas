@@ -1,8 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { MessageSquare, Trash2, Forward, X, EyeOff, Pause } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
-import type { Message, MsgPages } from "../hooks/useWhatsAppMessages";
+import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages";
 import { ChatHeader } from "./ChatHeader";
 import { ClientAlertBanner } from "./ClientAlertBanner";
 import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
@@ -73,7 +72,6 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
 
   const deleteMutation = useDeleteMessages();
   const { resendMessage } = useWhatsAppActions();
-  const queryClient = useQueryClient();
   const { user, profile } = useAuth();
   const isAccessActive = profile?.access_status === "active" || profile?.access_status === "ativo";
   const { data: allClientAlerts = [] } = useClientAlerts();
@@ -83,14 +81,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   // Generate greeting for new conversations (no messages yet)
   const initialGreeting = undefined;
 
-  const messagesData = queryClient.getQueryData<MsgPages>(
-    ['whatsapp', 'messages', conversation?.id]
-  );
-
-  const messages = useMemo<Message[]>(
-    () => (messagesData?.pages ?? []).flat(),
-    [messagesData]
-  );
+  const { messages } = useWhatsAppMessages(conversation?.id ?? null, { readOnly: true });
 
   const toggleSelect = useCallback((msgId: string) => {
     setSelectedMessages(prev => {

@@ -151,7 +151,11 @@ export function mergeMessage(old: Message[], incoming: Message): Message[] {
   return [...old, incoming];
 }
 
-export const useWhatsAppMessages = (conversationId: string | null) => {
+export const useWhatsAppMessages = (
+  conversationId: string | null,
+  options?: { readOnly?: boolean }
+) => {
+  const readOnly = options?.readOnly ?? false;
   const queryClient = useQueryClient();
 
   const {
@@ -203,6 +207,7 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
   }, [data]);
 
   useEffect(() => {
+    if (readOnly) return;
     if (conversationId) {
       // Zerar unread_count na conversa (badge da sidebar)
       supabase
@@ -219,7 +224,7 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
           queryClient.invalidateQueries({ queryKey: ['notifications-list'] });
         });
     }
-  }, [conversationId, queryClient]);
+  }, [conversationId, queryClient, readOnly]);
 
   
   const newMessageCallbackRef = useRef<((msg: Message) => void) | null>(null);
@@ -230,6 +235,7 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
   }, []);
 
   useEffect(() => {
+    if (readOnly) return;
     if (!conversationId) return;
 
     const channelName = `msgs-${conversationId}`;
@@ -280,7 +286,7 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         }
       }
     );
-  }, [conversationId, queryClient]);
+  }, [conversationId, queryClient, readOnly]);
 
   return { messages, isLoading, error, onNewMessage, fetchNextPage, hasNextPage, isFetchingNextPage };
 };
