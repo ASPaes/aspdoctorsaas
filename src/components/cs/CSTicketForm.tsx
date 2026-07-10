@@ -177,24 +177,12 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
     setDraftStatus("idle");
   }, [draftKey]);
 
-  // Client search
-  useEffect(() => {
-    if (isInterno || clienteId) return;
-    if (searchCliente.length < 2) { setClientes([]); return; }
-    setLoadingClientes(true);
-    const debounce = setTimeout(async () => {
-      const escaped = escapeLike(searchCliente);
-      const { data } = await tf(supabase.from('clientes').select('id, razao_social, nome_fantasia')
-        .eq('cancelado', false)
-        .or(`razao_social.ilike.%${escaped}%,nome_fantasia.ilike.%${escaped}%`)
-        .limit(10));
-      if (data) setClientes(data);
-      setLoadingClientes(false);
-    }, 300);
-    return () => clearTimeout(debounce);
-  }, [searchCliente, isInterno, clienteId]);
+  const { results: clientes, isLoading: loadingClientes } = useClienteSearch(
+    !isInterno && !clienteId && !selectedClienteId ? searchCliente : '',
+    incluirCancelados
+  );
 
-  const handleSelectCliente = (cliente: ClienteOption) => {
+  const handleSelectCliente = (cliente: ClienteSearchResult) => {
     setValue('cliente_id', cliente.id);
     setSearchCliente(cliente.nome_fantasia || cliente.razao_social);
   };
