@@ -14,6 +14,11 @@ export interface ConversationNote {
   updated_at: string;
   created_by?: string;
   author_name?: string;
+  media_path?: string | null;
+  media_type?: 'image' | 'video' | null;
+  media_mimetype?: string | null;
+  media_filename?: string | null;
+  media_size_bytes?: number | null;
 }
 
 export const useConversationNotes = (conversationId: string | null) => {
