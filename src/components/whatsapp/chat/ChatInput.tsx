@@ -18,6 +18,7 @@ import { MacroFillCard } from "./input/MacroFillCard";
 import { SmartReplySuggestions } from "./input/SmartReplySuggestions";
 import { ReplyPreview } from "./input/ReplyPreview";
 import { AttachmentChip } from "./input/AttachmentChip";
+import { MediaSendPreviewDialog } from "./input/MediaSendPreviewDialog";
 import { useWhatsAppMacros } from "../hooks/useWhatsAppMacros";
 import { useMacroTags } from "../hooks/useMacroTags";
 import { useSmartReply } from "../hooks/useSmartReply";
@@ -117,57 +118,67 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const WARN_FILE_SIZE_MB = 60;
   const MAX_FILES = 10;
 
-  const validateAndAttachFiles = (incoming: FileList | File[]) => {
+  const validateAndAttachFiles = (incoming: FileList | File[]): File[] => {
     const arr = Array.from(incoming);
-    if (arr.length === 0) return;
+    if (arr.length === 0) return [];
     const maxBytes = MAX_FILE_SIZE_MB * 1024 * 1024;
     const warnBytes = WARN_FILE_SIZE_MB * 1024 * 1024;
 
-    setAttachedFiles((prev) => {
-      const remaining = MAX_FILES - prev.length;
-      if (remaining <= 0) {
-        toast.error("Limite de anexos atingido", {
-          description: `Você pode anexar no máximo ${MAX_FILES} arquivos por mensagem.`,
-        });
-        return prev;
-      }
+    const remaining = MAX_FILES - attachedFiles.length;
+    if (remaining <= 0) {
+      toast.error("Limite de anexos atingido", {
+        description: `Você pode anexar no máximo ${MAX_FILES} arquivos por mensagem.`,
+      });
+      return [];
+    }
 
-      const accepted: File[] = [];
-      let rejectedBySize = 0;
-      let warnedBySize = 0;
+    const accepted: File[] = [];
+    let rejectedBySize = 0;
+    let warnedBySize = 0;
 
-      for (const file of arr) {
-        if (accepted.length >= remaining) break;
-        if (file.size > maxBytes) {
-          rejectedBySize++;
-          continue;
-        }
-        if (file.size > warnBytes) warnedBySize++;
-        accepted.push(file);
+    for (const file of arr) {
+      if (accepted.length >= remaining) break;
+      if (file.size > maxBytes) {
+        rejectedBySize++;
+        continue;
       }
+      if (file.size > warnBytes) warnedBySize++;
+      accepted.push(file);
+    }
 
-      const skippedByLimit = arr.length - accepted.length - rejectedBySize;
+    const skippedByLimit = arr.length - accepted.length - rejectedBySize;
 
-      if (rejectedBySize > 0) {
-        toast.error(
-          rejectedBySize === 1 ? "Arquivo muito grande" : `${rejectedBySize} arquivos muito grandes`,
-          { description: `O limite máximo por arquivo é de ${MAX_FILE_SIZE_MB}MB.` }
-        );
-      }
-      if (skippedByLimit > 0) {
-        toast.error("Limite de anexos excedido", {
-          description: `Você pode anexar no máximo ${MAX_FILES} arquivos. ${skippedByLimit} arquivo(s) não foram adicionados.`,
-        });
-      }
-      if (warnedBySize > 0) {
-        toast.warning("Arquivo grande", {
-          description: `Arquivos acima de ${WARN_FILE_SIZE_MB}MB podem falhar no envio pelo WhatsApp.`,
-        });
-      }
+    if (rejectedBySize > 0) {
+      toast.error(
+        rejectedBySize === 1 ? "Arquivo muito grande" : `${rejectedBySize} arquivos muito grandes`,
+        { description: `O limite máximo por arquivo é de ${MAX_FILE_SIZE_MB}MB.` }
+      );
+    }
+    if (skippedByLimit > 0) {
+      toast.error("Limite de anexos excedido", {
+        description: `Você pode anexar no máximo ${MAX_FILES} arquivos. ${skippedByLimit} arquivo(s) não foram adicionados.`,
+      });
+    }
+    if (warnedBySize > 0) {
+      toast.warning("Arquivo grande", {
+        description: `Arquivos acima de ${WARN_FILE_SIZE_MB}MB podem falhar no envio pelo WhatsApp.`,
+      });
+    }
 
-      return accepted.length > 0 ? [...prev, ...accepted] : prev;
-    });
+    if (accepted.length > 0) {
+      setAttachedFiles((prev) => [...prev, ...accepted]);
+    }
+    return accepted;
   };
+
+  const [mediaPreviewOpen, setMediaPreviewOpen] = useState(false);
+
+  const maybeOpenMediaPreview = (accepted: File[]) => {
+    if (mode !== "message") return;
+    const hasVisual = accepted.some(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
+    if (hasVisual) setMediaPreviewOpen(true);
+  };
+
 
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -561,9 +572,10 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     }
     if (files.length > 0) {
       e.preventDefault();
-      validateAndAttachFiles(files);
+      const accepted = validateAndAttachFiles(files);
+      maybeOpenMediaPreview(accepted);
     }
-  }, []);
+  }, [attachedFiles, mode]);
 
   // Drag & drop handlers
   const handleDragOver = useCallback((e: DragEvent) => {
@@ -583,15 +595,44 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     e.stopPropagation();
     setIsDragging(false);
     const files = e.dataTransfer?.files;
-    if (files && files.length > 0) validateAndAttachFiles(files);
-  }, []);
+    if (files && files.length > 0) {
+      const accepted = validateAndAttachFiles(files);
+      maybeOpenMediaPreview(accepted);
+    }
+  }, [attachedFiles, mode]);
 
   // File input handler
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files.length > 0) validateAndAttachFiles(files);
+    if (files && files.length > 0) {
+      const accepted = validateAndAttachFiles(files);
+      maybeOpenMediaPreview(accepted);
+    }
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, []);
+  }, [attachedFiles, mode]);
+
+  const handleMediaPreviewConfirm = (caption: string) => {
+    if (isBlocked) {
+      toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
+      return;
+    }
+    const filesSnapshot = attachedFiles;
+    setAttachedFiles([]);
+    setMessage("");
+    setMediaPreviewOpen(false);
+    onCancelReply?.();
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    void sendAttachedFilesAll(filesSnapshot, caption.trim() || undefined);
+    setTimeout(() => textareaRef.current?.focus(), 100);
+  };
+
+  const handleMediaPreviewCancel = (caption: string) => {
+    setMessage(caption);
+    setAttachedFiles([]);
+    setMediaPreviewOpen(false);
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  };
+
 
 
   const handleEmojiSelect = (emoji: string) => {
@@ -993,6 +1034,19 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           to={contactPhone}
         />
       )}
+
+      <MediaSendPreviewDialog
+        open={mediaPreviewOpen}
+        onOpenChange={(o) => { if (!o) handleMediaPreviewCancel(message); }}
+        files={attachedFiles}
+        onRemoveFile={(idx) => setAttachedFiles((prev) => prev.filter((_, i) => i !== idx))}
+        initialCaption={message}
+        onConfirm={handleMediaPreviewConfirm}
+        onCancel={handleMediaPreviewCancel}
+        isSending={sendMutation.isPending}
+        disabled={isBlocked || requiresTemplate}
+        disabledReason={requiresTemplate ? "Janela de 24h fechada — use um template Meta." : (isBlocked ? "Você precisa estar ATIVO para enviar." : undefined)}
+      />
     </div>
   );
 }
