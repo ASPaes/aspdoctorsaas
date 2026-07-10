@@ -1,8 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { MessageSquare, Trash2, Forward, X, EyeOff, Pause } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
-import type { Message, MsgPages } from "../hooks/useWhatsAppMessages";
+import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages";
 import { ChatHeader } from "./ChatHeader";
 import { ClientAlertBanner } from "./ClientAlertBanner";
 import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
