@@ -72,7 +72,6 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
 
   const deleteMutation = useDeleteMessages();
   const { resendMessage } = useWhatsAppActions();
-  const queryClient = useQueryClient();
   const { user, profile } = useAuth();
   const isAccessActive = profile?.access_status === "active" || profile?.access_status === "ativo";
   const { data: allClientAlerts = [] } = useClientAlerts();
@@ -82,14 +81,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   // Generate greeting for new conversations (no messages yet)
   const initialGreeting = undefined;
 
-  const messagesData = queryClient.getQueryData<MsgPages>(
-    ['whatsapp', 'messages', conversation?.id]
-  );
-
-  const messages = useMemo<Message[]>(
-    () => (messagesData?.pages ?? []).flat(),
-    [messagesData]
-  );
+  const { messages } = useWhatsAppMessages(conversation?.id ?? null, { readOnly: true });
 
   const toggleSelect = useCallback((msgId: string) => {
     setSelectedMessages(prev => {
