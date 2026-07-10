@@ -1079,9 +1079,9 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         initialCaption={message}
         onConfirm={handleMediaPreviewConfirm}
         onCancel={handleMediaPreviewCancel}
-        isSending={sendMutation.isPending}
-        disabled={isBlocked || requiresTemplate}
-        disabledReason={requiresTemplate ? "Janela de 24h fechada — use um template Meta." : (isBlocked ? "Você precisa estar ATIVO para enviar." : undefined)}
+        isSending={mode === "note" ? isCreatingNote : sendMutation.isPending}
+        disabled={mode === "note" ? false : (isBlocked || requiresTemplate)}
+        disabledReason={mode === "note" ? undefined : (requiresTemplate ? "Janela de 24h fechada — use um template Meta." : (isBlocked ? "Você precisa estar ATIVO para enviar." : undefined))}
       />
     </div>
   );
