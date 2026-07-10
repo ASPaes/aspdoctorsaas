@@ -1349,6 +1349,24 @@ Deno.serve(async (req) => {
     }
   }
 
+  // ── Guarda de corpo gigante (proteção contra OOM) ──────────────────────────
+  // Se a notificação vier com a mídia embutida (base64), o corpo pode ter dezenas
+  // de MB e estourar a memória no req.json() (546), derrubando a função e podendo
+  // levar junto outras mensagens em processamento. Detectamos o corpo grande pelo
+  // header ANTES de parsear e devolvemos 200 sem processar — evita o crash e a
+  // tempestade de retry. (A mídia embutida em si não é processada; isso deixa de
+  // ocorrer quando o base64 for desligado no Evolution ou o S3 entrar.) Tunável.
+  const MAX_BODY_BYTES = 40 * 1024 * 1024; // 40 MB
+  const contentLength = Number(req.headers.get('content-length') || '0');
+  if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+    console.warn(`${LOG} Body grande demais (${contentLength} bytes) — provavel base64 inline. Nao processado para evitar OOM.`);
+    try { await req.body?.cancel(); } catch { /* ignore */ }
+    return new Response(
+      JSON.stringify({ received: true, skipped: 'body_too_large', contentLength }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   // Parse rápido do body
   let payload: EvolutionWebhookPayload;
   try {
