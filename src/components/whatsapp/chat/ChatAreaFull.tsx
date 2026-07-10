@@ -232,7 +232,22 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
 
   return (
     <div className="h-full flex min-h-0 overflow-hidden">
-      <div className={`flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative ${presenceBlocked ? "opacity-60 grayscale-[30%]" : ""}`}>
+      <div
+        className={`flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative ${presenceBlocked ? "opacity-60 grayscale-[30%]" : ""}`}
+        onDragOver={(e) => { if (e.dataTransfer?.types?.includes("Files")) { e.preventDefault(); setIsDraggingFile(true); } }}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDraggingFile(false); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDraggingFile(false);
+          const files = e.dataTransfer?.files;
+          if (files && files.length > 0) chatInputRef.current?.handleExternalDrop(files);
+        }}
+      >
+        {isDraggingFile && (
+          <div className="absolute inset-0 z-30 bg-primary/10 border-2 border-dashed border-primary flex items-center justify-center pointer-events-none">
+            <p className="text-sm font-medium text-primary">Solte a imagem aqui</p>
+          </div>
+        )}
         {presenceBlocked && presenceStatus === "paused" && (
           <div className="bg-yellow-500/10 border-b border-yellow-500/30 px-4 py-1.5 text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-1.5 z-10 shrink-0">
             <Pause className="h-3 w-3" />
