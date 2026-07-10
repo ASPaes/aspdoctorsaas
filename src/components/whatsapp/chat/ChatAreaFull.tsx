@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import { MessageSquare, Trash2, Forward, X, EyeOff, Pause } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
-import type { Message } from "../hooks/useWhatsAppMessages";
+import type { Message, MsgPages } from "../hooks/useWhatsAppMessages";
 import { ChatHeader } from "./ChatHeader";
 import { ClientAlertBanner } from "./ClientAlertBanner";
 import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
@@ -83,9 +83,14 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   // Generate greeting for new conversations (no messages yet)
   const initialGreeting = undefined;
 
-  const messages: Message[] = queryClient.getQueryData(
+  const messagesData = queryClient.getQueryData<MsgPages>(
     ['whatsapp', 'messages', conversation?.id]
-  ) ?? [];
+  );
+
+  const messages = useMemo<Message[]>(
+    () => (messagesData?.pages ?? []).flat(),
+    [messagesData]
+  );
 
   const toggleSelect = useCallback((msgId: string) => {
     setSelectedMessages(prev => {
