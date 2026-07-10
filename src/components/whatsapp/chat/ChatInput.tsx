@@ -622,12 +622,16 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const handleMediaPreviewConfirm = (caption: string) => {
     if (mode === "note") {
       if (isCreatingNote) return;
-      const file = attachedFiles[0];
-      if (!file) return;
+      const filesSnapshot = attachedFiles;
+      if (filesSnapshot.length === 0) return;
+      const captionSnapshot = caption.trim();
       setAttachedFiles([]);
       setMessage("");
       setMediaPreviewOpen(false);
-      createNote({ content: caption.trim(), file });
+      // 1 nota por mídia; texto só na primeira (igual legenda do envio ao cliente)
+      filesSnapshot.forEach((file, i) => {
+        createNote({ content: i === 0 ? captionSnapshot : "", file });
+      });
       setTimeout(() => textareaRef.current?.focus(), 100);
       return;
     }
