@@ -572,9 +572,10 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     }
     if (files.length > 0) {
       e.preventDefault();
-      validateAndAttachFiles(files);
+      const accepted = validateAndAttachFiles(files);
+      maybeOpenMediaPreview(accepted);
     }
-  }, []);
+  }, [attachedFiles, mode]);
 
   // Drag & drop handlers
   const handleDragOver = useCallback((e: DragEvent) => {
@@ -594,15 +595,44 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     e.stopPropagation();
     setIsDragging(false);
     const files = e.dataTransfer?.files;
-    if (files && files.length > 0) validateAndAttachFiles(files);
-  }, []);
+    if (files && files.length > 0) {
+      const accepted = validateAndAttachFiles(files);
+      maybeOpenMediaPreview(accepted);
+    }
+  }, [attachedFiles, mode]);
 
   // File input handler
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files.length > 0) validateAndAttachFiles(files);
+    if (files && files.length > 0) {
+      const accepted = validateAndAttachFiles(files);
+      maybeOpenMediaPreview(accepted);
+    }
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, []);
+  }, [attachedFiles, mode]);
+
+  const handleMediaPreviewConfirm = (caption: string) => {
+    if (isBlocked) {
+      toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
+      return;
+    }
+    const filesSnapshot = attachedFiles;
+    setAttachedFiles([]);
+    setMessage("");
+    setMediaPreviewOpen(false);
+    onCancelReply?.();
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    void sendAttachedFilesAll(filesSnapshot, caption.trim() || undefined);
+    setTimeout(() => textareaRef.current?.focus(), 100);
+  };
+
+  const handleMediaPreviewCancel = (caption: string) => {
+    setMessage(caption);
+    setAttachedFiles([]);
+    setMediaPreviewOpen(false);
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  };
+
 
 
   const handleEmojiSelect = (emoji: string) => {
