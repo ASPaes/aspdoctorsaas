@@ -6,7 +6,7 @@ import { ChatHeader } from "./ChatHeader";
 import { ClientAlertBanner } from "./ClientAlertBanner";
 import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
 import { ChatMessages } from "./ChatMessages";
-import { ChatInput } from "./ChatInput";
+import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { DetailsSidebar } from "./DetailsSidebar";
 import { ForwardMessageDialog } from "./ForwardMessageDialog";
 import { useDeleteMessages } from "../hooks/useDeleteMessages";
