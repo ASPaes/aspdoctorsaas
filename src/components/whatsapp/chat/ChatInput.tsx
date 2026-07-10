@@ -603,29 +603,6 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     }
   }, [attachedFiles, mode]);
 
-  // Drag & drop handlers
-  const handleDragOver = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    const files = e.dataTransfer?.files;
-    if (files && files.length > 0) {
-      const accepted = validateAndAttachFiles(files);
-      maybeOpenMediaPreview(accepted);
-    }
-  }, [attachedFiles, mode]);
 
   // File input handler
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
