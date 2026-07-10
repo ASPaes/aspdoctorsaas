@@ -170,8 +170,7 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
     setIsInterno(!clienteId);
     setOportunidadeAtivacao(null);
     setOportunidadeMrr(null);
-    if (clienteId && clienteNome) setClientes([{ id: clienteId, razao_social: clienteNome, nome_fantasia: null }]);
-  }, [draftKey, reset, defaultFormValues, clienteId, clienteNome]);
+  }, [draftKey, reset, defaultFormValues, clienteId]);
 
   const clearDraft = useCallback(() => {
     try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
