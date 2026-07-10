@@ -66,9 +66,8 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
   const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
   const draftKey = buildDraftKey(profile?.tenant_id ?? null, user?.id ?? null, clienteId);
 
-  const [clientes, setClientes] = useState<ClienteOption[]>([]);
   const [searchCliente, setSearchCliente] = useState('');
-  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [incluirCancelados, setIncluirCancelados] = useState(false);
   const [isInterno, setIsInterno] = useState(!clienteId);
   const [oportunidadeAtivacao, setOportunidadeAtivacao] = useState<number | null>(null);
   const [oportunidadeMrr, setOportunidadeMrr] = useState<number | null>(null);
