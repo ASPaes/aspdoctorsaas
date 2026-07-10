@@ -96,7 +96,6 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const [filteredMacros, setFilteredMacros] = useState<any[]>([]);
   const [macroSelectedIndex, setMacroSelectedIndex] = useState(0);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeMacro, setActiveMacro] = useState<{ id: string; content: string; permite_edicao_livre: boolean; media_type?: string | null; media_path?: string | null } | null>(null);
   const isInternalNote = mode === "note";
