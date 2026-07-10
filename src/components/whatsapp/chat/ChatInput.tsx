@@ -63,7 +63,9 @@ const setDraft = (id: string, mode: ComposerMode, val: string) => {
   } catch { /* noop */ }
 };
 
-export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled, isGroup, groupJid, instanceId }: Props) {
+export type ChatInputHandle = { handleExternalDrop: (files: FileList | File[]) => void };
+
+export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled, isGroup, groupJid, instanceId }, ref) {
   const [mode, setMode] = useState<ComposerMode>("message");
   const [message, setMessage] = useState(() => initialMessage || getDraft(conversationId, "message") || "");
 
