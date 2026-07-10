@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo, KeyboardEvent, DragEvent, ClipboardEvent } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo, useImperativeHandle, forwardRef, KeyboardEvent, ClipboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -63,7 +63,9 @@ const setDraft = (id: string, mode: ComposerMode, val: string) => {
   } catch { /* noop */ }
 };
 
-export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled, isGroup, groupJid, instanceId }: Props) {
+export type ChatInputHandle = { handleExternalDrop: (files: FileList | File[]) => void };
+
+export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled, isGroup, groupJid, instanceId }, ref) {
   const [mode, setMode] = useState<ComposerMode>("message");
   const [message, setMessage] = useState(() => initialMessage || getDraft(conversationId, "message") || "");
 
@@ -94,7 +96,6 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [filteredMacros, setFilteredMacros] = useState<any[]>([]);
   const [macroSelectedIndex, setMacroSelectedIndex] = useState(0);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeMacro, setActiveMacro] = useState<{ id: string; content: string; permite_edicao_livre: boolean; media_type?: string | null; media_path?: string | null } | null>(null);
   const isInternalNote = mode === "note";
@@ -189,6 +190,13 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   };
 
   const [mediaPreviewOpen, setMediaPreviewOpen] = useState(false);
+
+  useImperativeHandle(ref, () => ({
+    handleExternalDrop: (files: FileList | File[]) => {
+      const accepted = validateAndAttachFiles(files);
+      maybeOpenMediaPreview(accepted);
+    },
+  }), [mode, attachedFiles]);
 
   const maybeOpenMediaPreview = (accepted: File[]) => {
     if (mode !== "message" && mode !== "note") return;
@@ -595,29 +603,6 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     }
   }, [attachedFiles, mode]);
 
-  // Drag & drop handlers
-  const handleDragOver = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    const files = e.dataTransfer?.files;
-    if (files && files.length > 0) {
-      const accepted = validateAndAttachFiles(files);
-      maybeOpenMediaPreview(accepted);
-    }
-  }, [attachedFiles, mode]);
 
   // File input handler
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -778,16 +763,9 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   return (
     <div
       className="border-t border-border bg-card relative"
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
     >
-      {/* Drag overlay */}
-      {isDragging && (
-        <div className="absolute inset-0 z-10 bg-primary/10 border-2 border-dashed border-primary rounded-md flex items-center justify-center pointer-events-none">
-          <p className="text-sm font-medium text-primary">Solte o arquivo aqui</p>
-        </div>
-      )}
+
+
 
       {replyTo && onCancelReply && (
         <ReplyPreview
@@ -1085,4 +1063,4 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
       />
     </div>
   );
-}
+});

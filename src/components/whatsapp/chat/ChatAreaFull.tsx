@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { MessageSquare, Trash2, Forward, X, EyeOff, Pause } from "lucide-react";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages";
@@ -6,7 +6,7 @@ import { ChatHeader } from "./ChatHeader";
 import { ClientAlertBanner } from "./ClientAlertBanner";
 import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
 import { ChatMessages } from "./ChatMessages";
-import { ChatInput } from "./ChatInput";
+import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { DetailsSidebar } from "./DetailsSidebar";
 import { ForwardMessageDialog } from "./ForwardMessageDialog";
 import { useDeleteMessages } from "../hooks/useDeleteMessages";
@@ -48,6 +48,8 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   const [showDetails, setShowDetails] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const { status: presenceStatus, isBlocked: presenceBlocked } = useAgentPresence();
+  const chatInputRef = useRef<ChatInputHandle>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   // Selection mode
   const [selectionMode, setSelectionMode] = useState(false);
@@ -230,7 +232,22 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
 
   return (
     <div className="h-full flex min-h-0 overflow-hidden">
-      <div className={`flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative ${presenceBlocked ? "opacity-60 grayscale-[30%]" : ""}`}>
+      <div
+        className={`flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative ${presenceBlocked ? "opacity-60 grayscale-[30%]" : ""}`}
+        onDragOver={(e) => { if (e.dataTransfer?.types?.includes("Files")) { e.preventDefault(); setIsDraggingFile(true); } }}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDraggingFile(false); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDraggingFile(false);
+          const files = e.dataTransfer?.files;
+          if (files && files.length > 0) chatInputRef.current?.handleExternalDrop(files);
+        }}
+      >
+        {isDraggingFile && (
+          <div className="absolute inset-0 z-30 bg-primary/10 border-2 border-dashed border-primary flex items-center justify-center pointer-events-none">
+            <p className="text-sm font-medium text-primary">Solte a imagem aqui</p>
+          </div>
+        )}
         {presenceBlocked && presenceStatus === "paused" && (
           <div className="bg-yellow-500/10 border-b border-yellow-500/30 px-4 py-1.5 text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-1.5 z-10 shrink-0">
             <Pause className="h-3 w-3" />
@@ -329,6 +346,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           </div>
         ) : (
           <ChatInput
+            ref={chatInputRef}
             key={`chat-input-${conversation.id}`}
             conversationId={conversation.id}
             replyTo={replyTo}
