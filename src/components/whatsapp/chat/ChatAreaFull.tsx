@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { MessageSquare, Trash2, Forward, X, EyeOff, Pause } from "lucide-react";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages";
