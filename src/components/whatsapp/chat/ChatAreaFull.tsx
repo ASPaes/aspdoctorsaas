@@ -346,6 +346,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           </div>
         ) : (
           <ChatInput
+            ref={chatInputRef}
             key={`chat-input-${conversation.id}`}
             conversationId={conversation.id}
             replyTo={replyTo}
