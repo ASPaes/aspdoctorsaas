@@ -10,9 +10,11 @@ export interface ClienteSearchResult {
   telefone_whatsapp: string | null;
   cnpj: string | null;
   codigo_sequencial: number;
+  cancelado: boolean;
+  data_cancelamento: string | null;
 }
 
-export function useClienteSearch(searchTerm: string) {
+export function useClienteSearch(searchTerm: string, includeCancelados: boolean = false) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
 
@@ -22,7 +24,7 @@ export function useClienteSearch(searchTerm: string) {
   }, [searchTerm]);
 
   const query = useQuery({
-    queryKey: ['clientes-search', debouncedTerm, tid],
+    queryKey: ['clientes-search', debouncedTerm, tid, includeCancelados],
     queryFn: async (): Promise<ClienteSearchResult[]> => {
       if (!debouncedTerm || debouncedTerm.length < 2) return [];
       if (!tid) return [];
@@ -30,6 +32,7 @@ export function useClienteSearch(searchTerm: string) {
       const { data, error } = await supabase.rpc('search_clientes_for_link' as any, {
         p_tenant_id: tid,
         p_term: debouncedTerm.trim(),
+        p_include_cancelados: includeCancelados,
       });
 
       if (error) throw error;
