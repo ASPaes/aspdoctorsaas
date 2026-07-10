@@ -9,14 +9,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { NumericInput } from '@/components/ui/numeric-input';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { supabase } from '@/integrations/supabase/client';
-import { escapeLike } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { useCreateCSTicket, useFuncionariosAtivos } from './hooks/useCSTickets';
+import { useClienteSearch, type ClienteSearchResult } from '@/components/whatsapp/hooks/useClienteSearch';
 import {
   CS_TICKET_TIPO_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_TICKET_IMPACTO_LABELS, CS_INDICACAO_STATUS_LABELS,
   type CSTicketTipo, type CSTicketPrioridade, type CSTicketImpacto, type CSIndicacaoStatus,
