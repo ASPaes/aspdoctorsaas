@@ -48,6 +48,8 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   const [showDetails, setShowDetails] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const { status: presenceStatus, isBlocked: presenceBlocked } = useAgentPresence();
+  const chatInputRef = useRef<ChatInputHandle>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   // Selection mode
   const [selectionMode, setSelectionMode] = useState(false);
