@@ -235,6 +235,7 @@ export const useWhatsAppMessages = (
   }, []);
 
   useEffect(() => {
+    if (readOnly) return;
     if (!conversationId) return;
 
     const channelName = `msgs-${conversationId}`;
