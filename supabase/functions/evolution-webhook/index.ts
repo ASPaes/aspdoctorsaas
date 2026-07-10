@@ -820,8 +820,8 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
     };
 
     for (const update of updates) {
-      const messageId = update?.key?.id;
-      const statusRaw = update?.update?.status;
+      const messageId = update?.key?.id ?? update?.keyId ?? update?.messageId;
+      const statusRaw = update?.update?.status ?? update?.status;
       console.log(`[processMessageUpdate] raw update: ${JSON.stringify(update).substring(0, 300)}`);
       if (!messageId || !statusRaw) {
         console.log(`[processMessageUpdate] SKIP — messageId=${messageId} statusRaw=${statusRaw}`);
