@@ -1034,6 +1034,19 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           to={contactPhone}
         />
       )}
+
+      <MediaSendPreviewDialog
+        open={mediaPreviewOpen}
+        onOpenChange={(o) => { if (!o) handleMediaPreviewCancel(message); }}
+        files={attachedFiles}
+        onRemoveFile={(idx) => setAttachedFiles((prev) => prev.filter((_, i) => i !== idx))}
+        initialCaption={message}
+        onConfirm={handleMediaPreviewConfirm}
+        onCancel={handleMediaPreviewCancel}
+        isSending={sendMutation.isPending}
+        disabled={isBlocked || requiresTemplate}
+        disabledReason={requiresTemplate ? "Janela de 24h fechada — use um template Meta." : (isBlocked ? "Você precisa estar ATIVO para enviar." : undefined)}
+      />
     </div>
   );
 }
