@@ -268,12 +268,32 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
                 <Label>Cliente</Label>
                 {clienteId ? <Input value={clienteNome || ''} disabled className="bg-muted" /> : (
                   <>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="incluir-cancelados" className="text-sm text-muted-foreground cursor-pointer">
+                        Incluir clientes cancelados
+                      </Label>
+                      <Switch
+                        id="incluir-cancelados"
+                        checked={incluirCancelados}
+                        onCheckedChange={setIncluirCancelados}
+                      />
+                    </div>
                     <Input placeholder="Buscar cliente..." value={searchCliente} onChange={(e) => setSearchCliente(e.target.value)} />
                     {loadingClientes && <p className="text-sm text-muted-foreground">Buscando...</p>}
                     {clientes.length > 0 && !selectedClienteId && (
                       <div className="border rounded-md max-h-40 overflow-auto">
-                        {clientes.map((c) => (<button key={c.id} type="button" className="w-full px-3 py-2 text-left hover:bg-accent text-sm" onClick={() => handleSelectCliente(c)}>{c.nome_fantasia || c.razao_social}</button>))}
+                        {clientes.map((c) => (
+                          <button key={c.id} type="button" className="w-full px-3 py-2 text-left hover:bg-accent text-sm flex items-center justify-between gap-2" onClick={() => handleSelectCliente(c)}>
+                            <span>{c.nome_fantasia || c.razao_social}</span>
+                            {c.cancelado && <Badge variant="destructive" className="shrink-0">Cancelado</Badge>}
+                          </button>
+                        ))}
                       </div>
+                    )}
+                    {!loadingClientes && searchCliente.length >= 2 && clientes.length === 0 && !selectedClienteId && !incluirCancelados && (
+                      <p className="text-sm text-muted-foreground">
+                        Não encontrou? Ative "Incluir clientes cancelados" acima.
+                      </p>
                     )}
                   </>
                 )}
