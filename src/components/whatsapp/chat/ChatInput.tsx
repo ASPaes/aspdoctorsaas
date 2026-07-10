@@ -191,6 +191,13 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
 
   const [mediaPreviewOpen, setMediaPreviewOpen] = useState(false);
 
+  useImperativeHandle(ref, () => ({
+    handleExternalDrop: (files: FileList | File[]) => {
+      const accepted = validateAndAttachFiles(files);
+      maybeOpenMediaPreview(accepted);
+    },
+  }), [mode, attachedFiles]);
+
   const maybeOpenMediaPreview = (accepted: File[]) => {
     if (mode !== "message" && mode !== "note") return;
     const hasVisual = accepted.some(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
