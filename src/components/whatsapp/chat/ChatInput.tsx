@@ -18,6 +18,7 @@ import { MacroFillCard } from "./input/MacroFillCard";
 import { SmartReplySuggestions } from "./input/SmartReplySuggestions";
 import { ReplyPreview } from "./input/ReplyPreview";
 import { AttachmentChip } from "./input/AttachmentChip";
+import { MediaSendPreviewDialog } from "./input/MediaSendPreviewDialog";
 import { useWhatsAppMacros } from "../hooks/useWhatsAppMacros";
 import { useMacroTags } from "../hooks/useMacroTags";
 import { useSmartReply } from "../hooks/useSmartReply";
