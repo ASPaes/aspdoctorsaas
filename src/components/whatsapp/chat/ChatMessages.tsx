@@ -447,10 +447,14 @@ export function ChatMessages({
                             {formatTime(item.note.created_at, timezone)}
                           </span>
                         </div>
-                        <p className="text-sm whitespace-pre-wrap break-words text-foreground/90">
-                          {item.note.content}
-                        </p>
-                      </div>
+                        {item.note.media_path && item.note.media_type && (
+                          <NoteMediaPreview noteId={item.note.id} mediaType={item.note.media_type} />
+                        )}
+                        {item.note.content && (
+                          <p className="text-sm whitespace-pre-wrap break-words text-foreground/90">
+                            {item.note.content}
+                          </p>
+                        )}
                       <button
                         type="button"
                         onClick={() => {
