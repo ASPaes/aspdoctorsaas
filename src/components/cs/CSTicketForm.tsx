@@ -9,14 +9,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { NumericInput } from '@/components/ui/numeric-input';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { supabase } from '@/integrations/supabase/client';
-import { escapeLike } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { useCreateCSTicket, useFuncionariosAtivos } from './hooks/useCSTickets';
+import { useClienteSearch, type ClienteSearchResult } from '@/components/whatsapp/hooks/useClienteSearch';
 import {
   CS_TICKET_TIPO_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_TICKET_IMPACTO_LABELS, CS_INDICACAO_STATUS_LABELS,
   type CSTicketTipo, type CSTicketPrioridade, type CSTicketImpacto, type CSIndicacaoStatus,
@@ -56,12 +56,6 @@ interface CSTicketFormProps {
   defaultOwnerId?: number;
 }
 
-interface ClienteOption {
-  id: string;
-  razao_social: string;
-  nome_fantasia: string | null;
-}
-
 function buildDraftKey(tenantId: string | null, userId: string | null, clienteId?: string) {
   return `draft:cs_ticket:${tenantId ?? "t"}:${userId ?? "u"}:new:${clienteId ?? "none"}`;
 }
@@ -72,9 +66,8 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
   const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
   const draftKey = buildDraftKey(profile?.tenant_id ?? null, user?.id ?? null, clienteId);
 
-  const [clientes, setClientes] = useState<ClienteOption[]>([]);
   const [searchCliente, setSearchCliente] = useState('');
-  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [incluirCancelados, setIncluirCancelados] = useState(false);
   const [isInterno, setIsInterno] = useState(!clienteId);
   const [oportunidadeAtivacao, setOportunidadeAtivacao] = useState<number | null>(null);
   const [oportunidadeMrr, setOportunidadeMrr] = useState<number | null>(null);
@@ -118,7 +111,6 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
     setIsInterno(!clienteId);
     setOportunidadeAtivacao(null);
     setOportunidadeMrr(null);
-    if (clienteId && clienteNome) setClientes([{ id: clienteId, razao_social: clienteNome, nome_fantasia: null }]);
   }, [open, draftKey]); // intentionally limited deps to avoid re-running on every prop change
 
   // Debounce-save draft while form is dirty
@@ -178,32 +170,19 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
     setIsInterno(!clienteId);
     setOportunidadeAtivacao(null);
     setOportunidadeMrr(null);
-    if (clienteId && clienteNome) setClientes([{ id: clienteId, razao_social: clienteNome, nome_fantasia: null }]);
-  }, [draftKey, reset, defaultFormValues, clienteId, clienteNome]);
+  }, [draftKey, reset, defaultFormValues, clienteId]);
 
   const clearDraft = useCallback(() => {
     try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
     setDraftStatus("idle");
   }, [draftKey]);
 
-  // Client search
-  useEffect(() => {
-    if (isInterno || clienteId) return;
-    if (searchCliente.length < 2) { setClientes([]); return; }
-    setLoadingClientes(true);
-    const debounce = setTimeout(async () => {
-      const escaped = escapeLike(searchCliente);
-      const { data } = await tf(supabase.from('clientes').select('id, razao_social, nome_fantasia')
-        .eq('cancelado', false)
-        .or(`razao_social.ilike.%${escaped}%,nome_fantasia.ilike.%${escaped}%`)
-        .limit(10));
-      if (data) setClientes(data);
-      setLoadingClientes(false);
-    }, 300);
-    return () => clearTimeout(debounce);
-  }, [searchCliente, isInterno, clienteId]);
+  const { results: clientes, isLoading: loadingClientes } = useClienteSearch(
+    !isInterno && !clienteId && !selectedClienteId ? searchCliente : '',
+    incluirCancelados
+  );
 
-  const handleSelectCliente = (cliente: ClienteOption) => {
+  const handleSelectCliente = (cliente: ClienteSearchResult) => {
     setValue('cliente_id', cliente.id);
     setSearchCliente(cliente.nome_fantasia || cliente.razao_social);
   };
@@ -289,12 +268,32 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
                 <Label>Cliente</Label>
                 {clienteId ? <Input value={clienteNome || ''} disabled className="bg-muted" /> : (
                   <>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="incluir-cancelados" className="text-sm text-muted-foreground cursor-pointer">
+                        Incluir clientes cancelados
+                      </Label>
+                      <Switch
+                        id="incluir-cancelados"
+                        checked={incluirCancelados}
+                        onCheckedChange={setIncluirCancelados}
+                      />
+                    </div>
                     <Input placeholder="Buscar cliente..." value={searchCliente} onChange={(e) => setSearchCliente(e.target.value)} />
                     {loadingClientes && <p className="text-sm text-muted-foreground">Buscando...</p>}
                     {clientes.length > 0 && !selectedClienteId && (
                       <div className="border rounded-md max-h-40 overflow-auto">
-                        {clientes.map((c) => (<button key={c.id} type="button" className="w-full px-3 py-2 text-left hover:bg-accent text-sm" onClick={() => handleSelectCliente(c)}>{c.nome_fantasia || c.razao_social}</button>))}
+                        {clientes.map((c) => (
+                          <button key={c.id} type="button" className="w-full px-3 py-2 text-left hover:bg-accent text-sm flex items-center justify-between gap-2" onClick={() => handleSelectCliente(c)}>
+                            <span>{c.nome_fantasia || c.razao_social}</span>
+                            {c.cancelado && <Badge variant="destructive" className="shrink-0">Cancelado</Badge>}
+                          </button>
+                        ))}
                       </div>
+                    )}
+                    {!loadingClientes && searchCliente.length >= 2 && clientes.length === 0 && !selectedClienteId && !incluirCancelados && (
+                      <p className="text-sm text-muted-foreground">
+                        Não encontrou? Ative "Incluir clientes cancelados" acima.
+                      </p>
                     )}
                   </>
                 )}
