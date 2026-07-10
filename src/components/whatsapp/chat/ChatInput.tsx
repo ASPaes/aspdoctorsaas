@@ -441,7 +441,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
       const content = message.trim();
       if (!content) return;
       if (isCreatingNote) return;
-      createNote(content);
+      createNote({ content });
       setMessage("");
       onCancelReply?.();
       requestAnimationFrame(() => textareaRef.current?.focus());
