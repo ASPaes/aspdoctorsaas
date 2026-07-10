@@ -286,7 +286,7 @@ export const useWhatsAppMessages = (
         }
       }
     );
-  }, [conversationId, queryClient]);
+  }, [conversationId, queryClient, readOnly]);
 
   return { messages, isLoading, error, onNewMessage, fetchNextPage, hasNextPage, isFetchingNextPage };
 };
