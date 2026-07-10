@@ -111,7 +111,6 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
     setIsInterno(!clienteId);
     setOportunidadeAtivacao(null);
     setOportunidadeMrr(null);
-    if (clienteId && clienteNome) setClientes([{ id: clienteId, razao_social: clienteNome, nome_fantasia: null }]);
   }, [open, draftKey]); // intentionally limited deps to avoid re-running on every prop change
 
   // Debounce-save draft while form is dirty
