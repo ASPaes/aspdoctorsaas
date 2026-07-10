@@ -56,12 +56,6 @@ interface CSTicketFormProps {
   defaultOwnerId?: number;
 }
 
-interface ClienteOption {
-  id: string;
-  razao_social: string;
-  nome_fantasia: string | null;
-}
-
 function buildDraftKey(tenantId: string | null, userId: string | null, clienteId?: string) {
   return `draft:cs_ticket:${tenantId ?? "t"}:${userId ?? "u"}:new:${clienteId ?? "none"}`;
 }
