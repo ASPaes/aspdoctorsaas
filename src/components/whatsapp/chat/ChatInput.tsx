@@ -923,7 +923,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             ref={fileInputRef}
             type="file"
             accept={isInternalNote ? "image/*,video/*" : "*/*"}
-            multiple={!isInternalNote}
+            multiple
             onChange={handleFileSelect}
             className="hidden"
           />
