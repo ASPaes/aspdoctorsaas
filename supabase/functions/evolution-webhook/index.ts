@@ -1054,6 +1054,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     let mediaFilename: string | null = null;
     let mediaSizeBytes: number | null = null;
     let mediaOversized = false;
+    let mediaTryDownloadAfter = false;
 
     if (messageType !== 'text' && messageType !== 'reaction' && messageType !== 'revoke') {
       // PATCH: use resolveDocumentMessage for documents, fallback to standard path
@@ -1065,18 +1066,22 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         mediaFilename = mediaMessage.fileName || mediaMessage.filename || null;
         mediaSizeBytes = readDeclaredMediaSize(mediaMessage);
 
-        // Guard de tamanho: baixar mídia grande em base64 dentro do isolate estoura
-        // a memória (OOM) e a mensagem some SEM ser inserida. Acima do teto NÃO
-        // baixamos — mas seguimos o fluxo para persistir a mensagem (filename +
-        // tamanho, sem media_url).
         if (mediaSizeBytes != null && mediaSizeBytes > MAX_INLINE_MEDIA_BYTES) {
+          // Tamanho conhecido e ACIMA do teto → não baixa (evita OOM). Só o aviso.
           mediaOversized = true;
-          console.warn(`${LOG} Media oversized (${mediaSizeBytes} > ${MAX_INLINE_MEDIA_BYTES}) msg ${key?.id} — pulando download inline`);
-        } else {
+          console.warn(`${LOG} Media oversized (${mediaSizeBytes} > ${MAX_INLINE_MEDIA_BYTES}) msg ${key?.id} — não baixa inline`);
+        } else if (mediaSizeBytes != null) {
+          // Tamanho conhecido e dentro do teto → baixa agora (atômico, como antes).
           mediaStoragePath = await downloadAndUploadMedia(
             secrets.api_url || '', secrets.api_key || '', evolutionInstanceId,
             key, supabase, mediaMimetype as string, instanceData.provider_type || 'self_hosted'
           );
+        } else {
+          // Tamanho DESCONHECIDO (fileLength ausente) → NÃO arrisca baixar antes de
+          // gravar. A mensagem é gravada primeiro; o download é tentado DEPOIS
+          // (logo após o processInboundMessage). Se estourar, a mensagem já existe.
+          mediaTryDownloadAfter = true;
+          console.warn(`${LOG} Media sem fileLength msg ${key?.id} — grava antes, baixa depois`);
         }
       }
     }
@@ -1156,13 +1161,27 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     console.log(`${LOG} Delegando para processInboundMessage: ${phone} fromMe=${fromMe}`);
     await processInboundMessage(supabase, normalized);
 
-    // Mídia grande não baixada: grava o tamanho na linha já inserida, para o card
-    // exibir "arquivo (29 MB) — abrir no WhatsApp" em vez de nada.
+    // ── Casos que não baixaram inline (a mensagem JÁ está gravada acima) ──────
     if (mediaOversized && mediaSizeBytes != null) {
+      // Grande e conhecido: só registra o tamanho pro card ("52 MB").
       await supabase.from('whatsapp_messages')
         .update({ media_size_bytes: mediaSizeBytes })
         .eq('tenant_id', tenantId)
         .eq('message_id', key.id);
+    } else if (mediaTryDownloadAfter) {
+      // Tamanho desconhecido: tenta baixar AGORA, com a mensagem já salva. Se o
+      // arquivo for gigante e estourar a memória, o isolate morre — mas a mensagem
+      // permanece com o aviso "abrir no WhatsApp" (não some).
+      const path = await downloadAndUploadMedia(
+        secrets.api_url || '', secrets.api_key || '', evolutionInstanceId,
+        key, supabase, mediaMimetype as string, instanceData.provider_type || 'self_hosted'
+      );
+      if (path) {
+        await supabase.from('whatsapp_messages')
+          .update({ media_url: path, media_path: path })
+          .eq('tenant_id', tenantId)
+          .eq('message_id', key.id);
+      }
     }
 
   } catch (processingError) {
