@@ -63,7 +63,7 @@ function buildDraftKey(tenantId: string | null, userId: string | null, clienteId
 export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defaultOwnerId }: CSTicketFormProps) {
   const { user, profile } = useAuth();
   const { effectiveTenantId: tid } = useTenantFilter();
-  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
+  
   const draftKey = buildDraftKey(profile?.tenant_id ?? null, user?.id ?? null, clienteId);
 
   const [searchCliente, setSearchCliente] = useState('');
@@ -278,7 +278,7 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
                         onCheckedChange={setIncluirCancelados}
                       />
                     </div>
-                    <Input placeholder="Buscar cliente..." value={searchCliente} onChange={(e) => setSearchCliente(e.target.value)} />
+                    <Input placeholder="Buscar por nome ou CNPJ..." value={searchCliente} onChange={(e) => setSearchCliente(e.target.value)} />
                     {loadingClientes && <p className="text-sm text-muted-foreground">Buscando...</p>}
                     {clientes.length > 0 && !selectedClienteId && (
                       <div className="border rounded-md max-h-40 overflow-auto">
