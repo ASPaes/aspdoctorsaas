@@ -932,15 +932,22 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           <EmojiPickerButton onEmojiSelect={handleEmojiSelect} disabled={sendMutation.isPending || isBlocked || isInternalNote} />
 
           {/* File attach button */}
-          <input ref={fileInputRef} type="file" accept="*/*" multiple onChange={handleFileSelect} className="hidden" />
-          {!isInternalNote && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={isInternalNote ? "image/*,video/*" : "*/*"}
+            multiple={!isInternalNote}
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          {!isDraftMode && (
             <Button
               type="button"
               size="icon"
               variant="ghost"
               onClick={() => fileInputRef.current?.click()}
-              disabled={sendMutation.isPending || isBlocked}
-              aria-label="Anexar arquivo"
+              disabled={sendMutation.isPending || (isBlocked && !isInternalNote)}
+              aria-label={isInternalNote ? "Anexar imagem ou vídeo à nota" : "Anexar arquivo"}
             >
               <Paperclip className="w-5 h-5" />
             </Button>
