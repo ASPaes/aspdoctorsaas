@@ -118,57 +118,67 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const WARN_FILE_SIZE_MB = 60;
   const MAX_FILES = 10;
 
-  const validateAndAttachFiles = (incoming: FileList | File[]) => {
+  const validateAndAttachFiles = (incoming: FileList | File[]): File[] => {
     const arr = Array.from(incoming);
-    if (arr.length === 0) return;
+    if (arr.length === 0) return [];
     const maxBytes = MAX_FILE_SIZE_MB * 1024 * 1024;
     const warnBytes = WARN_FILE_SIZE_MB * 1024 * 1024;
 
-    setAttachedFiles((prev) => {
-      const remaining = MAX_FILES - prev.length;
-      if (remaining <= 0) {
-        toast.error("Limite de anexos atingido", {
-          description: `Você pode anexar no máximo ${MAX_FILES} arquivos por mensagem.`,
-        });
-        return prev;
-      }
+    const remaining = MAX_FILES - attachedFiles.length;
+    if (remaining <= 0) {
+      toast.error("Limite de anexos atingido", {
+        description: `Você pode anexar no máximo ${MAX_FILES} arquivos por mensagem.`,
+      });
+      return [];
+    }
 
-      const accepted: File[] = [];
-      let rejectedBySize = 0;
-      let warnedBySize = 0;
+    const accepted: File[] = [];
+    let rejectedBySize = 0;
+    let warnedBySize = 0;
 
-      for (const file of arr) {
-        if (accepted.length >= remaining) break;
-        if (file.size > maxBytes) {
-          rejectedBySize++;
-          continue;
-        }
-        if (file.size > warnBytes) warnedBySize++;
-        accepted.push(file);
+    for (const file of arr) {
+      if (accepted.length >= remaining) break;
+      if (file.size > maxBytes) {
+        rejectedBySize++;
+        continue;
       }
+      if (file.size > warnBytes) warnedBySize++;
+      accepted.push(file);
+    }
 
-      const skippedByLimit = arr.length - accepted.length - rejectedBySize;
+    const skippedByLimit = arr.length - accepted.length - rejectedBySize;
 
-      if (rejectedBySize > 0) {
-        toast.error(
-          rejectedBySize === 1 ? "Arquivo muito grande" : `${rejectedBySize} arquivos muito grandes`,
-          { description: `O limite máximo por arquivo é de ${MAX_FILE_SIZE_MB}MB.` }
-        );
-      }
-      if (skippedByLimit > 0) {
-        toast.error("Limite de anexos excedido", {
-          description: `Você pode anexar no máximo ${MAX_FILES} arquivos. ${skippedByLimit} arquivo(s) não foram adicionados.`,
-        });
-      }
-      if (warnedBySize > 0) {
-        toast.warning("Arquivo grande", {
-          description: `Arquivos acima de ${WARN_FILE_SIZE_MB}MB podem falhar no envio pelo WhatsApp.`,
-        });
-      }
+    if (rejectedBySize > 0) {
+      toast.error(
+        rejectedBySize === 1 ? "Arquivo muito grande" : `${rejectedBySize} arquivos muito grandes`,
+        { description: `O limite máximo por arquivo é de ${MAX_FILE_SIZE_MB}MB.` }
+      );
+    }
+    if (skippedByLimit > 0) {
+      toast.error("Limite de anexos excedido", {
+        description: `Você pode anexar no máximo ${MAX_FILES} arquivos. ${skippedByLimit} arquivo(s) não foram adicionados.`,
+      });
+    }
+    if (warnedBySize > 0) {
+      toast.warning("Arquivo grande", {
+        description: `Arquivos acima de ${WARN_FILE_SIZE_MB}MB podem falhar no envio pelo WhatsApp.`,
+      });
+    }
 
-      return accepted.length > 0 ? [...prev, ...accepted] : prev;
-    });
+    if (accepted.length > 0) {
+      setAttachedFiles((prev) => [...prev, ...accepted]);
+    }
+    return accepted;
   };
+
+  const [mediaPreviewOpen, setMediaPreviewOpen] = useState(false);
+
+  const maybeOpenMediaPreview = (accepted: File[]) => {
+    if (mode !== "message") return;
+    const hasVisual = accepted.some(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
+    if (hasVisual) setMediaPreviewOpen(true);
+  };
+
 
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
