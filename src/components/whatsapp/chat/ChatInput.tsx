@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo, KeyboardEvent, DragEvent, ClipboardEvent } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo, useImperativeHandle, forwardRef, KeyboardEvent, ClipboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
