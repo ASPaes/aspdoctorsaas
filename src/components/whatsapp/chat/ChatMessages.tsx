@@ -455,6 +455,7 @@ export function ChatMessages({
                             {item.note.content}
                           </p>
                         )}
+                      </div>
                       <button
                         type="button"
                         onClick={() => {
