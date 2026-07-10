@@ -207,6 +207,7 @@ export const useWhatsAppMessages = (
   }, [data]);
 
   useEffect(() => {
+    if (readOnly) return;
     if (conversationId) {
       // Zerar unread_count na conversa (badge da sidebar)
       supabase
