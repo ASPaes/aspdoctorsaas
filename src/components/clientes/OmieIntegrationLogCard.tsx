@@ -22,12 +22,10 @@ interface Props {
 
 interface LogItem {
   quando: string;
-  evento: string;
-  entidade: string;
   status: "sucesso" | "erro" | "ignorado" | string;
   erro?: string | null;
-  rotulo: string;
-  direcao: "Envio ao Omie" | "Recebimento do Omie" | string;
+  direcao_texto?: string | null;
+  detalhe?: string | null;
 }
 
 interface OmieDadosLog {
