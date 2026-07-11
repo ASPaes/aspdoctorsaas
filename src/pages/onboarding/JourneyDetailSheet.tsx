@@ -16,7 +16,22 @@ import { toast } from "sonner";
 import {
   Loader2, Clock, Pause, Play, ChevronRight, Calendar, CheckCircle2,
   Circle, AlertCircle, MessageSquare, GraduationCap, User, ArrowRight,
+  UserPlus, Star, X, Users,
 } from "lucide-react";
+
+type Papel = "implantador" | "vendedor" | "especialista" | "outro";
+const PAPEL_OPTIONS: { value: Papel; label: string }[] = [
+  { value: "implantador", label: "Implantador" },
+  { value: "vendedor", label: "Vendedor" },
+  { value: "especialista", label: "Especialista" },
+  { value: "outro", label: "Outro" },
+];
+const PAPEL_COLOR: Record<Papel, string> = {
+  implantador: "hsl(142 71% 45%)",
+  vendedor: "hsl(199 89% 48%)",
+  especialista: "hsl(262 83% 58%)",
+  outro: "hsl(215 16% 47%)",
+};
 
 interface Props {
   open: boolean;
@@ -86,6 +101,7 @@ const EVENT_LABELS: Record<string, string> = {
   pausado: "Onboarding pausado",
   retomado: "Onboarding retomado",
   concluido: "Etapa concluída",
+  onboarding_participante: "Participante alterado",
 };
 
 export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tenantId }: Props) {
@@ -97,6 +113,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [pauseText, setPauseText] = useState("");
   const [pausePopoverOpen, setPausePopoverOpen] = useState(false);
   const [nextStageId, setNextStageId] = useState<string>("");
+  const [addParticipantOpen, setAddParticipantOpen] = useState(false);
+  const [newParticipantUserId, setNewParticipantUserId] = useState<string>("");
+  const [newParticipantPapel, setNewParticipantPapel] = useState<Papel>("especialista");
 
   useEffect(() => {
     if (!open) {
@@ -105,6 +124,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       setPauseReasonId("");
       setPauseText("");
       setNextStageId("");
+      setAddParticipantOpen(false);
+      setNewParticipantUserId("");
+      setNewParticipantPapel("especialista");
     }
   }, [open, journeyId]);
 
@@ -247,6 +269,46 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     },
   });
 
+  const participantsQ = useQuery({
+    queryKey: ["onboarding-participants", journey?.ticket_id],
+    enabled: !!journey?.ticket_id,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_participants" as any) as any)
+        .select("id, user_id, papel, created_at")
+        .eq("ticket_id", journey!.ticket_id!);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; user_id: string; papel: Papel; created_at: string }>;
+    },
+  });
+
+  const tenantMembersQ = useQuery({
+    queryKey: ["onboarding-tenant-members", tenantId],
+    enabled: open && !!tenantId,
+    queryFn: async () => {
+      const { data: profs, error } = await supabase
+        .from("profiles")
+        .select("user_id, funcionario_id")
+        .eq("tenant_id", tenantId as string)
+        .eq("status", "ativo");
+      if (error) throw error;
+      const funcIds = (profs ?? []).map((p: any) => p.funcionario_id).filter(Boolean) as number[];
+      const { data: funcs } = funcIds.length
+        ? await supabase.from("funcionarios").select("id, nome").in("id", funcIds)
+        : { data: [] as any[] };
+      const funcMap = new Map((funcs ?? []).map((f: any) => [f.id, f.nome]));
+      return (profs ?? []).map((p: any) => ({
+        user_id: p.user_id as string,
+        nome: (p.funcionario_id ? funcMap.get(p.funcionario_id) : null) || "Sem vínculo",
+      })).sort((a, b) => a.nome.localeCompare(b.nome));
+    },
+  });
+
+  const memberNameMap = useMemo(() => {
+    const m = new Map<string, string>();
+    (tenantMembersQ.data ?? []).forEach((u) => m.set(u.user_id, u.nome));
+    return m;
+  }, [tenantMembersQ.data]);
+
   const stages = stagesQ.data ?? [];
   const history = historyQ.data ?? [];
   const checklist = checklistQ.data ?? [];
@@ -365,6 +427,70 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     }
   }
 
+  async function handleAddParticipant() {
+    if (!journey?.ticket_id || !tenantId || !newParticipantUserId) {
+      toast.error("Selecione um usuário");
+      return;
+    }
+    try {
+      const { error } = await (supabase.from("onboarding_participants" as any) as any).insert({
+        tenant_id: tenantId,
+        ticket_id: journey.ticket_id,
+        user_id: newParticipantUserId,
+        papel: newParticipantPapel,
+      });
+      if (error) {
+        if ((error as any).code === "23505") {
+          toast.error("Participante já adicionado nesse papel");
+        } else {
+          throw error;
+        }
+        return;
+      }
+      const nome = memberNameMap.get(newParticipantUserId) || "usuário";
+      if (user?.id) {
+        await (supabase.from("support_ticket_events" as any) as any).insert({
+          ticket_id: journey.ticket_id,
+          user_id: user.id,
+          event_type: "onboarding_participante",
+          content: `Adicionado: ${nome} (${newParticipantPapel})`,
+        });
+      }
+      toast.success("Participante adicionado");
+      setAddParticipantOpen(false);
+      setNewParticipantUserId("");
+      setNewParticipantPapel("especialista");
+      qc.invalidateQueries({ queryKey: ["onboarding-participants"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao adicionar participante");
+    }
+  }
+
+  async function handleRemoveParticipant(id: string, userId: string, papel: Papel) {
+    if (!journey?.ticket_id) return;
+    try {
+      const { error } = await (supabase.from("onboarding_participants" as any) as any)
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+      const nome = memberNameMap.get(userId) || "usuário";
+      if (user?.id) {
+        await (supabase.from("support_ticket_events" as any) as any).insert({
+          ticket_id: journey.ticket_id,
+          user_id: user.id,
+          event_type: "onboarding_participante",
+          content: `Removido: ${nome} (${papel})`,
+        });
+      }
+      toast.success("Participante removido");
+      qc.invalidateQueries({ queryKey: ["onboarding-participants"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao remover participante");
+    }
+  }
+
   const loading = journeyQ.isLoading || !journey;
   const slaColor = SEMAFORO_COLOR[journey?.etapa_semaforo || "sem_sla"];
 
@@ -464,6 +590,100 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 p-5">
                 {/* LEFT */}
                 <div className="space-y-5">
+                  {/* Participants */}
+                  <section className="rounded-lg border border-border">
+                    <div className="p-3 border-b border-border flex items-center justify-between">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Users className="h-4 w-4" /> Responsável & participantes
+                      </h3>
+                      <Popover open={addParticipantOpen} onOpenChange={setAddParticipantOpen}>
+                        <PopoverTrigger asChild>
+                          <Button size="sm" variant="outline" className="h-7 text-xs">
+                            <UserPlus className="h-3.5 w-3.5 mr-1" /> Adicionar
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80 space-y-3" align="end">
+                          <div>
+                            <label className="text-xs font-medium">Usuário</label>
+                            <Select value={newParticipantUserId} onValueChange={setNewParticipantUserId}>
+                              <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                              <SelectContent>
+                                {(tenantMembersQ.data ?? []).map((u) => (
+                                  <SelectItem key={u.user_id} value={u.user_id}>{u.nome}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium">Papel</label>
+                            <Select value={newParticipantPapel} onValueChange={(v) => setNewParticipantPapel(v as Papel)}>
+                              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {PAPEL_OPTIONS.map((p) => (
+                                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button size="sm" className="w-full" onClick={handleAddParticipant}>Adicionar</Button>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="p-3 space-y-2">
+                      {(participantsQ.data ?? []).length === 0 ? (
+                        <p className="text-xs text-muted-foreground py-2 text-center">Nenhum participante cadastrado.</p>
+                      ) : (
+                        (["implantador", "vendedor", "especialista", "outro"] as Papel[]).map((papel) => {
+                          const rows = (participantsQ.data ?? []).filter((p) => p.papel === papel);
+                          if (!rows.length) return null;
+                          const isImpl = papel === "implantador";
+                          return (
+                            <div key={papel} className="space-y-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className="text-[10px] uppercase tracking-wide font-semibold"
+                                  style={{ color: PAPEL_COLOR[papel] }}
+                                >
+                                  {isImpl ? "Responsável" : PAPEL_OPTIONS.find((o) => o.value === papel)?.label}
+                                </span>
+                              </div>
+                              {rows.map((p) => (
+                                <div
+                                  key={p.id}
+                                  className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-1.5"
+                                >
+                                  {isImpl ? (
+                                    <Star className="h-3.5 w-3.5 shrink-0" style={{ color: PAPEL_COLOR[papel] }} fill={PAPEL_COLOR[papel]} />
+                                  ) : (
+                                    <User className="h-3.5 w-3.5 shrink-0" style={{ color: PAPEL_COLOR[papel] }} />
+                                  )}
+                                  <span className="text-xs flex-1 truncate">
+                                    {memberNameMap.get(p.user_id) || "—"}
+                                  </span>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[9px] capitalize"
+                                    style={{ borderColor: PAPEL_COLOR[papel], color: PAPEL_COLOR[papel] }}
+                                  >
+                                    {papel}
+                                  </Badge>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 shrink-0"
+                                    onClick={() => handleRemoveParticipant(p.id, p.user_id, p.papel)}
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </section>
+
                   {/* Timeline stages */}
                   <section className="rounded-lg border border-border">
                     <div className="p-3 border-b border-border">
