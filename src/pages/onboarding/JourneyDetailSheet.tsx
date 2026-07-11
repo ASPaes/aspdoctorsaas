@@ -142,14 +142,17 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journeyId && !!tenantId,
     queryFn: async () => {
       const { data } = await (supabase.from("onboarding_journeys" as any) as any)
-        .select("id, pipeline_id")
+        .select("id, fase_atual, pipeline_onboarding_id, pipeline_implantacao_id, current_stage_id")
         .eq("id", journeyId)
         .maybeSingle();
       return data as any;
     },
   });
 
-  const pipelineId = journeyRowQ.data?.pipeline_id as string | undefined;
+  const journeyRow = journeyRowQ.data;
+  const pipelineId = journeyRow?.fase_atual === "implantacao"
+    ? journeyRow?.pipeline_implantacao_id
+    : journeyRow?.pipeline_onboarding_id;
 
   const stagesQ = useQuery({
     queryKey: ["onboarding-detail-stages", pipelineId],
