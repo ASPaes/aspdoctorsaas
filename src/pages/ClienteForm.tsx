@@ -698,6 +698,9 @@ export default function ClienteForm() {
             <ClienteContratosSection clienteId={id} />
           )}
 
+          {isEditing && id && <IntegracaoOmieCard clienteId={id} />}
+
+
           {isEditing && id && !hasNonImplicitContracts && !forceShowContracts && (
             <div className="flex justify-center">
               <Button
