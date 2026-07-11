@@ -1217,5 +1217,20 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         )}
       </DialogContent>
     </Dialog>
+    {journey && journey.ticket_id && (
+      <StartConversationFromTicketDialog
+        open={startConvOpen}
+        onOpenChange={setStartConvOpen}
+        ticketId={journey.ticket_id}
+        ticketCode={journey.ticket_code ?? ""}
+        clienteId={journey.cliente_id ?? undefined}
+        clienteNome={clienteNome}
+        onCreated={() => {
+          qc.invalidateQueries({ queryKey: ["onboarding-attendances", journey.ticket_id] });
+          qc.invalidateQueries({ queryKey: ["onboarding-events", journey.ticket_id] });
+        }}
+      />
+    )}
+    </>
   );
 }
