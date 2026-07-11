@@ -243,7 +243,7 @@ export default function OnboardingPage() {
           Nenhum pipeline de {fase} configurado para este tenant.
         </div>
       ) : (
-        <div ref={scrollRef} className="flex-1 overflow-x-auto p-4">
+        <div className="flex-1 overflow-x-auto p-4">
           <div className="flex flex-row gap-3 min-h-full pb-2">
             {stages.map((col) => {
               const items = journeysByStage[col.id] ?? [];
