@@ -1385,6 +1385,70 @@ export default function OmieConferenciaTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={confirmAtribuirModeloOpen} onOpenChange={(o) => {
+        if (!atribuindoModeloLote) setConfirmAtribuirModeloOpen(o);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Atribuir modelo em lote</AlertDialogTitle>
+            <AlertDialogDescription>
+              O modelo selecionado será atribuído aos contratos deste balde que possuem produto vinculado. Contratos sem produto serão ignorados. Isso altera o cadastro do contrato no DoctorSaaS (não afeta o Omie).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2">
+            <Label className="text-sm mb-1.5 block">Modelo de contrato</Label>
+            <Select value={modeloSelecionadoId} onValueChange={setModeloSelecionadoId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um modelo" />
+              </SelectTrigger>
+              <SelectContent>
+                {modelosContrato.map((m) => (
+                  <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={atribuindoModeloLote}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={atribuindoModeloLote || !modeloSelecionadoId}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!tid || !modeloSelecionadoId) return;
+                setAtribuindoModeloLote(true);
+                try {
+                  const { data, error } = await supabase.functions.invoke(
+                    "recon-atribuir-modelo-lote",
+                    { body: { tenant_id: tid, modelo_contrato_id: modeloSelecionadoId } }
+                  );
+                  if (error) throw error;
+                  const res = data as { ok?: boolean; atualizados?: number; sem_produto_ignorados?: number; error?: string } | null;
+                  if (res?.ok) {
+                    toast.success(`${res.atualizados ?? 0} contratos atualizados (${res.sem_produto_ignorados ?? 0} sem produto ignorados)`);
+                    setConfirmAtribuirModeloOpen(false);
+                    setModeloSelecionadoId("");
+                    await Promise.all([
+                      queryClient.invalidateQueries({ queryKey: ["omie-conf-resumo"] }),
+                      queryClient.invalidateQueries({ queryKey: ["omie-conf-lista"] }),
+                      queryClient.invalidateQueries({ queryKey: ["omie-conf-visao-geral"] }),
+                      queryClient.invalidateQueries({ queryKey: ["omie-conf-fornecedores"] }),
+                    ]);
+                  } else {
+                    toast.error(res?.error ?? "Falha ao atribuir modelo em lote.");
+                  }
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Falha ao atribuir modelo em lote.");
+                } finally {
+                  setAtribuindoModeloLote(false);
+                }
+              }}
+            >
+              {atribuindoModeloLote ? "Atribuindo..." : "Atribuir modelo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
