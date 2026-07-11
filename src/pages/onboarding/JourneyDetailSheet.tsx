@@ -123,6 +123,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       setPauseReasonId("");
       setPauseText("");
       setNextStageId("");
+      setAddParticipantOpen(false);
+      setNewParticipantUserId("");
+      setNewParticipantPapel("especialista");
     }
   }, [open, journeyId]);
 
