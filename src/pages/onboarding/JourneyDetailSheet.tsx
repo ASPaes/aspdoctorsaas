@@ -441,6 +441,39 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     [stages, journey?.current_stage_id]
   );
 
+  const pausesByReason = useMemo(() => {
+    const rows = pausesByReasonQ.data ?? [];
+    const agg = new Map<string, { minutos: number; em_andamento: boolean; count: number }>();
+    rows.forEach((r) => {
+      const name = r.motivo_nome || "Sem motivo";
+      const cur = agg.get(name) || { minutos: 0, em_andamento: false, count: 0 };
+      cur.minutos += r.minutos ?? 0;
+      cur.em_andamento = cur.em_andamento || r.em_andamento;
+      cur.count += 1;
+      agg.set(name, cur);
+    });
+    return Array.from(agg.entries())
+      .map(([nome, v]) => ({ nome, ...v }))
+      .sort((a, b) => b.minutos - a.minutos);
+  }, [pausesByReasonQ.data]);
+
+  const accumulatedByStage = useMemo(() => {
+    const m: Record<string, number> = {};
+    let acc = 0;
+    stages.forEach((s, idx) => {
+      const isCurrent = s.id === journey?.current_stage_id;
+      const h = historyByStage[s.id];
+      if (isCurrent) {
+        acc += journey?.etapa_atual_min ?? 0;
+      } else if (currentStageIndex >= 0 && idx < currentStageIndex && h?.duracao_minutos != null) {
+        acc += h.duracao_minutos;
+      }
+      m[s.id] = acc;
+    });
+    return m;
+  }, [stages, historyByStage, currentStageIndex, journey?.current_stage_id, journey?.etapa_atual_min]);
+
+
   const cliente = clienteQ.data;
   const clienteNome = cliente?.nome_fantasia || cliente?.razao_social || "—";
   const isPaused = journey?.situacao === "pausado" || journey?.situacao === "parado";
