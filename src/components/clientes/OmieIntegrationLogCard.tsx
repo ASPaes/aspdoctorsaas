@@ -13,6 +13,7 @@ import {
   Ban,
   FileText,
   History,
+  Clock,
 } from "lucide-react";
 
 interface Props {
