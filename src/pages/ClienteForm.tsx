@@ -701,6 +701,8 @@ export default function ClienteForm() {
 
           {isEditing && id && <IntegracaoOmieCard clienteId={id} />}
 
+          {isEditing && id && <OmieIntegrationLogCard clienteId={id} />}
+
 
           {isEditing && id && !hasNonImplicitContracts && !forceShowContracts && (
             <div className="flex justify-center">
