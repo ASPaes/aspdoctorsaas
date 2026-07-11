@@ -233,6 +233,8 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
   const [open, setOpen] = useState(false);
   const [confirmVincular, setConfirmVincular] = useState(false);
   const [vincLoading, setVincLoading] = useState(false);
+  const [confirmAjuste, setConfirmAjuste] = useState(false);
+  const [ajusteLoading, setAjusteLoading] = useState(false);
   const queryClient = useQueryClient();
   const bucket = row.acao_sugerida as Bucket;
   const diffs = row.diffs && typeof row.diffs === "object" ? row.diffs : {};
@@ -290,6 +292,50 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
       toast.error(e?.message || "Falha ao vincular");
     } finally {
       setVincLoading(false);
+    }
+  }
+
+  const ajusteTipo: "upsell" | "downsell" | null =
+    delta == null || delta === 0 ? null : delta > 0 ? "upsell" : "downsell";
+  const ajusteAbs = delta != null ? Math.abs(delta) : 0;
+
+  async function handleAtualizarValorDs() {
+    if (!tid || !row.ds_contract_id) return;
+    setAjusteLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("recon-atualizar-valor-ds", {
+        body: { tenant_id: tid, ds_contract_id: row.ds_contract_id },
+      });
+      if (error) throw error;
+      const res = data as { ok?: boolean; error?: string; tipo?: string; valor_delta?: number } | null;
+      if (res?.ok) {
+        const tipoMsg = res.tipo || ajusteTipo || "ajuste";
+        const valorMsg = res.valor_delta != null ? Math.abs(Number(res.valor_delta)) : ajusteAbs;
+        toast.success(`Valor ajustado no DoctorSaaS (movimento ${tipoMsg} de ${formatBRL(valorMsg)})`);
+        setConfirmAjuste(false);
+        queryClient.setQueriesData<{ rows: ReconciliacaoRow[]; count: number } | undefined>(
+          { queryKey: ["omie-conf-lista"] },
+          (old) => {
+            if (!old) return old;
+            const rows = old.rows.filter((r) => r.ds_contract_id !== row.ds_contract_id);
+            const removed = old.rows.length - rows.length;
+            return { rows, count: Math.max(0, old.count - removed) };
+          }
+        );
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-resumo"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-lista"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-nome-diverge-count"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-visao-geral"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-fornecedores"] }),
+        ]);
+      } else {
+        toast.error(res?.error || "Falha ao ajustar valor");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao ajustar valor");
+    } finally {
+      setAjusteLoading(false);
     }
   }
 
@@ -480,12 +526,16 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
       <div className={`border-t bg-muted/10 px-3 py-2 flex items-center gap-2 ${bucket === "resolver" ? "justify-between" : "justify-end"}`}>
         {bucket === "resolver" ? (
           <>
-            <DisabledActionButton
-              icon={<ArrowLeft className="h-3 w-3" />}
-              tip="O valor no DoctorSaaS é calculado a partir dos produtos e movimentos do cliente. Ajustar aqui altera a base financeira e afeta relatórios de MRR."
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              onClick={() => setConfirmAjuste(true)}
+              disabled={ajusteLoading || !tid || !row.ds_contract_id || ajusteTipo == null}
             >
+              <ArrowLeft className="h-3 w-3" />
               Atualizar valor no DoctorSaaS
-            </DisabledActionButton>
+            </Button>
             <DisabledActionButton icon={<ArrowRight className="h-3 w-3" />}>
               Atualizar valor no Omie
             </DisabledActionButton>
@@ -549,6 +599,29 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
               disabled={vincLoading}
             >
               {vincLoading ? "Vinculando..." : "Confirmar vínculo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmAjuste} onOpenChange={setConfirmAjuste}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ajustar valor no DoctorSaaS</AlertDialogTitle>
+            <AlertDialogDescription>
+              O valor do DoctorSaaS ({formatBRL(row.valor_mrr_ds)}) será alinhado ao do Omie ({formatBRL(row.valor_omie)}) através de um movimento de MRR de {ajusteTipo ?? "ajuste"} no valor de {formatBRL(ajusteAbs)}. Isso altera a base de MRR do cliente e será registrado como correção de conciliação. Não altera nada no Omie.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={ajusteLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleAtualizarValorDs();
+              }}
+              disabled={ajusteLoading}
+            >
+              {ajusteLoading ? "Ajustando..." : "Confirmar ajuste"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
