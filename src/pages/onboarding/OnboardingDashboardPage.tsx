@@ -23,8 +23,11 @@ interface JourneyRow {
 }
 
 interface TrainingRow {
-  id: string;
-  journey_id: string;
+  id?: string;
+  journey_id: string | null;
+  training_type_id: string | null;
+  tipo_nome: string | null;
+  conta_como_pdv: boolean | null;
   status: string | null;
   no_show: boolean | null;
   tentativas: number | null;
@@ -32,7 +35,9 @@ interface TrainingRow {
   is_retreinamento: boolean | null;
   conduzido_por: string | null;
   realizado_em: string | null;
+  agendado_para: string | null;
 }
+
 
 function pct(num: number, den: number): number {
   if (!den) return 0;
@@ -95,24 +100,26 @@ export default function OnboardingDashboardPage() {
   });
 
   const trainingsAllQ = useQuery({
-    queryKey: ["onboarding-dash-trainings-all", effectiveTenantId],
+    queryKey: ["onboarding-dash-trainings-kpis", effectiveTenantId],
     enabled: isSuperAdmin && !!effectiveTenantId,
     queryFn: async () => {
       const rows = await fetchAllRows<TrainingRow>(() =>
-        (supabase.from("onboarding_training_sessions" as any) as any)
-          .select("id, journey_id, status, no_show, tentativas, proprietario_presente, is_retreinamento, conduzido_por, realizado_em")
+        (supabase.from("vw_onboarding_training_kpis" as any) as any)
+          .select("journey_id, training_type_id, tipo_nome, conta_como_pdv, status, no_show, tentativas, proprietario_presente, is_retreinamento, conduzido_por, agendado_para, realizado_em")
           .eq("tenant_id", effectiveTenantId)
       );
       return rows;
     },
   });
 
+  // Treinos no período: usa realizado_em quando existe, senão agendado_para
   const trainings = useMemo(() => {
     const from = dateRange.from.getTime();
     const to = dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1;
     return (trainingsAllQ.data ?? []).filter((t) => {
-      if (!t.realizado_em) return false;
-      const d = new Date(t.realizado_em).getTime();
+      const ref = t.realizado_em || t.agendado_para;
+      if (!ref) return false;
+      const d = new Date(ref).getTime();
       return d >= from && d <= to;
     });
   }, [trainingsAllQ.data, dateRange]);
@@ -149,6 +156,7 @@ export default function OnboardingDashboardPage() {
   const foraPrazo = journeys.filter((j) => j.etapa_semaforo === "vermelho").length;
   const semSla = journeys.filter((j) => !j.etapa_semaforo || j.etapa_semaforo === "sem_sla").length;
   const noPrazoPct = pct(noPrazo, totalJ - semSla);
+  const concluidas = journeys.filter((j) => j.situacao === "concluido").length;
 
   // KPIs treinos
   const realizadosOuNoShow = trainings.filter((t) => t.status === "realizado" || t.no_show === true);
@@ -157,7 +165,18 @@ export default function OnboardingDashboardPage() {
   const realizados = trainings.filter((t) => t.status === "realizado");
   const propPresent = realizados.filter((t) => t.proprietario_presente === true);
   const propRate = pct(propPresent.length, realizados.length);
-  const retreinos = trainings.filter((t) => t.is_retreinamento === true).length;
+  const retreinos = trainings.filter((t) => t.is_retreinamento === true);
+  const retreinosPct = pct(retreinos.length, trainings.length);
+
+  // Previstos/Agendados vs Realizados
+  const previstos = trainings.filter((t) => t.status === "previsto" || t.status === "agendado");
+  const realizadoPct = pct(realizados.length, previstos.length + realizados.length);
+
+  // PDV finalizados: treinos realizados com conta_como_pdv=true
+  const pdvFinalizados = realizados.filter((t) => t.conta_como_pdv === true).length;
+
+  // Primeiro no-show: treinos com no_show=true e tentativas <= 1
+  const primeiroNoShow = trainings.filter((t) => t.no_show === true && (t.tentativas ?? 0) <= 1).length;
 
   // Tabela por implantador
   const byImplantador = useMemo(() => {
@@ -179,6 +198,21 @@ export default function OnboardingDashboardPage() {
       }))
       .sort((a, b) => b.total - a.total);
   }, [trainings, names]);
+
+  // Tabela por tipo de treino
+  const byTipo = useMemo(() => {
+    const m: Record<string, { nome: string; previstos: number; realizados: number; no_show: number }> = {};
+    trainings.forEach((t) => {
+      const key = t.training_type_id || "__sem__";
+      const nome = t.tipo_nome || "Sem tipo";
+      if (!m[key]) m[key] = { nome, previstos: 0, realizados: 0, no_show: 0 };
+      if (t.status === "previsto" || t.status === "agendado") m[key].previstos += 1;
+      if (t.status === "realizado") m[key].realizados += 1;
+      if (t.no_show) m[key].no_show += 1;
+    });
+    return Object.values(m).sort((a, b) => (b.realizados + b.previstos) - (a.realizados + a.previstos));
+  }, [trainings]);
+
 
   if (profileLoading) {
     return <div className="flex items-center justify-center min-h-[40vh]"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -244,6 +278,46 @@ export default function OnboardingDashboardPage() {
             </div>
           </section>
 
+          {/* KPI Row 1b: PDV + previsto/realizado */}
+          <section>
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Indicadores Fase 1 · PDV</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <KpiCard
+                icon={CheckCircle2}
+                label="Total PDV finalizados"
+                value={String(pdvFinalizados)}
+                sub={`${concluidas} jornadas concluídas`}
+                tone="success"
+                subTone="muted"
+              />
+              <KpiCard
+                icon={GraduationCap}
+                label="% Realizado"
+                value={`${realizadoPct}%`}
+                sub={`${realizados.length} realiz. / ${previstos.length} prev.`}
+                tone={realizadoPct >= 80 ? "success" : realizadoPct >= 60 ? "warning" : "danger"}
+                subTone="muted"
+              />
+              <KpiCard
+                icon={AlertTriangle}
+                label="1º No-show"
+                value={String(primeiroNoShow)}
+                sub={`${noShowRate}% no-show geral`}
+                tone={primeiroNoShow === 0 ? "success" : "warning"}
+                subTone="muted"
+              />
+              <KpiCard
+                icon={RotateCcw}
+                label="% Retreinamento"
+                value={`${retreinosPct}%`}
+                sub={`${retreinos.length} de ${trainings.length} treinos`}
+                tone={retreinosPct < 15 ? "success" : retreinosPct < 30 ? "warning" : "danger"}
+                subTone="muted"
+              />
+            </div>
+          </section>
+
+
           {/* KPI Row 2: Treinos */}
           <section>
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Treinamentos no período</h2>
@@ -274,7 +348,44 @@ export default function OnboardingDashboardPage() {
             </div>
           </section>
 
+          {/* Tabela por tipo de treino */}
+          <section className="rounded-lg border border-border bg-card">
+            <div className="p-3 border-b border-border flex items-center justify-between">
+              <h2 className="text-sm font-semibold">Quantidade por tipo de treino</h2>
+              <Badge variant="outline" className="text-[10px]">{byTipo.length}</Badge>
+            </div>
+            {byTipo.length === 0 ? (
+              <p className="text-xs text-muted-foreground p-6 text-center">Nenhum treino registrado no período selecionado.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/30 text-muted-foreground">
+                    <tr className="text-left">
+                      <th className="px-3 py-2 font-medium">Tipo</th>
+                      <th className="px-3 py-2 font-medium text-right">Previstos</th>
+                      <th className="px-3 py-2 font-medium text-right">Realizados</th>
+                      <th className="px-3 py-2 font-medium text-right">No-show</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {byTipo.map((row) => (
+                      <tr key={row.nome} className="border-t border-border hover:bg-muted/20">
+                        <td className="px-3 py-2 font-medium">{row.nome}</td>
+                        <td className="px-3 py-2 text-right">{row.previstos}</td>
+                        <td className="px-3 py-2 text-right text-[hsl(142_71%_45%)] font-medium">{row.realizados}</td>
+                        <td className={`px-3 py-2 text-right ${row.no_show > 0 ? "text-destructive font-medium" : ""}`}>
+                          {row.no_show}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
           {/* Tabela por implantador */}
+
           <section className="rounded-lg border border-border bg-card">
             <div className="p-3 border-b border-border flex items-center justify-between">
               <h2 className="text-sm font-semibold">Performance por implantador</h2>

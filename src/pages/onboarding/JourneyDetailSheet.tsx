@@ -127,6 +127,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [newTrainingDate, setNewTrainingDate] = useState("");
   const [newTrainingConductor, setNewTrainingConductor] = useState<string>("");
   const [newTrainingRetreat, setNewTrainingRetreat] = useState(false);
+  const [newTrainingTypeId, setNewTrainingTypeId] = useState<string>("");
+
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
 
@@ -145,6 +147,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       setNewTrainingDate("");
       setNewTrainingConductor("");
       setNewTrainingRetreat(false);
+      setNewTrainingTypeId("");
+
       setRescheduleId(null);
       setRescheduleDate("");
     }
@@ -301,6 +305,22 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       return (data ?? []) as Array<{ id: string; user_id: string; papel: Papel; created_at: string }>;
     },
   });
+
+  const trainingTypesQ = useQuery({
+    queryKey: ["onb-training-types-lookup", tenantId],
+    enabled: open && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_training_types" as any) as any)
+        .select("id, nome, conta_como_pdv")
+        .eq("tenant_id", tenantId)
+        .eq("ativo", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; conta_como_pdv: boolean }>;
+    },
+  });
+
+
 
   const tenantMembersQ = useQuery({
     queryKey: ["onboarding-tenant-members", tenantId],
@@ -524,6 +544,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         p_agendado_para: newTrainingDate ? new Date(newTrainingDate).toISOString() : null,
         p_conduzido_por: newTrainingConductor || null,
         p_is_retreinamento: newTrainingRetreat,
+        p_training_type_id: newTrainingTypeId || null,
+
       });
       if (error) throw error;
       toast.success("Treino agendado");
@@ -889,6 +911,21 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                 </SelectContent>
                               </Select>
                             </div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-medium">Tipo de treino</label>
+                              <Select value={newTrainingTypeId} onValueChange={setNewTrainingTypeId}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar tipo" /></SelectTrigger>
+                                <SelectContent>
+                                  {(trainingTypesQ.data ?? []).map((tt) => (
+                                    <SelectItem key={tt.id} value={tt.id} className="text-xs">
+                                      {tt.nome}{tt.conta_como_pdv ? " · PDV" : ""}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+
                             <label className="flex items-center gap-2 text-xs cursor-pointer">
                               <Checkbox
                                 checked={newTrainingRetreat}

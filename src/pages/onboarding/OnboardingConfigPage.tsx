@@ -7,13 +7,15 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { PipelinesPanel } from "./config/PipelinesPanel";
 import { PauseReasonsPanel } from "./config/PauseReasonsPanel";
 import { DemandTypesPanel } from "./config/DemandTypesPanel";
+import { TrainingTypesPanel } from "./config/TrainingTypesPanel";
 
 type Fase = "onboarding" | "implantacao";
 
 export default function OnboardingConfigPage() {
   const { profile, profileLoading } = useAuth();
   const [fase, setFase] = useState<Fase>("onboarding");
-  const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas">("pipelines");
+  const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas" | "treinos">("pipelines");
+
 
 
   if (profileLoading) {
@@ -60,7 +62,9 @@ export default function OnboardingConfigPage() {
           <TabsTrigger value="pipelines">Pipelines & Etapas</TabsTrigger>
           <TabsTrigger value="motivos">Motivos de Parada</TabsTrigger>
           <TabsTrigger value="demandas">Tipos de demanda</TabsTrigger>
+          <TabsTrigger value="treinos">Tipos de treino</TabsTrigger>
         </TabsList>
+
         <TabsContent value="pipelines" className="flex-1 min-h-0 p-4 pt-3">
           <PipelinesPanel fase={fase} />
         </TabsContent>
@@ -70,6 +74,10 @@ export default function OnboardingConfigPage() {
         <TabsContent value="demandas" className="flex-1 min-h-0 p-4 pt-3">
           <DemandTypesPanel />
         </TabsContent>
+        <TabsContent value="treinos" className="flex-1 min-h-0 p-4 pt-3">
+          <TrainingTypesPanel />
+        </TabsContent>
+
 
       </Tabs>
     </div>
