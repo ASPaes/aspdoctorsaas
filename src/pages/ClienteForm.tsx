@@ -39,6 +39,7 @@ import FiliaisSection from "@/components/clientes/FiliaisSection";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import ClienteProdutosSection from "@/components/clientes/ClienteProdutosSection";
 import ClienteContratosSection from "@/components/clientes/ClienteContratosSection";
+import IntegracaoOmieCard from "@/components/clientes/IntegracaoOmieCard";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
 import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
 import DeleteClienteDialog from "@/components/clientes/DeleteClienteDialog";
