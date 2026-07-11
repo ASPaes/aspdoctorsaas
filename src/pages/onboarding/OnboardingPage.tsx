@@ -156,10 +156,11 @@ export default function OnboardingPage() {
     const m: Record<string, JourneyRow[]> = {};
     stages.forEach((s) => (m[s.id] = []));
     journeys.forEach((j) => {
+      if (!showConcluded && j.situacao === "concluido") return;
       if (j.current_stage_id && m[j.current_stage_id]) m[j.current_stage_id].push(j);
     });
     return m;
-  }, [stages, journeys]);
+  }, [stages, journeys, showConcluded]);
 
   async function handleDrop(journeyId: string, targetStageId: string, fromStageId: string) {
     if (fromStageId === targetStageId) return;
