@@ -147,6 +147,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       setNewTrainingDate("");
       setNewTrainingConductor("");
       setNewTrainingRetreat(false);
+      setNewTrainingTypeId("");
+
       setRescheduleId(null);
       setRescheduleDate("");
     }
