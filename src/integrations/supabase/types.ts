@@ -3773,6 +3773,50 @@ export type Database = {
         }
         Relationships: []
       }
+      onboarding_demand_types: {
+        Row: {
+          ativo: boolean
+          cor: string
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          position: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cor?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          position?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cor?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          position?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_demand_types_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_journeys: {
         Row: {
           cliente_id: string
@@ -3780,6 +3824,7 @@ export type Database = {
           created_at: string
           current_stage_id: string | null
           data_inicio_planejado: string | null
+          demand_type_id: string | null
           fase_atual: Database["public"]["Enums"]["onb_fase_atual"]
           go_live_previsto: string | null
           go_live_real: string | null
@@ -3799,6 +3844,7 @@ export type Database = {
           created_at?: string
           current_stage_id?: string | null
           data_inicio_planejado?: string | null
+          demand_type_id?: string | null
           fase_atual?: Database["public"]["Enums"]["onb_fase_atual"]
           go_live_previsto?: string | null
           go_live_real?: string | null
@@ -3818,6 +3864,7 @@ export type Database = {
           created_at?: string
           current_stage_id?: string | null
           data_inicio_planejado?: string | null
+          demand_type_id?: string | null
           fase_atual?: Database["public"]["Enums"]["onb_fase_atual"]
           go_live_previsto?: string | null
           go_live_real?: string | null
@@ -3837,6 +3884,13 @@ export type Database = {
             columns: ["current_stage_id"]
             isOneToOne: false
             referencedRelation: "onboarding_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_demand_type_id_fkey"
+            columns: ["demand_type_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_demand_types"
             referencedColumns: ["id"]
           },
           {
@@ -8763,6 +8817,9 @@ export type Database = {
           cliente_id: string | null
           current_stage_id: string | null
           data_inicio_planejado: string | null
+          demand_type_cor: string | null
+          demand_type_id: string | null
+          demand_type_nome: string | null
           etapa_atual_min: number | null
           etapa_semaforo: string | null
           fase_atual: Database["public"]["Enums"]["onb_fase_atual"] | null
@@ -8789,6 +8846,13 @@ export type Database = {
             columns: ["current_stage_id"]
             isOneToOne: false
             referencedRelation: "onboarding_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_demand_type_id_fkey"
+            columns: ["demand_type_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_demand_types"
             referencedColumns: ["id"]
           },
           {
@@ -9090,19 +9154,34 @@ export type Database = {
         }
         Returns: string
       }
-      create_onboarding_journey: {
-        Args: {
-          p_assunto: string
-          p_cliente_id: string
-          p_data_inicio_planejado?: string
-          p_descricao?: string
-          p_go_live_previsto?: string
-          p_implantador_user_id?: string
-          p_produto_id?: number
-          p_tenant_id: string
-        }
-        Returns: string
-      }
+      create_onboarding_journey:
+        | {
+            Args: {
+              p_assunto: string
+              p_cliente_id: string
+              p_data_inicio_planejado?: string
+              p_descricao?: string
+              p_go_live_previsto?: string
+              p_implantador_user_id?: string
+              p_produto_id?: number
+              p_tenant_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_assunto: string
+              p_cliente_id: string
+              p_data_inicio_planejado?: string
+              p_demand_type_id?: string
+              p_descricao?: string
+              p_go_live_previsto?: string
+              p_implantador_user_id?: string
+              p_produto_id?: number
+              p_tenant_id: string
+            }
+            Returns: string
+          }
       create_onboarding_training: {
         Args: {
           p_agendado_para?: string
