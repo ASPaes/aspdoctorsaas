@@ -127,6 +127,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [newTrainingDate, setNewTrainingDate] = useState("");
   const [newTrainingConductor, setNewTrainingConductor] = useState<string>("");
   const [newTrainingRetreat, setNewTrainingRetreat] = useState(false);
+  const [newTrainingTypeId, setNewTrainingTypeId] = useState<string>("");
+
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
 
