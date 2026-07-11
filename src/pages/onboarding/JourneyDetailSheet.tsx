@@ -1294,6 +1294,26 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         }}
       />
     )}
+    <Dialog open={concludeOpen} onOpenChange={setConcludeOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Concluir jornada?</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Ao concluir, os relógios de SLA serão congelados e a etapa/pausa em aberto será fechada.
+        </p>
+        <div className="space-y-1">
+          <label className="text-xs font-medium">Go-live real (opcional)</label>
+          <Input type="date" value={goLiveReal} onChange={(e) => setGoLiveReal(e.target.value)} />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => setConcludeOpen(false)}>Cancelar</Button>
+          <Button size="sm" className="text-white border-0" style={{ background: "#22C55E" }} onClick={handleConclude}>
+            <CheckCircle2 className="h-4 w-4 mr-1" /> Confirmar conclusão
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }
