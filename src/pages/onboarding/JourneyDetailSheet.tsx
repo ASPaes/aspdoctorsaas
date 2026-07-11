@@ -544,6 +544,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         p_agendado_para: newTrainingDate ? new Date(newTrainingDate).toISOString() : null,
         p_conduzido_por: newTrainingConductor || null,
         p_is_retreinamento: newTrainingRetreat,
+        p_training_type_id: newTrainingTypeId || null,
+
       });
       if (error) throw error;
       toast.success("Treino agendado");
