@@ -306,6 +306,22 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     },
   });
 
+  const trainingTypesQ = useQuery({
+    queryKey: ["onb-training-types-lookup", tenantId],
+    enabled: open && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_training_types" as any) as any)
+        .select("id, nome, conta_como_pdv")
+        .eq("tenant_id", tenantId)
+        .eq("ativo", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; conta_como_pdv: boolean }>;
+    },
+  });
+
+
+
   const tenantMembersQ = useQuery({
     queryKey: ["onboarding-tenant-members", tenantId],
     enabled: open && !!tenantId,
