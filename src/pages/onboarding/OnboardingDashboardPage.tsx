@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Loader2, CheckCircle2, AlertTriangle, UserCheck, GraduationCap,
-  RotateCcw, TrendingUp, Info,
+  RotateCcw, TrendingUp, Info, Pause,
 } from "lucide-react";
 import { startOfMonth, endOfMonth } from "date-fns";
 
@@ -42,6 +42,17 @@ interface TrainingRow {
 function pct(num: number, den: number): number {
   if (!den) return 0;
   return Math.round((num / den) * 1000) / 10;
+}
+
+function formatMin(min: number | null | undefined): string {
+  if (min == null || min <= 0) return "0m";
+  if (min < 60) return `${Math.round(min)}m`;
+  const h = Math.floor(min / 60);
+  const m = Math.round(min % 60);
+  if (h < 24) return m ? `${h}h ${m}m` : `${h}h`;
+  const d = Math.floor(h / 24);
+  const rh = h % 24;
+  return rh ? `${d}d ${rh}h` : `${d}d`;
 }
 
 function KpiCard({
@@ -111,6 +122,47 @@ export default function OnboardingDashboardPage() {
       return rows;
     },
   });
+
+  const pausesAllQ = useQuery({
+    queryKey: ["onboarding-dash-pauses-by-reason", effectiveTenantId],
+    enabled: isSuperAdmin && !!effectiveTenantId,
+    queryFn: async () => {
+      const rows = await fetchAllRows<{ motivo_nome: string | null; minutos: number | null; em_andamento: boolean; iniciada_em: string }>(() =>
+        (supabase.from("vw_onboarding_pauses_by_reason" as any) as any)
+          .select("motivo_nome, minutos, em_andamento, iniciada_em")
+          .eq("tenant_id", effectiveTenantId)
+      );
+      return rows;
+    },
+  });
+
+  const pausesByReasonAgg = useMemo(() => {
+    const from = dateRange.from.getTime();
+    const to = dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1;
+    const rows = (pausesAllQ.data ?? []).filter((p) => {
+      const d = new Date(p.iniciada_em).getTime();
+      return d >= from && d <= to;
+    });
+    const agg = new Map<string, { minutos: number; count: number; em_andamento: boolean }>();
+    rows.forEach((p) => {
+      const name = p.motivo_nome || "Sem motivo";
+      const cur = agg.get(name) || { minutos: 0, count: 0, em_andamento: false };
+      cur.minutos += p.minutos ?? 0;
+      cur.count += 1;
+      cur.em_andamento = cur.em_andamento || p.em_andamento;
+      agg.set(name, cur);
+    });
+    return Array.from(agg.entries())
+      .map(([nome, v]) => ({ nome, ...v }))
+      .sort((a, b) => b.minutos - a.minutos);
+  }, [pausesAllQ.data, dateRange]);
+
+  const pausesTotalMin = useMemo(
+    () => pausesByReasonAgg.reduce((s, r) => s + r.minutos, 0),
+    [pausesByReasonAgg]
+  );
+
+
 
   // Treinos no período: usa realizado_em quando existe, senão agendado_para
   const trainings = useMemo(() => {
@@ -424,6 +476,52 @@ export default function OnboardingDashboardPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </section>
+
+          {/* Tempo parado por motivo */}
+          <section className="rounded-lg border border-border bg-card">
+            <div className="p-3 border-b border-border flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold flex items-center gap-2">
+                  <Pause className="h-4 w-4" /> Tempo parado por motivo
+                </h2>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Soma de minutos por motivo em pausas iniciadas no período · total {formatMin(pausesTotalMin)}
+                </p>
+              </div>
+              <Badge variant="outline" className="text-[10px]">{pausesByReasonAgg.length}</Badge>
+            </div>
+            {pausesByReasonAgg.length === 0 ? (
+              <p className="text-xs text-muted-foreground p-6 text-center">Nenhuma pausa iniciada no período selecionado.</p>
+            ) : (
+              <div className="p-3 space-y-1.5">
+                {pausesByReasonAgg.map((r) => {
+                  const p = pausesTotalMin > 0 ? (r.minutos / pausesTotalMin) * 100 : 0;
+                  return (
+                    <div key={r.nome} className="rounded-md border border-border px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-medium truncate">{r.nome}</span>
+                          {r.em_andamento && (
+                            <Badge className="text-[9px] border-0 text-white shrink-0" style={{ backgroundColor: "hsl(38 92% 50%)" }}>
+                              em andamento
+                            </Badge>
+                          )}
+                          <span className="text-[10px] text-muted-foreground shrink-0">· {r.count}x</span>
+                        </div>
+                        <span className="text-xs font-semibold tabular-nums shrink-0">{formatMin(r.minutos)}</span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 w-full rounded bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded"
+                          style={{ width: `${Math.max(2, p)}%`, background: "hsl(38 92% 50%)" }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>

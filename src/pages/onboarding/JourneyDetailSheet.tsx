@@ -252,6 +252,20 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     },
   });
 
+  const pausesByReasonQ = useQuery({
+    queryKey: ["onboarding-pauses-by-reason", journeyId, tenantId],
+    enabled: !!journeyId && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("vw_onboarding_pauses_by_reason" as any) as any)
+        .select("motivo_nome, minutos, em_andamento, iniciada_em")
+        .eq("tenant_id", tenantId)
+        .eq("journey_id", journeyId);
+      if (error) throw error;
+      return (data ?? []) as Array<{ motivo_nome: string | null; minutos: number | null; em_andamento: boolean; iniciada_em: string }>;
+    },
+  });
+
+
   const eventsQ = useQuery({
     queryKey: ["onboarding-ticket-events", journey?.ticket_id],
     enabled: !!journey?.ticket_id,
@@ -426,6 +440,39 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     () => stages.findIndex((s) => s.id === journey?.current_stage_id),
     [stages, journey?.current_stage_id]
   );
+
+  const pausesByReason = useMemo(() => {
+    const rows = pausesByReasonQ.data ?? [];
+    const agg = new Map<string, { minutos: number; em_andamento: boolean; count: number }>();
+    rows.forEach((r) => {
+      const name = r.motivo_nome || "Sem motivo";
+      const cur = agg.get(name) || { minutos: 0, em_andamento: false, count: 0 };
+      cur.minutos += r.minutos ?? 0;
+      cur.em_andamento = cur.em_andamento || r.em_andamento;
+      cur.count += 1;
+      agg.set(name, cur);
+    });
+    return Array.from(agg.entries())
+      .map(([nome, v]) => ({ nome, ...v }))
+      .sort((a, b) => b.minutos - a.minutos);
+  }, [pausesByReasonQ.data]);
+
+  const accumulatedByStage = useMemo(() => {
+    const m: Record<string, number> = {};
+    let acc = 0;
+    stages.forEach((s, idx) => {
+      const isCurrent = s.id === journey?.current_stage_id;
+      const h = historyByStage[s.id];
+      if (isCurrent) {
+        acc += journey?.etapa_atual_min ?? 0;
+      } else if (currentStageIndex >= 0 && idx < currentStageIndex && h?.duracao_minutos != null) {
+        acc += h.duracao_minutos;
+      }
+      m[s.id] = acc;
+    });
+    return m;
+  }, [stages, historyByStage, currentStageIndex, journey?.current_stage_id, journey?.etapa_atual_min]);
+
 
   const cliente = clienteQ.data;
   const clienteNome = cliente?.nome_fantasia || cliente?.razao_social || "—";
@@ -1044,12 +1091,47 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                   {h.saiu_em && ` • saiu ${formatDateTime(h.saiu_em)}`}
                                 </p>
                               )}
+                              {(isCurrent || isPast) && accumulatedByStage[s.id] > 0 && (
+                                <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+                                  Acumulado até aqui: <span className="font-medium text-foreground/80">{formatMin(accumulatedByStage[s.id])}</span>
+                                </p>
+                              )}
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   </section>
+
+                  {/* Pauses by reason */}
+                  {pausesByReason.length > 0 && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border flex items-center justify-between">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <Pause className="h-4 w-4" /> Tempo parado por motivo
+                        </h3>
+                        <Badge variant="outline" className="text-[10px]">{pausesByReason.length}</Badge>
+                      </div>
+                      <div className="p-3 space-y-1.5">
+                        {pausesByReason.map((p) => (
+                          <div key={p.nome} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xs font-medium truncate">{p.nome}</span>
+                              {p.em_andamento && (
+                                <Badge className="text-[9px] border-0 text-white shrink-0" style={{ backgroundColor: "hsl(38 92% 50%)" }}>
+                                  em andamento
+                                </Badge>
+                              )}
+                              <span className="text-[10px] text-muted-foreground shrink-0">· {p.count}x</span>
+                            </div>
+                            <span className="text-xs font-medium tabular-nums">{formatMin(p.minutos)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+
 
                   {/* Modules */}
                   <section className="rounded-lg border border-border">
