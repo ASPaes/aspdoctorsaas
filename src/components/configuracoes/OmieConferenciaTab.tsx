@@ -235,6 +235,9 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
   const [vincLoading, setVincLoading] = useState(false);
   const [confirmAjuste, setConfirmAjuste] = useState(false);
   const [ajusteLoading, setAjusteLoading] = useState(false);
+  const [confirmEnviarOpen, setConfirmEnviarOpen] = useState(false);
+  const [enviarLoading, setEnviarLoading] = useState(false);
+  const [dryRun, setDryRun] = useState<any | null>(null);
   const queryClient = useQueryClient();
   const bucket = row.acao_sugerida as Bucket;
   const diffs = row.diffs && typeof row.diffs === "object" ? row.diffs : {};
@@ -339,6 +342,85 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
     }
   }
 
+  async function handleEnviarOmieClick() {
+    if (!tid || !row.ds_contract_id) return;
+    setEnviarLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("recon-omie-escrever", {
+        body: { tenant_id: tid, ds_contract_id: row.ds_contract_id, modo: "dry_run" },
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res?.ok === false) {
+        toast.error(res?.error || res?.bloqueado || "Envio bloqueado");
+        return;
+      }
+      if (res?.ok) {
+        setDryRun(res);
+        setConfirmEnviarOpen(true);
+        return;
+      }
+      toast.error("Resposta inesperada do servidor");
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao preparar envio");
+    } finally {
+      setEnviarLoading(false);
+    }
+  }
+
+  async function handleEnviarOmieConfirm() {
+    if (!tid || !row.ds_contract_id) return;
+    setEnviarLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("recon-omie-escrever", {
+        body: { tenant_id: tid, ds_contract_id: row.ds_contract_id, modo: "criar" },
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res?.ok) {
+        const omieId = res?.omie_contract_id ?? res?.criado?.omie_contract_id ?? res?.operacao?.omie_contract_id ?? "";
+        const base = omieId ? `Enviado ao Omie: contrato ${omieId}` : "Enviado ao Omie";
+        toast.success(res?.vendedor_pendente ? `${base} — vendedor pendente de mapeamento` : base);
+        setConfirmEnviarOpen(false);
+        setDryRun(null);
+        queryClient.setQueriesData<{ rows: ReconciliacaoRow[]; count: number } | undefined>(
+          { queryKey: ["omie-conf-lista"] },
+          (old) => {
+            if (!old) return old;
+            const rows = old.rows.filter((r) => r.ds_contract_id !== row.ds_contract_id);
+            const removed = old.rows.length - rows.length;
+            return { rows, count: Math.max(0, old.count - removed) };
+          }
+        );
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-resumo"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-lista"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-visao-geral"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-fornecedores"] }),
+        ]);
+      } else {
+        toast.error(res?.error || res?.bloqueado || "Falha ao enviar ao Omie");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao enviar ao Omie");
+    } finally {
+      setEnviarLoading(false);
+    }
+  }
+
+  const enviarOmieBtn = (
+    <Button
+      size="sm"
+      variant="outline"
+      className="gap-1"
+      onClick={handleEnviarOmieClick}
+      disabled={enviarLoading || !tid || !row.ds_contract_id}
+    >
+      <ArrowRight className="h-3 w-3" />
+      {enviarLoading ? "Preparando..." : "Enviar ao Omie"}
+    </Button>
+  );
+
   function renderBotao() {
     switch (bucket) {
       case "vinculo_auto_ok":
@@ -359,9 +441,8 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
       case "resolver":
         return <DisabledActionButton>Atualizar valor no Omie</DisabledActionButton>;
       case "criar":
-        return <DisabledActionButton>Criar cliente + contrato no Omie</DisabledActionButton>;
       case "criar_contrato":
-        return <DisabledActionButton>Criar contrato (cliente já existe)</DisabledActionButton>;
+        return enviarOmieBtn;
       case "atribuir_modelo":
         return <DisabledActionButton>Definir modelo no DS</DisabledActionButton>;
       case "pendente_assuncao":
@@ -536,9 +617,7 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
               <ArrowLeft className="h-3 w-3" />
               Atualizar valor no DoctorSaaS
             </Button>
-            <DisabledActionButton icon={<ArrowRight className="h-3 w-3" />}>
-              Atualizar valor no Omie
-            </DisabledActionButton>
+            {enviarOmieBtn}
           </>
         ) : (
           <>
@@ -622,6 +701,56 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
               disabled={ajusteLoading}
             >
               {ajusteLoading ? "Ajustando..." : "Confirmar ajuste"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmEnviarOpen} onOpenChange={(v) => { if (!enviarLoading) { setConfirmEnviarOpen(v); if (!v) setDryRun(null); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar envio ao Omie</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                {dryRun?.casado_no_omie && (
+                  <div className="rounded border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-2 py-1.5 text-amber-800 dark:text-amber-300 text-xs">
+                    Este contrato JÁ existe no Omie e será ATUALIZADO (não duplicado).
+                  </div>
+                )}
+                {dryRun?.cliente_seria_enviado && (
+                  <div className="rounded border p-2">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Cliente</div>
+                    <div className="font-medium break-words">{dryRun.cliente_seria_enviado.razao_social || dryRun.cliente_seria_enviado.razao || "—"}</div>
+                    <div className="text-xs text-muted-foreground font-mono mt-0.5">CNPJ {formatCNPJ(dryRun.cliente_seria_enviado.cnpj_cpf || dryRun.cliente_seria_enviado.cnpj || row.cnpj_norm)}</div>
+                  </div>
+                )}
+                {dryRun?.contrato_seria_enviado && (
+                  <div className="rounded border p-2 space-y-0.5">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Contrato</div>
+                    <div>Valor mensal: <span className="font-medium">{formatBRL(dryRun.contrato_seria_enviado.valor_mensal ?? dryRun.contrato_seria_enviado.valor)}</span></div>
+                    {dryRun.contrato_seria_enviado.modelo && (
+                      <div className="text-xs text-muted-foreground">Modelo: {dryRun.contrato_seria_enviado.modelo}</div>
+                    )}
+                    {(dryRun.contrato_seria_enviado.vigencia_inicial || dryRun.contrato_seria_enviado.vigencia_final) && (
+                      <div className="text-xs text-muted-foreground">
+                        Vigência: {dryRun.contrato_seria_enviado.vigencia_inicial || "—"} até {dryRun.contrato_seria_enviado.vigencia_final || "—"}
+                      </div>
+                    )}
+                    {dryRun.contrato_seria_enviado.dia_vencimento != null && (
+                      <div className="text-xs text-muted-foreground">Dia de vencimento: {dryRun.contrato_seria_enviado.dia_vencimento}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={enviarLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleEnviarOmieConfirm(); }}
+              disabled={enviarLoading}
+            >
+              {enviarLoading ? "Enviando..." : "Confirmar envio ao Omie"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
