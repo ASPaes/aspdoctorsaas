@@ -603,6 +603,29 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={confirmAjuste} onOpenChange={setConfirmAjuste}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ajustar valor no DoctorSaaS</AlertDialogTitle>
+            <AlertDialogDescription>
+              O valor do DoctorSaaS ({formatBRL(row.valor_mrr_ds)}) será alinhado ao do Omie ({formatBRL(row.valor_omie)}) através de um movimento de MRR de {ajusteTipo ?? "ajuste"} no valor de {formatBRL(ajusteAbs)}. Isso altera a base de MRR do cliente e será registrado como correção de conciliação. Não altera nada no Omie.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={ajusteLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleAtualizarValorDs();
+              }}
+              disabled={ajusteLoading}
+            >
+              {ajusteLoading ? "Ajustando..." : "Confirmar ajuste"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
