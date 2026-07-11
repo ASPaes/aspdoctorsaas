@@ -119,8 +119,8 @@ export default function OnboardingDashboardPage() {
 
   // Resolver nomes dos implantadores via profiles → funcionarios
   const conduzidoIds = useMemo(
-    () => Array.from(new Set((trainingsQ.data ?? []).map((t) => t.conduzido_por).filter(Boolean))) as string[],
-    [trainingsQ.data]
+    () => Array.from(new Set(trainings.map((t) => t.conduzido_por).filter(Boolean))) as string[],
+    [trainings]
   );
 
   const namesQ = useQuery({
@@ -141,7 +141,6 @@ export default function OnboardingDashboardPage() {
   });
 
   const journeys = journeysQ.data ?? [];
-  const trainings = trainingsQ.data ?? [];
   const names = namesQ.data ?? {};
 
   // KPIs jornadas (SLA)
