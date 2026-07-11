@@ -278,7 +278,50 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     },
   });
 
-  const attendancesQ = useQuery({
+  const modulesQ = useQuery({
+    queryKey: ["onboarding-journey-modules", journeyId, tenantId],
+    enabled: !!journeyId && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_journey_modules" as any) as any)
+        .select("id, nome, produto_modulo_id, origem, created_at")
+        .eq("tenant_id", tenantId)
+        .eq("journey_id", journeyId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; produto_modulo_id: string | null; origem: string; created_at: string }>;
+    },
+  });
+
+  const produtoModulosQ = useQuery({
+    queryKey: ["onboarding-produto-modulos", journeyRow?.produto_id, tenantId],
+    enabled: !!journeyRow?.produto_id && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("produto_modulos" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tenantId)
+        .eq("produto_id", journeyRow!.produto_id)
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string }>;
+    },
+  });
+
+  const clienteProdutoModulosQ = useQuery({
+    queryKey: ["onboarding-cliente-produto-modulos", journey?.cliente_id, tenantId],
+    enabled: !!journey?.cliente_id && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("cliente_produto_modulos" as any) as any)
+        .select("id, modulo_id, produto_modulos!inner(id, nome), cliente_produtos!inner(cliente_id)")
+        .eq("tenant_id", tenantId)
+        .eq("ativo", true)
+        .eq("cliente_produtos.cliente_id", journey!.cliente_id!);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; modulo_id: string; produto_modulos: { id: string; nome: string } }>;
+    },
+  });
+
+
     queryKey: ["onboarding-attendances", journey?.ticket_id],
     enabled: !!journey?.ticket_id,
     queryFn: async () => {
