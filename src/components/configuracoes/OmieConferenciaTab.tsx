@@ -342,6 +342,85 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
     }
   }
 
+  async function handleEnviarOmieClick() {
+    if (!tid || !row.ds_contract_id) return;
+    setEnviarLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("recon-omie-escrever", {
+        body: { tenant_id: tid, ds_contract_id: row.ds_contract_id, modo: "dry_run" },
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res?.ok === false) {
+        toast.error(res?.error || res?.bloqueado || "Envio bloqueado");
+        return;
+      }
+      if (res?.ok) {
+        setDryRun(res);
+        setConfirmEnviarOpen(true);
+        return;
+      }
+      toast.error("Resposta inesperada do servidor");
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao preparar envio");
+    } finally {
+      setEnviarLoading(false);
+    }
+  }
+
+  async function handleEnviarOmieConfirm() {
+    if (!tid || !row.ds_contract_id) return;
+    setEnviarLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("recon-omie-escrever", {
+        body: { tenant_id: tid, ds_contract_id: row.ds_contract_id, modo: "criar" },
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res?.ok) {
+        const omieId = res?.omie_contract_id ?? res?.criado?.omie_contract_id ?? res?.operacao?.omie_contract_id ?? "";
+        const base = omieId ? `Enviado ao Omie: contrato ${omieId}` : "Enviado ao Omie";
+        toast.success(res?.vendedor_pendente ? `${base} — vendedor pendente de mapeamento` : base);
+        setConfirmEnviarOpen(false);
+        setDryRun(null);
+        queryClient.setQueriesData<{ rows: ReconciliacaoRow[]; count: number } | undefined>(
+          { queryKey: ["omie-conf-lista"] },
+          (old) => {
+            if (!old) return old;
+            const rows = old.rows.filter((r) => r.ds_contract_id !== row.ds_contract_id);
+            const removed = old.rows.length - rows.length;
+            return { rows, count: Math.max(0, old.count - removed) };
+          }
+        );
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-resumo"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-lista"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-visao-geral"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-fornecedores"] }),
+        ]);
+      } else {
+        toast.error(res?.error || res?.bloqueado || "Falha ao enviar ao Omie");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao enviar ao Omie");
+    } finally {
+      setEnviarLoading(false);
+    }
+  }
+
+  const enviarOmieBtn = (
+    <Button
+      size="sm"
+      variant="outline"
+      className="gap-1"
+      onClick={handleEnviarOmieClick}
+      disabled={enviarLoading || !tid || !row.ds_contract_id}
+    >
+      <ArrowRight className="h-3 w-3" />
+      {enviarLoading ? "Preparando..." : "Enviar ao Omie"}
+    </Button>
+  );
+
   function renderBotao() {
     switch (bucket) {
       case "vinculo_auto_ok":
@@ -362,9 +441,8 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
       case "resolver":
         return <DisabledActionButton>Atualizar valor no Omie</DisabledActionButton>;
       case "criar":
-        return <DisabledActionButton>Criar cliente + contrato no Omie</DisabledActionButton>;
       case "criar_contrato":
-        return <DisabledActionButton>Criar contrato (cliente já existe)</DisabledActionButton>;
+        return enviarOmieBtn;
       case "atribuir_modelo":
         return <DisabledActionButton>Definir modelo no DS</DisabledActionButton>;
       case "pendente_assuncao":
