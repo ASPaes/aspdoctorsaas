@@ -121,6 +121,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [pausePopoverOpen, setPausePopoverOpen] = useState(false);
   const [startConvOpen, setStartConvOpen] = useState(false);
   const [nextStageId, setNextStageId] = useState<string>("");
+  const [concludeOpen, setConcludeOpen] = useState(false);
+  const [goLiveReal, setGoLiveReal] = useState<string>("");
   const [addParticipantOpen, setAddParticipantOpen] = useState(false);
   const [newParticipantUserId, setNewParticipantUserId] = useState<string>("");
   const [newParticipantPapel, setNewParticipantPapel] = useState<Papel>("especialista");
