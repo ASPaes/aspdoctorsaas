@@ -112,6 +112,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [pauseText, setPauseText] = useState("");
   const [pausePopoverOpen, setPausePopoverOpen] = useState(false);
   const [nextStageId, setNextStageId] = useState<string>("");
+  const [addParticipantOpen, setAddParticipantOpen] = useState(false);
+  const [newParticipantUserId, setNewParticipantUserId] = useState<string>("");
+  const [newParticipantPapel, setNewParticipantPapel] = useState<Papel>("especialista");
 
   useEffect(() => {
     if (!open) {
