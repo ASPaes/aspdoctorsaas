@@ -295,6 +295,50 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
     }
   }
 
+  const ajusteTipo: "upsell" | "downsell" | null =
+    delta == null || delta === 0 ? null : delta > 0 ? "upsell" : "downsell";
+  const ajusteAbs = delta != null ? Math.abs(delta) : 0;
+
+  async function handleAtualizarValorDs() {
+    if (!tid || !row.ds_contract_id) return;
+    setAjusteLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("recon-atualizar-valor-ds", {
+        body: { tenant_id: tid, ds_contract_id: row.ds_contract_id },
+      });
+      if (error) throw error;
+      const res = data as { ok?: boolean; error?: string; tipo?: string; valor_delta?: number } | null;
+      if (res?.ok) {
+        const tipoMsg = res.tipo || ajusteTipo || "ajuste";
+        const valorMsg = res.valor_delta != null ? Math.abs(Number(res.valor_delta)) : ajusteAbs;
+        toast.success(`Valor ajustado no DoctorSaaS (movimento ${tipoMsg} de ${formatBRL(valorMsg)})`);
+        setConfirmAjuste(false);
+        queryClient.setQueriesData<{ rows: ReconciliacaoRow[]; count: number } | undefined>(
+          { queryKey: ["omie-conf-lista"] },
+          (old) => {
+            if (!old) return old;
+            const rows = old.rows.filter((r) => r.ds_contract_id !== row.ds_contract_id);
+            const removed = old.rows.length - rows.length;
+            return { rows, count: Math.max(0, old.count - removed) };
+          }
+        );
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-resumo"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-lista"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-nome-diverge-count"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-visao-geral"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-fornecedores"] }),
+        ]);
+      } else {
+        toast.error(res?.error || "Falha ao ajustar valor");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao ajustar valor");
+    } finally {
+      setAjusteLoading(false);
+    }
+  }
+
   function renderBotao() {
     switch (bucket) {
       case "vinculo_auto_ok":
