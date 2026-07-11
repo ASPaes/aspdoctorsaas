@@ -321,8 +321,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     },
   });
 
-
+  const attendancesQ = useQuery({
     queryKey: ["onboarding-attendances", journey?.ticket_id],
+
     enabled: !!journey?.ticket_id,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_attendances" as any) as any)
