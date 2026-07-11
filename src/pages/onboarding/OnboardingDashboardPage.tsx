@@ -94,27 +94,28 @@ export default function OnboardingDashboardPage() {
     },
   });
 
-  const trainingsQ = useQuery({
-    queryKey: ["onboarding-dash-trainings", effectiveTenantId, dateRange.from.toISOString(), dateRange.to.toISOString()],
+  const trainingsAllQ = useQuery({
+    queryKey: ["onboarding-dash-trainings-all", effectiveTenantId],
     enabled: isSuperAdmin && !!effectiveTenantId,
     queryFn: async () => {
-      const fromISO = dateRange.from.toISOString();
-      const toISO = new Date(dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1).toISOString();
       const rows = await fetchAllRows<TrainingRow>(() =>
         (supabase.from("onboarding_training_sessions" as any) as any)
           .select("id, journey_id, status, no_show, tentativas, proprietario_presente, is_retreinamento, conduzido_por, realizado_em")
           .eq("tenant_id", effectiveTenantId)
-          .or(`realizado_em.gte.${fromISO},and(realizado_em.is.null,status.neq.realizado)`)
-          .lte("realizado_em", toISO)
       );
-      // filtrar client-side por segurança (o .or acima é conservador)
-      return rows.filter((t) => {
-        if (!t.realizado_em) return true; // pendentes/no-show sem data são considerados
-        const d = new Date(t.realizado_em).getTime();
-        return d >= dateRange.from.getTime() && d <= new Date(toISO).getTime();
-      });
+      return rows;
     },
   });
+
+  const trainings = useMemo(() => {
+    const from = dateRange.from.getTime();
+    const to = dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1;
+    return (trainingsAllQ.data ?? []).filter((t) => {
+      if (!t.realizado_em) return false;
+      const d = new Date(t.realizado_em).getTime();
+      return d >= from && d <= to;
+    });
+  }, [trainingsAllQ.data, dateRange]);
 
   // Resolver nomes dos implantadores via profiles → funcionarios
   const conduzidoIds = useMemo(
