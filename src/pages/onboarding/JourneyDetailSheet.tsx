@@ -117,6 +117,15 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [newParticipantUserId, setNewParticipantUserId] = useState<string>("");
   const [newParticipantPapel, setNewParticipantPapel] = useState<Papel>("especialista");
 
+  // Trainings
+  const [addTrainingOpen, setAddTrainingOpen] = useState(false);
+  const [newTrainingTitle, setNewTrainingTitle] = useState("");
+  const [newTrainingDate, setNewTrainingDate] = useState("");
+  const [newTrainingConductor, setNewTrainingConductor] = useState<string>("");
+  const [newTrainingRetreat, setNewTrainingRetreat] = useState(false);
+  const [rescheduleId, setRescheduleId] = useState<string | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+
   useEffect(() => {
     if (!open) {
       setChecked({});
@@ -127,8 +136,16 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       setAddParticipantOpen(false);
       setNewParticipantUserId("");
       setNewParticipantPapel("especialista");
+      setAddTrainingOpen(false);
+      setNewTrainingTitle("");
+      setNewTrainingDate("");
+      setNewTrainingConductor("");
+      setNewTrainingRetreat(false);
+      setRescheduleId(null);
+      setRescheduleDate("");
     }
   }, [open, journeyId]);
+
 
   const journeyQ = useQuery({
     queryKey: ["onboarding-journey-detail", journeyId, tenantId],
