@@ -619,6 +619,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const slaColor = SEMAFORO_COLOR[journey?.etapa_semaforo || "sem_sla"];
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden">
         {loading ? (
