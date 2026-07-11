@@ -101,6 +101,7 @@ const EVENT_LABELS: Record<string, string> = {
   pausado: "Onboarding pausado",
   retomado: "Onboarding retomado",
   concluido: "Etapa concluída",
+  onboarding_participante: "Participante alterado",
 };
 
 export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tenantId }: Props) {
