@@ -4329,6 +4329,7 @@ export type Database = {
           tentativas: number
           ticket_id: string
           titulo: string
+          training_type_id: string | null
           updated_at: string
         }
         Insert: {
@@ -4348,6 +4349,7 @@ export type Database = {
           tentativas?: number
           ticket_id: string
           titulo: string
+          training_type_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -4367,6 +4369,7 @@ export type Database = {
           tentativas?: number
           ticket_id?: string
           titulo?: string
+          training_type_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -4396,6 +4399,54 @@ export type Database = {
             columns: ["ticket_id"]
             isOneToOne: false
             referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_sessions_training_type_id_fkey"
+            columns: ["training_type_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_training_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_training_types: {
+        Row: {
+          ativo: boolean
+          conta_como_pdv: boolean
+          created_at: string
+          id: string
+          nome: string
+          position: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          conta_como_pdv?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          position?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          conta_como_pdv?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          position?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_training_types_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -8878,6 +8929,53 @@ export type Database = {
           },
         ]
       }
+      vw_onboarding_training_kpis: {
+        Row: {
+          agendado_para: string | null
+          conduzido_por: string | null
+          conta_como_pdv: boolean | null
+          is_retreinamento: boolean | null
+          journey_id: string | null
+          no_show: boolean | null
+          proprietario_presente: boolean | null
+          realizado_em: string | null
+          status: Database["public"]["Enums"]["onb_treino_status"] | null
+          tenant_id: string | null
+          tentativas: number | null
+          tipo_nome: string | null
+          training_type_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_training_sessions_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_sessions_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_sessions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_sessions_training_type_id_fkey"
+            columns: ["training_type_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_training_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       accept_access_invite: {
@@ -9182,16 +9280,28 @@ export type Database = {
             }
             Returns: string
           }
-      create_onboarding_training: {
-        Args: {
-          p_agendado_para?: string
-          p_conduzido_por?: string
-          p_is_retreinamento?: boolean
-          p_journey_id: string
-          p_titulo: string
-        }
-        Returns: string
-      }
+      create_onboarding_training:
+        | {
+            Args: {
+              p_agendado_para?: string
+              p_conduzido_por?: string
+              p_is_retreinamento?: boolean
+              p_journey_id: string
+              p_titulo: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_agendado_para?: string
+              p_conduzido_por?: string
+              p_is_retreinamento?: boolean
+              p_journey_id: string
+              p_titulo: string
+              p_training_type_id?: string
+            }
+            Returns: string
+          }
       create_simple_template_from_tenant: {
         Args: {
           p_descricao?: string
