@@ -17,7 +17,7 @@ import { StartConversationFromTicketDialog } from "@/components/tickets/StartCon
 import {
   Loader2, Clock, Pause, Play, ChevronRight, Calendar, CheckCircle2,
   Circle, AlertCircle, MessageSquare, GraduationCap, User, ArrowRight,
-  UserPlus, Star, X, Users,
+  UserPlus, Star, X, Users, Package, Plus, Trash2, Download,
 } from "lucide-react";
 
 type Papel = "implantador" | "vendedor" | "especialista" | "outro";
@@ -138,6 +138,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
 
+  // Modules
+  const [addModuleOpen, setAddModuleOpen] = useState(false);
+  const [newModuleName, setNewModuleName] = useState("");
+  const [newModuleProdutoModuloId, setNewModuleProdutoModuloId] = useState<string>("");
+
   useEffect(() => {
     if (!open) {
       setChecked({});
@@ -195,7 +200,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journeyId && !!tenantId,
     queryFn: async () => {
       const { data } = await (supabase.from("onboarding_journeys" as any) as any)
-        .select("id, fase_atual, pipeline_onboarding_id, pipeline_implantacao_id, current_stage_id")
+        .select("id, fase_atual, pipeline_onboarding_id, pipeline_implantacao_id, current_stage_id, produto_id")
         .eq("id", journeyId)
         .maybeSingle();
       return data as any;
@@ -273,8 +278,52 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     },
   });
 
+  const modulesQ = useQuery({
+    queryKey: ["onboarding-journey-modules", journeyId, tenantId],
+    enabled: !!journeyId && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_journey_modules" as any) as any)
+        .select("id, nome, produto_modulo_id, origem, created_at")
+        .eq("tenant_id", tenantId)
+        .eq("journey_id", journeyId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; produto_modulo_id: string | null; origem: string; created_at: string }>;
+    },
+  });
+
+  const produtoModulosQ = useQuery({
+    queryKey: ["onboarding-produto-modulos", journeyRow?.produto_id, tenantId],
+    enabled: !!journeyRow?.produto_id && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("produto_modulos" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tenantId)
+        .eq("produto_id", journeyRow!.produto_id)
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string }>;
+    },
+  });
+
+  const clienteProdutoModulosQ = useQuery({
+    queryKey: ["onboarding-cliente-produto-modulos", journey?.cliente_id, tenantId],
+    enabled: !!journey?.cliente_id && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("cliente_produto_modulos" as any) as any)
+        .select("id, modulo_id, produto_modulos!inner(id, nome), cliente_produtos!inner(cliente_id)")
+        .eq("tenant_id", tenantId)
+        .eq("ativo", true)
+        .eq("cliente_produtos.cliente_id", journey!.cliente_id!);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; modulo_id: string; produto_modulos: { id: string; nome: string } }>;
+    },
+  });
+
   const attendancesQ = useQuery({
     queryKey: ["onboarding-attendances", journey?.ticket_id],
+
     enabled: !!journey?.ticket_id,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_attendances" as any) as any)
@@ -649,6 +698,73 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     } catch (e: any) { toast.error(e.message || "Erro"); }
   }
 
+  async function handleAddModuleManual() {
+    if (!tenantId || !journeyId) return;
+    const nome = newModuleName.trim();
+    if (!nome) { toast.error("Informe o nome do módulo"); return; }
+    try {
+      const { error } = await (supabase.from("onboarding_journey_modules" as any) as any)
+        .insert({ tenant_id: tenantId, journey_id: journeyId, nome, origem: "manual" });
+      if (error) throw error;
+      toast.success("Módulo adicionado");
+      setNewModuleName("");
+      setAddModuleOpen(false);
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-modules", journeyId, tenantId] });
+    } catch (e: any) { toast.error(e.message || "Erro ao adicionar módulo"); }
+  }
+
+  async function handleAddModuleFromProduto() {
+    if (!tenantId || !journeyId || !newModuleProdutoModuloId) return;
+    const pm = (produtoModulosQ.data ?? []).find((m) => m.id === newModuleProdutoModuloId);
+    if (!pm) return;
+    try {
+      const { error } = await (supabase.from("onboarding_journey_modules" as any) as any)
+        .insert({ tenant_id: tenantId, journey_id: journeyId, nome: pm.nome, produto_modulo_id: pm.id, origem: "produto" });
+      if (error) throw error;
+      toast.success("Módulo adicionado");
+      setNewModuleProdutoModuloId("");
+      setAddModuleOpen(false);
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-modules", journeyId, tenantId] });
+    } catch (e: any) { toast.error(e.message || "Erro ao adicionar módulo"); }
+  }
+
+  async function handleImportFromCliente() {
+    if (!tenantId || !journeyId) return;
+    const items = clienteProdutoModulosQ.data ?? [];
+    if (items.length === 0) { toast.error("Cliente não possui módulos cadastrados"); return; }
+    const existing = new Set((modulesQ.data ?? []).map((m) => m.produto_modulo_id).filter(Boolean));
+    const rows = items
+      .filter((it) => !existing.has(it.modulo_id))
+      .map((it) => ({
+        tenant_id: tenantId,
+        journey_id: journeyId,
+        nome: it.produto_modulos.nome,
+        produto_modulo_id: it.modulo_id,
+        origem: "cliente",
+      }));
+    if (rows.length === 0) { toast.info("Todos os módulos do cliente já estão importados"); return; }
+    try {
+      const { error } = await (supabase.from("onboarding_journey_modules" as any) as any).insert(rows);
+      if (error) throw error;
+      toast.success(`${rows.length} módulo(s) importado(s)`);
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-modules", journeyId, tenantId] });
+    } catch (e: any) { toast.error(e.message || "Erro ao importar módulos"); }
+  }
+
+  async function handleDeleteModule(id: string) {
+    if (!tenantId) return;
+    try {
+      const { error } = await (supabase.from("onboarding_journey_modules" as any) as any)
+        .delete()
+        .eq("id", id)
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-modules", journeyId, tenantId] });
+    } catch (e: any) { toast.error(e.message || "Erro ao remover módulo"); }
+  }
+
+
+
 
 
   const loading = journeyQ.isLoading || !journey;
@@ -935,7 +1051,106 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     </div>
                   </section>
 
+                  {/* Modules */}
+                  <section className="rounded-lg border border-border">
+                    <div className="p-3 border-b border-border flex items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Package className="h-4 w-4" /> Módulos da jornada
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px]">{(modulesQ.data ?? []).length}</Badge>
+                        {(clienteProdutoModulosQ.data ?? []).length > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1"
+                            onClick={handleImportFromCliente}
+                          >
+                            <Download className="h-3 w-3" /> Importar do cliente
+                          </Button>
+                        )}
+                        <Popover open={addModuleOpen} onOpenChange={setAddModuleOpen}>
+                          <PopoverTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
+                              <Plus className="h-3 w-3" /> Adicionar módulo
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 space-y-3" align="end">
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-medium">Nome do módulo</label>
+                              <div className="flex gap-1.5">
+                                <Input
+                                  value={newModuleName}
+                                  onChange={(e) => setNewModuleName(e.target.value)}
+                                  placeholder="Ex: PDV, Financeiro"
+                                  className="h-8 text-xs"
+                                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddModuleManual(); } }}
+                                />
+                                <Button size="sm" className="h-8 px-3" onClick={handleAddModuleManual}>Add</Button>
+                              </div>
+                            </div>
+                            {(produtoModulosQ.data ?? []).length > 0 && (
+                              <>
+                                <Separator />
+                                <div className="space-y-1">
+                                  <label className="text-[11px] font-medium">Ou escolher do produto</label>
+                                  <div className="flex gap-1.5">
+                                    <Select value={newModuleProdutoModuloId} onValueChange={setNewModuleProdutoModuloId}>
+                                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar módulo" /></SelectTrigger>
+                                      <SelectContent>
+                                        {(produtoModulosQ.data ?? []).map((m) => (
+                                          <SelectItem key={m.id} value={m.id} className="text-xs">{m.nome}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Button size="sm" className="h-8 px-3" onClick={handleAddModuleFromProduto} disabled={!newModuleProdutoModuloId}>Add</Button>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                    <div className="p-3 space-y-1.5">
+                      {(modulesQ.data ?? []).length === 0 ? (
+                        <p className="text-xs text-muted-foreground py-2 text-center">Nenhum módulo cadastrado.</p>
+                      ) : (
+                        (modulesQ.data ?? []).map((m) => {
+                          const origemColor: Record<string, string> = {
+                            manual: "hsl(215 16% 47%)",
+                            produto: "hsl(199 89% 48%)",
+                            cliente: "hsl(262 83% 58%)",
+                          };
+                          return (
+                            <div key={m.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-xs font-medium truncate">{m.nome}</span>
+                                <Badge
+                                  variant="outline"
+                                  className="text-[9px] capitalize border-0 text-white shrink-0"
+                                  style={{ backgroundColor: origemColor[m.origem] || origemColor.manual }}
+                                >
+                                  {m.origem}
+                                </Badge>
+                              </div>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                                onClick={() => handleDeleteModule(m.id)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </section>
+
                   {/* Trainings */}
+
                   <section className="rounded-lg border border-border">
                     <div className="p-3 border-b border-border flex items-center justify-between">
                       <h3 className="text-sm font-semibold flex items-center gap-2">
