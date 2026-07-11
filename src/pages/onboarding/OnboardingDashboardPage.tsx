@@ -278,6 +278,46 @@ export default function OnboardingDashboardPage() {
             </div>
           </section>
 
+          {/* KPI Row 1b: PDV + previsto/realizado */}
+          <section>
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Indicadores Fase 1 · PDV</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <KpiCard
+                icon={CheckCircle2}
+                label="Total PDV finalizados"
+                value={String(pdvFinalizados)}
+                sub={`${concluidas} jornadas concluídas`}
+                tone="success"
+                subTone="muted"
+              />
+              <KpiCard
+                icon={GraduationCap}
+                label="% Realizado"
+                value={`${realizadoPct}%`}
+                sub={`${realizados.length} realiz. / ${previstos.length} prev.`}
+                tone={realizadoPct >= 80 ? "success" : realizadoPct >= 60 ? "warning" : "danger"}
+                subTone="muted"
+              />
+              <KpiCard
+                icon={AlertTriangle}
+                label="1º No-show"
+                value={String(primeiroNoShow)}
+                sub={`${noShowRate}% no-show geral`}
+                tone={primeiroNoShow === 0 ? "success" : "warning"}
+                subTone="muted"
+              />
+              <KpiCard
+                icon={RotateCcw}
+                label="% Retreinamento"
+                value={`${retreinosPct}%`}
+                sub={`${retreinos.length} de ${trainings.length} treinos`}
+                tone={retreinosPct < 15 ? "success" : retreinosPct < 30 ? "warning" : "danger"}
+                subTone="muted"
+              />
+            </div>
+          </section>
+
+
           {/* KPI Row 2: Treinos */}
           <section>
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Treinamentos no período</h2>
