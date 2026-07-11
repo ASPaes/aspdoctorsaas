@@ -526,12 +526,16 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
       <div className={`border-t bg-muted/10 px-3 py-2 flex items-center gap-2 ${bucket === "resolver" ? "justify-between" : "justify-end"}`}>
         {bucket === "resolver" ? (
           <>
-            <DisabledActionButton
-              icon={<ArrowLeft className="h-3 w-3" />}
-              tip="O valor no DoctorSaaS é calculado a partir dos produtos e movimentos do cliente. Ajustar aqui altera a base financeira e afeta relatórios de MRR."
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              onClick={() => setConfirmAjuste(true)}
+              disabled={ajusteLoading || !tid || !row.ds_contract_id || ajusteTipo == null}
             >
+              <ArrowLeft className="h-3 w-3" />
               Atualizar valor no DoctorSaaS
-            </DisabledActionButton>
+            </Button>
             <DisabledActionButton icon={<ArrowRight className="h-3 w-3" />}>
               Atualizar valor no Omie
             </DisabledActionButton>
