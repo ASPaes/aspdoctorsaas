@@ -8866,6 +8866,7 @@ export type Database = {
         Row: {
           assunto: string | null
           cliente_id: string | null
+          concluido_em: string | null
           current_stage_id: string | null
           data_inicio_planejado: string | null
           demand_type_cor: string | null
@@ -9162,6 +9163,10 @@ export type Database = {
       collect_tenant_daily_metrics:
         | { Args: never; Returns: undefined }
         | { Args: { p_date?: string }; Returns: undefined }
+      conclude_onboarding_journey: {
+        Args: { p_go_live_real?: string; p_journey_id: string }
+        Returns: Json
+      }
       create_access_invite: {
         Args: {
           p_access_status?: string
@@ -10674,6 +10679,10 @@ export type Database = {
         Returns: string
       }
       remind_ai_disabled: { Args: never; Returns: Json }
+      reopen_onboarding_journey: {
+        Args: { p_journey_id: string }
+        Returns: Json
+      }
       require_active_profile: { Args: never; Returns: boolean }
       reset_tenant_permissions_to_default: {
         Args: { p_role?: string; p_tenant_id?: string }
