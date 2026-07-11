@@ -3773,6 +3773,579 @@ export type Database = {
         }
         Relationships: []
       }
+      onboarding_journeys: {
+        Row: {
+          cliente_id: string
+          concluido_em: string | null
+          created_at: string
+          current_stage_id: string | null
+          data_inicio_planejado: string | null
+          fase_atual: Database["public"]["Enums"]["onb_fase_atual"]
+          go_live_previsto: string | null
+          go_live_real: string | null
+          id: string
+          pipeline_implantacao_id: string | null
+          pipeline_onboarding_id: string | null
+          produto_id: number | null
+          situacao: Database["public"]["Enums"]["onb_situacao"]
+          sla_iniciado_em: string | null
+          tenant_id: string
+          ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          concluido_em?: string | null
+          created_at?: string
+          current_stage_id?: string | null
+          data_inicio_planejado?: string | null
+          fase_atual?: Database["public"]["Enums"]["onb_fase_atual"]
+          go_live_previsto?: string | null
+          go_live_real?: string | null
+          id?: string
+          pipeline_implantacao_id?: string | null
+          pipeline_onboarding_id?: string | null
+          produto_id?: number | null
+          situacao?: Database["public"]["Enums"]["onb_situacao"]
+          sla_iniciado_em?: string | null
+          tenant_id: string
+          ticket_id: string
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          concluido_em?: string | null
+          created_at?: string
+          current_stage_id?: string | null
+          data_inicio_planejado?: string | null
+          fase_atual?: Database["public"]["Enums"]["onb_fase_atual"]
+          go_live_previsto?: string | null
+          go_live_real?: string | null
+          id?: string
+          pipeline_implantacao_id?: string | null
+          pipeline_onboarding_id?: string | null
+          produto_id?: number | null
+          situacao?: Database["public"]["Enums"]["onb_situacao"]
+          sla_iniciado_em?: string | null
+          tenant_id?: string
+          ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_journeys_current_stage_id_fkey"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_pipeline_implantacao_id_fkey"
+            columns: ["pipeline_implantacao_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_pipeline_onboarding_id_fkey"
+            columns: ["pipeline_onboarding_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: true
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_participants: {
+        Row: {
+          created_at: string
+          id: string
+          papel: Database["public"]["Enums"]["onb_participante_papel"]
+          tenant_id: string
+          ticket_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          papel?: Database["public"]["Enums"]["onb_participante_papel"]
+          tenant_id: string
+          ticket_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          papel?: Database["public"]["Enums"]["onb_participante_papel"]
+          tenant_id?: string
+          ticket_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_participants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_participants_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_pause_reasons: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          position: number
+          tenant_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          position?: number
+          tenant_id: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          position?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_pause_reasons_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_pauses: {
+        Row: {
+          created_at: string
+          criada_por: string | null
+          duracao_minutos: number | null
+          finalizada_em: string | null
+          id: string
+          iniciada_em: string
+          journey_id: string
+          motivo_texto: string | null
+          reason_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          criada_por?: string | null
+          duracao_minutos?: number | null
+          finalizada_em?: string | null
+          id?: string
+          iniciada_em?: string
+          journey_id: string
+          motivo_texto?: string | null
+          reason_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          criada_por?: string | null
+          duracao_minutos?: number | null
+          finalizada_em?: string | null
+          id?: string
+          iniciada_em?: string
+          journey_id?: string
+          motivo_texto?: string | null
+          reason_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_pauses_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_pauses_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_pauses_reason_id_fkey"
+            columns: ["reason_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_pause_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_pauses_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_pipelines: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          fase: Database["public"]["Enums"]["onb_fase"]
+          id: string
+          nome: string
+          position: number
+          produto_id: number | null
+          sla_total_minutos: number | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          fase: Database["public"]["Enums"]["onb_fase"]
+          id?: string
+          nome: string
+          position?: number
+          produto_id?: number | null
+          sla_total_minutos?: number | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          fase?: Database["public"]["Enums"]["onb_fase"]
+          id?: string
+          nome?: string
+          position?: number
+          produto_id?: number | null
+          sla_total_minutos?: number | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_pipelines_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_pipelines_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_stage_checklist: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          is_required: boolean
+          position: number
+          stage_id: string
+          tenant_id: string
+          texto: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          is_required?: boolean
+          position?: number
+          stage_id: string
+          tenant_id: string
+          texto: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          is_required?: boolean
+          position?: number
+          stage_id?: string
+          tenant_id?: string
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_stage_checklist_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_stage_checklist_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_stage_history: {
+        Row: {
+          created_at: string
+          duracao_minutos: number | null
+          duracao_util_minutos: number | null
+          entrou_em: string
+          id: string
+          journey_id: string
+          saiu_em: string | null
+          stage_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          duracao_minutos?: number | null
+          duracao_util_minutos?: number | null
+          entrou_em?: string
+          id?: string
+          journey_id: string
+          saiu_em?: string | null
+          stage_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          duracao_minutos?: number | null
+          duracao_util_minutos?: number | null
+          entrou_em?: string
+          id?: string
+          journey_id?: string
+          saiu_em?: string | null
+          stage_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_stage_history_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_stage_history_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_stage_history_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_stage_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_stages: {
+        Row: {
+          ativo: boolean
+          cor: string
+          created_at: string
+          id: string
+          is_final: boolean
+          is_initial: boolean
+          nome: string
+          pausa_sla: boolean
+          pipeline_id: string
+          position: number
+          sla_minutos: number | null
+          slug: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cor?: string
+          created_at?: string
+          id?: string
+          is_final?: boolean
+          is_initial?: boolean
+          nome: string
+          pausa_sla?: boolean
+          pipeline_id: string
+          position?: number
+          sla_minutos?: number | null
+          slug: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cor?: string
+          created_at?: string
+          id?: string
+          is_final?: boolean
+          is_initial?: boolean
+          nome?: string
+          pausa_sla?: boolean
+          pipeline_id?: string
+          position?: number
+          sla_minutos?: number | null
+          slug?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_stages_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_stages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_training_sessions: {
+        Row: {
+          agendado_para: string | null
+          conduzido_por: string | null
+          created_at: string
+          id: string
+          is_retreinamento: boolean
+          journey_id: string
+          no_show: boolean
+          observacao: string | null
+          participantes: string | null
+          proprietario_presente: boolean | null
+          realizado_em: string | null
+          status: Database["public"]["Enums"]["onb_treino_status"]
+          tenant_id: string
+          tentativas: number
+          ticket_id: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          agendado_para?: string | null
+          conduzido_por?: string | null
+          created_at?: string
+          id?: string
+          is_retreinamento?: boolean
+          journey_id: string
+          no_show?: boolean
+          observacao?: string | null
+          participantes?: string | null
+          proprietario_presente?: boolean | null
+          realizado_em?: string | null
+          status?: Database["public"]["Enums"]["onb_treino_status"]
+          tenant_id: string
+          tentativas?: number
+          ticket_id: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          agendado_para?: string | null
+          conduzido_por?: string | null
+          created_at?: string
+          id?: string
+          is_retreinamento?: boolean
+          journey_id?: string
+          no_show?: boolean
+          observacao?: string | null
+          participantes?: string | null
+          proprietario_presente?: boolean | null
+          realizado_em?: string | null
+          status?: Database["public"]["Enums"]["onb_treino_status"]
+          tenant_id?: string
+          tentativas?: number
+          ticket_id?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_training_sessions_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_sessions_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_sessions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_sessions_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       origens_venda: {
         Row: {
           id: number
@@ -5647,6 +6220,7 @@ export type Database = {
           closed_by: string | null
           concluido_em: string | null
           contact_id: string | null
+          contexto: string
           criado_por: string | null
           data_fim_implantacao: string | null
           data_inicio_implantacao: string | null
@@ -5695,6 +6269,7 @@ export type Database = {
           closed_by?: string | null
           concluido_em?: string | null
           contact_id?: string | null
+          contexto?: string
           criado_por?: string | null
           data_fim_implantacao?: string | null
           data_inicio_implantacao?: string | null
@@ -5743,6 +6318,7 @@ export type Database = {
           closed_by?: string | null
           concluido_em?: string | null
           contact_id?: string | null
+          contexto?: string
           criado_por?: string | null
           data_fim_implantacao?: string | null
           data_inicio_implantacao?: string | null
@@ -8181,6 +8757,63 @@ export type Database = {
         }
         Relationships: []
       }
+      vw_onboarding_journeys: {
+        Row: {
+          assunto: string | null
+          cliente_id: string | null
+          current_stage_id: string | null
+          data_inicio_planejado: string | null
+          etapa_atual_min: number | null
+          etapa_semaforo: string | null
+          fase_atual: Database["public"]["Enums"]["onb_fase_atual"] | null
+          go_live_previsto: string | null
+          go_live_real: string | null
+          journey_id: string | null
+          produto_id: number | null
+          situacao: Database["public"]["Enums"]["onb_situacao"] | null
+          sla_ancora: string | null
+          sla_corrido_min: number | null
+          sla_iniciado_em: string | null
+          sla_pausado_min: number | null
+          sla_util_min: number | null
+          stage_fase: Database["public"]["Enums"]["onb_fase"] | null
+          stage_nome: string | null
+          stage_sla_min: number | null
+          tenant_id: string | null
+          ticket_code: string | null
+          ticket_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_journeys_current_stage_id_fkey"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: true
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       accept_access_invite: {
@@ -8454,6 +9087,19 @@ export type Database = {
           p_status_id?: string
           p_subcategory_id: string
           p_tipo_horario?: string
+        }
+        Returns: string
+      }
+      create_onboarding_journey: {
+        Args: {
+          p_assunto: string
+          p_cliente_id: string
+          p_data_inicio_planejado?: string
+          p_descricao?: string
+          p_go_live_previsto?: string
+          p_implantador_user_id?: string
+          p_produto_id?: number
+          p_tenant_id: string
         }
         Returns: string
       }
@@ -9701,6 +10347,15 @@ export type Database = {
         Args: { p_contrato_id: string; p_tenant_id: string }
         Returns: Json
       }
+      move_onboarding_stage: {
+        Args: {
+          p_completed_checklist_ids?: string[]
+          p_force?: boolean
+          p_journey_id: string
+          p_target_stage_id: string
+        }
+        Returns: Json
+      }
       mute_conversation: {
         Args: { p_conversation_id: string; p_duration: string }
         Returns: undefined
@@ -9726,6 +10381,14 @@ export type Database = {
       obter_chave_omie: { Args: { p_tenant_id?: string }; Returns: string }
       obter_chave_omie_sistema: {
         Args: { p_tenant_id: string }
+        Returns: string
+      }
+      pause_onboarding: {
+        Args: {
+          p_journey_id: string
+          p_motivo_texto?: string
+          p_reason_id?: string
+        }
         Returns: string
       }
       preparar_reajuste: {
@@ -9837,6 +10500,7 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: Json
       }
+      resume_onboarding: { Args: { p_journey_id: string }; Returns: Json }
       rodar_deteccao_reconciliacao: {
         Args: { p_tenant_id: string }
         Returns: number
@@ -10268,6 +10932,25 @@ export type Database = {
         | "churn"
         | "reactivation"
         | "reajuste"
+      onb_fase: "onboarding" | "implantacao"
+      onb_fase_atual: "onboarding" | "implantacao" | "concluido"
+      onb_participante_papel:
+        | "implantador"
+        | "vendedor"
+        | "especialista"
+        | "outro"
+      onb_situacao:
+        | "nao_iniciado"
+        | "em_andamento"
+        | "parado"
+        | "concluido"
+        | "cancelado"
+      onb_treino_status:
+        | "previsto"
+        | "agendado"
+        | "realizado"
+        | "no_show"
+        | "cancelado"
       recorrencia_tipo: "mensal" | "anual" | "semestral" | "semanal"
       sentiment_type: "positive" | "neutral" | "negative"
       support_ticket_prioridade: "baixa" | "media" | "alta" | "urgente"
@@ -10453,6 +11136,28 @@ export const Constants = {
         "churn",
         "reactivation",
         "reajuste",
+      ],
+      onb_fase: ["onboarding", "implantacao"],
+      onb_fase_atual: ["onboarding", "implantacao", "concluido"],
+      onb_participante_papel: [
+        "implantador",
+        "vendedor",
+        "especialista",
+        "outro",
+      ],
+      onb_situacao: [
+        "nao_iniciado",
+        "em_andamento",
+        "parado",
+        "concluido",
+        "cancelado",
+      ],
+      onb_treino_status: [
+        "previsto",
+        "agendado",
+        "realizado",
+        "no_show",
+        "cancelado",
       ],
       recorrencia_tipo: ["mensal", "anual", "semestral", "semanal"],
       sentiment_type: ["positive", "neutral", "negative"],

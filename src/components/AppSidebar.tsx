@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles, ChevronDown, Library, Building2 } from "lucide-react";
+import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles, ChevronDown, Library, Building2, Rocket } from "lucide-react";
 import { NAV_ITEMS } from "@/config/navItems";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
 import { Logo } from "@/components/Logo";
@@ -321,6 +321,14 @@ export function AppSidebar() {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild>
+                        <NavLink to="/onboarding" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                          <Rocket className="h-4 w-4" />
+                          <span>Onboarding</span>
+                        </NavLink>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild>
                         <NavLink to="/super/tenants" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
