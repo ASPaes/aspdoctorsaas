@@ -88,6 +88,7 @@ export default function OnboardingPage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [showConcluded, setShowConcluded] = useState(false);
 
   const isSuperAdmin = profile?.is_super_admin === true;
 
