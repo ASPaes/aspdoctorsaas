@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Send, Loader2, AlertTriangle, Cloud } from "lucide-react";
+import { Send, Loader2, AlertTriangle, Cloud, CheckCircle } from "lucide-react";
 
 interface Props {
   clienteId: string;
@@ -27,6 +27,8 @@ interface ContratoAtivo {
   numero: string | null;
   vlr_total_mensal: number | null;
   modelos_contrato?: { nome: string } | null;
+  sincronizado: boolean;
+  codigo_contrato_omie: string | number | null;
 }
 
 const brl = (v: any) =>
@@ -42,6 +44,21 @@ const fmtDate = (v: any) => {
   return s;
 };
 
+function SincronizadoBadge({ codigo }: { codigo: string | number | null }) {
+  return (
+    <Badge
+      variant="outline"
+      className="gap-1 text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-900"
+    >
+      <CheckCircle className="h-3 w-3" />
+      Sincronizado com o Omie
+      {codigo != null && (
+        <span className="ml-1 font-mono text-[11px]">({codigo})</span>
+      )}
+    </Badge>
+  );
+}
+
 function EnviarBotao({
   tenantId,
   contrato,
@@ -54,6 +71,10 @@ function EnviarBotao({
   const [bloqueioOpen, setBloqueioOpen] = useState(false);
   const [bloqueioMsg, setBloqueioMsg] = useState<string>("");
   const [dryRun, setDryRun] = useState<any | null>(null);
+
+  if (contrato.sincronizado) {
+    return <SincronizadoBadge codigo={contrato.codigo_contrato_omie} />;
+  }
 
   const handleClick = async () => {
     setLoading(true);
@@ -218,21 +239,66 @@ function EnviarBotao({
 export default function IntegracaoOmieCard({ clienteId }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
+  const integracaoAtivaQuery = useQuery({
+    queryKey: ["omie_integration_ativa", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("omie_integration")
+        .select("ativo")
+        .eq("tenant_id", tid as string)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.ativo === true;
+    },
+  });
+
   const contratosQuery = useQuery({
     queryKey: ["contratos_ativos_omie", tid, clienteId],
-    enabled: !!clienteId,
+    enabled: !!clienteId && !!tid && integracaoAtivaQuery.data === true,
     queryFn: async () => {
-      let q = (supabase.from("contratos" as any) as any)
+      let q = (supabase.from("contratos") as any)
         .select("id, numero, vlr_total_mensal, status, modelos_contrato:modelo_contrato_id(nome)")
         .eq("cliente_id", clienteId)
         .eq("status", "ativo")
         .order("numero", { ascending: false });
       if (tid) q = q.eq("tenant_id", tid);
-      const { data, error } = await q;
+      const { data: contratos, error } = await q;
       if (error) throw error;
-      return (data ?? []) as ContratoAtivo[];
+
+      const ids = (contratos ?? []).map((c: any) => c.id);
+      let vinculos: any[] = [];
+      if (ids.length > 0) {
+        const { data: v, error: vError } = await supabase
+          .from("reconciliacao_cadastro")
+          .select("ds_contract_id, codigo_contrato_omie")
+          .eq("tenant_id", tid)
+          .eq("estado_match", "CASADO")
+          .not("codigo_contrato_omie", "is", null)
+          .in("ds_contract_id", ids);
+        if (vError) throw vError;
+        vinculos = v ?? [];
+      }
+
+      const vinculoMap = new Map<string, string | number>(
+        vinculos.map((v) => [v.ds_contract_id, v.codigo_contrato_omie])
+      );
+
+      return (contratos ?? []).map((c: any) => {
+        const codigo = vinculoMap.get(c.id) ?? null;
+        return {
+          ...c,
+          sincronizado: codigo != null,
+          codigo_contrato_omie: codigo,
+        } as ContratoAtivo;
+      });
     },
   });
+
+  // Não renderiza nada enquanto não souber se a integração está ativa.
+  if (!tid || integracaoAtivaQuery.data !== true) {
+    return null;
+  }
 
   const contratos = contratosQuery.data ?? [];
 
@@ -264,7 +330,7 @@ export default function IntegracaoOmieCard({ clienteId }: Props) {
                   : ""}
               </div>
             </div>
-            {tid && <EnviarBotao tenantId={tid} contrato={contratos[0]} />}
+            <EnviarBotao tenantId={tid} contrato={contratos[0]} />
           </div>
         ) : (
           <div className="space-y-2">
@@ -283,7 +349,7 @@ export default function IntegracaoOmieCard({ clienteId }: Props) {
                     {c.modelos_contrato?.nome && <span>{c.modelos_contrato.nome}</span>}
                   </div>
                 </div>
-                {tid && <EnviarBotao tenantId={tid} contrato={c} />}
+                <EnviarBotao tenantId={tid} contrato={c} />
               </div>
             ))}
           </div>
