@@ -688,6 +688,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         <Pause className="h-3 w-3" /> pausado
                       </Badge>
                     )}
+                    {isConcluded && (
+                      <Badge className="text-[10px] gap-1 border-0 text-white" style={{ background: "#22C55E" }}>
+                        <CheckCircle2 className="h-3 w-3" /> Concluída
+                      </Badge>
+                    )}
                   </div>
                   <DialogTitle className="text-base mt-1 truncate">{clienteNome}</DialogTitle>
                   {journey.assunto && (
