@@ -706,36 +706,55 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       <MessageSquare className="h-4 w-4 mr-1" /> Conversa
                     </Button>
                   )}
-                  {isPaused ? (
-                    <Button size="sm" variant="outline" onClick={handleResume}>
-                      <Play className="h-4 w-4 mr-1" /> Retomar
-                    </Button>
+                  {isConcluded ? (
+                    <>
+                      <span className="text-[11px] text-muted-foreground">
+                        Concluída em {formatDate(journey.concluido_em ?? null)}
+                      </span>
+                      <Button size="sm" variant="outline" onClick={handleReopen}>
+                        <Play className="h-4 w-4 mr-1" /> Reabrir
+                      </Button>
+                    </>
+                  ) : isPaused ? (
+                    <>
+                      <Button size="sm" variant="outline" onClick={handleResume}>
+                        <Play className="h-4 w-4 mr-1" /> Retomar
+                      </Button>
+                      <Button size="sm" className="text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
+                        <CheckCircle2 className="h-4 w-4 mr-1" /> Concluir
+                      </Button>
+                    </>
                   ) : (
-                    <Popover open={pausePopoverOpen} onOpenChange={setPausePopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <Button size="sm" variant="outline">
-                          <Pause className="h-4 w-4 mr-1" /> Pausar
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-80 space-y-3" align="end">
-                        <div>
-                          <label className="text-xs font-medium">Motivo</label>
-                          <Select value={pauseReasonId} onValueChange={setPauseReasonId}>
-                            <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                            <SelectContent>
-                              {(pauseReasonsQ.data ?? []).map((r) => (
-                                <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium">Justificativa (opcional)</label>
-                          <Textarea value={pauseText} onChange={(e) => setPauseText(e.target.value)} rows={3} className="mt-1" />
-                        </div>
-                        <Button size="sm" className="w-full" onClick={handlePause}>Confirmar pausa</Button>
-                      </PopoverContent>
-                    </Popover>
+                    <>
+                      <Popover open={pausePopoverOpen} onOpenChange={setPausePopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button size="sm" variant="outline">
+                            <Pause className="h-4 w-4 mr-1" /> Pausar
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80 space-y-3" align="end">
+                          <div>
+                            <label className="text-xs font-medium">Motivo</label>
+                            <Select value={pauseReasonId} onValueChange={setPauseReasonId}>
+                              <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                              <SelectContent>
+                                {(pauseReasonsQ.data ?? []).map((r) => (
+                                  <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium">Justificativa (opcional)</label>
+                            <Textarea value={pauseText} onChange={(e) => setPauseText(e.target.value)} rows={3} className="mt-1" />
+                          </div>
+                          <Button size="sm" className="w-full" onClick={handlePause}>Confirmar pausa</Button>
+                        </PopoverContent>
+                      </Popover>
+                      <Button size="sm" className="text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
+                        <CheckCircle2 className="h-4 w-4 mr-1" /> Concluir
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
