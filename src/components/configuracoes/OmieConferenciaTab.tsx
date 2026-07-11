@@ -1243,6 +1243,18 @@ export default function OmieConferenciaTab() {
                 </Button>
               );
             })()}
+            {bucketAtivo === "atribuir_modelo" && (() => {
+              const qtd = contadores.get("atribuir_modelo") ?? 0;
+              return (
+                <Button
+                  size="sm"
+                  disabled={atribuindoModeloLote || qtd === 0}
+                  onClick={() => setConfirmAtribuirModeloOpen(true)}
+                >
+                  {atribuindoModeloLote ? "Atribuindo..." : `Atribuir modelo em lote (${qtd})`}
+                </Button>
+              );
+            })()}
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
