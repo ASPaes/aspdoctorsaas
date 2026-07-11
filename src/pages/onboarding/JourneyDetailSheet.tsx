@@ -590,6 +590,100 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 p-5">
                 {/* LEFT */}
                 <div className="space-y-5">
+                  {/* Participants */}
+                  <section className="rounded-lg border border-border">
+                    <div className="p-3 border-b border-border flex items-center justify-between">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Users className="h-4 w-4" /> Responsável & participantes
+                      </h3>
+                      <Popover open={addParticipantOpen} onOpenChange={setAddParticipantOpen}>
+                        <PopoverTrigger asChild>
+                          <Button size="sm" variant="outline" className="h-7 text-xs">
+                            <UserPlus className="h-3.5 w-3.5 mr-1" /> Adicionar
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80 space-y-3" align="end">
+                          <div>
+                            <label className="text-xs font-medium">Usuário</label>
+                            <Select value={newParticipantUserId} onValueChange={setNewParticipantUserId}>
+                              <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                              <SelectContent>
+                                {(tenantMembersQ.data ?? []).map((u) => (
+                                  <SelectItem key={u.user_id} value={u.user_id}>{u.nome}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium">Papel</label>
+                            <Select value={newParticipantPapel} onValueChange={(v) => setNewParticipantPapel(v as Papel)}>
+                              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {PAPEL_OPTIONS.map((p) => (
+                                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button size="sm" className="w-full" onClick={handleAddParticipant}>Adicionar</Button>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="p-3 space-y-2">
+                      {(participantsQ.data ?? []).length === 0 ? (
+                        <p className="text-xs text-muted-foreground py-2 text-center">Nenhum participante cadastrado.</p>
+                      ) : (
+                        (["implantador", "vendedor", "especialista", "outro"] as Papel[]).map((papel) => {
+                          const rows = (participantsQ.data ?? []).filter((p) => p.papel === papel);
+                          if (!rows.length) return null;
+                          const isImpl = papel === "implantador";
+                          return (
+                            <div key={papel} className="space-y-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className="text-[10px] uppercase tracking-wide font-semibold"
+                                  style={{ color: PAPEL_COLOR[papel] }}
+                                >
+                                  {isImpl ? "Responsável" : PAPEL_OPTIONS.find((o) => o.value === papel)?.label}
+                                </span>
+                              </div>
+                              {rows.map((p) => (
+                                <div
+                                  key={p.id}
+                                  className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-1.5"
+                                >
+                                  {isImpl ? (
+                                    <Star className="h-3.5 w-3.5 shrink-0" style={{ color: PAPEL_COLOR[papel] }} fill={PAPEL_COLOR[papel]} />
+                                  ) : (
+                                    <User className="h-3.5 w-3.5 shrink-0" style={{ color: PAPEL_COLOR[papel] }} />
+                                  )}
+                                  <span className="text-xs flex-1 truncate">
+                                    {memberNameMap.get(p.user_id) || "—"}
+                                  </span>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[9px] capitalize"
+                                    style={{ borderColor: PAPEL_COLOR[papel], color: PAPEL_COLOR[papel] }}
+                                  >
+                                    {papel}
+                                  </Badge>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 shrink-0"
+                                    onClick={() => handleRemoveParticipant(p.id, p.user_id, p.papel)}
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </section>
+
                   {/* Timeline stages */}
                   <section className="rounded-lg border border-border">
                     <div className="p-3 border-b border-border">
