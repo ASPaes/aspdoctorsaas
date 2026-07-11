@@ -356,6 +356,13 @@ export default function OnboardingPage() {
           queryClient.invalidateQueries({ queryKey: ["onboarding-journeys"] });
         }}
       />
+
+      <JourneyDetailSheet
+        open={!!detailId}
+        onOpenChange={(o) => { if (!o) setDetailId(null); }}
+        journeyId={detailId}
+        tenantId={effectiveTenantId}
+      />
     </div>
   );
 }
