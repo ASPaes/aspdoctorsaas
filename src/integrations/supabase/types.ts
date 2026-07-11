@@ -9103,6 +9103,16 @@ export type Database = {
         }
         Returns: string
       }
+      create_onboarding_training: {
+        Args: {
+          p_agendado_para?: string
+          p_conduzido_por?: string
+          p_is_retreinamento?: boolean
+          p_journey_id: string
+          p_titulo: string
+        }
+        Returns: string
+      }
       create_simple_template_from_tenant: {
         Args: {
           p_descricao?: string
