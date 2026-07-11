@@ -480,6 +480,52 @@ export default function OnboardingDashboardPage() {
             )}
           </section>
 
+          {/* Tempo parado por motivo */}
+          <section className="rounded-lg border border-border bg-card">
+            <div className="p-3 border-b border-border flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold flex items-center gap-2">
+                  <Pause className="h-4 w-4" /> Tempo parado por motivo
+                </h2>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Soma de minutos por motivo em pausas iniciadas no período · total {formatMin(pausesTotalMin)}
+                </p>
+              </div>
+              <Badge variant="outline" className="text-[10px]">{pausesByReasonAgg.length}</Badge>
+            </div>
+            {pausesByReasonAgg.length === 0 ? (
+              <p className="text-xs text-muted-foreground p-6 text-center">Nenhuma pausa iniciada no período selecionado.</p>
+            ) : (
+              <div className="p-3 space-y-1.5">
+                {pausesByReasonAgg.map((r) => {
+                  const p = pausesTotalMin > 0 ? (r.minutos / pausesTotalMin) * 100 : 0;
+                  return (
+                    <div key={r.nome} className="rounded-md border border-border px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-medium truncate">{r.nome}</span>
+                          {r.em_andamento && (
+                            <Badge className="text-[9px] border-0 text-white shrink-0" style={{ backgroundColor: "hsl(38 92% 50%)" }}>
+                              em andamento
+                            </Badge>
+                          )}
+                          <span className="text-[10px] text-muted-foreground shrink-0">· {r.count}x</span>
+                        </div>
+                        <span className="text-xs font-semibold tabular-nums shrink-0">{formatMin(r.minutos)}</span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 w-full rounded bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded"
+                          style={{ width: `${Math.max(2, p)}%`, background: "hsl(38 92% 50%)" }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
           {/* Fase 2 placeholder */}
           <section className="rounded-lg border border-dashed border-border bg-muted/20 p-4 flex items-start gap-3">
             <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
