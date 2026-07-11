@@ -44,6 +44,7 @@ const LimpezaUras = lazy(() => import("@/pages/admin/LimpezaUras"));
 const WhatsAppContatos = lazy(() => import("@/pages/WhatsAppContatos"));
 const AtendimentoDashboard = lazy(() => import("@/pages/AtendimentoDashboard"));
 const OnboardingPage = lazy(() => import("@/pages/onboarding/OnboardingPage"));
+const OnboardingConfigPage = lazy(() => import("@/pages/onboarding/OnboardingConfigPage"));
 
 
 const SupportTickets = lazy(() => import("@/pages/SupportTickets"));
