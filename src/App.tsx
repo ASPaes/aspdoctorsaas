@@ -113,6 +113,7 @@ const App = () => (
               {/* Super Admin routes */}
               <Route element={<SuperAdminGuard />}>
                 <Route path="/onboarding" element={<Suspense fallback={<PageLoader />}><OnboardingPage /></Suspense>} />
+                <Route path="/onboarding/config" element={<Suspense fallback={<PageLoader />}><OnboardingConfigPage /></Suspense>} />
                 <Route path="/super/tenants" element={<SuperTenants />} />
                 <Route path="/super/tenants/:id" element={<SuperTenantDetail />} />
                 <Route path="/super/monitor" element={<SuperMonitor />} />
