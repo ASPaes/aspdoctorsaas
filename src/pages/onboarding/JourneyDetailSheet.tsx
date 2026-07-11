@@ -62,6 +62,8 @@ interface Journey {
   demand_type_id?: string | null;
   demand_type_nome?: string | null;
   demand_type_cor?: string | null;
+  concluido_em?: string | null;
+  go_live_real?: string | null;
 }
 
 
