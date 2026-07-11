@@ -283,6 +283,19 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
   function renderBotao() {
     switch (bucket) {
       case "vinculo_auto_ok":
+        if (nomesDiferem) {
+          return (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              onClick={() => setConfirmVincular(true)}
+              disabled={vincLoading || !tid || !row.ds_contract_id}
+            >
+              Vincular assim mesmo
+            </Button>
+          );
+        }
         return <DisabledActionButton>Vincular cliente + contrato</DisabledActionButton>;
       case "resolver":
         return <DisabledActionButton>Atualizar valor no Omie</DisabledActionButton>;
