@@ -1131,11 +1131,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     </section>
                   )}
 
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </section>
+
 
                   {/* Modules */}
                   <section className="rounded-lg border border-border">
