@@ -233,6 +233,8 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
   const [open, setOpen] = useState(false);
   const [confirmVincular, setConfirmVincular] = useState(false);
   const [vincLoading, setVincLoading] = useState(false);
+  const [confirmAjuste, setConfirmAjuste] = useState(false);
+  const [ajusteLoading, setAjusteLoading] = useState(false);
   const queryClient = useQueryClient();
   const bucket = row.acao_sugerida as Bucket;
   const diffs = row.diffs && typeof row.diffs === "object" ? row.diffs : {};
