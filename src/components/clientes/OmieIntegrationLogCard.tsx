@@ -64,12 +64,17 @@ function statusConfig(status?: string | null) {
   };
 }
 
-function direcaoIcon(direcao?: string | null) {
-  const d = (direcao || "").toLowerCase();
-  if (d.includes("recebimento") || d.includes("recebido") || d.includes("do omie")) {
-    return { Icon: ArrowDown, label: direcao || "Recebimento do Omie" };
+function direcaoIcon(direcaoTexto?: string | null) {
+  const d = (direcaoTexto || "").toLowerCase();
+  const isRecebimento =
+    d.includes("recebido") ||
+    d.includes("recebimento") ||
+    d.includes("do omie") ||
+    d.includes("para o ds");
+  if (isRecebimento) {
+    return { Icon: ArrowLeft, label: direcaoTexto || "Recebido do Omie" };
   }
-  return { Icon: ArrowUp, label: direcao || "Envio ao Omie" };
+  return { Icon: ArrowRight, label: direcaoTexto || "Enviado do DS" };
 }
 
 function formatQuando(quando?: string | null): string {
