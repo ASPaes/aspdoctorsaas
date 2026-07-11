@@ -45,6 +45,7 @@ const WhatsAppContatos = lazy(() => import("@/pages/WhatsAppContatos"));
 const AtendimentoDashboard = lazy(() => import("@/pages/AtendimentoDashboard"));
 const OnboardingPage = lazy(() => import("@/pages/onboarding/OnboardingPage"));
 const OnboardingConfigPage = lazy(() => import("@/pages/onboarding/OnboardingConfigPage"));
+const OnboardingDashboardPage = lazy(() => import("@/pages/onboarding/OnboardingDashboardPage"));
 
 
 const SupportTickets = lazy(() => import("@/pages/SupportTickets"));
@@ -114,6 +115,7 @@ const App = () => (
               <Route element={<SuperAdminGuard />}>
                 <Route path="/onboarding" element={<Suspense fallback={<PageLoader />}><OnboardingPage /></Suspense>} />
                 <Route path="/onboarding/config" element={<Suspense fallback={<PageLoader />}><OnboardingConfigPage /></Suspense>} />
+                <Route path="/onboarding/dashboard" element={<Suspense fallback={<PageLoader />}><OnboardingDashboardPage /></Suspense>} />
                 <Route path="/super/tenants" element={<SuperTenants />} />
                 <Route path="/super/tenants/:id" element={<SuperTenantDetail />} />
                 <Route path="/super/monitor" element={<SuperMonitor />} />
