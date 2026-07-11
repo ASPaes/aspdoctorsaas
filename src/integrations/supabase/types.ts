@@ -3817,6 +3817,65 @@ export type Database = {
           },
         ]
       }
+      onboarding_journey_modules: {
+        Row: {
+          created_at: string
+          id: string
+          journey_id: string
+          nome: string
+          origem: string
+          produto_modulo_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          journey_id: string
+          nome: string
+          origem?: string
+          produto_modulo_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          journey_id?: string
+          nome?: string
+          origem?: string
+          produto_modulo_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_journey_modules_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_modules_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_modules_produto_modulo_id_fkey"
+            columns: ["produto_modulo_id"]
+            isOneToOne: false
+            referencedRelation: "produto_modulos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_modules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_journeys: {
         Row: {
           cliente_id: string
@@ -8872,6 +8931,7 @@ export type Database = {
           demand_type_cor: string | null
           demand_type_id: string | null
           demand_type_nome: string | null
+          department_id: string | null
           etapa_atual_min: number | null
           etapa_semaforo: string | null
           fase_atual: Database["public"]["Enums"]["onb_fase_atual"] | null
@@ -8879,6 +8939,7 @@ export type Database = {
           go_live_real: string | null
           journey_id: string | null
           produto_id: number | null
+          setor_nome: string | null
           situacao: Database["public"]["Enums"]["onb_situacao"] | null
           sla_ancora: string | null
           sla_corrido_min: number | null
@@ -8891,6 +8952,8 @@ export type Database = {
           tenant_id: string | null
           ticket_code: string | null
           ticket_id: string | null
+          unidade_base_id: number | null
+          unidade_nome: string | null
         }
         Relationships: [
           {
@@ -8926,6 +8989,20 @@ export type Database = {
             columns: ["ticket_id"]
             isOneToOne: true
             referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_unidade_base_id_fkey"
+            columns: ["unidade_base_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_base"
             referencedColumns: ["id"]
           },
         ]
@@ -9282,6 +9359,22 @@ export type Database = {
               p_implantador_user_id?: string
               p_produto_id?: number
               p_tenant_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_assunto: string
+              p_cliente_id: string
+              p_data_inicio_planejado?: string
+              p_demand_type_id?: string
+              p_department_id?: string
+              p_descricao?: string
+              p_go_live_previsto?: string
+              p_implantador_user_id?: string
+              p_produto_id?: number
+              p_tenant_id: string
+              p_unidade_base_id?: number
             }
             Returns: string
           }
