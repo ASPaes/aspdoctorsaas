@@ -49,7 +49,11 @@ interface JourneyRow {
   go_live_previsto: string | null;
   data_inicio_planejado: string | null;
   cliente_nome?: string | null;
+  demand_type_id?: string | null;
+  demand_type_nome?: string | null;
+  demand_type_cor?: string | null;
 }
+
 
 const SEMAFORO_COLOR: Record<string, string> = {
   verde: "#22C55E",
@@ -323,6 +327,15 @@ export default function OnboardingPage() {
                                 {j.cliente_nome}
                               </p>
                             )}
+                            {j.demand_type_nome && (
+                              <span
+                                className="inline-flex items-center mt-1.5 px-1.5 py-0.5 rounded text-[9px] font-medium text-white"
+                                style={{ background: j.demand_type_cor || "#6B7280" }}
+                              >
+                                {j.demand_type_nome}
+                              </span>
+                            )}
+
                             <div className="flex items-center gap-2 text-[10px] text-muted-foreground/90 mt-1.5 flex-wrap">
                               <span className="inline-flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
