@@ -381,6 +381,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const cliente = clienteQ.data;
   const clienteNome = cliente?.nome_fantasia || cliente?.razao_social || "—";
   const isPaused = journey?.situacao === "pausado" || journey?.situacao === "parado";
+  const isConcluded = journey?.situacao === "concluido";
 
   async function handleAdvance() {
     if (!journey) return;
