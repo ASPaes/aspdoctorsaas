@@ -7,13 +7,15 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { PipelinesPanel } from "./config/PipelinesPanel";
 import { PauseReasonsPanel } from "./config/PauseReasonsPanel";
 import { DemandTypesPanel } from "./config/DemandTypesPanel";
+import { TrainingTypesPanel } from "./config/TrainingTypesPanel";
 
 type Fase = "onboarding" | "implantacao";
 
 export default function OnboardingConfigPage() {
   const { profile, profileLoading } = useAuth();
   const [fase, setFase] = useState<Fase>("onboarding");
-  const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas">("pipelines");
+  const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas" | "treinos">("pipelines");
+
 
 
   if (profileLoading) {
