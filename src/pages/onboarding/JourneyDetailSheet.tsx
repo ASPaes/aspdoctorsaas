@@ -659,6 +659,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  {journey.ticket_id && (
+                    <Button size="sm" variant="outline" onClick={() => setStartConvOpen(true)}>
+                      <MessageSquare className="h-4 w-4 mr-1" /> Conversa
+                    </Button>
+                  )}
                   {isPaused ? (
                     <Button size="sm" variant="outline" onClick={handleResume}>
                       <Play className="h-4 w-4 mr-1" /> Retomar
