@@ -348,7 +348,44 @@ export default function OnboardingDashboardPage() {
             </div>
           </section>
 
+          {/* Tabela por tipo de treino */}
+          <section className="rounded-lg border border-border bg-card">
+            <div className="p-3 border-b border-border flex items-center justify-between">
+              <h2 className="text-sm font-semibold">Quantidade por tipo de treino</h2>
+              <Badge variant="outline" className="text-[10px]">{byTipo.length}</Badge>
+            </div>
+            {byTipo.length === 0 ? (
+              <p className="text-xs text-muted-foreground p-6 text-center">Nenhum treino registrado no período selecionado.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/30 text-muted-foreground">
+                    <tr className="text-left">
+                      <th className="px-3 py-2 font-medium">Tipo</th>
+                      <th className="px-3 py-2 font-medium text-right">Previstos</th>
+                      <th className="px-3 py-2 font-medium text-right">Realizados</th>
+                      <th className="px-3 py-2 font-medium text-right">No-show</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {byTipo.map((row) => (
+                      <tr key={row.nome} className="border-t border-border hover:bg-muted/20">
+                        <td className="px-3 py-2 font-medium">{row.nome}</td>
+                        <td className="px-3 py-2 text-right">{row.previstos}</td>
+                        <td className="px-3 py-2 text-right text-[hsl(142_71%_45%)] font-medium">{row.realizados}</td>
+                        <td className={`px-3 py-2 text-right ${row.no_show > 0 ? "text-destructive font-medium" : ""}`}>
+                          {row.no_show}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
           {/* Tabela por implantador */}
+
           <section className="rounded-lg border border-border bg-card">
             <div className="p-3 border-b border-border flex items-center justify-between">
               <h2 className="text-sm font-semibold">Performance por implantador</h2>
