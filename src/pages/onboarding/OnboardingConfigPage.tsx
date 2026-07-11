@@ -62,7 +62,9 @@ export default function OnboardingConfigPage() {
           <TabsTrigger value="pipelines">Pipelines & Etapas</TabsTrigger>
           <TabsTrigger value="motivos">Motivos de Parada</TabsTrigger>
           <TabsTrigger value="demandas">Tipos de demanda</TabsTrigger>
+          <TabsTrigger value="treinos">Tipos de treino</TabsTrigger>
         </TabsList>
+
         <TabsContent value="pipelines" className="flex-1 min-h-0 p-4 pt-3">
           <PipelinesPanel fase={fase} />
         </TabsContent>
