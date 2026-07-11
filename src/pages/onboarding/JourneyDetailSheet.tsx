@@ -138,6 +138,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
 
+  // Modules
+  const [addModuleOpen, setAddModuleOpen] = useState(false);
+  const [newModuleName, setNewModuleName] = useState("");
+  const [newModuleProdutoModuloId, setNewModuleProdutoModuloId] = useState<string>("");
+
   useEffect(() => {
     if (!open) {
       setChecked({});
