@@ -499,6 +499,47 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
           <CandidatosLinha cnpj={row.cnpj_norm} />
         </div>
       )}
+
+      <AlertDialog open={confirmVincular} onOpenChange={setConfirmVincular}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar vínculo</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="rounded border p-2 text-sm">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                    DoctorSaaS
+                  </div>
+                  <div className="font-medium break-words">{row.razao_ds || "—"}</div>
+                  <div className="text-xs text-muted-foreground font-mono mt-0.5">CNPJ {cnpjFmt}</div>
+                </div>
+                <div className="rounded border p-2 text-sm">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                    Omie
+                  </div>
+                  <div className="font-medium break-words">{row.razao_omie || "—"}</div>
+                </div>
+                <p className="text-sm">
+                  Os nomes divergem. Confirme que é a <strong>MESMA empresa</strong> antes de vincular. Isso
+                  cria a ligação DoctorSaaS ↔ Omie e não altera nada no Omie.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={vincLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleVincularAssimMesmo();
+              }}
+              disabled={vincLoading}
+            >
+              {vincLoading ? "Vinculando..." : "Confirmar vínculo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
