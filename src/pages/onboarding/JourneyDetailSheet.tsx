@@ -1159,12 +1159,15 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                               ))}
                           </SelectContent>
                         </Select>
-                        <Button size="sm" onClick={handleAdvance} disabled={isPaused}>
+                        <Button size="sm" onClick={handleAdvance} disabled={isPaused || isConcluded}>
                           Avançar <ArrowRight className="h-3.5 w-3.5 ml-1" />
                         </Button>
                       </div>
-                      {isPaused && (
+                      {isPaused && !isConcluded && (
                         <p className="text-[10px] text-muted-foreground">Retome o onboarding para avançar de etapa.</p>
+                      )}
+                      {isConcluded && (
+                        <p className="text-[10px] text-muted-foreground">Jornada concluída — reabra para movimentar etapas.</p>
                       )}
                     </div>
                   </section>
