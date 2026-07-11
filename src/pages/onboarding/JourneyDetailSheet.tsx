@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -369,15 +369,15 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const slaColor = SEMAFORO_COLOR[journey?.etapa_semaforo || "sem_sla"];
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-5xl p-0 flex flex-col gap-0">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <>
-            <SheetHeader className="p-5 border-b border-border">
+            <DialogHeader className="px-6 py-4 border-b border-border shrink-0">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -394,7 +394,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       </Badge>
                     )}
                   </div>
-                  <SheetTitle className="text-base mt-1 truncate">{clienteNome}</SheetTitle>
+                  <DialogTitle className="text-base mt-1 truncate">{clienteNome}</DialogTitle>
                   {journey.assunto && (
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">{journey.assunto}</p>
                   )}
@@ -458,9 +458,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   </div>
                 </div>
               </div>
-            </SheetHeader>
+            </DialogHeader>
 
-            <ScrollArea className="flex-1">
+            <div className="overflow-y-auto flex-1">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 p-5">
                 {/* LEFT */}
                 <div className="space-y-5">
@@ -676,10 +676,10 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   </section>
                 </div>
               </div>
-            </ScrollArea>
+            </div>
           </>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
