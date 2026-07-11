@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Pause, Clock, Calendar, Settings2 } from "lucide-react";
+import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { NewJourneyModal } from "./NewJourneyModal";
