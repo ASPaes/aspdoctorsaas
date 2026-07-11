@@ -5,11 +5,6 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { buildLookup } from "../chat/mentionUtils";
 import type { GroupParticipant } from "./useGroupParticipants";
 
-/**
- * Busca participants de TODOS os whatsapp_groups do tenant e monta um único
- * lookup (JID/phone -> display) via buildLookup. Uma query por tenant,
- * deduplicada pelo react-query.
- */
 export function useGroupMentionLookup() {
   const { effectiveTenantId } = useTenantFilter();
 
@@ -18,22 +13,38 @@ export function useGroupMentionLookup() {
     enabled: !!effectiveTenantId,
     staleTime: 10 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await (supabase.from("whatsapp_groups" as any) as any)
-        .select("participants")
-        .eq("tenant_id", effectiveTenantId);
-      if (error) throw error;
-      return (data ?? []) as Array<{ participants: any }>;
+      const [groupsRes, namesRes] = await Promise.all([
+        (supabase.from("whatsapp_groups" as any) as any).select("participants").eq("tenant_id", effectiveTenantId),
+        (supabase.from("whatsapp_group_participants" as any) as any).select("phone, lid, push_name").eq("tenant_id", effectiveTenantId),
+      ]);
+      if (groupsRes.error) throw groupsRes.error;
+      return {
+        rows: (groupsRes.data ?? []) as Array<{ participants: any }>,
+        names: namesRes.error ? [] : ((namesRes.data ?? []) as Array<{ phone: string | null; lid: string | null; push_name: string | null }>),
+      };
     },
   });
 
   const lookup = useMemo(() => {
+    const nameByKey = new Map<string, string>();
+    for (const n of (query.data?.names ?? [])) {
+      if (!n?.push_name) continue;
+      if (n.phone) nameByKey.set(String(n.phone), n.push_name);
+      if (n.lid) nameByKey.set(String(n.lid), n.push_name);
+    }
+
     const all: GroupParticipant[] = [];
-    for (const row of query.data ?? []) {
+    for (const row of query.data?.rows ?? []) {
       const raw = row?.participants;
       if (!raw) continue;
       try {
         const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-        if (Array.isArray(parsed)) all.push(...(parsed as GroupParticipant[]));
+        if (!Array.isArray(parsed)) continue;
+        for (const p of parsed as GroupParticipant[]) {
+          if (p.name && p.name.trim()) { all.push(p); continue; }
+          const nm = (p.phone && nameByKey.get(String(p.phone))) || (p.lid && nameByKey.get(String(p.lid))) || null;
+          all.push(nm ? { ...p, name: nm } : p);
+        }
       } catch {
         // ignore malformed row
       }
