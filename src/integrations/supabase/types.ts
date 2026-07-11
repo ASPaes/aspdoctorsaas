@@ -9007,6 +9007,48 @@ export type Database = {
           },
         ]
       }
+      vw_onboarding_pauses_by_reason: {
+        Row: {
+          em_andamento: boolean | null
+          finalizada_em: string | null
+          iniciada_em: string | null
+          journey_id: string | null
+          minutos: number | null
+          motivo_nome: string | null
+          reason_id: string | null
+          tenant_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_pauses_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_pauses_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_pauses_reason_id_fkey"
+            columns: ["reason_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_pause_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_pauses_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vw_onboarding_training_kpis: {
         Row: {
           agendado_para: string | null
