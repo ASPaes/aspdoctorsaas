@@ -898,7 +898,9 @@ export default function OmieConferenciaTab() {
         .from("reconciliacao_cadastro")
         .select("*", { count: "exact", head: true })
         .eq("acao_sugerida", "vinculo_auto_ok")
-        .eq("nome_diverge", true);
+        .eq("nome_diverge", true)
+        .neq("status_usuario", "vinculado");
+
       if (fornecedorParam != null && fornecedorParam.length > 0) {
         const ids = fornecedorParam.filter((n) => n !== -1);
         const incluirNull = fornecedorParam.includes(-1);
@@ -943,7 +945,9 @@ export default function OmieConferenciaTab() {
         .select(
           "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id, situacao_contrato, tem_cancelado_omie",
           { count: "exact" }
-        );
+        )
+        .neq("status_usuario", "vinculado");
+
       if (bucketAtivo !== "visao_geral") q = q.eq("acao_sugerida", bucketAtivo);
       if (bucketAtivo === "vinculo_auto_ok" && nomeFiltro === "diferentes") {
         q = q.eq("nome_diverge", true);
