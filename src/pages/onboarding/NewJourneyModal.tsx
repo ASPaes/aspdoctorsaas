@@ -23,11 +23,12 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
   const [assunto, setAssunto] = useState<string>("");
   const [dataInicio, setDataInicio] = useState<string>("");
   const [goLive, setGoLive] = useState<string>("");
+  const [demandTypeId, setDemandTypeId] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) {
-      setClienteId(""); setProdutoId(""); setAssunto(""); setDataInicio(""); setGoLive("");
+      setClienteId(""); setProdutoId(""); setAssunto(""); setDataInicio(""); setGoLive(""); setDemandTypeId("");
     }
   }, [open]);
 
@@ -60,6 +61,20 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
     },
   });
 
+  const demandTypesQuery = useQuery({
+    queryKey: ["onb-demand-types-lookup", tenantId],
+    enabled: open && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_demand_types" as any) as any)
+        .select("id, nome, cor")
+        .eq("tenant_id", tenantId!)
+        .eq("ativo", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; cor: string | null }>;
+    },
+  });
+
   async function handleSubmit() {
     if (!tenantId) return;
     if (!clienteId || !produtoId || !assunto.trim()) {
@@ -75,6 +90,7 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
         p_assunto: assunto.trim(),
         p_data_inicio_planejado: dataInicio || null,
         p_go_live_previsto: goLive || null,
+        p_demand_type_id: demandTypeId || null,
       });
       if (error) throw error;
       const res = data as any;
@@ -91,6 +107,7 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
       setSaving(false);
     }
   }
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
