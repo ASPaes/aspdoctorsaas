@@ -934,6 +934,22 @@ export default function OmieConferenciaTab() {
   const queryClient = useQueryClient();
   const [confirmVincularOpen, setConfirmVincularOpen] = useState(false);
   const [vinculandoLote, setVinculandoLote] = useState(false);
+  const [confirmAtribuirModeloOpen, setConfirmAtribuirModeloOpen] = useState(false);
+  const [atribuindoModeloLote, setAtribuindoModeloLote] = useState(false);
+  const [modeloSelecionadoId, setModeloSelecionadoId] = useState<string>("");
+
+  const { data: modelosContrato = [] } = useQuery({
+    queryKey: ["modelos_contrato", tid],
+    enabled: !!tid,
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      let q = supabase.from("modelos_contrato").select("id, nome").order("nome") as any;
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as { id: string; nome: string }[];
+    },
+  });
 
   const { data: resumo, isLoading: loadingResumo } = useQuery({
     queryKey: ["omie-conf-resumo", tid, fornecedorParam],
