@@ -113,9 +113,9 @@ const App = () => (
 
               {/* Super Admin routes */}
               <Route element={<SuperAdminGuard />}>
-                <Route path="/onboarding" element={<Suspense fallback={<PageLoader />}><OnboardingPage /></Suspense>} />
-                <Route path="/onboarding/config" element={<Suspense fallback={<PageLoader />}><OnboardingConfigPage /></Suspense>} />
-                <Route path="/onboarding/dashboard" element={<Suspense fallback={<PageLoader />}><OnboardingDashboardPage /></Suspense>} />
+                <Route path="/onboarding-implantacao" element={<Suspense fallback={<PageLoader />}><OnboardingPage /></Suspense>} />
+                <Route path="/onboarding-implantacao/config" element={<Suspense fallback={<PageLoader />}><OnboardingConfigPage /></Suspense>} />
+                <Route path="/onboarding-implantacao/dashboard" element={<Suspense fallback={<PageLoader />}><OnboardingDashboardPage /></Suspense>} />
                 <Route path="/super/tenants" element={<SuperTenants />} />
                 <Route path="/super/tenants/:id" element={<SuperTenantDetail />} />
                 <Route path="/super/monitor" element={<SuperMonitor />} />

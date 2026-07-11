@@ -323,7 +323,7 @@ export function AppSidebar() {
                   <SidebarMenuSub>
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild>
-                        <NavLink to="/onboarding" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                        <NavLink to="/onboarding-implantacao" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
                           <Rocket className="h-4 w-4" />
                           <span>Onboarding</span>
                         </NavLink>
@@ -331,7 +331,7 @@ export function AppSidebar() {
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild>
-                        <NavLink to="/onboarding/dashboard" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                        <NavLink to="/onboarding-implantacao/dashboard" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
                           <BarChart3 className="h-4 w-4" />
                           <span>Dashboard Onboarding</span>
                         </NavLink>
@@ -339,7 +339,7 @@ export function AppSidebar() {
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild>
-                        <NavLink to="/onboarding/config" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                        <NavLink to="/onboarding-implantacao/config" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
                           <SlidersHorizontal className="h-4 w-4" />
                           <span>Config. Onboarding</span>
                         </NavLink>
