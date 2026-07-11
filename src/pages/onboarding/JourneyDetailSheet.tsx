@@ -1091,7 +1091,46 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                   {h.saiu_em && ` • saiu ${formatDateTime(h.saiu_em)}`}
                                 </p>
                               )}
+                              {(isCurrent || isPast) && accumulatedByStage[s.id] > 0 && (
+                                <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+                                  Acumulado até aqui: <span className="font-medium text-foreground/80">{formatMin(accumulatedByStage[s.id])}</span>
+                                </p>
+                              )}
                             </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+
+                  {/* Pauses by reason */}
+                  {pausesByReason.length > 0 && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border flex items-center justify-between">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <Pause className="h-4 w-4" /> Tempo parado por motivo
+                        </h3>
+                        <Badge variant="outline" className="text-[10px]">{pausesByReason.length}</Badge>
+                      </div>
+                      <div className="p-3 space-y-1.5">
+                        {pausesByReason.map((p) => (
+                          <div key={p.nome} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xs font-medium truncate">{p.nome}</span>
+                              {p.em_andamento && (
+                                <Badge className="text-[9px] border-0 text-white shrink-0" style={{ backgroundColor: "hsl(38 92% 50%)" }}>
+                                  em andamento
+                                </Badge>
+                              )}
+                              <span className="text-[10px] text-muted-foreground shrink-0">· {p.count}x</span>
+                            </div>
+                            <span className="text-xs font-medium tabular-nums">{formatMin(p.minutos)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
                           </div>
                         );
                       })}
