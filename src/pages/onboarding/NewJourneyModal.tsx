@@ -73,7 +73,6 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
         p_cliente_id: clienteId,
         p_produto_id: produtoId,
         p_assunto: assunto.trim(),
-        p_fase: fase,
         p_data_inicio_planejado: dataInicio || null,
         p_go_live_previsto: goLive || null,
       });
