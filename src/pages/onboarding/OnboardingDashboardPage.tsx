@@ -44,6 +44,17 @@ function pct(num: number, den: number): number {
   return Math.round((num / den) * 1000) / 10;
 }
 
+function formatMin(min: number | null | undefined): string {
+  if (min == null || min <= 0) return "0m";
+  if (min < 60) return `${Math.round(min)}m`;
+  const h = Math.floor(min / 60);
+  const m = Math.round(min % 60);
+  if (h < 24) return m ? `${h}h ${m}m` : `${h}h`;
+  const d = Math.floor(h / 24);
+  const rh = h % 24;
+  return rh ? `${d}d ${rh}h` : `${d}d`;
+}
+
 function KpiCard({
   icon: Icon, label, value, sub, tone = "default", subTone,
 }: {
