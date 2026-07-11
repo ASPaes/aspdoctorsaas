@@ -187,7 +187,7 @@ export default function OnboardingDashboardPage() {
     return <div className="p-6 text-sm text-muted-foreground">Acesso restrito a super administradores.</div>;
   }
 
-  const loading = journeysQ.isLoading || trainingsQ.isLoading;
+  const loading = journeysQ.isLoading || trainingsAllQ.isLoading;
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 overflow-y-auto">
