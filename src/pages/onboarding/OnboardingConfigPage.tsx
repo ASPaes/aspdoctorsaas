@@ -31,7 +31,7 @@ export default function OnboardingConfigPage() {
       <div className="flex items-center justify-between gap-3 p-4 border-b border-border">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="sm">
-            <Link to="/onboarding"><ArrowLeft className="h-4 w-4 mr-1" />Kanban</Link>
+            <Link to="/onboarding-implantacao"><ArrowLeft className="h-4 w-4 mr-1" />Kanban</Link>
           </Button>
           <h1 className="text-lg font-semibold">Configuração · Onboarding & Implantação</h1>
         </div>
