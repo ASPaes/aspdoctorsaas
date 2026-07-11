@@ -6,13 +6,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { PipelinesPanel } from "./config/PipelinesPanel";
 import { PauseReasonsPanel } from "./config/PauseReasonsPanel";
+import { DemandTypesPanel } from "./config/DemandTypesPanel";
 
 type Fase = "onboarding" | "implantacao";
 
 export default function OnboardingConfigPage() {
   const { profile, profileLoading } = useAuth();
   const [fase, setFase] = useState<Fase>("onboarding");
-  const [tab, setTab] = useState<"pipelines" | "motivos">("pipelines");
+  const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas">("pipelines");
+
 
   if (profileLoading) {
     return (
