@@ -6950,6 +6950,42 @@ export type Database = {
           },
         ]
       }
+      whatsapp_group_participants: {
+        Row: {
+          first_seen_at: string
+          group_jid: string
+          instance_id: string
+          lid: string | null
+          participant_key: string
+          phone: string | null
+          push_name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          first_seen_at?: string
+          group_jid: string
+          instance_id: string
+          lid?: string | null
+          participant_key: string
+          phone?: string | null
+          push_name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          first_seen_at?: string
+          group_jid?: string
+          instance_id?: string
+          lid?: string | null
+          participant_key?: string
+          phone?: string | null
+          push_name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       whatsapp_groups: {
         Row: {
           created_at: string
