@@ -272,7 +272,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journey?.ticket_id,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_attendances" as any) as any)
-        .select("id, attendance_code, status, opened_at, closed_at, participant_label")
+        .select("id, attendance_code, status, opened_at, closed_at, participant_label, wait_seconds, handle_seconds, first_response_time_seconds, first_response_business_seconds")
         .eq("ticket_id", journey!.ticket_id!)
         .order("opened_at", { ascending: false });
       if (error) throw error;
