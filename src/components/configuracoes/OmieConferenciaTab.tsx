@@ -1186,7 +1186,7 @@ export default function OmieConferenciaTab() {
           ) : !lista?.rows.length ? (
             <p className="text-sm text-muted-foreground text-center py-8">Nenhuma linha encontrada.</p>
           ) : (
-            lista.rows.map((r, i) => <LinhaConferencia key={`${r.ds_contract_id ?? i}`} row={r} />)
+            lista.rows.map((r, i) => <LinhaConferencia key={`${r.ds_contract_id ?? i}`} row={r} tid={tid} />)
           )}
 
           {total > PAGE_SIZE && (
