@@ -456,6 +456,37 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     }
   }
 
+  async function handleConclude() {
+    if (!journey) return;
+    try {
+      const { error } = await (supabase.rpc as any)("conclude_onboarding_journey", {
+        p_journey_id: journey.journey_id,
+        p_go_live_real: goLiveReal || null,
+      });
+      if (error) throw error;
+      toast.success("Jornada concluída");
+      setConcludeOpen(false);
+      setGoLiveReal("");
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao concluir");
+    }
+  }
+
+  async function handleReopen() {
+    if (!journey) return;
+    try {
+      const { error } = await (supabase.rpc as any)("reopen_onboarding_journey", { p_journey_id: journey.journey_id });
+      if (error) throw error;
+      toast.success("Jornada reaberta");
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao reabrir");
+    }
+  }
+
   async function handleAddNote() {
     if (!journey?.ticket_id || !note.trim() || !user?.id) return;
     try {
