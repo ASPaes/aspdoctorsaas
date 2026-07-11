@@ -74,6 +74,10 @@ export default function OnboardingConfigPage() {
         <TabsContent value="demandas" className="flex-1 min-h-0 p-4 pt-3">
           <DemandTypesPanel />
         </TabsContent>
+        <TabsContent value="treinos" className="flex-1 min-h-0 p-4 pt-3">
+          <TrainingTypesPanel />
+        </TabsContent>
+
 
       </Tabs>
     </div>
