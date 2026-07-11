@@ -268,6 +268,46 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     },
   });
 
+  const participantsQ = useQuery({
+    queryKey: ["onboarding-participants", journey?.ticket_id],
+    enabled: !!journey?.ticket_id,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_participants" as any) as any)
+        .select("id, user_id, papel, created_at")
+        .eq("ticket_id", journey!.ticket_id!);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; user_id: string; papel: Papel; created_at: string }>;
+    },
+  });
+
+  const tenantMembersQ = useQuery({
+    queryKey: ["onboarding-tenant-members", tenantId],
+    enabled: open && !!tenantId,
+    queryFn: async () => {
+      const { data: profs, error } = await supabase
+        .from("profiles")
+        .select("user_id, funcionario_id")
+        .eq("tenant_id", tenantId as string)
+        .eq("status", "ativo");
+      if (error) throw error;
+      const funcIds = (profs ?? []).map((p: any) => p.funcionario_id).filter(Boolean) as number[];
+      const { data: funcs } = funcIds.length
+        ? await supabase.from("funcionarios").select("id, nome").in("id", funcIds)
+        : { data: [] as any[] };
+      const funcMap = new Map((funcs ?? []).map((f: any) => [f.id, f.nome]));
+      return (profs ?? []).map((p: any) => ({
+        user_id: p.user_id as string,
+        nome: (p.funcionario_id ? funcMap.get(p.funcionario_id) : null) || "Sem vínculo",
+      })).sort((a, b) => a.nome.localeCompare(b.nome));
+    },
+  });
+
+  const memberNameMap = useMemo(() => {
+    const m = new Map<string, string>();
+    (tenantMembersQ.data ?? []).forEach((u) => m.set(u.user_id, u.nome));
+    return m;
+  }, [tenantMembersQ.data]);
+
   const stages = stagesQ.data ?? [];
   const history = historyQ.data ?? [];
   const checklist = checklistQ.data ?? [];
