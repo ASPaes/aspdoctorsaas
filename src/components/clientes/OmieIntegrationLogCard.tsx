@@ -201,7 +201,7 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
             <div className="space-y-3">
               {sortedLogs.map((log, idx) => {
                 const { icon: StatusIcon, badge, label } = statusConfig(log.status);
-                const { Icon: DirecaoIcon, label: direcaoLabel } = direcaoIcon(log.direcao);
+                const { Icon: DirecaoIcon, label: direcaoLabel } = direcaoIcon(log.direcao_texto);
                 return (
                   <div
                     key={idx}
@@ -220,11 +220,10 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
                     <div className="flex items-start gap-2">
                       <DirecaoIcon className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                       <div className="min-w-0">
-                        <div className="font-medium">{log.rotulo || log.evento || "Evento"}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {direcaoLabel}
-                          {log.entidade && ` · ${log.entidade}`}
-                        </div>
+                        <div className="font-medium">{direcaoLabel || "Integração"}</div>
+                        {log.detalhe && (
+                          <div className="text-xs text-muted-foreground">{log.detalhe}</div>
+                        )}
                       </div>
                     </div>
                     {log.erro && (
