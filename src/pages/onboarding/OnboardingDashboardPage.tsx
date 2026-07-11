@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Loader2, CheckCircle2, AlertTriangle, UserCheck, GraduationCap,
-  RotateCcw, TrendingUp, Info,
+  RotateCcw, TrendingUp, Info, Pause,
 } from "lucide-react";
 import { startOfMonth, endOfMonth } from "date-fns";
 
