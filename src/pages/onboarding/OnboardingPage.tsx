@@ -10,6 +10,7 @@ import { Loader2, Plus, Pause, Clock, Calendar, Settings2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { NewJourneyModal } from "./NewJourneyModal";
+import JourneyDetailSheet from "./JourneyDetailSheet";
 
 interface StageRow {
   id: string;
