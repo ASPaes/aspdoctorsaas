@@ -252,6 +252,20 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     },
   });
 
+  const pausesByReasonQ = useQuery({
+    queryKey: ["onboarding-pauses-by-reason", journeyId, tenantId],
+    enabled: !!journeyId && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("vw_onboarding_pauses_by_reason" as any) as any)
+        .select("motivo_nome, minutos, em_andamento, iniciada_em")
+        .eq("tenant_id", tenantId)
+        .eq("journey_id", journeyId);
+      if (error) throw error;
+      return (data ?? []) as Array<{ motivo_nome: string | null; minutos: number | null; em_andamento: boolean; iniciada_em: string }>;
+    },
+  });
+
+
   const eventsQ = useQuery({
     queryKey: ["onboarding-ticket-events", journey?.ticket_id],
     enabled: !!journey?.ticket_id,
