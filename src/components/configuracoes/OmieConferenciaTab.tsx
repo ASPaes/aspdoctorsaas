@@ -229,8 +229,11 @@ function CandidatosLinha({ cnpj }: { cnpj: string }) {
   );
 }
 
-function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
+function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | null | undefined }) {
   const [open, setOpen] = useState(false);
+  const [confirmVincular, setConfirmVincular] = useState(false);
+  const [vincLoading, setVincLoading] = useState(false);
+  const queryClient = useQueryClient();
   const bucket = row.acao_sugerida as Bucket;
   const diffs = row.diffs && typeof row.diffs === "object" ? row.diffs : {};
   const diffKeys = Object.keys(diffs);
@@ -249,9 +252,50 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
 
   const cnpjFmt = formatCNPJ(row.cnpj_norm);
 
+  async function handleVincularAssimMesmo() {
+    if (!tid || !row.ds_contract_id) return;
+    setVincLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("recon-vincular-unitario", {
+        body: { tenant_id: tid, ds_contract_id: row.ds_contract_id },
+      });
+      if (error) throw error;
+      const res = data as { ok?: boolean; error?: string } | null;
+      if (res?.ok) {
+        toast.success("Vinculado com sucesso");
+        setConfirmVincular(false);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-resumo"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-lista"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-nome-diverge-count"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-visao-geral"] }),
+        ]);
+      } else {
+        toast.error(res?.error || "Falha ao vincular");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao vincular");
+    } finally {
+      setVincLoading(false);
+    }
+  }
+
   function renderBotao() {
     switch (bucket) {
       case "vinculo_auto_ok":
+        if (nomesDiferem) {
+          return (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              onClick={() => setConfirmVincular(true)}
+              disabled={vincLoading || !tid || !row.ds_contract_id}
+            >
+              Vincular assim mesmo
+            </Button>
+          );
+        }
         return <DisabledActionButton>Vincular cliente + contrato</DisabledActionButton>;
       case "resolver":
         return <DisabledActionButton>Atualizar valor no Omie</DisabledActionButton>;
@@ -455,6 +499,47 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
           <CandidatosLinha cnpj={row.cnpj_norm} />
         </div>
       )}
+
+      <AlertDialog open={confirmVincular} onOpenChange={setConfirmVincular}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar vínculo</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="rounded border p-2 text-sm">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                    DoctorSaaS
+                  </div>
+                  <div className="font-medium break-words">{row.razao_ds || "—"}</div>
+                  <div className="text-xs text-muted-foreground font-mono mt-0.5">CNPJ {cnpjFmt}</div>
+                </div>
+                <div className="rounded border p-2 text-sm">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                    Omie
+                  </div>
+                  <div className="font-medium break-words">{row.razao_omie || "—"}</div>
+                </div>
+                <p className="text-sm">
+                  Os nomes divergem. Confirme que é a <strong>MESMA empresa</strong> antes de vincular. Isso
+                  cria a ligação DoctorSaaS ↔ Omie e não altera nada no Omie.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={vincLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleVincularAssimMesmo();
+              }}
+              disabled={vincLoading}
+            >
+              {vincLoading ? "Vinculando..." : "Confirmar vínculo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -1101,7 +1186,7 @@ export default function OmieConferenciaTab() {
           ) : !lista?.rows.length ? (
             <p className="text-sm text-muted-foreground text-center py-8">Nenhuma linha encontrada.</p>
           ) : (
-            lista.rows.map((r, i) => <LinhaConferencia key={`${r.ds_contract_id ?? i}`} row={r} />)
+            lista.rows.map((r, i) => <LinhaConferencia key={`${r.ds_contract_id ?? i}`} row={r} tid={tid} />)
           )}
 
           {total > PAGE_SIZE && (
