@@ -331,6 +331,14 @@ export function AppSidebar() {
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild>
+                        <NavLink to="/onboarding/config" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                          <SlidersHorizontal className="h-4 w-4" />
+                          <span>Config. Onboarding</span>
+                        </NavLink>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild>
                         <NavLink to="/super/tenants" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
                           <Building2 className="h-4 w-4" />
                           <span>Tenants</span>
