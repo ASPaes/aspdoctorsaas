@@ -1548,6 +1548,28 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
       console.log('[processor] Group not whitelisted, ignoring:', groupJid);
       return;
     }
+
+    // Captura pushName + identidade do participante do grupo (nomeia o roster de @menções).
+    // Idempotente, 1 linha; erros nunca bloqueiam o processamento.
+    if (!fromMe && pushName) {
+      try {
+        const gk = (msg.rawPayload as any)?.key || {};
+        const stripJid = (j?: string) =>
+          (j || '').replace('@s.whatsapp.net', '').replace('@lid', '').replace(/@.*/, '').replace(/:\d+$/, '') || null;
+        const pPhone = stripJid([gk.participant, gk.participantAlt, gk.participantPn].find((j: any) => typeof j === 'string' && j.includes('@s.whatsapp.net')));
+        const pLid   = stripJid([gk.participant, gk.participantAlt].find((j: any) => typeof j === 'string' && j.includes('@lid')));
+        const pKey   = pLid || pPhone;
+        if (pKey) {
+          await supabase.from('whatsapp_group_participants').upsert({
+            tenant_id: tenantId, instance_id: instanceId, group_jid: groupJid,
+            participant_key: pKey, phone: pPhone, lid: pLid, push_name: pushName,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'tenant_id,instance_id,group_jid,participant_key' });
+        }
+      } catch (e) {
+        console.error('[processor] group participant name capture failed (non-fatal):', e);
+      }
+    }
   }
 
   // Para grupos: resolver nome real do grupo em vez de usar pushName do remetente
