@@ -100,24 +100,26 @@ export default function OnboardingDashboardPage() {
   });
 
   const trainingsAllQ = useQuery({
-    queryKey: ["onboarding-dash-trainings-all", effectiveTenantId],
+    queryKey: ["onboarding-dash-trainings-kpis", effectiveTenantId],
     enabled: isSuperAdmin && !!effectiveTenantId,
     queryFn: async () => {
       const rows = await fetchAllRows<TrainingRow>(() =>
-        (supabase.from("onboarding_training_sessions" as any) as any)
-          .select("id, journey_id, status, no_show, tentativas, proprietario_presente, is_retreinamento, conduzido_por, realizado_em")
+        (supabase.from("vw_onboarding_training_kpis" as any) as any)
+          .select("journey_id, training_type_id, tipo_nome, conta_como_pdv, status, no_show, tentativas, proprietario_presente, is_retreinamento, conduzido_por, agendado_para, realizado_em")
           .eq("tenant_id", effectiveTenantId)
       );
       return rows;
     },
   });
 
+  // Treinos no período: usa realizado_em quando existe, senão agendado_para
   const trainings = useMemo(() => {
     const from = dateRange.from.getTime();
     const to = dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1;
     return (trainingsAllQ.data ?? []).filter((t) => {
-      if (!t.realizado_em) return false;
-      const d = new Date(t.realizado_em).getTime();
+      const ref = t.realizado_em || t.agendado_para;
+      if (!ref) return false;
+      const d = new Date(ref).getTime();
       return d >= from && d <= to;
     });
   }, [trainingsAllQ.data, dateRange]);
@@ -154,6 +156,7 @@ export default function OnboardingDashboardPage() {
   const foraPrazo = journeys.filter((j) => j.etapa_semaforo === "vermelho").length;
   const semSla = journeys.filter((j) => !j.etapa_semaforo || j.etapa_semaforo === "sem_sla").length;
   const noPrazoPct = pct(noPrazo, totalJ - semSla);
+  const concluidas = journeys.filter((j) => j.situacao === "concluido").length;
 
   // KPIs treinos
   const realizadosOuNoShow = trainings.filter((t) => t.status === "realizado" || t.no_show === true);
@@ -162,7 +165,18 @@ export default function OnboardingDashboardPage() {
   const realizados = trainings.filter((t) => t.status === "realizado");
   const propPresent = realizados.filter((t) => t.proprietario_presente === true);
   const propRate = pct(propPresent.length, realizados.length);
-  const retreinos = trainings.filter((t) => t.is_retreinamento === true).length;
+  const retreinos = trainings.filter((t) => t.is_retreinamento === true);
+  const retreinosPct = pct(retreinos.length, trainings.length);
+
+  // Previstos/Agendados vs Realizados
+  const previstos = trainings.filter((t) => t.status === "previsto" || t.status === "agendado");
+  const realizadoPct = pct(realizados.length, previstos.length + realizados.length);
+
+  // PDV finalizados: treinos realizados com conta_como_pdv=true
+  const pdvFinalizados = realizados.filter((t) => t.conta_como_pdv === true).length;
+
+  // Primeiro no-show: treinos com no_show=true e tentativas <= 1
+  const primeiroNoShow = trainings.filter((t) => t.no_show === true && (t.tentativas ?? 0) <= 1).length;
 
   // Tabela por implantador
   const byImplantador = useMemo(() => {
@@ -184,6 +198,21 @@ export default function OnboardingDashboardPage() {
       }))
       .sort((a, b) => b.total - a.total);
   }, [trainings, names]);
+
+  // Tabela por tipo de treino
+  const byTipo = useMemo(() => {
+    const m: Record<string, { nome: string; previstos: number; realizados: number; no_show: number }> = {};
+    trainings.forEach((t) => {
+      const key = t.training_type_id || "__sem__";
+      const nome = t.tipo_nome || "Sem tipo";
+      if (!m[key]) m[key] = { nome, previstos: 0, realizados: 0, no_show: 0 };
+      if (t.status === "previsto" || t.status === "agendado") m[key].previstos += 1;
+      if (t.status === "realizado") m[key].realizados += 1;
+      if (t.no_show) m[key].no_show += 1;
+    });
+    return Object.values(m).sort((a, b) => (b.realizados + b.previstos) - (a.realizados + a.previstos));
+  }, [trainings]);
+
 
   if (profileLoading) {
     return <div className="flex items-center justify-center min-h-[40vh]"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
