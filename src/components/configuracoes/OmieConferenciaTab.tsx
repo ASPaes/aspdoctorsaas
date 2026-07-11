@@ -705,6 +705,56 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={confirmEnviarOpen} onOpenChange={(v) => { if (!enviarLoading) { setConfirmEnviarOpen(v); if (!v) setDryRun(null); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar envio ao Omie</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                {dryRun?.casado_no_omie && (
+                  <div className="rounded border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-2 py-1.5 text-amber-800 dark:text-amber-300 text-xs">
+                    Este contrato JÁ existe no Omie e será ATUALIZADO (não duplicado).
+                  </div>
+                )}
+                {dryRun?.cliente_seria_enviado && (
+                  <div className="rounded border p-2">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Cliente</div>
+                    <div className="font-medium break-words">{dryRun.cliente_seria_enviado.razao_social || dryRun.cliente_seria_enviado.razao || "—"}</div>
+                    <div className="text-xs text-muted-foreground font-mono mt-0.5">CNPJ {formatCNPJ(dryRun.cliente_seria_enviado.cnpj_cpf || dryRun.cliente_seria_enviado.cnpj || row.cnpj_norm)}</div>
+                  </div>
+                )}
+                {dryRun?.contrato_seria_enviado && (
+                  <div className="rounded border p-2 space-y-0.5">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Contrato</div>
+                    <div>Valor mensal: <span className="font-medium">{formatBRL(dryRun.contrato_seria_enviado.valor_mensal ?? dryRun.contrato_seria_enviado.valor)}</span></div>
+                    {dryRun.contrato_seria_enviado.modelo && (
+                      <div className="text-xs text-muted-foreground">Modelo: {dryRun.contrato_seria_enviado.modelo}</div>
+                    )}
+                    {(dryRun.contrato_seria_enviado.vigencia_inicial || dryRun.contrato_seria_enviado.vigencia_final) && (
+                      <div className="text-xs text-muted-foreground">
+                        Vigência: {dryRun.contrato_seria_enviado.vigencia_inicial || "—"} até {dryRun.contrato_seria_enviado.vigencia_final || "—"}
+                      </div>
+                    )}
+                    {dryRun.contrato_seria_enviado.dia_vencimento != null && (
+                      <div className="text-xs text-muted-foreground">Dia de vencimento: {dryRun.contrato_seria_enviado.dia_vencimento}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={enviarLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleEnviarOmieConfirm(); }}
+              disabled={enviarLoading}
+            >
+              {enviarLoading ? "Enviando..." : "Confirmar envio ao Omie"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
