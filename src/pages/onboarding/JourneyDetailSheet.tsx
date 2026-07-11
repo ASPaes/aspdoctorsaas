@@ -923,6 +923,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                   ))}
                                 </SelectContent>
                               </Select>
+                            </div>
+
 
                             <label className="flex items-center gap-2 text-xs cursor-pointer">
                               <Checkbox
