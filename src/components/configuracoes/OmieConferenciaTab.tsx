@@ -617,9 +617,7 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
               <ArrowLeft className="h-3 w-3" />
               Atualizar valor no DoctorSaaS
             </Button>
-            <DisabledActionButton icon={<ArrowRight className="h-3 w-3" />}>
-              Atualizar valor no Omie
-            </DisabledActionButton>
+            {enviarOmieBtn}
           </>
         ) : (
           <>
