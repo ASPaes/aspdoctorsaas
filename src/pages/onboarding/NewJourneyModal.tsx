@@ -145,9 +145,31 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
             </Select>
           </div>
           <div className="space-y-1.5">
+            <Label>Tipo de demanda</Label>
+            <Select value={demandTypeId} onValueChange={setDemandTypeId}>
+              <SelectTrigger>
+                <SelectValue placeholder={demandTypesQuery.isLoading ? "Carregando..." : "Selecione (opcional)"} />
+              </SelectTrigger>
+              <SelectContent>
+                {(demandTypesQuery.data ?? []).map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: d.cor || "#6B7280" }}
+                      />
+                      {d.nome}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
             <Label>Assunto *</Label>
             <Input value={assunto} onChange={(e) => setAssunto(e.target.value)} maxLength={200} />
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Início planejado</Label>
