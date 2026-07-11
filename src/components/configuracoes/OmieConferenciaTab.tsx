@@ -264,15 +264,28 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
       if (res?.ok) {
         toast.success("Vinculado com sucesso");
         setConfirmVincular(false);
+        // Remoção otimista: tira a linha vinculada de todas as listas em cache
+        // (a view de reconciliação pode não refletir imediatamente após o insert do vínculo).
+        queryClient.setQueriesData<{ rows: ReconciliacaoRow[]; count: number } | undefined>(
+          { queryKey: ["omie-conf-lista"] },
+          (old) => {
+            if (!old) return old;
+            const rows = old.rows.filter((r) => r.ds_contract_id !== row.ds_contract_id);
+            const removed = old.rows.length - rows.length;
+            return { rows, count: Math.max(0, old.count - removed) };
+          }
+        );
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["omie-conf-resumo"] }),
           queryClient.invalidateQueries({ queryKey: ["omie-conf-lista"] }),
           queryClient.invalidateQueries({ queryKey: ["omie-conf-nome-diverge-count"] }),
           queryClient.invalidateQueries({ queryKey: ["omie-conf-visao-geral"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-fornecedores"] }),
         ]);
       } else {
         toast.error(res?.error || "Falha ao vincular");
       }
+
     } catch (e: any) {
       toast.error(e?.message || "Falha ao vincular");
     } finally {
