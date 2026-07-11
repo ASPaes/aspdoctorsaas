@@ -898,7 +898,9 @@ export default function OmieConferenciaTab() {
         .from("reconciliacao_cadastro")
         .select("*", { count: "exact", head: true })
         .eq("acao_sugerida", "vinculo_auto_ok")
-        .eq("nome_diverge", true);
+        .eq("nome_diverge", true)
+        .neq("status_usuario", "vinculado");
+
       if (fornecedorParam != null && fornecedorParam.length > 0) {
         const ids = fornecedorParam.filter((n) => n !== -1);
         const incluirNull = fornecedorParam.includes(-1);
