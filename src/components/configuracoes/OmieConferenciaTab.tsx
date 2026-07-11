@@ -229,8 +229,11 @@ function CandidatosLinha({ cnpj }: { cnpj: string }) {
   );
 }
 
-function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
+function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | null | undefined }) {
   const [open, setOpen] = useState(false);
+  const [confirmVincular, setConfirmVincular] = useState(false);
+  const [vincLoading, setVincLoading] = useState(false);
+  const queryClient = useQueryClient();
   const bucket = row.acao_sugerida as Bucket;
   const diffs = row.diffs && typeof row.diffs === "object" ? row.diffs : {};
   const diffKeys = Object.keys(diffs);
@@ -248,6 +251,34 @@ function LinhaConferencia({ row }: { row: ReconciliacaoRow }) {
       : null;
 
   const cnpjFmt = formatCNPJ(row.cnpj_norm);
+
+  async function handleVincularAssimMesmo() {
+    if (!tid || !row.ds_contract_id) return;
+    setVincLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("recon-vincular-unitario", {
+        body: { tenant_id: tid, ds_contract_id: row.ds_contract_id },
+      });
+      if (error) throw error;
+      const res = data as { ok?: boolean; error?: string } | null;
+      if (res?.ok) {
+        toast.success("Vinculado com sucesso");
+        setConfirmVincular(false);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-resumo"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-lista"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-nome-diverge-count"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-visao-geral"] }),
+        ]);
+      } else {
+        toast.error(res?.error || "Falha ao vincular");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao vincular");
+    } finally {
+      setVincLoading(false);
+    }
+  }
 
   function renderBotao() {
     switch (bucket) {
