@@ -614,6 +614,15 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     <Badge className="text-[10px] capitalize" style={{ background: slaColor, color: "white" }}>
                       {journey.stage_nome || "sem etapa"}
                     </Badge>
+                    {journey.demand_type_nome && (
+                      <Badge
+                        className="text-[10px] border-0 text-white"
+                        style={{ background: journey.demand_type_cor || "#6B7280" }}
+                      >
+                        {journey.demand_type_nome}
+                      </Badge>
+                    )}
+
                     {isPaused && (
                       <Badge variant="outline" className="text-[10px] gap-1">
                         <Pause className="h-3 w-3" /> pausado
