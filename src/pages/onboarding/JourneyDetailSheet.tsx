@@ -195,7 +195,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journeyId && !!tenantId,
     queryFn: async () => {
       const { data } = await (supabase.from("onboarding_journeys" as any) as any)
-        .select("id, fase_atual, pipeline_onboarding_id, pipeline_implantacao_id, current_stage_id")
+        .select("id, fase_atual, pipeline_onboarding_id, pipeline_implantacao_id, current_stage_id, produto_id")
         .eq("id", journeyId)
         .maybeSingle();
       return data as any;
