@@ -58,7 +58,11 @@ interface Journey {
   go_live_previsto: string | null;
   data_inicio_planejado: string | null;
   pipeline_id?: string | null;
+  demand_type_id?: string | null;
+  demand_type_nome?: string | null;
+  demand_type_cor?: string | null;
 }
+
 
 const SEMAFORO_COLOR: Record<string, string> = {
   verde: "hsl(142 71% 45%)",
