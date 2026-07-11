@@ -426,6 +426,70 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     }
   }
 
+  async function handleAddParticipant() {
+    if (!journey?.ticket_id || !tenantId || !newParticipantUserId) {
+      toast.error("Selecione um usuário");
+      return;
+    }
+    try {
+      const { error } = await (supabase.from("onboarding_participants" as any) as any).insert({
+        tenant_id: tenantId,
+        ticket_id: journey.ticket_id,
+        user_id: newParticipantUserId,
+        papel: newParticipantPapel,
+      });
+      if (error) {
+        if ((error as any).code === "23505") {
+          toast.error("Participante já adicionado nesse papel");
+        } else {
+          throw error;
+        }
+        return;
+      }
+      const nome = memberNameMap.get(newParticipantUserId) || "usuário";
+      if (user?.id) {
+        await (supabase.from("support_ticket_events" as any) as any).insert({
+          ticket_id: journey.ticket_id,
+          user_id: user.id,
+          event_type: "onboarding_participante",
+          content: `Adicionado: ${nome} (${newParticipantPapel})`,
+        });
+      }
+      toast.success("Participante adicionado");
+      setAddParticipantOpen(false);
+      setNewParticipantUserId("");
+      setNewParticipantPapel("especialista");
+      qc.invalidateQueries({ queryKey: ["onboarding-participants"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao adicionar participante");
+    }
+  }
+
+  async function handleRemoveParticipant(id: string, userId: string, papel: Papel) {
+    if (!journey?.ticket_id) return;
+    try {
+      const { error } = await (supabase.from("onboarding_participants" as any) as any)
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+      const nome = memberNameMap.get(userId) || "usuário";
+      if (user?.id) {
+        await (supabase.from("support_ticket_events" as any) as any).insert({
+          ticket_id: journey.ticket_id,
+          user_id: user.id,
+          event_type: "onboarding_participante",
+          content: `Removido: ${nome} (${papel})`,
+        });
+      }
+      toast.success("Participante removido");
+      qc.invalidateQueries({ queryKey: ["onboarding-participants"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao remover participante");
+    }
+  }
+
   const loading = journeyQ.isLoading || !journey;
   const slaColor = SEMAFORO_COLOR[journey?.etapa_semaforo || "sem_sla"];
 
