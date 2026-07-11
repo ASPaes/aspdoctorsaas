@@ -23,8 +23,11 @@ interface JourneyRow {
 }
 
 interface TrainingRow {
-  id: string;
-  journey_id: string;
+  id?: string;
+  journey_id: string | null;
+  training_type_id: string | null;
+  tipo_nome: string | null;
+  conta_como_pdv: boolean | null;
   status: string | null;
   no_show: boolean | null;
   tentativas: number | null;
@@ -32,7 +35,9 @@ interface TrainingRow {
   is_retreinamento: boolean | null;
   conduzido_por: string | null;
   realizado_em: string | null;
+  agendado_para: string | null;
 }
+
 
 function pct(num: number, den: number): number {
   if (!den) return 0;
