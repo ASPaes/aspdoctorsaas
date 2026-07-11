@@ -460,7 +460,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
               </div>
             </DialogHeader>
 
-            <ScrollArea className="flex-1">
+            <div className="overflow-y-auto flex-1">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 p-5">
                 {/* LEFT */}
                 <div className="space-y-5">
@@ -676,7 +676,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   </section>
                 </div>
               </div>
-            </ScrollArea>
+            </div>
           </>
         )}
       </DialogContent>
