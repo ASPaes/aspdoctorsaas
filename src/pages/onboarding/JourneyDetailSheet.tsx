@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
+import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
 import {
   Loader2, Clock, Pause, Play, ChevronRight, Calendar, CheckCircle2,
   Circle, AlertCircle, MessageSquare, GraduationCap, User, ArrowRight,
