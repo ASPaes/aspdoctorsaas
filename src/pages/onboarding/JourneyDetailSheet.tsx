@@ -698,6 +698,73 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     } catch (e: any) { toast.error(e.message || "Erro"); }
   }
 
+  async function handleAddModuleManual() {
+    if (!tenantId || !journeyId) return;
+    const nome = newModuleName.trim();
+    if (!nome) { toast.error("Informe o nome do módulo"); return; }
+    try {
+      const { error } = await (supabase.from("onboarding_journey_modules" as any) as any)
+        .insert({ tenant_id: tenantId, journey_id: journeyId, nome, origem: "manual" });
+      if (error) throw error;
+      toast.success("Módulo adicionado");
+      setNewModuleName("");
+      setAddModuleOpen(false);
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-modules", journeyId, tenantId] });
+    } catch (e: any) { toast.error(e.message || "Erro ao adicionar módulo"); }
+  }
+
+  async function handleAddModuleFromProduto() {
+    if (!tenantId || !journeyId || !newModuleProdutoModuloId) return;
+    const pm = (produtoModulosQ.data ?? []).find((m) => m.id === newModuleProdutoModuloId);
+    if (!pm) return;
+    try {
+      const { error } = await (supabase.from("onboarding_journey_modules" as any) as any)
+        .insert({ tenant_id: tenantId, journey_id: journeyId, nome: pm.nome, produto_modulo_id: pm.id, origem: "produto" });
+      if (error) throw error;
+      toast.success("Módulo adicionado");
+      setNewModuleProdutoModuloId("");
+      setAddModuleOpen(false);
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-modules", journeyId, tenantId] });
+    } catch (e: any) { toast.error(e.message || "Erro ao adicionar módulo"); }
+  }
+
+  async function handleImportFromCliente() {
+    if (!tenantId || !journeyId) return;
+    const items = clienteProdutoModulosQ.data ?? [];
+    if (items.length === 0) { toast.error("Cliente não possui módulos cadastrados"); return; }
+    const existing = new Set((modulesQ.data ?? []).map((m) => m.produto_modulo_id).filter(Boolean));
+    const rows = items
+      .filter((it) => !existing.has(it.modulo_id))
+      .map((it) => ({
+        tenant_id: tenantId,
+        journey_id: journeyId,
+        nome: it.produto_modulos.nome,
+        produto_modulo_id: it.modulo_id,
+        origem: "cliente",
+      }));
+    if (rows.length === 0) { toast.info("Todos os módulos do cliente já estão importados"); return; }
+    try {
+      const { error } = await (supabase.from("onboarding_journey_modules" as any) as any).insert(rows);
+      if (error) throw error;
+      toast.success(`${rows.length} módulo(s) importado(s)`);
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-modules", journeyId, tenantId] });
+    } catch (e: any) { toast.error(e.message || "Erro ao importar módulos"); }
+  }
+
+  async function handleDeleteModule(id: string) {
+    if (!tenantId) return;
+    try {
+      const { error } = await (supabase.from("onboarding_journey_modules" as any) as any)
+        .delete()
+        .eq("id", id)
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-modules", journeyId, tenantId] });
+    } catch (e: any) { toast.error(e.message || "Erro ao remover módulo"); }
+  }
+
+
+
 
 
   const loading = journeyQ.isLoading || !journey;
