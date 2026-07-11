@@ -112,6 +112,47 @@ export default function OnboardingDashboardPage() {
     },
   });
 
+  const pausesAllQ = useQuery({
+    queryKey: ["onboarding-dash-pauses-by-reason", effectiveTenantId],
+    enabled: isSuperAdmin && !!effectiveTenantId,
+    queryFn: async () => {
+      const rows = await fetchAllRows<{ motivo_nome: string | null; minutos: number | null; em_andamento: boolean; iniciada_em: string }>(() =>
+        (supabase.from("vw_onboarding_pauses_by_reason" as any) as any)
+          .select("motivo_nome, minutos, em_andamento, iniciada_em")
+          .eq("tenant_id", effectiveTenantId)
+      );
+      return rows;
+    },
+  });
+
+  const pausesByReasonAgg = useMemo(() => {
+    const from = dateRange.from.getTime();
+    const to = dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1;
+    const rows = (pausesAllQ.data ?? []).filter((p) => {
+      const d = new Date(p.iniciada_em).getTime();
+      return d >= from && d <= to;
+    });
+    const agg = new Map<string, { minutos: number; count: number; em_andamento: boolean }>();
+    rows.forEach((p) => {
+      const name = p.motivo_nome || "Sem motivo";
+      const cur = agg.get(name) || { minutos: 0, count: 0, em_andamento: false };
+      cur.minutos += p.minutos ?? 0;
+      cur.count += 1;
+      cur.em_andamento = cur.em_andamento || p.em_andamento;
+      agg.set(name, cur);
+    });
+    return Array.from(agg.entries())
+      .map(([nome, v]) => ({ nome, ...v }))
+      .sort((a, b) => b.minutos - a.minutos);
+  }, [pausesAllQ.data, dateRange]);
+
+  const pausesTotalMin = useMemo(
+    () => pausesByReasonAgg.reduce((s, r) => s + r.minutos, 0),
+    [pausesByReasonAgg]
+  );
+
+
+
   // Treinos no período: usa realizado_em quando existe, senão agendado_para
   const trainings = useMemo(() => {
     const from = dateRange.from.getTime();
