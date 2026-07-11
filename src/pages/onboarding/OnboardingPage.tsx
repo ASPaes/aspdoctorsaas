@@ -218,10 +218,18 @@ export default function OnboardingPage() {
             </button>
           </div>
         </div>
-        <Button size="sm" onClick={() => setNewOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          Nova jornada
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link to="/onboarding/config">
+              <Settings2 className="h-4 w-4 mr-1" />
+              Configurar
+            </Link>
+          </Button>
+          <Button size="sm" onClick={() => setNewOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Nova jornada
+          </Button>
+        </div>
       </div>
 
       {loading ? (
