@@ -508,6 +508,85 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     }
   }
 
+  async function handleCreateTraining() {
+    if (!journeyId || !newTrainingTitle.trim()) {
+      toast.error("Informe o título do treino");
+      return;
+    }
+    try {
+      const { error } = await (supabase.rpc as any)("create_onboarding_training", {
+        p_journey_id: journeyId,
+        p_titulo: newTrainingTitle.trim(),
+        p_agendado_para: newTrainingDate ? new Date(newTrainingDate).toISOString() : null,
+        p_conduzido_por: newTrainingConductor || null,
+        p_is_retreinamento: newTrainingRetreat,
+      });
+      if (error) throw error;
+      toast.success("Treino agendado");
+      setAddTrainingOpen(false);
+      setNewTrainingTitle("");
+      setNewTrainingDate("");
+      setNewTrainingConductor("");
+      setNewTrainingRetreat(false);
+      qc.invalidateQueries({ queryKey: ["onboarding-training", journeyId] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao criar treino");
+    }
+  }
+
+  async function updateTraining(id: string, patch: Record<string, any>) {
+    if (!tenantId) return;
+    const { error } = await (supabase.from("onboarding_training_sessions" as any) as any)
+      .update(patch)
+      .eq("id", id)
+      .eq("tenant_id", tenantId);
+    if (error) throw error;
+    qc.invalidateQueries({ queryKey: ["onboarding-training", journeyId] });
+  }
+
+  async function handleMarkRealized(id: string) {
+    try {
+      await updateTraining(id, { status: "realizado", realizado_em: new Date().toISOString() });
+      toast.success("Treino marcado como realizado");
+    } catch (e: any) { toast.error(e.message || "Erro"); }
+  }
+
+  async function handleMarkNoShow(id: string, currentAttempts: number) {
+    try {
+      await updateTraining(id, { status: "no_show", no_show: true, tentativas: (currentAttempts || 0) + 1 });
+      toast.success("Marcado como no-show");
+    } catch (e: any) { toast.error(e.message || "Erro"); }
+  }
+
+  async function handleReschedule(id: string, currentAttempts: number) {
+    if (!rescheduleDate) { toast.error("Escolha a nova data"); return; }
+    try {
+      await updateTraining(id, {
+        status: "agendado",
+        agendado_para: new Date(rescheduleDate).toISOString(),
+        tentativas: (currentAttempts || 0) + 1,
+      });
+      toast.success("Treino remarcado");
+      setRescheduleId(null);
+      setRescheduleDate("");
+    } catch (e: any) { toast.error(e.message || "Erro"); }
+  }
+
+  async function handleTogglePresente(id: string, current: boolean) {
+    try {
+      await updateTraining(id, { proprietario_presente: !current });
+    } catch (e: any) { toast.error(e.message || "Erro"); }
+  }
+
+  async function handleCancelTraining(id: string) {
+    try {
+      await updateTraining(id, { status: "cancelado" });
+      toast.success("Treino cancelado");
+    } catch (e: any) { toast.error(e.message || "Erro"); }
+  }
+
+
+
   const loading = journeyQ.isLoading || !journey;
   const slaColor = SEMAFORO_COLOR[journey?.etapa_semaforo || "sem_sla"];
 
