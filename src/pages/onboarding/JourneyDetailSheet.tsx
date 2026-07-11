@@ -1051,7 +1051,106 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     </div>
                   </section>
 
+                  {/* Modules */}
+                  <section className="rounded-lg border border-border">
+                    <div className="p-3 border-b border-border flex items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Package className="h-4 w-4" /> Módulos da jornada
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px]">{(modulesQ.data ?? []).length}</Badge>
+                        {(clienteProdutoModulosQ.data ?? []).length > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1"
+                            onClick={handleImportFromCliente}
+                          >
+                            <Download className="h-3 w-3" /> Importar do cliente
+                          </Button>
+                        )}
+                        <Popover open={addModuleOpen} onOpenChange={setAddModuleOpen}>
+                          <PopoverTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
+                              <Plus className="h-3 w-3" /> Adicionar módulo
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 space-y-3" align="end">
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-medium">Nome do módulo</label>
+                              <div className="flex gap-1.5">
+                                <Input
+                                  value={newModuleName}
+                                  onChange={(e) => setNewModuleName(e.target.value)}
+                                  placeholder="Ex: PDV, Financeiro"
+                                  className="h-8 text-xs"
+                                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddModuleManual(); } }}
+                                />
+                                <Button size="sm" className="h-8 px-3" onClick={handleAddModuleManual}>Add</Button>
+                              </div>
+                            </div>
+                            {(produtoModulosQ.data ?? []).length > 0 && (
+                              <>
+                                <Separator />
+                                <div className="space-y-1">
+                                  <label className="text-[11px] font-medium">Ou escolher do produto</label>
+                                  <div className="flex gap-1.5">
+                                    <Select value={newModuleProdutoModuloId} onValueChange={setNewModuleProdutoModuloId}>
+                                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar módulo" /></SelectTrigger>
+                                      <SelectContent>
+                                        {(produtoModulosQ.data ?? []).map((m) => (
+                                          <SelectItem key={m.id} value={m.id} className="text-xs">{m.nome}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Button size="sm" className="h-8 px-3" onClick={handleAddModuleFromProduto} disabled={!newModuleProdutoModuloId}>Add</Button>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                    <div className="p-3 space-y-1.5">
+                      {(modulesQ.data ?? []).length === 0 ? (
+                        <p className="text-xs text-muted-foreground py-2 text-center">Nenhum módulo cadastrado.</p>
+                      ) : (
+                        (modulesQ.data ?? []).map((m) => {
+                          const origemColor: Record<string, string> = {
+                            manual: "hsl(215 16% 47%)",
+                            produto: "hsl(199 89% 48%)",
+                            cliente: "hsl(262 83% 58%)",
+                          };
+                          return (
+                            <div key={m.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-xs font-medium truncate">{m.nome}</span>
+                                <Badge
+                                  variant="outline"
+                                  className="text-[9px] capitalize border-0 text-white shrink-0"
+                                  style={{ backgroundColor: origemColor[m.origem] || origemColor.manual }}
+                                >
+                                  {m.origem}
+                                </Badge>
+                              </div>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                                onClick={() => handleDeleteModule(m.id)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </section>
+
                   {/* Trainings */}
+
                   <section className="rounded-lg border border-border">
                     <div className="p-3 border-b border-border flex items-center justify-between">
                       <h3 className="text-sm font-semibold flex items-center gap-2">
