@@ -227,6 +227,10 @@ export default function OnboardingPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant={showConcluded ? "default" : "outline"} onClick={() => setShowConcluded((v) => !v)}>
+            <CheckCircle2 className="h-4 w-4 mr-1" />
+            {showConcluded ? "Ocultar concluídas" : "Mostrar concluídas"}
+          </Button>
           <Button asChild size="sm" variant="outline">
             <Link to="/onboarding-implantacao/config">
               <Settings2 className="h-4 w-4 mr-1" />
