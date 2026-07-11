@@ -911,6 +911,19 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                 </SelectContent>
                               </Select>
                             </div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-medium">Tipo de treino</label>
+                              <Select value={newTrainingTypeId} onValueChange={setNewTrainingTypeId}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar tipo" /></SelectTrigger>
+                                <SelectContent>
+                                  {(trainingTypesQ.data ?? []).map((tt) => (
+                                    <SelectItem key={tt.id} value={tt.id} className="text-xs">
+                                      {tt.nome}{tt.conta_como_pdv ? " · PDV" : ""}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
                             <label className="flex items-center gap-2 text-xs cursor-pointer">
                               <Checkbox
                                 checked={newTrainingRetreat}
