@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
+import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
 import {
   Loader2, Clock, Pause, Play, ChevronRight, Calendar, CheckCircle2,
   Circle, AlertCircle, MessageSquare, GraduationCap, User, ArrowRight,
@@ -116,6 +117,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [pauseReasonId, setPauseReasonId] = useState<string>("");
   const [pauseText, setPauseText] = useState("");
   const [pausePopoverOpen, setPausePopoverOpen] = useState(false);
+  const [startConvOpen, setStartConvOpen] = useState(false);
   const [nextStageId, setNextStageId] = useState<string>("");
   const [addParticipantOpen, setAddParticipantOpen] = useState(false);
   const [newParticipantUserId, setNewParticipantUserId] = useState<string>("");
@@ -617,6 +619,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const slaColor = SEMAFORO_COLOR[journey?.etapa_semaforo || "sem_sla"];
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden">
         {loading ? (
@@ -657,6 +660,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  {journey.ticket_id && (
+                    <Button size="sm" variant="outline" onClick={() => setStartConvOpen(true)}>
+                      <MessageSquare className="h-4 w-4 mr-1" /> Conversa
+                    </Button>
+                  )}
                   {isPaused ? (
                     <Button size="sm" variant="outline" onClick={handleResume}>
                       <Play className="h-4 w-4 mr-1" /> Retomar
@@ -1209,5 +1217,20 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         )}
       </DialogContent>
     </Dialog>
+    {journey && journey.ticket_id && (
+      <StartConversationFromTicketDialog
+        open={startConvOpen}
+        onOpenChange={setStartConvOpen}
+        ticketId={journey.ticket_id}
+        ticketCode={journey.ticket_code ?? ""}
+        clienteId={journey.cliente_id ?? undefined}
+        clienteNome={clienteNome}
+        onCreated={() => {
+          qc.invalidateQueries({ queryKey: ["onboarding-attendances", journey.ticket_id] });
+          qc.invalidateQueries({ queryKey: ["onboarding-events", journey.ticket_id] });
+        }}
+      />
+    )}
+    </>
   );
 }
