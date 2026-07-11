@@ -293,9 +293,10 @@ export default function OnboardingPage() {
                               setDraggingId(j.journey_id);
                             }}
                             onDragEnd={() => setDraggingId(null)}
-                            className={`bg-card border border-border rounded-md p-2.5 hover:border-primary/40 transition-all ${
+                            onClick={() => setDetailId(j.journey_id)}
+                            className={`bg-card border border-border rounded-md p-2.5 hover:border-primary/40 transition-all cursor-pointer ${
                               draggingId === j.journey_id ? "opacity-40 scale-95" : ""
-                            } ${parado ? "opacity-60" : "cursor-grab active:cursor-grabbing"}`}
+                            } ${parado ? "opacity-60" : "active:cursor-grabbing"}`}
                           >
                             <div className="flex items-center gap-1.5 mb-1">
                               <span
