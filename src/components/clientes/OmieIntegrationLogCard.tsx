@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  ArrowUp,
-  ArrowDown,
+  ArrowRight,
+  ArrowLeft,
   CheckCircle,
   AlertCircle,
   Ban,
@@ -22,12 +22,10 @@ interface Props {
 
 interface LogItem {
   quando: string;
-  evento: string;
-  entidade: string;
   status: "sucesso" | "erro" | "ignorado" | string;
   erro?: string | null;
-  rotulo: string;
-  direcao: "Envio ao Omie" | "Recebimento do Omie" | string;
+  direcao_texto?: string | null;
+  detalhe?: string | null;
 }
 
 interface OmieDadosLog {
@@ -66,12 +64,17 @@ function statusConfig(status?: string | null) {
   };
 }
 
-function direcaoIcon(direcao?: string | null) {
-  const d = (direcao || "").toLowerCase();
-  if (d.includes("recebimento") || d.includes("recebido") || d.includes("do omie")) {
-    return { Icon: ArrowDown, label: direcao || "Recebimento do Omie" };
+function direcaoIcon(direcaoTexto?: string | null) {
+  const d = (direcaoTexto || "").toLowerCase();
+  const isRecebimento =
+    d.includes("recebido") ||
+    d.includes("recebimento") ||
+    d.includes("do omie") ||
+    d.includes("para o ds");
+  if (isRecebimento) {
+    return { Icon: ArrowLeft, label: direcaoTexto || "Recebido do Omie" };
   }
-  return { Icon: ArrowUp, label: direcao || "Envio ao Omie" };
+  return { Icon: ArrowRight, label: direcaoTexto || "Enviado do DS" };
 }
 
 function formatQuando(quando?: string | null): string {
@@ -198,7 +201,7 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
             <div className="space-y-3">
               {sortedLogs.map((log, idx) => {
                 const { icon: StatusIcon, badge, label } = statusConfig(log.status);
-                const { Icon: DirecaoIcon, label: direcaoLabel } = direcaoIcon(log.direcao);
+                const { Icon: DirecaoIcon, label: direcaoLabel } = direcaoIcon(log.direcao_texto);
                 return (
                   <div
                     key={idx}
@@ -217,11 +220,10 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
                     <div className="flex items-start gap-2">
                       <DirecaoIcon className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                       <div className="min-w-0">
-                        <div className="font-medium">{log.rotulo || log.evento || "Evento"}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {direcaoLabel}
-                          {log.entidade && ` · ${log.entidade}`}
-                        </div>
+                        <div className="font-medium">{direcaoLabel || "Integração"}</div>
+                        {log.detalhe && (
+                          <div className="text-xs text-muted-foreground">{log.detalhe}</div>
+                        )}
                       </div>
                     </div>
                     {log.erro && (
