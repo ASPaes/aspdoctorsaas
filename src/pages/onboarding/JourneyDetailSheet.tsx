@@ -62,6 +62,8 @@ interface Journey {
   demand_type_id?: string | null;
   demand_type_nome?: string | null;
   demand_type_cor?: string | null;
+  concluido_em?: string | null;
+  go_live_real?: string | null;
 }
 
 
@@ -119,6 +121,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [pausePopoverOpen, setPausePopoverOpen] = useState(false);
   const [startConvOpen, setStartConvOpen] = useState(false);
   const [nextStageId, setNextStageId] = useState<string>("");
+  const [concludeOpen, setConcludeOpen] = useState(false);
+  const [goLiveReal, setGoLiveReal] = useState<string>("");
   const [addParticipantOpen, setAddParticipantOpen] = useState(false);
   const [newParticipantUserId, setNewParticipantUserId] = useState<string>("");
   const [newParticipantPapel, setNewParticipantPapel] = useState<Papel>("especialista");
@@ -377,6 +381,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const cliente = clienteQ.data;
   const clienteNome = cliente?.nome_fantasia || cliente?.razao_social || "—";
   const isPaused = journey?.situacao === "pausado" || journey?.situacao === "parado";
+  const isConcluded = journey?.situacao === "concluido";
 
   async function handleAdvance() {
     if (!journey) return;
@@ -449,6 +454,37 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao retomar");
+    }
+  }
+
+  async function handleConclude() {
+    if (!journey) return;
+    try {
+      const { error } = await (supabase.rpc as any)("conclude_onboarding_journey", {
+        p_journey_id: journey.journey_id,
+        p_go_live_real: goLiveReal || null,
+      });
+      if (error) throw error;
+      toast.success("Jornada concluída");
+      setConcludeOpen(false);
+      setGoLiveReal("");
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao concluir");
+    }
+  }
+
+  async function handleReopen() {
+    if (!journey) return;
+    try {
+      const { error } = await (supabase.rpc as any)("reopen_onboarding_journey", { p_journey_id: journey.journey_id });
+      if (error) throw error;
+      toast.success("Jornada reaberta");
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao reabrir");
     }
   }
 
@@ -653,6 +689,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         <Pause className="h-3 w-3" /> pausado
                       </Badge>
                     )}
+                    {isConcluded && (
+                      <Badge className="text-[10px] gap-1 border-0 text-white" style={{ background: "#22C55E" }}>
+                        <CheckCircle2 className="h-3 w-3" /> Concluída
+                      </Badge>
+                    )}
                   </div>
                   <DialogTitle className="text-base mt-1 truncate">{clienteNome}</DialogTitle>
                   {journey.assunto && (
@@ -665,36 +706,55 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       <MessageSquare className="h-4 w-4 mr-1" /> Conversa
                     </Button>
                   )}
-                  {isPaused ? (
-                    <Button size="sm" variant="outline" onClick={handleResume}>
-                      <Play className="h-4 w-4 mr-1" /> Retomar
-                    </Button>
+                  {isConcluded ? (
+                    <>
+                      <span className="text-[11px] text-muted-foreground">
+                        Concluída em {formatDate(journey.concluido_em ?? null)}
+                      </span>
+                      <Button size="sm" variant="outline" onClick={handleReopen}>
+                        <Play className="h-4 w-4 mr-1" /> Reabrir
+                      </Button>
+                    </>
+                  ) : isPaused ? (
+                    <>
+                      <Button size="sm" variant="outline" onClick={handleResume}>
+                        <Play className="h-4 w-4 mr-1" /> Retomar
+                      </Button>
+                      <Button size="sm" className="text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
+                        <CheckCircle2 className="h-4 w-4 mr-1" /> Concluir
+                      </Button>
+                    </>
                   ) : (
-                    <Popover open={pausePopoverOpen} onOpenChange={setPausePopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <Button size="sm" variant="outline">
-                          <Pause className="h-4 w-4 mr-1" /> Pausar
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-80 space-y-3" align="end">
-                        <div>
-                          <label className="text-xs font-medium">Motivo</label>
-                          <Select value={pauseReasonId} onValueChange={setPauseReasonId}>
-                            <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                            <SelectContent>
-                              {(pauseReasonsQ.data ?? []).map((r) => (
-                                <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium">Justificativa (opcional)</label>
-                          <Textarea value={pauseText} onChange={(e) => setPauseText(e.target.value)} rows={3} className="mt-1" />
-                        </div>
-                        <Button size="sm" className="w-full" onClick={handlePause}>Confirmar pausa</Button>
-                      </PopoverContent>
-                    </Popover>
+                    <>
+                      <Popover open={pausePopoverOpen} onOpenChange={setPausePopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button size="sm" variant="outline">
+                            <Pause className="h-4 w-4 mr-1" /> Pausar
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80 space-y-3" align="end">
+                          <div>
+                            <label className="text-xs font-medium">Motivo</label>
+                            <Select value={pauseReasonId} onValueChange={setPauseReasonId}>
+                              <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                              <SelectContent>
+                                {(pauseReasonsQ.data ?? []).map((r) => (
+                                  <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium">Justificativa (opcional)</label>
+                            <Textarea value={pauseText} onChange={(e) => setPauseText(e.target.value)} rows={3} className="mt-1" />
+                          </div>
+                          <Button size="sm" className="w-full" onClick={handlePause}>Confirmar pausa</Button>
+                        </PopoverContent>
+                      </Popover>
+                      <Button size="sm" className="text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
+                        <CheckCircle2 className="h-4 w-4 mr-1" /> Concluir
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
@@ -1099,12 +1159,15 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                               ))}
                           </SelectContent>
                         </Select>
-                        <Button size="sm" onClick={handleAdvance} disabled={isPaused}>
+                        <Button size="sm" onClick={handleAdvance} disabled={isPaused || isConcluded}>
                           Avançar <ArrowRight className="h-3.5 w-3.5 ml-1" />
                         </Button>
                       </div>
-                      {isPaused && (
+                      {isPaused && !isConcluded && (
                         <p className="text-[10px] text-muted-foreground">Retome o onboarding para avançar de etapa.</p>
+                      )}
+                      {isConcluded && (
+                        <p className="text-[10px] text-muted-foreground">Jornada concluída — reabra para movimentar etapas.</p>
                       )}
                     </div>
                   </section>
@@ -1231,6 +1294,26 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         }}
       />
     )}
+    <Dialog open={concludeOpen} onOpenChange={setConcludeOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Concluir jornada?</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Ao concluir, os relógios de SLA serão congelados e a etapa/pausa em aberto será fechada.
+        </p>
+        <div className="space-y-1">
+          <label className="text-xs font-medium">Go-live real (opcional)</label>
+          <Input type="date" value={goLiveReal} onChange={(e) => setGoLiveReal(e.target.value)} />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => setConcludeOpen(false)}>Cancelar</Button>
+          <Button size="sm" className="text-white border-0" style={{ background: "#22C55E" }} onClick={handleConclude}>
+            <CheckCircle2 className="h-4 w-4 mr-1" /> Confirmar conclusão
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }

@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Pause, Clock, Calendar, Settings2 } from "lucide-react";
+import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { NewJourneyModal } from "./NewJourneyModal";
@@ -88,6 +88,7 @@ export default function OnboardingPage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [showConcluded, setShowConcluded] = useState(false);
 
   const isSuperAdmin = profile?.is_super_admin === true;
 
@@ -155,10 +156,11 @@ export default function OnboardingPage() {
     const m: Record<string, JourneyRow[]> = {};
     stages.forEach((s) => (m[s.id] = []));
     journeys.forEach((j) => {
+      if (!showConcluded && j.situacao === "concluido") return;
       if (j.current_stage_id && m[j.current_stage_id]) m[j.current_stage_id].push(j);
     });
     return m;
-  }, [stages, journeys]);
+  }, [stages, journeys, showConcluded]);
 
   async function handleDrop(journeyId: string, targetStageId: string, fromStageId: string) {
     if (fromStageId === targetStageId) return;
@@ -225,6 +227,10 @@ export default function OnboardingPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant={showConcluded ? "default" : "outline"} onClick={() => setShowConcluded((v) => !v)}>
+            <CheckCircle2 className="h-4 w-4 mr-1" />
+            {showConcluded ? "Ocultar concluídas" : "Mostrar concluídas"}
+          </Button>
           <Button asChild size="sm" variant="outline">
             <Link to="/onboarding-implantacao/config">
               <Settings2 className="h-4 w-4 mr-1" />
@@ -286,11 +292,12 @@ export default function OnboardingPage() {
                     ) : (
                       items.map((j) => {
                         const parado = j.situacao === "parado" || j.situacao === "pausado";
-                        const semaforo = j.etapa_semaforo || "sem_sla";
+                        const concluida = j.situacao === "concluido";
+                        const semaforo = concluida ? "sem_sla" : (j.etapa_semaforo || "sem_sla");
                         return (
                           <div
                             key={j.journey_id}
-                            draggable={!parado}
+                            draggable={!parado && !concluida}
                             onDragStart={(e) => {
                               e.dataTransfer.setData("journeyId", j.journey_id);
                               e.dataTransfer.setData("fromStageId", j.current_stage_id ?? "");
@@ -298,22 +305,32 @@ export default function OnboardingPage() {
                             }}
                             onDragEnd={() => setDraggingId(null)}
                             onClick={() => setDetailId(j.journey_id)}
-                            className={`bg-card border border-border rounded-md p-2.5 hover:border-primary/40 transition-all cursor-pointer ${
+                            className={`bg-card border rounded-md p-2.5 hover:border-primary/40 transition-all cursor-pointer ${
                               draggingId === j.journey_id ? "opacity-40 scale-95" : ""
-                            } ${parado ? "opacity-60" : "active:cursor-grabbing"}`}
+                            } ${parado ? "opacity-60" : ""} ${concluida ? "opacity-70" : "active:cursor-grabbing"}`}
+                            style={concluida ? { borderColor: "#22C55E" } : undefined}
                           >
                             <div className="flex items-center gap-1.5 mb-1">
-                              <span
-                                className="h-2 w-2 rounded-full shrink-0"
-                                style={{ background: SEMAFORO_COLOR[semaforo] }}
-                                title={`SLA: ${semaforo}`}
-                              />
+                              {concluida ? (
+                                <CheckCircle2 className="h-3 w-3 shrink-0" style={{ color: "#22C55E" }} />
+                              ) : (
+                                <span
+                                  className="h-2 w-2 rounded-full shrink-0"
+                                  style={{ background: SEMAFORO_COLOR[semaforo] }}
+                                  title={`SLA: ${semaforo}`}
+                                />
+                              )}
                               {j.ticket_code && (
                                 <span className="font-mono text-[11px] text-primary font-semibold">
                                   {j.ticket_code}
                                 </span>
                               )}
-                              {parado && (
+                              {concluida && (
+                                <span className="ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border-0 text-white" style={{ background: "#22C55E" }}>
+                                  concluída
+                                </span>
+                              )}
+                              {parado && !concluida && (
                                 <span className="ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
                                   <Pause className="h-2.5 w-2.5" /> pausado
                                 </span>
