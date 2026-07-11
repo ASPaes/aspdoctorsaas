@@ -679,7 +679,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
             </ScrollArea>
           </>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
