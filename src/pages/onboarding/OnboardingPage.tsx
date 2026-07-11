@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -10,6 +10,7 @@ import { Loader2, Plus, Pause, Clock, Calendar, Settings2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { NewJourneyModal } from "./NewJourneyModal";
+import JourneyDetailSheet from "./JourneyDetailSheet";
 
 interface StageRow {
   id: string;
@@ -82,7 +83,7 @@ export default function OnboardingPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const isSuperAdmin = profile?.is_super_admin === true;
 
@@ -242,7 +243,7 @@ export default function OnboardingPage() {
           Nenhum pipeline de {fase} configurado para este tenant.
         </div>
       ) : (
-        <div ref={scrollRef} className="flex-1 overflow-x-auto p-4">
+        <div className="flex-1 overflow-x-auto p-4">
           <div className="flex flex-row gap-3 min-h-full pb-2">
             {stages.map((col) => {
               const items = journeysByStage[col.id] ?? [];
@@ -292,9 +293,10 @@ export default function OnboardingPage() {
                               setDraggingId(j.journey_id);
                             }}
                             onDragEnd={() => setDraggingId(null)}
-                            className={`bg-card border border-border rounded-md p-2.5 hover:border-primary/40 transition-all ${
+                            onClick={() => setDetailId(j.journey_id)}
+                            className={`bg-card border border-border rounded-md p-2.5 hover:border-primary/40 transition-all cursor-pointer ${
                               draggingId === j.journey_id ? "opacity-40 scale-95" : ""
-                            } ${parado ? "opacity-60" : "cursor-grab active:cursor-grabbing"}`}
+                            } ${parado ? "opacity-60" : "active:cursor-grabbing"}`}
                           >
                             <div className="flex items-center gap-1.5 mb-1">
                               <span
@@ -353,6 +355,13 @@ export default function OnboardingPage() {
         onCreated={() => {
           queryClient.invalidateQueries({ queryKey: ["onboarding-journeys"] });
         }}
+      />
+
+      <JourneyDetailSheet
+        open={!!detailId}
+        onOpenChange={(o) => { if (!o) setDetailId(null); }}
+        journeyId={detailId}
+        tenantId={effectiveTenantId}
       />
     </div>
   );
