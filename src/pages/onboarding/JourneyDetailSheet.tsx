@@ -1054,8 +1054,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         ) : (
           <>
             <DialogHeader className="px-6 py-4 border-b border-border shrink-0">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-3">
+                <div className="min-w-0 pr-10">
                   <div className="flex items-center gap-2 flex-wrap">
                     {journey.ticket_code && (
                       <span className="font-mono text-xs text-primary font-semibold">{journey.ticket_code}</span>
