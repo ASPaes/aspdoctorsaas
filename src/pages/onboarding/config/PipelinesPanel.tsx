@@ -31,6 +31,20 @@ import { formatSlaHuman, slugify } from "./utils";
 
 type Fase = "onboarding" | "implantacao";
 
+const SECTION_OPTIONS: { key: string; label: string }[] = [
+  { key: "participantes", label: "Responsável & participantes" },
+  { key: "timeline", label: "Linha do tempo das etapas" },
+  { key: "pausas", label: "Tempo parado por motivo" },
+  { key: "modulos", label: "Módulos da jornada" },
+  { key: "contabilidade", label: "Dados da contabilidade" },
+  { key: "treinos", label: "Sub-tickets de treino" },
+  { key: "checklist", label: "Checklist da etapa" },
+  { key: "atendimentos", label: "Atendimentos vinculados" },
+  { key: "eventos", label: "Timeline de eventos" },
+  { key: "anexos", label: "Anexos" },
+];
+const ALL_SECTION_KEYS = SECTION_OPTIONS.map((s) => s.key);
+
 interface Pipeline {
   id: string;
   nome: string;
