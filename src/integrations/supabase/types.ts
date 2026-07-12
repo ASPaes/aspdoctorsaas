@@ -3991,6 +3991,9 @@ export type Database = {
           go_live_previsto: string | null
           go_live_real: string | null
           id: string
+          implantacao_concluida_em: string | null
+          implantacao_iniciada_em: string | null
+          onboarding_concluido_em: string | null
           pipeline_implantacao_id: string | null
           pipeline_onboarding_id: string | null
           produto_id: number | null
@@ -4011,6 +4014,9 @@ export type Database = {
           go_live_previsto?: string | null
           go_live_real?: string | null
           id?: string
+          implantacao_concluida_em?: string | null
+          implantacao_iniciada_em?: string | null
+          onboarding_concluido_em?: string | null
           pipeline_implantacao_id?: string | null
           pipeline_onboarding_id?: string | null
           produto_id?: number | null
@@ -4031,6 +4037,9 @@ export type Database = {
           go_live_previsto?: string | null
           go_live_real?: string | null
           id?: string
+          implantacao_concluida_em?: string | null
+          implantacao_iniciada_em?: string | null
+          onboarding_concluido_em?: string | null
           pipeline_implantacao_id?: string | null
           pipeline_onboarding_id?: string | null
           produto_id?: number | null
@@ -4174,6 +4183,7 @@ export type Database = {
           created_at: string
           criada_por: string | null
           duracao_minutos: number | null
+          fase: Database["public"]["Enums"]["onb_fase_atual"] | null
           finalizada_em: string | null
           id: string
           iniciada_em: string
@@ -4186,6 +4196,7 @@ export type Database = {
           created_at?: string
           criada_por?: string | null
           duracao_minutos?: number | null
+          fase?: Database["public"]["Enums"]["onb_fase_atual"] | null
           finalizada_em?: string | null
           id?: string
           iniciada_em?: string
@@ -4198,6 +4209,7 @@ export type Database = {
           created_at?: string
           criada_por?: string | null
           duracao_minutos?: number | null
+          fase?: Database["public"]["Enums"]["onb_fase_atual"] | null
           finalizada_em?: string | null
           id?: string
           iniciada_em?: string
@@ -4230,6 +4242,70 @@ export type Database = {
           },
           {
             foreignKeyName: "onboarding_pauses_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_phase_metrics: {
+        Row: {
+          concluida_em: string | null
+          created_at: string
+          fase: Database["public"]["Enums"]["onb_fase"]
+          id: string
+          iniciada_em: string | null
+          journey_id: string
+          pausado_min: number | null
+          responsavel_user_id: string | null
+          sla_corrido_min: number | null
+          sla_util_min: number | null
+          tenant_id: string
+        }
+        Insert: {
+          concluida_em?: string | null
+          created_at?: string
+          fase: Database["public"]["Enums"]["onb_fase"]
+          id?: string
+          iniciada_em?: string | null
+          journey_id: string
+          pausado_min?: number | null
+          responsavel_user_id?: string | null
+          sla_corrido_min?: number | null
+          sla_util_min?: number | null
+          tenant_id: string
+        }
+        Update: {
+          concluida_em?: string | null
+          created_at?: string
+          fase?: Database["public"]["Enums"]["onb_fase"]
+          id?: string
+          iniciada_em?: string | null
+          journey_id?: string
+          pausado_min?: number | null
+          responsavel_user_id?: string | null
+          sla_corrido_min?: number | null
+          sla_util_min?: number | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_phase_metrics_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_phase_metrics_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_phase_metrics_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -9152,14 +9228,26 @@ export type Database = {
           fase_atual: Database["public"]["Enums"]["onb_fase_atual"] | null
           go_live_previsto: string | null
           go_live_real: string | null
+          implantacao_concluida_em: string | null
+          implantacao_iniciada_em: string | null
           journey_id: string | null
+          onb_ini: string | null
+          onboarding_concluido: boolean | null
+          onboarding_concluido_em: string | null
           produto_id: number | null
           setor_nome: string | null
           situacao: Database["public"]["Enums"]["onb_situacao"] | null
-          sla_ancora: string | null
           sla_corrido_min: number | null
+          sla_imp_corrido_min: number | null
+          sla_imp_pausado_min: number | null
+          sla_imp_util_min: number | null
           sla_iniciado_em: string | null
+          sla_onb_corrido_min: number | null
+          sla_onb_pausado_min: number | null
+          sla_onb_util_min: number | null
           sla_pausado_min: number | null
+          sla_total_corrido_min: number | null
+          sla_total_pausado_min: number | null
           sla_util_min: number | null
           stage_fase: Database["public"]["Enums"]["onb_fase"] | null
           stage_nome: string | null
@@ -9903,6 +9991,13 @@ export type Database = {
       fn_process_ura_timeouts: { Args: never; Returns: Json }
       fn_retry_waiting_conversations: { Args: never; Returns: Json }
       fn_schedule_group_syncs: { Args: never; Returns: undefined }
+      fn_snapshot_onboarding_phase: {
+        Args: {
+          p_fase: Database["public"]["Enums"]["onb_fase"]
+          p_journey_id: string
+        }
+        Returns: undefined
+      }
       fn_sync_member_for_funcionario: {
         Args: { p_funcionario_id: number; p_tenant_id: string }
         Returns: undefined
