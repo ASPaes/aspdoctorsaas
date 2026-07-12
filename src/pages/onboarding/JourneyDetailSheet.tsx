@@ -744,7 +744,6 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       toast.error(e.message || "Erro ao cancelar");
     }
   }
-  }
 
   async function handleAddNote() {
     if (!journey?.ticket_id || !note.trim() || !user?.id) return;
