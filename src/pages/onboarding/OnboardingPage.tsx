@@ -97,6 +97,12 @@ export default function OnboardingPage() {
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [showConcluded, setShowConcluded] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [filtroResponsavel, setFiltroResponsavel] = useState<string>("todos");
+  const [filtroDemanda, setFiltroDemanda] = useState<string>("todos");
+  const [filtroSemaforo, setFiltroSemaforo] = useState<string>("todos");
+  const [filtroSituacao, setFiltroSituacao] = useState<string>("todos");
+  const [periodoEntrada, setPeriodoEntrada] = useState<{ from: Date; to: Date } | null>(null);
 
   const isSuperAdmin = profile?.is_super_admin === true;
 
