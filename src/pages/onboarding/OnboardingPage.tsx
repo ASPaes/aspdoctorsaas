@@ -130,12 +130,18 @@ export default function OnboardingPage() {
     queryKey: ["onboarding-journeys", effectiveTenantId, fase],
     enabled: isSuperAdmin && !!effectiveTenantId,
     queryFn: async () => {
-      const rows = await fetchAllRows<JourneyRow>(() =>
-        (supabase.from("vw_onboarding_journeys" as any) as any)
+      const rows = await fetchAllRows<JourneyRow>(() => {
+        let q = (supabase.from("vw_onboarding_journeys" as any) as any)
           .select("*")
-          .eq("tenant_id", effectiveTenantId)
-          .eq("stage_fase", fase)
-      );
+          .eq("tenant_id", effectiveTenantId);
+        if (fase === "onboarding") {
+          // ativas no onboarding + jornadas cujo onboarding já foi concluído (visível como coluna final)
+          q = q.or("stage_fase.eq.onboarding,onboarding_concluido.eq.true");
+        } else {
+          q = q.eq("stage_fase", fase);
+        }
+        return q;
+      });
       // fetch cliente names
       const clienteIds = Array.from(new Set(rows.map((r) => r.cliente_id).filter(Boolean))) as string[];
       let clienteMap: Record<string, string> = {};
