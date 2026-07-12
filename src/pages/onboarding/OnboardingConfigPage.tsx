@@ -9,13 +9,14 @@ import { PauseReasonsPanel } from "./config/PauseReasonsPanel";
 import { DemandTypesPanel } from "./config/DemandTypesPanel";
 import { TrainingTypesPanel } from "./config/TrainingTypesPanel";
 import { VendorReturnReasonsPanel } from "./config/VendorReturnReasonsPanel";
+import { AccountingFieldsPanel } from "./config/AccountingFieldsPanel";
 
 type Fase = "onboarding" | "implantacao";
 
 export default function OnboardingConfigPage() {
   const { profile, profileLoading } = useAuth();
   const [fase, setFase] = useState<Fase>("onboarding");
-  const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas" | "treinos" | "retornos">("pipelines");
+  const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas" | "treinos" | "retornos" | "contabilidade">("pipelines");
 
 
 
@@ -68,6 +69,7 @@ export default function OnboardingConfigPage() {
           <TabsTrigger value="demandas">Tipos de demanda</TabsTrigger>
           <TabsTrigger value="treinos">Tipos de treino</TabsTrigger>
           <TabsTrigger value="retornos">Retorno ao vendedor</TabsTrigger>
+          <TabsTrigger value="contabilidade">Dados da contabilidade</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pipelines" className="flex-1 min-h-0 p-4 pt-3">
@@ -84,6 +86,9 @@ export default function OnboardingConfigPage() {
         </TabsContent>
         <TabsContent value="retornos" className="flex-1 min-h-0 p-4 pt-3">
           <VendorReturnReasonsPanel />
+        </TabsContent>
+        <TabsContent value="contabilidade" className="flex-1 min-h-0 p-4 pt-3">
+          <AccountingFieldsPanel />
         </TabsContent>
 
 
