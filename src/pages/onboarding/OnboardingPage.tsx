@@ -390,6 +390,90 @@ export default function OnboardingPage() {
                 </div>
               );
             })}
+            {fase === "onboarding" && (() => {
+              const items = journeysByStage[ONB_DONE_COL_ID] ?? [];
+              const doneColor = "#22C55E";
+              return (
+                <div
+                  key={ONB_DONE_COL_ID}
+                  className="flex flex-col min-w-[280px] w-[280px] rounded-lg border border-emerald-500/40 bg-emerald-500/5"
+                >
+                  <div className="flex items-center gap-2 px-3 py-2 border-b border-emerald-500/30 bg-emerald-500/10 rounded-t-lg">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: doneColor }} />
+                    <span className="text-xs font-medium truncate text-emerald-700 dark:text-emerald-400">
+                      Onboarding concluído
+                    </span>
+                    <Badge variant="outline" className="ml-auto text-[10px] border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
+                      {items.length}
+                    </Badge>
+                  </div>
+                  <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[75vh]">
+                    {items.length === 0 ? (
+                      <div className="text-center text-[11px] text-muted-foreground/50 py-6">
+                        Nenhuma jornada
+                      </div>
+                    ) : (
+                      items.map((j) => {
+                        const emImplantacao = j.fase_atual === "implantacao";
+                        const jornadaConcluida = j.fase_atual === "concluido" || j.situacao === "concluido";
+                        const slaOnb = j.sla_onb_util_min ?? j.sla_onb_corrido_min ?? null;
+                        return (
+                          <div
+                            key={j.journey_id}
+                            onClick={() => setDetailId(j.journey_id)}
+                            className="bg-card border rounded-md p-2.5 cursor-pointer hover:border-emerald-500/60 transition-all"
+                            style={{ borderColor: `${doneColor}55` }}
+                          >
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <CheckCircle2 className="h-3 w-3 shrink-0" style={{ color: doneColor }} />
+                              {j.ticket_code && (
+                                <span className="font-mono text-[11px] text-primary font-semibold">
+                                  {j.ticket_code}
+                                </span>
+                              )}
+                              <span
+                                className="ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border-0 text-white"
+                                style={{ background: jornadaConcluida ? doneColor : "#3B82F6" }}
+                              >
+                                {jornadaConcluida ? "concluída" : emImplantacao ? "→ em Implantação" : (j.fase_atual ?? "—")}
+                              </span>
+                            </div>
+                            <p className="text-xs text-foreground line-clamp-2">
+                              {j.assunto || "Sem assunto"}
+                            </p>
+                            {j.cliente_nome && (
+                              <p className="text-[11px] text-muted-foreground truncate mt-1">
+                                {j.cliente_nome}
+                              </p>
+                            )}
+                            {j.demand_type_nome && (
+                              <span
+                                className="inline-flex items-center mt-1.5 px-1.5 py-0.5 rounded text-[9px] font-medium text-white"
+                                style={{ background: j.demand_type_cor || "#6B7280" }}
+                              >
+                                {j.demand_type_nome}
+                              </span>
+                            )}
+                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground/90 mt-1.5 flex-wrap">
+                              <span className="inline-flex items-center gap-1" title="SLA do onboarding (congelado)">
+                                <Clock className="h-3 w-3" />
+                                SLA onb {formatMin(slaOnb)}
+                              </span>
+                              {j.go_live_previsto && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {formatDate(j.go_live_previsto)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
