@@ -144,6 +144,14 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [newModuleName, setNewModuleName] = useState("");
   const [newModuleProdutoModuloId, setNewModuleProdutoModuloId] = useState<string>("");
 
+  // Vendor return
+  const [returnOpen, setReturnOpen] = useState(false);
+  const [returnVendorId, setReturnVendorId] = useState<string>("");
+  const [returnReasonId, setReturnReasonId] = useState<string>("");
+  const [returnText, setReturnText] = useState("");
+  const [returnPauseSla, setReturnPauseSla] = useState(true);
+
+
   useEffect(() => {
     if (!open) {
       setChecked({});
