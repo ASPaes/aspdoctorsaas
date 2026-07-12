@@ -4499,6 +4499,7 @@ export type Database = {
           slug: string
           tenant_id: string
           updated_at: string
+          visible_sections: string[]
         }
         Insert: {
           ativo?: boolean
@@ -4515,6 +4516,7 @@ export type Database = {
           slug: string
           tenant_id: string
           updated_at?: string
+          visible_sections?: string[]
         }
         Update: {
           ativo?: boolean
@@ -4531,6 +4533,7 @@ export type Database = {
           slug?: string
           tenant_id?: string
           updated_at?: string
+          visible_sections?: string[]
         }
         Relationships: [
           {
@@ -9235,6 +9238,8 @@ export type Database = {
           onboarding_concluido: boolean | null
           onboarding_concluido_em: string | null
           produto_id: number | null
+          responsavel_nome: string | null
+          responsavel_user_id: string | null
           setor_nome: string | null
           situacao: Database["public"]["Enums"]["onb_situacao"] | null
           sla_corrido_min: number | null
@@ -9604,6 +9609,10 @@ export type Database = {
           p_motivo_id: number
           p_observacao?: string
         }
+        Returns: Json
+      }
+      cancel_onboarding_journey: {
+        Args: { p_journey_id: string; p_motivo?: string }
         Returns: Json
       }
       cancelar_contrato: {
