@@ -1007,6 +1007,67 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       <MessageSquare className="h-3.5 w-3.5 mr-1" /> Conversa
                     </Button>
                   )}
+                  {canScheduleTraining && (
+                    <Popover open={addTrainingOpenTop} onOpenChange={setAddTrainingOpenTop}>
+                      <PopoverTrigger asChild>
+                        <Button size="sm" variant="outline" className="h-8 text-xs">
+                          <GraduationCap className="h-3.5 w-3.5 mr-1" /> Agendar treino
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-96 space-y-3" align="end">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium">Título *</label>
+                          <Input
+                            value={newTrainingTitle}
+                            onChange={(e) => setNewTrainingTitle(e.target.value)}
+                            placeholder="Ex: Treinamento PDV"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium">Data/hora</label>
+                          <Input
+                            type="datetime-local"
+                            value={newTrainingDate}
+                            onChange={(e) => setNewTrainingDate(e.target.value)}
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium">Conduzido por</label>
+                          <Select value={newTrainingConductor} onValueChange={setNewTrainingConductor}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar usuário" /></SelectTrigger>
+                            <SelectContent>
+                              {(tenantMembersQ.data ?? []).map((m) => (
+                                <SelectItem key={m.user_id} value={m.user_id} className="text-xs">{m.nome}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium">Tipo de treino</label>
+                          <Select value={newTrainingTypeId} onValueChange={setNewTrainingTypeId}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar tipo" /></SelectTrigger>
+                            <SelectContent>
+                              {(trainingTypesQ.data ?? []).map((tt) => (
+                                <SelectItem key={tt.id} value={tt.id} className="text-xs">
+                                  {tt.nome}{tt.conta_como_pdv ? " · PDV" : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <label className="flex items-center gap-2 text-xs cursor-pointer">
+                          <Checkbox
+                            checked={newTrainingRetreat}
+                            onCheckedChange={(v) => setNewTrainingRetreat(!!v)}
+                          />
+                          É retreinamento?
+                        </label>
+                        <Button size="sm" className="w-full" onClick={handleCreateTraining}>Agendar</Button>
+                      </PopoverContent>
+                    </Popover>
+                  )}
                   {!isConcluded && (
                     openVendorReturn ? (
                       <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleResolveVendorReturn}>
