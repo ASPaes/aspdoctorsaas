@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
         }
 
         // Alerta in-app via notifyEvent (dedupe/cooldown de 60min gerenciado pela RPC)
-        if (newStatus === 'disconnected' && tenantId) {
+        if (newStatus === 'disconnected' && prevStatus === 'connected' && tenantId) {
           try {
             await notifyEvent(
               supabaseAdmin,

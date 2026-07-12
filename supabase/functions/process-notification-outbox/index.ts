@@ -16,6 +16,15 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  const { data: quiet } = await supabase.rpc('is_wa_quiet_hours');
+
+  if (quiet === true) {
+    return new Response(JSON.stringify({ processed: 0, skipped: 'quiet_hours' }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     // Sem auth de entrada: a proteção real está na fila (RLS: só service_role insere no outbox).
     // Este processador só drena itens legítimos — mesmo padrão do process-finalize-queue.
