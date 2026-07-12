@@ -289,6 +289,38 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     },
   });
 
+  const eventUserIds = useMemo(() => {
+    const ids = new Set<string>();
+    (eventsQ.data ?? []).forEach((e: any) => { if (e.user_id) ids.add(e.user_id); });
+    return Array.from(ids);
+  }, [eventsQ.data]);
+
+  const eventUsersQ = useQuery({
+    queryKey: ["onboarding-event-users", tenantId, eventUserIds.sort().join(",")],
+    enabled: !!tenantId && eventUserIds.length > 0,
+    queryFn: async () => {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("user_id, funcionario_id")
+        .eq("tenant_id", tenantId!)
+        .in("user_id", eventUserIds);
+      const funcIds = (profs ?? []).map((p: any) => p.funcionario_id).filter(Boolean);
+      let funcMap: Record<number, string> = {};
+      if (funcIds.length > 0) {
+        const { data: funcs } = await supabase
+          .from("funcionarios")
+          .select("id, nome")
+          .in("id", funcIds);
+        (funcs ?? []).forEach((f: any) => { funcMap[f.id] = f.nome; });
+      }
+      const map: Record<string, string> = {};
+      (profs ?? []).forEach((p: any) => {
+        if (p.funcionario_id && funcMap[p.funcionario_id]) map[p.user_id] = funcMap[p.funcionario_id];
+      });
+      return map;
+    },
+  });
+
   const trainingQ = useQuery({
     queryKey: ["onboarding-training", journeyId],
     enabled: !!journeyId,
