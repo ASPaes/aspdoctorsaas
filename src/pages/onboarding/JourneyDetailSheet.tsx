@@ -2037,11 +2037,19 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     <Dialog open={concludeOpen} onOpenChange={setConcludeOpen}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Concluir jornada?</DialogTitle>
+          <DialogTitle>Registrar Go-live?</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
           Ao concluir, os relógios de SLA serão congelados e a etapa/pausa em aberto será fechada.
         </p>
+        {!(journey?.fase_atual === "implantacao" && etapaFinal) && (
+          <Alert className="border-warning/50 bg-warning/15 text-warning [&>svg]:text-warning py-2">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              Você está registrando o Go-live antes da etapa final da implantação (permissão de administrador).
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="space-y-1">
           <label className="text-xs font-medium">Go-live real (opcional)</label>
           <Input type="date" value={goLiveReal} onChange={(e) => setGoLiveReal(e.target.value)} />
@@ -2049,7 +2057,29 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" size="sm" onClick={() => setConcludeOpen(false)}>Cancelar</Button>
           <Button size="sm" className="text-white border-0" style={{ background: "#22C55E" }} onClick={handleConclude}>
-            <CheckCircle2 className="h-4 w-4 mr-1" /> Confirmar conclusão
+            <CheckCircle2 className="h-4 w-4 mr-1" /> Confirmar Go-live
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Ban className="h-4 w-4 text-destructive" /> Cancelar jornada?
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          A jornada será encerrada como cancelada, os relógios de SLA congelados e a etapa/pausa em aberto fechada. O motivo fica registrado no histórico.
+        </p>
+        <div className="space-y-1">
+          <label className="text-xs font-medium">Motivo do cancelamento *</label>
+          <Textarea value={cancelMotivo} onChange={(e) => setCancelMotivo(e.target.value)} rows={4} placeholder="Descreva o motivo..." />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => setCancelOpen(false)}>Voltar</Button>
+          <Button variant="destructive" size="sm" onClick={handleCancel}>
+            <Ban className="h-4 w-4 mr-1" /> Confirmar cancelamento
           </Button>
         </div>
       </DialogContent>
