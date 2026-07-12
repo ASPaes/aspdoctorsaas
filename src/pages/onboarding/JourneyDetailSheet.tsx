@@ -723,6 +723,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       const nome = memberNameMap.get(userId) || "usuário";
       if (user?.id) {
         await (supabase.from("support_ticket_events" as any) as any).insert({
+          tenant_id: tenantId,
           ticket_id: journey.ticket_id,
           user_id: user.id,
           event_type: "onboarding_participante",
