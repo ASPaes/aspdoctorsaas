@@ -1537,7 +1537,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     </div>
                     <div className="p-3 space-y-2">
                       {trainings.length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2 text-center">Nenhum treino cadastrado.</p>
+                        <p className="text-xs text-muted-foreground py-2 text-center">
+                          {canScheduleTraining
+                            ? "Nenhum treino cadastrado."
+                            : "Disponível a partir da última etapa do onboarding."}
+                        </p>
                       ) : (
                         trainings.map((t) => {
                           const statusColors: Record<string, string> = {
