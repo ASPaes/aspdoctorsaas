@@ -1526,6 +1526,14 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-96 space-y-3" align="end">
+                              {journey?.fase_atual === "onboarding" && (
+                                <Alert className="border-warning/50 bg-warning/15 text-warning [&>svg]:text-warning py-2 text-xs">
+                                  <AlertTriangle className="h-4 w-4" />
+                                  <AlertDescription className="text-xs">
+                                    Ao agendar este treino, a jornada será concluída no Onboarding e iniciará a fase de Implantação.
+                                  </AlertDescription>
+                                </Alert>
+                              )}
                               <div className="space-y-1">
                                 <label className="text-[11px] font-medium">Título *</label>
                                 <Input
