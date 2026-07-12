@@ -612,6 +612,13 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const etapaFinal = stages.find((s) => s.id === journey?.current_stage_id)?.is_final === true;
   const canGoLive = (journey?.fase_atual === "implantacao" && etapaFinal) || isAdmin;
 
+  const currentStageSections = useMemo(() => {
+    const cur = stages.find((s) => s.id === journey?.current_stage_id);
+    return cur?.visible_sections ?? null;
+  }, [stages, journey]);
+  const secVisible = (key: string) =>
+    !currentStageSections || currentStageSections.length === 0 || currentStageSections.includes(key);
+
 
   async function handleAdvance() {
     if (!journey) return;
