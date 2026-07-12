@@ -399,6 +399,38 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   });
 
 
+  const vendorReturnReasonsQ = useQuery({
+    queryKey: ["onb-vendor-return-reasons-lookup", tenantId],
+    enabled: open && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_vendor_return_reasons" as any) as any)
+        .select("id, nome, atribuivel_vendedor")
+        .eq("tenant_id", tenantId)
+        .eq("ativo", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; atribuivel_vendedor: boolean }>;
+    },
+  });
+
+  const vendorReturnsQ = useQuery({
+    queryKey: ["onboarding-vendor-returns", journeyId, tenantId],
+    enabled: !!journeyId && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("vw_onboarding_vendor_returns" as any) as any)
+        .select("vendedor_user_id, motivo_nome, atribuivel_vendedor, retornado_em, resolvido_em, em_aberto, minutos")
+        .eq("tenant_id", tenantId)
+        .eq("journey_id", journeyId)
+        .order("retornado_em", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        vendedor_user_id: string; motivo_nome: string | null; atribuivel_vendedor: boolean;
+        retornado_em: string; resolvido_em: string | null; em_aberto: boolean; minutos: number | null;
+      }>;
+    },
+  });
+
+
 
   const tenantMembersQ = useQuery({
     queryKey: ["onboarding-tenant-members", tenantId],
