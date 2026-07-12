@@ -511,6 +511,17 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     [stages, journey?.current_stage_id]
   );
 
+  const canScheduleTraining = useMemo(() => {
+    if (!journey) return false;
+    if (journey.situacao === "concluido") return false;
+    if (journey.fase_atual === "implantacao") return true;
+    if (journey.fase_atual === "onboarding") {
+      const cur = stages.find((s) => s.id === journey.current_stage_id);
+      return cur?.is_final === true;
+    }
+    return false;
+  }, [journey, stages]);
+
   const pausesByReason = useMemo(() => {
     const rows = pausesByReasonQ.data ?? [];
     const agg = new Map<string, { minutos: number; em_andamento: boolean; count: number }>();
