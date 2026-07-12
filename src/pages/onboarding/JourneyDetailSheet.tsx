@@ -242,12 +242,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!pipelineId && !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_stages" as any) as any)
-        .select("id, nome, position, cor, is_final")
+        .select("id, nome, position, cor, is_final, visible_sections")
         .eq("tenant_id", tenantId)
         .eq("pipeline_id", pipelineId)
         .order("position");
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; nome: string; position: number; cor: string | null; is_final: boolean | null }>;
+      return (data ?? []) as Array<{ id: string; nome: string; position: number; cor: string | null; is_final: boolean | null; visible_sections: string[] | null }>;
     },
   });
 
@@ -611,6 +611,13 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const isAdmin = profile?.is_super_admin === true || profile?.role === "admin";
   const etapaFinal = stages.find((s) => s.id === journey?.current_stage_id)?.is_final === true;
   const canGoLive = (journey?.fase_atual === "implantacao" && etapaFinal) || isAdmin;
+
+  const currentStageSections = useMemo(() => {
+    const cur = stages.find((s) => s.id === journey?.current_stage_id);
+    return cur?.visible_sections ?? null;
+  }, [stages, journey]);
+  const secVisible = (key: string) =>
+    !currentStageSections || currentStageSections.length === 0 || currentStageSections.includes(key);
 
 
   async function handleAdvance() {
@@ -1333,158 +1340,162 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                 {/* LEFT */}
                 <div className="space-y-5">
                   {/* Participants */}
-                  <section className="rounded-lg border border-border">
-                    <div className="p-3 border-b border-border flex items-center justify-between">
-                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                        <Users className="h-4 w-4" /> Responsável & participantes
-                      </h3>
-                      <Popover open={addParticipantOpen} onOpenChange={setAddParticipantOpen}>
-                        <PopoverTrigger asChild>
-                          <Button size="sm" variant="outline" className="h-7 text-xs">
-                            <UserPlus className="h-3.5 w-3.5 mr-1" /> Adicionar
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-80 space-y-3" align="end">
-                          <div>
-                            <label className="text-xs font-medium">Usuário</label>
-                            <Select value={newParticipantUserId} onValueChange={setNewParticipantUserId}>
-                              <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                              <SelectContent>
-                                {(tenantMembersQ.data ?? []).map((u) => (
-                                  <SelectItem key={u.user_id} value={u.user_id}>{u.nome}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium">Papel</label>
-                            <Select value={newParticipantPapel} onValueChange={(v) => setNewParticipantPapel(v as Papel)}>
-                              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {PAPEL_OPTIONS.map((p) => (
-                                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <Button size="sm" className="w-full" onClick={handleAddParticipant}>Adicionar</Button>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    <div className="p-3 space-y-2">
-                      {(participantsQ.data ?? []).length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2 text-center">Nenhum participante cadastrado.</p>
-                      ) : (
-                        (["implantador", "vendedor", "especialista", "outro"] as Papel[]).map((papel) => {
-                          const rows = (participantsQ.data ?? []).filter((p) => p.papel === papel);
-                          if (!rows.length) return null;
-                          const isImpl = papel === "implantador";
-                          return (
-                            <div key={papel} className="space-y-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <span
-                                  className="text-[10px] uppercase tracking-wide font-semibold"
-                                  style={{ color: PAPEL_COLOR[papel] }}
-                                >
-                                  {isImpl ? "Responsável" : PAPEL_OPTIONS.find((o) => o.value === papel)?.label}
-                                </span>
-                              </div>
-                              {rows.map((p) => (
-                                <div
-                                  key={p.id}
-                                  className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-1.5"
-                                >
-                                  {isImpl ? (
-                                    <Star className="h-3.5 w-3.5 shrink-0" style={{ color: PAPEL_COLOR[papel] }} fill={PAPEL_COLOR[papel]} />
-                                  ) : (
-                                    <User className="h-3.5 w-3.5 shrink-0" style={{ color: PAPEL_COLOR[papel] }} />
-                                  )}
-                                  <span className="text-xs flex-1 truncate">
-                                    {memberNameMap.get(p.user_id) || "—"}
-                                  </span>
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[9px] capitalize"
-                                    style={{ borderColor: PAPEL_COLOR[papel], color: PAPEL_COLOR[papel] }}
-                                  >
-                                    {papel}
-                                  </Badge>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-6 w-6 shrink-0"
-                                    onClick={() => handleRemoveParticipant(p.id, p.user_id, p.papel)}
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                              ))}
+                  {secVisible("participantes") && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border flex items-center justify-between">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <Users className="h-4 w-4" /> Responsável & participantes
+                        </h3>
+                        <Popover open={addParticipantOpen} onOpenChange={setAddParticipantOpen}>
+                          <PopoverTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 text-xs">
+                              <UserPlus className="h-3.5 w-3.5 mr-1" /> Adicionar
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 space-y-3" align="end">
+                            <div>
+                              <label className="text-xs font-medium">Usuário</label>
+                              <Select value={newParticipantUserId} onValueChange={setNewParticipantUserId}>
+                                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                                <SelectContent>
+                                  {(tenantMembersQ.data ?? []).map((u) => (
+                                    <SelectItem key={u.user_id} value={u.user_id}>{u.nome}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </section>
+                            <div>
+                              <label className="text-xs font-medium">Papel</label>
+                              <Select value={newParticipantPapel} onValueChange={(v) => setNewParticipantPapel(v as Papel)}>
+                                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {PAPEL_OPTIONS.map((p) => (
+                                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <Button size="sm" className="w-full" onClick={handleAddParticipant}>Adicionar</Button>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        {(participantsQ.data ?? []).length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2 text-center">Nenhum participante cadastrado.</p>
+                        ) : (
+                          (["implantador", "vendedor", "especialista", "outro"] as Papel[]).map((papel) => {
+                            const rows = (participantsQ.data ?? []).filter((p) => p.papel === papel);
+                            if (!rows.length) return null;
+                            const isImpl = papel === "implantador";
+                            return (
+                              <div key={papel} className="space-y-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className="text-[10px] uppercase tracking-wide font-semibold"
+                                    style={{ color: PAPEL_COLOR[papel] }}
+                                  >
+                                    {isImpl ? "Responsável" : PAPEL_OPTIONS.find((o) => o.value === papel)?.label}
+                                  </span>
+                                </div>
+                                {rows.map((p) => (
+                                  <div
+                                    key={p.id}
+                                    className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-1.5"
+                                  >
+                                    {isImpl ? (
+                                      <Star className="h-3.5 w-3.5 shrink-0" style={{ color: PAPEL_COLOR[papel] }} fill={PAPEL_COLOR[papel]} />
+                                    ) : (
+                                      <User className="h-3.5 w-3.5 shrink-0" style={{ color: PAPEL_COLOR[papel] }} />
+                                    )}
+                                    <span className="text-xs flex-1 truncate">
+                                      {memberNameMap.get(p.user_id) || "—"}
+                                    </span>
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[9px] capitalize"
+                                      style={{ borderColor: PAPEL_COLOR[papel], color: PAPEL_COLOR[papel] }}
+                                    >
+                                      {papel}
+                                    </Badge>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-6 w-6 shrink-0"
+                                      onClick={() => handleRemoveParticipant(p.id, p.user_id, p.papel)}
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </section>
+                  )}
 
                   {/* Timeline stages */}
-                  <section className="rounded-lg border border-border">
-                    <div className="p-3 border-b border-border">
-                      <h3 className="text-sm font-semibold">Linha do tempo das etapas</h3>
-                    </div>
-                    <div className="p-3 space-y-2">
-                      {stages.map((s, idx) => {
-                        const h = historyByStage[s.id];
-                        const isCurrent = s.id === journey.current_stage_id;
-                        const isPast = currentStageIndex >= 0 && idx < currentStageIndex;
-                        const dot = s.cor || "hsl(var(--muted-foreground))";
-                        return (
-                          <div
-                            key={s.id}
-                            className={`flex items-start gap-3 rounded-md p-2 ${
-                              isCurrent ? "bg-primary/5 border border-primary/30" : ""
-                            } ${!isCurrent && !isPast ? "opacity-50" : ""}`}
-                          >
-                            <div className="mt-0.5">
-                              {isPast ? (
-                                <CheckCircle2 className="h-4 w-4 text-primary" />
-                              ) : isCurrent ? (
-                                <div className="h-4 w-4 rounded-full ring-2 ring-primary/40" style={{ background: dot }} />
-                              ) : (
-                                <Circle className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs font-medium truncate">{s.nome}</span>
-                                {h?.duracao_minutos != null && !isCurrent && (
-                                  <span className="text-[10px] text-muted-foreground shrink-0">{formatMin(h.duracao_minutos)}</span>
-                                )}
-                                {isCurrent && journey.etapa_atual_min != null && (
-                                  <span className="text-[10px] font-medium shrink-0" style={{ color: slaColor }}>
-                                    {formatMin(journey.etapa_atual_min)}
-                                  </span>
+                  {secVisible("timeline") && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border">
+                        <h3 className="text-sm font-semibold">Linha do tempo das etapas</h3>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        {stages.map((s, idx) => {
+                          const h = historyByStage[s.id];
+                          const isCurrent = s.id === journey.current_stage_id;
+                          const isPast = currentStageIndex >= 0 && idx < currentStageIndex;
+                          const dot = s.cor || "hsl(var(--muted-foreground))";
+                          return (
+                            <div
+                              key={s.id}
+                              className={`flex items-start gap-3 rounded-md p-2 ${
+                                isCurrent ? "bg-primary/5 border border-primary/30" : ""
+                              } ${!isCurrent && !isPast ? "opacity-50" : ""}`}
+                            >
+                              <div className="mt-0.5">
+                                {isPast ? (
+                                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                                ) : isCurrent ? (
+                                  <div className="h-4 w-4 rounded-full ring-2 ring-primary/40" style={{ background: dot }} />
+                                ) : (
+                                  <Circle className="h-4 w-4 text-muted-foreground" />
                                 )}
                               </div>
-                              {h?.entrou_em && (
-                                <p className="text-[10px] text-muted-foreground mt-0.5">
-                                  Entrou {formatDateTime(h.entrou_em)}
-                                  {h.saiu_em && ` • saiu ${formatDateTime(h.saiu_em)}`}
-                                </p>
-                              )}
-                              {(isCurrent || isPast) && accumulatedByStage[s.id] > 0 && (
-                                <p className="text-[10px] text-muted-foreground/80 mt-0.5">
-                                  Acumulado até aqui: <span className="font-medium text-foreground/80">{formatMin(accumulatedByStage[s.id])}</span>
-                                </p>
-                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-medium truncate">{s.nome}</span>
+                                  {h?.duracao_minutos != null && !isCurrent && (
+                                    <span className="text-[10px] text-muted-foreground shrink-0">{formatMin(h.duracao_minutos)}</span>
+                                  )}
+                                  {isCurrent && journey.etapa_atual_min != null && (
+                                    <span className="text-[10px] font-medium shrink-0" style={{ color: slaColor }}>
+                                      {formatMin(journey.etapa_atual_min)}
+                                    </span>
+                                  )}
+                                </div>
+                                {h?.entrou_em && (
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                                    Entrou {formatDateTime(h.entrou_em)}
+                                    {h.saiu_em && ` • saiu ${formatDateTime(h.saiu_em)}`}
+                                  </p>
+                                )}
+                                {(isCurrent || isPast) && accumulatedByStage[s.id] > 0 && (
+                                  <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+                                    Acumulado até aqui: <span className="font-medium text-foreground/80">{formatMin(accumulatedByStage[s.id])}</span>
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </section>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
 
                   {/* Pauses by reason */}
-                  {pausesByReason.length > 0 && (
+                  {secVisible("pausas") && pausesByReason.length > 0 && (
                     <section className="rounded-lg border border-border">
                       <div className="p-3 border-b border-border flex items-center justify-between">
                         <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -1514,376 +1525,381 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
 
 
                   {/* Modules */}
-                  <section className="rounded-lg border border-border">
-                    <div className="p-3 border-b border-border flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                        <Package className="h-4 w-4" /> Módulos da jornada
-                      </h3>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px]">{(modulesQ.data ?? []).length}</Badge>
-                        {(clienteProdutoModulosQ.data ?? []).length > 0 && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs gap-1"
-                            onClick={handleImportFromCliente}
-                          >
-                            <Download className="h-3 w-3" /> Importar do cliente
-                          </Button>
-                        )}
-                        <Popover open={addModuleOpen} onOpenChange={setAddModuleOpen}>
-                          <PopoverTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
-                              <Plus className="h-3 w-3" /> Adicionar módulo
+                  {secVisible("modulos") && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <Package className="h-4 w-4" /> Módulos da jornada
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[10px]">{(modulesQ.data ?? []).length}</Badge>
+                          {(clienteProdutoModulosQ.data ?? []).length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1"
+                              onClick={handleImportFromCliente}
+                            >
+                              <Download className="h-3 w-3" /> Importar do cliente
                             </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-80 space-y-3" align="end">
-                            <div className="space-y-1">
-                              <label className="text-[11px] font-medium">Nome do módulo</label>
-                              <div className="flex gap-1.5">
-                                <Input
-                                  value={newModuleName}
-                                  onChange={(e) => setNewModuleName(e.target.value)}
-                                  placeholder="Ex: PDV, Financeiro"
-                                  className="h-8 text-xs"
-                                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddModuleManual(); } }}
-                                />
-                                <Button size="sm" className="h-8 px-3" onClick={handleAddModuleManual}>Add</Button>
-                              </div>
-                            </div>
-                            {(produtoModulosQ.data ?? []).length > 0 && (
-                              <>
-                                <Separator />
-                                <div className="space-y-1">
-                                  <label className="text-[11px] font-medium">Ou escolher do produto</label>
-                                  <div className="flex gap-1.5">
-                                    <Select value={newModuleProdutoModuloId} onValueChange={setNewModuleProdutoModuloId}>
-                                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar módulo" /></SelectTrigger>
-                                      <SelectContent>
-                                        {(produtoModulosQ.data ?? []).map((m) => (
-                                          <SelectItem key={m.id} value={m.id} className="text-xs">{m.nome}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <Button size="sm" className="h-8 px-3" onClick={handleAddModuleFromProduto} disabled={!newModuleProdutoModuloId}>Add</Button>
-                                  </div>
-                                </div>
-                              </>
-                            )}
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </div>
-                    <div className="p-3 space-y-1.5">
-                      {(modulesQ.data ?? []).length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2 text-center">Nenhum módulo cadastrado.</p>
-                      ) : (
-                        (modulesQ.data ?? []).map((m) => {
-                          const origemColor: Record<string, string> = {
-                            manual: "hsl(215 16% 47%)",
-                            produto: "hsl(199 89% 48%)",
-                            cliente: "hsl(262 83% 58%)",
-                          };
-                          return (
-                            <div key={m.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-xs font-medium truncate">{m.nome}</span>
-                                <Badge
-                                  variant="outline"
-                                  className="text-[9px] capitalize border-0 text-white shrink-0"
-                                  style={{ backgroundColor: origemColor[m.origem] || origemColor.manual }}
-                                >
-                                  {m.origem}
-                                </Badge>
-                              </div>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                                onClick={() => handleDeleteModule(m.id)}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </section>
-
-                  {/* Dados da contabilidade */}
-                  <AccountingCard
-                    fields={accountingFieldsQ.data ?? []}
-                    values={accountingValuesQ.data ?? []}
-                    loading={accountingFieldsQ.isLoading}
-                    onSave={async (fieldId, valor, coletado) => {
-                      if (!tenantId || !journeyId) return;
-                      const { error } = await (supabase.from("onboarding_journey_accounting" as any) as any)
-                        .upsert(
-                          { tenant_id: tenantId, journey_id: journeyId, field_id: fieldId, valor, coletado },
-                          { onConflict: "journey_id,field_id" }
-                        );
-                      if (error) { toast.error(error.message); return; }
-                      qc.invalidateQueries({ queryKey: ["onboarding-accounting-values", journeyId, tenantId] });
-                    }}
-                  />
-
-                  {/* Trainings */}
-
-
-
-                  <section className="rounded-lg border border-border">
-                    <div className="p-3 border-b border-border flex items-center justify-between">
-                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                        <GraduationCap className="h-4 w-4" /> Sub-tickets de treino
-                      </h3>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px]">{trainings.length}</Badge>
-                        {canScheduleTraining && (
-                          <Popover open={addTrainingOpen} onOpenChange={setAddTrainingOpen}>
+                          )}
+                          <Popover open={addModuleOpen} onOpenChange={setAddModuleOpen}>
                             <PopoverTrigger asChild>
                               <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
-                                <UserPlus className="h-3 w-3" /> Agendar treino
+                                <Plus className="h-3 w-3" /> Adicionar módulo
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-96 space-y-3" align="end">
-                              {journey?.fase_atual === "onboarding" && (
-                                <Alert className="border-warning/50 bg-warning/15 text-warning [&>svg]:text-warning py-2 text-xs">
-                                  <AlertTriangle className="h-4 w-4" />
-                                  <AlertDescription className="text-xs">
-                                    Ao agendar este treino, a jornada será concluída no Onboarding e iniciará a fase de Implantação.
-                                  </AlertDescription>
-                                </Alert>
+                            <PopoverContent className="w-80 space-y-3" align="end">
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-medium">Nome do módulo</label>
+                                <div className="flex gap-1.5">
+                                  <Input
+                                    value={newModuleName}
+                                    onChange={(e) => setNewModuleName(e.target.value)}
+                                    placeholder="Ex: PDV, Financeiro"
+                                    className="h-8 text-xs"
+                                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddModuleManual(); } }}
+                                  />
+                                  <Button size="sm" className="h-8 px-3" onClick={handleAddModuleManual}>Add</Button>
+                                </div>
+                              </div>
+                              {(produtoModulosQ.data ?? []).length > 0 && (
+                                <>
+                                  <Separator />
+                                  <div className="space-y-1">
+                                    <label className="text-[11px] font-medium">Ou escolher do produto</label>
+                                    <div className="flex gap-1.5">
+                                      <Select value={newModuleProdutoModuloId} onValueChange={setNewModuleProdutoModuloId}>
+                                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar módulo" /></SelectTrigger>
+                                        <SelectContent>
+                                          {(produtoModulosQ.data ?? []).map((m) => (
+                                            <SelectItem key={m.id} value={m.id} className="text-xs">{m.nome}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <Button size="sm" className="h-8 px-3" onClick={handleAddModuleFromProduto} disabled={!newModuleProdutoModuloId}>Add</Button>
+                                    </div>
+                                  </div>
+                                </>
                               )}
-                              <div className="space-y-1">
-                                <label className="text-[11px] font-medium">Título *</label>
-                                <Input
-                                  value={newTrainingTitle}
-                                  onChange={(e) => setNewTrainingTitle(e.target.value)}
-                                  placeholder="Ex: Treinamento PDV"
-                                  className="h-8 text-xs"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[11px] font-medium">Data/hora</label>
-                                <Input
-                                  type="datetime-local"
-                                  value={newTrainingDate}
-                                  onChange={(e) => setNewTrainingDate(e.target.value)}
-                                  className="h-8 text-xs"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[11px] font-medium">Conduzido por</label>
-                                <Select value={newTrainingConductor} onValueChange={setNewTrainingConductor}>
-                                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar usuário" /></SelectTrigger>
-                                  <SelectContent>
-                                    {(tenantMembersQ.data ?? []).map((m) => (
-                                      <SelectItem key={m.user_id} value={m.user_id} className="text-xs">{m.nome}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[11px] font-medium">Tipo de treino</label>
-                                <Select value={newTrainingTypeId} onValueChange={setNewTrainingTypeId}>
-                                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar tipo" /></SelectTrigger>
-                                  <SelectContent>
-                                    {(trainingTypesQ.data ?? []).map((tt) => (
-                                      <SelectItem key={tt.id} value={tt.id} className="text-xs">
-                                        {tt.nome}{tt.conta_como_pdv ? " · PDV" : ""}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-
-                              <label className="flex items-center gap-2 text-xs cursor-pointer">
-                                <Checkbox
-                                  checked={newTrainingRetreat}
-                                  onCheckedChange={(v) => setNewTrainingRetreat(!!v)}
-                                />
-                                É retreinamento?
-                              </label>
-                              <Button size="sm" className="w-full" onClick={handleCreateTraining}>Agendar</Button>
                             </PopoverContent>
                           </Popover>
+                        </div>
+                      </div>
+                      <div className="p-3 space-y-1.5">
+                        {(modulesQ.data ?? []).length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2 text-center">Nenhum módulo cadastrado.</p>
+                        ) : (
+                          (modulesQ.data ?? []).map((m) => {
+                            const origemColor: Record<string, string> = {
+                              manual: "hsl(215 16% 47%)",
+                              produto: "hsl(199 89% 48%)",
+                              cliente: "hsl(262 83% 58%)",
+                            };
+                            return (
+                              <div key={m.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-xs font-medium truncate">{m.nome}</span>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[9px] capitalize border-0 text-white shrink-0"
+                                    style={{ backgroundColor: origemColor[m.origem] || origemColor.manual }}
+                                  >
+                                    {m.origem}
+                                  </Badge>
+                                </div>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                                  onClick={() => handleDeleteModule(m.id)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            );
+                          })
                         )}
                       </div>
-                    </div>
-                    <div className="p-3 space-y-2">
-                      {trainings.length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2 text-center">
-                          {canScheduleTraining
-                            ? "Nenhum treino cadastrado."
-                            : "Disponível a partir da última etapa do onboarding."}
-                        </p>
-                      ) : (
-                        trainings.map((t) => {
-                          const statusColors: Record<string, string> = {
-                            previsto: "hsl(215 16% 47%)",
-                            agendado: "hsl(199 89% 48%)",
-                            realizado: "hsl(142 71% 45%)",
-                            no_show: "hsl(0 84% 60%)",
-                            cancelado: "hsl(215 25% 27%)",
-                          };
-                          const conductorName = t.conduzido_por ? memberNameMap.get(t.conduzido_por) : null;
-                          const isDone = t.status === "realizado";
-                          const isCancelled = t.status === "cancelado";
-                          return (
-                            <div key={t.id} className="rounded-md border border-border p-2.5">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs font-medium truncate">{t.titulo}</span>
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] capitalize border-0 text-white"
-                                  style={{ backgroundColor: statusColors[t.status] || statusColors.previsto }}
-                                >
-                                  {t.status.replace("_", "-")}
-                                </Badge>
-                              </div>
-                              <div className="text-[10px] text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                                {t.agendado_para && <span>Agendado: {formatDateTime(t.agendado_para)}</span>}
-                                {t.realizado_em && <span>Realizado: {formatDateTime(t.realizado_em)}</span>}
-                                {conductorName && <span>Por: {conductorName}</span>}
-                              </div>
-                              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                                {(t.tentativas ?? 0) > 0 && (
-                                  <Badge variant="outline" className="text-[9px]">tentativas: {t.tentativas}</Badge>
-                                )}
-                                {t.no_show && <Badge variant="destructive" className="text-[9px]">no-show</Badge>}
-                                {t.is_retreinamento && (
-                                  <Badge variant="outline" className="text-[9px] border-[hsl(262_83%_58%)] text-[hsl(262_83%_58%)]">
-                                    retreinamento
-                                  </Badge>
-                                )}
-                                {t.proprietario_presente && (
-                                  <Badge variant="outline" className="text-[9px] border-[hsl(142_71%_45%)] text-[hsl(142_71%_45%)]">
-                                    proprietário presente
-                                  </Badge>
-                                )}
-                              </div>
-                              {!isCancelled && (
-                                <div className="flex items-center gap-1 mt-2 flex-wrap">
-                                  {!isDone && (
-                                    <>
-                                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
-                                        onClick={() => handleMarkRealized(t.id)}>
-                                        <CheckCircle2 className="h-3 w-3 mr-1" /> Realizado
-                                      </Button>
-                                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
-                                        onClick={() => handleMarkNoShow(t.id, t.tentativas ?? 0)}>
-                                        No-show
-                                      </Button>
-                                    </>
-                                  )}
-                                  <Popover
-                                    open={rescheduleId === t.id}
-                                    onOpenChange={(o) => {
-                                      setRescheduleId(o ? t.id : null);
-                                      if (!o) setRescheduleDate("");
-                                    }}
-                                  >
-                                    <PopoverTrigger asChild>
-                                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2">
-                                        <Calendar className="h-3 w-3 mr-1" /> Remarcar
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-72 space-y-2" align="start">
-                                      <label className="text-[11px] font-medium">Nova data/hora</label>
-                                      <Input
-                                        type="datetime-local"
-                                        value={rescheduleDate}
-                                        onChange={(e) => setRescheduleDate(e.target.value)}
-                                        className="h-8 text-xs"
-                                      />
-                                      <Button size="sm" className="w-full h-7 text-xs"
-                                        onClick={() => handleReschedule(t.id, t.tentativas ?? 0)}>
-                                        Confirmar
-                                      </Button>
-                                    </PopoverContent>
-                                  </Popover>
-                                  {isDone && (
-                                    <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
-                                      onClick={() => handleTogglePresente(t.id, !!t.proprietario_presente)}>
-                                      {t.proprietario_presente ? "Marcar ausente" : "Proprietário presente"}
-                                    </Button>
-                                  )}
-                                  <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-muted-foreground"
-                                    onClick={() => handleCancelTraining(t.id)}>
-                                    Cancelar
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
+                    </section>
+                  )}
+
+                  {/* Dados da contabilidade */}
+                  {secVisible("contabilidade") && (
+                    <AccountingCard
+                      fields={accountingFieldsQ.data ?? []}
+                      values={accountingValuesQ.data ?? []}
+                      loading={accountingFieldsQ.isLoading}
+                      onSave={async (fieldId, valor, coletado) => {
+                        if (!tenantId || !journeyId) return;
+                        const { error } = await (supabase.from("onboarding_journey_accounting" as any) as any)
+                          .upsert(
+                            { tenant_id: tenantId, journey_id: journeyId, field_id: fieldId, valor, coletado },
+                            { onConflict: "journey_id,field_id" }
                           );
-                        })
-                      )}
-                    </div>
-                  </section>
+                        if (error) { toast.error(error.message); return; }
+                        qc.invalidateQueries({ queryKey: ["onboarding-accounting-values", journeyId, tenantId] });
+                      }}
+                    />
+                  )}
+
+                  {/* Trainings */}
+                  {secVisible("treinos") && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border flex items-center justify-between">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <GraduationCap className="h-4 w-4" /> Sub-tickets de treino
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[10px]">{trainings.length}</Badge>
+                          {canScheduleTraining && (
+                            <Popover open={addTrainingOpen} onOpenChange={setAddTrainingOpen}>
+                              <PopoverTrigger asChild>
+                                <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
+                                  <UserPlus className="h-3 w-3" /> Agendar treino
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-96 space-y-3" align="end">
+                                {journey?.fase_atual === "onboarding" && (
+                                  <Alert className="border-warning/50 bg-warning/15 text-warning [&>svg]:text-warning py-2 text-xs">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <AlertDescription className="text-xs">
+                                      Ao agendar este treino, a jornada será concluída no Onboarding e iniciará a fase de Implantação.
+                                    </AlertDescription>
+                                  </Alert>
+                                )}
+                                <div className="space-y-1">
+                                  <label className="text-[11px] font-medium">Título *</label>
+                                  <Input
+                                    value={newTrainingTitle}
+                                    onChange={(e) => setNewTrainingTitle(e.target.value)}
+                                    placeholder="Ex: Treinamento PDV"
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[11px] font-medium">Data/hora</label>
+                                  <Input
+                                    type="datetime-local"
+                                    value={newTrainingDate}
+                                    onChange={(e) => setNewTrainingDate(e.target.value)}
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[11px] font-medium">Conduzido por</label>
+                                  <Select value={newTrainingConductor} onValueChange={setNewTrainingConductor}>
+                                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar usuário" /></SelectTrigger>
+                                    <SelectContent>
+                                      {(tenantMembersQ.data ?? []).map((m) => (
+                                        <SelectItem key={m.user_id} value={m.user_id} className="text-xs">{m.nome}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[11px] font-medium">Tipo de treino</label>
+                                  <Select value={newTrainingTypeId} onValueChange={setNewTrainingTypeId}>
+                                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar tipo" /></SelectTrigger>
+                                    <SelectContent>
+                                      {(trainingTypesQ.data ?? []).map((tt) => (
+                                        <SelectItem key={tt.id} value={tt.id} className="text-xs">
+                                          {tt.nome}{tt.conta_como_pdv ? " · PDV" : ""}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+
+                                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                                  <Checkbox
+                                    checked={newTrainingRetreat}
+                                    onCheckedChange={(v) => setNewTrainingRetreat(!!v)}
+                                  />
+                                  É retreinamento?
+                                </label>
+                                <Button size="sm" className="w-full" onClick={handleCreateTraining}>Agendar</Button>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                        </div>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        {trainings.length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2 text-center">
+                            {canScheduleTraining
+                              ? "Nenhum treino cadastrado."
+                              : "Disponível a partir da última etapa do onboarding."}
+                          </p>
+                        ) : (
+                          trainings.map((t) => {
+                            const statusColors: Record<string, string> = {
+                              previsto: "hsl(215 16% 47%)",
+                              agendado: "hsl(199 89% 48%)",
+                              realizado: "hsl(142 71% 45%)",
+                              no_show: "hsl(0 84% 60%)",
+                              cancelado: "hsl(215 25% 27%)",
+                            };
+                            const conductorName = t.conduzido_por ? memberNameMap.get(t.conduzido_por) : null;
+                            const isDone = t.status === "realizado";
+                            const isCancelled = t.status === "cancelado";
+                            return (
+                              <div key={t.id} className="rounded-md border border-border p-2.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-medium truncate">{t.titulo}</span>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] capitalize border-0 text-white"
+                                    style={{ backgroundColor: statusColors[t.status] || statusColors.previsto }}
+                                  >
+                                    {t.status.replace("_", "-")}
+                                  </Badge>
+                                </div>
+                                <div className="text-[10px] text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                                  {t.agendado_para && <span>Agendado: {formatDateTime(t.agendado_para)}</span>}
+                                  {t.realizado_em && <span>Realizado: {formatDateTime(t.realizado_em)}</span>}
+                                  {conductorName && <span>Por: {conductorName}</span>}
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                  {(t.tentativas ?? 0) > 0 && (
+                                    <Badge variant="outline" className="text-[9px]">tentativas: {t.tentativas}</Badge>
+                                  )}
+                                  {t.no_show && <Badge variant="destructive" className="text-[9px]">no-show</Badge>}
+                                  {t.is_retreinamento && (
+                                    <Badge variant="outline" className="text-[9px] border-[hsl(262_83%_58%)] text-[hsl(262_83%_58%)]">
+                                      retreinamento
+                                    </Badge>
+                                  )}
+                                  {t.proprietario_presente && (
+                                    <Badge variant="outline" className="text-[9px] border-[hsl(142_71%_45%)] text-[hsl(142_71%_45%)]">
+                                      proprietário presente
+                                    </Badge>
+                                  )}
+                                </div>
+                                {!isCancelled && (
+                                  <div className="flex items-center gap-1 mt-2 flex-wrap">
+                                    {!isDone && (
+                                      <>
+                                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
+                                          onClick={() => handleMarkRealized(t.id)}>
+                                          <CheckCircle2 className="h-3 w-3 mr-1" /> Realizado
+                                        </Button>
+                                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
+                                          onClick={() => handleMarkNoShow(t.id, t.tentativas ?? 0)}>
+                                          No-show
+                                        </Button>
+                                      </>
+                                    )}
+                                    <Popover
+                                      open={rescheduleId === t.id}
+                                      onOpenChange={(o) => {
+                                        setRescheduleId(o ? t.id : null);
+                                        if (!o) setRescheduleDate("");
+                                      }}
+                                    >
+                                      <PopoverTrigger asChild>
+                                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2">
+                                          <Calendar className="h-3 w-3 mr-1" /> Remarcar
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-72 space-y-2" align="start">
+                                        <label className="text-[11px] font-medium">Nova data/hora</label>
+                                        <Input
+                                          type="datetime-local"
+                                          value={rescheduleDate}
+                                          onChange={(e) => setRescheduleDate(e.target.value)}
+                                          className="h-8 text-xs"
+                                        />
+                                        <Button size="sm" className="w-full h-7 text-xs"
+                                          onClick={() => handleReschedule(t.id, t.tentativas ?? 0)}>
+                                          Confirmar
+                                        </Button>
+                                      </PopoverContent>
+                                    </Popover>
+                                    {isDone && (
+                                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
+                                        onClick={() => handleTogglePresente(t.id, !!t.proprietario_presente)}>
+                                        {t.proprietario_presente ? "Marcar ausente" : "Proprietário presente"}
+                                      </Button>
+                                    )}
+                                    <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-muted-foreground"
+                                      onClick={() => handleCancelTraining(t.id)}>
+                                      Cancelar
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </section>
+                  )}
 
                 </div>
 
                 {/* RIGHT */}
                 <div className="space-y-5">
                   {/* Checklist + Advance */}
-                  <section className="rounded-lg border border-border">
-                    <div className="p-3 border-b border-border">
-                      <h3 className="text-sm font-semibold">Checklist da etapa</h3>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{journey.stage_nome}</p>
-                    </div>
-                    <div className="p-3 space-y-2">
-                      {checklist.length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2 text-center">Sem itens de checklist para esta etapa.</p>
-                      ) : (
-                        checklist.map((c) => (
-                          <label key={c.id} className="flex items-start gap-2 cursor-pointer">
-                            <Checkbox
-                              checked={!!checked[c.id]}
-                              onCheckedChange={(v) => setChecked((prev) => ({ ...prev, [c.id]: !!v }))}
-                              className="mt-0.5"
-                            />
-                            <span className="text-xs">
-                              {c.texto}
-                              {c.is_required && (
-                                <span className="ml-1.5 inline-flex items-center gap-0.5 text-[9px] text-destructive font-medium uppercase">
-                                  <AlertCircle className="h-2.5 w-2.5" />obrigatório
-                                </span>
-                              )}
-                            </span>
-                          </label>
-                        ))
-                      )}
-                      <Separator className="my-2" />
-                      <div className="flex items-center gap-2">
-                        <Select value={nextStageId} onValueChange={setNextStageId}>
-                          <SelectTrigger className="flex-1 h-8 text-xs">
-                            <SelectValue placeholder="Próxima etapa (padrão: seguinte)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {stages
-                              .filter((s) => s.id !== journey.current_stage_id)
-                              .map((s) => (
-                                <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                        <Button size="sm" onClick={handleAdvance} disabled={isPaused || isConcluded}>
-                          Avançar <ArrowRight className="h-3.5 w-3.5 ml-1" />
-                        </Button>
+                  {secVisible("checklist") && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border">
+                        <h3 className="text-sm font-semibold">Checklist da etapa</h3>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{journey.stage_nome}</p>
                       </div>
-                      {isPaused && !isConcluded && (
-                        <p className="text-[10px] text-muted-foreground">Retome o onboarding para avançar de etapa.</p>
-                      )}
-                      {isConcluded && (
-                        <p className="text-[10px] text-muted-foreground">Jornada concluída — reabra para movimentar etapas.</p>
-                      )}
-                    </div>
-                  </section>
+                      <div className="p-3 space-y-2">
+                        {checklist.length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2 text-center">Sem itens de checklist para esta etapa.</p>
+                        ) : (
+                          checklist.map((c) => (
+                            <label key={c.id} className="flex items-start gap-2 cursor-pointer">
+                              <Checkbox
+                                checked={!!checked[c.id]}
+                                onCheckedChange={(v) => setChecked((prev) => ({ ...prev, [c.id]: !!v }))}
+                                className="mt-0.5"
+                              />
+                              <span className="text-xs">
+                                {c.texto}
+                                {c.is_required && (
+                                  <span className="ml-1.5 inline-flex items-center gap-0.5 text-[9px] text-destructive font-medium uppercase">
+                                    <AlertCircle className="h-2.5 w-2.5" />obrigatório
+                                  </span>
+                                )}
+                              </span>
+                            </label>
+                          ))
+                        )}
+                        <Separator className="my-2" />
+                        <div className="flex items-center gap-2">
+                          <Select value={nextStageId} onValueChange={setNextStageId}>
+                            <SelectTrigger className="flex-1 h-8 text-xs">
+                              <SelectValue placeholder="Próxima etapa (padrão: seguinte)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {stages
+                                .filter((s) => s.id !== journey.current_stage_id)
+                                .map((s) => (
+                                  <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                          <Button size="sm" onClick={handleAdvance} disabled={isPaused || isConcluded}>
+                            Avançar <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                          </Button>
+                        </div>
+                        {isPaused && !isConcluded && (
+                          <p className="text-[10px] text-muted-foreground">Retome o onboarding para avançar de etapa.</p>
+                        )}
+                        {isConcluded && (
+                          <p className="text-[10px] text-muted-foreground">Jornada concluída — reabra para movimentar etapas.</p>
+                        )}
+                      </div>
+                    </section>
+                  )}
 
                   {/* Attachments */}
-                  {journey?.ticket_id && (
+                  {secVisible("anexos") && journey?.ticket_id && (
                     <section className="rounded-lg border border-border">
                       <div className="p-3 border-b border-border">
                         <h3 className="text-sm font-semibold">Anexos</h3>
@@ -1899,120 +1915,124 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   )}
 
                   {/* Attendances */}
-                  <section className="rounded-lg border border-border">
-                    <div className="p-3 border-b border-border flex items-center justify-between">
-                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4" /> Atendimentos vinculados
-                      </h3>
-                      <Badge variant="outline" className="text-[10px]">{attendances.length}</Badge>
-                    </div>
-                    <div className="p-3 space-y-2">
-                      {attendances.length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2 text-center">Nenhum atendimento vinculado.</p>
-                      ) : (
-                        <>
-                          {(() => {
-                            const avg = (key: string) => {
-                              const vals = attendances
-                                .map((a: any) => a[key])
-                                .filter((v: any) => typeof v === "number" && !isNaN(v));
-                              if (vals.length === 0) return null;
-                              return vals.reduce((s: number, v: number) => s + v, 0) / vals.length / 60;
-                            };
-                            const espera = avg("wait_seconds");
-                            const resposta = avg("first_response_time_seconds");
-                            const atendimento = avg("handle_seconds");
-                            return (
-                              <div className="grid grid-cols-3 gap-2 mb-1">
-                                <div className="rounded-md border border-border p-2">
-                                  <div className="text-[10px] text-muted-foreground">T. médio de espera</div>
-                                  <div className="text-sm font-semibold">{formatMin(espera)}</div>
-                                </div>
-                                <div className="rounded-md border border-border p-2">
-                                  <div className="text-[10px] text-muted-foreground">T. médio de resposta</div>
-                                  <div className="text-sm font-semibold">{formatMin(resposta)}</div>
-                                </div>
-                                <div className="rounded-md border border-border p-2">
-                                  <div className="text-[10px] text-muted-foreground">T. médio de atendimento</div>
-                                  <div className="text-sm font-semibold">{formatMin(atendimento)}</div>
-                                </div>
-                              </div>
-                            );
-                          })()}
-                          <div className="space-y-1.5">
-                            {attendances.map((a) => (
-                              <div key={a.id} className="rounded-md border border-border p-2 flex items-center gap-2">
-                                <span className="font-mono text-[11px] text-primary">{a.attendance_code}</span>
-                                <span className="text-[11px] text-muted-foreground truncate flex-1">
-                                  {a.participant_label || "—"}
-                                </span>
-                                <Badge variant="outline" className="text-[9px] capitalize">{a.status}</Badge>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </section>
-
-                  {/* Events */}
-                  <section className="rounded-lg border border-border">
-                    <div className="p-3 border-b border-border">
-                      <h3 className="text-sm font-semibold">Timeline de eventos</h3>
-                    </div>
-                    <div className="p-3 space-y-3">
-                      <div className="space-y-2">
-                        <Textarea
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          placeholder="Adicionar nota do agente..."
-                          rows={2}
-                          className="text-xs"
-                        />
-                        <Button size="sm" onClick={handleAddNote} disabled={!note.trim()}>
-                          Adicionar nota
-                        </Button>
+                  {secVisible("atendimentos") && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border flex items-center justify-between">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <MessageSquare className="h-4 w-4" /> Atendimentos vinculados
+                        </h3>
+                        <Badge variant="outline" className="text-[10px]">{attendances.length}</Badge>
                       </div>
-                      <Separator />
-                      <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                        {events.length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2 text-center">Sem eventos registrados.</p>
+                      <div className="p-3 space-y-2">
+                        {attendances.length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2 text-center">Nenhum atendimento vinculado.</p>
                         ) : (
-                          events.map((ev: any) => {
-                            const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-                            const isStageChange = ev.event_type === "onboarding_mudou_etapa";
-                            const oldIsUuid = ev.old_value && UUID_RE.test(String(ev.old_value).trim());
-                            const newIsUuid = ev.new_value && UUID_RE.test(String(ev.new_value).trim());
-                            const hideRawValues = isStageChange && (oldIsUuid || newIsUuid);
-                            const showRawValues = (ev.old_value || ev.new_value) && !hideRawValues && !oldIsUuid && !newIsUuid;
-                            const legacyStageFallback = isStageChange && hideRawValues && !ev.content;
-                            const authorName = ev.user_id ? (eventUsersQ.data?.[ev.user_id] ?? "Usuário") : "Sistema";
-                            return (
-                              <div key={ev.id} className="flex items-start gap-2 text-xs">
-                                <div className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-medium">{EVENT_LABELS[ev.event_type] || ev.event_type}</span>
-                                    <span className="text-[10px] text-muted-foreground">{formatDateTime(ev.created_at)}</span>
-                                    <span className="text-[10px] text-muted-foreground">· {authorName}</span>
+                          <>
+                            {(() => {
+                              const avg = (key: string) => {
+                                const vals = attendances
+                                  .map((a: any) => a[key])
+                                  .filter((v: any) => typeof v === "number" && !isNaN(v));
+                                if (vals.length === 0) return null;
+                                return vals.reduce((s: number, v: number) => s + v, 0) / vals.length / 60;
+                              };
+                              const espera = avg("wait_seconds");
+                              const resposta = avg("first_response_time_seconds");
+                              const atendimento = avg("handle_seconds");
+                              return (
+                                <div className="grid grid-cols-3 gap-2 mb-1">
+                                  <div className="rounded-md border border-border p-2">
+                                    <div className="text-[10px] text-muted-foreground">T. médio de espera</div>
+                                    <div className="text-sm font-semibold">{formatMin(espera)}</div>
                                   </div>
-                                  {ev.content && <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{ev.content}</p>}
-                                  {legacyStageFallback && (
-                                    <p className="text-xs text-muted-foreground mt-0.5">Mudança de etapa</p>
-                                  )}
-                                  {showRawValues && (
-                                    <p className="text-[10px] text-muted-foreground/80 mt-0.5">
-                                      {ev.old_value || "—"} <ChevronRight className="inline h-3 w-3" /> {ev.new_value || "—"}
-                                    </p>
-                                  )}
+                                  <div className="rounded-md border border-border p-2">
+                                    <div className="text-[10px] text-muted-foreground">T. médio de resposta</div>
+                                    <div className="text-sm font-semibold">{formatMin(resposta)}</div>
+                                  </div>
+                                  <div className="rounded-md border border-border p-2">
+                                    <div className="text-[10px] text-muted-foreground">T. médio de atendimento</div>
+                                    <div className="text-sm font-semibold">{formatMin(atendimento)}</div>
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })
+                              );
+                            })()}
+                            <div className="space-y-1.5">
+                              {attendances.map((a) => (
+                                <div key={a.id} className="rounded-md border border-border p-2 flex items-center gap-2">
+                                  <span className="font-mono text-[11px] text-primary">{a.attendance_code}</span>
+                                  <span className="text-[11px] text-muted-foreground truncate flex-1">
+                                    {a.participant_label || "—"}
+                                  </span>
+                                  <Badge variant="outline" className="text-[9px] capitalize">{a.status}</Badge>
+                                </div>
+                              ))}
+                            </div>
+                          </>
                         )}
                       </div>
-                    </div>
-                  </section>
+                    </section>
+                  )}
+
+                  {/* Events */}
+                  {secVisible("eventos") && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border">
+                        <h3 className="text-sm font-semibold">Timeline de eventos</h3>
+                      </div>
+                      <div className="p-3 space-y-3">
+                        <div className="space-y-2">
+                          <Textarea
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            placeholder="Adicionar nota do agente..."
+                            rows={2}
+                            className="text-xs"
+                          />
+                          <Button size="sm" onClick={handleAddNote} disabled={!note.trim()}>
+                            Adicionar nota
+                          </Button>
+                        </div>
+                        <Separator />
+                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                          {events.length === 0 ? (
+                            <p className="text-xs text-muted-foreground py-2 text-center">Sem eventos registrados.</p>
+                          ) : (
+                            events.map((ev: any) => {
+                              const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                              const isStageChange = ev.event_type === "onboarding_mudou_etapa";
+                              const oldIsUuid = ev.old_value && UUID_RE.test(String(ev.old_value).trim());
+                              const newIsUuid = ev.new_value && UUID_RE.test(String(ev.new_value).trim());
+                              const hideRawValues = isStageChange && (oldIsUuid || newIsUuid);
+                              const showRawValues = (ev.old_value || ev.new_value) && !hideRawValues && !oldIsUuid && !newIsUuid;
+                              const legacyStageFallback = isStageChange && hideRawValues && !ev.content;
+                              const authorName = ev.user_id ? (eventUsersQ.data?.[ev.user_id] ?? "Usuário") : "Sistema";
+                              return (
+                                <div key={ev.id} className="flex items-start gap-2 text-xs">
+                                  <div className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-medium">{EVENT_LABELS[ev.event_type] || ev.event_type}</span>
+                                      <span className="text-[10px] text-muted-foreground">{formatDateTime(ev.created_at)}</span>
+                                      <span className="text-[10px] text-muted-foreground">· {authorName}</span>
+                                    </div>
+                                    {ev.content && <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{ev.content}</p>}
+                                    {legacyStageFallback && (
+                                      <p className="text-xs text-muted-foreground mt-0.5">Mudança de etapa</p>
+                                    )}
+                                    {showRawValues && (
+                                      <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+                                        {ev.old_value || "—"} <ChevronRight className="inline h-3 w-3" /> {ev.new_value || "—"}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    </section>
+                  )}
                 </div>
               </div>
             </div>
