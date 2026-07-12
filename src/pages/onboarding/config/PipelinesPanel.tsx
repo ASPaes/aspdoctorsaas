@@ -797,12 +797,37 @@ function StageDialog({
               <Switch checked={ativo} onCheckedChange={setAtivo} />
             </div>
           </div>
+          <div className="space-y-2 pt-2 border-t border-border">
+            <Label className="text-sm">Seções visíveis nesta etapa</Label>
+            <p className="text-[11px] text-muted-foreground">
+              As seções desmarcadas ficam ocultas no detalhe da jornada quando ela está nesta etapa.
+            </p>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              {SECTION_OPTIONS.map((opt) => {
+                const checked = visibleSections.includes(opt.key);
+                return (
+                  <label
+                    key={opt.key}
+                    className="flex items-start gap-2 text-xs cursor-pointer rounded-md border border-border/50 p-2 hover:bg-muted/40 transition-colors"
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => toggleSection(opt.key)}
+                      className="mt-0.5"
+                    />
+                    <span className="leading-tight">{opt.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button disabled={!nome.trim()} onClick={() => onSave({
             id: initial?.id, nome, slug, sla_minutos: slaMin, cor,
             is_initial: isInitial, is_final: isFinal, pausa_sla: pausaSla, ativo,
+            visible_sections: visibleSections,
           })}>Salvar</Button>
         </DialogFooter>
       </DialogContent>
