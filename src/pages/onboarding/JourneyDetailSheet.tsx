@@ -768,11 +768,19 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       if (error) throw error;
       toast.success("Treino agendado");
       setAddTrainingOpen(false);
+      setAddTrainingOpenTop(false);
       setNewTrainingTitle("");
       setNewTrainingDate("");
       setNewTrainingConductor("");
       setNewTrainingRetreat(false);
+      setNewTrainingTypeId("");
       qc.invalidateQueries({ queryKey: ["onboarding-training", journeyId] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-row", journeyId] });
+      qc.invalidateQueries({ queryKey: ["onboarding-detail-stages"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-stage-history", journeyId] });
+      qc.invalidateQueries({ queryKey: ["onboarding-stage-checklist"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao criar treino");
     }
