@@ -137,6 +137,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [nextStageId, setNextStageId] = useState<string>("");
   const [concludeOpen, setConcludeOpen] = useState(false);
   const [goLiveReal, setGoLiveReal] = useState<string>("");
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelMotivo, setCancelMotivo] = useState("");
   const [addParticipantOpen, setAddParticipantOpen] = useState(false);
   const [newParticipantUserId, setNewParticipantUserId] = useState<string>("");
   const [newParticipantPapel, setNewParticipantPapel] = useState<Papel>("especialista");
