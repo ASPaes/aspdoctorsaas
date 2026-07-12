@@ -58,6 +58,8 @@ interface JourneyRow {
   demand_type_id?: string | null;
   demand_type_nome?: string | null;
   demand_type_cor?: string | null;
+  responsavel_user_id?: string | null;
+  responsavel_nome?: string | null;
 }
 
 
