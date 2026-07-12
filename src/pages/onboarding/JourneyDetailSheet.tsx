@@ -1340,158 +1340,162 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                 {/* LEFT */}
                 <div className="space-y-5">
                   {/* Participants */}
-                  <section className="rounded-lg border border-border">
-                    <div className="p-3 border-b border-border flex items-center justify-between">
-                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                        <Users className="h-4 w-4" /> Responsável & participantes
-                      </h3>
-                      <Popover open={addParticipantOpen} onOpenChange={setAddParticipantOpen}>
-                        <PopoverTrigger asChild>
-                          <Button size="sm" variant="outline" className="h-7 text-xs">
-                            <UserPlus className="h-3.5 w-3.5 mr-1" /> Adicionar
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-80 space-y-3" align="end">
-                          <div>
-                            <label className="text-xs font-medium">Usuário</label>
-                            <Select value={newParticipantUserId} onValueChange={setNewParticipantUserId}>
-                              <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                              <SelectContent>
-                                {(tenantMembersQ.data ?? []).map((u) => (
-                                  <SelectItem key={u.user_id} value={u.user_id}>{u.nome}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium">Papel</label>
-                            <Select value={newParticipantPapel} onValueChange={(v) => setNewParticipantPapel(v as Papel)}>
-                              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {PAPEL_OPTIONS.map((p) => (
-                                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <Button size="sm" className="w-full" onClick={handleAddParticipant}>Adicionar</Button>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    <div className="p-3 space-y-2">
-                      {(participantsQ.data ?? []).length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2 text-center">Nenhum participante cadastrado.</p>
-                      ) : (
-                        (["implantador", "vendedor", "especialista", "outro"] as Papel[]).map((papel) => {
-                          const rows = (participantsQ.data ?? []).filter((p) => p.papel === papel);
-                          if (!rows.length) return null;
-                          const isImpl = papel === "implantador";
-                          return (
-                            <div key={papel} className="space-y-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <span
-                                  className="text-[10px] uppercase tracking-wide font-semibold"
-                                  style={{ color: PAPEL_COLOR[papel] }}
-                                >
-                                  {isImpl ? "Responsável" : PAPEL_OPTIONS.find((o) => o.value === papel)?.label}
-                                </span>
-                              </div>
-                              {rows.map((p) => (
-                                <div
-                                  key={p.id}
-                                  className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-1.5"
-                                >
-                                  {isImpl ? (
-                                    <Star className="h-3.5 w-3.5 shrink-0" style={{ color: PAPEL_COLOR[papel] }} fill={PAPEL_COLOR[papel]} />
-                                  ) : (
-                                    <User className="h-3.5 w-3.5 shrink-0" style={{ color: PAPEL_COLOR[papel] }} />
-                                  )}
-                                  <span className="text-xs flex-1 truncate">
-                                    {memberNameMap.get(p.user_id) || "—"}
-                                  </span>
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[9px] capitalize"
-                                    style={{ borderColor: PAPEL_COLOR[papel], color: PAPEL_COLOR[papel] }}
-                                  >
-                                    {papel}
-                                  </Badge>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-6 w-6 shrink-0"
-                                    onClick={() => handleRemoveParticipant(p.id, p.user_id, p.papel)}
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                              ))}
+                  {secVisible("participantes") && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border flex items-center justify-between">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <Users className="h-4 w-4" /> Responsável & participantes
+                        </h3>
+                        <Popover open={addParticipantOpen} onOpenChange={setAddParticipantOpen}>
+                          <PopoverTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 text-xs">
+                              <UserPlus className="h-3.5 w-3.5 mr-1" /> Adicionar
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 space-y-3" align="end">
+                            <div>
+                              <label className="text-xs font-medium">Usuário</label>
+                              <Select value={newParticipantUserId} onValueChange={setNewParticipantUserId}>
+                                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                                <SelectContent>
+                                  {(tenantMembersQ.data ?? []).map((u) => (
+                                    <SelectItem key={u.user_id} value={u.user_id}>{u.nome}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </section>
+                            <div>
+                              <label className="text-xs font-medium">Papel</label>
+                              <Select value={newParticipantPapel} onValueChange={(v) => setNewParticipantPapel(v as Papel)}>
+                                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {PAPEL_OPTIONS.map((p) => (
+                                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <Button size="sm" className="w-full" onClick={handleAddParticipant}>Adicionar</Button>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        {(participantsQ.data ?? []).length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2 text-center">Nenhum participante cadastrado.</p>
+                        ) : (
+                          (["implantador", "vendedor", "especialista", "outro"] as Papel[]).map((papel) => {
+                            const rows = (participantsQ.data ?? []).filter((p) => p.papel === papel);
+                            if (!rows.length) return null;
+                            const isImpl = papel === "implantador";
+                            return (
+                              <div key={papel} className="space-y-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className="text-[10px] uppercase tracking-wide font-semibold"
+                                    style={{ color: PAPEL_COLOR[papel] }}
+                                  >
+                                    {isImpl ? "Responsável" : PAPEL_OPTIONS.find((o) => o.value === papel)?.label}
+                                  </span>
+                                </div>
+                                {rows.map((p) => (
+                                  <div
+                                    key={p.id}
+                                    className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-1.5"
+                                  >
+                                    {isImpl ? (
+                                      <Star className="h-3.5 w-3.5 shrink-0" style={{ color: PAPEL_COLOR[papel] }} fill={PAPEL_COLOR[papel]} />
+                                    ) : (
+                                      <User className="h-3.5 w-3.5 shrink-0" style={{ color: PAPEL_COLOR[papel] }} />
+                                    )}
+                                    <span className="text-xs flex-1 truncate">
+                                      {memberNameMap.get(p.user_id) || "—"}
+                                    </span>
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[9px] capitalize"
+                                      style={{ borderColor: PAPEL_COLOR[papel], color: PAPEL_COLOR[papel] }}
+                                    >
+                                      {papel}
+                                    </Badge>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-6 w-6 shrink-0"
+                                      onClick={() => handleRemoveParticipant(p.id, p.user_id, p.papel)}
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </section>
+                  )}
 
                   {/* Timeline stages */}
-                  <section className="rounded-lg border border-border">
-                    <div className="p-3 border-b border-border">
-                      <h3 className="text-sm font-semibold">Linha do tempo das etapas</h3>
-                    </div>
-                    <div className="p-3 space-y-2">
-                      {stages.map((s, idx) => {
-                        const h = historyByStage[s.id];
-                        const isCurrent = s.id === journey.current_stage_id;
-                        const isPast = currentStageIndex >= 0 && idx < currentStageIndex;
-                        const dot = s.cor || "hsl(var(--muted-foreground))";
-                        return (
-                          <div
-                            key={s.id}
-                            className={`flex items-start gap-3 rounded-md p-2 ${
-                              isCurrent ? "bg-primary/5 border border-primary/30" : ""
-                            } ${!isCurrent && !isPast ? "opacity-50" : ""}`}
-                          >
-                            <div className="mt-0.5">
-                              {isPast ? (
-                                <CheckCircle2 className="h-4 w-4 text-primary" />
-                              ) : isCurrent ? (
-                                <div className="h-4 w-4 rounded-full ring-2 ring-primary/40" style={{ background: dot }} />
-                              ) : (
-                                <Circle className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs font-medium truncate">{s.nome}</span>
-                                {h?.duracao_minutos != null && !isCurrent && (
-                                  <span className="text-[10px] text-muted-foreground shrink-0">{formatMin(h.duracao_minutos)}</span>
-                                )}
-                                {isCurrent && journey.etapa_atual_min != null && (
-                                  <span className="text-[10px] font-medium shrink-0" style={{ color: slaColor }}>
-                                    {formatMin(journey.etapa_atual_min)}
-                                  </span>
+                  {secVisible("timeline") && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border">
+                        <h3 className="text-sm font-semibold">Linha do tempo das etapas</h3>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        {stages.map((s, idx) => {
+                          const h = historyByStage[s.id];
+                          const isCurrent = s.id === journey.current_stage_id;
+                          const isPast = currentStageIndex >= 0 && idx < currentStageIndex;
+                          const dot = s.cor || "hsl(var(--muted-foreground))";
+                          return (
+                            <div
+                              key={s.id}
+                              className={`flex items-start gap-3 rounded-md p-2 ${
+                                isCurrent ? "bg-primary/5 border border-primary/30" : ""
+                              } ${!isCurrent && !isPast ? "opacity-50" : ""}`}
+                            >
+                              <div className="mt-0.5">
+                                {isPast ? (
+                                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                                ) : isCurrent ? (
+                                  <div className="h-4 w-4 rounded-full ring-2 ring-primary/40" style={{ background: dot }} />
+                                ) : (
+                                  <Circle className="h-4 w-4 text-muted-foreground" />
                                 )}
                               </div>
-                              {h?.entrou_em && (
-                                <p className="text-[10px] text-muted-foreground mt-0.5">
-                                  Entrou {formatDateTime(h.entrou_em)}
-                                  {h.saiu_em && ` • saiu ${formatDateTime(h.saiu_em)}`}
-                                </p>
-                              )}
-                              {(isCurrent || isPast) && accumulatedByStage[s.id] > 0 && (
-                                <p className="text-[10px] text-muted-foreground/80 mt-0.5">
-                                  Acumulado até aqui: <span className="font-medium text-foreground/80">{formatMin(accumulatedByStage[s.id])}</span>
-                                </p>
-                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-medium truncate">{s.nome}</span>
+                                  {h?.duracao_minutos != null && !isCurrent && (
+                                    <span className="text-[10px] text-muted-foreground shrink-0">{formatMin(h.duracao_minutos)}</span>
+                                  )}
+                                  {isCurrent && journey.etapa_atual_min != null && (
+                                    <span className="text-[10px] font-medium shrink-0" style={{ color: slaColor }}>
+                                      {formatMin(journey.etapa_atual_min)}
+                                    </span>
+                                  )}
+                                </div>
+                                {h?.entrou_em && (
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                                    Entrou {formatDateTime(h.entrou_em)}
+                                    {h.saiu_em && ` • saiu ${formatDateTime(h.saiu_em)}`}
+                                  </p>
+                                )}
+                                {(isCurrent || isPast) && accumulatedByStage[s.id] > 0 && (
+                                  <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+                                    Acumulado até aqui: <span className="font-medium text-foreground/80">{formatMin(accumulatedByStage[s.id])}</span>
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </section>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
 
                   {/* Pauses by reason */}
-                  {pausesByReason.length > 0 && (
+                  {secVisible("pausas") && pausesByReason.length > 0 && (
                     <section className="rounded-lg border border-border">
                       <div className="p-3 border-b border-border flex items-center justify-between">
                         <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -1521,102 +1525,104 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
 
 
                   {/* Modules */}
-                  <section className="rounded-lg border border-border">
-                    <div className="p-3 border-b border-border flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                        <Package className="h-4 w-4" /> Módulos da jornada
-                      </h3>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px]">{(modulesQ.data ?? []).length}</Badge>
-                        {(clienteProdutoModulosQ.data ?? []).length > 0 && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs gap-1"
-                            onClick={handleImportFromCliente}
-                          >
-                            <Download className="h-3 w-3" /> Importar do cliente
-                          </Button>
-                        )}
-                        <Popover open={addModuleOpen} onOpenChange={setAddModuleOpen}>
-                          <PopoverTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
-                              <Plus className="h-3 w-3" /> Adicionar módulo
+                  {secVisible("modulos") && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <Package className="h-4 w-4" /> Módulos da jornada
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[10px]">{(modulesQ.data ?? []).length}</Badge>
+                          {(clienteProdutoModulosQ.data ?? []).length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1"
+                              onClick={handleImportFromCliente}
+                            >
+                              <Download className="h-3 w-3" /> Importar do cliente
                             </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-80 space-y-3" align="end">
-                            <div className="space-y-1">
-                              <label className="text-[11px] font-medium">Nome do módulo</label>
-                              <div className="flex gap-1.5">
-                                <Input
-                                  value={newModuleName}
-                                  onChange={(e) => setNewModuleName(e.target.value)}
-                                  placeholder="Ex: PDV, Financeiro"
-                                  className="h-8 text-xs"
-                                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddModuleManual(); } }}
-                                />
-                                <Button size="sm" className="h-8 px-3" onClick={handleAddModuleManual}>Add</Button>
-                              </div>
-                            </div>
-                            {(produtoModulosQ.data ?? []).length > 0 && (
-                              <>
-                                <Separator />
-                                <div className="space-y-1">
-                                  <label className="text-[11px] font-medium">Ou escolher do produto</label>
-                                  <div className="flex gap-1.5">
-                                    <Select value={newModuleProdutoModuloId} onValueChange={setNewModuleProdutoModuloId}>
-                                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar módulo" /></SelectTrigger>
-                                      <SelectContent>
-                                        {(produtoModulosQ.data ?? []).map((m) => (
-                                          <SelectItem key={m.id} value={m.id} className="text-xs">{m.nome}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <Button size="sm" className="h-8 px-3" onClick={handleAddModuleFromProduto} disabled={!newModuleProdutoModuloId}>Add</Button>
-                                  </div>
-                                </div>
-                              </>
-                            )}
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </div>
-                    <div className="p-3 space-y-1.5">
-                      {(modulesQ.data ?? []).length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2 text-center">Nenhum módulo cadastrado.</p>
-                      ) : (
-                        (modulesQ.data ?? []).map((m) => {
-                          const origemColor: Record<string, string> = {
-                            manual: "hsl(215 16% 47%)",
-                            produto: "hsl(199 89% 48%)",
-                            cliente: "hsl(262 83% 58%)",
-                          };
-                          return (
-                            <div key={m.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-xs font-medium truncate">{m.nome}</span>
-                                <Badge
-                                  variant="outline"
-                                  className="text-[9px] capitalize border-0 text-white shrink-0"
-                                  style={{ backgroundColor: origemColor[m.origem] || origemColor.manual }}
-                                >
-                                  {m.origem}
-                                </Badge>
-                              </div>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                                onClick={() => handleDeleteModule(m.id)}
-                              >
-                                <Trash2 className="h-3 w-3" />
+                          )}
+                          <Popover open={addModuleOpen} onOpenChange={setAddModuleOpen}>
+                            <PopoverTrigger asChild>
+                              <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
+                                <Plus className="h-3 w-3" /> Adicionar módulo
                               </Button>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </section>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 space-y-3" align="end">
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-medium">Nome do módulo</label>
+                                <div className="flex gap-1.5">
+                                  <Input
+                                    value={newModuleName}
+                                    onChange={(e) => setNewModuleName(e.target.value)}
+                                    placeholder="Ex: PDV, Financeiro"
+                                    className="h-8 text-xs"
+                                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddModuleManual(); } }}
+                                  />
+                                  <Button size="sm" className="h-8 px-3" onClick={handleAddModuleManual}>Add</Button>
+                                </div>
+                              </div>
+                              {(produtoModulosQ.data ?? []).length > 0 && (
+                                <>
+                                  <Separator />
+                                  <div className="space-y-1">
+                                    <label className="text-[11px] font-medium">Ou escolher do produto</label>
+                                    <div className="flex gap-1.5">
+                                      <Select value={newModuleProdutoModuloId} onValueChange={setNewModuleProdutoModuloId}>
+                                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar módulo" /></SelectTrigger>
+                                        <SelectContent>
+                                          {(produtoModulosQ.data ?? []).map((m) => (
+                                            <SelectItem key={m.id} value={m.id} className="text-xs">{m.nome}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <Button size="sm" className="h-8 px-3" onClick={handleAddModuleFromProduto} disabled={!newModuleProdutoModuloId}>Add</Button>
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                      <div className="p-3 space-y-1.5">
+                        {(modulesQ.data ?? []).length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2 text-center">Nenhum módulo cadastrado.</p>
+                        ) : (
+                          (modulesQ.data ?? []).map((m) => {
+                            const origemColor: Record<string, string> = {
+                              manual: "hsl(215 16% 47%)",
+                              produto: "hsl(199 89% 48%)",
+                              cliente: "hsl(262 83% 58%)",
+                            };
+                            return (
+                              <div key={m.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-xs font-medium truncate">{m.nome}</span>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[9px] capitalize border-0 text-white shrink-0"
+                                    style={{ backgroundColor: origemColor[m.origem] || origemColor.manual }}
+                                  >
+                                    {m.origem}
+                                  </Badge>
+                                </div>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                                  onClick={() => handleDeleteModule(m.id)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </section>
+                  )}
 
                   {/* Dados da contabilidade */}
                   <AccountingCard
