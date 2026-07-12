@@ -610,6 +610,116 @@ export default function OnboardingDashboardPage() {
             )}
           </section>
 
+          {/* Retornos ao vendedor */}
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Retornos ao vendedor</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <KpiCard
+                icon={UserX}
+                label="Total de retornos"
+                value={String(vendorReturnsTotal)}
+                sub="no período"
+                tone="info"
+                subTone="muted"
+              />
+              <KpiCard
+                icon={AlertTriangle}
+                label="Atribuíveis ao vendedor"
+                value={String(vendorReturnsAtribuiveis)}
+                sub={`${vendorReturnsAtribuiveisPct}% do total · qualidade`}
+                tone={vendorReturnsAtribuiveisPct === 0 ? "success" : vendorReturnsAtribuiveisPct < 30 ? "warning" : "danger"}
+                subTone={vendorReturnsAtribuiveisPct === 0 ? "success" : vendorReturnsAtribuiveisPct < 30 ? "warning" : "danger"}
+              />
+              <KpiCard
+                icon={Pause}
+                label="Em aberto"
+                value={String(vendorReturnsPeriodo.filter((r) => r.em_aberto).length)}
+                sub="aguardando vendedor"
+                tone="warning"
+                subTone="muted"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div className="rounded-lg border border-border bg-card">
+                <div className="p-3 border-b border-border flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Por vendedor</h3>
+                  <Badge variant="outline" className="text-[10px]">{vendorReturnsByVendor.length}</Badge>
+                </div>
+                {vendorReturnsByVendor.length === 0 ? (
+                  <p className="text-xs text-muted-foreground p-6 text-center">Nenhum retorno no período.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/30 text-muted-foreground">
+                        <tr className="text-left">
+                          <th className="px-3 py-2 font-medium">Vendedor</th>
+                          <th className="px-3 py-2 font-medium text-right">Total</th>
+                          <th className="px-3 py-2 font-medium text-right">Atribuíveis</th>
+                          <th className="px-3 py-2 font-medium text-right">TMR</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vendorReturnsByVendor.map((row) => (
+                          <tr key={row.id} className="border-t border-border hover:bg-muted/20">
+                            <td className="px-3 py-2 font-medium">{row.nome}</td>
+                            <td className="px-3 py-2 text-right">{row.total}</td>
+                            <td className={`px-3 py-2 text-right ${row.atribuiveis > 0 ? "text-[hsl(38_92%_50%)] font-medium" : ""}`}>
+                              {row.atribuiveis}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                              {row.tmr != null ? formatMin(row.tmr) : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-border bg-card">
+                <div className="p-3 border-b border-border flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Por motivo</h3>
+                  <Badge variant="outline" className="text-[10px]">{vendorReturnsByReason.length}</Badge>
+                </div>
+                {vendorReturnsByReason.length === 0 ? (
+                  <p className="text-xs text-muted-foreground p-6 text-center">Nenhum retorno no período.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/30 text-muted-foreground">
+                        <tr className="text-left">
+                          <th className="px-3 py-2 font-medium">Motivo</th>
+                          <th className="px-3 py-2 font-medium text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vendorReturnsByReason.map((row) => (
+                          <tr key={row.nome} className="border-t border-border hover:bg-muted/20">
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-medium">{row.nome}</span>
+                                {row.atribuivel && (
+                                  <Badge className="text-[9px] border-0 text-white" style={{ backgroundColor: "hsl(38 92% 50%)" }}>
+                                    atribuível
+                                  </Badge>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-right font-medium">{row.total}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+
+
           {/* Fase 2 placeholder */}
           <section className="rounded-lg border border-dashed border-border bg-muted/20 p-4 flex items-start gap-3">
             <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
