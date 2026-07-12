@@ -17,8 +17,9 @@ import { StartConversationFromTicketDialog } from "@/components/tickets/StartCon
 import {
   Loader2, Clock, Pause, Play, ChevronRight, Calendar, CheckCircle2,
   Circle, AlertCircle, MessageSquare, GraduationCap, User, ArrowRight,
-  UserPlus, Star, X, Users, Package, Plus, Trash2, Download,
+  UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle,
 } from "lucide-react";
+
 
 type Papel = "implantador" | "vendedor" | "especialista" | "outro";
 const PAPEL_OPTIONS: { value: Papel; label: string }[] = [
@@ -142,6 +143,14 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [addModuleOpen, setAddModuleOpen] = useState(false);
   const [newModuleName, setNewModuleName] = useState("");
   const [newModuleProdutoModuloId, setNewModuleProdutoModuloId] = useState<string>("");
+
+  // Vendor return
+  const [returnOpen, setReturnOpen] = useState(false);
+  const [returnVendorId, setReturnVendorId] = useState<string>("");
+  const [returnReasonId, setReturnReasonId] = useState<string>("");
+  const [returnText, setReturnText] = useState("");
+  const [returnPauseSla, setReturnPauseSla] = useState(true);
+
 
   useEffect(() => {
     if (!open) {
@@ -386,6 +395,38 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         .order("position");
       if (error) throw error;
       return (data ?? []) as Array<{ id: string; nome: string; conta_como_pdv: boolean }>;
+    },
+  });
+
+
+  const vendorReturnReasonsQ = useQuery({
+    queryKey: ["onb-vendor-return-reasons-lookup", tenantId],
+    enabled: open && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_vendor_return_reasons" as any) as any)
+        .select("id, nome, atribuivel_vendedor")
+        .eq("tenant_id", tenantId)
+        .eq("ativo", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; atribuivel_vendedor: boolean }>;
+    },
+  });
+
+  const vendorReturnsQ = useQuery({
+    queryKey: ["onboarding-vendor-returns", journeyId, tenantId],
+    enabled: !!journeyId && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("vw_onboarding_vendor_returns" as any) as any)
+        .select("vendedor_user_id, motivo_nome, atribuivel_vendedor, retornado_em, resolvido_em, em_aberto, minutos")
+        .eq("tenant_id", tenantId)
+        .eq("journey_id", journeyId)
+        .order("retornado_em", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        vendedor_user_id: string; motivo_nome: string | null; atribuivel_vendedor: boolean;
+        retornado_em: string; resolvido_em: string | null; em_aberto: boolean; minutos: number | null;
+      }>;
     },
   });
 
@@ -810,8 +851,48 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     } catch (e: any) { toast.error(e.message || "Erro ao remover módulo"); }
   }
 
+  const openVendorReturn = (vendorReturnsQ.data ?? []).find((r) => r.em_aberto);
 
+  async function handleReturnToVendor() {
+    if (!journey) return;
+    if (!returnVendorId) { toast.error("Selecione o vendedor"); return; }
+    if (!returnReasonId) { toast.error("Selecione o motivo"); return; }
+    try {
+      const { error } = await (supabase.rpc as any)("return_to_vendor", {
+        p_journey_id: journey.journey_id,
+        p_vendedor_user_id: returnVendorId,
+        p_reason_id: returnReasonId,
+        p_motivo_texto: returnText || null,
+        p_pausar_sla: returnPauseSla,
+      });
+      if (error) throw error;
+      toast.success("Retornado ao vendedor");
+      setReturnOpen(false);
+      setReturnVendorId(""); setReturnReasonId(""); setReturnText(""); setReturnPauseSla(true);
+      qc.invalidateQueries({ queryKey: ["onboarding-vendor-returns"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-participants"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao retornar");
+    }
+  }
 
+  async function handleResolveVendorReturn() {
+    if (!journey) return;
+    try {
+      const { error } = await (supabase.rpc as any)("resolve_vendor_return", { p_journey_id: journey.journey_id });
+      if (error) throw error;
+      toast.success("Retorno resolvido");
+      qc.invalidateQueries({ queryKey: ["onboarding-vendor-returns"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao resolver retorno");
+    }
+  }
 
 
   const loading = journeyQ.isLoading || !journey;
@@ -857,6 +938,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         <CheckCircle2 className="h-3 w-3" /> Concluída
                       </Badge>
                     )}
+                    {openVendorReturn && (
+                      <Badge className="text-[10px] gap-1 border-0 text-white" style={{ background: "hsl(38 92% 50%)" }}>
+                        <AlertTriangle className="h-3 w-3" /> Aguardando vendedor
+                      </Badge>
+                    )}
+
                   </div>
                   <DialogTitle className="text-base mt-1 truncate">{clienteNome}</DialogTitle>
                   {journey.assunto && (
@@ -869,6 +956,18 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       <MessageSquare className="h-4 w-4 mr-1" /> Conversa
                     </Button>
                   )}
+                  {!isConcluded && (
+                    openVendorReturn ? (
+                      <Button size="sm" variant="outline" onClick={handleResolveVendorReturn}>
+                        <RotateCcw className="h-4 w-4 mr-1" /> Resolver retorno
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => setReturnOpen(true)}>
+                        <AlertTriangle className="h-4 w-4 mr-1" /> Retornar ao vendedor
+                      </Button>
+                    )
+                  )}
+
                   {isConcluded ? (
                     <>
                       <span className="text-[11px] text-muted-foreground">
@@ -1611,6 +1710,64 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         </div>
       </DialogContent>
     </Dialog>
+    <Dialog open={returnOpen} onOpenChange={setReturnOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" style={{ color: "hsl(38 92% 50%)" }} />
+            Retornar ao vendedor
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Vendedor *</label>
+            <Select value={returnVendorId} onValueChange={setReturnVendorId}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecionar usuário" /></SelectTrigger>
+              <SelectContent>
+                {(tenantMembersQ.data ?? []).map((u) => (
+                  <SelectItem key={u.user_id} value={u.user_id} className="text-xs">{u.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Motivo *</label>
+            <Select value={returnReasonId} onValueChange={setReturnReasonId}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecionar motivo" /></SelectTrigger>
+              <SelectContent>
+                {(vendorReturnReasonsQ.data ?? []).map((r) => (
+                  <SelectItem key={r.id} value={r.id} className="text-xs">
+                    <span className="flex items-center gap-1.5">
+                      {r.nome}
+                      {r.atribuivel_vendedor && (
+                        <Badge className="text-[9px] border-0 text-white" style={{ backgroundColor: "hsl(38 92% 50%)" }}>
+                          atribuível
+                        </Badge>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Observação (opcional)</label>
+            <Textarea value={returnText} onChange={(e) => setReturnText(e.target.value)} rows={3} className="text-xs" />
+          </div>
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <Checkbox checked={returnPauseSla} onCheckedChange={(v) => setReturnPauseSla(!!v)} />
+            Pausar SLA enquanto aguarda o vendedor
+          </label>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => setReturnOpen(false)}>Cancelar</Button>
+          <Button size="sm" className="text-white border-0" style={{ background: "hsl(38 92% 50%)" }} onClick={handleReturnToVendor}>
+            <AlertTriangle className="h-4 w-4 mr-1" /> Confirmar retorno
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
     </>
+
   );
 }

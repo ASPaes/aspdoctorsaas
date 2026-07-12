@@ -4510,6 +4510,118 @@ export type Database = {
           },
         ]
       }
+      onboarding_vendor_return_reasons: {
+        Row: {
+          ativo: boolean
+          atribuivel_vendedor: boolean
+          created_at: string
+          id: string
+          nome: string
+          position: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          atribuivel_vendedor?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          position?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          atribuivel_vendedor?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          position?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_vendor_return_reasons_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_vendor_returns: {
+        Row: {
+          created_at: string
+          criado_por: string | null
+          id: string
+          journey_id: string
+          motivo_texto: string | null
+          reason_id: string | null
+          resolvido_em: string | null
+          resolvido_por: string | null
+          retornado_em: string
+          tenant_id: string
+          vendedor_user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          journey_id: string
+          motivo_texto?: string | null
+          reason_id?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          retornado_em?: string
+          tenant_id: string
+          vendedor_user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          journey_id?: string
+          motivo_texto?: string | null
+          reason_id?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          retornado_em?: string
+          tenant_id?: string
+          vendedor_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_vendor_returns_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_vendor_returns_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_vendor_returns_reason_id_fkey"
+            columns: ["reason_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_vendor_return_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_vendor_returns_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       origens_venda: {
         Row: {
           id: number
@@ -9096,6 +9208,50 @@ export type Database = {
           },
         ]
       }
+      vw_onboarding_vendor_returns: {
+        Row: {
+          atribuivel_vendedor: boolean | null
+          em_aberto: boolean | null
+          journey_id: string | null
+          minutos: number | null
+          motivo_nome: string | null
+          reason_id: string | null
+          resolvido_em: string | null
+          retornado_em: string | null
+          tenant_id: string | null
+          vendedor_user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_vendor_returns_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_vendor_returns_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_vendor_returns_reason_id_fkey"
+            columns: ["reason_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_vendor_return_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_vendor_returns_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       accept_access_invite: {
@@ -10843,7 +10999,18 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: Json
       }
+      resolve_vendor_return: { Args: { p_journey_id: string }; Returns: Json }
       resume_onboarding: { Args: { p_journey_id: string }; Returns: Json }
+      return_to_vendor: {
+        Args: {
+          p_journey_id: string
+          p_motivo_texto?: string
+          p_pausar_sla?: boolean
+          p_reason_id?: string
+          p_vendedor_user_id: string
+        }
+        Returns: string
+      }
       rodar_deteccao_reconciliacao: {
         Args: { p_tenant_id: string }
         Returns: number

@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Loader2, CheckCircle2, AlertTriangle, UserCheck, GraduationCap,
-  RotateCcw, TrendingUp, Info, Pause,
+  RotateCcw, TrendingUp, Info, Pause, UserX,
 } from "lucide-react";
+
 import { startOfMonth, endOfMonth } from "date-fns";
 
 interface JourneyRow {
@@ -162,6 +163,89 @@ export default function OnboardingDashboardPage() {
     [pausesByReasonAgg]
   );
 
+  const vendorReturnsAllQ = useQuery({
+    queryKey: ["onboarding-dash-vendor-returns", effectiveTenantId],
+    enabled: isSuperAdmin && !!effectiveTenantId,
+    queryFn: async () => {
+      const rows = await fetchAllRows<{
+        vendedor_user_id: string; motivo_nome: string | null; atribuivel_vendedor: boolean;
+        retornado_em: string; resolvido_em: string | null; em_aberto: boolean; minutos: number | null;
+      }>(() =>
+        (supabase.from("vw_onboarding_vendor_returns" as any) as any)
+          .select("vendedor_user_id, motivo_nome, atribuivel_vendedor, retornado_em, resolvido_em, em_aberto, minutos")
+          .eq("tenant_id", effectiveTenantId)
+      );
+      return rows;
+    },
+  });
+
+  const vendorReturnsPeriodo = useMemo(() => {
+    const from = dateRange.from.getTime();
+    const to = dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1;
+    return (vendorReturnsAllQ.data ?? []).filter((r) => {
+      const d = new Date(r.retornado_em).getTime();
+      return d >= from && d <= to;
+    });
+  }, [vendorReturnsAllQ.data, dateRange]);
+
+  const vendorReturnUserIds = useMemo(
+    () => Array.from(new Set(vendorReturnsPeriodo.map((r) => r.vendedor_user_id).filter(Boolean))) as string[],
+    [vendorReturnsPeriodo]
+  );
+
+  const vendorNamesQ = useQuery({
+    queryKey: ["onboarding-dash-vendor-names", vendorReturnUserIds.join(",")],
+    enabled: vendorReturnUserIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, funcionarios:funcionario_id(nome)")
+        .in("user_id", vendorReturnUserIds);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      (data ?? []).forEach((p: any) => {
+        if (p.funcionarios?.nome) map[p.user_id] = p.funcionarios.nome;
+      });
+      return map;
+    },
+  });
+
+  const vendorNames = vendorNamesQ.data ?? {};
+
+  const vendorReturnsTotal = vendorReturnsPeriodo.length;
+  const vendorReturnsAtribuiveis = vendorReturnsPeriodo.filter((r) => r.atribuivel_vendedor).length;
+  const vendorReturnsAtribuiveisPct = pct(vendorReturnsAtribuiveis, vendorReturnsTotal);
+
+  const vendorReturnsByVendor = useMemo(() => {
+    const m: Record<string, { total: number; atribuiveis: number; minutosResolvidos: number; countResolvidos: number }> = {};
+    vendorReturnsPeriodo.forEach((r) => {
+      const id = r.vendedor_user_id || "__sem__";
+      if (!m[id]) m[id] = { total: 0, atribuiveis: 0, minutosResolvidos: 0, countResolvidos: 0 };
+      m[id].total += 1;
+      if (r.atribuivel_vendedor) m[id].atribuiveis += 1;
+      if (r.resolvido_em && r.minutos != null) {
+        m[id].minutosResolvidos += r.minutos;
+        m[id].countResolvidos += 1;
+      }
+    });
+    return Object.entries(m).map(([id, s]) => ({
+      id,
+      nome: id === "__sem__" ? "—" : (vendorNames[id] || "—"),
+      total: s.total,
+      atribuiveis: s.atribuiveis,
+      tmr: s.countResolvidos > 0 ? s.minutosResolvidos / s.countResolvidos : null,
+    })).sort((a, b) => b.total - a.total);
+  }, [vendorReturnsPeriodo, vendorNames]);
+
+  const vendorReturnsByReason = useMemo(() => {
+    const m: Record<string, { total: number; atribuivel: boolean }> = {};
+    vendorReturnsPeriodo.forEach((r) => {
+      const nome = r.motivo_nome || "Sem motivo";
+      if (!m[nome]) m[nome] = { total: 0, atribuivel: r.atribuivel_vendedor };
+      m[nome].total += 1;
+    });
+    return Object.entries(m).map(([nome, s]) => ({ nome, ...s })).sort((a, b) => b.total - a.total);
+  }, [vendorReturnsPeriodo]);
 
 
   // Treinos no período: usa realizado_em quando existe, senão agendado_para
@@ -525,6 +609,116 @@ export default function OnboardingDashboardPage() {
               </div>
             )}
           </section>
+
+          {/* Retornos ao vendedor */}
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Retornos ao vendedor</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <KpiCard
+                icon={UserX}
+                label="Total de retornos"
+                value={String(vendorReturnsTotal)}
+                sub="no período"
+                tone="info"
+                subTone="muted"
+              />
+              <KpiCard
+                icon={AlertTriangle}
+                label="Atribuíveis ao vendedor"
+                value={String(vendorReturnsAtribuiveis)}
+                sub={`${vendorReturnsAtribuiveisPct}% do total · qualidade`}
+                tone={vendorReturnsAtribuiveisPct === 0 ? "success" : vendorReturnsAtribuiveisPct < 30 ? "warning" : "danger"}
+                subTone={vendorReturnsAtribuiveisPct === 0 ? "success" : vendorReturnsAtribuiveisPct < 30 ? "warning" : "danger"}
+              />
+              <KpiCard
+                icon={Pause}
+                label="Em aberto"
+                value={String(vendorReturnsPeriodo.filter((r) => r.em_aberto).length)}
+                sub="aguardando vendedor"
+                tone="warning"
+                subTone="muted"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div className="rounded-lg border border-border bg-card">
+                <div className="p-3 border-b border-border flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Por vendedor</h3>
+                  <Badge variant="outline" className="text-[10px]">{vendorReturnsByVendor.length}</Badge>
+                </div>
+                {vendorReturnsByVendor.length === 0 ? (
+                  <p className="text-xs text-muted-foreground p-6 text-center">Nenhum retorno no período.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/30 text-muted-foreground">
+                        <tr className="text-left">
+                          <th className="px-3 py-2 font-medium">Vendedor</th>
+                          <th className="px-3 py-2 font-medium text-right">Total</th>
+                          <th className="px-3 py-2 font-medium text-right">Atribuíveis</th>
+                          <th className="px-3 py-2 font-medium text-right">TMR</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vendorReturnsByVendor.map((row) => (
+                          <tr key={row.id} className="border-t border-border hover:bg-muted/20">
+                            <td className="px-3 py-2 font-medium">{row.nome}</td>
+                            <td className="px-3 py-2 text-right">{row.total}</td>
+                            <td className={`px-3 py-2 text-right ${row.atribuiveis > 0 ? "text-[hsl(38_92%_50%)] font-medium" : ""}`}>
+                              {row.atribuiveis}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                              {row.tmr != null ? formatMin(row.tmr) : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-border bg-card">
+                <div className="p-3 border-b border-border flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Por motivo</h3>
+                  <Badge variant="outline" className="text-[10px]">{vendorReturnsByReason.length}</Badge>
+                </div>
+                {vendorReturnsByReason.length === 0 ? (
+                  <p className="text-xs text-muted-foreground p-6 text-center">Nenhum retorno no período.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/30 text-muted-foreground">
+                        <tr className="text-left">
+                          <th className="px-3 py-2 font-medium">Motivo</th>
+                          <th className="px-3 py-2 font-medium text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vendorReturnsByReason.map((row) => (
+                          <tr key={row.nome} className="border-t border-border hover:bg-muted/20">
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-medium">{row.nome}</span>
+                                {row.atribuivel && (
+                                  <Badge className="text-[9px] border-0 text-white" style={{ backgroundColor: "hsl(38 92% 50%)" }}>
+                                    atribuível
+                                  </Badge>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-right font-medium">{row.total}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+
 
           {/* Fase 2 placeholder */}
           <section className="rounded-lg border border-dashed border-border bg-muted/20 p-4 flex items-start gap-3">
