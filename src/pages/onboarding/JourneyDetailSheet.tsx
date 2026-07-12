@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
+import { TicketAttachments } from "@/components/tickets/TicketAttachments";
 import {
   Loader2, Clock, Pause, Play, ChevronRight, Calendar, CheckCircle2,
   Circle, AlertCircle, MessageSquare, GraduationCap, User, ArrowRight,
@@ -125,7 +126,7 @@ const EVENT_LABELS: Record<string, string> = {
 };
 
 export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tenantId }: Props) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const qc = useQueryClient();
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [note, setNote] = useState("");
@@ -1830,6 +1831,22 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       )}
                     </div>
                   </section>
+
+                  {/* Attachments */}
+                  {journey?.ticket_id && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border">
+                        <h3 className="text-sm font-semibold">Anexos</h3>
+                      </div>
+                      <div className="p-3">
+                        <TicketAttachments
+                          ticketId={journey.ticket_id}
+                          tenantId={tenantId!}
+                          canDelete={profile?.is_super_admin === true || profile?.role === "admin"}
+                        />
+                      </div>
+                    </section>
+                  )}
 
                   {/* Attendances */}
                   <section className="rounded-lg border border-border">
