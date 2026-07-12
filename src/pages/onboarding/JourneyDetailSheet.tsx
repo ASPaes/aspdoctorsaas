@@ -606,6 +606,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const clienteNome = cliente?.nome_fantasia || cliente?.razao_social || "—";
   const isPaused = journey?.situacao === "pausado" || journey?.situacao === "parado";
   const isConcluded = journey?.situacao === "concluido";
+  const isCancelled = journey?.situacao === "cancelado";
+  const isTerminal = isConcluded || isCancelled;
+  const isAdmin = profile?.is_super_admin === true || profile?.role === "admin";
+  const etapaFinal = stages.find((s) => s.id === journey?.current_stage_id)?.is_final === true;
+  const canGoLive = (journey?.fase_atual === "implantacao" && etapaFinal) || isAdmin;
+
 
   async function handleAdvance() {
     if (!journey) return;
