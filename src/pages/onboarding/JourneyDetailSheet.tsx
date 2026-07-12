@@ -1142,7 +1142,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   </div>
                 </div>
                 <div className="rounded-lg border border-border bg-muted/30 p-3">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Sem tempo parado</div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Tempo efetivo (sem pausas)</div>
                   <div className="text-lg font-semibold mt-0.5 flex items-center gap-1.5">
                     <Clock className="h-4 w-4" style={{ color: slaColor }} />
                     {formatMin(journey.sla_util_min)}
