@@ -788,6 +788,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       toast.error("Informe o título do treino");
       return;
     }
+    const movesToImplantation = journey?.fase_atual === "onboarding";
     try {
       const { error } = await (supabase.rpc as any)("create_onboarding_training", {
         p_journey_id: journeyId,
@@ -799,7 +800,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
 
       });
       if (error) throw error;
-      toast.success("Treino agendado");
+      toast.success(
+        movesToImplantation
+          ? "Treino agendado — jornada movida para Implantação."
+          : "Treino agendado"
+      );
       setAddTrainingOpen(false);
       setAddTrainingOpenTop(false);
       setNewTrainingTitle("");
