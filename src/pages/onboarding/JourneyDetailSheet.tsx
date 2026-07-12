@@ -344,6 +344,34 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     },
   });
 
+  const accountingFieldsQ = useQuery({
+    queryKey: ["onboarding-accounting-fields", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_accounting_fields" as any) as any)
+        .select("id, nome, tipo, opcoes, position")
+        .eq("tenant_id", tenantId)
+        .eq("ativo", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; tipo: "text" | "number" | "date" | "option" | "boolean"; opcoes: string[] | null; position: number }>;
+    },
+  });
+
+  const accountingValuesQ = useQuery({
+    queryKey: ["onboarding-accounting-values", journeyId, tenantId],
+    enabled: !!journeyId && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_journey_accounting" as any) as any)
+        .select("id, field_id, valor, coletado")
+        .eq("tenant_id", tenantId)
+        .eq("journey_id", journeyId);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; field_id: string; valor: string | null; coletado: boolean }>;
+    },
+  });
+
+
   const attendancesQ = useQuery({
     queryKey: ["onboarding-attendances", journey?.ticket_id],
 
