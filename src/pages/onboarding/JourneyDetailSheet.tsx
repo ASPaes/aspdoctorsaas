@@ -1180,10 +1180,10 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     )
                   )}
 
-                  {isConcluded ? (
+                  {isTerminal ? (
                     <>
                       <span className="text-[11px] text-muted-foreground">
-                        Concluída em {formatDate(journey.concluido_em ?? null)}
+                        {isCancelled ? "Cancelada" : "Concluída"} em {formatDate(journey.concluido_em ?? null)}
                       </span>
                       <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleReopen}>
                         <Play className="h-3.5 w-3.5 mr-1" /> Reabrir
@@ -1194,9 +1194,14 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleResume}>
                         <Play className="h-3.5 w-3.5 mr-1" /> Retomar
                       </Button>
-                      <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir
+                      <Button size="sm" variant="outline" className="h-8 text-xs border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setCancelOpen(true)}>
+                        <Ban className="h-3.5 w-3.5 mr-1" /> Cancelar jornada
                       </Button>
+                      {canGoLive && (
+                        <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Go-live
+                        </Button>
+                      )}
                     </>
                   ) : (
                     <>
@@ -1225,9 +1230,14 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           <Button size="sm" className="w-full" onClick={handlePause}>Confirmar pausa</Button>
                         </PopoverContent>
                       </Popover>
-                      <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir
+                      <Button size="sm" variant="outline" className="h-8 text-xs border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setCancelOpen(true)}>
+                        <Ban className="h-3.5 w-3.5 mr-1" /> Cancelar jornada
                       </Button>
+                      {canGoLive && (
+                        <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Go-live
+                        </Button>
+                      )}
                     </>
                   )}
                 </div>
