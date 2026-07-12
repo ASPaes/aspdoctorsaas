@@ -17,8 +17,9 @@ import { StartConversationFromTicketDialog } from "@/components/tickets/StartCon
 import {
   Loader2, Clock, Pause, Play, ChevronRight, Calendar, CheckCircle2,
   Circle, AlertCircle, MessageSquare, GraduationCap, User, ArrowRight,
-  UserPlus, Star, X, Users, Package, Plus, Trash2, Download,
+  UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle,
 } from "lucide-react";
+
 
 type Papel = "implantador" | "vendedor" | "especialista" | "outro";
 const PAPEL_OPTIONS: { value: Papel; label: string }[] = [
