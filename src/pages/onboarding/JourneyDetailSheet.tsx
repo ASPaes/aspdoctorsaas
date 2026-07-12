@@ -715,6 +715,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao reabrir");
+    }
   }
 
   async function handleCancel() {
