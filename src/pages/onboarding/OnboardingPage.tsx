@@ -337,6 +337,75 @@ export default function OnboardingPage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar cliente, ticket ou assunto..."
+            className="h-8 text-xs pl-7"
+          />
+        </div>
+        <Select value={filtroResponsavel} onValueChange={setFiltroResponsavel}>
+          <SelectTrigger className="h-8 text-xs w-[160px]"><SelectValue placeholder="Responsável" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos" className="text-xs">Todos os responsáveis</SelectItem>
+            {opcoesResponsavel.map((r) => (
+              <SelectItem key={r.id} value={r.id} className="text-xs">{r.nome}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filtroDemanda} onValueChange={setFiltroDemanda}>
+          <SelectTrigger className="h-8 text-xs w-[160px]"><SelectValue placeholder="Demanda" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos" className="text-xs">Todas as demandas</SelectItem>
+            {opcoesDemanda.map((d) => (
+              <SelectItem key={d.id} value={d.id} className="text-xs">{d.nome}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filtroSemaforo} onValueChange={setFiltroSemaforo}>
+          <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue placeholder="Semáforo" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos" className="text-xs">Todos os SLAs</SelectItem>
+            <SelectItem value="verde" className="text-xs">🟢 Verde</SelectItem>
+            <SelectItem value="amarelo" className="text-xs">🟡 Amarelo</SelectItem>
+            <SelectItem value="vermelho" className="text-xs">🔴 Vermelho</SelectItem>
+            <SelectItem value="sem_sla" className="text-xs">⚪ Sem SLA</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filtroSituacao} onValueChange={setFiltroSituacao}>
+          <SelectTrigger className="h-8 text-xs w-[150px]"><SelectValue placeholder="Situação" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos" className="text-xs">Todas as situações</SelectItem>
+            <SelectItem value="em_andamento" className="text-xs">Em andamento</SelectItem>
+            <SelectItem value="parado" className="text-xs">Parado / Pausado</SelectItem>
+            <SelectItem value="concluido" className="text-xs">Concluída</SelectItem>
+            <SelectItem value="cancelado" className="text-xs">Cancelada</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex items-center gap-1">
+          <DateRangePicker
+            dateRange={periodoEntrada ?? { from: new Date(), to: new Date() }}
+            onDateRangeChange={setPeriodoEntrada}
+            align="start"
+          />
+          {periodoEntrada && (
+            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setPeriodoEntrada(null)} title="Limpar período">
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+        {hasFiltros && (
+          <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={limparFiltros}>
+            <X className="h-3.5 w-3.5 mr-1" /> Limpar filtros
+          </Button>
+        )}
+      </div>
+
+
+
       {loading ? (
         <div className="flex items-center justify-center flex-1">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
