@@ -1358,7 +1358,26 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     </div>
                   </section>
 
+                  {/* Dados da contabilidade */}
+                  <AccountingCard
+                    fields={accountingFieldsQ.data ?? []}
+                    values={accountingValuesQ.data ?? []}
+                    loading={accountingFieldsQ.isLoading}
+                    onSave={async (fieldId, valor, coletado) => {
+                      if (!tenantId || !journeyId) return;
+                      const { error } = await (supabase.from("onboarding_journey_accounting" as any) as any)
+                        .upsert(
+                          { tenant_id: tenantId, journey_id: journeyId, field_id: fieldId, valor, coletado },
+                          { onConflict: "journey_id,field_id" }
+                        );
+                      if (error) { toast.error(error.message); return; }
+                      qc.invalidateQueries({ queryKey: ["onboarding-accounting-values", journeyId, tenantId] });
+                    }}
+                  />
+
                   {/* Trainings */}
+
+
 
                   <section className="rounded-lg border border-border">
                     <div className="p-3 border-b border-border flex items-center justify-between">
