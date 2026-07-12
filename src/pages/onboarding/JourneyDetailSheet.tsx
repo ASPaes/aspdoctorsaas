@@ -1076,6 +1076,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         <CheckCircle2 className="h-3 w-3" /> Concluída
                       </Badge>
                     )}
+                    {isCancelled && (
+                      <Badge className="text-[10px] gap-1 border-0 text-white" style={{ background: "hsl(var(--destructive))" }}>
+                        <Ban className="h-3 w-3" /> Cancelada
+                      </Badge>
+                    )}
                     {openVendorReturn && (
                       <Badge className="text-[10px] gap-1 border-0 text-white" style={{ background: "hsl(38 92% 50%)" }}>
                         <AlertTriangle className="h-3 w-3" /> Aguardando vendedor
