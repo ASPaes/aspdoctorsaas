@@ -66,6 +66,17 @@ interface Journey {
   demand_type_cor?: string | null;
   concluido_em?: string | null;
   go_live_real?: string | null;
+  onboarding_concluido?: boolean | null;
+  onboarding_concluido_em?: string | null;
+  implantacao_iniciada_em?: string | null;
+  sla_onb_corrido_min?: number | null;
+  sla_onb_util_min?: number | null;
+  sla_onb_pausado_min?: number | null;
+  sla_imp_corrido_min?: number | null;
+  sla_imp_util_min?: number | null;
+  sla_imp_pausado_min?: number | null;
+  sla_total_corrido_min?: number | null;
+  sla_total_pausado_min?: number | null;
 }
 
 
