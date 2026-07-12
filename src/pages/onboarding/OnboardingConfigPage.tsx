@@ -9,13 +9,14 @@ import { PauseReasonsPanel } from "./config/PauseReasonsPanel";
 import { DemandTypesPanel } from "./config/DemandTypesPanel";
 import { TrainingTypesPanel } from "./config/TrainingTypesPanel";
 import { VendorReturnReasonsPanel } from "./config/VendorReturnReasonsPanel";
+import { AccountingFieldsPanel } from "./config/AccountingFieldsPanel";
 
 type Fase = "onboarding" | "implantacao";
 
 export default function OnboardingConfigPage() {
   const { profile, profileLoading } = useAuth();
   const [fase, setFase] = useState<Fase>("onboarding");
-  const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas" | "treinos" | "retornos">("pipelines");
+  const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas" | "treinos" | "retornos" | "contabilidade">("pipelines");
 
 
 
