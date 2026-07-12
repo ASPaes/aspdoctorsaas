@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -29,6 +30,20 @@ import { SlaInput } from "./SlaInput";
 import { formatSlaHuman, slugify } from "./utils";
 
 type Fase = "onboarding" | "implantacao";
+
+const SECTION_OPTIONS: { key: string; label: string }[] = [
+  { key: "participantes", label: "Responsável & participantes" },
+  { key: "timeline", label: "Linha do tempo das etapas" },
+  { key: "pausas", label: "Tempo parado por motivo" },
+  { key: "modulos", label: "Módulos da jornada" },
+  { key: "contabilidade", label: "Dados da contabilidade" },
+  { key: "treinos", label: "Sub-tickets de treino" },
+  { key: "checklist", label: "Checklist da etapa" },
+  { key: "atendimentos", label: "Atendimentos vinculados" },
+  { key: "eventos", label: "Timeline de eventos" },
+  { key: "anexos", label: "Anexos" },
+];
+const ALL_SECTION_KEYS = SECTION_OPTIONS.map((s) => s.key);
 
 interface Pipeline {
   id: string;
@@ -53,6 +68,7 @@ interface Stage {
   is_final: boolean;
   pausa_sla: boolean;
   ativo: boolean;
+  visible_sections: string[] | null;
 }
 
 interface ChecklistItem {
@@ -118,7 +134,7 @@ export function PipelinesPanel({ fase }: Props) {
     enabled: !!effectiveTenantId && !!selectedPipelineId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_stages" as any) as any)
-        .select("id, pipeline_id, nome, slug, position, sla_minutos, cor, is_initial, is_final, pausa_sla, ativo")
+        .select("id, pipeline_id, nome, slug, position, sla_minutos, cor, is_initial, is_final, pausa_sla, ativo, visible_sections")
         .eq("tenant_id", effectiveTenantId).eq("pipeline_id", selectedPipelineId).order("position");
       if (error) throw error;
       return (data ?? []) as Stage[];
@@ -204,6 +220,7 @@ export function PipelinesPanel({ fase }: Props) {
       is_final: !!s.is_final,
       pausa_sla: !!s.pausa_sla,
       ativo: s.ativo ?? true,
+      visible_sections: s.visible_sections ?? ALL_SECTION_KEYS,
     };
     try {
       if (isNew) {
@@ -701,6 +718,7 @@ function StageDialog({
   const [isFinal, setIsFinal] = useState(false);
   const [pausaSla, setPausaSla] = useState(false);
   const [ativo, setAtivo] = useState(true);
+  const [visibleSections, setVisibleSections] = useState<string[]>(ALL_SECTION_KEYS);
 
   useEffect(() => {
     if (open) {
@@ -712,8 +730,15 @@ function StageDialog({
       setIsFinal(!!initial?.is_final);
       setPausaSla(!!initial?.pausa_sla);
       setAtivo(initial?.ativo ?? true);
+      setVisibleSections(initial?.visible_sections ?? ALL_SECTION_KEYS);
     }
   }, [open, initial]);
+
+  function toggleSection(key: string) {
+    setVisibleSections((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  }
 
   const autoSlug = useMemo(() => slugify(nome), [nome]);
 
@@ -772,12 +797,37 @@ function StageDialog({
               <Switch checked={ativo} onCheckedChange={setAtivo} />
             </div>
           </div>
+          <div className="space-y-2 pt-2 border-t border-border">
+            <Label className="text-sm">Seções visíveis nesta etapa</Label>
+            <p className="text-[11px] text-muted-foreground">
+              As seções desmarcadas ficam ocultas no detalhe da jornada quando ela está nesta etapa.
+            </p>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              {SECTION_OPTIONS.map((opt) => {
+                const checked = visibleSections.includes(opt.key);
+                return (
+                  <label
+                    key={opt.key}
+                    className="flex items-start gap-2 text-xs cursor-pointer rounded-md border border-border/50 p-2 hover:bg-muted/40 transition-colors"
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => toggleSection(opt.key)}
+                      className="mt-0.5"
+                    />
+                    <span className="leading-tight">{opt.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button disabled={!nome.trim()} onClick={() => onSave({
             id: initial?.id, nome, slug, sla_minutos: slaMin, cor,
             is_initial: isInitial, is_final: isFinal, pausa_sla: pausaSla, ativo,
+            visible_sections: visibleSections,
           })}>Salvar</Button>
         </DialogFooter>
       </DialogContent>
