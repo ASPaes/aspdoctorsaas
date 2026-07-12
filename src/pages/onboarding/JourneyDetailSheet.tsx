@@ -1100,7 +1100,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">{journey.assunto}</p>
                   )}
                 </div>
-                <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 pr-10">
+                <div className="flex flex-wrap items-center gap-2">
                   {journey.ticket_id && (
                     <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setStartConvOpen(true)}>
                       <MessageSquare className="h-3.5 w-3.5 mr-1" /> Conversa
