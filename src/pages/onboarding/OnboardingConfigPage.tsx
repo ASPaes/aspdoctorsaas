@@ -69,6 +69,7 @@ export default function OnboardingConfigPage() {
           <TabsTrigger value="demandas">Tipos de demanda</TabsTrigger>
           <TabsTrigger value="treinos">Tipos de treino</TabsTrigger>
           <TabsTrigger value="retornos">Retorno ao vendedor</TabsTrigger>
+          <TabsTrigger value="contabilidade">Dados da contabilidade</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pipelines" className="flex-1 min-h-0 p-4 pt-3">
