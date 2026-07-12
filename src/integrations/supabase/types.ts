@@ -11208,6 +11208,15 @@ export type Database = {
         Args: { p_attendance_id: string; p_scheduled_until: string }
         Returns: Json
       }
+      search_clientes: {
+        Args: { p_limit?: number; p_tenant_id: string; p_termo?: string }
+        Returns: {
+          cnpj: string
+          id: string
+          nome_fantasia: string
+          razao_social: string
+        }[]
+      }
       search_clientes_for_link: {
         Args: {
           p_include_cancelados?: boolean
