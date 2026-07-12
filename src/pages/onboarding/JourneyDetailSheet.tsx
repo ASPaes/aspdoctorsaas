@@ -12,6 +12,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
 import {
@@ -787,6 +788,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       toast.error("Informe o título do treino");
       return;
     }
+    const movesToImplantation = journey?.fase_atual === "onboarding";
     try {
       const { error } = await (supabase.rpc as any)("create_onboarding_training", {
         p_journey_id: journeyId,
@@ -798,7 +800,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
 
       });
       if (error) throw error;
-      toast.success("Treino agendado");
+      toast.success(
+        movesToImplantation
+          ? "Treino agendado — jornada movida para Implantação."
+          : "Treino agendado"
+      );
       setAddTrainingOpen(false);
       setAddTrainingOpenTop(false);
       setNewTrainingTitle("");
@@ -1049,6 +1055,14 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-96 space-y-3" align="end">
+                        {journey?.fase_atual === "onboarding" && (
+                          <Alert className="border-warning/50 bg-warning/15 text-warning [&>svg]:text-warning py-2 text-xs">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertDescription className="text-xs">
+                              Ao agendar este treino, a jornada será concluída no Onboarding e iniciará a fase de Implantação.
+                            </AlertDescription>
+                          </Alert>
+                        )}
                         <div className="space-y-1">
                           <label className="text-[11px] font-medium">Título *</label>
                           <Input
@@ -1512,6 +1526,14 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-96 space-y-3" align="end">
+                              {journey?.fase_atual === "onboarding" && (
+                                <Alert className="border-warning/50 bg-warning/15 text-warning [&>svg]:text-warning py-2 text-xs">
+                                  <AlertTriangle className="h-4 w-4" />
+                                  <AlertDescription className="text-xs">
+                                    Ao agendar este treino, a jornada será concluída no Onboarding e iniciará a fase de Implantação.
+                                  </AlertDescription>
+                                </Alert>
+                              )}
                               <div className="space-y-1">
                                 <label className="text-[11px] font-medium">Título *</label>
                                 <Input
