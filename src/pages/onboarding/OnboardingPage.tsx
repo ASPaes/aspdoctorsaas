@@ -161,15 +161,23 @@ export default function OnboardingPage() {
   const stages = stagesQuery.data ?? [];
   const journeys = journeysQuery.data ?? [];
 
+  const ONB_DONE_COL_ID = "__onb_concluido__";
+
   const journeysByStage = useMemo(() => {
     const m: Record<string, JourneyRow[]> = {};
     stages.forEach((s) => (m[s.id] = []));
+    m[ONB_DONE_COL_ID] = [];
     journeys.forEach((j) => {
       if (!showConcluded && j.situacao === "concluido") return;
+      // Na aba Onboarding, se o onboarding já foi concluído, vai pra coluna final
+      if (fase === "onboarding" && j.onboarding_concluido) {
+        m[ONB_DONE_COL_ID].push(j);
+        return;
+      }
       if (j.current_stage_id && m[j.current_stage_id]) m[j.current_stage_id].push(j);
     });
     return m;
-  }, [stages, journeys, showConcluded]);
+  }, [stages, journeys, showConcluded, fase]);
 
   async function handleDrop(journeyId: string, targetStageId: string, fromStageId: string) {
     if (fromStageId === targetStageId) return;
