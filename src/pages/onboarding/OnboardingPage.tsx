@@ -6,7 +6,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
+import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2, Ban, X, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { NewJourneyModal } from "./NewJourneyModal";
@@ -55,6 +58,8 @@ interface JourneyRow {
   demand_type_id?: string | null;
   demand_type_nome?: string | null;
   demand_type_cor?: string | null;
+  responsavel_user_id?: string | null;
+  responsavel_nome?: string | null;
 }
 
 
@@ -92,6 +97,12 @@ export default function OnboardingPage() {
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [showConcluded, setShowConcluded] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [filtroResponsavel, setFiltroResponsavel] = useState<string>("todos");
+  const [filtroDemanda, setFiltroDemanda] = useState<string>("todos");
+  const [filtroSemaforo, setFiltroSemaforo] = useState<string>("todos");
+  const [filtroSituacao, setFiltroSituacao] = useState<string>("todos");
+  const [periodoEntrada, setPeriodoEntrada] = useState<{ from: Date; to: Date } | null>(null);
 
   const isSuperAdmin = profile?.is_super_admin === true;
 
@@ -163,12 +174,77 @@ export default function OnboardingPage() {
 
   const ONB_DONE_COL_ID = "__onb_concluido__";
 
+  const opcoesResponsavel = useMemo(() => {
+    const seen = new Map<string, string>();
+    journeys.forEach((j) => {
+      if (j.responsavel_user_id && !seen.has(j.responsavel_user_id)) {
+        seen.set(j.responsavel_user_id, j.responsavel_nome || "—");
+      }
+    });
+    return Array.from(seen.entries()).map(([id, nome]) => ({ id, nome }));
+  }, [journeys]);
+
+  const opcoesDemanda = useMemo(() => {
+    const seen = new Map<string, string>();
+    journeys.forEach((j) => {
+      if (j.demand_type_id && !seen.has(j.demand_type_id)) {
+        seen.set(j.demand_type_id, j.demand_type_nome || "—");
+      }
+    });
+    return Array.from(seen.entries()).map(([id, nome]) => ({ id, nome }));
+  }, [journeys]);
+
+  const journeysFiltradas = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    return journeys.filter((j) => {
+      if (termo) {
+        const hay = [j.cliente_nome, j.ticket_code, j.assunto]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(termo)) return false;
+      }
+      if (filtroResponsavel !== "todos" && j.responsavel_user_id !== filtroResponsavel) return false;
+      if (filtroDemanda !== "todos" && j.demand_type_id !== filtroDemanda) return false;
+      if (filtroSemaforo !== "todos" && (j.etapa_semaforo ?? "sem_sla") !== filtroSemaforo) return false;
+      if (filtroSituacao !== "todos") {
+        if (filtroSituacao === "em_andamento") {
+          if (j.situacao && j.situacao !== "em_andamento" && j.situacao !== "aberto") return false;
+        } else if (j.situacao !== filtroSituacao) return false;
+      }
+      if (periodoEntrada && j.data_inicio_planejado) {
+        const d = new Date(j.data_inicio_planejado).getTime();
+        if (d < periodoEntrada.from.getTime() || d > periodoEntrada.to.getTime()) return false;
+      } else if (periodoEntrada && !j.data_inicio_planejado) {
+        return false;
+      }
+      return true;
+    });
+  }, [journeys, busca, filtroResponsavel, filtroDemanda, filtroSemaforo, filtroSituacao, periodoEntrada]);
+
+  function limparFiltros() {
+    setBusca("");
+    setFiltroResponsavel("todos");
+    setFiltroDemanda("todos");
+    setFiltroSemaforo("todos");
+    setFiltroSituacao("todos");
+    setPeriodoEntrada(null);
+  }
+
+  const hasFiltros =
+    busca.trim() !== "" ||
+    filtroResponsavel !== "todos" ||
+    filtroDemanda !== "todos" ||
+    filtroSemaforo !== "todos" ||
+    filtroSituacao !== "todos" ||
+    periodoEntrada !== null;
+
   const journeysByStage = useMemo(() => {
     const m: Record<string, JourneyRow[]> = {};
     stages.forEach((s) => (m[s.id] = []));
     m[ONB_DONE_COL_ID] = [];
-    journeys.forEach((j) => {
-      if (!showConcluded && j.situacao === "concluido") return;
+    journeysFiltradas.forEach((j) => {
+      if (!showConcluded && (j.situacao === "concluido" || j.situacao === "cancelado")) return;
       // Na aba Onboarding, se o onboarding já foi concluído, vai pra coluna final
       if (fase === "onboarding" && j.onboarding_concluido) {
         m[ONB_DONE_COL_ID].push(j);
@@ -177,7 +253,7 @@ export default function OnboardingPage() {
       if (j.current_stage_id && m[j.current_stage_id]) m[j.current_stage_id].push(j);
     });
     return m;
-  }, [stages, journeys, showConcluded, fase]);
+  }, [stages, journeysFiltradas, showConcluded, fase]);
 
   async function handleDrop(journeyId: string, targetStageId: string, fromStageId: string) {
     if (fromStageId === targetStageId) return;
@@ -246,7 +322,7 @@ export default function OnboardingPage() {
         <div className="flex items-center gap-2">
           <Button size="sm" variant={showConcluded ? "default" : "outline"} onClick={() => setShowConcluded((v) => !v)}>
             <CheckCircle2 className="h-4 w-4 mr-1" />
-            {showConcluded ? "Ocultar concluídas" : "Mostrar concluídas"}
+            {showConcluded ? "Ocultar concluídas/canceladas" : "Mostrar concluídas/canceladas"}
           </Button>
           <Button asChild size="sm" variant="outline">
             <Link to="/onboarding-implantacao/config">
@@ -260,6 +336,75 @@ export default function OnboardingPage() {
           </Button>
         </div>
       </div>
+
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar cliente, ticket ou assunto..."
+            className="h-8 text-xs pl-7"
+          />
+        </div>
+        <Select value={filtroResponsavel} onValueChange={setFiltroResponsavel}>
+          <SelectTrigger className="h-8 text-xs w-[160px]"><SelectValue placeholder="Responsável" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos" className="text-xs">Todos os responsáveis</SelectItem>
+            {opcoesResponsavel.map((r) => (
+              <SelectItem key={r.id} value={r.id} className="text-xs">{r.nome}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filtroDemanda} onValueChange={setFiltroDemanda}>
+          <SelectTrigger className="h-8 text-xs w-[160px]"><SelectValue placeholder="Demanda" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos" className="text-xs">Todas as demandas</SelectItem>
+            {opcoesDemanda.map((d) => (
+              <SelectItem key={d.id} value={d.id} className="text-xs">{d.nome}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filtroSemaforo} onValueChange={setFiltroSemaforo}>
+          <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue placeholder="Semáforo" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos" className="text-xs">Todos os SLAs</SelectItem>
+            <SelectItem value="verde" className="text-xs">🟢 Verde</SelectItem>
+            <SelectItem value="amarelo" className="text-xs">🟡 Amarelo</SelectItem>
+            <SelectItem value="vermelho" className="text-xs">🔴 Vermelho</SelectItem>
+            <SelectItem value="sem_sla" className="text-xs">⚪ Sem SLA</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filtroSituacao} onValueChange={setFiltroSituacao}>
+          <SelectTrigger className="h-8 text-xs w-[150px]"><SelectValue placeholder="Situação" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos" className="text-xs">Todas as situações</SelectItem>
+            <SelectItem value="em_andamento" className="text-xs">Em andamento</SelectItem>
+            <SelectItem value="parado" className="text-xs">Parado / Pausado</SelectItem>
+            <SelectItem value="concluido" className="text-xs">Concluída</SelectItem>
+            <SelectItem value="cancelado" className="text-xs">Cancelada</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex items-center gap-1">
+          <DateRangePicker
+            dateRange={periodoEntrada ?? { from: new Date(), to: new Date() }}
+            onDateRangeChange={setPeriodoEntrada}
+            align="start"
+          />
+          {periodoEntrada && (
+            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setPeriodoEntrada(null)} title="Limpar período">
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+        {hasFiltros && (
+          <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={limparFiltros}>
+            <X className="h-3.5 w-3.5 mr-1" /> Limpar filtros
+          </Button>
+        )}
+      </div>
+
+
 
       {loading ? (
         <div className="flex items-center justify-center flex-1">
@@ -310,11 +455,12 @@ export default function OnboardingPage() {
                       items.map((j) => {
                         const parado = j.situacao === "parado" || j.situacao === "pausado";
                         const concluida = j.situacao === "concluido";
-                        const semaforo = concluida ? "sem_sla" : (j.etapa_semaforo || "sem_sla");
+                        const cancelada = j.situacao === "cancelado";
+                        const semaforo = (concluida || cancelada) ? "sem_sla" : (j.etapa_semaforo || "sem_sla");
                         return (
                           <div
                             key={j.journey_id}
-                            draggable={!parado && !concluida}
+                            draggable={!parado && !concluida && !cancelada}
                             onDragStart={(e) => {
                               e.dataTransfer.setData("journeyId", j.journey_id);
                               e.dataTransfer.setData("fromStageId", j.current_stage_id ?? "");
@@ -324,12 +470,20 @@ export default function OnboardingPage() {
                             onClick={() => setDetailId(j.journey_id)}
                             className={`bg-card border rounded-md p-2.5 hover:border-primary/40 transition-all cursor-pointer ${
                               draggingId === j.journey_id ? "opacity-40 scale-95" : ""
-                            } ${parado ? "opacity-60" : ""} ${concluida ? "opacity-70" : "active:cursor-grabbing"}`}
-                            style={concluida ? { borderColor: "#22C55E" } : undefined}
+                            } ${parado ? "opacity-60" : ""} ${concluida ? "opacity-70" : ""} ${cancelada ? "opacity-50" : ""} ${(concluida || cancelada) ? "" : "active:cursor-grabbing"}`}
+                            style={
+                              concluida
+                                ? { borderColor: "#22C55E" }
+                                : cancelada
+                                ? { borderColor: "hsl(var(--destructive))" }
+                                : undefined
+                            }
                           >
                             <div className="flex items-center gap-1.5 mb-1">
                               {concluida ? (
                                 <CheckCircle2 className="h-3 w-3 shrink-0" style={{ color: "#22C55E" }} />
+                              ) : cancelada ? (
+                                <Ban className="h-3 w-3 shrink-0 text-destructive" />
                               ) : (
                                 <span
                                   className="h-2 w-2 rounded-full shrink-0"
@@ -342,16 +496,19 @@ export default function OnboardingPage() {
                                   {j.ticket_code}
                                 </span>
                               )}
-                              {concluida && (
+                              {cancelada ? (
+                                <span className="ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border-0 text-white bg-destructive">
+                                  <Ban className="h-2.5 w-2.5" /> Cancelada
+                                </span>
+                              ) : concluida ? (
                                 <span className="ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border-0 text-white" style={{ background: "#22C55E" }}>
                                   concluída
                                 </span>
-                              )}
-                              {parado && !concluida && (
+                              ) : parado ? (
                                 <span className="ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
                                   <Pause className="h-2.5 w-2.5" /> pausado
                                 </span>
-                              )}
+                              ) : null}
                             </div>
                             <p className="text-xs text-foreground line-clamp-2">
                               {j.assunto || "Sem assunto"}
@@ -359,6 +516,11 @@ export default function OnboardingPage() {
                             {j.cliente_nome && (
                               <p className="text-[11px] text-muted-foreground truncate mt-1">
                                 {j.cliente_nome}
+                              </p>
+                            )}
+                            {j.responsavel_nome && (
+                              <p className="text-[11px] text-muted-foreground truncate">
+                                Resp.: {j.responsavel_nome}
                               </p>
                             )}
                             {j.demand_type_nome && (
