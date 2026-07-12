@@ -18,12 +18,7 @@ export default function OnboardingConfigPage() {
   const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas" | "treinos" | "retornos">("pipelines");
 
 
-type Fase = "onboarding" | "implantacao";
 
-export default function OnboardingConfigPage() {
-  const { profile, profileLoading } = useAuth();
-  const [fase, setFase] = useState<Fase>("onboarding");
-  const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas" | "treinos">("pipelines");
 
 
 
