@@ -813,6 +813,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       qc.invalidateQueries({ queryKey: ["onboarding-stage-history", journeyId] });
       qc.invalidateQueries({ queryKey: ["onboarding-stage-checklist"] });
       qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-participants"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao criar treino");
     }
