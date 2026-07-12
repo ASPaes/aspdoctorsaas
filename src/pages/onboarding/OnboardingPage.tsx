@@ -455,11 +455,12 @@ export default function OnboardingPage() {
                       items.map((j) => {
                         const parado = j.situacao === "parado" || j.situacao === "pausado";
                         const concluida = j.situacao === "concluido";
-                        const semaforo = concluida ? "sem_sla" : (j.etapa_semaforo || "sem_sla");
+                        const cancelada = j.situacao === "cancelado";
+                        const semaforo = (concluida || cancelada) ? "sem_sla" : (j.etapa_semaforo || "sem_sla");
                         return (
                           <div
                             key={j.journey_id}
-                            draggable={!parado && !concluida}
+                            draggable={!parado && !concluida && !cancelada}
                             onDragStart={(e) => {
                               e.dataTransfer.setData("journeyId", j.journey_id);
                               e.dataTransfer.setData("fromStageId", j.current_stage_id ?? "");
@@ -469,12 +470,20 @@ export default function OnboardingPage() {
                             onClick={() => setDetailId(j.journey_id)}
                             className={`bg-card border rounded-md p-2.5 hover:border-primary/40 transition-all cursor-pointer ${
                               draggingId === j.journey_id ? "opacity-40 scale-95" : ""
-                            } ${parado ? "opacity-60" : ""} ${concluida ? "opacity-70" : "active:cursor-grabbing"}`}
-                            style={concluida ? { borderColor: "#22C55E" } : undefined}
+                            } ${parado ? "opacity-60" : ""} ${concluida ? "opacity-70" : ""} ${cancelada ? "opacity-50" : ""} ${(concluida || cancelada) ? "" : "active:cursor-grabbing"}`}
+                            style={
+                              concluida
+                                ? { borderColor: "#22C55E" }
+                                : cancelada
+                                ? { borderColor: "hsl(var(--destructive))" }
+                                : undefined
+                            }
                           >
                             <div className="flex items-center gap-1.5 mb-1">
                               {concluida ? (
                                 <CheckCircle2 className="h-3 w-3 shrink-0" style={{ color: "#22C55E" }} />
+                              ) : cancelada ? (
+                                <Ban className="h-3 w-3 shrink-0 text-destructive" />
                               ) : (
                                 <span
                                   className="h-2 w-2 rounded-full shrink-0"
@@ -487,16 +496,19 @@ export default function OnboardingPage() {
                                   {j.ticket_code}
                                 </span>
                               )}
-                              {concluida && (
+                              {cancelada ? (
+                                <span className="ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border-0 text-white bg-destructive">
+                                  <Ban className="h-2.5 w-2.5" /> Cancelada
+                                </span>
+                              ) : concluida ? (
                                 <span className="ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border-0 text-white" style={{ background: "#22C55E" }}>
                                   concluída
                                 </span>
-                              )}
-                              {parado && !concluida && (
+                              ) : parado ? (
                                 <span className="ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
                                   <Pause className="h-2.5 w-2.5" /> pausado
                                 </span>
-                              )}
+                              ) : null}
                             </div>
                             <p className="text-xs text-foreground line-clamp-2">
                               {j.assunto || "Sem assunto"}
@@ -504,6 +516,11 @@ export default function OnboardingPage() {
                             {j.cliente_nome && (
                               <p className="text-[11px] text-muted-foreground truncate mt-1">
                                 {j.cliente_nome}
+                              </p>
+                            )}
+                            {j.responsavel_nome && (
+                              <p className="text-[11px] text-muted-foreground truncate">
+                                Resp.: {j.responsavel_nome}
                               </p>
                             )}
                             {j.demand_type_nome && (
