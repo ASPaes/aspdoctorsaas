@@ -120,7 +120,6 @@ Deno.serve(async (req) => {
           }
         }
 
-
         console.log(`[check-instances-status] ${instance.instance_name} (${providerType}): ${newStatus}`);
         checked++;
 
