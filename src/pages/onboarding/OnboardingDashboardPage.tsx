@@ -163,6 +163,89 @@ export default function OnboardingDashboardPage() {
     [pausesByReasonAgg]
   );
 
+  const vendorReturnsAllQ = useQuery({
+    queryKey: ["onboarding-dash-vendor-returns", effectiveTenantId],
+    enabled: isSuperAdmin && !!effectiveTenantId,
+    queryFn: async () => {
+      const rows = await fetchAllRows<{
+        vendedor_user_id: string; motivo_nome: string | null; atribuivel_vendedor: boolean;
+        retornado_em: string; resolvido_em: string | null; em_aberto: boolean; minutos: number | null;
+      }>(() =>
+        (supabase.from("vw_onboarding_vendor_returns" as any) as any)
+          .select("vendedor_user_id, motivo_nome, atribuivel_vendedor, retornado_em, resolvido_em, em_aberto, minutos")
+          .eq("tenant_id", effectiveTenantId)
+      );
+      return rows;
+    },
+  });
+
+  const vendorReturnsPeriodo = useMemo(() => {
+    const from = dateRange.from.getTime();
+    const to = dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1;
+    return (vendorReturnsAllQ.data ?? []).filter((r) => {
+      const d = new Date(r.retornado_em).getTime();
+      return d >= from && d <= to;
+    });
+  }, [vendorReturnsAllQ.data, dateRange]);
+
+  const vendorReturnUserIds = useMemo(
+    () => Array.from(new Set(vendorReturnsPeriodo.map((r) => r.vendedor_user_id).filter(Boolean))) as string[],
+    [vendorReturnsPeriodo]
+  );
+
+  const vendorNamesQ = useQuery({
+    queryKey: ["onboarding-dash-vendor-names", vendorReturnUserIds.join(",")],
+    enabled: vendorReturnUserIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, funcionarios:funcionario_id(nome)")
+        .in("user_id", vendorReturnUserIds);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      (data ?? []).forEach((p: any) => {
+        if (p.funcionarios?.nome) map[p.user_id] = p.funcionarios.nome;
+      });
+      return map;
+    },
+  });
+
+  const vendorNames = vendorNamesQ.data ?? {};
+
+  const vendorReturnsTotal = vendorReturnsPeriodo.length;
+  const vendorReturnsAtribuiveis = vendorReturnsPeriodo.filter((r) => r.atribuivel_vendedor).length;
+  const vendorReturnsAtribuiveisPct = pct(vendorReturnsAtribuiveis, vendorReturnsTotal);
+
+  const vendorReturnsByVendor = useMemo(() => {
+    const m: Record<string, { total: number; atribuiveis: number; minutosResolvidos: number; countResolvidos: number }> = {};
+    vendorReturnsPeriodo.forEach((r) => {
+      const id = r.vendedor_user_id || "__sem__";
+      if (!m[id]) m[id] = { total: 0, atribuiveis: 0, minutosResolvidos: 0, countResolvidos: 0 };
+      m[id].total += 1;
+      if (r.atribuivel_vendedor) m[id].atribuiveis += 1;
+      if (r.resolvido_em && r.minutos != null) {
+        m[id].minutosResolvidos += r.minutos;
+        m[id].countResolvidos += 1;
+      }
+    });
+    return Object.entries(m).map(([id, s]) => ({
+      id,
+      nome: id === "__sem__" ? "—" : (vendorNames[id] || "—"),
+      total: s.total,
+      atribuiveis: s.atribuiveis,
+      tmr: s.countResolvidos > 0 ? s.minutosResolvidos / s.countResolvidos : null,
+    })).sort((a, b) => b.total - a.total);
+  }, [vendorReturnsPeriodo, vendorNames]);
+
+  const vendorReturnsByReason = useMemo(() => {
+    const m: Record<string, { total: number; atribuivel: boolean }> = {};
+    vendorReturnsPeriodo.forEach((r) => {
+      const nome = r.motivo_nome || "Sem motivo";
+      if (!m[nome]) m[nome] = { total: 0, atribuivel: r.atribuivel_vendedor };
+      m[nome].total += 1;
+    });
+    return Object.entries(m).map(([nome, s]) => ({ nome, ...s })).sort((a, b) => b.total - a.total);
+  }, [vendorReturnsPeriodo]);
 
 
   // Treinos no período: usa realizado_em quando existe, senão agendado_para
