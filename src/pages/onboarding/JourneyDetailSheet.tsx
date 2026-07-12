@@ -289,6 +289,38 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     },
   });
 
+  const eventUserIds = useMemo(() => {
+    const ids = new Set<string>();
+    (eventsQ.data ?? []).forEach((e: any) => { if (e.user_id) ids.add(e.user_id); });
+    return Array.from(ids);
+  }, [eventsQ.data]);
+
+  const eventUsersQ = useQuery({
+    queryKey: ["onboarding-event-users", tenantId, eventUserIds.sort().join(",")],
+    enabled: !!tenantId && eventUserIds.length > 0,
+    queryFn: async () => {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("user_id, funcionario_id")
+        .eq("tenant_id", tenantId!)
+        .in("user_id", eventUserIds);
+      const funcIds = (profs ?? []).map((p: any) => p.funcionario_id).filter(Boolean);
+      let funcMap: Record<number, string> = {};
+      if (funcIds.length > 0) {
+        const { data: funcs } = await supabase
+          .from("funcionarios")
+          .select("id, nome")
+          .in("id", funcIds);
+        (funcs ?? []).forEach((f: any) => { funcMap[f.id] = f.nome; });
+      }
+      const map: Record<string, string> = {};
+      (profs ?? []).forEach((p: any) => {
+        if (p.funcionario_id && funcMap[p.funcionario_id]) map[p.user_id] = funcMap[p.funcionario_id];
+      });
+      return map;
+    },
+  });
+
   const trainingQ = useQuery({
     queryKey: ["onboarding-training", journeyId],
     enabled: !!journeyId,
@@ -1785,23 +1817,37 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         {events.length === 0 ? (
                           <p className="text-xs text-muted-foreground py-2 text-center">Sem eventos registrados.</p>
                         ) : (
-                          events.map((ev: any) => (
-                            <div key={ev.id} className="flex items-start gap-2 text-xs">
-                              <div className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium">{EVENT_LABELS[ev.event_type] || ev.event_type}</span>
-                                  <span className="text-[10px] text-muted-foreground">{formatDateTime(ev.created_at)}</span>
+                          events.map((ev: any) => {
+                            const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                            const isStageChange = ev.event_type === "onboarding_mudou_etapa";
+                            const oldIsUuid = ev.old_value && UUID_RE.test(String(ev.old_value).trim());
+                            const newIsUuid = ev.new_value && UUID_RE.test(String(ev.new_value).trim());
+                            const hideRawValues = isStageChange && (oldIsUuid || newIsUuid);
+                            const showRawValues = (ev.old_value || ev.new_value) && !hideRawValues && !oldIsUuid && !newIsUuid;
+                            const legacyStageFallback = isStageChange && hideRawValues && !ev.content;
+                            const authorName = ev.user_id ? (eventUsersQ.data?.[ev.user_id] ?? "Usuário") : "Sistema";
+                            return (
+                              <div key={ev.id} className="flex items-start gap-2 text-xs">
+                                <div className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium">{EVENT_LABELS[ev.event_type] || ev.event_type}</span>
+                                    <span className="text-[10px] text-muted-foreground">{formatDateTime(ev.created_at)}</span>
+                                    <span className="text-[10px] text-muted-foreground">· {authorName}</span>
+                                  </div>
+                                  {ev.content && <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{ev.content}</p>}
+                                  {legacyStageFallback && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">Mudança de etapa</p>
+                                  )}
+                                  {showRawValues && (
+                                    <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+                                      {ev.old_value || "—"} <ChevronRight className="inline h-3 w-3" /> {ev.new_value || "—"}
+                                    </p>
+                                  )}
                                 </div>
-                                {ev.content && <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{ev.content}</p>}
-                                {(ev.old_value || ev.new_value) && (
-                                  <p className="text-[10px] text-muted-foreground/80 mt-0.5">
-                                    {ev.old_value || "—"} <ChevronRight className="inline h-3 w-3" /> {ev.new_value || "—"}
-                                  </p>
-                                )}
                               </div>
-                            </div>
-                          ))
+                            );
+                          })
                         )}
                       </div>
                     </div>
