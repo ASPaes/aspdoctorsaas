@@ -178,20 +178,23 @@ export function TrainingTypesPanel() {
 
   return (
     <div className="max-w-2xl space-y-4">
-      <div className="flex items-center gap-2">
-        <Input
-          value={novo}
-          onChange={(e) => setNovo(e.target.value)}
-          placeholder="Novo tipo de treino (ex: Treinamento PDV)"
-          onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
-        />
-        <label className="flex items-center gap-1.5 text-xs whitespace-nowrap">
-          <Switch checked={novoPdv} onCheckedChange={setNovoPdv} />
-          <span>Conta PDV</span>
-        </label>
-        <Button onClick={handleAdd} disabled={saving || !novo.trim()}>
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-        </Button>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Input
+            value={novo}
+            onChange={(e) => setNovo(e.target.value)}
+            placeholder="Novo tipo de treino (ex: Treinamento PDV)"
+            onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+          />
+          <label className="flex items-center gap-1.5 text-xs whitespace-nowrap">
+            <Switch checked={novoPdv} onCheckedChange={setNovoPdv} />
+            <span>Conta PDV</span>
+          </label>
+          <Button onClick={handleAdd} disabled={saving || !novo.trim()}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-1" /> Adicionar</>}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Digite o nome e clique em Adicionar (ou tecle Enter).</p>
       </div>
 
       {isLoading ? (

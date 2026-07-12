@@ -218,17 +218,20 @@ export function DemandTypesPanel() {
 
   return (
     <div className="max-w-xl space-y-4">
-      <div className="flex items-center gap-2">
-        <ColorPicker value={novaCor} onChange={setNovaCor} />
-        <Input
-          value={novo}
-          onChange={(e) => setNovo(e.target.value)}
-          placeholder="Novo tipo de demanda (ex: Onboarding PDV Legal)"
-          onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
-        />
-        <Button onClick={handleAdd} disabled={saving || !novo.trim()}>
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-        </Button>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <ColorPicker value={novaCor} onChange={setNovaCor} />
+          <Input
+            value={novo}
+            onChange={(e) => setNovo(e.target.value)}
+            placeholder="Novo tipo de demanda (ex: Onboarding PDV Legal)"
+            onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+          />
+          <Button onClick={handleAdd} disabled={saving || !novo.trim()}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-1" /> Adicionar</>}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Digite o nome e clique em Adicionar (ou tecle Enter).</p>
       </div>
 
       {isLoading ? (
