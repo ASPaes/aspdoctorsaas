@@ -134,7 +134,7 @@ export function PipelinesPanel({ fase }: Props) {
     enabled: !!effectiveTenantId && !!selectedPipelineId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_stages" as any) as any)
-        .select("id, pipeline_id, nome, slug, position, sla_minutos, cor, is_initial, is_final, pausa_sla, ativo")
+        .select("id, pipeline_id, nome, slug, position, sla_minutos, cor, is_initial, is_final, pausa_sla, ativo, visible_sections")
         .eq("tenant_id", effectiveTenantId).eq("pipeline_id", selectedPipelineId).order("position");
       if (error) throw error;
       return (data ?? []) as Stage[];
