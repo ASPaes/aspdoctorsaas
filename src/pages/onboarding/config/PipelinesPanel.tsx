@@ -220,6 +220,7 @@ export function PipelinesPanel({ fase }: Props) {
       is_final: !!s.is_final,
       pausa_sla: !!s.pausa_sla,
       ativo: s.ativo ?? true,
+      visible_sections: s.visible_sections ?? ALL_SECTION_KEYS,
     };
     try {
       if (isNew) {
