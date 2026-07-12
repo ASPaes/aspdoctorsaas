@@ -851,8 +851,48 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     } catch (e: any) { toast.error(e.message || "Erro ao remover módulo"); }
   }
 
+  const openVendorReturn = (vendorReturnsQ.data ?? []).find((r) => r.em_aberto);
 
+  async function handleReturnToVendor() {
+    if (!journey) return;
+    if (!returnVendorId) { toast.error("Selecione o vendedor"); return; }
+    if (!returnReasonId) { toast.error("Selecione o motivo"); return; }
+    try {
+      const { error } = await (supabase.rpc as any)("return_to_vendor", {
+        p_journey_id: journey.journey_id,
+        p_vendedor_user_id: returnVendorId,
+        p_reason_id: returnReasonId,
+        p_motivo_texto: returnText || null,
+        p_pausar_sla: returnPauseSla,
+      });
+      if (error) throw error;
+      toast.success("Retornado ao vendedor");
+      setReturnOpen(false);
+      setReturnVendorId(""); setReturnReasonId(""); setReturnText(""); setReturnPauseSla(true);
+      qc.invalidateQueries({ queryKey: ["onboarding-vendor-returns"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-participants"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao retornar");
+    }
+  }
 
+  async function handleResolveVendorReturn() {
+    if (!journey) return;
+    try {
+      const { error } = await (supabase.rpc as any)("resolve_vendor_return", { p_journey_id: journey.journey_id });
+      if (error) throw error;
+      toast.success("Retorno resolvido");
+      qc.invalidateQueries({ queryKey: ["onboarding-vendor-returns"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao resolver retorno");
+    }
+  }
 
 
   const loading = journeyQ.isLoading || !journey;
