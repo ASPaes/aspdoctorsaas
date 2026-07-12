@@ -1842,62 +1842,64 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                 {/* RIGHT */}
                 <div className="space-y-5">
                   {/* Checklist + Advance */}
-                  <section className="rounded-lg border border-border">
-                    <div className="p-3 border-b border-border">
-                      <h3 className="text-sm font-semibold">Checklist da etapa</h3>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{journey.stage_nome}</p>
-                    </div>
-                    <div className="p-3 space-y-2">
-                      {checklist.length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2 text-center">Sem itens de checklist para esta etapa.</p>
-                      ) : (
-                        checklist.map((c) => (
-                          <label key={c.id} className="flex items-start gap-2 cursor-pointer">
-                            <Checkbox
-                              checked={!!checked[c.id]}
-                              onCheckedChange={(v) => setChecked((prev) => ({ ...prev, [c.id]: !!v }))}
-                              className="mt-0.5"
-                            />
-                            <span className="text-xs">
-                              {c.texto}
-                              {c.is_required && (
-                                <span className="ml-1.5 inline-flex items-center gap-0.5 text-[9px] text-destructive font-medium uppercase">
-                                  <AlertCircle className="h-2.5 w-2.5" />obrigatório
-                                </span>
-                              )}
-                            </span>
-                          </label>
-                        ))
-                      )}
-                      <Separator className="my-2" />
-                      <div className="flex items-center gap-2">
-                        <Select value={nextStageId} onValueChange={setNextStageId}>
-                          <SelectTrigger className="flex-1 h-8 text-xs">
-                            <SelectValue placeholder="Próxima etapa (padrão: seguinte)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {stages
-                              .filter((s) => s.id !== journey.current_stage_id)
-                              .map((s) => (
-                                <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                        <Button size="sm" onClick={handleAdvance} disabled={isPaused || isConcluded}>
-                          Avançar <ArrowRight className="h-3.5 w-3.5 ml-1" />
-                        </Button>
+                  {secVisible("checklist") && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border">
+                        <h3 className="text-sm font-semibold">Checklist da etapa</h3>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{journey.stage_nome}</p>
                       </div>
-                      {isPaused && !isConcluded && (
-                        <p className="text-[10px] text-muted-foreground">Retome o onboarding para avançar de etapa.</p>
-                      )}
-                      {isConcluded && (
-                        <p className="text-[10px] text-muted-foreground">Jornada concluída — reabra para movimentar etapas.</p>
-                      )}
-                    </div>
-                  </section>
+                      <div className="p-3 space-y-2">
+                        {checklist.length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2 text-center">Sem itens de checklist para esta etapa.</p>
+                        ) : (
+                          checklist.map((c) => (
+                            <label key={c.id} className="flex items-start gap-2 cursor-pointer">
+                              <Checkbox
+                                checked={!!checked[c.id]}
+                                onCheckedChange={(v) => setChecked((prev) => ({ ...prev, [c.id]: !!v }))}
+                                className="mt-0.5"
+                              />
+                              <span className="text-xs">
+                                {c.texto}
+                                {c.is_required && (
+                                  <span className="ml-1.5 inline-flex items-center gap-0.5 text-[9px] text-destructive font-medium uppercase">
+                                    <AlertCircle className="h-2.5 w-2.5" />obrigatório
+                                  </span>
+                                )}
+                              </span>
+                            </label>
+                          ))
+                        )}
+                        <Separator className="my-2" />
+                        <div className="flex items-center gap-2">
+                          <Select value={nextStageId} onValueChange={setNextStageId}>
+                            <SelectTrigger className="flex-1 h-8 text-xs">
+                              <SelectValue placeholder="Próxima etapa (padrão: seguinte)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {stages
+                                .filter((s) => s.id !== journey.current_stage_id)
+                                .map((s) => (
+                                  <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                          <Button size="sm" onClick={handleAdvance} disabled={isPaused || isConcluded}>
+                            Avançar <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                          </Button>
+                        </div>
+                        {isPaused && !isConcluded && (
+                          <p className="text-[10px] text-muted-foreground">Retome o onboarding para avançar de etapa.</p>
+                        )}
+                        {isConcluded && (
+                          <p className="text-[10px] text-muted-foreground">Jornada concluída — reabra para movimentar etapas.</p>
+                        )}
+                      </div>
+                    </section>
+                  )}
 
                   {/* Attachments */}
-                  {journey?.ticket_id && (
+                  {secVisible("anexos") && journey?.ticket_id && (
                     <section className="rounded-lg border border-border">
                       <div className="p-3 border-b border-border">
                         <h3 className="text-sm font-semibold">Anexos</h3>
@@ -1913,61 +1915,63 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   )}
 
                   {/* Attendances */}
-                  <section className="rounded-lg border border-border">
-                    <div className="p-3 border-b border-border flex items-center justify-between">
-                      <h3 className="text-sm font-semibold flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4" /> Atendimentos vinculados
-                      </h3>
-                      <Badge variant="outline" className="text-[10px]">{attendances.length}</Badge>
-                    </div>
-                    <div className="p-3 space-y-2">
-                      {attendances.length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2 text-center">Nenhum atendimento vinculado.</p>
-                      ) : (
-                        <>
-                          {(() => {
-                            const avg = (key: string) => {
-                              const vals = attendances
-                                .map((a: any) => a[key])
-                                .filter((v: any) => typeof v === "number" && !isNaN(v));
-                              if (vals.length === 0) return null;
-                              return vals.reduce((s: number, v: number) => s + v, 0) / vals.length / 60;
-                            };
-                            const espera = avg("wait_seconds");
-                            const resposta = avg("first_response_time_seconds");
-                            const atendimento = avg("handle_seconds");
-                            return (
-                              <div className="grid grid-cols-3 gap-2 mb-1">
-                                <div className="rounded-md border border-border p-2">
-                                  <div className="text-[10px] text-muted-foreground">T. médio de espera</div>
-                                  <div className="text-sm font-semibold">{formatMin(espera)}</div>
+                  {secVisible("atendimentos") && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border flex items-center justify-between">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <MessageSquare className="h-4 w-4" /> Atendimentos vinculados
+                        </h3>
+                        <Badge variant="outline" className="text-[10px]">{attendances.length}</Badge>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        {attendances.length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2 text-center">Nenhum atendimento vinculado.</p>
+                        ) : (
+                          <>
+                            {(() => {
+                              const avg = (key: string) => {
+                                const vals = attendances
+                                  .map((a: any) => a[key])
+                                  .filter((v: any) => typeof v === "number" && !isNaN(v));
+                                if (vals.length === 0) return null;
+                                return vals.reduce((s: number, v: number) => s + v, 0) / vals.length / 60;
+                              };
+                              const espera = avg("wait_seconds");
+                              const resposta = avg("first_response_time_seconds");
+                              const atendimento = avg("handle_seconds");
+                              return (
+                                <div className="grid grid-cols-3 gap-2 mb-1">
+                                  <div className="rounded-md border border-border p-2">
+                                    <div className="text-[10px] text-muted-foreground">T. médio de espera</div>
+                                    <div className="text-sm font-semibold">{formatMin(espera)}</div>
+                                  </div>
+                                  <div className="rounded-md border border-border p-2">
+                                    <div className="text-[10px] text-muted-foreground">T. médio de resposta</div>
+                                    <div className="text-sm font-semibold">{formatMin(resposta)}</div>
+                                  </div>
+                                  <div className="rounded-md border border-border p-2">
+                                    <div className="text-[10px] text-muted-foreground">T. médio de atendimento</div>
+                                    <div className="text-sm font-semibold">{formatMin(atendimento)}</div>
+                                  </div>
                                 </div>
-                                <div className="rounded-md border border-border p-2">
-                                  <div className="text-[10px] text-muted-foreground">T. médio de resposta</div>
-                                  <div className="text-sm font-semibold">{formatMin(resposta)}</div>
+                              );
+                            })()}
+                            <div className="space-y-1.5">
+                              {attendances.map((a) => (
+                                <div key={a.id} className="rounded-md border border-border p-2 flex items-center gap-2">
+                                  <span className="font-mono text-[11px] text-primary">{a.attendance_code}</span>
+                                  <span className="text-[11px] text-muted-foreground truncate flex-1">
+                                    {a.participant_label || "—"}
+                                  </span>
+                                  <Badge variant="outline" className="text-[9px] capitalize">{a.status}</Badge>
                                 </div>
-                                <div className="rounded-md border border-border p-2">
-                                  <div className="text-[10px] text-muted-foreground">T. médio de atendimento</div>
-                                  <div className="text-sm font-semibold">{formatMin(atendimento)}</div>
-                                </div>
-                              </div>
-                            );
-                          })()}
-                          <div className="space-y-1.5">
-                            {attendances.map((a) => (
-                              <div key={a.id} className="rounded-md border border-border p-2 flex items-center gap-2">
-                                <span className="font-mono text-[11px] text-primary">{a.attendance_code}</span>
-                                <span className="text-[11px] text-muted-foreground truncate flex-1">
-                                  {a.participant_label || "—"}
-                                </span>
-                                <Badge variant="outline" className="text-[9px] capitalize">{a.status}</Badge>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </section>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </section>
+                  )}
 
                   {/* Events */}
                   <section className="rounded-lg border border-border">
