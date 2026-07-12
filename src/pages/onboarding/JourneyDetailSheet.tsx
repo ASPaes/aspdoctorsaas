@@ -130,6 +130,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
 
   // Trainings
   const [addTrainingOpen, setAddTrainingOpen] = useState(false);
+  const [addTrainingOpenTop, setAddTrainingOpenTop] = useState(false);
   const [newTrainingTitle, setNewTrainingTitle] = useState("");
   const [newTrainingDate, setNewTrainingDate] = useState("");
   const [newTrainingConductor, setNewTrainingConductor] = useState<string>("");
