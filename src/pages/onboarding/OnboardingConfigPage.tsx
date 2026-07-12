@@ -87,6 +87,9 @@ export default function OnboardingConfigPage() {
         <TabsContent value="retornos" className="flex-1 min-h-0 p-4 pt-3">
           <VendorReturnReasonsPanel />
         </TabsContent>
+        <TabsContent value="contabilidade" className="flex-1 min-h-0 p-4 pt-3">
+          <AccountingFieldsPanel />
+        </TabsContent>
 
 
 
