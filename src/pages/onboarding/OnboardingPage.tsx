@@ -48,6 +48,9 @@ interface JourneyRow {
   etapa_semaforo: "verde" | "amarelo" | "vermelho" | "sem_sla" | null;
   go_live_previsto: string | null;
   data_inicio_planejado: string | null;
+  onboarding_concluido?: boolean | null;
+  sla_onb_util_min?: number | null;
+  sla_onb_corrido_min?: number | null;
   cliente_nome?: string | null;
   demand_type_id?: string | null;
   demand_type_nome?: string | null;
