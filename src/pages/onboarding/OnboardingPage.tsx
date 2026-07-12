@@ -174,12 +174,77 @@ export default function OnboardingPage() {
 
   const ONB_DONE_COL_ID = "__onb_concluido__";
 
+  const opcoesResponsavel = useMemo(() => {
+    const seen = new Map<string, string>();
+    journeys.forEach((j) => {
+      if (j.responsavel_user_id && !seen.has(j.responsavel_user_id)) {
+        seen.set(j.responsavel_user_id, j.responsavel_nome || "—");
+      }
+    });
+    return Array.from(seen.entries()).map(([id, nome]) => ({ id, nome }));
+  }, [journeys]);
+
+  const opcoesDemanda = useMemo(() => {
+    const seen = new Map<string, string>();
+    journeys.forEach((j) => {
+      if (j.demand_type_id && !seen.has(j.demand_type_id)) {
+        seen.set(j.demand_type_id, j.demand_type_nome || "—");
+      }
+    });
+    return Array.from(seen.entries()).map(([id, nome]) => ({ id, nome }));
+  }, [journeys]);
+
+  const journeysFiltradas = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    return journeys.filter((j) => {
+      if (termo) {
+        const hay = [j.cliente_nome, j.ticket_code, j.assunto]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(termo)) return false;
+      }
+      if (filtroResponsavel !== "todos" && j.responsavel_user_id !== filtroResponsavel) return false;
+      if (filtroDemanda !== "todos" && j.demand_type_id !== filtroDemanda) return false;
+      if (filtroSemaforo !== "todos" && (j.etapa_semaforo ?? "sem_sla") !== filtroSemaforo) return false;
+      if (filtroSituacao !== "todos") {
+        if (filtroSituacao === "em_andamento") {
+          if (j.situacao && j.situacao !== "em_andamento" && j.situacao !== "aberto") return false;
+        } else if (j.situacao !== filtroSituacao) return false;
+      }
+      if (periodoEntrada && j.data_inicio_planejado) {
+        const d = new Date(j.data_inicio_planejado).getTime();
+        if (d < periodoEntrada.from.getTime() || d > periodoEntrada.to.getTime()) return false;
+      } else if (periodoEntrada && !j.data_inicio_planejado) {
+        return false;
+      }
+      return true;
+    });
+  }, [journeys, busca, filtroResponsavel, filtroDemanda, filtroSemaforo, filtroSituacao, periodoEntrada]);
+
+  function limparFiltros() {
+    setBusca("");
+    setFiltroResponsavel("todos");
+    setFiltroDemanda("todos");
+    setFiltroSemaforo("todos");
+    setFiltroSituacao("todos");
+    setPeriodoEntrada(null);
+  }
+
+  const hasFiltros =
+    busca.trim() !== "" ||
+    filtroResponsavel !== "todos" ||
+    filtroDemanda !== "todos" ||
+    filtroSemaforo !== "todos" ||
+    filtroSituacao !== "todos" ||
+    periodoEntrada !== null;
+
   const journeysByStage = useMemo(() => {
     const m: Record<string, JourneyRow[]> = {};
     stages.forEach((s) => (m[s.id] = []));
     m[ONB_DONE_COL_ID] = [];
-    journeys.forEach((j) => {
-      if (!showConcluded && j.situacao === "concluido") return;
+    journeysFiltradas.forEach((j) => {
+      if (!showConcluded && (j.situacao === "concluido" || j.situacao === "cancelado")) return;
       // Na aba Onboarding, se o onboarding já foi concluído, vai pra coluna final
       if (fase === "onboarding" && j.onboarding_concluido) {
         m[ONB_DONE_COL_ID].push(j);
@@ -188,7 +253,7 @@ export default function OnboardingPage() {
       if (j.current_stage_id && m[j.current_stage_id]) m[j.current_stage_id].push(j);
     });
     return m;
-  }, [stages, journeys, showConcluded, fase]);
+  }, [stages, journeysFiltradas, showConcluded, fase]);
 
   async function handleDrop(journeyId: string, targetStageId: string, fromStageId: string) {
     if (fromStageId === targetStageId) return;
