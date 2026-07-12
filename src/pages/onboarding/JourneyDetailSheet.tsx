@@ -715,7 +715,34 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao reabrir");
+  }
+
+  async function handleCancel() {
+    if (!journey) return;
+    if (!cancelMotivo.trim()) {
+      toast.error("Informe o motivo do cancelamento.");
+      return;
     }
+    try {
+      const { data, error } = await (supabase.rpc as any)("cancel_onboarding_journey", {
+        p_journey_id: journey.journey_id,
+        p_motivo: cancelMotivo.trim(),
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res?.ok === false) {
+        toast.error(res.reason === "ja_terminal" ? "Jornada já finalizada" : "Não foi possível cancelar");
+        return;
+      }
+      toast.success("Jornada cancelada");
+      setCancelOpen(false);
+      setCancelMotivo("");
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao cancelar");
+    }
+  }
   }
 
   async function handleAddNote() {
