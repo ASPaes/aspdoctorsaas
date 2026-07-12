@@ -938,6 +938,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         <CheckCircle2 className="h-3 w-3" /> Concluída
                       </Badge>
                     )}
+                    {openVendorReturn && (
+                      <Badge className="text-[10px] gap-1 border-0 text-white" style={{ background: "hsl(38 92% 50%)" }}>
+                        <AlertTriangle className="h-3 w-3" /> Aguardando vendedor
+                      </Badge>
+                    )}
+
                   </div>
                   <DialogTitle className="text-base mt-1 truncate">{clienteNome}</DialogTitle>
                   {journey.assunto && (
