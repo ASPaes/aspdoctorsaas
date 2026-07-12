@@ -182,20 +182,23 @@ export function VendorReturnReasonsPanel() {
       <div className="rounded-md border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
         <strong className="text-foreground">Atribuível ao vendedor</strong> = falha do vendedor (ex: faltou dado). Marcações não atribuíveis são impedimentos externos (ex: cliente não responde).
       </div>
-      <div className="flex items-center gap-2">
-        <Input
-          value={novo}
-          onChange={(e) => setNovo(e.target.value)}
-          placeholder="Novo motivo de retorno ao vendedor"
-          onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
-        />
-        <label className="flex items-center gap-1.5 text-xs whitespace-nowrap px-2">
-          <Switch checked={novoAtrib} onCheckedChange={setNovoAtrib} />
-          Atribuível
-        </label>
-        <Button onClick={handleAdd} disabled={saving || !novo.trim()}>
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-        </Button>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Input
+            value={novo}
+            onChange={(e) => setNovo(e.target.value)}
+            placeholder="Novo motivo de retorno ao vendedor"
+            onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+          />
+          <label className="flex items-center gap-1.5 text-xs whitespace-nowrap px-2">
+            <Switch checked={novoAtrib} onCheckedChange={setNovoAtrib} />
+            Atribuível
+          </label>
+          <Button onClick={handleAdd} disabled={saving || !novo.trim()}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-1" /> Adicionar</>}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Digite o nome e clique em Adicionar (ou tecle Enter).</p>
       </div>
 
       {isLoading ? (
