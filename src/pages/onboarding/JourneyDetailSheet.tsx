@@ -1710,6 +1710,64 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         </div>
       </DialogContent>
     </Dialog>
+    <Dialog open={returnOpen} onOpenChange={setReturnOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" style={{ color: "hsl(38 92% 50%)" }} />
+            Retornar ao vendedor
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Vendedor *</label>
+            <Select value={returnVendorId} onValueChange={setReturnVendorId}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecionar usuário" /></SelectTrigger>
+              <SelectContent>
+                {(tenantMembersQ.data ?? []).map((u) => (
+                  <SelectItem key={u.user_id} value={u.user_id} className="text-xs">{u.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Motivo *</label>
+            <Select value={returnReasonId} onValueChange={setReturnReasonId}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecionar motivo" /></SelectTrigger>
+              <SelectContent>
+                {(vendorReturnReasonsQ.data ?? []).map((r) => (
+                  <SelectItem key={r.id} value={r.id} className="text-xs">
+                    <span className="flex items-center gap-1.5">
+                      {r.nome}
+                      {r.atribuivel_vendedor && (
+                        <Badge className="text-[9px] border-0 text-white" style={{ backgroundColor: "hsl(38 92% 50%)" }}>
+                          atribuível
+                        </Badge>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Observação (opcional)</label>
+            <Textarea value={returnText} onChange={(e) => setReturnText(e.target.value)} rows={3} className="text-xs" />
+          </div>
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <Checkbox checked={returnPauseSla} onCheckedChange={(v) => setReturnPauseSla(!!v)} />
+            Pausar SLA enquanto aguarda o vendedor
+          </label>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => setReturnOpen(false)}>Cancelar</Button>
+          <Button size="sm" className="text-white border-0" style={{ background: "hsl(38 92% 50%)" }} onClick={handleReturnToVendor}>
+            <AlertTriangle className="h-4 w-4 mr-1" /> Confirmar retorno
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
     </>
+
   );
 }
