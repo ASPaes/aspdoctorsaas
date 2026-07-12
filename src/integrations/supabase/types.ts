@@ -6517,7 +6517,7 @@ export type Database = {
           old_value: string | null
           tenant_id: string
           ticket_id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           content?: string | null
@@ -6528,7 +6528,7 @@ export type Database = {
           old_value?: string | null
           tenant_id: string
           ticket_id: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           content?: string | null
@@ -6539,7 +6539,7 @@ export type Database = {
           old_value?: string | null
           tenant_id?: string
           ticket_id?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -9635,72 +9635,33 @@ export type Database = {
         }
         Returns: string
       }
-      create_onboarding_journey:
-        | {
-            Args: {
-              p_assunto: string
-              p_cliente_id: string
-              p_data_inicio_planejado?: string
-              p_descricao?: string
-              p_go_live_previsto?: string
-              p_implantador_user_id?: string
-              p_produto_id?: number
-              p_tenant_id: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_assunto: string
-              p_cliente_id: string
-              p_data_inicio_planejado?: string
-              p_demand_type_id?: string
-              p_descricao?: string
-              p_go_live_previsto?: string
-              p_implantador_user_id?: string
-              p_produto_id?: number
-              p_tenant_id: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_assunto: string
-              p_cliente_id: string
-              p_data_inicio_planejado?: string
-              p_demand_type_id?: string
-              p_department_id?: string
-              p_descricao?: string
-              p_go_live_previsto?: string
-              p_implantador_user_id?: string
-              p_produto_id?: number
-              p_tenant_id: string
-              p_unidade_base_id?: number
-            }
-            Returns: string
-          }
-      create_onboarding_training:
-        | {
-            Args: {
-              p_agendado_para?: string
-              p_conduzido_por?: string
-              p_is_retreinamento?: boolean
-              p_journey_id: string
-              p_titulo: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_agendado_para?: string
-              p_conduzido_por?: string
-              p_is_retreinamento?: boolean
-              p_journey_id: string
-              p_titulo: string
-              p_training_type_id?: string
-            }
-            Returns: string
-          }
+      create_onboarding_journey: {
+        Args: {
+          p_assunto: string
+          p_cliente_id: string
+          p_data_inicio_planejado?: string
+          p_demand_type_id?: string
+          p_department_id?: string
+          p_descricao?: string
+          p_go_live_previsto?: string
+          p_implantador_user_id?: string
+          p_produto_id?: number
+          p_tenant_id: string
+          p_unidade_base_id?: number
+        }
+        Returns: string
+      }
+      create_onboarding_training: {
+        Args: {
+          p_agendado_para?: string
+          p_conduzido_por?: string
+          p_is_retreinamento?: boolean
+          p_journey_id: string
+          p_titulo: string
+          p_training_type_id?: string
+        }
+        Returns: string
+      }
       create_simple_template_from_tenant: {
         Args: {
           p_descricao?: string
