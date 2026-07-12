@@ -19,7 +19,7 @@ import { TicketAttachments } from "@/components/tickets/TicketAttachments";
 import {
   Loader2, Clock, Pause, Play, ChevronRight, Calendar, CheckCircle2,
   Circle, AlertCircle, MessageSquare, GraduationCap, User, ArrowRight,
-  UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle,
+  UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle, Ban,
 } from "lucide-react";
 
 
