@@ -1974,63 +1974,65 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   )}
 
                   {/* Events */}
-                  <section className="rounded-lg border border-border">
-                    <div className="p-3 border-b border-border">
-                      <h3 className="text-sm font-semibold">Timeline de eventos</h3>
-                    </div>
-                    <div className="p-3 space-y-3">
-                      <div className="space-y-2">
-                        <Textarea
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          placeholder="Adicionar nota do agente..."
-                          rows={2}
-                          className="text-xs"
-                        />
-                        <Button size="sm" onClick={handleAddNote} disabled={!note.trim()}>
-                          Adicionar nota
-                        </Button>
+                  {secVisible("eventos") && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border">
+                        <h3 className="text-sm font-semibold">Timeline de eventos</h3>
                       </div>
-                      <Separator />
-                      <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                        {events.length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2 text-center">Sem eventos registrados.</p>
-                        ) : (
-                          events.map((ev: any) => {
-                            const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-                            const isStageChange = ev.event_type === "onboarding_mudou_etapa";
-                            const oldIsUuid = ev.old_value && UUID_RE.test(String(ev.old_value).trim());
-                            const newIsUuid = ev.new_value && UUID_RE.test(String(ev.new_value).trim());
-                            const hideRawValues = isStageChange && (oldIsUuid || newIsUuid);
-                            const showRawValues = (ev.old_value || ev.new_value) && !hideRawValues && !oldIsUuid && !newIsUuid;
-                            const legacyStageFallback = isStageChange && hideRawValues && !ev.content;
-                            const authorName = ev.user_id ? (eventUsersQ.data?.[ev.user_id] ?? "Usuário") : "Sistema";
-                            return (
-                              <div key={ev.id} className="flex items-start gap-2 text-xs">
-                                <div className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-medium">{EVENT_LABELS[ev.event_type] || ev.event_type}</span>
-                                    <span className="text-[10px] text-muted-foreground">{formatDateTime(ev.created_at)}</span>
-                                    <span className="text-[10px] text-muted-foreground">· {authorName}</span>
+                      <div className="p-3 space-y-3">
+                        <div className="space-y-2">
+                          <Textarea
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            placeholder="Adicionar nota do agente..."
+                            rows={2}
+                            className="text-xs"
+                          />
+                          <Button size="sm" onClick={handleAddNote} disabled={!note.trim()}>
+                            Adicionar nota
+                          </Button>
+                        </div>
+                        <Separator />
+                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                          {events.length === 0 ? (
+                            <p className="text-xs text-muted-foreground py-2 text-center">Sem eventos registrados.</p>
+                          ) : (
+                            events.map((ev: any) => {
+                              const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                              const isStageChange = ev.event_type === "onboarding_mudou_etapa";
+                              const oldIsUuid = ev.old_value && UUID_RE.test(String(ev.old_value).trim());
+                              const newIsUuid = ev.new_value && UUID_RE.test(String(ev.new_value).trim());
+                              const hideRawValues = isStageChange && (oldIsUuid || newIsUuid);
+                              const showRawValues = (ev.old_value || ev.new_value) && !hideRawValues && !oldIsUuid && !newIsUuid;
+                              const legacyStageFallback = isStageChange && hideRawValues && !ev.content;
+                              const authorName = ev.user_id ? (eventUsersQ.data?.[ev.user_id] ?? "Usuário") : "Sistema";
+                              return (
+                                <div key={ev.id} className="flex items-start gap-2 text-xs">
+                                  <div className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-medium">{EVENT_LABELS[ev.event_type] || ev.event_type}</span>
+                                      <span className="text-[10px] text-muted-foreground">{formatDateTime(ev.created_at)}</span>
+                                      <span className="text-[10px] text-muted-foreground">· {authorName}</span>
+                                    </div>
+                                    {ev.content && <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{ev.content}</p>}
+                                    {legacyStageFallback && (
+                                      <p className="text-xs text-muted-foreground mt-0.5">Mudança de etapa</p>
+                                    )}
+                                    {showRawValues && (
+                                      <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+                                        {ev.old_value || "—"} <ChevronRight className="inline h-3 w-3" /> {ev.new_value || "—"}
+                                      </p>
+                                    )}
                                   </div>
-                                  {ev.content && <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{ev.content}</p>}
-                                  {legacyStageFallback && (
-                                    <p className="text-xs text-muted-foreground mt-0.5">Mudança de etapa</p>
-                                  )}
-                                  {showRawValues && (
-                                    <p className="text-[10px] text-muted-foreground/80 mt-0.5">
-                                      {ev.old_value || "—"} <ChevronRight className="inline h-3 w-3" /> {ev.new_value || "—"}
-                                    </p>
-                                  )}
                                 </div>
-                              </div>
-                            );
-                          })
-                        )}
+                              );
+                            })
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </section>
+                    </section>
+                  )}
                 </div>
               </div>
             </div>
