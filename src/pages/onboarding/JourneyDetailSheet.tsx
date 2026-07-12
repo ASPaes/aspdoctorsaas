@@ -1818,3 +1818,123 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
 
   );
 }
+
+type AccField = { id: string; nome: string; tipo: "text" | "number" | "date" | "option" | "boolean"; opcoes: string[] | null; position: number };
+type AccValue = { id: string; field_id: string; valor: string | null; coletado: boolean };
+
+function AccountingCard({
+  fields, values, loading, onSave,
+}: {
+  fields: AccField[];
+  values: AccValue[];
+  loading: boolean;
+  onSave: (fieldId: string, valor: string | null, coletado: boolean) => Promise<void>;
+}) {
+  const byField = useMemo(() => {
+    const m = new Map<string, AccValue>();
+    values.forEach((v) => m.set(v.field_id, v));
+    return m;
+  }, [values]);
+
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const total = fields.length;
+  const coletados = fields.reduce((n, f) => n + (byField.get(f.id)?.coletado ? 1 : 0), 0);
+
+  async function commit(field: AccField, valor: string | null, coletado: boolean) {
+    setSavingId(field.id);
+    try { await onSave(field.id, valor, coletado); } finally { setSavingId(null); }
+  }
+
+  if (loading) {
+    return (
+      <section className="rounded-lg border border-border">
+        <div className="p-6 flex justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+      </section>
+    );
+  }
+
+  if (total === 0) return null;
+
+  return (
+    <section className="rounded-lg border border-border">
+      <div className="p-3 border-b border-border flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          <Package className="h-4 w-4" /> Dados da contabilidade
+        </h3>
+        <Badge variant="outline" className="text-[10px]">{coletados} de {total} coletados</Badge>
+      </div>
+      <div className="p-3 space-y-2.5">
+        {fields.map((f) => {
+          const cur = byField.get(f.id);
+          const rawValor = drafts[f.id] ?? (cur?.valor ?? "");
+          const coletado = cur?.coletado ?? false;
+          return (
+            <div key={f.id} className="grid grid-cols-[1fr_auto] gap-2 items-center">
+              <div className="min-w-0 space-y-1">
+                <label className="text-[11px] font-medium text-muted-foreground">{f.nome}</label>
+                {f.tipo === "text" && (
+                  <Input
+                    className="h-8 text-xs"
+                    value={rawValor}
+                    onChange={(e) => setDrafts((d) => ({ ...d, [f.id]: e.target.value }))}
+                    onBlur={() => { if (rawValor !== (cur?.valor ?? "")) commit(f, rawValor || null, coletado); }}
+                  />
+                )}
+                {f.tipo === "number" && (
+                  <Input
+                    type="number"
+                    className="h-8 text-xs"
+                    value={rawValor}
+                    onChange={(e) => setDrafts((d) => ({ ...d, [f.id]: e.target.value }))}
+                    onBlur={() => { if (rawValor !== (cur?.valor ?? "")) commit(f, rawValor || null, coletado); }}
+                  />
+                )}
+                {f.tipo === "date" && (
+                  <Input
+                    type="date"
+                    className="h-8 text-xs"
+                    value={rawValor}
+                    onChange={(e) => { setDrafts((d) => ({ ...d, [f.id]: e.target.value })); commit(f, e.target.value || null, coletado); }}
+                  />
+                )}
+                {f.tipo === "option" && (
+                  <Select
+                    value={rawValor || undefined}
+                    onValueChange={(v) => { setDrafts((d) => ({ ...d, [f.id]: v })); commit(f, v, coletado); }}
+                  >
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                    <SelectContent>
+                      {(f.opcoes ?? []).map((op) => (
+                        <SelectItem key={op} value={op} className="text-xs">{op}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {f.tipo === "boolean" && (
+                  <div className="flex items-center gap-2 h-8">
+                    <Checkbox
+                      checked={rawValor === "true"}
+                      onCheckedChange={(v) => { const nv = v ? "true" : "false"; setDrafts((d) => ({ ...d, [f.id]: nv })); commit(f, nv, coletado); }}
+                    />
+                    <span className="text-xs text-muted-foreground">{rawValor === "true" ? "Sim" : "Não"}</span>
+                  </div>
+                )}
+              </div>
+              <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0 mt-4">
+                <Checkbox
+                  checked={coletado}
+                  disabled={savingId === f.id}
+                  onCheckedChange={(v) => commit(f, cur?.valor ?? (drafts[f.id] || null), !!v)}
+                />
+                Coletado
+              </label>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
