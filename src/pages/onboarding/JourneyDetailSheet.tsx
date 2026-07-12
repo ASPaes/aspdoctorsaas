@@ -929,7 +929,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden">
+      <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -978,20 +978,20 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">{journey.assunto}</p>
                   )}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 pr-10">
                   {journey.ticket_id && (
-                    <Button size="sm" variant="outline" onClick={() => setStartConvOpen(true)}>
-                      <MessageSquare className="h-4 w-4 mr-1" /> Conversa
+                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setStartConvOpen(true)}>
+                      <MessageSquare className="h-3.5 w-3.5 mr-1" /> Conversa
                     </Button>
                   )}
                   {!isConcluded && (
                     openVendorReturn ? (
-                      <Button size="sm" variant="outline" onClick={handleResolveVendorReturn}>
-                        <RotateCcw className="h-4 w-4 mr-1" /> Resolver retorno
+                      <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleResolveVendorReturn}>
+                        <RotateCcw className="h-3.5 w-3.5 mr-1" /> Resolver retorno
                       </Button>
                     ) : (
-                      <Button size="sm" variant="outline" onClick={() => setReturnOpen(true)}>
-                        <AlertTriangle className="h-4 w-4 mr-1" /> Retornar ao vendedor
+                      <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setReturnOpen(true)}>
+                        <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Retornar ao vendedor
                       </Button>
                     )
                   )}
@@ -1001,25 +1001,25 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       <span className="text-[11px] text-muted-foreground">
                         Concluída em {formatDate(journey.concluido_em ?? null)}
                       </span>
-                      <Button size="sm" variant="outline" onClick={handleReopen}>
-                        <Play className="h-4 w-4 mr-1" /> Reabrir
+                      <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleReopen}>
+                        <Play className="h-3.5 w-3.5 mr-1" /> Reabrir
                       </Button>
                     </>
                   ) : isPaused ? (
                     <>
-                      <Button size="sm" variant="outline" onClick={handleResume}>
-                        <Play className="h-4 w-4 mr-1" /> Retomar
+                      <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleResume}>
+                        <Play className="h-3.5 w-3.5 mr-1" /> Retomar
                       </Button>
-                      <Button size="sm" className="text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
-                        <CheckCircle2 className="h-4 w-4 mr-1" /> Concluir
+                      <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir
                       </Button>
                     </>
                   ) : (
                     <>
                       <Popover open={pausePopoverOpen} onOpenChange={setPausePopoverOpen}>
                         <PopoverTrigger asChild>
-                          <Button size="sm" variant="outline">
-                            <Pause className="h-4 w-4 mr-1" /> Pausar
+                          <Button size="sm" variant="outline" className="h-8 text-xs">
+                            <Pause className="h-3.5 w-3.5 mr-1" /> Pausar
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-80 space-y-3" align="end">
@@ -1041,8 +1041,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           <Button size="sm" className="w-full" onClick={handlePause}>Confirmar pausa</Button>
                         </PopoverContent>
                       </Popover>
-                      <Button size="sm" className="text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
-                        <CheckCircle2 className="h-4 w-4 mr-1" /> Concluir
+                      <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir
                       </Button>
                     </>
                   )}
@@ -1075,7 +1075,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
               </div>
             </DialogHeader>
 
-            <div className="overflow-y-auto flex-1">
+            <div className="flex-1 min-h-0 overflow-y-auto">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 p-5">
                 {/* LEFT */}
                 <div className="space-y-5">
