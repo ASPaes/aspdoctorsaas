@@ -130,6 +130,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
 
   // Trainings
   const [addTrainingOpen, setAddTrainingOpen] = useState(false);
+  const [addTrainingOpenTop, setAddTrainingOpenTop] = useState(false);
   const [newTrainingTitle, setNewTrainingTitle] = useState("");
   const [newTrainingDate, setNewTrainingDate] = useState("");
   const [newTrainingConductor, setNewTrainingConductor] = useState<string>("");
@@ -510,6 +511,17 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     [stages, journey?.current_stage_id]
   );
 
+  const canScheduleTraining = useMemo(() => {
+    if (!journey) return false;
+    if (journey.situacao === "concluido") return false;
+    if (journey.fase_atual === "implantacao") return true;
+    if (journey.fase_atual === "onboarding") {
+      const cur = stages.find((s) => s.id === journey.current_stage_id);
+      return cur?.is_final === true;
+    }
+    return false;
+  }, [journey, stages]);
+
   const pausesByReason = useMemo(() => {
     const rows = pausesByReasonQ.data ?? [];
     const agg = new Map<string, { minutos: number; em_andamento: boolean; count: number }>();
@@ -756,11 +768,19 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       if (error) throw error;
       toast.success("Treino agendado");
       setAddTrainingOpen(false);
+      setAddTrainingOpenTop(false);
       setNewTrainingTitle("");
       setNewTrainingDate("");
       setNewTrainingConductor("");
       setNewTrainingRetreat(false);
+      setNewTrainingTypeId("");
       qc.invalidateQueries({ queryKey: ["onboarding-training", journeyId] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-row", journeyId] });
+      qc.invalidateQueries({ queryKey: ["onboarding-detail-stages"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-stage-history", journeyId] });
+      qc.invalidateQueries({ queryKey: ["onboarding-stage-checklist"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao criar treino");
     }
@@ -986,6 +1006,67 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setStartConvOpen(true)}>
                       <MessageSquare className="h-3.5 w-3.5 mr-1" /> Conversa
                     </Button>
+                  )}
+                  {canScheduleTraining && (
+                    <Popover open={addTrainingOpenTop} onOpenChange={setAddTrainingOpenTop}>
+                      <PopoverTrigger asChild>
+                        <Button size="sm" variant="outline" className="h-8 text-xs">
+                          <GraduationCap className="h-3.5 w-3.5 mr-1" /> Agendar treino
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-96 space-y-3" align="end">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium">Título *</label>
+                          <Input
+                            value={newTrainingTitle}
+                            onChange={(e) => setNewTrainingTitle(e.target.value)}
+                            placeholder="Ex: Treinamento PDV"
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium">Data/hora</label>
+                          <Input
+                            type="datetime-local"
+                            value={newTrainingDate}
+                            onChange={(e) => setNewTrainingDate(e.target.value)}
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium">Conduzido por</label>
+                          <Select value={newTrainingConductor} onValueChange={setNewTrainingConductor}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar usuário" /></SelectTrigger>
+                            <SelectContent>
+                              {(tenantMembersQ.data ?? []).map((m) => (
+                                <SelectItem key={m.user_id} value={m.user_id} className="text-xs">{m.nome}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium">Tipo de treino</label>
+                          <Select value={newTrainingTypeId} onValueChange={setNewTrainingTypeId}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar tipo" /></SelectTrigger>
+                            <SelectContent>
+                              {(trainingTypesQ.data ?? []).map((tt) => (
+                                <SelectItem key={tt.id} value={tt.id} className="text-xs">
+                                  {tt.nome}{tt.conta_como_pdv ? " · PDV" : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <label className="flex items-center gap-2 text-xs cursor-pointer">
+                          <Checkbox
+                            checked={newTrainingRetreat}
+                            onCheckedChange={(v) => setNewTrainingRetreat(!!v)}
+                          />
+                          É retreinamento?
+                        </label>
+                        <Button size="sm" className="w-full" onClick={handleCreateTraining}>Agendar</Button>
+                      </PopoverContent>
+                    </Popover>
                   )}
                   {!isConcluded && (
                     openVendorReturn ? (
@@ -1389,72 +1470,78 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       </h3>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px]">{trainings.length}</Badge>
-                        <Popover open={addTrainingOpen} onOpenChange={setAddTrainingOpen}>
-                          <PopoverTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
-                              <UserPlus className="h-3 w-3" /> Agendar treino
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-96 space-y-3" align="end">
-                            <div className="space-y-1">
-                              <label className="text-[11px] font-medium">Título *</label>
-                              <Input
-                                value={newTrainingTitle}
-                                onChange={(e) => setNewTrainingTitle(e.target.value)}
-                                placeholder="Ex: Treinamento PDV"
-                                className="h-8 text-xs"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[11px] font-medium">Data/hora</label>
-                              <Input
-                                type="datetime-local"
-                                value={newTrainingDate}
-                                onChange={(e) => setNewTrainingDate(e.target.value)}
-                                className="h-8 text-xs"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[11px] font-medium">Conduzido por</label>
-                              <Select value={newTrainingConductor} onValueChange={setNewTrainingConductor}>
-                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar usuário" /></SelectTrigger>
-                                <SelectContent>
-                                  {(tenantMembersQ.data ?? []).map((m) => (
-                                    <SelectItem key={m.user_id} value={m.user_id} className="text-xs">{m.nome}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[11px] font-medium">Tipo de treino</label>
-                              <Select value={newTrainingTypeId} onValueChange={setNewTrainingTypeId}>
-                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar tipo" /></SelectTrigger>
-                                <SelectContent>
-                                  {(trainingTypesQ.data ?? []).map((tt) => (
-                                    <SelectItem key={tt.id} value={tt.id} className="text-xs">
-                                      {tt.nome}{tt.conta_como_pdv ? " · PDV" : ""}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
+                        {canScheduleTraining && (
+                          <Popover open={addTrainingOpen} onOpenChange={setAddTrainingOpen}>
+                            <PopoverTrigger asChild>
+                              <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
+                                <UserPlus className="h-3 w-3" /> Agendar treino
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-96 space-y-3" align="end">
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-medium">Título *</label>
+                                <Input
+                                  value={newTrainingTitle}
+                                  onChange={(e) => setNewTrainingTitle(e.target.value)}
+                                  placeholder="Ex: Treinamento PDV"
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-medium">Data/hora</label>
+                                <Input
+                                  type="datetime-local"
+                                  value={newTrainingDate}
+                                  onChange={(e) => setNewTrainingDate(e.target.value)}
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-medium">Conduzido por</label>
+                                <Select value={newTrainingConductor} onValueChange={setNewTrainingConductor}>
+                                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar usuário" /></SelectTrigger>
+                                  <SelectContent>
+                                    {(tenantMembersQ.data ?? []).map((m) => (
+                                      <SelectItem key={m.user_id} value={m.user_id} className="text-xs">{m.nome}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-medium">Tipo de treino</label>
+                                <Select value={newTrainingTypeId} onValueChange={setNewTrainingTypeId}>
+                                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar tipo" /></SelectTrigger>
+                                  <SelectContent>
+                                    {(trainingTypesQ.data ?? []).map((tt) => (
+                                      <SelectItem key={tt.id} value={tt.id} className="text-xs">
+                                        {tt.nome}{tt.conta_como_pdv ? " · PDV" : ""}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
 
 
-                            <label className="flex items-center gap-2 text-xs cursor-pointer">
-                              <Checkbox
-                                checked={newTrainingRetreat}
-                                onCheckedChange={(v) => setNewTrainingRetreat(!!v)}
-                              />
-                              É retreinamento?
-                            </label>
-                            <Button size="sm" className="w-full" onClick={handleCreateTraining}>Agendar</Button>
-                          </PopoverContent>
-                        </Popover>
+                              <label className="flex items-center gap-2 text-xs cursor-pointer">
+                                <Checkbox
+                                  checked={newTrainingRetreat}
+                                  onCheckedChange={(v) => setNewTrainingRetreat(!!v)}
+                                />
+                                É retreinamento?
+                              </label>
+                              <Button size="sm" className="w-full" onClick={handleCreateTraining}>Agendar</Button>
+                            </PopoverContent>
+                          </Popover>
+                        )}
                       </div>
                     </div>
                     <div className="p-3 space-y-2">
                       {trainings.length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2 text-center">Nenhum treino cadastrado.</p>
+                        <p className="text-xs text-muted-foreground py-2 text-center">
+                          {canScheduleTraining
+                            ? "Nenhum treino cadastrado."
+                            : "Disponível a partir da última etapa do onboarding."}
+                        </p>
                       ) : (
                         trainings.map((t) => {
                           const statusColors: Record<string, string> = {
