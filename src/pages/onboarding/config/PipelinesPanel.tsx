@@ -718,6 +718,7 @@ function StageDialog({
   const [isFinal, setIsFinal] = useState(false);
   const [pausaSla, setPausaSla] = useState(false);
   const [ativo, setAtivo] = useState(true);
+  const [visibleSections, setVisibleSections] = useState<string[]>(ALL_SECTION_KEYS);
 
   useEffect(() => {
     if (open) {
@@ -729,8 +730,15 @@ function StageDialog({
       setIsFinal(!!initial?.is_final);
       setPausaSla(!!initial?.pausa_sla);
       setAtivo(initial?.ativo ?? true);
+      setVisibleSections(initial?.visible_sections ?? ALL_SECTION_KEYS);
     }
   }, [open, initial]);
+
+  function toggleSection(key: string) {
+    setVisibleSections((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  }
 
   const autoSlug = useMemo(() => slugify(nome), [nome]);
 
