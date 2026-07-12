@@ -3773,6 +3773,50 @@ export type Database = {
         }
         Relationships: []
       }
+      onboarding_accounting_fields: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          opcoes: string[] | null
+          position: number
+          tenant_id: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          opcoes?: string[] | null
+          position?: number
+          tenant_id: string
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          opcoes?: string[] | null
+          position?: number
+          tenant_id?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_accounting_fields_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_demand_types: {
         Row: {
           ativo: boolean
@@ -3810,6 +3854,65 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "onboarding_demand_types_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_journey_accounting: {
+        Row: {
+          coletado: boolean
+          field_id: string
+          id: string
+          journey_id: string
+          tenant_id: string
+          updated_at: string
+          valor: string | null
+        }
+        Insert: {
+          coletado?: boolean
+          field_id: string
+          id?: string
+          journey_id: string
+          tenant_id: string
+          updated_at?: string
+          valor?: string | null
+        }
+        Update: {
+          coletado?: boolean
+          field_id?: string
+          id?: string
+          journey_id?: string
+          tenant_id?: string
+          updated_at?: string
+          valor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_journey_accounting_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_accounting_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_accounting_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_accounting_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_accounting_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
