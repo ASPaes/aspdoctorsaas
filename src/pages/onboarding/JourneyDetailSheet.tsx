@@ -956,6 +956,18 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       <MessageSquare className="h-4 w-4 mr-1" /> Conversa
                     </Button>
                   )}
+                  {!isConcluded && (
+                    openVendorReturn ? (
+                      <Button size="sm" variant="outline" onClick={handleResolveVendorReturn}>
+                        <RotateCcw className="h-4 w-4 mr-1" /> Resolver retorno
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => setReturnOpen(true)}>
+                        <AlertTriangle className="h-4 w-4 mr-1" /> Retornar ao vendedor
+                      </Button>
+                    )
+                  )}
+
                   {isConcluded ? (
                     <>
                       <span className="text-[11px] text-muted-foreground">
