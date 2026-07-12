@@ -68,6 +68,7 @@ interface Stage {
   is_final: boolean;
   pausa_sla: boolean;
   ativo: boolean;
+  visible_sections: string[] | null;
 }
 
 interface ChecklistItem {
