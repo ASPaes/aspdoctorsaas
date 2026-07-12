@@ -6,8 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Loader2, ChevronsUpDown, Check } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -19,31 +23,38 @@ interface Props {
 
 export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated }: Props) {
   const [clienteId, setClienteId] = useState<string>("");
+  const [clienteLabel, setClienteLabel] = useState<string>("");
+  const [clienteBusca, setClienteBusca] = useState<string>("");
+  const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
   const [produtoId, setProdutoId] = useState<string>("");
   const [assunto, setAssunto] = useState<string>("");
   const [dataInicio, setDataInicio] = useState<string>("");
   const [goLive, setGoLive] = useState<string>("");
   const [demandTypeId, setDemandTypeId] = useState<string>("");
+  const [implantadorUserId, setImplantadorUserId] = useState<string>("");
   const [saving, setSaving] = useState(false);
+
+  const clienteBuscaDebounced = useDebouncedValue(clienteBusca, 300);
 
   useEffect(() => {
     if (!open) {
-      setClienteId(""); setProdutoId(""); setAssunto(""); setDataInicio(""); setGoLive(""); setDemandTypeId("");
+      setClienteId(""); setClienteLabel(""); setClienteBusca("");
+      setProdutoId(""); setAssunto(""); setDataInicio(""); setGoLive("");
+      setDemandTypeId(""); setImplantadorUserId("");
     }
   }, [open]);
 
   const clientesQuery = useQuery({
-    queryKey: ["onb-clientes-lookup", tenantId],
+    queryKey: ["onb-clientes-search", tenantId, clienteBuscaDebounced],
     enabled: open && !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clientes")
-        .select("id, nome_fantasia, razao_social")
-        .eq("tenant_id", tenantId!)
-        .order("nome_fantasia")
-        .limit(1000);
+      const { data, error } = await (supabase.rpc as any)("search_clientes", {
+        p_tenant_id: tenantId,
+        p_termo: clienteBuscaDebounced,
+        p_limit: 30,
+      });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as Array<{ id: string; nome_fantasia: string | null; razao_social: string | null; cnpj: string | null }>;
     },
   });
 
@@ -75,6 +86,31 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
     },
   });
 
+  const membrosQuery = useQuery({
+    queryKey: ["onb-membros", tenantId],
+    enabled: open && !!tenantId,
+    queryFn: async () => {
+      const { data: profiles, error: pErr } = await supabase
+        .from("profiles")
+        .select("user_id, funcionario_id")
+        .eq("tenant_id", tenantId!)
+        .eq("status", "ativo");
+      if (pErr) throw pErr;
+      const funcIds = (profiles ?? []).map((p) => p.funcionario_id).filter(Boolean) as number[];
+      const { data: funcs = [] } = await supabase
+        .from("funcionarios")
+        .select("id, nome")
+        .in("id", funcIds.length ? funcIds : [0]);
+      const funcMap = new Map((funcs ?? []).map((f) => [f.id, f.nome as string]));
+      return (profiles ?? [])
+        .map((p) => ({
+          user_id: p.user_id as string,
+          nome: (p.funcionario_id ? funcMap.get(p.funcionario_id) : null) || "Sem vínculo",
+        }))
+        .sort((a, b) => a.nome.localeCompare(b.nome));
+    },
+  });
+
   async function handleSubmit() {
     if (!tenantId) return;
     if (!clienteId || !produtoId || !assunto.trim()) {
@@ -91,6 +127,7 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
         p_data_inicio_planejado: dataInicio || null,
         p_go_live_previsto: goLive || null,
         p_demand_type_id: demandTypeId || null,
+        p_implantador_user_id: implantadorUserId || null,
       });
       if (error) throw error;
       const res = data as any;
@@ -118,15 +155,80 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
         <div className="space-y-3 py-2">
           <div className="space-y-1.5">
             <Label>Cliente *</Label>
-            <Select value={clienteId} onValueChange={setClienteId}>
+            <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={clientePopoverOpen}
+                  className="w-full justify-between font-normal"
+                >
+                  <span className={cn("truncate", !clienteLabel && "text-muted-foreground")}>
+                    {clienteLabel || "Buscar cliente por nome ou CNPJ..."}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder="Digite nome ou CNPJ..."
+                    value={clienteBusca}
+                    onValueChange={setClienteBusca}
+                  />
+                  <CommandList>
+                    {clientesQuery.isFetching && (
+                      <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" /> Buscando...
+                      </div>
+                    )}
+                    {!clientesQuery.isFetching && (clientesQuery.data ?? []).length === 0 && (
+                      <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                    )}
+                    <CommandGroup>
+                      {(clientesQuery.data ?? []).map((c) => {
+                        const label = c.nome_fantasia || c.razao_social || "—";
+                        return (
+                          <CommandItem
+                            key={c.id}
+                            value={c.id}
+                            onSelect={() => {
+                              setClienteId(c.id);
+                              setClienteLabel(label);
+                              setClientePopoverOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                clienteId === c.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex flex-col min-w-0">
+                              <span className="truncate">{label}</span>
+                              {c.cnpj && (
+                                <span className="text-xs text-muted-foreground">{c.cnpj}</span>
+                              )}
+                            </div>
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Responsável</Label>
+            <Select value={implantadorUserId} onValueChange={setImplantadorUserId}>
               <SelectTrigger>
-                <SelectValue placeholder={clientesQuery.isLoading ? "Carregando..." : "Selecione o cliente"} />
+                <SelectValue placeholder={membrosQuery.isLoading ? "Carregando..." : "Selecione (opcional)"} />
               </SelectTrigger>
               <SelectContent>
-                {(clientesQuery.data ?? []).map((c: any) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.nome_fantasia || c.razao_social}
-                  </SelectItem>
+                {(membrosQuery.data ?? []).map((m) => (
+                  <SelectItem key={m.user_id} value={m.user_id}>{m.nome}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
