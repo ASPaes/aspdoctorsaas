@@ -19,7 +19,7 @@ import { TicketAttachments } from "@/components/tickets/TicketAttachments";
 import {
   Loader2, Clock, Pause, Play, ChevronRight, Calendar, CheckCircle2,
   Circle, AlertCircle, MessageSquare, GraduationCap, User, ArrowRight,
-  UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle,
+  UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle, Ban,
 } from "lucide-react";
 
 
@@ -137,6 +137,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [nextStageId, setNextStageId] = useState<string>("");
   const [concludeOpen, setConcludeOpen] = useState(false);
   const [goLiveReal, setGoLiveReal] = useState<string>("");
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelMotivo, setCancelMotivo] = useState("");
   const [addParticipantOpen, setAddParticipantOpen] = useState(false);
   const [newParticipantUserId, setNewParticipantUserId] = useState<string>("");
   const [newParticipantPapel, setNewParticipantPapel] = useState<Papel>("especialista");
@@ -604,6 +606,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const clienteNome = cliente?.nome_fantasia || cliente?.razao_social || "—";
   const isPaused = journey?.situacao === "pausado" || journey?.situacao === "parado";
   const isConcluded = journey?.situacao === "concluido";
+  const isCancelled = journey?.situacao === "cancelado";
+  const isTerminal = isConcluded || isCancelled;
+  const isAdmin = profile?.is_super_admin === true || profile?.role === "admin";
+  const etapaFinal = stages.find((s) => s.id === journey?.current_stage_id)?.is_final === true;
+  const canGoLive = (journey?.fase_atual === "implantacao" && etapaFinal) || isAdmin;
+
 
   async function handleAdvance() {
     if (!journey) return;
@@ -707,6 +715,33 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao reabrir");
+    }
+  }
+
+  async function handleCancel() {
+    if (!journey) return;
+    if (!cancelMotivo.trim()) {
+      toast.error("Informe o motivo do cancelamento.");
+      return;
+    }
+    try {
+      const { data, error } = await (supabase.rpc as any)("cancel_onboarding_journey", {
+        p_journey_id: journey.journey_id,
+        p_motivo: cancelMotivo.trim(),
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res?.ok === false) {
+        toast.error(res.reason === "ja_terminal" ? "Jornada já finalizada" : "Não foi possível cancelar");
+        return;
+      }
+      toast.success("Jornada cancelada");
+      setCancelOpen(false);
+      setCancelMotivo("");
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao cancelar");
     }
   }
 
@@ -1041,6 +1076,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         <CheckCircle2 className="h-3 w-3" /> Concluída
                       </Badge>
                     )}
+                    {isCancelled && (
+                      <Badge className="text-[10px] gap-1 border-0 text-white" style={{ background: "hsl(var(--destructive))" }}>
+                        <Ban className="h-3 w-3" /> Cancelada
+                      </Badge>
+                    )}
                     {openVendorReturn && (
                       <Badge className="text-[10px] gap-1 border-0 text-white" style={{ background: "hsl(38 92% 50%)" }}>
                         <AlertTriangle className="h-3 w-3" /> Aguardando vendedor
@@ -1140,10 +1180,10 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     )
                   )}
 
-                  {isConcluded ? (
+                  {isTerminal ? (
                     <>
                       <span className="text-[11px] text-muted-foreground">
-                        Concluída em {formatDate(journey.concluido_em ?? null)}
+                        {isCancelled ? "Cancelada" : "Concluída"} em {formatDate(journey.concluido_em ?? null)}
                       </span>
                       <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleReopen}>
                         <Play className="h-3.5 w-3.5 mr-1" /> Reabrir
@@ -1154,9 +1194,14 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleResume}>
                         <Play className="h-3.5 w-3.5 mr-1" /> Retomar
                       </Button>
-                      <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir
+                      <Button size="sm" variant="outline" className="h-8 text-xs border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setCancelOpen(true)}>
+                        <Ban className="h-3.5 w-3.5 mr-1" /> Cancelar jornada
                       </Button>
+                      {canGoLive && (
+                        <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Go-live
+                        </Button>
+                      )}
                     </>
                   ) : (
                     <>
@@ -1185,9 +1230,14 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           <Button size="sm" className="w-full" onClick={handlePause}>Confirmar pausa</Button>
                         </PopoverContent>
                       </Popover>
-                      <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir
+                      <Button size="sm" variant="outline" className="h-8 text-xs border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setCancelOpen(true)}>
+                        <Ban className="h-3.5 w-3.5 mr-1" /> Cancelar jornada
                       </Button>
+                      {canGoLive && (
+                        <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Go-live
+                        </Button>
+                      )}
                     </>
                   )}
                 </div>
@@ -1987,11 +2037,19 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     <Dialog open={concludeOpen} onOpenChange={setConcludeOpen}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Concluir jornada?</DialogTitle>
+          <DialogTitle>Registrar Go-live?</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
           Ao concluir, os relógios de SLA serão congelados e a etapa/pausa em aberto será fechada.
         </p>
+        {!(journey?.fase_atual === "implantacao" && etapaFinal) && (
+          <Alert className="border-warning/50 bg-warning/15 text-warning [&>svg]:text-warning py-2">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              Você está registrando o Go-live antes da etapa final da implantação (permissão de administrador).
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="space-y-1">
           <label className="text-xs font-medium">Go-live real (opcional)</label>
           <Input type="date" value={goLiveReal} onChange={(e) => setGoLiveReal(e.target.value)} />
@@ -1999,7 +2057,29 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" size="sm" onClick={() => setConcludeOpen(false)}>Cancelar</Button>
           <Button size="sm" className="text-white border-0" style={{ background: "#22C55E" }} onClick={handleConclude}>
-            <CheckCircle2 className="h-4 w-4 mr-1" /> Confirmar conclusão
+            <CheckCircle2 className="h-4 w-4 mr-1" /> Confirmar Go-live
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Ban className="h-4 w-4 text-destructive" /> Cancelar jornada?
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          A jornada será encerrada como cancelada, os relógios de SLA congelados e a etapa/pausa em aberto fechada. O motivo fica registrado no histórico.
+        </p>
+        <div className="space-y-1">
+          <label className="text-xs font-medium">Motivo do cancelamento *</label>
+          <Textarea value={cancelMotivo} onChange={(e) => setCancelMotivo(e.target.value)} rows={4} placeholder="Descreva o motivo..." />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => setCancelOpen(false)}>Voltar</Button>
+          <Button variant="destructive" size="sm" onClick={handleCancel}>
+            <Ban className="h-4 w-4 mr-1" /> Confirmar cancelamento
           </Button>
         </div>
       </DialogContent>
