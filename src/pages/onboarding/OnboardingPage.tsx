@@ -357,6 +357,23 @@ export default function OnboardingPage() {
         </div>
       </div>
 
+      {(pipelinesQuery.data ?? []).length > 1 && (
+        <div className="flex flex-wrap items-center gap-1 px-4 py-2 border-b border-border bg-background">
+          <div className="inline-flex rounded-md border border-border p-0.5 flex-wrap">
+            {(pipelinesQuery.data ?? []).map((p) => (
+              <button
+                key={p.id}
+                onClick={() => selectPipeline(p.id)}
+                className={`px-3 py-1 text-xs rounded ${p.id === selectedPipelineId ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              >
+                {p.nome}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
         <div className="relative flex-1 min-w-[200px] max-w-xs">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
