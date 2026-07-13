@@ -2263,6 +2263,7 @@ function AccountingCard({
 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
 
   const total = fields.length;
   const coletados = fields.reduce((n, f) => n + (byField.get(f.id)?.coletado ? 1 : 0), 0);
