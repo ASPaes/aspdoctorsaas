@@ -132,9 +132,9 @@ export default function OnboardingDashboardPage() {
     queryKey: ["onboarding-dash-pauses-by-reason", effectiveTenantId],
     enabled: isSuperAdmin && !!effectiveTenantId,
     queryFn: async () => {
-      const rows = await fetchAllRows<{ motivo_nome: string | null; minutos: number | null; em_andamento: boolean; iniciada_em: string }>(() =>
+      const rows = await fetchAllRows<{ journey_id: string; motivo_nome: string | null; minutos: number | null; em_andamento: boolean; iniciada_em: string }>(() =>
         (supabase.from("vw_onboarding_pauses_by_reason" as any) as any)
-          .select("motivo_nome, minutos, em_andamento, iniciada_em")
+          .select("journey_id, motivo_nome, minutos, em_andamento, iniciada_em")
           .eq("tenant_id", effectiveTenantId)
       );
       return rows;
