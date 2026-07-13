@@ -13,11 +13,13 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
 const formSchema = z.object({
   display_name: z.string().min(1, "Nome obrigatório"),
   instance_name: z.string().min(1, "Nome da instância obrigatório").regex(/^[a-zA-Z0-9_-]+$/, "Apenas letras, números, _ e -"),
   instance_id_external: z.string().optional(),
+  default_operator_id: z.string().optional(),
   provider_type: z.enum(["self_hosted", "cloud", "meta_cloud", "zapi"]),
   // Evolution
   api_url: z.string().optional(),
@@ -44,6 +46,7 @@ interface EditInstanceDialogProps {
     display_name: string | null;
     provider_type: string;
     instance_id_external: string | null;
+    default_operator_id?: string | null;
     meta_phone_number_id?: string | null;
     meta_waba_id?: string | null;
     meta_business_id?: string | null;
@@ -54,6 +57,7 @@ interface EditInstanceDialogProps {
 
 export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanceDialogProps) => {
   const { updateInstance } = useWhatsAppInstances();
+  const { effectiveTenantId: tid } = useTenantFilter();
 
   const { data: secrets } = useQuery({
     queryKey: ['whatsapp', 'instance-secrets', instance.id],
@@ -77,12 +81,29 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
     staleTime: 0,
   });
 
+  const { data: agentes = [] } = useQuery({
+    queryKey: ["instance_owner_agentes", tid],
+    enabled: open && !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("profiles" as any) as any)
+        .select("user_id, funcionario:funcionarios!profiles_funcionario_id_fkey(id, nome, email, ativo)")
+        .eq("tenant_id", tid);
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{ user_id: string; funcionario: { id: number; nome: string; email: string | null; ativo: boolean } | null }>;
+      return rows
+        .filter((r) => r.funcionario && r.funcionario.ativo)
+        .map((r) => ({ id: r.user_id, full_name: r.funcionario!.nome, email: r.funcionario!.email }))
+        .sort((a, b) => a.full_name.localeCompare(b.full_name));
+    },
+  });
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       display_name: instance.display_name || '',
       instance_name: instance.instance_name,
       instance_id_external: instance.instance_id_external || '',
+      default_operator_id: instance.default_operator_id ?? '__fila__',
       provider_type: (instance.provider_type as FormValues['provider_type']) || 'self_hosted',
       api_url: '',
       api_key: '',
@@ -106,6 +127,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       display_name: instance.display_name || '',
       instance_name: instance.instance_name,
       instance_id_external: instance.instance_id_external || '',
+      default_operator_id: instance.default_operator_id ?? '__fila__',
       provider_type: (instance.provider_type as FormValues['provider_type']) || 'self_hosted',
       api_url: '',
       api_key: '',
@@ -143,6 +165,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
           display_name: values.display_name,
           instance_name: values.instance_name,
           instance_id_external: values.provider_type === 'cloud' ? values.instance_id_external : null,
+          default_operator_id: (values.default_operator_id && values.default_operator_id !== '__fila__') ? values.default_operator_id : null,
           provider_type: values.provider_type,
           ...((!isMeta && !isZapi) && { api_url: values.api_url, api_key: values.api_key }),
           ...(isMeta && {
@@ -154,7 +177,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
             meta_business_id: values.meta_business_id || null,
           }),
           ...(isZapi && { zapi_instance_id: values.zapi_instance_id, zapi_token: values.zapi_token, zapi_client_token: values.zapi_client_token }),
-        },
+        } as any,
       });
       toast.success("Instância atualizada com sucesso!");
       onOpenChange(false);
@@ -207,6 +230,29 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
               <FormItem>
                 <FormLabel>Nome da Instância</FormLabel>
                 <FormControl><Input placeholder="my-instance" autoComplete="off" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="default_operator_id" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Operador dono do aparelho (celular)</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o operador" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="__fila__">Vai pra fila (número compartilhado)</SelectItem>
+                    {agentes.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.full_name || a.email || a.id}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Quando esta instância é o celular pessoal de um operador, mensagens enviadas por fora do Doctor caem como atendimento na lista dele. Deixe em "Vai pra fila" se o número é compartilhado.
+                </p>
                 <FormMessage />
               </FormItem>
             )} />
