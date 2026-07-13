@@ -64,6 +64,7 @@ interface JourneyRow {
   responsavel_nome?: string | null;
   pipeline_onboarding_id?: string | null;
   pipeline_implantacao_id?: string | null;
+  cliente_unidade_id?: number | null;
 }
 
 
