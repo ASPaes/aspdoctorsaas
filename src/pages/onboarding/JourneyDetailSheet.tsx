@@ -1856,13 +1856,15 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           <h3 className="text-sm font-semibold">Anexos</h3>
                         </button>
                       </div>
-                      <div className="p-3">
-                        <TicketAttachments
-                          ticketId={journey.ticket_id}
-                          tenantId={tenantId!}
-                          canDelete={profile?.is_super_admin === true || profile?.role === "admin"}
-                        />
-                      </div>
+                      {secOpen.anexos && (
+                        <div className="p-3">
+                          <TicketAttachments
+                            ticketId={journey.ticket_id}
+                            tenantId={tenantId!}
+                            canDelete={profile?.is_super_admin === true || profile?.role === "admin"}
+                          />
+                        </div>
+                      )}
                     </section>
                   )}
 
