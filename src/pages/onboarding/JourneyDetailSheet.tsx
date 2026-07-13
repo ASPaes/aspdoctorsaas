@@ -1285,6 +1285,70 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
               </div>
             </DialogHeader>
 
+            {/* Trilho da jornada */}
+            <div className="px-6 py-3 border-b border-border bg-muted/10 shrink-0">
+              {(() => {
+                const fase = journey.fase_atual;
+                const situ = journey.situacao;
+                const isConcl = situ === "concluido";
+                const isCanc = situ === "cancelado";
+                const s1: string = fase === "onboarding" ? "cur" : "done";
+                const s2 = (isConcl || isCanc) ? "done" : (fase === "implantacao" ? "cur" : "todo");
+                const s3 = isConcl ? "done" : (isCanc ? "canc" : "todo");
+                const line1 = s1 === "done";
+                const line2 = isConcl ? "full" : (fase === "implantacao" ? "half" : "none");
+                const nodeCls = (s: string) =>
+                  s === "done" ? "bg-[#22C55E] text-[#052012]"
+                  : s === "cur" ? "bg-[#0EA5E9] text-[#04202e] ring-4 ring-[#0EA5E9]/20"
+                  : s === "canc" ? "bg-destructive text-white"
+                  : "bg-muted text-muted-foreground";
+                const Node = ({ s, n }: { s: string; n: string }) => (
+                  <div className={`h-6 w-6 rounded-full grid place-items-center text-[11px] font-mono font-semibold shrink-0 ${nodeCls(s)}`}>
+                    {s === "done" ? "✓" : s === "canc" ? <Ban className="h-3 w-3" /> : n}
+                  </div>
+                );
+                const Line = ({ mode }: { mode: string }) => (
+                  <div className="flex-1 h-0.5 mx-3 rounded bg-muted relative overflow-hidden">
+                    {mode === "full" && <span className="absolute inset-0" style={{ background: "linear-gradient(90deg,#22C55E,#0EA5E9)" }} />}
+                    {mode === "half" && <span className="absolute inset-y-0 left-0 w-1/2 bg-[#0EA5E9]" />}
+                  </div>
+                );
+                return (
+                  <div className="flex items-center">
+                    <div className="flex items-center gap-2.5">
+                      <Node s={s1} n="1" />
+                      <div>
+                        <div className={`text-xs font-medium ${s1==="todo"?"text-muted-foreground":""}`}>Onboarding</div>
+                        <div className="text-[10px] text-muted-foreground font-mono">{formatMin(journey.sla_onb_util_min)}</div>
+                      </div>
+                    </div>
+                    <Line mode={line1 ? "full" : "none"} />
+                    <div className="flex items-center gap-2.5">
+                      <Node s={s2} n="2" />
+                      <div>
+                        <div className={`text-xs font-medium ${s2==="todo"?"text-muted-foreground":""}`}>
+                          Implantação{s2==="cur" && journey.stage_nome ? ` · ${journey.stage_nome}` : ""}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground font-mono">
+                          {s2==="cur" ? `${formatMin(journey.etapa_atual_min)} nesta etapa` : s2==="done" ? formatMin(journey.sla_imp_util_min) : "não iniciada"}
+                        </div>
+                      </div>
+                    </div>
+                    <Line mode={line2} />
+                    <div className="flex items-center gap-2.5">
+                      <Node s={s3} n="3" />
+                      <div>
+                        <div className={`text-xs font-medium ${s3==="todo"?"text-muted-foreground":""}`}>Go-live</div>
+                        <div className="text-[10px] text-muted-foreground font-mono">
+                          {s3==="done" ? formatDate(journey.go_live_real || journey.go_live_previsto) : s3==="canc" ? "cancelada" : formatDate(journey.go_live_previsto)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
             <div className="flex-1 min-h-0 overflow-y-auto">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 p-5">
                 {/* LEFT */}
