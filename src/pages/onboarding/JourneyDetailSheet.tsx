@@ -170,6 +170,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [returnPauseSla, setReturnPauseSla] = useState(true);
 
   const [activeTab, setActiveTab] = useState<"atividade" | "geral">("atividade");
+  const [secOpen, setSecOpen] = useState<Record<string, boolean>>({ treinos: true, modulos: true, anexos: true, atendimentos: true });
+  const toggleSec = (k: string) => setSecOpen((s) => ({ ...s, [k]: !s[k] }));
 
 
   useEffect(() => {
