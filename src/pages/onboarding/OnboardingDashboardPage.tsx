@@ -92,6 +92,7 @@ function KpiCard({
 export default function OnboardingDashboardPage() {
   const { profile, profileLoading } = useAuth();
   const { effectiveTenantId } = useTenantFilter();
+  const { selectedUnidadeIds, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
