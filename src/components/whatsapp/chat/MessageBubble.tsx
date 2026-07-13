@@ -35,6 +35,7 @@ interface Props {
   onDeletePanelOnly?: (msgId: string) => void;
   onDeleteEveryone?: (msgId: string) => void;
   onRetryDelete?: (msgId: string) => void;
+  deleteEveryoneDisabled?: boolean;
   onForward?: (msgId: string) => void;
   onResendFailed?: (msgId: string) => void;
   onEnterSelectionMode?: (msgId: string) => void;
@@ -61,6 +62,7 @@ export function MessageBubble({
   onDeletePanelOnly,
   onDeleteEveryone,
   onRetryDelete,
+  deleteEveryoneDisabled,
   onForward,
   onResendFailed,
   onEnterSelectionMode,
@@ -212,15 +214,19 @@ export function MessageBubble({
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-destructive">
             <AlertCircle className="h-3 w-3" />
-            <span>Falha ao apagar para todos</span>
-            <button
-              onClick={() => onRetryDelete?.(msg.id)}
-              className="flex items-center gap-0.5 underline hover:no-underline"
-            >
-              <RotateCcw className="h-3 w-3" />
-              Tentar novamente
-            </button>
-            <span className="text-muted-foreground">·</span>
+            <span>{deleteEveryoneDisabled ? "WhatsApp Oficial não permite apagar para todos" : "Falha ao apagar para todos"}</span>
+            {!deleteEveryoneDisabled && (
+              <>
+                <button
+                  onClick={() => onRetryDelete?.(msg.id)}
+                  className="flex items-center gap-0.5 underline hover:no-underline"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Tentar novamente
+                </button>
+                <span className="text-muted-foreground">·</span>
+              </>
+            )}
             <button
               onClick={() => onDeletePanelOnly?.(msg.id)}
               className="underline hover:no-underline text-muted-foreground"
@@ -484,7 +490,7 @@ export function MessageBubble({
           Responder
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        {isFromMe && canDeletePanelOnly(msg) && (
+        {isFromMe && canDeletePanelOnly(msg) && !deleteEveryoneDisabled && (
           <DropdownMenuItem onClick={handleDeleteEveryone} className="text-destructive focus:text-destructive">
             <Trash2 className="h-4 w-4 mr-2" />
             Apagar para todos (WhatsApp)
