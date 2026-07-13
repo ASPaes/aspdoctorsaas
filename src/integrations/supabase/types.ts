@@ -9219,6 +9219,8 @@ export type Database = {
         Row: {
           assunto: string | null
           cliente_id: string | null
+          cliente_unidade_id: number | null
+          cliente_unidade_nome: string | null
           concluido_em: string | null
           current_stage_id: string | null
           data_inicio_planejado: string | null
@@ -9264,6 +9266,13 @@ export type Database = {
           unidade_nome: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "clientes_unidade_base_id_fkey"
+            columns: ["cliente_unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_base"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "onboarding_journeys_current_stage_id_fkey"
             columns: ["current_stage_id"]
