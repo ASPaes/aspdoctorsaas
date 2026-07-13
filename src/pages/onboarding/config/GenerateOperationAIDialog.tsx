@@ -126,7 +126,7 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
         return;
       }
       setBlueprint(data.blueprint as Blueprint);
-      setSelected(ALL_SELECTED);
+      setSel(buildFullSelection(data.blueprint as Blueprint));
     } catch (e: any) {
       toast.error(e?.message || "Falha ao gerar sugestão");
     } finally {
