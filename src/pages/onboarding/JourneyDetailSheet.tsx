@@ -1292,7 +1292,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                 const situ = journey.situacao;
                 const isConcl = situ === "concluido";
                 const isCanc = situ === "cancelado";
-                const s1 = fase === "onboarding" ? "cur" : "done";
+                const s1: string = fase === "onboarding" ? "cur" : "done";
                 const s2 = (isConcl || isCanc) ? "done" : (fase === "implantacao" ? "cur" : "todo");
                 const s3 = isConcl ? "done" : (isCanc ? "canc" : "todo");
                 const line1 = s1 === "done";
