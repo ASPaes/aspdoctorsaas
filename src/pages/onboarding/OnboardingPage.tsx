@@ -120,6 +120,7 @@ export default function OnboardingPage() {
         .select("id, nome, fase, position")
         .eq("tenant_id", effectiveTenantId)
         .eq("fase", fase)
+        .eq("ativo", true)
         .order("position");
       if (error) throw error;
       return (data ?? []) as PipelineRow[];
