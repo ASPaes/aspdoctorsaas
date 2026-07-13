@@ -193,9 +193,9 @@ export default function OnboardingDashboardPage() {
     const to = dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1;
     return (vendorReturnsAllQ.data ?? []).filter((r) => {
       const d = new Date(r.retornado_em).getTime();
-      return d >= from && d <= to;
+      return d >= from && d <= to && allowedJourneyIds.has(r.journey_id);
     });
-  }, [vendorReturnsAllQ.data, dateRange]);
+  }, [vendorReturnsAllQ.data, dateRange, allowedJourneyIds]);
 
   const vendorReturnUserIds = useMemo(
     () => Array.from(new Set(vendorReturnsPeriodo.map((r) => r.vendedor_user_id).filter(Boolean))) as string[],
