@@ -19,6 +19,7 @@ const formSchema = z.object({
   display_name: z.string().min(1, "Nome obrigatório"),
   instance_name: z.string().min(1, "Nome da instância obrigatório").regex(/^[a-zA-Z0-9_-]+$/, "Apenas letras, números, _ e -"),
   instance_id_external: z.string().optional(),
+  default_operator_id: z.string().optional(),
   provider_type: z.enum(["self_hosted", "cloud", "meta_cloud", "zapi"]),
   // Evolution
   api_url: z.string().optional(),
