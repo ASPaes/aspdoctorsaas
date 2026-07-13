@@ -1262,87 +1262,25 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 mt-4">
-                <div className="rounded-lg border border-border bg-muted/30 p-3">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Tempo corrido</div>
-                  <div className="text-lg font-semibold mt-0.5 flex items-center gap-1.5">
-                    <Clock className="h-4 w-4" style={{ color: slaColor }} />
-                    {formatMin(journey.sla_corrido_min)}
-                  </div>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1.5">
+                  <span className="text-[9px] uppercase text-muted-foreground">Onb</span>
+                  <span className="text-[11px] font-mono font-semibold">{formatMin(journey.sla_onb_util_min)}</span>
+                  <span className="text-[10px] text-muted-foreground">· pausa {formatMin(journey.sla_onb_pausado_min)}</span>
                 </div>
-                <div className="rounded-lg border border-border bg-muted/30 p-3">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Tempo efetivo (sem pausas)</div>
-                  <div className="text-lg font-semibold mt-0.5 flex items-center gap-1.5">
-                    <Clock className="h-4 w-4" style={{ color: slaColor }} />
-                    {formatMin(journey.sla_util_min)}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Pausado: {formatMin(journey.sla_pausado_min)}</div>
+                <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1.5">
+                  <span className="text-[9px] uppercase text-muted-foreground">Impl</span>
+                  <span className="text-[11px] font-mono font-semibold">
+                    {journey.implantacao_iniciada_em ? formatMin(journey.sla_imp_util_min) : "—"}
+                  </span>
                 </div>
-                <div className="rounded-lg border border-border bg-muted/30 p-3">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Go-live previsto</div>
-                  <div className="text-lg font-semibold mt-0.5 flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    {formatDate(journey.go_live_previsto)}
-                  </div>
+                <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1.5">
+                  <span className="text-[9px] uppercase text-muted-foreground">Total</span>
+                  <span className="text-[11px] font-mono font-semibold">{formatMin(journey.sla_total_corrido_min)}</span>
                 </div>
-              </div>
-
-              {/* Breakdown por fase */}
-              <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">SLA por fase</div>
-                <div className="grid grid-cols-3 gap-3">
-                  {(() => {
-                    const isCurrentOnboarding = journey.fase_atual === "onboarding";
-                    const isCurrentImplantacao = journey.fase_atual === "implantacao";
-                    const onbFrozen = !!journey.onboarding_concluido;
-                    const impStarted = !!journey.implantacao_iniciada_em;
-                    const totalUtil = (journey.sla_total_corrido_min ?? 0) - (journey.sla_total_pausado_min ?? 0);
-                    return (
-                      <>
-                        <div className={`rounded-md border p-2.5 transition-colors ${isCurrentOnboarding ? "border-primary/50 bg-primary/5" : "border-border bg-card"}`}>
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className={`h-1.5 w-1.5 rounded-full ${isCurrentOnboarding ? "bg-primary" : "bg-muted-foreground/50"}`} />
-                            <span className="text-[11px] font-medium">Onboarding</span>
-                            {onbFrozen && (
-                              <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">congelado</span>
-                            )}
-                          </div>
-                          <div className="text-sm font-semibold">
-                            {formatMin(journey.sla_onb_util_min)}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5">
-                            pausado {formatMin(journey.sla_onb_pausado_min)}
-                          </div>
-                        </div>
-
-                        <div className={`rounded-md border p-2.5 transition-colors ${isCurrentImplantacao ? "border-primary/50 bg-primary/5" : "border-border bg-card"}`}>
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className={`h-1.5 w-1.5 rounded-full ${isCurrentImplantacao ? "bg-primary" : "bg-muted-foreground/50"}`} />
-                            <span className="text-[11px] font-medium">Implantação</span>
-                          </div>
-                          <div className="text-sm font-semibold">
-                            {impStarted ? formatMin(journey.sla_imp_util_min) : "—"}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5">
-                            {impStarted ? `pausado ${formatMin(journey.sla_imp_pausado_min)}` : "não iniciada"}
-                          </div>
-                        </div>
-
-                        <div className="rounded-md border border-border bg-card p-2.5">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
-                            <span className="text-[11px] font-medium">Total</span>
-                          </div>
-                          <div className="text-sm font-semibold">
-                            {formatMin(journey.sla_total_corrido_min)}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5">
-                            efetivo {formatMin(totalUtil > 0 ? totalUtil : 0)}
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
+                <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1.5">
+                  <span className="text-[9px] uppercase text-muted-foreground">Go-live</span>
+                  <span className="text-[11px] font-mono font-semibold">{formatDate(journey.go_live_previsto)}</span>
                 </div>
               </div>
             </DialogHeader>
