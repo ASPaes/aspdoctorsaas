@@ -1062,6 +1062,16 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     {journey.ticket_code && (
                       <span className="font-mono text-xs text-primary font-semibold">{journey.ticket_code}</span>
                     )}
+                    {journey.cliente_unidade_nome && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] gap-1 border"
+                        style={{ background: "rgba(139,92,246,.15)", borderColor: "rgba(139,92,246,.45)", color: "#c9b8fb" }}
+                      >
+                        <Building2 className="h-3 w-3" />
+                        {journey.cliente_unidade_nome}
+                      </Badge>
+                    )}
                     <Badge variant="outline" className="text-[10px] capitalize">{journey.fase_atual || "—"}</Badge>
                     <Badge className="text-[10px] capitalize" style={{ background: slaColor, color: "white" }}>
                       {journey.stage_nome || "sem etapa"}
