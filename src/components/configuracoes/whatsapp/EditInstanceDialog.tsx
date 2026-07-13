@@ -127,6 +127,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       display_name: instance.display_name || '',
       instance_name: instance.instance_name,
       instance_id_external: instance.instance_id_external || '',
+      default_operator_id: instance.default_operator_id ?? '__fila__',
       provider_type: (instance.provider_type as FormValues['provider_type']) || 'self_hosted',
       api_url: '',
       api_key: '',
