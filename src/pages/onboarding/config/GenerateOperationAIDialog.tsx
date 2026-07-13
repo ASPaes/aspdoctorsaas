@@ -139,12 +139,17 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
     setApplying(true);
     try {
       const filtered = {
-        pipelines: blueprint.pipelines.filter((p) => selected[p.fase]),
-        demand_types: selected.demand_types ? blueprint.demand_types : [],
-        training_types: selected.training_types ? blueprint.training_types : [],
-        pause_reasons: selected.pause_reasons ? blueprint.pause_reasons : [],
-        accounting_fields: selected.accounting_fields ? blueprint.accounting_fields : [],
-        vendor_return_reasons: selected.vendor_return_reasons ? blueprint.vendor_return_reasons : [],
+        pipelines: blueprint.pipelines
+          .map((p, pi) => ({
+            ...p,
+            stages: p.stages.filter((_, si) => sel.stages[pi]?.has(si)),
+          }))
+          .filter((p) => p.stages.length > 0),
+        demand_types: blueprint.demand_types.filter((_, i) => sel.demand_types.has(i)),
+        training_types: blueprint.training_types.filter((_, i) => sel.training_types.has(i)),
+        pause_reasons: blueprint.pause_reasons.filter((_, i) => sel.pause_reasons.has(i)),
+        accounting_fields: blueprint.accounting_fields.filter((_, i) => sel.accounting_fields.has(i)),
+        vendor_return_reasons: blueprint.vendor_return_reasons.filter((_, i) => sel.vendor_return_reasons.has(i)),
       };
       const { data, error } = await (supabase.rpc as any)("apply_onboarding_blueprint", {
         p_tenant_id: effectiveTenantId,
