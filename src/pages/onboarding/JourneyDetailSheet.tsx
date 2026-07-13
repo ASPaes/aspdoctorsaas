@@ -169,6 +169,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [returnText, setReturnText] = useState("");
   const [returnPauseSla, setReturnPauseSla] = useState(true);
 
+  const [activeTab, setActiveTab] = useState<"atividade" | "geral">("atividade");
+
 
   useEffect(() => {
     if (!open) {
