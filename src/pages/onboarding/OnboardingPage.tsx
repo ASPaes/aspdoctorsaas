@@ -343,10 +343,6 @@ export default function OnboardingPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant={showConcluded ? "default" : "outline"} onClick={() => setShowConcluded((v) => !v)}>
-            <CheckCircle2 className="h-4 w-4 mr-1" />
-            {showConcluded ? "Ocultar concluídas/canceladas" : "Mostrar concluídas/canceladas"}
-          </Button>
           <Button asChild size="sm" variant="outline">
             <Link to="/onboarding-implantacao/config">
               <Settings2 className="h-4 w-4 mr-1" />
@@ -418,7 +414,7 @@ export default function OnboardingPage() {
         <Select value={filtroSituacao} onValueChange={setFiltroSituacao}>
           <SelectTrigger className="h-8 text-xs w-[150px]"><SelectValue placeholder="Situação" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="todos" className="text-xs">Todas as situações</SelectItem>
+            <SelectItem value="todos" className="text-xs">Ativas (padrão)</SelectItem>
             <SelectItem value="em_andamento" className="text-xs">Em andamento</SelectItem>
             <SelectItem value="parado" className="text-xs">Parado / Pausado</SelectItem>
             <SelectItem value="concluido" className="text-xs">Concluída</SelectItem>
