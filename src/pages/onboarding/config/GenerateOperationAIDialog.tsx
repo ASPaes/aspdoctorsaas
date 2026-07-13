@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatSlaHuman } from "./utils";
 
 const EXAMPLE_PROMPT = `Somos uma revenda de software de gestão e PDV. Vendemos o sistema por assinatura mensal para varejo (lojas, mercados, conveniências) e para food service (restaurantes, lanchonetes, pizzarias).
@@ -37,6 +38,25 @@ type Blueprint = {
   vendor_return_reasons: { nome: string; atribuivel_vendedor: boolean }[];
 };
 
+type SectionKey =
+  | "onboarding"
+  | "implantacao"
+  | "demand_types"
+  | "training_types"
+  | "pause_reasons"
+  | "accounting_fields"
+  | "vendor_return_reasons";
+
+const ALL_SELECTED: Record<SectionKey, boolean> = {
+  onboarding: true,
+  implantacao: true,
+  demand_types: true,
+  training_types: true,
+  pause_reasons: true,
+  accounting_fields: true,
+  vendor_return_reasons: true,
+};
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -50,6 +70,9 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
   const [loading, setLoading] = useState(false);
   const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
   const [applying, setApplying] = useState(false);
+  const [selected, setSelected] = useState<Record<SectionKey, boolean>>(ALL_SELECTED);
+
+  const toggleSection = (k: SectionKey) => setSelected((s) => ({ ...s, [k]: !s[k] }));
 
   const handleGenerate = async () => {
     if (!effectiveTenantId) {
@@ -70,6 +93,7 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
         return;
       }
       setBlueprint(data.blueprint as Blueprint);
+      setSelected(ALL_SELECTED);
     } catch (e: any) {
       toast.error(e?.message || "Falha ao gerar sugestão");
     } finally {
@@ -81,9 +105,17 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
     if (!effectiveTenantId || !blueprint) return;
     setApplying(true);
     try {
+      const filtered = {
+        pipelines: blueprint.pipelines.filter((p) => selected[p.fase]),
+        demand_types: selected.demand_types ? blueprint.demand_types : [],
+        training_types: selected.training_types ? blueprint.training_types : [],
+        pause_reasons: selected.pause_reasons ? blueprint.pause_reasons : [],
+        accounting_fields: selected.accounting_fields ? blueprint.accounting_fields : [],
+        vendor_return_reasons: selected.vendor_return_reasons ? blueprint.vendor_return_reasons : [],
+      };
       const { data, error } = await (supabase.rpc as any)("apply_onboarding_blueprint", {
         p_tenant_id: effectiveTenantId,
-        p_blueprint: blueprint,
+        p_blueprint: filtered,
       });
       if (error) {
         toast.error(error.message || "Falha ao aplicar operação");
@@ -113,6 +145,16 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
 
   const pipelinesByFase = (fase: "onboarding" | "implantacao") =>
     (blueprint?.pipelines ?? []).filter((p) => p.fase === fase);
+
+  const hasSelection = blueprint
+    ? (selected.onboarding && pipelinesByFase("onboarding").length > 0) ||
+      (selected.implantacao && pipelinesByFase("implantacao").length > 0) ||
+      (selected.demand_types && blueprint.demand_types.length > 0) ||
+      (selected.training_types && blueprint.training_types.length > 0) ||
+      (selected.pause_reasons && blueprint.pause_reasons.length > 0) ||
+      (selected.accounting_fields && blueprint.accounting_fields.length > 0) ||
+      (selected.vendor_return_reasons && blueprint.vendor_return_reasons.length > 0)
+    : false;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -163,13 +205,24 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
         ) : (
           <div className="space-y-4">
             <div className="max-h-[60vh] overflow-y-auto space-y-5 pr-2">
+              <p className="text-xs text-muted-foreground">
+                Desmarque o que não quiser aplicar. Itens de catálogo com nome já existente são ignorados automaticamente.
+              </p>
+
               {(["onboarding", "implantacao"] as const).map((fase) => {
                 const list = pipelinesByFase(fase);
                 if (!list.length) return null;
                 return (
                   <section key={fase} className="space-y-2">
-                    <h3 className="text-sm font-semibold">
-                      {fase === "onboarding" ? "Onboarding" : "Implantação"}
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Checkbox
+                        id={`sel-${fase}`}
+                        checked={selected[fase]}
+                        onCheckedChange={() => toggleSection(fase)}
+                      />
+                      <label htmlFor={`sel-${fase}`}>
+                        {fase === "onboarding" ? "Onboarding" : "Implantação"}
+                      </label>
                     </h3>
                     {list.map((p, i) => (
                       <div key={i} className="rounded-md border border-border p-3 space-y-2">
@@ -222,7 +275,14 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
 
               {blueprint.demand_types.length > 0 && (
                 <section className="space-y-1.5">
-                  <h3 className="text-sm font-semibold">Tipos de demanda</h3>
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Checkbox
+                      id="sel-demand_types"
+                      checked={selected.demand_types}
+                      onCheckedChange={() => toggleSection("demand_types")}
+                    />
+                    <label htmlFor="sel-demand_types">Tipos de demanda</label>
+                  </h3>
                   <div className="flex flex-wrap gap-1.5">
                     {blueprint.demand_types.map((d, i) => (
                       <Badge key={i} variant="outline" title={d.descricao ?? undefined}>
@@ -235,7 +295,14 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
 
               {blueprint.training_types.length > 0 && (
                 <section className="space-y-1.5">
-                  <h3 className="text-sm font-semibold">Tipos de treino</h3>
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Checkbox
+                      id="sel-training_types"
+                      checked={selected.training_types}
+                      onCheckedChange={() => toggleSection("training_types")}
+                    />
+                    <label htmlFor="sel-training_types">Tipos de treino</label>
+                  </h3>
                   <div className="flex flex-wrap gap-1.5">
                     {blueprint.training_types.map((t, i) => (
                       <Badge key={i} variant="outline">
@@ -249,7 +316,14 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
 
               {blueprint.pause_reasons.length > 0 && (
                 <section className="space-y-1.5">
-                  <h3 className="text-sm font-semibold">Motivos de parada</h3>
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Checkbox
+                      id="sel-pause_reasons"
+                      checked={selected.pause_reasons}
+                      onCheckedChange={() => toggleSection("pause_reasons")}
+                    />
+                    <label htmlFor="sel-pause_reasons">Motivos de parada</label>
+                  </h3>
                   <div className="flex flex-wrap gap-1.5">
                     {blueprint.pause_reasons.map((r, i) => (
                       <Badge key={i} variant="outline">{r.nome}</Badge>
@@ -260,7 +334,14 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
 
               {blueprint.accounting_fields.length > 0 && (
                 <section className="space-y-1.5">
-                  <h3 className="text-sm font-semibold">Campos de contabilidade</h3>
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Checkbox
+                      id="sel-accounting_fields"
+                      checked={selected.accounting_fields}
+                      onCheckedChange={() => toggleSection("accounting_fields")}
+                    />
+                    <label htmlFor="sel-accounting_fields">Campos de contabilidade</label>
+                  </h3>
                   <div className="space-y-1">
                     {blueprint.accounting_fields.map((f, i) => (
                       <div key={i} className="text-xs flex items-center gap-2 flex-wrap">
@@ -279,7 +360,14 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
 
               {blueprint.vendor_return_reasons.length > 0 && (
                 <section className="space-y-1.5">
-                  <h3 className="text-sm font-semibold">Retorno ao vendedor</h3>
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Checkbox
+                      id="sel-vendor_return_reasons"
+                      checked={selected.vendor_return_reasons}
+                      onCheckedChange={() => toggleSection("vendor_return_reasons")}
+                    />
+                    <label htmlFor="sel-vendor_return_reasons">Retorno ao vendedor</label>
+                  </h3>
                   <div className="flex flex-wrap gap-1.5">
                     {blueprint.vendor_return_reasons.map((r, i) => (
                       <Badge key={i} variant="outline">
@@ -300,7 +388,7 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
               >
                 Voltar
               </Button>
-              <Button onClick={handleApply} disabled={applying}>
+              <Button onClick={handleApply} disabled={applying || !hasSelection}>
                 {applying && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Aplicar operação
               </Button>
