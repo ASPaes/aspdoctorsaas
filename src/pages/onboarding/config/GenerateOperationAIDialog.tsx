@@ -38,23 +38,44 @@ type Blueprint = {
   vendor_return_reasons: { nome: string; atribuivel_vendedor: boolean }[];
 };
 
-type SectionKey =
-  | "onboarding"
-  | "implantacao"
+type CatalogKey =
   | "demand_types"
   | "training_types"
   | "pause_reasons"
   | "accounting_fields"
   | "vendor_return_reasons";
 
-const ALL_SELECTED: Record<SectionKey, boolean> = {
-  onboarding: true,
-  implantacao: true,
-  demand_types: true,
-  training_types: true,
-  pause_reasons: true,
-  accounting_fields: true,
-  vendor_return_reasons: true,
+type Selection = {
+  stages: Record<number, Set<number>>;
+  demand_types: Set<number>;
+  training_types: Set<number>;
+  pause_reasons: Set<number>;
+  accounting_fields: Set<number>;
+  vendor_return_reasons: Set<number>;
+};
+
+const emptySelection = (): Selection => ({
+  stages: {},
+  demand_types: new Set<number>(),
+  training_types: new Set<number>(),
+  pause_reasons: new Set<number>(),
+  accounting_fields: new Set<number>(),
+  vendor_return_reasons: new Set<number>(),
+});
+
+const buildFullSelection = (bp: Blueprint): Selection => {
+  const stages: Record<number, Set<number>> = {};
+  bp.pipelines.forEach((p, pi) => {
+    stages[pi] = new Set(p.stages.map((_, si) => si));
+  });
+  return {
+    stages,
+    demand_types: new Set(bp.demand_types.map((_, i) => i)),
+    training_types: new Set(bp.training_types.map((_, i) => i)),
+    pause_reasons: new Set(bp.pause_reasons.map((_, i) => i)),
+    accounting_fields: new Set(bp.accounting_fields.map((_, i) => i)),
+    vendor_return_reasons: new Set(bp.vendor_return_reasons.map((_, i) => i)),
+  };
 };
 
 interface Props {
