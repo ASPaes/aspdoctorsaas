@@ -241,11 +241,12 @@ Deno.serve(async (req) => {
     // Get instance secrets for Evolution API call
     const instanceIds = [...new Set(validMessages.map(m => m.instance_id).filter(Boolean))];
     const instanceSecrets: Record<string, { api_url: string; api_key: string; instance_name: string }> = {};
+    const providerMap = new Map<string, string>();
 
     if (instanceIds.length > 0) {
       const { data: instancesData } = await supabase.from('whatsapp_instances').select('id, instance_name, provider_type').in('id', instanceIds);
       const instanceMap = new Map((instancesData || []).map((i: any) => [i.id, i.instance_name]));
-      const providerMap = new Map((instancesData || []).map((i: any) => [i.id, i.provider_type as string]));
+      for (const inst of (instancesData || [])) providerMap.set(inst.id, (inst as any).provider_type);
 
       for (const iid of instanceIds) {
         const vaultSecrets = await getInstanceSecrets(supabase, iid);
