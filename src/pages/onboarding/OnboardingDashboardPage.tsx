@@ -265,9 +265,9 @@ export default function OnboardingDashboardPage() {
       const ref = t.realizado_em || t.agendado_para;
       if (!ref) return false;
       const d = new Date(ref).getTime();
-      return d >= from && d <= to;
+      return d >= from && d <= to && t.journey_id != null && allowedJourneyIds.has(t.journey_id);
     });
-  }, [trainingsAllQ.data, dateRange]);
+  }, [trainingsAllQ.data, dateRange, allowedJourneyIds]);
 
   // Resolver nomes dos implantadores via profiles → funcionarios
   const conduzidoIds = useMemo(
