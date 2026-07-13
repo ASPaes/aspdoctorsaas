@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
+import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -93,9 +94,10 @@ function formatDate(iso: string | null): string {
 }
 
 export default function OnboardingPage() {
-  const { profile, profileLoading } = useAuth();
+  const { profileLoading } = useAuth();
   const { effectiveTenantId } = useTenantFilter();
   const { selectedUnidadeIds, viewKey, unidadeFilterReady } = useUnidadeFilter();
+  const { canAccess, isLoading: accessLoading } = useOnboardingAccess();
   const queryClient = useQueryClient();
   const [fase, setFase] = useState<"onboarding" | "implantacao">("onboarding");
   const [newOpen, setNewOpen] = useState(false);
@@ -109,12 +111,10 @@ export default function OnboardingPage() {
   const [filtroSituacao, setFiltroSituacao] = useState<string>("todos");
   const [periodoEntrada, setPeriodoEntrada] = useState<{ from: Date; to: Date } | null>(null);
 
-  const isSuperAdmin = profile?.is_super_admin === true;
-
   // Pipelines + stages
   const pipelinesQuery = useQuery({
     queryKey: ["onboarding-pipelines", effectiveTenantId, fase],
-    enabled: isSuperAdmin && !!effectiveTenantId,
+    enabled: canAccess && !!effectiveTenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_pipelines" as any) as any)
         .select("id, nome, fase, position")
@@ -144,7 +144,7 @@ export default function OnboardingPage() {
 
   const stagesQuery = useQuery({
     queryKey: ["onboarding-stages", effectiveTenantId, selectedPipelineId],
-    enabled: isSuperAdmin && !!effectiveTenantId && !!selectedPipelineId,
+    enabled: canAccess && !!effectiveTenantId && !!selectedPipelineId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_stages" as any) as any)
         .select("id, pipeline_id, nome, slug, position, cor, is_initial, is_final")
@@ -159,7 +159,7 @@ export default function OnboardingPage() {
   // Journeys from view
   const journeysQuery = useQuery({
     queryKey: ["onboarding-journeys", effectiveTenantId, fase, viewKey],
-    enabled: isSuperAdmin && !!effectiveTenantId && unidadeFilterReady,
+    enabled: canAccess && !!effectiveTenantId && unidadeFilterReady,
     queryFn: async () => {
       const rows = await fetchAllRows<JourneyRow>(() => {
         let q = (supabase.from("vw_onboarding_journeys" as any) as any)
@@ -304,7 +304,7 @@ export default function OnboardingPage() {
     }
   }
 
-  if (profileLoading) {
+  if (profileLoading || accessLoading) {
     return (
       <div className="flex items-center justify-center min-h-[40vh]">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -312,10 +312,10 @@ export default function OnboardingPage() {
     );
   }
 
-  if (!isSuperAdmin) {
+  if (!canAccess) {
     return (
       <div className="p-6 text-sm text-muted-foreground">
-        Acesso restrito a super administradores.
+        Acesso não liberado a este módulo.
       </div>
     );
   }

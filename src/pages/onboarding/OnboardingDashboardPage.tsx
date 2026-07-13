@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
+import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Badge } from "@/components/ui/badge";
@@ -90,19 +91,18 @@ function KpiCard({
 }
 
 export default function OnboardingDashboardPage() {
-  const { profile, profileLoading } = useAuth();
+  const { profileLoading } = useAuth();
   const { effectiveTenantId } = useTenantFilter();
   const { selectedUnidadeIds, viewKey, unidadeFilterReady } = useUnidadeFilter();
+  const { canAccess, isLoading: accessLoading } = useOnboardingAccess();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
 
-  const isSuperAdmin = profile?.is_super_admin === true;
-
   const journeysQ = useQuery({
     queryKey: ["onboarding-dash-journeys", effectiveTenantId, viewKey],
-    enabled: isSuperAdmin && !!effectiveTenantId && unidadeFilterReady,
+    enabled: canAccess && !!effectiveTenantId && unidadeFilterReady,
     queryFn: async () => {
       const rows = await fetchAllRows<JourneyRow>(() => {
         let q = (supabase.from("vw_onboarding_journeys" as any) as any)
@@ -117,7 +117,7 @@ export default function OnboardingDashboardPage() {
 
   const trainingsAllQ = useQuery({
     queryKey: ["onboarding-dash-trainings-kpis", effectiveTenantId],
-    enabled: isSuperAdmin && !!effectiveTenantId,
+    enabled: canAccess && !!effectiveTenantId,
     queryFn: async () => {
       const rows = await fetchAllRows<TrainingRow>(() =>
         (supabase.from("vw_onboarding_training_kpis" as any) as any)
@@ -130,7 +130,7 @@ export default function OnboardingDashboardPage() {
 
   const pausesAllQ = useQuery({
     queryKey: ["onboarding-dash-pauses-by-reason", effectiveTenantId],
-    enabled: isSuperAdmin && !!effectiveTenantId,
+    enabled: canAccess && !!effectiveTenantId,
     queryFn: async () => {
       const rows = await fetchAllRows<{ journey_id: string; motivo_nome: string | null; minutos: number | null; em_andamento: boolean; iniciada_em: string }>(() =>
         (supabase.from("vw_onboarding_pauses_by_reason" as any) as any)
@@ -174,7 +174,7 @@ export default function OnboardingDashboardPage() {
 
   const vendorReturnsAllQ = useQuery({
     queryKey: ["onboarding-dash-vendor-returns", effectiveTenantId],
-    enabled: isSuperAdmin && !!effectiveTenantId,
+    enabled: canAccess && !!effectiveTenantId,
     queryFn: async () => {
       const rows = await fetchAllRows<{
         journey_id: string; vendedor_user_id: string; motivo_nome: string | null; atribuivel_vendedor: boolean;
@@ -359,11 +359,11 @@ export default function OnboardingDashboardPage() {
   }, [trainings]);
 
 
-  if (profileLoading) {
+  if (profileLoading || accessLoading) {
     return <div className="flex items-center justify-center min-h-[40vh]"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
-  if (!isSuperAdmin) {
-    return <div className="p-6 text-sm text-muted-foreground">Acesso restrito a super administradores.</div>;
+  if (!canAccess) {
+    return <div className="p-6 text-sm text-muted-foreground">Acesso não liberado a este módulo.</div>;
   }
 
   const loading = journeysQ.isLoading || trainingsAllQ.isLoading;
