@@ -352,51 +352,6 @@ export function AppSidebar() {
         <Separator className="bg-sidebar-border" />
 
         <SidebarMenu>
-          {canOnboarding && (
-            <Collapsible
-              defaultOpen={getGroupOpen("Onboarding")}
-              onOpenChange={(open) => setGroupOpen("Onboarding", open)}
-              className="group/collapsible"
-            >
-              <SidebarMenuItem>
-                <CollapsibleTrigger asChild>
-                  <SidebarMenuButton tooltip="Onboarding & Implantação">
-                    <Rocket className="h-4 w-4" />
-                    <span>Onboarding & Implantação</span>
-                    <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                  </SidebarMenuButton>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <SidebarMenuSub>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild>
-                        <NavLink to="/onboarding-implantacao" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                          <Rocket className="h-4 w-4" />
-                          <span>Kanban</span>
-                        </NavLink>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild>
-                        <NavLink to="/onboarding-implantacao/dashboard" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                          <BarChart3 className="h-4 w-4" />
-                          <span>Dashboard</span>
-                        </NavLink>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild>
-                        <NavLink to="/onboarding-implantacao/config" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                          <SlidersHorizontal className="h-4 w-4" />
-                          <span>Configuração</span>
-                        </NavLink>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  </SidebarMenuSub>
-                </CollapsibleContent>
-              </SidebarMenuItem>
-            </Collapsible>
-          )}
           {isSuperAdmin && (
             <Collapsible
               defaultOpen={getGroupOpen("Super Admin")}
