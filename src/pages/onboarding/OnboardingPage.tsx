@@ -159,8 +159,8 @@ export default function OnboardingPage() {
 
   // Journeys from view
   const journeysQuery = useQuery({
-    queryKey: ["onboarding-journeys", effectiveTenantId, fase],
-    enabled: isSuperAdmin && !!effectiveTenantId,
+    queryKey: ["onboarding-journeys", effectiveTenantId, fase, viewKey],
+    enabled: isSuperAdmin && !!effectiveTenantId && unidadeFilterReady,
     queryFn: async () => {
       const rows = await fetchAllRows<JourneyRow>(() => {
         let q = (supabase.from("vw_onboarding_journeys" as any) as any)
@@ -172,6 +172,7 @@ export default function OnboardingPage() {
         } else {
           q = q.eq("stage_fase", fase);
         }
+        if (selectedUnidadeIds.length > 0) q = q.in("cliente_unidade_id", selectedUnidadeIds);
         return q;
       });
       // fetch cliente names
