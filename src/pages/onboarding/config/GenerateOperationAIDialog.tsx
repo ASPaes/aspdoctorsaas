@@ -182,16 +182,19 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
   };
 
   const pipelinesByFase = (fase: "onboarding" | "implantacao") =>
-    (blueprint?.pipelines ?? []).filter((p) => p.fase === fase);
+    (blueprint?.pipelines ?? [])
+      .map((p, pi) => ({ p, pi }))
+      .filter(({ p }) => p.fase === fase);
 
   const hasSelection = blueprint
-    ? (selected.onboarding && pipelinesByFase("onboarding").length > 0) ||
-      (selected.implantacao && pipelinesByFase("implantacao").length > 0) ||
-      (selected.demand_types && blueprint.demand_types.length > 0) ||
-      (selected.training_types && blueprint.training_types.length > 0) ||
-      (selected.pause_reasons && blueprint.pause_reasons.length > 0) ||
-      (selected.accounting_fields && blueprint.accounting_fields.length > 0) ||
-      (selected.vendor_return_reasons && blueprint.vendor_return_reasons.length > 0)
+    ? blueprint.pipelines.some((p, pi) =>
+        p.stages.some((_, si) => sel.stages[pi]?.has(si))
+      ) ||
+      sel.demand_types.size > 0 ||
+      sel.training_types.size > 0 ||
+      sel.pause_reasons.size > 0 ||
+      sel.accounting_fields.size > 0 ||
+      sel.vendor_return_reasons.size > 0
     : false;
 
   return (
