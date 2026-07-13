@@ -1850,8 +1850,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     {/* Anexos */}
                   {secVisible("anexos") && journey?.ticket_id && (
                     <section className="rounded-lg border border-border">
-                      <div className="p-3 border-b border-border">
-                        <h3 className="text-sm font-semibold">Anexos</h3>
+                      <div className="p-3 border-b border-border flex items-center justify-between">
+                        <button type="button" onClick={() => toggleSec("anexos")} className="flex items-center gap-2 flex-1 text-left">
+                          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${secOpen.anexos ? "rotate-90" : ""}`} />
+                          <h3 className="text-sm font-semibold">Anexos</h3>
+                        </button>
                       </div>
                       <div className="p-3">
                         <TicketAttachments
