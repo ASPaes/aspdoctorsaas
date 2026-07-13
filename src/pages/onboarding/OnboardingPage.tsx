@@ -94,9 +94,10 @@ function formatDate(iso: string | null): string {
 }
 
 export default function OnboardingPage() {
-  const { profile, profileLoading } = useAuth();
+  const { profileLoading } = useAuth();
   const { effectiveTenantId } = useTenantFilter();
   const { selectedUnidadeIds, viewKey, unidadeFilterReady } = useUnidadeFilter();
+  const { canAccess, isLoading: accessLoading } = useOnboardingAccess();
   const queryClient = useQueryClient();
   const [fase, setFase] = useState<"onboarding" | "implantacao">("onboarding");
   const [newOpen, setNewOpen] = useState(false);
@@ -110,12 +111,10 @@ export default function OnboardingPage() {
   const [filtroSituacao, setFiltroSituacao] = useState<string>("todos");
   const [periodoEntrada, setPeriodoEntrada] = useState<{ from: Date; to: Date } | null>(null);
 
-  const isSuperAdmin = profile?.is_super_admin === true;
-
   // Pipelines + stages
   const pipelinesQuery = useQuery({
     queryKey: ["onboarding-pipelines", effectiveTenantId, fase],
-    enabled: isSuperAdmin && !!effectiveTenantId,
+    enabled: canAccess && !!effectiveTenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_pipelines" as any) as any)
         .select("id, nome, fase, position")
