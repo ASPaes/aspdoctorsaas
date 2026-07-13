@@ -61,6 +61,8 @@ interface JourneyRow {
   demand_type_cor?: string | null;
   responsavel_user_id?: string | null;
   responsavel_nome?: string | null;
+  pipeline_onboarding_id?: string | null;
+  pipeline_implantacao_id?: string | null;
 }
 
 
