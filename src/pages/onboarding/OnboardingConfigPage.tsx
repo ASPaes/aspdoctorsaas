@@ -4,13 +4,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Sparkles } from "lucide-react";
 import { PipelinesPanel } from "./config/PipelinesPanel";
 import { PauseReasonsPanel } from "./config/PauseReasonsPanel";
 import { DemandTypesPanel } from "./config/DemandTypesPanel";
 import { TrainingTypesPanel } from "./config/TrainingTypesPanel";
 import { VendorReturnReasonsPanel } from "./config/VendorReturnReasonsPanel";
 import { AccountingFieldsPanel } from "./config/AccountingFieldsPanel";
+import { GenerateOperationAIDialog } from "./config/GenerateOperationAIDialog";
 
 type Fase = "onboarding" | "implantacao";
 
@@ -19,6 +20,8 @@ export default function OnboardingConfigPage() {
   const { canAccess, isLoading: accessLoading } = useOnboardingAccess();
   const [fase, setFase] = useState<Fase>("onboarding");
   const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas" | "treinos" | "retornos" | "contabilidade">("pipelines");
+  const [aiOpen, setAiOpen] = useState(false);
+  const canGenerateAI = profile?.role === "admin" || profile?.is_super_admin === true;
 
 
 
@@ -46,22 +49,30 @@ export default function OnboardingConfigPage() {
           </Button>
           <h1 className="text-lg font-semibold">Configuração · Onboarding & Implantação</h1>
         </div>
-        {tab === "pipelines" && (
-          <div className="inline-flex rounded-md border border-border p-0.5">
-            <button
-              onClick={() => setFase("onboarding")}
-              className={`px-3 py-1 text-xs rounded ${fase === "onboarding" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-            >
-              Onboarding
-            </button>
-            <button
-              onClick={() => setFase("implantacao")}
-              className={`px-3 py-1 text-xs rounded ${fase === "implantacao" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-            >
-              Implantação
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {canGenerateAI && (
+            <Button variant="outline" size="sm" onClick={() => setAiOpen(true)}>
+              <Sparkles className="h-4 w-4 mr-1" />
+              Gerar com IA
+            </Button>
+          )}
+          {tab === "pipelines" && (
+            <div className="inline-flex rounded-md border border-border p-0.5">
+              <button
+                onClick={() => setFase("onboarding")}
+                className={`px-3 py-1 text-xs rounded ${fase === "onboarding" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              >
+                Onboarding
+              </button>
+              <button
+                onClick={() => setFase("implantacao")}
+                className={`px-3 py-1 text-xs rounded ${fase === "implantacao" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              >
+                Implantação
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="flex-1 flex flex-col min-h-0">
@@ -96,6 +107,8 @@ export default function OnboardingConfigPage() {
 
 
       </Tabs>
+
+      <GenerateOperationAIDialog open={aiOpen} onOpenChange={setAiOpen} />
     </div>
   );
 }
