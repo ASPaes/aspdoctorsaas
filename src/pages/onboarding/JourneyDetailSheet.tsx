@@ -78,6 +78,8 @@ interface Journey {
   sla_imp_pausado_min?: number | null;
   sla_total_corrido_min?: number | null;
   sla_total_pausado_min?: number | null;
+  cliente_unidade_id?: number | null;
+  cliente_unidade_nome?: string | null;
 }
 
 
