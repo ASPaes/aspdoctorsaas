@@ -1509,115 +1509,13 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           )}
                         </div>
                       </div>
-                      <div className="p-3 space-y-2">
-                        {trainings.length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2 text-center">
-                            {canScheduleTraining
-                              ? "Nenhum treino cadastrado."
-                              : "Disponível a partir da última etapa do onboarding."}
-                          </p>
-                        ) : (
-                          trainings.map((t) => {
-                            const statusColors: Record<string, string> = {
-                              previsto: "hsl(215 16% 47%)",
-                              agendado: "hsl(199 89% 48%)",
-                              realizado: "hsl(142 71% 45%)",
-                              no_show: "hsl(0 84% 60%)",
-                              cancelado: "hsl(215 25% 27%)",
-                            };
-                            const conductorName = t.conduzido_por ? memberNameMap.get(t.conduzido_por) : null;
-                            const isDone = t.status === "realizado";
-                            const isCancelled = t.status === "cancelado";
-                            return (
-                              <div key={t.id} className="rounded-md border border-border p-2.5">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-xs font-medium truncate">{t.titulo}</span>
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] capitalize border-0 text-white"
-                                    style={{ backgroundColor: statusColors[t.status] || statusColors.previsto }}
-                                  >
-                                    {t.status.replace("_", "-")}
-                                  </Badge>
-                                </div>
-                                <div className="text-[10px] text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                                  {t.agendado_para && <span>Agendado: {formatDateTime(t.agendado_para)}</span>}
-                                  {t.realizado_em && <span>Realizado: {formatDateTime(t.realizado_em)}</span>}
-                                  {conductorName && <span>Por: {conductorName}</span>}
-                                </div>
-                                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                                  {(t.tentativas ?? 0) > 0 && (
-                                    <Badge variant="outline" className="text-[9px]">tentativas: {t.tentativas}</Badge>
-                                  )}
-                                  {t.no_show && <Badge variant="destructive" className="text-[9px]">no-show</Badge>}
-                                  {t.is_retreinamento && (
-                                    <Badge variant="outline" className="text-[9px] border-[hsl(262_83%_58%)] text-[hsl(262_83%_58%)]">
-                                      retreinamento
-                                    </Badge>
-                                  )}
-                                  {t.proprietario_presente && (
-                                    <Badge variant="outline" className="text-[9px] border-[hsl(142_71%_45%)] text-[hsl(142_71%_45%)]">
-                                      proprietário presente
-                                    </Badge>
-                                  )}
-                                </div>
-                                {!isCancelled && (
-                                  <div className="flex items-center gap-1 mt-2 flex-wrap">
-                                    {!isDone && (
-                                      <>
-                                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
-                                          onClick={() => handleMarkRealized(t.id)}>
-                                          <CheckCircle2 className="h-3 w-3 mr-1" /> Realizado
-                                        </Button>
-                                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
-                                          onClick={() => handleMarkNoShow(t.id, t.tentativas ?? 0)}>
-                                          No-show
-                                        </Button>
-                                      </>
-                                    )}
-                                    <Popover
-                                      open={rescheduleId === t.id}
-                                      onOpenChange={(o) => {
-                                        setRescheduleId(o ? t.id : null);
-                                        if (!o) setRescheduleDate("");
-                                      }}
-                                    >
-                                      <PopoverTrigger asChild>
-                                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2">
-                                          <Calendar className="h-3 w-3 mr-1" /> Remarcar
-                                        </Button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-72 space-y-2" align="start">
-                                        <label className="text-[11px] font-medium">Nova data/hora</label>
-                                        <Input
-                                          type="datetime-local"
-                                          value={rescheduleDate}
-                                          onChange={(e) => setRescheduleDate(e.target.value)}
-                                          className="h-8 text-xs"
-                                        />
-                                        <Button size="sm" className="w-full h-7 text-xs"
-                                          onClick={() => handleReschedule(t.id, t.tentativas ?? 0)}>
-                                          Confirmar
-                                        </Button>
-                                      </PopoverContent>
-                                    </Popover>
-                                    {isDone && (
-                                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
-                                        onClick={() => handleTogglePresente(t.id, !!t.proprietario_presente)}>
-                                        {t.proprietario_presente ? "Marcar ausente" : "Proprietário presente"}
-                                      </Button>
-                                    )}
-                                    <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-muted-foreground"
-                                      onClick={() => handleCancelTraining(t.id)}>
-                                      Cancelar
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
+                      {secOpen.treinos && (
+                        <div className="p-3 space-y-2">
+                          {trainings.length === 0 ? (
+...
+                          )}
+                        </div>
+                      )}
                     </section>
                   )}
 
