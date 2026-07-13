@@ -46,6 +46,7 @@ interface EditInstanceDialogProps {
     display_name: string | null;
     provider_type: string;
     instance_id_external: string | null;
+    default_operator_id?: string | null;
     meta_phone_number_id?: string | null;
     meta_waba_id?: string | null;
     meta_business_id?: string | null;
