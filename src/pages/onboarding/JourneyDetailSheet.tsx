@@ -1616,11 +1616,6 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     </section>
                   )}
 
-                </div>
-
-                {/* RIGHT */}
-                <div className="space-y-5">
-
                     {/* Contabilidade */}
                   {secVisible("contabilidade") && (
                     <AccountingCard
@@ -1640,9 +1635,10 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     />
                   )}
 
-                  </div>
-                  {/* RIGHT */}
-                  <div className="space-y-5">
+                </div>
+
+                {/* RIGHT */}
+                <div className="space-y-5">
                     {/* Participantes */}
                   {secVisible("participantes") && (
                     <section className="rounded-lg border border-border">
