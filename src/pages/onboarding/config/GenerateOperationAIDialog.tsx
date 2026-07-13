@@ -91,9 +91,21 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
   const [loading, setLoading] = useState(false);
   const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
   const [applying, setApplying] = useState(false);
-  const [selected, setSelected] = useState<Record<SectionKey, boolean>>(ALL_SELECTED);
+  const [sel, setSel] = useState<Selection>(emptySelection);
 
-  const toggleSection = (k: SectionKey) => setSelected((s) => ({ ...s, [k]: !s[k] }));
+  const toggleStage = (pi: number, si: number) =>
+    setSel((s) => {
+      const next = new Set(s.stages[pi] ?? []);
+      next.has(si) ? next.delete(si) : next.add(si);
+      return { ...s, stages: { ...s.stages, [pi]: next } };
+    });
+
+  const toggleCatalog = (key: CatalogKey, i: number) =>
+    setSel((s) => {
+      const next = new Set(s[key]);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return { ...s, [key]: next };
+    });
 
   const handleGenerate = async () => {
     if (!effectiveTenantId) {
