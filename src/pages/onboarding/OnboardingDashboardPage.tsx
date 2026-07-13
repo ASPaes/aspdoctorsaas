@@ -146,7 +146,7 @@ export default function OnboardingDashboardPage() {
     const to = dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1;
     const rows = (pausesAllQ.data ?? []).filter((p) => {
       const d = new Date(p.iniciada_em).getTime();
-      return d >= from && d <= to;
+      return d >= from && d <= to && allowedJourneyIds.has(p.journey_id);
     });
     const agg = new Map<string, { minutos: number; count: number; em_andamento: boolean }>();
     rows.forEach((p) => {
@@ -160,7 +160,7 @@ export default function OnboardingDashboardPage() {
     return Array.from(agg.entries())
       .map(([nome, v]) => ({ nome, ...v }))
       .sort((a, b) => b.minutos - a.minutos);
-  }, [pausesAllQ.data, dateRange]);
+  }, [pausesAllQ.data, dateRange, allowedJourneyIds]);
 
   const pausesTotalMin = useMemo(
     () => pausesByReasonAgg.reduce((s, r) => s + r.minutos, 0),
