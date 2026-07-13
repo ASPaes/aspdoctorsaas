@@ -115,24 +115,39 @@ export default function OnboardingPage() {
     enabled: isSuperAdmin && !!effectiveTenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_pipelines" as any) as any)
-        .select("id, nome, fase")
+        .select("id, nome, fase, position")
         .eq("tenant_id", effectiveTenantId)
-        .eq("fase", fase);
+        .eq("fase", fase)
+        .order("position");
       if (error) throw error;
       return (data ?? []) as PipelineRow[];
     },
   });
 
-  const pipelineIds = useMemo(() => (pipelinesQuery.data ?? []).map((p) => p.id), [pipelinesQuery.data]);
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const list = pipelinesQuery.data ?? [];
+    if (list.length === 0) { setSelectedPipelineId(null); return; }
+    const key = `onb-board-pipeline-${effectiveTenantId}-${fase}`;
+    const saved = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
+    const valid = saved && list.some((p) => p.id === saved);
+    setSelectedPipelineId(valid ? saved : list[0].id);
+  }, [pipelinesQuery.data, effectiveTenantId, fase]);
+
+  function selectPipeline(id: string) {
+    setSelectedPipelineId(id);
+    try { window.localStorage.setItem(`onb-board-pipeline-${effectiveTenantId}-${fase}`, id); } catch {}
+  }
 
   const stagesQuery = useQuery({
-    queryKey: ["onboarding-stages", effectiveTenantId, pipelineIds.join(",")],
-    enabled: isSuperAdmin && !!effectiveTenantId && pipelineIds.length > 0,
+    queryKey: ["onboarding-stages", effectiveTenantId, selectedPipelineId],
+    enabled: isSuperAdmin && !!effectiveTenantId && !!selectedPipelineId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_stages" as any) as any)
         .select("id, pipeline_id, nome, slug, position, cor, is_initial, is_final")
         .eq("tenant_id", effectiveTenantId)
-        .in("pipeline_id", pipelineIds)
+        .eq("pipeline_id", selectedPipelineId)
         .order("position");
       if (error) throw error;
       return (data ?? []) as StageRow[];
