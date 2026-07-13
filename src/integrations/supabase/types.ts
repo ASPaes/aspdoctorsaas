@@ -8216,6 +8216,7 @@ export type Database = {
         Row: {
           auto_close_inactivity_minutes: number | null
           created_at: string
+          default_operator_id: string | null
           disconnected_alert_at: string | null
           display_name: string | null
           id: string
@@ -8242,6 +8243,7 @@ export type Database = {
         Insert: {
           auto_close_inactivity_minutes?: number | null
           created_at?: string
+          default_operator_id?: string | null
           disconnected_alert_at?: string | null
           display_name?: string | null
           id?: string
@@ -8268,6 +8270,7 @@ export type Database = {
         Update: {
           auto_close_inactivity_minutes?: number | null
           created_at?: string
+          default_operator_id?: string | null
           disconnected_alert_at?: string | null
           display_name?: string | null
           id?: string
@@ -8292,6 +8295,13 @@ export type Database = {
           webhook_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "whatsapp_instances_default_operator_id_fkey"
+            columns: ["default_operator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
           {
             foreignKeyName: "whatsapp_instances_inbound_department_id_fkey"
             columns: ["inbound_department_id"]

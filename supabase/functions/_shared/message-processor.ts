@@ -1339,7 +1339,7 @@ export async function ensureAttendanceForIncomingMessage(supabase: any, conversa
   } catch (err) { console.error('[processor] Error in ensureAttendanceForIncomingMessage:', err); }
 }
 
-export async function ensureAttendanceForOperatorMessage(supabase: any, conversationId: string, contactId: string, tenantId: string): Promise<void> {
+export async function ensureAttendanceForOperatorMessage(supabase: any, conversationId: string, contactId: string, tenantId: string, instanceId: string): Promise<void> {
   try {
     const { data: active } = await supabase.from('support_attendances').select('id').eq('conversation_id', conversationId).in('status', ['waiting', 'in_progress']).limit(1).maybeSingle();
     if (active) return;
@@ -1348,8 +1348,25 @@ export async function ensureAttendanceForOperatorMessage(supabase: any, conversa
     const { data: lastAtt } = await supabase.from('support_attendances').select('id, closed_at, created_at, status').eq('conversation_id', conversationId).order('created_at', { ascending: false }).limit(1).maybeSingle();
     if (lastAtt) { const ago = (Date.now() - new Date(lastAtt.closed_at || lastAtt.created_at).getTime()) / 1000; if (ago < 30) return; }
     const nowIso = new Date().toISOString();
-    const { data: newAtt, error } = await supabase.from('support_attendances').insert({ tenant_id: tenantId, conversation_id: conversationId, contact_id: contactId, status: 'in_progress', opened_at: nowIso, assumed_at: nowIso, created_from: 'operator' }).select('id, attendance_code').single();
+    // Cascata do dono: instância pessoal (owner ativo) => atribui direto; senão => fila.
+    let ownerId: string | null = null;
+    const { data: inst } = await supabase.from('whatsapp_instances').select('default_operator_id').eq('id', instanceId).maybeSingle();
+    if (inst?.default_operator_id) {
+      const { data: prof } = await supabase.from('profiles').select('user_id').eq('user_id', inst.default_operator_id).eq('tenant_id', tenantId).eq('status', 'ativo').maybeSingle();
+      if (prof) ownerId = prof.user_id;
+    }
+    const payload: Record<string, any> = {
+      tenant_id: tenantId, conversation_id: conversationId, contact_id: contactId,
+      opened_at: nowIso, created_from: 'operator',
+      status: ownerId ? 'in_progress' : 'waiting',
+    };
+    if (ownerId) { payload.assigned_to = ownerId; payload.assumed_at = nowIso; }
+    else { payload.queued_at = nowIso; }
+    const { data: newAtt, error } = await (supabase.from('support_attendances') as any).insert(payload as any).select('id, attendance_code').single();
     if (error) { console.error('[processor] Error creating operator attendance:', error); return; }
+    if (ownerId) {
+      await supabase.from('whatsapp_conversations').update({ assigned_to: ownerId, updated_at: nowIso }).eq('id', conversationId).is('assigned_to', null);
+    }
     insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened').catch(() => {});
     clearAfterHoursFlag(supabase, conversationId).catch(() => {});
   } catch (err) { console.error('[processor] Error in ensureAttendanceForOperatorMessage:', err); }
@@ -1820,7 +1837,18 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
     const nowIso = new Date().toISOString();
     const onlyOut = await isOutboundOnlyConversation(supabase, conversationId);
     if (onlyOut) { await supabase.from('whatsapp_conversations').update({ status: 'closed', updated_at: nowIso }).eq('id', conversationId).neq('status', 'closed'); }
-    else { supabase.from('whatsapp_conversations').update({ first_agent_message_at: nowIso, updated_at: nowIso }).eq('id', conversationId).is('first_agent_message_at', null).then(() => {}).catch(() => {}); ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId).then(() => incrementAttendanceCounter(supabase, conversationId, 'agent')).catch(() => {}); }
+    else {
+      // Humano respondeu do celular: reabre a conversa se estava fechada.
+      // TEM que vir antes do ensureAttendance — a trigger de dispatch aborta se a conversa estiver 'closed'.
+      await supabase.from('whatsapp_conversations')
+        .update({ status: 'active', updated_at: nowIso })
+        .eq('id', conversationId).in('status', ['closed', 'inactive_closed']);
+      supabase.from('whatsapp_conversations')
+        .update({ first_agent_message_at: nowIso, updated_at: nowIso })
+        .eq('id', conversationId).is('first_agent_message_at', null).then(() => {}).catch(() => {});
+      await ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId, instanceId);
+      incrementAttendanceCounter(supabase, conversationId, 'agent').catch(() => {});
+    }
     return;
   }
 
