@@ -20,6 +20,8 @@ export default function OnboardingConfigPage() {
   const { canAccess, isLoading: accessLoading } = useOnboardingAccess();
   const [fase, setFase] = useState<Fase>("onboarding");
   const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas" | "treinos" | "retornos" | "contabilidade">("pipelines");
+  const [aiOpen, setAiOpen] = useState(false);
+  const canGenerateAI = profile?.role === "admin" || profile?.is_super_admin === true;
 
 
 
