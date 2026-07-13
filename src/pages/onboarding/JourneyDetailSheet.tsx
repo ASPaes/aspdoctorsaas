@@ -1807,41 +1807,43 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           </Popover>
                         </div>
                       </div>
-                      <div className="p-3 space-y-1.5">
-                        {(modulesQ.data ?? []).length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2 text-center">Nenhum módulo cadastrado.</p>
-                        ) : (
-                          (modulesQ.data ?? []).map((m) => {
-                            const origemColor: Record<string, string> = {
-                              manual: "hsl(215 16% 47%)",
-                              produto: "hsl(199 89% 48%)",
-                              cliente: "hsl(262 83% 58%)",
-                            };
-                            return (
-                              <div key={m.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="text-xs font-medium truncate">{m.nome}</span>
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[9px] capitalize border-0 text-white shrink-0"
-                                    style={{ backgroundColor: origemColor[m.origem] || origemColor.manual }}
+                      {secOpen.modulos && (
+                        <div className="p-3 space-y-1.5">
+                          {(modulesQ.data ?? []).length === 0 ? (
+                            <p className="text-xs text-muted-foreground py-2 text-center">Nenhum módulo cadastrado.</p>
+                          ) : (
+                            (modulesQ.data ?? []).map((m) => {
+                              const origemColor: Record<string, string> = {
+                                manual: "hsl(215 16% 47%)",
+                                produto: "hsl(199 89% 48%)",
+                                cliente: "hsl(262 83% 58%)",
+                              };
+                              return (
+                                <div key={m.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="text-xs font-medium truncate">{m.nome}</span>
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[9px] capitalize border-0 text-white shrink-0"
+                                      style={{ backgroundColor: origemColor[m.origem] || origemColor.manual }}
+                                    >
+                                      {m.origem}
+                                    </Badge>
+                                  </div>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                                    onClick={() => handleDeleteModule(m.id)}
                                   >
-                                    {m.origem}
-                                  </Badge>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
                                 </div>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                                  onClick={() => handleDeleteModule(m.id)}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
                     </section>
                   )}
 
