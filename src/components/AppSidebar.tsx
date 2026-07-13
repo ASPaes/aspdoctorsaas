@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles, ChevronDown, Library, Building2, Rocket, BarChart3 } from "lucide-react";
 import { NAV_ITEMS } from "@/config/navItems";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
@@ -62,6 +63,7 @@ export function AppSidebar() {
   const { temNovo, marcarVisto } = useReleasesNovidade();
   const isSuperAdmin = profile?.is_super_admin === true;
   const { can } = usePermissions();
+  const { canAccess: canOnboarding } = useOnboardingAccess();
 
   const getGroupOpen = (title: string) => {
     const v = localStorage.getItem(`sidebar.group.${title}`);
@@ -305,6 +307,51 @@ export function AppSidebar() {
         <Separator className="bg-sidebar-border" />
 
         <SidebarMenu>
+          {canOnboarding && (
+            <Collapsible
+              defaultOpen={getGroupOpen("Onboarding")}
+              onOpenChange={(open) => setGroupOpen("Onboarding", open)}
+              className="group/collapsible"
+            >
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Onboarding & Implantação">
+                    <Rocket className="h-4 w-4" />
+                    <span>Onboarding & Implantação</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild>
+                        <NavLink to="/onboarding-implantacao" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                          <Rocket className="h-4 w-4" />
+                          <span>Kanban</span>
+                        </NavLink>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild>
+                        <NavLink to="/onboarding-implantacao/dashboard" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                          <BarChart3 className="h-4 w-4" />
+                          <span>Dashboard</span>
+                        </NavLink>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild>
+                        <NavLink to="/onboarding-implantacao/config" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                          <SlidersHorizontal className="h-4 w-4" />
+                          <span>Configuração</span>
+                        </NavLink>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
           {isSuperAdmin && (
             <Collapsible
               defaultOpen={getGroupOpen("Super Admin")}
@@ -321,30 +368,6 @@ export function AppSidebar() {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild>
-                        <NavLink to="/onboarding-implantacao" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                          <Rocket className="h-4 w-4" />
-                          <span>Onboarding</span>
-                        </NavLink>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild>
-                        <NavLink to="/onboarding-implantacao/dashboard" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                          <BarChart3 className="h-4 w-4" />
-                          <span>Dashboard Onboarding</span>
-                        </NavLink>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild>
-                        <NavLink to="/onboarding-implantacao/config" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                          <SlidersHorizontal className="h-4 w-4" />
-                          <span>Config. Onboarding</span>
-                        </NavLink>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild>
                         <NavLink to="/super/tenants" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
