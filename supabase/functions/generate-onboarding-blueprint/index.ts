@@ -26,6 +26,7 @@ Separe corretamente: coleta/migração/cadastro inicial = onboarding; parametriz
 ETAPAS (stages):
 - A primeira etapa do pipeline é o início; a última é a conclusão da fase.
 - Defina SLA realista por etapa (sla_valor + sla_unidade "dias" ou "horas"). Ex.: coleta de documentos ~2 dias; migração de base ~3 a 5 dias; parametrização ~2 dias; treinamento ~1 dia; homologação fiscal ~2 dias.
+- PRAZOS INFORMADOS PELO GESTOR TÊM PRIORIDADE sobre os valores acima. Se o gestor indicar prazo de uma etapa específica (ex.: "coleta em 3 dias", "migração leva até 5 dias"), use exatamente esse valor naquela etapa. Se o gestor indicar um prazo TOTAL para uma fase (ex.: "a implantação deve caber em 15 dias", "onboarding em no máximo 10 dias úteis"), distribua os SLAs das etapas daquela fase de modo que a SOMA se aproxime ao máximo do total informado — dando mais tempo às etapas mais pesadas (migração, parametrização) e menos às leves. Só use os valores realistas padrão quando o gestor não informar prazos.
 - Marque pausa_sla=true nas etapas que normalmente ficam aguardando o cliente (ex.: aguardando documentos, aguardando agendamento) — nelas o relógio de SLA é congelado.
 
 CHECKLIST por etapa:
