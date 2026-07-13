@@ -95,6 +95,7 @@ function formatDate(iso: string | null): string {
 export default function OnboardingPage() {
   const { profile, profileLoading } = useAuth();
   const { effectiveTenantId } = useTenantFilter();
+  const { selectedUnidadeIds, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const queryClient = useQueryClient();
   const [fase, setFase] = useState<"onboarding" | "implantacao">("onboarding");
   const [newOpen, setNewOpen] = useState(false);
