@@ -126,6 +126,20 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
 
         {!blueprint ? (
           <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Descreva sua operação</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setPrompt(EXAMPLE_PROMPT)}
+                disabled={loading}
+              >
+                <FileText className="h-3.5 w-3.5 mr-1" />
+                Usar este exemplo
+              </Button>
+            </div>
             <Textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
