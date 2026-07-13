@@ -1976,9 +1976,6 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   )}
                 </div>
               </div>
-
-                  </div>
-                </div>
               )}
 
               {activeTab === "geral" && (
