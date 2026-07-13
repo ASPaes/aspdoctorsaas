@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Badge } from "@/components/ui/badge";
