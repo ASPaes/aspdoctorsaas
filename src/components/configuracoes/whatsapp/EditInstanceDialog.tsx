@@ -165,6 +165,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
           display_name: values.display_name,
           instance_name: values.instance_name,
           instance_id_external: values.provider_type === 'cloud' ? values.instance_id_external : null,
+          default_operator_id: (values.default_operator_id && values.default_operator_id !== '__fila__') ? values.default_operator_id : null,
           provider_type: values.provider_type,
           ...((!isMeta && !isZapi) && { api_url: values.api_url, api_key: values.api_key }),
           ...(isMeta && {
@@ -176,7 +177,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
             meta_business_id: values.meta_business_id || null,
           }),
           ...(isZapi && { zapi_instance_id: values.zapi_instance_id, zapi_token: values.zapi_token, zapi_client_token: values.zapi_client_token }),
-        },
+        } as any,
       });
       toast.success("Instância atualizada com sucesso!");
       onOpenChange(false);
