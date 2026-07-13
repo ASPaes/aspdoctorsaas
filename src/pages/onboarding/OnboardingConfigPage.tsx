@@ -16,6 +16,7 @@ type Fase = "onboarding" | "implantacao";
 
 export default function OnboardingConfigPage() {
   const { profile, profileLoading } = useAuth();
+  const { canAccess, isLoading: accessLoading } = useOnboardingAccess();
   const [fase, setFase] = useState<Fase>("onboarding");
   const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas" | "treinos" | "retornos" | "contabilidade">("pipelines");
 
@@ -24,7 +25,7 @@ export default function OnboardingConfigPage() {
 
 
 
-  if (profileLoading) {
+  if (profileLoading || accessLoading) {
     return (
       <div className="flex items-center justify-center min-h-[40vh]">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -32,8 +33,8 @@ export default function OnboardingConfigPage() {
     );
   }
 
-  if (!profile?.is_super_admin) {
-    return <div className="p-6 text-sm text-muted-foreground">Acesso restrito a super administradores.</div>;
+  if (!canAccess) {
+    return <div className="p-6 text-sm text-muted-foreground">Acesso não liberado a este módulo.</div>;
   }
 
   return (

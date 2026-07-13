@@ -145,7 +145,7 @@ export default function OnboardingPage() {
 
   const stagesQuery = useQuery({
     queryKey: ["onboarding-stages", effectiveTenantId, selectedPipelineId],
-    enabled: isSuperAdmin && !!effectiveTenantId && !!selectedPipelineId,
+    enabled: canAccess && !!effectiveTenantId && !!selectedPipelineId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_stages" as any) as any)
         .select("id, pipeline_id, nome, slug, position, cor, is_initial, is_final")
@@ -160,7 +160,7 @@ export default function OnboardingPage() {
   // Journeys from view
   const journeysQuery = useQuery({
     queryKey: ["onboarding-journeys", effectiveTenantId, fase, viewKey],
-    enabled: isSuperAdmin && !!effectiveTenantId && unidadeFilterReady,
+    enabled: canAccess && !!effectiveTenantId && unidadeFilterReady,
     queryFn: async () => {
       const rows = await fetchAllRows<JourneyRow>(() => {
         let q = (supabase.from("vw_onboarding_journeys" as any) as any)
@@ -305,7 +305,7 @@ export default function OnboardingPage() {
     }
   }
 
-  if (profileLoading) {
+  if (profileLoading || accessLoading) {
     return (
       <div className="flex items-center justify-center min-h-[40vh]">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -313,10 +313,10 @@ export default function OnboardingPage() {
     );
   }
 
-  if (!isSuperAdmin) {
+  if (!canAccess) {
     return (
       <div className="p-6 text-sm text-muted-foreground">
-        Acesso restrito a super administradores.
+        Acesso não liberado a este módulo.
       </div>
     );
   }
