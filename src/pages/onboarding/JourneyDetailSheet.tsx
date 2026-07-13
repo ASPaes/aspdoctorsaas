@@ -1746,9 +1746,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   {secVisible("modulos") && (
                     <section className="rounded-lg border border-border">
                       <div className="p-3 border-b border-border flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-semibold flex items-center gap-2">
-                          <Package className="h-4 w-4" /> Módulos da jornada
-                        </h3>
+                        <button type="button" onClick={() => toggleSec("modulos")} className="flex items-center gap-2 flex-1 text-left">
+                          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${secOpen.modulos ? "rotate-90" : ""}`} />
+                          <h3 className="text-sm font-semibold flex items-center gap-2">
+                            <Package className="h-4 w-4" /> Módulos da jornada
+                          </h3>
+                        </button>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-[10px]">{(modulesQ.data ?? []).length}</Badge>
                           {(clienteProdutoModulosQ.data ?? []).length > 0 && (
