@@ -4,13 +4,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Sparkles } from "lucide-react";
 import { PipelinesPanel } from "./config/PipelinesPanel";
 import { PauseReasonsPanel } from "./config/PauseReasonsPanel";
 import { DemandTypesPanel } from "./config/DemandTypesPanel";
 import { TrainingTypesPanel } from "./config/TrainingTypesPanel";
 import { VendorReturnReasonsPanel } from "./config/VendorReturnReasonsPanel";
 import { AccountingFieldsPanel } from "./config/AccountingFieldsPanel";
+import { GenerateOperationAIDialog } from "./config/GenerateOperationAIDialog";
 
 type Fase = "onboarding" | "implantacao";
 
