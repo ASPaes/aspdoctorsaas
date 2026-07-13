@@ -1880,53 +1880,55 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         </button>
                         <Badge variant="outline" className="text-[10px]">{attendances.length}</Badge>
                       </div>
-                      <div className="p-3 space-y-2">
-                        {attendances.length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2 text-center">Nenhum atendimento vinculado.</p>
-                        ) : (
-                          <>
-                            {(() => {
-                              const avg = (key: string) => {
-                                const vals = attendances
-                                  .map((a: any) => a[key])
-                                  .filter((v: any) => typeof v === "number" && !isNaN(v));
-                                if (vals.length === 0) return null;
-                                return vals.reduce((s: number, v: number) => s + v, 0) / vals.length / 60;
-                              };
-                              const espera = avg("wait_seconds");
-                              const resposta = avg("first_response_time_seconds");
-                              const atendimento = avg("handle_seconds");
-                              return (
-                                <div className="grid grid-cols-3 gap-2 mb-1">
-                                  <div className="rounded-md border border-border p-2">
-                                    <div className="text-[10px] text-muted-foreground">T. médio de espera</div>
-                                    <div className="text-sm font-semibold">{formatMin(espera)}</div>
+                      {secOpen.atendimentos && (
+                        <div className="p-3 space-y-2">
+                          {attendances.length === 0 ? (
+                            <p className="text-xs text-muted-foreground py-2 text-center">Nenhum atendimento vinculado.</p>
+                          ) : (
+                            <>
+                              {(() => {
+                                const avg = (key: string) => {
+                                  const vals = attendances
+                                    .map((a: any) => a[key])
+                                    .filter((v: any) => typeof v === "number" && !isNaN(v));
+                                  if (vals.length === 0) return null;
+                                  return vals.reduce((s: number, v: number) => s + v, 0) / vals.length / 60;
+                                };
+                                const espera = avg("wait_seconds");
+                                const resposta = avg("first_response_time_seconds");
+                                const atendimento = avg("handle_seconds");
+                                return (
+                                  <div className="grid grid-cols-3 gap-2 mb-1">
+                                    <div className="rounded-md border border-border p-2">
+                                      <div className="text-[10px] text-muted-foreground">T. médio de espera</div>
+                                      <div className="text-sm font-semibold">{formatMin(espera)}</div>
+                                    </div>
+                                    <div className="rounded-md border border-border p-2">
+                                      <div className="text-[10px] text-muted-foreground">T. médio de resposta</div>
+                                      <div className="text-sm font-semibold">{formatMin(resposta)}</div>
+                                    </div>
+                                    <div className="rounded-md border border-border p-2">
+                                      <div className="text-[10px] text-muted-foreground">T. médio de atendimento</div>
+                                      <div className="text-sm font-semibold">{formatMin(atendimento)}</div>
+                                    </div>
                                   </div>
-                                  <div className="rounded-md border border-border p-2">
-                                    <div className="text-[10px] text-muted-foreground">T. médio de resposta</div>
-                                    <div className="text-sm font-semibold">{formatMin(resposta)}</div>
+                                );
+                              })()}
+                              <div className="space-y-1.5">
+                                {attendances.map((a) => (
+                                  <div key={a.id} className="rounded-md border border-border p-2 flex items-center gap-2">
+                                    <span className="font-mono text-[11px] text-primary">{a.attendance_code}</span>
+                                    <span className="text-[11px] text-muted-foreground truncate flex-1">
+                                      {a.participant_label || "—"}
+                                    </span>
+                                    <Badge variant="outline" className="text-[9px] capitalize">{a.status}</Badge>
                                   </div>
-                                  <div className="rounded-md border border-border p-2">
-                                    <div className="text-[10px] text-muted-foreground">T. médio de atendimento</div>
-                                    <div className="text-sm font-semibold">{formatMin(atendimento)}</div>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                            <div className="space-y-1.5">
-                              {attendances.map((a) => (
-                                <div key={a.id} className="rounded-md border border-border p-2 flex items-center gap-2">
-                                  <span className="font-mono text-[11px] text-primary">{a.attendance_code}</span>
-                                  <span className="text-[11px] text-muted-foreground truncate flex-1">
-                                    {a.participant_label || "—"}
-                                  </span>
-                                  <Badge variant="outline" className="text-[9px] capitalize">{a.status}</Badge>
-                                </div>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </section>
                   )}
 
