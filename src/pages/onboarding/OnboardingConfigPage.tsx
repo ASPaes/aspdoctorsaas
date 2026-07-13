@@ -49,22 +49,30 @@ export default function OnboardingConfigPage() {
           </Button>
           <h1 className="text-lg font-semibold">Configuração · Onboarding & Implantação</h1>
         </div>
-        {tab === "pipelines" && (
-          <div className="inline-flex rounded-md border border-border p-0.5">
-            <button
-              onClick={() => setFase("onboarding")}
-              className={`px-3 py-1 text-xs rounded ${fase === "onboarding" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-            >
-              Onboarding
-            </button>
-            <button
-              onClick={() => setFase("implantacao")}
-              className={`px-3 py-1 text-xs rounded ${fase === "implantacao" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-            >
-              Implantação
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {canGenerateAI && (
+            <Button variant="outline" size="sm" onClick={() => setAiOpen(true)}>
+              <Sparkles className="h-4 w-4 mr-1" />
+              Gerar com IA
+            </Button>
+          )}
+          {tab === "pipelines" && (
+            <div className="inline-flex rounded-md border border-border p-0.5">
+              <button
+                onClick={() => setFase("onboarding")}
+                className={`px-3 py-1 text-xs rounded ${fase === "onboarding" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              >
+                Onboarding
+              </button>
+              <button
+                onClick={() => setFase("implantacao")}
+                className={`px-3 py-1 text-xs rounded ${fase === "implantacao" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              >
+                Implantação
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="flex-1 flex flex-col min-h-0">
