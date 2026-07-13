@@ -9239,6 +9239,8 @@ export type Database = {
           onb_ini: string | null
           onboarding_concluido: boolean | null
           onboarding_concluido_em: string | null
+          pipeline_implantacao_id: string | null
+          pipeline_onboarding_id: string | null
           produto_id: number | null
           responsavel_nome: string | null
           responsavel_user_id: string | null
@@ -9285,6 +9287,20 @@ export type Database = {
             columns: ["demand_type_id"]
             isOneToOne: false
             referencedRelation: "onboarding_demand_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_pipeline_implantacao_id_fkey"
+            columns: ["pipeline_implantacao_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_pipeline_onboarding_id_fkey"
+            columns: ["pipeline_onboarding_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_pipelines"
             referencedColumns: ["id"]
           },
           {

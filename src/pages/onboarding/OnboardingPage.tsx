@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -30,6 +30,7 @@ interface PipelineRow {
   id: string;
   nome: string;
   fase: "onboarding" | "implantacao";
+  position?: number;
 }
 
 interface JourneyRow {
@@ -60,6 +61,8 @@ interface JourneyRow {
   demand_type_cor?: string | null;
   responsavel_user_id?: string | null;
   responsavel_nome?: string | null;
+  pipeline_onboarding_id?: string | null;
+  pipeline_implantacao_id?: string | null;
 }
 
 
@@ -112,24 +115,39 @@ export default function OnboardingPage() {
     enabled: isSuperAdmin && !!effectiveTenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_pipelines" as any) as any)
-        .select("id, nome, fase")
+        .select("id, nome, fase, position")
         .eq("tenant_id", effectiveTenantId)
-        .eq("fase", fase);
+        .eq("fase", fase)
+        .order("position");
       if (error) throw error;
       return (data ?? []) as PipelineRow[];
     },
   });
 
-  const pipelineIds = useMemo(() => (pipelinesQuery.data ?? []).map((p) => p.id), [pipelinesQuery.data]);
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const list = pipelinesQuery.data ?? [];
+    if (list.length === 0) { setSelectedPipelineId(null); return; }
+    const key = `onb-board-pipeline-${effectiveTenantId}-${fase}`;
+    const saved = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
+    const valid = saved && list.some((p) => p.id === saved);
+    setSelectedPipelineId(valid ? saved : list[0].id);
+  }, [pipelinesQuery.data, effectiveTenantId, fase]);
+
+  function selectPipeline(id: string) {
+    setSelectedPipelineId(id);
+    try { window.localStorage.setItem(`onb-board-pipeline-${effectiveTenantId}-${fase}`, id); } catch {}
+  }
 
   const stagesQuery = useQuery({
-    queryKey: ["onboarding-stages", effectiveTenantId, pipelineIds.join(",")],
-    enabled: isSuperAdmin && !!effectiveTenantId && pipelineIds.length > 0,
+    queryKey: ["onboarding-stages", effectiveTenantId, selectedPipelineId],
+    enabled: isSuperAdmin && !!effectiveTenantId && !!selectedPipelineId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_stages" as any) as any)
         .select("id, pipeline_id, nome, slug, position, cor, is_initial, is_final")
         .eq("tenant_id", effectiveTenantId)
-        .in("pipeline_id", pipelineIds)
+        .eq("pipeline_id", selectedPipelineId)
         .order("position");
       if (error) throw error;
       return (data ?? []) as StageRow[];
@@ -245,6 +263,8 @@ export default function OnboardingPage() {
     m[ONB_DONE_COL_ID] = [];
     journeysFiltradas.forEach((j) => {
       if (!showConcluded && (j.situacao === "concluido" || j.situacao === "cancelado")) return;
+      const jPipe = fase === "onboarding" ? j.pipeline_onboarding_id : j.pipeline_implantacao_id;
+      if (selectedPipelineId && jPipe !== selectedPipelineId) return;
       // Na aba Onboarding, se o onboarding já foi concluído, vai pra coluna final
       if (fase === "onboarding" && j.onboarding_concluido) {
         m[ONB_DONE_COL_ID].push(j);
@@ -253,7 +273,7 @@ export default function OnboardingPage() {
       if (j.current_stage_id && m[j.current_stage_id]) m[j.current_stage_id].push(j);
     });
     return m;
-  }, [stages, journeysFiltradas, showConcluded, fase]);
+  }, [stages, journeysFiltradas, showConcluded, fase, selectedPipelineId]);
 
   async function handleDrop(journeyId: string, targetStageId: string, fromStageId: string) {
     if (fromStageId === targetStageId) return;
@@ -336,6 +356,23 @@ export default function OnboardingPage() {
           </Button>
         </div>
       </div>
+
+      {(pipelinesQuery.data ?? []).length > 1 && (
+        <div className="flex flex-wrap items-center gap-1 px-4 py-2 border-b border-border bg-background">
+          <div className="inline-flex rounded-md border border-border p-0.5 flex-wrap">
+            {(pipelinesQuery.data ?? []).map((p) => (
+              <button
+                key={p.id}
+                onClick={() => selectPipeline(p.id)}
+                className={`px-3 py-1 text-xs rounded ${p.id === selectedPipelineId ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              >
+                {p.nome}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
 
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
         <div className="relative flex-1 min-w-[200px] max-w-xs">
