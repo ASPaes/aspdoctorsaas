@@ -233,6 +233,29 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
               </FormItem>
             )} />
 
+            <FormField control={form.control} name="default_operator_id" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Operador dono do aparelho (celular)</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o operador" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="__fila__">Vai pra fila (número compartilhado)</SelectItem>
+                    {agentes.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.full_name || a.email || a.id}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Quando esta instância é o celular pessoal de um operador, mensagens enviadas por fora do Doctor caem como atendimento na lista dele. Deixe em "Vai pra fila" se o número é compartilhado.
+                </p>
+                <FormMessage />
+              </FormItem>
+            )} />
+
             {providerType === 'cloud' && (
               <FormField control={form.control} name="instance_id_external" render={({ field }) => (
                 <FormItem>
