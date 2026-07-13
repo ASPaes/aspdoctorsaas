@@ -7187,6 +7187,7 @@ export type Database = {
           id: string
           max_users: number
           nome: string
+          onboarding_enabled: boolean
           plano: string | null
           rbac_enabled: boolean
           status: string
@@ -7198,6 +7199,7 @@ export type Database = {
           id?: string
           max_users?: number
           nome: string
+          onboarding_enabled?: boolean
           plano?: string | null
           rbac_enabled?: boolean
           status?: string
@@ -7209,6 +7211,7 @@ export type Database = {
           id?: string
           max_users?: number
           nome?: string
+          onboarding_enabled?: boolean
           plano?: string | null
           rbac_enabled?: boolean
           status?: string

@@ -52,6 +52,7 @@ const SupportTickets = lazy(() => import("@/pages/SupportTickets"));
 const ConfiguracoesNotificacoes = lazy(() => import("@/pages/ConfiguracoesNotificacoes"));
 
 import SuperAdminGuard from "@/components/SuperAdminGuard";
+import OnboardingGuard from "@/components/OnboardingGuard";
 
 const PageLoader = () => (
   <div className="flex min-h-[50vh] items-center justify-center bg-background">
@@ -111,11 +112,15 @@ const App = () => (
               <Route path="/painel-uso" element={<RequirePermission resource="nav.painel_uso"><PainelUso /></RequirePermission>} />
               <Route path="/admin/limpeza-uras" element={<LimpezaUras />} />
 
-              {/* Super Admin routes */}
-              <Route element={<SuperAdminGuard />}>
+              {/* Onboarding (feature-flagged per tenant) */}
+              <Route element={<OnboardingGuard />}>
                 <Route path="/onboarding-implantacao" element={<Suspense fallback={<PageLoader />}><OnboardingPage /></Suspense>} />
                 <Route path="/onboarding-implantacao/config" element={<Suspense fallback={<PageLoader />}><OnboardingConfigPage /></Suspense>} />
                 <Route path="/onboarding-implantacao/dashboard" element={<Suspense fallback={<PageLoader />}><OnboardingDashboardPage /></Suspense>} />
+              </Route>
+
+              {/* Super Admin routes */}
+              <Route element={<SuperAdminGuard />}>
                 <Route path="/super/tenants" element={<SuperTenants />} />
                 <Route path="/super/tenants/:id" element={<SuperTenantDetail />} />
                 <Route path="/super/monitor" element={<SuperMonitor />} />
