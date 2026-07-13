@@ -57,6 +57,7 @@ interface EditInstanceDialogProps {
 
 export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanceDialogProps) => {
   const { updateInstance } = useWhatsAppInstances();
+  const { effectiveTenantId: tid } = useTenantFilter();
 
   const { data: secrets } = useQuery({
     queryKey: ['whatsapp', 'instance-secrets', instance.id],
