@@ -38,23 +38,44 @@ type Blueprint = {
   vendor_return_reasons: { nome: string; atribuivel_vendedor: boolean }[];
 };
 
-type SectionKey =
-  | "onboarding"
-  | "implantacao"
+type CatalogKey =
   | "demand_types"
   | "training_types"
   | "pause_reasons"
   | "accounting_fields"
   | "vendor_return_reasons";
 
-const ALL_SELECTED: Record<SectionKey, boolean> = {
-  onboarding: true,
-  implantacao: true,
-  demand_types: true,
-  training_types: true,
-  pause_reasons: true,
-  accounting_fields: true,
-  vendor_return_reasons: true,
+type Selection = {
+  stages: Record<number, Set<number>>;
+  demand_types: Set<number>;
+  training_types: Set<number>;
+  pause_reasons: Set<number>;
+  accounting_fields: Set<number>;
+  vendor_return_reasons: Set<number>;
+};
+
+const emptySelection = (): Selection => ({
+  stages: {},
+  demand_types: new Set<number>(),
+  training_types: new Set<number>(),
+  pause_reasons: new Set<number>(),
+  accounting_fields: new Set<number>(),
+  vendor_return_reasons: new Set<number>(),
+});
+
+const buildFullSelection = (bp: Blueprint): Selection => {
+  const stages: Record<number, Set<number>> = {};
+  bp.pipelines.forEach((p, pi) => {
+    stages[pi] = new Set(p.stages.map((_, si) => si));
+  });
+  return {
+    stages,
+    demand_types: new Set(bp.demand_types.map((_, i) => i)),
+    training_types: new Set(bp.training_types.map((_, i) => i)),
+    pause_reasons: new Set(bp.pause_reasons.map((_, i) => i)),
+    accounting_fields: new Set(bp.accounting_fields.map((_, i) => i)),
+    vendor_return_reasons: new Set(bp.vendor_return_reasons.map((_, i) => i)),
+  };
 };
 
 interface Props {
@@ -70,9 +91,21 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
   const [loading, setLoading] = useState(false);
   const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
   const [applying, setApplying] = useState(false);
-  const [selected, setSelected] = useState<Record<SectionKey, boolean>>(ALL_SELECTED);
+  const [sel, setSel] = useState<Selection>(emptySelection);
 
-  const toggleSection = (k: SectionKey) => setSelected((s) => ({ ...s, [k]: !s[k] }));
+  const toggleStage = (pi: number, si: number) =>
+    setSel((s) => {
+      const next = new Set(s.stages[pi] ?? []);
+      next.has(si) ? next.delete(si) : next.add(si);
+      return { ...s, stages: { ...s.stages, [pi]: next } };
+    });
+
+  const toggleCatalog = (key: CatalogKey, i: number) =>
+    setSel((s) => {
+      const next = new Set(s[key]);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return { ...s, [key]: next };
+    });
 
   const handleGenerate = async () => {
     if (!effectiveTenantId) {
@@ -93,7 +126,7 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
         return;
       }
       setBlueprint(data.blueprint as Blueprint);
-      setSelected(ALL_SELECTED);
+      setSel(buildFullSelection(data.blueprint as Blueprint));
     } catch (e: any) {
       toast.error(e?.message || "Falha ao gerar sugestão");
     } finally {
@@ -106,12 +139,17 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
     setApplying(true);
     try {
       const filtered = {
-        pipelines: blueprint.pipelines.filter((p) => selected[p.fase]),
-        demand_types: selected.demand_types ? blueprint.demand_types : [],
-        training_types: selected.training_types ? blueprint.training_types : [],
-        pause_reasons: selected.pause_reasons ? blueprint.pause_reasons : [],
-        accounting_fields: selected.accounting_fields ? blueprint.accounting_fields : [],
-        vendor_return_reasons: selected.vendor_return_reasons ? blueprint.vendor_return_reasons : [],
+        pipelines: blueprint.pipelines
+          .map((p, pi) => ({
+            ...p,
+            stages: p.stages.filter((_, si) => sel.stages[pi]?.has(si)),
+          }))
+          .filter((p) => p.stages.length > 0),
+        demand_types: blueprint.demand_types.filter((_, i) => sel.demand_types.has(i)),
+        training_types: blueprint.training_types.filter((_, i) => sel.training_types.has(i)),
+        pause_reasons: blueprint.pause_reasons.filter((_, i) => sel.pause_reasons.has(i)),
+        accounting_fields: blueprint.accounting_fields.filter((_, i) => sel.accounting_fields.has(i)),
+        vendor_return_reasons: blueprint.vendor_return_reasons.filter((_, i) => sel.vendor_return_reasons.has(i)),
       };
       const { data, error } = await (supabase.rpc as any)("apply_onboarding_blueprint", {
         p_tenant_id: effectiveTenantId,
@@ -144,16 +182,19 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
   };
 
   const pipelinesByFase = (fase: "onboarding" | "implantacao") =>
-    (blueprint?.pipelines ?? []).filter((p) => p.fase === fase);
+    (blueprint?.pipelines ?? [])
+      .map((p, pi) => ({ p, pi }))
+      .filter(({ p }) => p.fase === fase);
 
   const hasSelection = blueprint
-    ? (selected.onboarding && pipelinesByFase("onboarding").length > 0) ||
-      (selected.implantacao && pipelinesByFase("implantacao").length > 0) ||
-      (selected.demand_types && blueprint.demand_types.length > 0) ||
-      (selected.training_types && blueprint.training_types.length > 0) ||
-      (selected.pause_reasons && blueprint.pause_reasons.length > 0) ||
-      (selected.accounting_fields && blueprint.accounting_fields.length > 0) ||
-      (selected.vendor_return_reasons && blueprint.vendor_return_reasons.length > 0)
+    ? blueprint.pipelines.some((p, pi) =>
+        p.stages.some((_, si) => sel.stages[pi]?.has(si))
+      ) ||
+      sel.demand_types.size > 0 ||
+      sel.training_types.size > 0 ||
+      sel.pause_reasons.size > 0 ||
+      sel.accounting_fields.size > 0 ||
+      sel.vendor_return_reasons.size > 0
     : false;
 
   return (
@@ -214,18 +255,11 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
                 if (!list.length) return null;
                 return (
                   <section key={fase} className="space-y-2">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                      <Checkbox
-                        id={`sel-${fase}`}
-                        checked={selected[fase]}
-                        onCheckedChange={() => toggleSection(fase)}
-                      />
-                      <label htmlFor={`sel-${fase}`}>
-                        {fase === "onboarding" ? "Onboarding" : "Implantação"}
-                      </label>
+                    <h3 className="text-sm font-semibold">
+                      {fase === "onboarding" ? "Onboarding" : "Implantação"}
                     </h3>
-                    {list.map((p, i) => (
-                      <div key={i} className="rounded-md border border-border p-3 space-y-2">
+                    {list.map(({ p, pi }) => (
+                      <div key={pi} className="rounded-md border border-border p-3 space-y-2">
                         <div className="flex items-baseline justify-between gap-2">
                           <div className="font-medium text-sm">{p.nome}</div>
                           {p.descricao && (
@@ -236,6 +270,10 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
                           {p.stages.map((s, si) => (
                             <div key={si} className="text-xs border-l-2 border-muted pl-2">
                               <div className="flex items-center gap-2 flex-wrap">
+                                <Checkbox
+                                  checked={sel.stages[pi]?.has(si) ?? false}
+                                  onCheckedChange={() => toggleStage(pi, si)}
+                                />
                                 <span className="font-medium">{s.nome}</span>
                                 <span className="text-muted-foreground">
                                   SLA: {formatSlaHuman(s.sla_minutos)}
@@ -275,19 +313,16 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
 
               {blueprint.demand_types.length > 0 && (
                 <section className="space-y-1.5">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <Checkbox
-                      id="sel-demand_types"
-                      checked={selected.demand_types}
-                      onCheckedChange={() => toggleSection("demand_types")}
-                    />
-                    <label htmlFor="sel-demand_types">Tipos de demanda</label>
-                  </h3>
-                  <div className="flex flex-wrap gap-1.5">
+                  <h3 className="text-sm font-semibold">Tipos de demanda</h3>
+                  <div className="flex flex-col gap-1">
                     {blueprint.demand_types.map((d, i) => (
-                      <Badge key={i} variant="outline" title={d.descricao ?? undefined}>
-                        {d.nome}
-                      </Badge>
+                      <label key={i} className="flex items-center gap-2 text-sm cursor-pointer" title={d.descricao ?? undefined}>
+                        <Checkbox
+                          checked={sel.demand_types.has(i)}
+                          onCheckedChange={() => toggleCatalog("demand_types", i)}
+                        />
+                        <span>{d.nome}</span>
+                      </label>
                     ))}
                   </div>
                 </section>
@@ -295,20 +330,19 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
 
               {blueprint.training_types.length > 0 && (
                 <section className="space-y-1.5">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <Checkbox
-                      id="sel-training_types"
-                      checked={selected.training_types}
-                      onCheckedChange={() => toggleSection("training_types")}
-                    />
-                    <label htmlFor="sel-training_types">Tipos de treino</label>
-                  </h3>
-                  <div className="flex flex-wrap gap-1.5">
+                  <h3 className="text-sm font-semibold">Tipos de treino</h3>
+                  <div className="flex flex-col gap-1">
                     {blueprint.training_types.map((t, i) => (
-                      <Badge key={i} variant="outline">
-                        {t.nome}
-                        {t.conta_como_pdv && <span className="ml-1 text-[10px]">· PDV</span>}
-                      </Badge>
+                      <label key={i} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={sel.training_types.has(i)}
+                          onCheckedChange={() => toggleCatalog("training_types", i)}
+                        />
+                        <span>
+                          {t.nome}
+                          {t.conta_como_pdv && <span className="ml-1 text-[10px] text-muted-foreground">· PDV</span>}
+                        </span>
+                      </label>
                     ))}
                   </div>
                 </section>
@@ -316,17 +350,16 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
 
               {blueprint.pause_reasons.length > 0 && (
                 <section className="space-y-1.5">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <Checkbox
-                      id="sel-pause_reasons"
-                      checked={selected.pause_reasons}
-                      onCheckedChange={() => toggleSection("pause_reasons")}
-                    />
-                    <label htmlFor="sel-pause_reasons">Motivos de parada</label>
-                  </h3>
-                  <div className="flex flex-wrap gap-1.5">
+                  <h3 className="text-sm font-semibold">Motivos de parada</h3>
+                  <div className="flex flex-col gap-1">
                     {blueprint.pause_reasons.map((r, i) => (
-                      <Badge key={i} variant="outline">{r.nome}</Badge>
+                      <label key={i} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={sel.pause_reasons.has(i)}
+                          onCheckedChange={() => toggleCatalog("pause_reasons", i)}
+                        />
+                        <span>{r.nome}</span>
+                      </label>
                     ))}
                   </div>
                 </section>
@@ -334,25 +367,22 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
 
               {blueprint.accounting_fields.length > 0 && (
                 <section className="space-y-1.5">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <Checkbox
-                      id="sel-accounting_fields"
-                      checked={selected.accounting_fields}
-                      onCheckedChange={() => toggleSection("accounting_fields")}
-                    />
-                    <label htmlFor="sel-accounting_fields">Campos de contabilidade</label>
-                  </h3>
-                  <div className="space-y-1">
+                  <h3 className="text-sm font-semibold">Campos de contabilidade</h3>
+                  <div className="flex flex-col gap-1">
                     {blueprint.accounting_fields.map((f, i) => (
-                      <div key={i} className="text-xs flex items-center gap-2 flex-wrap">
-                        <Badge variant="outline">{f.nome}</Badge>
-                        <span className="text-muted-foreground">{f.tipo}</span>
+                      <label key={i} className="flex items-center gap-2 text-sm cursor-pointer flex-wrap">
+                        <Checkbox
+                          checked={sel.accounting_fields.has(i)}
+                          onCheckedChange={() => toggleCatalog("accounting_fields", i)}
+                        />
+                        <span>{f.nome}</span>
+                        <span className="text-xs text-muted-foreground">{f.tipo}</span>
                         {f.tipo === "select" && f.opcoes && f.opcoes.length > 0 && (
-                          <span className="text-muted-foreground">
+                          <span className="text-xs text-muted-foreground">
                             [{f.opcoes.join(", ")}]
                           </span>
                         )}
-                      </div>
+                      </label>
                     ))}
                   </div>
                 </section>
@@ -360,20 +390,19 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
 
               {blueprint.vendor_return_reasons.length > 0 && (
                 <section className="space-y-1.5">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <Checkbox
-                      id="sel-vendor_return_reasons"
-                      checked={selected.vendor_return_reasons}
-                      onCheckedChange={() => toggleSection("vendor_return_reasons")}
-                    />
-                    <label htmlFor="sel-vendor_return_reasons">Retorno ao vendedor</label>
-                  </h3>
-                  <div className="flex flex-wrap gap-1.5">
+                  <h3 className="text-sm font-semibold">Retorno ao vendedor</h3>
+                  <div className="flex flex-col gap-1">
                     {blueprint.vendor_return_reasons.map((r, i) => (
-                      <Badge key={i} variant="outline">
-                        {r.nome}
-                        {r.atribuivel_vendedor && <span className="ml-1 text-[10px]">· atribuível</span>}
-                      </Badge>
+                      <label key={i} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={sel.vendor_return_reasons.has(i)}
+                          onCheckedChange={() => toggleCatalog("vendor_return_reasons", i)}
+                        />
+                        <span>
+                          {r.nome}
+                          {r.atribuivel_vendedor && <span className="ml-1 text-[10px] text-muted-foreground">· atribuível</span>}
+                        </span>
+                      </label>
                     ))}
                   </div>
                 </section>
