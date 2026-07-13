@@ -107,6 +107,8 @@ export default function OnboardingConfigPage() {
 
 
       </Tabs>
+
+      <GenerateOperationAIDialog open={aiOpen} onOpenChange={setAiOpen} />
     </div>
   );
 }
