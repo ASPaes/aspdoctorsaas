@@ -2,6 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
 
 const FUNCTION_NAME = 'delete-whatsapp-message';
+// Providers cujo backend (Evolution) suporta apagar-para-todos. Meta Cloud e Z-API não têm revoke.
+const REVOKE_SUPPORTED_PROVIDERS = new Set(['self_hosted', 'cloud']);
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
@@ -241,8 +243,9 @@ Deno.serve(async (req) => {
     const instanceSecrets: Record<string, { api_url: string; api_key: string; instance_name: string }> = {};
 
     if (instanceIds.length > 0) {
-      const { data: instancesData } = await supabase.from('whatsapp_instances').select('id, instance_name').in('id', instanceIds);
+      const { data: instancesData } = await supabase.from('whatsapp_instances').select('id, instance_name, provider_type').in('id', instanceIds);
       const instanceMap = new Map((instancesData || []).map((i: any) => [i.id, i.instance_name]));
+      const providerMap = new Map((instancesData || []).map((i: any) => [i.id, i.provider_type as string]));
 
       for (const iid of instanceIds) {
         const vaultSecrets = await getInstanceSecrets(supabase, iid);
@@ -257,6 +260,20 @@ Deno.serve(async (req) => {
     const results: { id: string; status: 'pending' | 'failed'; error?: string }[] = [];
 
     for (const msg of validMessages) {
+      const providerType = msg.instance_id ? (providerMap.get(msg.instance_id) as string | undefined) : undefined;
+      if (!providerType || !REVOKE_SUPPORTED_PROVIDERS.has(providerType)) {
+        const errorMsg = providerType === 'meta_cloud'
+          ? 'WhatsApp Oficial (Meta) não permite apagar para todos'
+          : `Provedor "${providerType ?? 'desconhecido'}" não permite apagar para todos`;
+        await supabase.from('whatsapp_messages').update({
+          delete_scope: 'everyone',
+          delete_status: 'failed',
+          delete_error: errorMsg,
+          deleted_by: userId,
+        }).eq('id', msg.id);
+        results.push({ id: msg.id, status: 'failed', error: errorMsg });
+        continue;
+      }
       if (!msg.instance_id || !instanceSecrets[msg.instance_id]) {
         await supabase.from('whatsapp_messages').update({
           delete_scope: 'everyone',
