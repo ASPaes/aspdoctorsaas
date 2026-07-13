@@ -141,6 +141,11 @@ export default function OnboardingDashboardPage() {
     },
   });
 
+  const allowedJourneyIds = useMemo(
+    () => new Set((journeysQ.data ?? []).map((j) => j.journey_id)),
+    [journeysQ.data]
+  );
+
   const pausesByReasonAgg = useMemo(() => {
     const from = dateRange.from.getTime();
     const to = dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1;
