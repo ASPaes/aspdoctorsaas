@@ -172,11 +172,11 @@ export default function OnboardingDashboardPage() {
     enabled: isSuperAdmin && !!effectiveTenantId,
     queryFn: async () => {
       const rows = await fetchAllRows<{
-        vendedor_user_id: string; motivo_nome: string | null; atribuivel_vendedor: boolean;
+        journey_id: string; vendedor_user_id: string; motivo_nome: string | null; atribuivel_vendedor: boolean;
         retornado_em: string; resolvido_em: string | null; em_aberto: boolean; minutos: number | null;
       }>(() =>
         (supabase.from("vw_onboarding_vendor_returns" as any) as any)
-          .select("vendedor_user_id, motivo_nome, atribuivel_vendedor, retornado_em, resolvido_em, em_aberto, minutos")
+          .select("journey_id, vendedor_user_id, motivo_nome, atribuivel_vendedor, retornado_em, resolvido_em, em_aberto, minutos")
           .eq("tenant_id", effectiveTenantId)
       );
       return rows;
