@@ -102,7 +102,6 @@ export default function OnboardingPage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [showConcluded, setShowConcluded] = useState(false);
   const [busca, setBusca] = useState("");
   const [filtroResponsavel, setFiltroResponsavel] = useState<string>("todos");
   const [filtroDemanda, setFiltroDemanda] = useState<string>("todos");
@@ -266,7 +265,7 @@ export default function OnboardingPage() {
     stages.forEach((s) => (m[s.id] = []));
     m[ONB_DONE_COL_ID] = [];
     journeysFiltradas.forEach((j) => {
-      if (!showConcluded && (j.situacao === "concluido" || j.situacao === "cancelado")) return;
+      if (filtroSituacao === "todos" && (j.situacao === "concluido" || j.situacao === "cancelado")) return;
       const jPipe = fase === "onboarding" ? j.pipeline_onboarding_id : j.pipeline_implantacao_id;
       if (selectedPipelineId && jPipe !== selectedPipelineId) return;
       // Na aba Onboarding, se o onboarding já foi concluído, vai pra coluna final
@@ -277,7 +276,7 @@ export default function OnboardingPage() {
       if (j.current_stage_id && m[j.current_stage_id]) m[j.current_stage_id].push(j);
     });
     return m;
-  }, [stages, journeysFiltradas, showConcluded, fase, selectedPipelineId]);
+  }, [stages, journeysFiltradas, filtroSituacao, fase, selectedPipelineId]);
 
   async function handleDrop(journeyId: string, targetStageId: string, fromStageId: string) {
     if (fromStageId === targetStageId) return;
