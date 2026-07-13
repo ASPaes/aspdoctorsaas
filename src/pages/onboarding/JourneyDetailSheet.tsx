@@ -2294,75 +2294,77 @@ function AccountingCard({
         </button>
         <Badge variant="outline" className="text-[10px]">{coletados} de {total} coletados</Badge>
       </div>
-      <div className="p-3 space-y-2.5">
-        {fields.map((f) => {
-          const cur = byField.get(f.id);
-          const rawValor = drafts[f.id] ?? (cur?.valor ?? "");
-          const coletado = cur?.coletado ?? false;
-          return (
-            <div key={f.id} className="grid grid-cols-[1fr_auto] gap-2 items-center">
-              <div className="min-w-0 space-y-1">
-                <label className="text-[11px] font-medium text-muted-foreground">{f.nome}</label>
-                {f.tipo === "text" && (
-                  <Input
-                    className="h-8 text-xs"
-                    value={rawValor}
-                    onChange={(e) => setDrafts((d) => ({ ...d, [f.id]: e.target.value }))}
-                    onBlur={() => { if (rawValor !== (cur?.valor ?? "")) commit(f, rawValor || null, coletado); }}
-                  />
-                )}
-                {f.tipo === "number" && (
-                  <Input
-                    type="number"
-                    className="h-8 text-xs"
-                    value={rawValor}
-                    onChange={(e) => setDrafts((d) => ({ ...d, [f.id]: e.target.value }))}
-                    onBlur={() => { if (rawValor !== (cur?.valor ?? "")) commit(f, rawValor || null, coletado); }}
-                  />
-                )}
-                {f.tipo === "date" && (
-                  <Input
-                    type="date"
-                    className="h-8 text-xs"
-                    value={rawValor}
-                    onChange={(e) => { setDrafts((d) => ({ ...d, [f.id]: e.target.value })); commit(f, e.target.value || null, coletado); }}
-                  />
-                )}
-                {f.tipo === "option" && (
-                  <Select
-                    value={rawValor || undefined}
-                    onValueChange={(v) => { setDrafts((d) => ({ ...d, [f.id]: v })); commit(f, v, coletado); }}
-                  >
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                    <SelectContent>
-                      {(f.opcoes ?? []).map((op) => (
-                        <SelectItem key={op} value={op} className="text-xs">{op}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {f.tipo === "boolean" && (
-                  <div className="flex items-center gap-2 h-8">
-                    <Checkbox
-                      checked={rawValor === "true"}
-                      onCheckedChange={(v) => { const nv = v ? "true" : "false"; setDrafts((d) => ({ ...d, [f.id]: nv })); commit(f, nv, coletado); }}
+      {open && (
+        <div className="p-3 space-y-2.5">
+          {fields.map((f) => {
+            const cur = byField.get(f.id);
+            const rawValor = drafts[f.id] ?? (cur?.valor ?? "");
+            const coletado = cur?.coletado ?? false;
+            return (
+              <div key={f.id} className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                <div className="min-w-0 space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground">{f.nome}</label>
+                  {f.tipo === "text" && (
+                    <Input
+                      className="h-8 text-xs"
+                      value={rawValor}
+                      onChange={(e) => setDrafts((d) => ({ ...d, [f.id]: e.target.value }))}
+                      onBlur={() => { if (rawValor !== (cur?.valor ?? "")) commit(f, rawValor || null, coletado); }}
                     />
-                    <span className="text-xs text-muted-foreground">{rawValor === "true" ? "Sim" : "Não"}</span>
-                  </div>
-                )}
+                  )}
+                  {f.tipo === "number" && (
+                    <Input
+                      type="number"
+                      className="h-8 text-xs"
+                      value={rawValor}
+                      onChange={(e) => setDrafts((d) => ({ ...d, [f.id]: e.target.value }))}
+                      onBlur={() => { if (rawValor !== (cur?.valor ?? "")) commit(f, rawValor || null, coletado); }}
+                    />
+                  )}
+                  {f.tipo === "date" && (
+                    <Input
+                      type="date"
+                      className="h-8 text-xs"
+                      value={rawValor}
+                      onChange={(e) => { setDrafts((d) => ({ ...d, [f.id]: e.target.value })); commit(f, e.target.value || null, coletado); }}
+                    />
+                  )}
+                  {f.tipo === "option" && (
+                    <Select
+                      value={rawValor || undefined}
+                      onValueChange={(v) => { setDrafts((d) => ({ ...d, [f.id]: v })); commit(f, v, coletado); }}
+                    >
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                      <SelectContent>
+                        {(f.opcoes ?? []).map((op) => (
+                          <SelectItem key={op} value={op} className="text-xs">{op}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {f.tipo === "boolean" && (
+                    <div className="flex items-center gap-2 h-8">
+                      <Checkbox
+                        checked={rawValor === "true"}
+                        onCheckedChange={(v) => { const nv = v ? "true" : "false"; setDrafts((d) => ({ ...d, [f.id]: nv })); commit(f, nv, coletado); }}
+                      />
+                      <span className="text-xs text-muted-foreground">{rawValor === "true" ? "Sim" : "Não"}</span>
+                    </div>
+                  )}
+                </div>
+                <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0 mt-4">
+                  <Checkbox
+                    checked={coletado}
+                    disabled={savingId === f.id}
+                    onCheckedChange={(v) => commit(f, cur?.valor ?? (drafts[f.id] || null), !!v)}
+                  />
+                  Coletado
+                </label>
               </div>
-              <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0 mt-4">
-                <Checkbox
-                  checked={coletado}
-                  disabled={savingId === f.id}
-                  onCheckedChange={(v) => commit(f, cur?.valor ?? (drafts[f.id] || null), !!v)}
-                />
-                Coletado
-              </label>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
