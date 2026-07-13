@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
+import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Badge } from "@/components/ui/badge";
