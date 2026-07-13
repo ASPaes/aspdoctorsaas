@@ -263,6 +263,8 @@ export default function OnboardingPage() {
     m[ONB_DONE_COL_ID] = [];
     journeysFiltradas.forEach((j) => {
       if (!showConcluded && (j.situacao === "concluido" || j.situacao === "cancelado")) return;
+      const jPipe = fase === "onboarding" ? j.pipeline_onboarding_id : j.pipeline_implantacao_id;
+      if (selectedPipelineId && jPipe !== selectedPipelineId) return;
       // Na aba Onboarding, se o onboarding já foi concluído, vai pra coluna final
       if (fase === "onboarding" && j.onboarding_concluido) {
         m[ONB_DONE_COL_ID].push(j);
@@ -271,7 +273,7 @@ export default function OnboardingPage() {
       if (j.current_stage_id && m[j.current_stage_id]) m[j.current_stage_id].push(j);
     });
     return m;
-  }, [stages, journeysFiltradas, showConcluded, fase]);
+  }, [stages, journeysFiltradas, showConcluded, fase, selectedPipelineId]);
 
   async function handleDrop(journeyId: string, targetStageId: string, fromStageId: string) {
     if (fromStageId === targetStageId) return;
