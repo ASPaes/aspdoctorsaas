@@ -101,14 +101,16 @@ export default function OnboardingDashboardPage() {
   const isSuperAdmin = profile?.is_super_admin === true;
 
   const journeysQ = useQuery({
-    queryKey: ["onboarding-dash-journeys", effectiveTenantId],
-    enabled: isSuperAdmin && !!effectiveTenantId,
+    queryKey: ["onboarding-dash-journeys", effectiveTenantId, viewKey],
+    enabled: isSuperAdmin && !!effectiveTenantId && unidadeFilterReady,
     queryFn: async () => {
-      const rows = await fetchAllRows<JourneyRow>(() =>
-        (supabase.from("vw_onboarding_journeys" as any) as any)
-          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min")
-          .eq("tenant_id", effectiveTenantId)
-      );
+      const rows = await fetchAllRows<JourneyRow>(() => {
+        let q = (supabase.from("vw_onboarding_journeys" as any) as any)
+          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id")
+          .eq("tenant_id", effectiveTenantId);
+        if (selectedUnidadeIds.length > 0) q = q.in("cliente_unidade_id", selectedUnidadeIds);
+        return q;
+      });
       return rows;
     },
   });
