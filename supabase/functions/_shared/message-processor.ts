@@ -1837,7 +1837,18 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
     const nowIso = new Date().toISOString();
     const onlyOut = await isOutboundOnlyConversation(supabase, conversationId);
     if (onlyOut) { await supabase.from('whatsapp_conversations').update({ status: 'closed', updated_at: nowIso }).eq('id', conversationId).neq('status', 'closed'); }
-    else { supabase.from('whatsapp_conversations').update({ first_agent_message_at: nowIso, updated_at: nowIso }).eq('id', conversationId).is('first_agent_message_at', null).then(() => {}).catch(() => {}); ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId).then(() => incrementAttendanceCounter(supabase, conversationId, 'agent')).catch(() => {}); }
+    else {
+      // Humano respondeu do celular: reabre a conversa se estava fechada.
+      // TEM que vir antes do ensureAttendance — a trigger de dispatch aborta se a conversa estiver 'closed'.
+      await supabase.from('whatsapp_conversations')
+        .update({ status: 'active', updated_at: nowIso })
+        .eq('id', conversationId).in('status', ['closed', 'inactive_closed']);
+      supabase.from('whatsapp_conversations')
+        .update({ first_agent_message_at: nowIso, updated_at: nowIso })
+        .eq('id', conversationId).is('first_agent_message_at', null).then(() => {}).catch(() => {});
+      await ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId, instanceId);
+      incrementAttendanceCounter(supabase, conversationId, 'agent').catch(() => {});
+    }
     return;
   }
 
