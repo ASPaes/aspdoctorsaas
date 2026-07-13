@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { MessageBubble } from "./MessageBubble";
 import { AttendanceEventBadge, parseAttendanceEvent } from "./AttendanceEventBadge";
 import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages";
+import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { formatDateLabel, formatTime } from "@/lib/formatDateWithTimezone";
 import { useConversationAssignmentHistory, type AssignmentEvent } from "../hooks/useConversationAssignmentHistory";
@@ -77,6 +78,11 @@ export function ChatMessages({
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
   const { notes, deleteNote } = useConversationNotes(conversationId);
   const { timezone } = useAppTimezone();
+  const { instances } = useWhatsAppInstances();
+  const revokeUnsupportedInstanceIds = useMemo(
+    () => new Set(instances.filter((i) => !["self_hosted", "cloud"].includes(i.provider_type)).map((i) => i.id)),
+    [instances]
+  );
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
   const firstUnreadRef = useRef<HTMLDivElement>(null);
@@ -410,6 +416,7 @@ export function ChatMessages({
                         onContactChat={onContactChat}
                         onContactSave={onContactSave}
                         groupParticipants={isGroup ? groupParticipants : undefined}
+                        deleteEveryoneDisabled={!!item.msg.instance_id && revokeUnsupportedInstanceIds.has(item.msg.instance_id)}
                       />
                     </div>
                   );
