@@ -170,6 +170,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [returnPauseSla, setReturnPauseSla] = useState(true);
 
   const [activeTab, setActiveTab] = useState<"atividade" | "geral">("atividade");
+  const [secOpen, setSecOpen] = useState<Record<string, boolean>>({ treinos: true, modulos: true, anexos: true, atendimentos: true });
+  const toggleSec = (k: string) => setSecOpen((s) => ({ ...s, [k]: !s[k] }));
 
 
   useEffect(() => {
@@ -1426,9 +1428,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   {secVisible("treinos") && (
                     <section className="rounded-lg border border-border">
                       <div className="p-3 border-b border-border flex items-center justify-between">
-                        <h3 className="text-sm font-semibold flex items-center gap-2">
-                          <GraduationCap className="h-4 w-4" /> Sub-tickets de treino
-                        </h3>
+                        <button type="button" onClick={() => toggleSec("treinos")} className="flex items-center gap-2 flex-1 text-left">
+                          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${secOpen.treinos ? "rotate-90" : ""}`} />
+                          <h3 className="text-sm font-semibold flex items-center gap-2">
+                            <GraduationCap className="h-4 w-4" /> Sub-tickets de treino
+                          </h3>
+                        </button>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-[10px]">{trainings.length}</Badge>
                           {canScheduleTraining && (
@@ -1504,115 +1509,117 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           )}
                         </div>
                       </div>
-                      <div className="p-3 space-y-2">
-                        {trainings.length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2 text-center">
-                            {canScheduleTraining
-                              ? "Nenhum treino cadastrado."
-                              : "Disponível a partir da última etapa do onboarding."}
-                          </p>
-                        ) : (
-                          trainings.map((t) => {
-                            const statusColors: Record<string, string> = {
-                              previsto: "hsl(215 16% 47%)",
-                              agendado: "hsl(199 89% 48%)",
-                              realizado: "hsl(142 71% 45%)",
-                              no_show: "hsl(0 84% 60%)",
-                              cancelado: "hsl(215 25% 27%)",
-                            };
-                            const conductorName = t.conduzido_por ? memberNameMap.get(t.conduzido_por) : null;
-                            const isDone = t.status === "realizado";
-                            const isCancelled = t.status === "cancelado";
-                            return (
-                              <div key={t.id} className="rounded-md border border-border p-2.5">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-xs font-medium truncate">{t.titulo}</span>
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] capitalize border-0 text-white"
-                                    style={{ backgroundColor: statusColors[t.status] || statusColors.previsto }}
-                                  >
-                                    {t.status.replace("_", "-")}
-                                  </Badge>
-                                </div>
-                                <div className="text-[10px] text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                                  {t.agendado_para && <span>Agendado: {formatDateTime(t.agendado_para)}</span>}
-                                  {t.realizado_em && <span>Realizado: {formatDateTime(t.realizado_em)}</span>}
-                                  {conductorName && <span>Por: {conductorName}</span>}
-                                </div>
-                                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                                  {(t.tentativas ?? 0) > 0 && (
-                                    <Badge variant="outline" className="text-[9px]">tentativas: {t.tentativas}</Badge>
-                                  )}
-                                  {t.no_show && <Badge variant="destructive" className="text-[9px]">no-show</Badge>}
-                                  {t.is_retreinamento && (
-                                    <Badge variant="outline" className="text-[9px] border-[hsl(262_83%_58%)] text-[hsl(262_83%_58%)]">
-                                      retreinamento
-                                    </Badge>
-                                  )}
-                                  {t.proprietario_presente && (
-                                    <Badge variant="outline" className="text-[9px] border-[hsl(142_71%_45%)] text-[hsl(142_71%_45%)]">
-                                      proprietário presente
-                                    </Badge>
-                                  )}
-                                </div>
-                                {!isCancelled && (
-                                  <div className="flex items-center gap-1 mt-2 flex-wrap">
-                                    {!isDone && (
-                                      <>
-                                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
-                                          onClick={() => handleMarkRealized(t.id)}>
-                                          <CheckCircle2 className="h-3 w-3 mr-1" /> Realizado
-                                        </Button>
-                                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
-                                          onClick={() => handleMarkNoShow(t.id, t.tentativas ?? 0)}>
-                                          No-show
-                                        </Button>
-                                      </>
-                                    )}
-                                    <Popover
-                                      open={rescheduleId === t.id}
-                                      onOpenChange={(o) => {
-                                        setRescheduleId(o ? t.id : null);
-                                        if (!o) setRescheduleDate("");
-                                      }}
+                      {secOpen.treinos && (
+                        <div className="p-3 space-y-2">
+                          {trainings.length === 0 ? (
+                            <p className="text-xs text-muted-foreground py-2 text-center">
+                              {canScheduleTraining
+                                ? "Nenhum treino cadastrado."
+                                : "Disponível a partir da última etapa do onboarding."}
+                            </p>
+                          ) : (
+                            trainings.map((t) => {
+                              const statusColors: Record<string, string> = {
+                                previsto: "hsl(215 16% 47%)",
+                                agendado: "hsl(199 89% 48%)",
+                                realizado: "hsl(142 71% 45%)",
+                                no_show: "hsl(0 84% 60%)",
+                                cancelado: "hsl(215 25% 27%)",
+                              };
+                              const conductorName = t.conduzido_por ? memberNameMap.get(t.conduzido_por) : null;
+                              const isDone = t.status === "realizado";
+                              const isCancelled = t.status === "cancelado";
+                              return (
+                                <div key={t.id} className="rounded-md border border-border p-2.5">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-xs font-medium truncate">{t.titulo}</span>
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] capitalize border-0 text-white"
+                                      style={{ backgroundColor: statusColors[t.status] || statusColors.previsto }}
                                     >
-                                      <PopoverTrigger asChild>
-                                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2">
-                                          <Calendar className="h-3 w-3 mr-1" /> Remarcar
-                                        </Button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-72 space-y-2" align="start">
-                                        <label className="text-[11px] font-medium">Nova data/hora</label>
-                                        <Input
-                                          type="datetime-local"
-                                          value={rescheduleDate}
-                                          onChange={(e) => setRescheduleDate(e.target.value)}
-                                          className="h-8 text-xs"
-                                        />
-                                        <Button size="sm" className="w-full h-7 text-xs"
-                                          onClick={() => handleReschedule(t.id, t.tentativas ?? 0)}>
-                                          Confirmar
-                                        </Button>
-                                      </PopoverContent>
-                                    </Popover>
-                                    {isDone && (
-                                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
-                                        onClick={() => handleTogglePresente(t.id, !!t.proprietario_presente)}>
-                                        {t.proprietario_presente ? "Marcar ausente" : "Proprietário presente"}
-                                      </Button>
-                                    )}
-                                    <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-muted-foreground"
-                                      onClick={() => handleCancelTraining(t.id)}>
-                                      Cancelar
-                                    </Button>
+                                      {t.status.replace("_", "-")}
+                                    </Badge>
                                   </div>
-                                )}
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
+                                  <div className="text-[10px] text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                                    {t.agendado_para && <span>Agendado: {formatDateTime(t.agendado_para)}</span>}
+                                    {t.realizado_em && <span>Realizado: {formatDateTime(t.realizado_em)}</span>}
+                                    {conductorName && <span>Por: {conductorName}</span>}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                    {(t.tentativas ?? 0) > 0 && (
+                                      <Badge variant="outline" className="text-[9px]">tentativas: {t.tentativas}</Badge>
+                                    )}
+                                    {t.no_show && <Badge variant="destructive" className="text-[9px]">no-show</Badge>}
+                                    {t.is_retreinamento && (
+                                      <Badge variant="outline" className="text-[9px] border-[hsl(262_83%_58%)] text-[hsl(262_83%_58%)]">
+                                        retreinamento
+                                      </Badge>
+                                    )}
+                                    {t.proprietario_presente && (
+                                      <Badge variant="outline" className="text-[9px] border-[hsl(142_71%_45%)] text-[hsl(142_71%_45%)]">
+                                        proprietário presente
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {!isCancelled && (
+                                    <div className="flex items-center gap-1 mt-2 flex-wrap">
+                                      {!isDone && (
+                                        <>
+                                          <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
+                                            onClick={() => handleMarkRealized(t.id)}>
+                                            <CheckCircle2 className="h-3 w-3 mr-1" /> Realizado
+                                          </Button>
+                                          <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
+                                            onClick={() => handleMarkNoShow(t.id, t.tentativas ?? 0)}>
+                                            No-show
+                                          </Button>
+                                        </>
+                                      )}
+                                      <Popover
+                                        open={rescheduleId === t.id}
+                                        onOpenChange={(o) => {
+                                          setRescheduleId(o ? t.id : null);
+                                          if (!o) setRescheduleDate("");
+                                        }}
+                                      >
+                                        <PopoverTrigger asChild>
+                                          <Button size="sm" variant="outline" className="h-6 text-[10px] px-2">
+                                            <Calendar className="h-3 w-3 mr-1" /> Remarcar
+                                          </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-72 space-y-2" align="start">
+                                          <label className="text-[11px] font-medium">Nova data/hora</label>
+                                          <Input
+                                            type="datetime-local"
+                                            value={rescheduleDate}
+                                            onChange={(e) => setRescheduleDate(e.target.value)}
+                                            className="h-8 text-xs"
+                                          />
+                                          <Button size="sm" className="w-full h-7 text-xs"
+                                            onClick={() => handleReschedule(t.id, t.tentativas ?? 0)}>
+                                            Confirmar
+                                          </Button>
+                                        </PopoverContent>
+                                      </Popover>
+                                      {isDone && (
+                                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
+                                          onClick={() => handleTogglePresente(t.id, !!t.proprietario_presente)}>
+                                          {t.proprietario_presente ? "Marcar ausente" : "Proprietário presente"}
+                                        </Button>
+                                      )}
+                                      <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-muted-foreground"
+                                        onClick={() => handleCancelTraining(t.id)}>
+                                        Cancelar
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
                     </section>
                   )}
 
@@ -1739,9 +1746,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   {secVisible("modulos") && (
                     <section className="rounded-lg border border-border">
                       <div className="p-3 border-b border-border flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-semibold flex items-center gap-2">
-                          <Package className="h-4 w-4" /> Módulos da jornada
-                        </h3>
+                        <button type="button" onClick={() => toggleSec("modulos")} className="flex items-center gap-2 flex-1 text-left">
+                          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${secOpen.modulos ? "rotate-90" : ""}`} />
+                          <h3 className="text-sm font-semibold flex items-center gap-2">
+                            <Package className="h-4 w-4" /> Módulos da jornada
+                          </h3>
+                        </button>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-[10px]">{(modulesQ.data ?? []).length}</Badge>
                           {(clienteProdutoModulosQ.data ?? []).length > 0 && (
@@ -1797,57 +1807,64 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           </Popover>
                         </div>
                       </div>
-                      <div className="p-3 space-y-1.5">
-                        {(modulesQ.data ?? []).length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2 text-center">Nenhum módulo cadastrado.</p>
-                        ) : (
-                          (modulesQ.data ?? []).map((m) => {
-                            const origemColor: Record<string, string> = {
-                              manual: "hsl(215 16% 47%)",
-                              produto: "hsl(199 89% 48%)",
-                              cliente: "hsl(262 83% 58%)",
-                            };
-                            return (
-                              <div key={m.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="text-xs font-medium truncate">{m.nome}</span>
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[9px] capitalize border-0 text-white shrink-0"
-                                    style={{ backgroundColor: origemColor[m.origem] || origemColor.manual }}
+                      {secOpen.modulos && (
+                        <div className="p-3 space-y-1.5">
+                          {(modulesQ.data ?? []).length === 0 ? (
+                            <p className="text-xs text-muted-foreground py-2 text-center">Nenhum módulo cadastrado.</p>
+                          ) : (
+                            (modulesQ.data ?? []).map((m) => {
+                              const origemColor: Record<string, string> = {
+                                manual: "hsl(215 16% 47%)",
+                                produto: "hsl(199 89% 48%)",
+                                cliente: "hsl(262 83% 58%)",
+                              };
+                              return (
+                                <div key={m.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="text-xs font-medium truncate">{m.nome}</span>
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[9px] capitalize border-0 text-white shrink-0"
+                                      style={{ backgroundColor: origemColor[m.origem] || origemColor.manual }}
+                                    >
+                                      {m.origem}
+                                    </Badge>
+                                  </div>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                                    onClick={() => handleDeleteModule(m.id)}
                                   >
-                                    {m.origem}
-                                  </Badge>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
                                 </div>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                                  onClick={() => handleDeleteModule(m.id)}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
                     </section>
                   )}
 
                     {/* Anexos */}
                   {secVisible("anexos") && journey?.ticket_id && (
                     <section className="rounded-lg border border-border">
-                      <div className="p-3 border-b border-border">
-                        <h3 className="text-sm font-semibold">Anexos</h3>
+                      <div className="p-3 border-b border-border flex items-center justify-between">
+                        <button type="button" onClick={() => toggleSec("anexos")} className="flex items-center gap-2 flex-1 text-left">
+                          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${secOpen.anexos ? "rotate-90" : ""}`} />
+                          <h3 className="text-sm font-semibold">Anexos</h3>
+                        </button>
                       </div>
-                      <div className="p-3">
-                        <TicketAttachments
-                          ticketId={journey.ticket_id}
-                          tenantId={tenantId!}
-                          canDelete={profile?.is_super_admin === true || profile?.role === "admin"}
-                        />
-                      </div>
+                      {secOpen.anexos && (
+                        <div className="p-3">
+                          <TicketAttachments
+                            ticketId={journey.ticket_id}
+                            tenantId={tenantId!}
+                            canDelete={profile?.is_super_admin === true || profile?.role === "admin"}
+                          />
+                        </div>
+                      )}
                     </section>
                   )}
 
@@ -1855,58 +1872,63 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   {secVisible("atendimentos") && (
                     <section className="rounded-lg border border-border">
                       <div className="p-3 border-b border-border flex items-center justify-between">
-                        <h3 className="text-sm font-semibold flex items-center gap-2">
-                          <MessageSquare className="h-4 w-4" /> Atendimentos vinculados
-                        </h3>
+                        <button type="button" onClick={() => toggleSec("atendimentos")} className="flex items-center gap-2 flex-1 text-left">
+                          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${secOpen.atendimentos ? "rotate-90" : ""}`} />
+                          <h3 className="text-sm font-semibold flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4" /> Atendimentos vinculados
+                          </h3>
+                        </button>
                         <Badge variant="outline" className="text-[10px]">{attendances.length}</Badge>
                       </div>
-                      <div className="p-3 space-y-2">
-                        {attendances.length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2 text-center">Nenhum atendimento vinculado.</p>
-                        ) : (
-                          <>
-                            {(() => {
-                              const avg = (key: string) => {
-                                const vals = attendances
-                                  .map((a: any) => a[key])
-                                  .filter((v: any) => typeof v === "number" && !isNaN(v));
-                                if (vals.length === 0) return null;
-                                return vals.reduce((s: number, v: number) => s + v, 0) / vals.length / 60;
-                              };
-                              const espera = avg("wait_seconds");
-                              const resposta = avg("first_response_time_seconds");
-                              const atendimento = avg("handle_seconds");
-                              return (
-                                <div className="grid grid-cols-3 gap-2 mb-1">
-                                  <div className="rounded-md border border-border p-2">
-                                    <div className="text-[10px] text-muted-foreground">T. médio de espera</div>
-                                    <div className="text-sm font-semibold">{formatMin(espera)}</div>
+                      {secOpen.atendimentos && (
+                        <div className="p-3 space-y-2">
+                          {attendances.length === 0 ? (
+                            <p className="text-xs text-muted-foreground py-2 text-center">Nenhum atendimento vinculado.</p>
+                          ) : (
+                            <>
+                              {(() => {
+                                const avg = (key: string) => {
+                                  const vals = attendances
+                                    .map((a: any) => a[key])
+                                    .filter((v: any) => typeof v === "number" && !isNaN(v));
+                                  if (vals.length === 0) return null;
+                                  return vals.reduce((s: number, v: number) => s + v, 0) / vals.length / 60;
+                                };
+                                const espera = avg("wait_seconds");
+                                const resposta = avg("first_response_time_seconds");
+                                const atendimento = avg("handle_seconds");
+                                return (
+                                  <div className="grid grid-cols-3 gap-2 mb-1">
+                                    <div className="rounded-md border border-border p-2">
+                                      <div className="text-[10px] text-muted-foreground">T. médio de espera</div>
+                                      <div className="text-sm font-semibold">{formatMin(espera)}</div>
+                                    </div>
+                                    <div className="rounded-md border border-border p-2">
+                                      <div className="text-[10px] text-muted-foreground">T. médio de resposta</div>
+                                      <div className="text-sm font-semibold">{formatMin(resposta)}</div>
+                                    </div>
+                                    <div className="rounded-md border border-border p-2">
+                                      <div className="text-[10px] text-muted-foreground">T. médio de atendimento</div>
+                                      <div className="text-sm font-semibold">{formatMin(atendimento)}</div>
+                                    </div>
                                   </div>
-                                  <div className="rounded-md border border-border p-2">
-                                    <div className="text-[10px] text-muted-foreground">T. médio de resposta</div>
-                                    <div className="text-sm font-semibold">{formatMin(resposta)}</div>
+                                );
+                              })()}
+                              <div className="space-y-1.5">
+                                {attendances.map((a) => (
+                                  <div key={a.id} className="rounded-md border border-border p-2 flex items-center gap-2">
+                                    <span className="font-mono text-[11px] text-primary">{a.attendance_code}</span>
+                                    <span className="text-[11px] text-muted-foreground truncate flex-1">
+                                      {a.participant_label || "—"}
+                                    </span>
+                                    <Badge variant="outline" className="text-[9px] capitalize">{a.status}</Badge>
                                   </div>
-                                  <div className="rounded-md border border-border p-2">
-                                    <div className="text-[10px] text-muted-foreground">T. médio de atendimento</div>
-                                    <div className="text-sm font-semibold">{formatMin(atendimento)}</div>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                            <div className="space-y-1.5">
-                              {attendances.map((a) => (
-                                <div key={a.id} className="rounded-md border border-border p-2 flex items-center gap-2">
-                                  <span className="font-mono text-[11px] text-primary">{a.attendance_code}</span>
-                                  <span className="text-[11px] text-muted-foreground truncate flex-1">
-                                    {a.participant_label || "—"}
-                                  </span>
-                                  <Badge variant="outline" className="text-[9px] capitalize">{a.status}</Badge>
-                                </div>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </section>
                   )}
 
@@ -2241,6 +2263,7 @@ function AccountingCard({
 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
 
   const total = fields.length;
   const coletados = fields.reduce((n, f) => n + (byField.get(f.id)?.coletado ? 1 : 0), 0);
@@ -2263,80 +2286,85 @@ function AccountingCard({
   return (
     <section className="rounded-lg border border-border">
       <div className="p-3 border-b border-border flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Package className="h-4 w-4" /> Dados da contabilidade
-        </h3>
+        <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 flex-1 text-left">
+          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Package className="h-4 w-4" /> Dados da contabilidade
+          </h3>
+        </button>
         <Badge variant="outline" className="text-[10px]">{coletados} de {total} coletados</Badge>
       </div>
-      <div className="p-3 space-y-2.5">
-        {fields.map((f) => {
-          const cur = byField.get(f.id);
-          const rawValor = drafts[f.id] ?? (cur?.valor ?? "");
-          const coletado = cur?.coletado ?? false;
-          return (
-            <div key={f.id} className="grid grid-cols-[1fr_auto] gap-2 items-center">
-              <div className="min-w-0 space-y-1">
-                <label className="text-[11px] font-medium text-muted-foreground">{f.nome}</label>
-                {f.tipo === "text" && (
-                  <Input
-                    className="h-8 text-xs"
-                    value={rawValor}
-                    onChange={(e) => setDrafts((d) => ({ ...d, [f.id]: e.target.value }))}
-                    onBlur={() => { if (rawValor !== (cur?.valor ?? "")) commit(f, rawValor || null, coletado); }}
-                  />
-                )}
-                {f.tipo === "number" && (
-                  <Input
-                    type="number"
-                    className="h-8 text-xs"
-                    value={rawValor}
-                    onChange={(e) => setDrafts((d) => ({ ...d, [f.id]: e.target.value }))}
-                    onBlur={() => { if (rawValor !== (cur?.valor ?? "")) commit(f, rawValor || null, coletado); }}
-                  />
-                )}
-                {f.tipo === "date" && (
-                  <Input
-                    type="date"
-                    className="h-8 text-xs"
-                    value={rawValor}
-                    onChange={(e) => { setDrafts((d) => ({ ...d, [f.id]: e.target.value })); commit(f, e.target.value || null, coletado); }}
-                  />
-                )}
-                {f.tipo === "option" && (
-                  <Select
-                    value={rawValor || undefined}
-                    onValueChange={(v) => { setDrafts((d) => ({ ...d, [f.id]: v })); commit(f, v, coletado); }}
-                  >
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                    <SelectContent>
-                      {(f.opcoes ?? []).map((op) => (
-                        <SelectItem key={op} value={op} className="text-xs">{op}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {f.tipo === "boolean" && (
-                  <div className="flex items-center gap-2 h-8">
-                    <Checkbox
-                      checked={rawValor === "true"}
-                      onCheckedChange={(v) => { const nv = v ? "true" : "false"; setDrafts((d) => ({ ...d, [f.id]: nv })); commit(f, nv, coletado); }}
+      {open && (
+        <div className="p-3 space-y-2.5">
+          {fields.map((f) => {
+            const cur = byField.get(f.id);
+            const rawValor = drafts[f.id] ?? (cur?.valor ?? "");
+            const coletado = cur?.coletado ?? false;
+            return (
+              <div key={f.id} className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                <div className="min-w-0 space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground">{f.nome}</label>
+                  {f.tipo === "text" && (
+                    <Input
+                      className="h-8 text-xs"
+                      value={rawValor}
+                      onChange={(e) => setDrafts((d) => ({ ...d, [f.id]: e.target.value }))}
+                      onBlur={() => { if (rawValor !== (cur?.valor ?? "")) commit(f, rawValor || null, coletado); }}
                     />
-                    <span className="text-xs text-muted-foreground">{rawValor === "true" ? "Sim" : "Não"}</span>
-                  </div>
-                )}
+                  )}
+                  {f.tipo === "number" && (
+                    <Input
+                      type="number"
+                      className="h-8 text-xs"
+                      value={rawValor}
+                      onChange={(e) => setDrafts((d) => ({ ...d, [f.id]: e.target.value }))}
+                      onBlur={() => { if (rawValor !== (cur?.valor ?? "")) commit(f, rawValor || null, coletado); }}
+                    />
+                  )}
+                  {f.tipo === "date" && (
+                    <Input
+                      type="date"
+                      className="h-8 text-xs"
+                      value={rawValor}
+                      onChange={(e) => { setDrafts((d) => ({ ...d, [f.id]: e.target.value })); commit(f, e.target.value || null, coletado); }}
+                    />
+                  )}
+                  {f.tipo === "option" && (
+                    <Select
+                      value={rawValor || undefined}
+                      onValueChange={(v) => { setDrafts((d) => ({ ...d, [f.id]: v })); commit(f, v, coletado); }}
+                    >
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                      <SelectContent>
+                        {(f.opcoes ?? []).map((op) => (
+                          <SelectItem key={op} value={op} className="text-xs">{op}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {f.tipo === "boolean" && (
+                    <div className="flex items-center gap-2 h-8">
+                      <Checkbox
+                        checked={rawValor === "true"}
+                        onCheckedChange={(v) => { const nv = v ? "true" : "false"; setDrafts((d) => ({ ...d, [f.id]: nv })); commit(f, nv, coletado); }}
+                      />
+                      <span className="text-xs text-muted-foreground">{rawValor === "true" ? "Sim" : "Não"}</span>
+                    </div>
+                  )}
+                </div>
+                <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0 mt-4">
+                  <Checkbox
+                    checked={coletado}
+                    disabled={savingId === f.id}
+                    onCheckedChange={(v) => commit(f, cur?.valor ?? (drafts[f.id] || null), !!v)}
+                  />
+                  Coletado
+                </label>
               </div>
-              <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0 mt-4">
-                <Checkbox
-                  checked={coletado}
-                  disabled={savingId === f.id}
-                  onCheckedChange={(v) => commit(f, cur?.valor ?? (drafts[f.id] || null), !!v)}
-                />
-                Coletado
-              </label>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
