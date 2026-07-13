@@ -30,6 +30,7 @@ interface PipelineRow {
   id: string;
   nome: string;
   fase: "onboarding" | "implantacao";
+  position?: number;
 }
 
 interface JourneyRow {
