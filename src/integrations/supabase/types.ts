@@ -9588,6 +9588,10 @@ export type Database = {
       }
       ai_month_spend_usd: { Args: { p_tenant_id: string }; Returns: number }
       aplicar_reajuste: { Args: { p_reajuste_id: string }; Returns: Json }
+      apply_onboarding_blueprint: {
+        Args: { p_blueprint: Json; p_tenant_id: string }
+        Returns: Json
+      }
       attach_attendance_to_ticket: {
         Args: { p_attendance_id: string; p_nota?: string }
         Returns: string
@@ -11072,6 +11076,7 @@ export type Database = {
         Args: { p_tenant_id: string }
         Returns: string
       }
+      onb_slugify: { Args: { p_txt: string }; Returns: string }
       pause_onboarding: {
         Args: {
           p_journey_id: string

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +92,7 @@ function KpiCard({
 export default function OnboardingDashboardPage() {
   const { profile, profileLoading } = useAuth();
   const { effectiveTenantId } = useTenantFilter();
+  const { selectedUnidadeIds, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
@@ -99,14 +101,16 @@ export default function OnboardingDashboardPage() {
   const isSuperAdmin = profile?.is_super_admin === true;
 
   const journeysQ = useQuery({
-    queryKey: ["onboarding-dash-journeys", effectiveTenantId],
-    enabled: isSuperAdmin && !!effectiveTenantId,
+    queryKey: ["onboarding-dash-journeys", effectiveTenantId, viewKey],
+    enabled: isSuperAdmin && !!effectiveTenantId && unidadeFilterReady,
     queryFn: async () => {
-      const rows = await fetchAllRows<JourneyRow>(() =>
-        (supabase.from("vw_onboarding_journeys" as any) as any)
-          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min")
-          .eq("tenant_id", effectiveTenantId)
-      );
+      const rows = await fetchAllRows<JourneyRow>(() => {
+        let q = (supabase.from("vw_onboarding_journeys" as any) as any)
+          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id")
+          .eq("tenant_id", effectiveTenantId);
+        if (selectedUnidadeIds.length > 0) q = q.in("cliente_unidade_id", selectedUnidadeIds);
+        return q;
+      });
       return rows;
     },
   });
@@ -128,21 +132,26 @@ export default function OnboardingDashboardPage() {
     queryKey: ["onboarding-dash-pauses-by-reason", effectiveTenantId],
     enabled: isSuperAdmin && !!effectiveTenantId,
     queryFn: async () => {
-      const rows = await fetchAllRows<{ motivo_nome: string | null; minutos: number | null; em_andamento: boolean; iniciada_em: string }>(() =>
+      const rows = await fetchAllRows<{ journey_id: string; motivo_nome: string | null; minutos: number | null; em_andamento: boolean; iniciada_em: string }>(() =>
         (supabase.from("vw_onboarding_pauses_by_reason" as any) as any)
-          .select("motivo_nome, minutos, em_andamento, iniciada_em")
+          .select("journey_id, motivo_nome, minutos, em_andamento, iniciada_em")
           .eq("tenant_id", effectiveTenantId)
       );
       return rows;
     },
   });
 
+  const allowedJourneyIds = useMemo(
+    () => new Set((journeysQ.data ?? []).map((j) => j.journey_id)),
+    [journeysQ.data]
+  );
+
   const pausesByReasonAgg = useMemo(() => {
     const from = dateRange.from.getTime();
     const to = dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1;
     const rows = (pausesAllQ.data ?? []).filter((p) => {
       const d = new Date(p.iniciada_em).getTime();
-      return d >= from && d <= to;
+      return d >= from && d <= to && allowedJourneyIds.has(p.journey_id);
     });
     const agg = new Map<string, { minutos: number; count: number; em_andamento: boolean }>();
     rows.forEach((p) => {
@@ -156,7 +165,7 @@ export default function OnboardingDashboardPage() {
     return Array.from(agg.entries())
       .map(([nome, v]) => ({ nome, ...v }))
       .sort((a, b) => b.minutos - a.minutos);
-  }, [pausesAllQ.data, dateRange]);
+  }, [pausesAllQ.data, dateRange, allowedJourneyIds]);
 
   const pausesTotalMin = useMemo(
     () => pausesByReasonAgg.reduce((s, r) => s + r.minutos, 0),
@@ -168,11 +177,11 @@ export default function OnboardingDashboardPage() {
     enabled: isSuperAdmin && !!effectiveTenantId,
     queryFn: async () => {
       const rows = await fetchAllRows<{
-        vendedor_user_id: string; motivo_nome: string | null; atribuivel_vendedor: boolean;
+        journey_id: string; vendedor_user_id: string; motivo_nome: string | null; atribuivel_vendedor: boolean;
         retornado_em: string; resolvido_em: string | null; em_aberto: boolean; minutos: number | null;
       }>(() =>
         (supabase.from("vw_onboarding_vendor_returns" as any) as any)
-          .select("vendedor_user_id, motivo_nome, atribuivel_vendedor, retornado_em, resolvido_em, em_aberto, minutos")
+          .select("journey_id, vendedor_user_id, motivo_nome, atribuivel_vendedor, retornado_em, resolvido_em, em_aberto, minutos")
           .eq("tenant_id", effectiveTenantId)
       );
       return rows;
@@ -184,9 +193,9 @@ export default function OnboardingDashboardPage() {
     const to = dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1;
     return (vendorReturnsAllQ.data ?? []).filter((r) => {
       const d = new Date(r.retornado_em).getTime();
-      return d >= from && d <= to;
+      return d >= from && d <= to && allowedJourneyIds.has(r.journey_id);
     });
-  }, [vendorReturnsAllQ.data, dateRange]);
+  }, [vendorReturnsAllQ.data, dateRange, allowedJourneyIds]);
 
   const vendorReturnUserIds = useMemo(
     () => Array.from(new Set(vendorReturnsPeriodo.map((r) => r.vendedor_user_id).filter(Boolean))) as string[],
@@ -256,9 +265,9 @@ export default function OnboardingDashboardPage() {
       const ref = t.realizado_em || t.agendado_para;
       if (!ref) return false;
       const d = new Date(ref).getTime();
-      return d >= from && d <= to;
+      return d >= from && d <= to && t.journey_id != null && allowedJourneyIds.has(t.journey_id);
     });
-  }, [trainingsAllQ.data, dateRange]);
+  }, [trainingsAllQ.data, dateRange, allowedJourneyIds]);
 
   // Resolver nomes dos implantadores via profiles → funcionarios
   const conduzidoIds = useMemo(
