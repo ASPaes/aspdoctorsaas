@@ -10,6 +10,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { formatSlaHuman } from "./utils";
 
+const EXAMPLE_PROMPT = `Somos uma revenda de software de gestão e PDV. Vendemos o sistema por assinatura mensal para varejo (lojas, mercados, conveniências) e para food service (restaurantes, lanchonetes, pizzarias).
+
+Quando o comercial fecha a venda, o cliente passa para a equipe de implantação. Começamos com uma mensagem de boas-vindas e uma reunião inicial para confirmar o que foi vendido (quais módulos, quantos PDVs, quantas lojas). Em seguida coletamos os dados do cliente: CNPJ e dados cadastrais, certificado digital, informações fiscais, logotipo e a lista de produtos. Se o cliente vinha de outro sistema, migramos a base dele (produtos, clientes, estoque e fornecedores).
+
+Depois cadastramos os produtos, configuramos a parte fiscal (NF-e, NFC-e e SAT conforme o estado), instalamos e parametrizamos o sistema (formas de pagamento, impressoras fiscais, balança e integrações) e emitimos uma nota de teste em homologação. Na sequência vem o treinamento: frente de caixa/PDV, retaguarda e gestão (estoque, financeiro, relatórios) e treinamento fiscal quando necessário. Alguns clientes precisam de retreinamento depois. Por fim acompanhamos o go-live (primeiro dia real de operação) e damos suporte próximo nos primeiros dias até estabilizar.
+
+O que mais costuma travar: o cliente demora a enviar os documentos, o certificado digital não fica pronto a tempo, o cliente não agenda o treinamento, pendência financeira, ou estamos aguardando o contador do cliente. Da contabilidade sempre precisamos saber o regime tributário, o CRT, os dados do contador e o tipo de certificado digital. Em alguns casos devolvemos o cliente para o vendedor: quando o que foi vendido não bate com a necessidade real, quando o cliente não tem a infraestrutura mínima (internet ou equipamento adequado), ou quando os dados da venda vieram incompletos.`;
+
 type Blueprint = {
   pipelines: {
     fase: "onboarding" | "implantacao";
