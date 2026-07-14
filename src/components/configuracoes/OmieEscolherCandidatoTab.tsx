@@ -254,7 +254,7 @@ export default function OmieEscolherCandidatoTab() {
     setBusy("__todos_limpos__");
     try {
       const { data, error } = await supabase.functions.invoke("recon-candidato-confirmar", {
-        body: { confirmacoes: confs },
+        body: { tenant_id: tid, confirmacoes: confs },
       });
       if (error) throw error;
       const res = data as any;
