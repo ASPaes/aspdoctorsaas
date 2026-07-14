@@ -7,12 +7,36 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, X, ChevronDown, Phone, Mail, MessageSquare, Building2, UserPlus, Paperclip, Plus, Trash2, Tag as TagIcon, Send, Clock, User as UserIcon, Calendar, Check, Lock, RefreshCw, Bot } from "lucide-react";
+import { Loader2, X, ChevronDown, Phone, Mail, MessageSquare, Building2, UserPlus, Paperclip, Plus, Trash2, Tag as TagIcon, Send, Clock, User as UserIcon, Calendar, Check, Lock, RefreshCw, Bot, ArrowLeft, ArrowRight, HelpCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
 import { useClienteSearch, type ClienteSearchResult } from "@/components/whatsapp/hooks/useClienteSearch";
+import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
+
+function HelpBadge({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((v) => !v); }}
+          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-current/40 text-[10px] leading-none opacity-80 hover:opacity-100"
+          aria-label="Ajuda"
+        >
+          ?
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="top" align="end" className="max-w-xs text-xs p-2.5 leading-relaxed">
+        {text}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 interface Props {
   open: boolean;
