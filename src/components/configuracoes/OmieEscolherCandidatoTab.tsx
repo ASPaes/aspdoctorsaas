@@ -187,7 +187,7 @@ export default function OmieEscolherCandidatoTab() {
     // recompute totalizadores por pista simplificado (subtrair grupos que sumiram)
     const contagem: Record<Pista, number> = { limpo: 0, decisao: 0, parear: 0, conflito: 0, bloqueado: 0 };
     for (const g of novosGrupos) contagem[g.pista]++;
-    qc.setQueryData<ListaResp>(["recon-escolher-candidato", "listar"], {
+    qc.setQueryData<ListaResp>(["recon-escolher-candidato", "listar", tid], {
       ...data,
       grupos: novosGrupos,
       total_grupos: novosGrupos.length,
@@ -218,6 +218,7 @@ export default function OmieEscolherCandidatoTab() {
       if (res?.ok) {
         const resolvidos: { ds_contract_id: string }[] = res.resolvidos ?? [];
         removeResolvidos(resolvidos.map((r) => r.ds_contract_id));
+        await qc.invalidateQueries({ queryKey: ["recon-escolher-candidato", "listar", tid] });
         toast.success(`${res.vinculados ?? resolvidos.length} vínculo(s) criados`);
       } else {
         // interpretar erros 409
@@ -261,6 +262,7 @@ export default function OmieEscolherCandidatoTab() {
       if (res?.ok) {
         const resolvidos: { ds_contract_id: string }[] = res.resolvidos ?? [];
         removeResolvidos(resolvidos.map((r) => r.ds_contract_id));
+        await qc.invalidateQueries({ queryKey: ["recon-escolher-candidato", "listar", tid] });
         toast.success(`${res.vinculados ?? resolvidos.length} contratos vinculados`);
       } else {
         toast.error(res?.error || "Falha ao vincular em lote");
