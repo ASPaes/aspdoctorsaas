@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OmieVinculosTab from "./OmieVinculosTab";
 import OmiePadroesTab from "./OmiePadroesTab";
 import OmieConferenciaTab from "./OmieConferenciaTab";
+import OmieEscolherCandidatoTab from "./OmieEscolherCandidatoTab";
 
 export default function OmieIntegrationTab() {
   const { toast } = useToast();
