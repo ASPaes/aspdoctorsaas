@@ -917,18 +917,16 @@ function VisaoGeralPanel({
           Conferido em{" "}
           <span className="font-medium text-foreground">{formatDateTime(data?.gerado_em)}</span>
         </div>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span tabIndex={0}>
-                <Button variant="outline" size="sm" disabled className="gap-1 pointer-events-none">
-                  <RefreshCw className="h-4 w-4" /> Reconferir agora
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>disponível em breve</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1"
+          onClick={reconferir.run}
+          disabled={reconferir.loading || !tid}
+        >
+          <RefreshCw className={`h-4 w-4 ${reconferir.loading ? "animate-spin" : ""}`} />
+          {reconferir.loading ? "Reconferindo..." : "Reconferir agora"}
+        </Button>
       </div>
 
       {/* Retrato das bases */}
