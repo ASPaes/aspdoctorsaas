@@ -1114,6 +1114,7 @@ export default function OmieConferenciaTab() {
   };
 
   const queryClient = useQueryClient();
+  const reconferir = useReconferir(tid);
   const [confirmVincularOpen, setConfirmVincularOpen] = useState(false);
   const [vinculandoLote, setVinculandoLote] = useState(false);
   const [confirmAtribuirModeloOpen, setConfirmAtribuirModeloOpen] = useState(false);
