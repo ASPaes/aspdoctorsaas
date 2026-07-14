@@ -5,6 +5,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Loader2, GitMerge, EyeOff, Phone, MessageSquare, CheckCircle2, AlertTriangle, Search } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -26,9 +36,9 @@ function formatPhone(phone: string): string {
 }
 
 function ContactCard({
-  id, name, phone, conversations, lastMessage, isKeep, onSelect,
+  name, phone, conversations, lastMessage, isKeep, onSelect,
 }: {
-  id: string; name: string; phone: string; conversations: number; lastMessage: string | null;
+  name: string; phone: string; conversations: number; lastMessage: string | null;
   isKeep: boolean | null; onSelect: () => void;
 }) {
   return (
@@ -72,21 +82,23 @@ function ContactCard({
 }
 
 function DuplicatePairCard({
-  pair, onIgnore, onMerge,
+  pair, selectedKeepId, onSelectKeep, onIgnore, onMerge,
 }: {
   pair: DuplicatePair;
+  selectedKeepId: string | null;
+  onSelectKeep: (id: string) => void;
   onIgnore: () => void;
   onMerge: (keepId: string, mergeId: string) => void;
 }) {
-  const [keepId, setKeepId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
-  const handleSelectKeep = (id: string) => {
-    setKeepId(prev => prev === id ? null : id);
+  const keepId = selectedKeepId;
+  const mergeId = keepId === pair.id_a ? pair.id_b : pair.id_a;
+
+  const handleSelect = (id: string) => {
+    onSelectKeep(id);
     setConfirming(false);
   };
-
-  const mergeId = keepId === pair.id_a ? pair.id_b : pair.id_a;
 
   return (
     <div className="rounded-lg border bg-card p-4 space-y-3">
@@ -102,22 +114,20 @@ function DuplicatePairCard({
 
       <div className="flex flex-col md:flex-row gap-3">
         <ContactCard
-          id={pair.id_a}
           name={pair.name_a}
           phone={pair.phone_a}
           conversations={pair.conversations_a}
           lastMessage={pair.last_message_a}
           isKeep={keepId === null ? null : keepId === pair.id_a}
-          onSelect={() => handleSelectKeep(pair.id_a)}
+          onSelect={() => handleSelect(pair.id_a)}
         />
         <ContactCard
-          id={pair.id_b}
           name={pair.name_b}
           phone={pair.phone_b}
           conversations={pair.conversations_b}
           lastMessage={pair.last_message_b}
           isKeep={keepId === null ? null : keepId === pair.id_b}
-          onSelect={() => handleSelectKeep(pair.id_b)}
+          onSelect={() => handleSelect(pair.id_b)}
         />
       </div>
 
@@ -152,12 +162,17 @@ function DuplicatePairCard({
   );
 }
 
+const pairKeyOf = (pair: Pick<DuplicatePair, 'id_a' | 'id_b'>) => `${pair.id_a}:${pair.id_b}`;
+
 export function DuplicateContactsTab() {
   const { profile } = useAuth();
   const { effectiveTenantId } = useTenantFilter();
   const tenantId = effectiveTenantId || profile?.tenant_id;
   const queryClient = useQueryClient();
   const [ignored, setIgnored] = useState<Set<string>>(new Set());
+  const [selections, setSelections] = useState<Record<string, string>>({});
+  const [batchConfirmOpen, setBatchConfirmOpen] = useState(false);
+  const [lastFailed, setLastFailed] = useState<{ keep: string; merge: string; error: string }[]>([]);
 
   const { data: pairs, isLoading } = useQuery({
     queryKey: ['duplicate-contacts', tenantId],
@@ -172,27 +187,64 @@ export function DuplicateContactsTab() {
   });
 
   const mergeMutation = useMutation({
-    mutationFn: async ({ keepId, mergeId }: { keepId: string; mergeId: string }) => {
+    mutationFn: async ({ keepId, mergeId, key }: { keepId: string; mergeId: string; key: string }) => {
       const { error } = await (supabase.rpc as any)('merge_whatsapp_contacts', {
         p_keep_id: keepId,
         p_merge_id: mergeId,
         p_tenant_id: tenantId,
       });
       if (error) throw error;
+      return key;
     },
-    onSuccess: () => {
+    onSuccess: (key) => {
       toast.success('Contatos unificados com sucesso');
+      setSelections(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: ['duplicate-contacts'] });
     },
     onError: () => toast.error('Erro ao unificar contatos'),
   });
 
-  const pairKey = (pair: DuplicatePair) => `${pair.id_a}:${pair.id_b}`;
+  const batchMerge = useMutation({
+    mutationFn: async (pairsPayload: { keep: string; merge: string }[]) => {
+      const { data, error } = await (supabase.rpc as any)('merge_whatsapp_contacts_batch', {
+        p_pairs: pairsPayload,
+        p_tenant_id: tenantId,
+      });
+      if (error) throw error;
+      return data as {
+        ok_count: number;
+        fail_count: number;
+        ok: { keep: string; merge: string }[];
+        failed: { keep: string; merge: string; error: string }[];
+      };
+    },
+    onSuccess: (data) => {
+      if ((data?.fail_count ?? 0) === 0) {
+        toast.success(`${data.ok_count} contato(s) unificado(s)`);
+        setLastFailed([]);
+      } else {
+        toast.warning(`${data.ok_count} unificado(s), ${data.fail_count} falhou/falharam`);
+        setLastFailed(data.failed || []);
+      }
+      setSelections({});
+      setBatchConfirmOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['duplicate-contacts'] });
+    },
+    onError: () => {
+      toast.error('Erro ao unificar em lote');
+      setBatchConfirmOpen(false);
+    },
+  });
 
   const [search, setSearch] = useState('');
 
-  const visiblePairs = (pairs || []).filter(p => {
-    if (ignored.has(pairKey(p))) return false;
+  const notIgnoredPairs = (pairs || []).filter(p => !ignored.has(pairKeyOf(p)));
+
+  const visiblePairs = notIgnoredPairs.filter(p => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
@@ -203,6 +255,41 @@ export function DuplicateContactsTab() {
     );
   });
 
+  // Selected pairs — includes those hidden by search
+  const selectedPairs = notIgnoredPairs.filter(p => selections[pairKeyOf(p)]);
+  const selectedCount = selectedPairs.length;
+
+  const handleSelectKeep = (pair: DuplicatePair, id: string) => {
+    const key = pairKeyOf(pair);
+    setSelections(prev => {
+      const next = { ...prev };
+      if (next[key] === id) {
+        delete next[key];
+      } else {
+        next[key] = id;
+      }
+      return next;
+    });
+  };
+
+  const handleIgnore = (pair: DuplicatePair) => {
+    const key = pairKeyOf(pair);
+    setIgnored(prev => new Set([...prev, key]));
+    setSelections(prev => {
+      if (!(key in prev)) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const buildBatchPayload = () =>
+    selectedPairs.map(p => {
+      const keep = selections[pairKeyOf(p)];
+      const merge = keep === p.id_a ? p.id_b : p.id_a;
+      return { keep, merge };
+    });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -211,7 +298,7 @@ export function DuplicateContactsTab() {
     );
   }
 
-  if (visiblePairs.length === 0 && !search.trim() && (pairs || []).filter(p => !ignored.has(pairKey(p))).length === 0) {
+  if (notIgnoredPairs.length === 0 && !search.trim()) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
         <CheckCircle2 className="h-8 w-8 text-green-500" />
@@ -223,7 +310,7 @@ export function DuplicateContactsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="shrink-0">
           <h3 className="text-sm font-medium">
             {visiblePairs.length} par{visiblePairs.length !== 1 ? 'es' : ''} encontrado{visiblePairs.length !== 1 ? 's' : ''}
@@ -232,17 +319,45 @@ export function DuplicateContactsTab() {
             Clique no contato que deseja manter, depois em Unificar.
           </p>
         </div>
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Buscar por nome ou telefone..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          />
+        <div className="flex items-center gap-2 flex-1 justify-end flex-wrap">
+          <Button
+            size="sm"
+            onClick={() => setBatchConfirmOpen(true)}
+            disabled={selectedCount === 0 || batchMerge.isPending}
+          >
+            {batchMerge.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+            ) : (
+              <GitMerge className="h-3.5 w-3.5 mr-1" />
+            )}
+            Unificar selecionados ({selectedCount})
+          </Button>
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Buscar por nome ou telefone..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
         </div>
       </div>
+
+      {lastFailed.length > 0 && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-1">
+          <p className="text-xs font-medium text-destructive flex items-center gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {lastFailed.length} par(es) falharam ao unificar
+          </p>
+          <ul className="text-xs text-destructive/90 space-y-0.5 max-h-32 overflow-auto">
+            {lastFailed.map((f, i) => (
+              <li key={i} className="truncate">• {f.error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {visiblePairs.length === 0 && search.trim() && (
         <div className="flex flex-col items-center justify-center py-8 text-center space-y-1">
@@ -252,15 +367,71 @@ export function DuplicateContactsTab() {
       )}
 
       <div className="space-y-3">
-        {visiblePairs.map(pair => (
-          <DuplicatePairCard
-            key={pairKey(pair)}
-            pair={pair}
-            onIgnore={() => setIgnored(prev => new Set([...prev, pairKey(pair)]))}
-            onMerge={(keepId, mergeId) => mergeMutation.mutate({ keepId, mergeId })}
-          />
-        ))}
+        {visiblePairs.map(pair => {
+          const key = pairKeyOf(pair);
+          return (
+            <DuplicatePairCard
+              key={key}
+              pair={pair}
+              selectedKeepId={selections[key] ?? null}
+              onSelectKeep={(id) => handleSelectKeep(pair, id)}
+              onIgnore={() => handleIgnore(pair)}
+              onMerge={(keepId, mergeId) => mergeMutation.mutate({ keepId, mergeId, key })}
+            />
+          );
+        })}
       </div>
+
+      <AlertDialog open={batchConfirmOpen} onOpenChange={(open) => !batchMerge.isPending && setBatchConfirmOpen(open)}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unificar {selectedCount} par{selectedCount !== 1 ? 'es' : ''} selecionado{selectedCount !== 1 ? 's' : ''}</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs font-medium text-destructive flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  Esta ação não pode ser desfeita.
+                </div>
+                <div className="max-h-72 overflow-auto rounded-md border">
+                  <ul className="divide-y">
+                    {selectedPairs.map(p => {
+                      const keep = selections[pairKeyOf(p)];
+                      const keepName = keep === p.id_a ? p.name_a : p.name_b;
+                      const keepPhone = keep === p.id_a ? p.phone_a : p.phone_b;
+                      const removeName = keep === p.id_a ? p.name_b : p.name_a;
+                      const removePhone = keep === p.id_a ? p.phone_b : p.phone_a;
+                      return (
+                        <li key={pairKeyOf(p)} className="p-2 text-xs space-y-0.5">
+                          <div>
+                            <span className="font-medium">MANTÉM</span> {keepName}
+                            {' '}← <span className="text-destructive">remove</span> {removeName}
+                          </div>
+                          <div className="text-muted-foreground text-[11px]">
+                            {formatPhone(keepPhone)} ← {formatPhone(removePhone)}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={batchMerge.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={batchMerge.isPending || selectedCount === 0}
+              onClick={(e) => {
+                e.preventDefault();
+                batchMerge.mutate(buildBatchPayload());
+              }}
+            >
+              {batchMerge.isPending && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}
+              Confirmar unificação
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
