@@ -101,6 +101,11 @@ export default function OmiePadroesTab() {
   const [modelos, setModelos] = useState<ModeloContrato[]>([]);
   const [modelosPermitidos, setModelosPermitidos] = useState<string[]>([]);
 
+  // Kill switch da integração
+  const [pausada, setPausada] = useState(false);
+  const [confirmPauseOpen, setConfirmPauseOpen] = useState(false);
+  const [savingPausa, setSavingPausa] = useState(false);
+
   useEffect(() => {
     void carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
