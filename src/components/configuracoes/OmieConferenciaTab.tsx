@@ -844,6 +844,7 @@ function VisaoGeralPanel({
   tid: string | null | undefined;
   onIrParaBalde: (b: Bucket) => void;
 }) {
+  const reconferir = useReconferir(tid);
   const { data, isLoading } = useQuery({
     queryKey: ["omie-conf-visao-geral", tid],
     enabled: !!tid,
