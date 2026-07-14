@@ -155,6 +155,9 @@ export function CreateSupportTicketModal({
   const [creatingTag, setCreatingTag] = useState(false);
   const [firstNote, setFirstNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMode, setSubmitMode] = useState<null | "close" | "continue">(null);
+  const [continueTicketId, setContinueTicketId] = useState<string | null>(null);
+  const [pendingContinueTicketId, setPendingContinueTicketId] = useState<string | null>(null);
 
   const reset = () => {
     setSelectedCliente(null);
