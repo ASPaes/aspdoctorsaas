@@ -117,6 +117,7 @@ export default function OmieIntegrationTab() {
         <TabsTrigger value="vinculos" disabled={!configurado}>Vínculos</TabsTrigger>
         <TabsTrigger value="padroes" disabled={!configurado}>Padrões Omie</TabsTrigger>
         <TabsTrigger value="conferencia" disabled={!configurado}>Conferência</TabsTrigger>
+        <TabsTrigger value="escolher" disabled={!configurado}>Escolher Candidato</TabsTrigger>
       </TabsList>
 
       <TabsContent value="conexao" className="space-y-4 max-w-xl">
