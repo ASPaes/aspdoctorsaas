@@ -7,12 +7,36 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, X, ChevronDown, Phone, Mail, MessageSquare, Building2, UserPlus, Paperclip, Plus, Trash2, Tag as TagIcon, Send, Clock, User as UserIcon, Calendar, Check, Lock, RefreshCw, Bot } from "lucide-react";
+import { Loader2, X, ChevronDown, Phone, Mail, MessageSquare, Building2, UserPlus, Paperclip, Plus, Trash2, Tag as TagIcon, Send, Clock, User as UserIcon, Calendar, Check, Lock, RefreshCw, Bot, ArrowLeft, ArrowRight, HelpCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
 import { useClienteSearch, type ClienteSearchResult } from "@/components/whatsapp/hooks/useClienteSearch";
+import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
+
+function HelpBadge({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((v) => !v); }}
+          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-current/40 text-[10px] leading-none opacity-80 hover:opacity-100"
+          aria-label="Ajuda"
+        >
+          ?
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="top" align="end" className="max-w-xs text-xs p-2.5 leading-relaxed">
+        {text}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 interface Props {
   open: boolean;
@@ -131,6 +155,9 @@ export function CreateSupportTicketModal({
   const [creatingTag, setCreatingTag] = useState(false);
   const [firstNote, setFirstNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMode, setSubmitMode] = useState<null | "close" | "continue">(null);
+  const [continueTicketId, setContinueTicketId] = useState<string | null>(null);
+  const [pendingContinueTicketId, setPendingContinueTicketId] = useState<string | null>(null);
 
   const reset = () => {
     setSelectedCliente(null);
@@ -506,7 +533,22 @@ export function CreateSupportTicketModal({
     }
   };
 
-  const handleSubmit = async () => {
+  const isDirty = !!(
+    selectedCliente || produtoId || categoryId || subcategoryId || serviceTypeId ||
+    (observacaoAgente && observacaoAgente.trim()) || (firstNote && firstNote.trim()) ||
+    checklistItems.length > 0 || selectedTagIds.length > 0 || agendadoPara ||
+    (contatoSolicitante && contatoSolicitante.trim())
+  );
+
+  const requestClose = () => {
+    if (isSubmitting) return;
+    if (isDirty && !fromClosure) {
+      if (!window.confirm("Descartar este ticket?")) return;
+    }
+    onOpenChange(false);
+  };
+
+  const handleSubmit = async (nextAction: "close" | "continue" = "close") => {
     if (!selectedCliente) {
       toast.error("Selecione um cliente");
       return;
@@ -521,6 +563,7 @@ export function CreateSupportTicketModal({
     }
 
     setIsSubmitting(true);
+    setSubmitMode(nextAction);
     try {
       let ticketId: string | null = null;
 
@@ -612,11 +655,23 @@ export function CreateSupportTicketModal({
           : "Ticket criado com sucesso"
       );
       onCreated?.();
-      onOpenChange(false);
+
+      if (nextAction === "continue" && ticketId) {
+        try {
+          setContinueTicketId(ticketId);
+          onOpenChange(false);
+        } catch (openErr) {
+          console.warn("Falha ao abrir a tela do ticket:", openErr);
+          setPendingContinueTicketId(ticketId);
+        }
+      } else {
+        onOpenChange(false);
+      }
     } catch (err: any) {
       toast.error("Erro ao criar ticket: " + (err?.message || "desconhecido"));
     } finally {
       setIsSubmitting(false);
+      setSubmitMode(null);
     }
   };
 
@@ -660,7 +715,7 @@ export function CreateSupportTicketModal({
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { requestClose(); } else { onOpenChange(true); } }}>
       <DialogContent
         className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col shadow-none"
         onPointerDownOutside={(e) => e.preventDefault()}
@@ -1381,21 +1436,64 @@ export function CreateSupportTicketModal({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-5 py-3 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t">
+          <Button variant="ghost" onClick={requestClose} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
-            Criar ticket
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => handleSubmit("close")}
+              disabled={isSubmitting}
+              className="gap-1.5"
+            >
+              {submitMode === "close" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ArrowLeft className="h-4 w-4" />
+              )}
+              Criar e fechar
+              <HelpBadge text="Cria o ticket e volta para a lista." />
+            </Button>
+            <Button
+              onClick={() => handleSubmit("continue")}
+              disabled={isSubmitting}
+              className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
+            >
+              {submitMode === "continue" && <Loader2 className="h-4 w-4 animate-spin" />}
+              Criar e continuar
+              {submitMode !== "continue" && <ArrowRight className="h-4 w-4" />}
+              <HelpBadge text="Cria o ticket e permanece na tela para continuar o preenchimento (anexo, ocorrências, etc.)." />
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
+
+    <SupportTicketDetailDialog
+      ticketId={continueTicketId}
+      open={!!continueTicketId}
+      onOpenChange={(o) => { if (!o) setContinueTicketId(null); }}
+    />
+
+    {pendingContinueTicketId && (
+      <Dialog open={!!pendingContinueTicketId} onOpenChange={(o) => { if (!o) setPendingContinueTicketId(null); }}>
+        <DialogContent className="max-w-sm">
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold">Ticket criado</h3>
+            <p className="text-sm text-muted-foreground">
+              O ticket foi criado com sucesso, mas não foi possível abrir a tela dele automaticamente. Você pode abri-lo agora.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPendingContinueTicketId(null)}>Fechar</Button>
+              <Button size="sm" onClick={() => { const id = pendingContinueTicketId; setPendingContinueTicketId(null); setContinueTicketId(id); }}>
+                Abrir ticket
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )}
 
     <Dialog open={newContactDialogOpen} onOpenChange={setNewContactDialogOpen}>
       <DialogContent className="max-w-md">
