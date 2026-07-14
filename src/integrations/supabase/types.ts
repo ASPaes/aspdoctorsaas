@@ -3690,6 +3690,7 @@ export type Database = {
         Row: {
           ativo: boolean
           id: string
+          integracao_pausada: boolean
           integrar_a_partir_de: string | null
           omie_bloqueado_ate: string | null
           sync_automatica_ativa: boolean
@@ -3705,6 +3706,7 @@ export type Database = {
         Insert: {
           ativo?: boolean
           id?: string
+          integracao_pausada?: boolean
           integrar_a_partir_de?: string | null
           omie_bloqueado_ate?: string | null
           sync_automatica_ativa?: boolean
@@ -3720,6 +3722,7 @@ export type Database = {
         Update: {
           ativo?: boolean
           id?: string
+          integracao_pausada?: boolean
           integrar_a_partir_de?: string | null
           omie_bloqueado_ate?: string | null
           sync_automatica_ativa?: boolean
