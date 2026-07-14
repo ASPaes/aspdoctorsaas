@@ -563,6 +563,7 @@ export function CreateSupportTicketModal({
     }
 
     setIsSubmitting(true);
+    setSubmitMode(nextAction);
     try {
       let ticketId: string | null = null;
 
