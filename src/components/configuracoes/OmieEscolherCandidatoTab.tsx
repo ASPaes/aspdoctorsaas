@@ -131,6 +131,7 @@ type ErrorState =
 
 export default function OmieEscolherCandidatoTab() {
   const qc = useQueryClient();
+  const { effectiveTenantId: tid } = useTenantFilter();
   const [filtro, setFiltro] = useState<Pista | "todos">("todos");
   const [confirmarTodosLimpos, setConfirmarTodosLimpos] = useState(false);
   const [busy, setBusy] = useState<string | null>(null); // key do grupo/ação em processamento
@@ -141,9 +142,12 @@ export default function OmieEscolherCandidatoTab() {
   const [escolhas, setEscolhas] = useState<Record<string, number>>({});
 
   const { data, isLoading, isFetching, refetch } = useQuery<ListaResp>({
-    queryKey: ["recon-escolher-candidato", "listar"],
+    queryKey: ["recon-escolher-candidato", "listar", tid],
+    enabled: !!tid,
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("recon-candidatos-listar", { body: {} });
+      const { data, error } = await supabase.functions.invoke("recon-candidatos-listar", {
+        body: { tenant_id: tid },
+      });
       if (error) throw error;
       return data as ListaResp;
     },
