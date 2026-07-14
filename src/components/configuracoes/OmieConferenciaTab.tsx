@@ -783,6 +783,60 @@ function num(v: any): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function useReconferir(tid: string | null | undefined) {
+  const queryClient = useQueryClient();
+  const [loading, setLoading] = useState(false);
+
+  async function run() {
+    if (!tid) {
+      toast.error("Tenant não selecionado");
+      return;
+    }
+    setLoading(true);
+    try {
+      // 1) Puxa o espelho do Omie (leitura)
+      const { data: pullData, error: pullErr } = await supabase.functions.invoke(
+        "recon-espelho-pull",
+        { body: { tenant_id: tid } }
+      );
+      if (pullErr) throw pullErr;
+      if (pullData && (pullData as any).ok === false) {
+        throw new Error((pullData as any).error || "Falha ao puxar espelho do Omie");
+      }
+
+      // 2) Snapshot do lado DS
+      const { error: snapErr } = await supabase.rpc(
+        "snapshot_reconciliacao_ds" as any,
+        { p_tenant_id: tid }
+      );
+      if (snapErr) throw snapErr;
+
+      // 3) Rodar detecção
+      const { error: detErr } = await supabase.rpc(
+        "rodar_deteccao_reconciliacao" as any,
+        { p_tenant_id: tid }
+      );
+      if (detErr) throw detErr;
+
+      // Recarregar painel (leitura)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["omie-conf-resumo"] }),
+        queryClient.invalidateQueries({ queryKey: ["omie-conf-lista"] }),
+        queryClient.invalidateQueries({ queryKey: ["omie-conf-nome-diverge-count"] }),
+        queryClient.invalidateQueries({ queryKey: ["omie-conf-visao-geral"] }),
+        queryClient.invalidateQueries({ queryKey: ["omie-conf-fornecedores"] }),
+      ]);
+      toast.success("Reconferência concluída");
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao reconferir");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return { run, loading };
+}
+
 function VisaoGeralPanel({
   tid,
   onIrParaBalde,
@@ -790,6 +844,7 @@ function VisaoGeralPanel({
   tid: string | null | undefined;
   onIrParaBalde: (b: Bucket) => void;
 }) {
+  const reconferir = useReconferir(tid);
   const { data, isLoading } = useQuery({
     queryKey: ["omie-conf-visao-geral", tid],
     enabled: !!tid,
@@ -862,18 +917,16 @@ function VisaoGeralPanel({
           Conferido em{" "}
           <span className="font-medium text-foreground">{formatDateTime(data?.gerado_em)}</span>
         </div>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span tabIndex={0}>
-                <Button variant="outline" size="sm" disabled className="gap-1 pointer-events-none">
-                  <RefreshCw className="h-4 w-4" /> Reconferir agora
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>disponível em breve</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1"
+          onClick={reconferir.run}
+          disabled={reconferir.loading || !tid}
+        >
+          <RefreshCw className={`h-4 w-4 ${reconferir.loading ? "animate-spin" : ""}`} />
+          {reconferir.loading ? "Reconferindo..." : "Reconferir agora"}
+        </Button>
       </div>
 
       {/* Retrato das bases */}
@@ -1061,6 +1114,7 @@ export default function OmieConferenciaTab() {
   };
 
   const queryClient = useQueryClient();
+  const reconferir = useReconferir(tid);
   const [confirmVincularOpen, setConfirmVincularOpen] = useState(false);
   const [vinculandoLote, setVinculandoLote] = useState(false);
   const [confirmAtribuirModeloOpen, setConfirmAtribuirModeloOpen] = useState(false);
@@ -1206,18 +1260,16 @@ export default function OmieConferenciaTab() {
         <div className="text-sm text-muted-foreground">
           Espelho conferido em <span className="font-medium text-foreground">{formatDateTime(geradoEm)}</span>
         </div>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span tabIndex={0}>
-                <Button variant="outline" size="sm" disabled className="gap-1 pointer-events-none">
-                  <RefreshCw className="h-4 w-4" /> Reconferir agora
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>disponível em breve</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1"
+          onClick={reconferir.run}
+          disabled={reconferir.loading || !tid}
+        >
+          <RefreshCw className={`h-4 w-4 ${reconferir.loading ? "animate-spin" : ""}`} />
+          {reconferir.loading ? "Reconferindo..." : "Reconferir agora"}
+        </Button>
       </div>
 
       <Alert>
