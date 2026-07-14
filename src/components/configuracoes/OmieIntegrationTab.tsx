@@ -237,6 +237,14 @@ export default function OmieIntegrationTab() {
           <p className="text-sm text-muted-foreground">Conecte a integração antes de acessar a conferência.</p>
         )}
       </TabsContent>
+
+      <TabsContent value="escolher">
+        {configurado ? (
+          <OmieEscolherCandidatoTab />
+        ) : (
+          <p className="text-sm text-muted-foreground">Conecte a integração antes de acessar a escolha de candidato.</p>
+        )}
+      </TabsContent>
     </Tabs>
   );
 }
