@@ -715,7 +715,7 @@ export function CreateSupportTicketModal({
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { requestClose(); } else { onOpenChange(true); } }}>
       <DialogContent
         className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col shadow-none"
         onPointerDownOutside={(e) => e.preventDefault()}
