@@ -533,7 +533,22 @@ export function CreateSupportTicketModal({
     }
   };
 
-  const handleSubmit = async () => {
+  const isDirty = !!(
+    selectedCliente || produtoId || categoryId || subcategoryId || serviceTypeId ||
+    (observacaoAgente && observacaoAgente.trim()) || (firstNote && firstNote.trim()) ||
+    checklistItems.length > 0 || selectedTagIds.length > 0 || agendadoPara ||
+    (contatoSolicitante && contatoSolicitante.trim())
+  );
+
+  const requestClose = () => {
+    if (isSubmitting) return;
+    if (isDirty && !fromClosure) {
+      if (!window.confirm("Descartar este ticket?")) return;
+    }
+    onOpenChange(false);
+  };
+
+  const handleSubmit = async (nextAction: "close" | "continue" = "close") => {
     if (!selectedCliente) {
       toast.error("Selecione um cliente");
       return;
