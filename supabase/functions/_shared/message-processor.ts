@@ -361,9 +361,27 @@ export async function sendAndPersistAutoMessage(
 // ─── Helpers de banco ─────────────────────────────────────────────────────────
 
 export async function isOutboundOnlyConversation(supabase: any, conversationId: string): Promise<boolean> {
-  const { count } = await supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('is_from_me', false);
-  return (count ?? 0) === 0;
+  const { count, error } = await supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('is_from_me', false);
+
+  // FAIL-SAFE (14/07): erro/timeout na contagem retornava count=null -> (null ?? 0)===0 -> TRUE,
+  // e o caller FECHAVA a conversa de um cliente ativo (casos reais: 03328, 03303, 03154, 02978).
+  if (error || count === null || count === undefined) {
+    console.error('[isOutboundOnly] count falhou — fail-safe: NOT outbound-only', error);
+    return false;
+  }
+
+  if (count > 0) return false;
+
+  // Guard (14/07): sem inbound MAS com atendimento vivo = operador abriu o chat e esta
+  // atendendo. Fechar aqui matava o atendimento via cascade com closed_reason='system'
+  // (casos reais: 02944, 02898, 02899). Nao fechar por baixo dele.
+  const { count: attCount, error: attErr } = await supabase.from('support_attendances').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).in('status', ['waiting', 'in_progress']);
+
+  if (attErr || (attCount ?? 0) > 0) return false;
+
+  return true;
 }
+
 
 export async function resolveDepartmentForInstance(supabase: any, instanceId: string, tenantId: string): Promise<string | null> {
   try {
