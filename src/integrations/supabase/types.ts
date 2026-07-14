@@ -11132,6 +11132,10 @@ export type Database = {
         Args: { p_contrato_id: string; p_observacao?: string }
         Returns: Json
       }
+      recon_marcar_candidatos_resolvidos: {
+        Args: { p_pares: Json; p_por: string; p_tenant: string }
+        Returns: number
+      }
       reconciliacao_fornecedores: {
         Args: { p_tenant_id: string }
         Returns: {

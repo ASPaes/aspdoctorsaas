@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OmieVinculosTab from "./OmieVinculosTab";
 import OmiePadroesTab from "./OmiePadroesTab";
 import OmieConferenciaTab from "./OmieConferenciaTab";
+import OmieEscolherCandidatoTab from "./OmieEscolherCandidatoTab";
 
 export default function OmieIntegrationTab() {
   const { toast } = useToast();
@@ -116,6 +117,7 @@ export default function OmieIntegrationTab() {
         <TabsTrigger value="vinculos" disabled={!configurado}>Vínculos</TabsTrigger>
         <TabsTrigger value="padroes" disabled={!configurado}>Padrões Omie</TabsTrigger>
         <TabsTrigger value="conferencia" disabled={!configurado}>Conferência</TabsTrigger>
+        <TabsTrigger value="escolher" disabled={!configurado}>Escolher Candidato</TabsTrigger>
       </TabsList>
 
       <TabsContent value="conexao" className="space-y-4 max-w-xl">
@@ -233,6 +235,14 @@ export default function OmieIntegrationTab() {
           <OmieConferenciaTab />
         ) : (
           <p className="text-sm text-muted-foreground">Conecte a integração antes de acessar a conferência.</p>
+        )}
+      </TabsContent>
+
+      <TabsContent value="escolher">
+        {configurado ? (
+          <OmieEscolherCandidatoTab />
+        ) : (
+          <p className="text-sm text-muted-foreground">Conecte a integração antes de acessar a escolha de candidato.</p>
         )}
       </TabsContent>
     </Tabs>
