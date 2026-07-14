@@ -334,10 +334,72 @@ export default function OmiePadroesTab() {
 
   return (
     <div className="space-y-4 max-w-3xl">
+      {pausada && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-4 py-3 flex items-center gap-2">
+          <Pause className="h-4 w-4 shrink-0" />
+          <span className="text-sm font-medium">
+            ⏸️ Integração Omie pausada — nada está sendo enviado ao Omie.
+          </span>
+        </div>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Status da integração</CardTitle>
+          <CardDescription>
+            Kill switch geral. Enquanto pausada, nenhuma alteração vai para o Omie (nem a sincronização automática,
+            nem o botão "Enviar ao Omie"). A conferência e o vínculo manual continuam liberados.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between rounded-md border p-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Label className="text-sm">Integração Omie ativa</Label>
+              {!pausada && (
+                <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Integração ativa
+                </span>
+              )}
+            </div>
+            <Switch
+              checked={!pausada}
+              onCheckedChange={onToggleKillSwitch}
+              disabled={savingPausa}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={confirmPauseOpen} onOpenChange={(o) => { if (!savingPausa) setConfirmPauseOpen(o); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pausar a integração Omie?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enquanto pausada, NENHUMA alteração vai para o Omie — nem a sincronização automática, nem o botão "Enviar ao Omie".
+              As movimentações que acontecerem enquanto estiver pausada são descartadas (a fila não acumula).
+              Ao reativar, só sincroniza o que vier a partir daí. O trabalho de conciliação (Conferência/vincular) continua liberado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingPausa}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); void aplicarPausa(true); }}
+              disabled={savingPausa}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {savingPausa && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Pausar integração
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <p className="text-sm text-muted-foreground">
         Estes são os valores padrão usados ao enviar contratos ao Omie. Se um produto tiver o campo preenchido,
         o valor do produto tem prioridade; caso contrário, usa-se o padrão definido aqui.
       </p>
+
 
       <Card>
         <CardHeader>
