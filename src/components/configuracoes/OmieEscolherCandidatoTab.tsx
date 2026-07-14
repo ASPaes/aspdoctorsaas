@@ -211,7 +211,7 @@ export default function OmieEscolherCandidatoTab() {
     setErros((p) => ({ ...p, [cnpj]: null }));
     try {
       const { data, error } = await supabase.functions.invoke("recon-candidato-confirmar", {
-        body: { confirmacoes },
+        body: { tenant_id: tid, confirmacoes },
       });
       if (error) throw error;
       const res = data as any;
