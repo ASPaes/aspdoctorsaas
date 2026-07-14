@@ -282,6 +282,32 @@ export default function OmiePadroesTab() {
     });
   }
 
+  async function aplicarPausa(novaPausa: boolean) {
+    setSavingPausa(true);
+    try {
+      const { error } = await (supabase.from("omie_integration" as any) as any)
+        .update({ integracao_pausada: novaPausa })
+        .eq("tenant_id", tid);
+      if (error) throw error;
+      setPausada(novaPausa);
+      toast({ title: novaPausa ? "Integração pausada" : "Integração reativada" });
+    } catch (err: any) {
+      toast({ title: "Erro ao atualizar", description: err?.message || "Tente novamente.", variant: "destructive" });
+    } finally {
+      setSavingPausa(false);
+      setConfirmPauseOpen(false);
+    }
+  }
+
+  function onToggleKillSwitch(checked: boolean) {
+    // checked = true → ativa (pausada=false); checked = false → desligar (pausar)
+    if (!checked) {
+      setConfirmPauseOpen(true);
+    } else {
+      void aplicarPausa(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-4 max-w-3xl">
