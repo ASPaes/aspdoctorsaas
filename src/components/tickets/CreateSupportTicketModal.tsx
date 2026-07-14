@@ -1436,21 +1436,64 @@ export function CreateSupportTicketModal({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-5 py-3 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t">
+          <Button variant="ghost" onClick={requestClose} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
-            Criar ticket
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => handleSubmit("close")}
+              disabled={isSubmitting}
+              className="gap-1.5"
+            >
+              {submitMode === "close" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ArrowLeft className="h-4 w-4" />
+              )}
+              Criar e fechar
+              <HelpBadge text="Cria o ticket e volta para a lista." />
+            </Button>
+            <Button
+              onClick={() => handleSubmit("continue")}
+              disabled={isSubmitting}
+              className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
+            >
+              {submitMode === "continue" && <Loader2 className="h-4 w-4 animate-spin" />}
+              Criar e continuar
+              {submitMode !== "continue" && <ArrowRight className="h-4 w-4" />}
+              <HelpBadge text="Cria o ticket e permanece na tela para continuar o preenchimento (anexo, ocorrências, etc.)." />
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
+
+    <SupportTicketDetailDialog
+      ticketId={continueTicketId}
+      open={!!continueTicketId}
+      onOpenChange={(o) => { if (!o) setContinueTicketId(null); }}
+    />
+
+    {pendingContinueTicketId && (
+      <Dialog open={!!pendingContinueTicketId} onOpenChange={(o) => { if (!o) setPendingContinueTicketId(null); }}>
+        <DialogContent className="max-w-sm">
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold">Ticket criado</h3>
+            <p className="text-sm text-muted-foreground">
+              O ticket foi criado com sucesso, mas não foi possível abrir a tela dele automaticamente. Você pode abri-lo agora.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPendingContinueTicketId(null)}>Fechar</Button>
+              <Button size="sm" onClick={() => { const id = pendingContinueTicketId; setPendingContinueTicketId(null); setContinueTicketId(id); }}>
+                Abrir ticket
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )}
 
     <Dialog open={newContactDialogOpen} onOpenChange={setNewContactDialogOpen}>
       <DialogContent className="max-w-md">
