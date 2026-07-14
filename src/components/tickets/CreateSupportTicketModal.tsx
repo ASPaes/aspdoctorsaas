@@ -655,11 +655,23 @@ export function CreateSupportTicketModal({
           : "Ticket criado com sucesso"
       );
       onCreated?.();
-      onOpenChange(false);
+
+      if (nextAction === "continue" && ticketId) {
+        try {
+          setContinueTicketId(ticketId);
+          onOpenChange(false);
+        } catch (openErr) {
+          console.warn("Falha ao abrir a tela do ticket:", openErr);
+          setPendingContinueTicketId(ticketId);
+        }
+      } else {
+        onOpenChange(false);
+      }
     } catch (err: any) {
       toast.error("Erro ao criar ticket: " + (err?.message || "desconhecido"));
     } finally {
       setIsSubmitting(false);
+      setSubmitMode(null);
     }
   };
 
