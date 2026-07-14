@@ -11052,6 +11052,10 @@ export type Database = {
         Args: { p_keep_id: string; p_merge_id: string; p_tenant_id: string }
         Returns: undefined
       }
+      merge_whatsapp_contacts_batch: {
+        Args: { p_pairs: Json; p_tenant_id: string }
+        Returns: Json
+      }
       montar_payload_contrato_omie: {
         Args: { p_contrato_id: string; p_tenant_id: string }
         Returns: Json
