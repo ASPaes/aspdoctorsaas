@@ -173,7 +173,7 @@ export default function OmiePadroesTab() {
       // Data de corte + lista de modelos (paralelo)
       const [omieRow, modelosRes] = await Promise.all([
         (supabase.from("omie_integration" as any) as any)
-          .select("integrar_a_partir_de")
+          .select("integrar_a_partir_de, integracao_pausada")
           .eq("tenant_id", tid)
           .maybeSingle(),
         (supabase.from("modelos_contrato" as any) as any)
@@ -183,6 +183,7 @@ export default function OmiePadroesTab() {
       ]);
       const dc = (omieRow?.data as any)?.integrar_a_partir_de ?? null;
       setDataCorte(dc ? String(dc).slice(0, 10) : "");
+      setPausada(!!(omieRow?.data as any)?.integracao_pausada);
       setModelos(((modelosRes?.data as any[]) ?? []).map((m) => ({ id: String(m.id), nome: String(m.nome) })));
     } catch (err: any) {
       setErro(err?.message || "Erro ao carregar padrões.");
