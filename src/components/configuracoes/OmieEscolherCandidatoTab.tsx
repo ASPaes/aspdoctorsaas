@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -130,6 +131,7 @@ type ErrorState =
 
 export default function OmieEscolherCandidatoTab() {
   const qc = useQueryClient();
+  const { effectiveTenantId: tid } = useTenantFilter();
   const [filtro, setFiltro] = useState<Pista | "todos">("todos");
   const [confirmarTodosLimpos, setConfirmarTodosLimpos] = useState(false);
   const [busy, setBusy] = useState<string | null>(null); // key do grupo/ação em processamento
@@ -140,9 +142,12 @@ export default function OmieEscolherCandidatoTab() {
   const [escolhas, setEscolhas] = useState<Record<string, number>>({});
 
   const { data, isLoading, isFetching, refetch } = useQuery<ListaResp>({
-    queryKey: ["recon-escolher-candidato", "listar"],
+    queryKey: ["recon-escolher-candidato", "listar", tid],
+    enabled: !!tid,
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("recon-candidatos-listar", { body: {} });
+      const { data, error } = await supabase.functions.invoke("recon-candidatos-listar", {
+        body: { tenant_id: tid },
+      });
       if (error) throw error;
       return data as ListaResp;
     },
@@ -206,7 +211,7 @@ export default function OmieEscolherCandidatoTab() {
     setErros((p) => ({ ...p, [cnpj]: null }));
     try {
       const { data, error } = await supabase.functions.invoke("recon-candidato-confirmar", {
-        body: { confirmacoes },
+        body: { tenant_id: tid, confirmacoes },
       });
       if (error) throw error;
       const res = data as any;
@@ -249,7 +254,7 @@ export default function OmieEscolherCandidatoTab() {
     setBusy("__todos_limpos__");
     try {
       const { data, error } = await supabase.functions.invoke("recon-candidato-confirmar", {
-        body: { confirmacoes: confs },
+        body: { tenant_id: tid, confirmacoes: confs },
       });
       if (error) throw error;
       const res = data as any;
