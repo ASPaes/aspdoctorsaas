@@ -1219,7 +1219,7 @@ export async function handleUraResponse(supabase: any, ctx: SendContext, convers
   if (att.ura_option_selected !== null) { await sendWaitingAck(); return true; }
   if (att.ura_asked_at) {
     const elapsed = (Date.now() - new Date(att.ura_asked_at).getTime()) / (1000 * 60);
-    if (elapsed > (supportConfig.ura_timeout_minutes ?? 2)) { await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig); return false; }
+    if (elapsed > (supportConfig.support_ura_timeout_minutes ?? supportConfig.ura_timeout_minutes ?? 2)) { await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig); return false; }
   }
   const trimmed = (messageContent || '').trim();
   if (detectsHumanIntent(trimmed)) { await markHumanFallback(supabase, att.id); await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig); await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(HUMAN_FALLBACK_MESSAGES)); return true; }
