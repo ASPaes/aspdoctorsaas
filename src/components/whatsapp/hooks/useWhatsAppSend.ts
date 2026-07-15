@@ -14,6 +14,7 @@ interface SendMessageParams {
   quotedMessageId?: string;
   instanceId?: string;
   mentioned?: string[];
+  mentionEveryone?: boolean;
 }
 
 let tempCounter = 0;
