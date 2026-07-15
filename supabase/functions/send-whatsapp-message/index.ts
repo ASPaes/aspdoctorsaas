@@ -20,6 +20,7 @@ interface SendMessageRequest {
   mentioned?: string[] | null;
   instanceId?: string; // NEW: optional instance override for cross-instance conversations
   systemMessage?: boolean; // Skip attendance logic (used for closure/system notifications)
+  mentionEveryone?: boolean; // @todos — marca todos os participantes do grupo (Evolution only)
 }
 
 Deno.serve(async (req) => {
