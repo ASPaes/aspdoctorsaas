@@ -724,7 +724,7 @@ function GrupoCard({
                   className={`flex items-start gap-2 rounded border p-2 cursor-pointer ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-accent"}`}
                 >
                   <RadioGroupItem id={id} value={String(c.codigo_contrato_omie)} disabled={disabled} className="mt-1" />
-                  <CandidatoInfo c={c} recomendado={recomendado} sugerido={ds.sugestao_codigo_contrato_omie != null && Number(ds.sugestao_codigo_contrato_omie) === Number(c.codigo_contrato_omie)} />
+                  <CandidatoInfo c={c} recomendado={recomendado} sugestao={sugestaoFor(ds, c)} />
                   {c.ja_vinculado_hint && <Badge variant="outline" className="text-[10px] shrink-0">já vinculado</Badge>}
                 </Label>
               );
