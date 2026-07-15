@@ -279,6 +279,20 @@ export function MessageBubble({
         </p>
       )}
 
+      {(msg as any).mentions_everyone === true && (
+        <span
+          className={cn(
+            "inline-block text-[9px] font-mono font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded mb-1 mr-1 align-middle",
+            isFromMe
+              ? "bg-primary-foreground/20 text-primary-foreground/90"
+              : "bg-foreground/10 text-foreground/70"
+          )}
+          title="Mensagem enviada com @todos"
+        >
+          @todos
+        </span>
+      )}
+
   {msg.quoted_message_id && (
     <button
       type="button"
