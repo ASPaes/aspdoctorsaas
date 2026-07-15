@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +34,7 @@ type ContratoDS = {
   modelo_ds: string | null;
   status_usuario: string | null;
   candidato_escolhido: number | string | null;
+  sugestao_codigo_contrato_omie?: number | null;
 };
 
 type Candidato = {
@@ -53,6 +54,7 @@ type Candidato = {
   codigo_cliente_integracao: string | null;
   ja_vinculado_hint: boolean;
   rank: number;
+  qtd_contratos_ativos_omie?: number | null;
 };
 
 type ClienteSemContrato = {
@@ -159,6 +161,29 @@ export default function OmieEscolherCandidatoTab() {
     if (filtro === "todos") return grupos;
     return grupos.filter((g) => g.pista === filtro);
   }, [grupos, filtro]);
+
+  // Pré-seleciona sugestões vindas do backend (sem forçar: só quando não há escolha manual).
+  useEffect(() => {
+    if (!grupos.length) return;
+    setEscolhas((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const g of grupos) {
+        for (const ds of g.contratos_ds) {
+          const sug = ds.sugestao_codigo_contrato_omie;
+          if (sug == null) continue;
+          const k = `${g.cnpj_norm}::${ds.ds_contract_id}`;
+          if (next[k] != null) continue;
+          // só usa a sugestão se o candidato ainda existe e não está indisponível
+          const cand = g.candidatos.find((c) => Number(c.codigo_contrato_omie) === Number(sug));
+          if (!cand || cand.ja_vinculado_hint) continue;
+          next[k] = Number(sug);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [grupos]);
 
   function keyOf(cnpj: string, ds_contract_id: string) { return `${cnpj}::${ds_contract_id}`; }
 
@@ -466,12 +491,17 @@ function ContratoDSInfo({ ds }: { ds: ContratoDS }) {
   );
 }
 
-function CandidatoInfo({ c, recomendado }: { c: Candidato; recomendado?: boolean }) {
+function CandidatoInfo({ c, recomendado, sugerido }: { c: Candidato; recomendado?: boolean; sugerido?: boolean }) {
   return (
     <div className="space-y-1 text-sm min-w-0 flex-1">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="font-medium truncate">{c.razao_social_omie || "—"}</span>
         {recomendado && <Badge className="bg-blue-600 text-white text-[10px]">Recomendado</Badge>}
+        {sugerido && (
+          <Badge className="bg-emerald-600 text-white text-[10px] gap-1">
+            <CheckCircle2 className="h-3 w-3" /> Valor confere
+          </Badge>
+        )}
         <HealthBadge c={c} />
         {c.situacao_contrato && (
           <Badge variant="outline" className="text-[10px]">Situação {c.situacao_contrato}</Badge>
@@ -570,6 +600,15 @@ function GrupoCard({
     return set;
   }, [erro]);
 
+  const maxAtivosOmie = useMemo(() => {
+    let max = 0;
+    for (const c of grupo.candidatos) {
+      const n = Number(c.qtd_contratos_ativos_omie ?? 0);
+      if (n > max) max = n;
+    }
+    return max;
+  }, [grupo.candidatos]);
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -588,6 +627,15 @@ function GrupoCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <ErroBox erro={erro} />
+
+        {maxAtivosOmie > 1 && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              Este cliente tem {maxAtivosOmie} contratos ativos no Omie.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {grupo.pista === "limpo" && renderLimpo()}
         {grupo.pista === "decisao" && renderDecisao()}
@@ -611,7 +659,7 @@ function GrupoCard({
         </div>
         <div className="rounded border p-3 flex flex-col gap-2">
           <div className="text-[10px] uppercase text-muted-foreground">Omie</div>
-          <CandidatoInfo c={cand} recomendado />
+          <CandidatoInfo c={cand} recomendado sugerido={ds.sugestao_codigo_contrato_omie != null && Number(ds.sugestao_codigo_contrato_omie) === Number(cand.codigo_contrato_omie)} />
           <div className="mt-auto flex justify-end pt-2">
             <Button size="sm" onClick={onConfirmarLimpo} disabled={isBusy} className="gap-1">
               {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
@@ -652,7 +700,7 @@ function GrupoCard({
                   className={`flex items-start gap-2 rounded border p-2 cursor-pointer ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-accent"}`}
                 >
                   <RadioGroupItem id={id} value={String(c.codigo_contrato_omie)} disabled={disabled} className="mt-1" />
-                  <CandidatoInfo c={c} recomendado={recomendado} />
+                  <CandidatoInfo c={c} recomendado={recomendado} sugerido={ds.sugestao_codigo_contrato_omie != null && Number(ds.sugestao_codigo_contrato_omie) === Number(c.codigo_contrato_omie)} />
                   {c.ja_vinculado_hint && <Badge variant="outline" className="text-[10px] shrink-0">já vinculado</Badge>}
                 </Label>
               );
@@ -731,6 +779,7 @@ function GrupoCard({
                         )}
                         {opcoes.map((c) => {
                           const recomendado = Number(c.codigo_contrato_omie) === Number(grupo.recomendado_codigo_contrato_omie);
+                          const sugerido = ds.sugestao_codigo_contrato_omie != null && Number(ds.sugestao_codigo_contrato_omie) === Number(c.codigo_contrato_omie);
                           return (
                             <SelectItem key={c.codigo_contrato_omie} value={String(c.codigo_contrato_omie)}>
                               <span className="flex items-center gap-2 text-xs">
@@ -738,6 +787,7 @@ function GrupoCard({
                                 <span className="truncate max-w-[220px]">{c.razao_social_omie}</span>
                                 <span className="text-muted-foreground">{formatBRL(c.valor_omie)}</span>
                                 {recomendado && <Badge className="bg-blue-600 text-white text-[9px]">Rec.</Badge>}
+                                {sugerido && <Badge className="bg-emerald-600 text-white text-[9px]">Valor confere</Badge>}
                                 {!c.saudavel && <Badge className="bg-amber-500 text-white text-[9px]">!</Badge>}
                               </span>
                             </SelectItem>

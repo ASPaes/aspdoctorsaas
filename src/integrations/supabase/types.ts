@@ -3633,6 +3633,7 @@ export type Database = {
           codigo_cliente_integracao: string | null
           codigo_cliente_omie: number
           codigo_contrato_omie: number | null
+          contratos_omie: Json | null
           dia_venc_omie: number | null
           id: string
           omie_inativo: boolean | null
@@ -3652,6 +3653,7 @@ export type Database = {
           codigo_cliente_integracao?: string | null
           codigo_cliente_omie: number
           codigo_contrato_omie?: number | null
+          contratos_omie?: Json | null
           dia_venc_omie?: number | null
           id?: string
           omie_inativo?: boolean | null
@@ -3671,6 +3673,7 @@ export type Database = {
           codigo_cliente_integracao?: string | null
           codigo_cliente_omie?: number
           codigo_contrato_omie?: number | null
+          contratos_omie?: Json | null
           dia_venc_omie?: number | null
           id?: string
           omie_inativo?: boolean | null
