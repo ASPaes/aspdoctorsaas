@@ -41,6 +41,7 @@ export interface SendRequest {
   fileName?: string;
   quotedMessageId?: string;
   mentioned?: string[] | null;
+  mentionsEveryOne?: boolean; // @todos — só suportado pelo EvolutionAdapter
 }
 
 export interface SendResult {
@@ -59,6 +60,12 @@ export interface ProviderAdapter {
     instance: InstanceInfo,
     webhookUrl: string
   ): Promise<{ ok: boolean; action: string }>;
+  /** Opcional — só o EvolutionAdapter implementa. Lista participantes de um grupo. */
+  getGroupParticipants?(
+    secrets: InstanceSecrets,
+    instance: InstanceInfo,
+    groupJid: string
+  ): Promise<{ count: number }>;
 }
 
 // ── Evolution Adapter ─────────────────────────────────────────────────────────
@@ -109,6 +116,8 @@ class EvolutionAdapter implements ProviderAdapter {
         body = { number: msg.to, text: msg.content };
         if (msg.quotedMessageId) body.quoted = { key: { id: msg.quotedMessageId } };
         if (Array.isArray(msg.mentioned) && msg.mentioned.length > 0) body.mentioned = msg.mentioned;
+        // CRÍTICO: só incluir quando true. Bug evolution-api#2431: false marca todos.
+        if (msg.mentionsEveryOne === true) body.mentionsEveryOne = true;
         break;
       }
       case 'audio': {
@@ -130,6 +139,8 @@ class EvolutionAdapter implements ProviderAdapter {
           ...(msg.messageType === 'document' && msg.fileName ? { fileName: msg.fileName } : {}),
         };
         if (msg.quotedMessageId) body.quoted = { key: { id: msg.quotedMessageId } };
+        // Mesma regra do texto: só quando true.
+        if (msg.mentionsEveryOne === true) body.mentionsEveryOne = true;
       }
     }
 
@@ -174,6 +185,21 @@ class EvolutionAdapter implements ProviderAdapter {
     });
     if (!setRes.ok) return { ok: false, action: 'reconfigure_failed' };
     return { ok: true, action: 'reconfigured' };
+  }
+
+  async getGroupParticipants(
+    secrets: InstanceSecrets,
+    instance: InstanceInfo,
+    groupJid: string
+  ): Promise<{ count: number }> {
+    const base = this.getBaseUrl(secrets);
+    const id = this.getIdentifier(secrets, instance);
+    const url = `${base}/group/participants/${id}?groupJid=${encodeURIComponent(groupJid)}`;
+    const res = await fetch(url, { headers: this.getHeaders(secrets) });
+    if (!res.ok) throw new Error(`Evolution getGroupParticipants error: ${await res.text()}`);
+    const data = await res.json();
+    const participants = Array.isArray(data?.participants) ? data.participants : [];
+    return { count: participants.length };
   }
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Megaphone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { GroupParticipant } from "../../hooks/useGroupParticipants";
@@ -52,6 +53,31 @@ export const MentionSuggestions = ({ participants, onSelect, selectedIndex = 0 }
       <div className="p-1 max-h-[240px] overflow-y-auto">
         {participants.map((p, idx) => {
           const isSelected = idx === selectedIndex;
+          if (p.isAll) {
+            return (
+              <button
+                key={`__all__-${idx}`}
+                ref={(el) => (itemRefs.current[idx] = el)}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => onSelect(p)}
+                className={cn(
+                  "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors border-l-2",
+                  isSelected ? "bg-accent border-primary" : "border-transparent hover:bg-accent/50"
+                )}
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Megaphone className="w-3.5 h-3.5" />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-semibold truncate">todos</span>
+                  <span className="block text-[11px] text-muted-foreground truncate">
+                    Notifica todos os participantes do grupo
+                  </span>
+                </span>
+              </button>
+            );
+          }
           const display = displayFor(p);
           const initials = initialsFor(p);
           const subtitle = p.name?.trim() ? formatPhone(p.phone || "") : null;

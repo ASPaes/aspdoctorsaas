@@ -30,6 +30,7 @@ import type { MediaSendParams } from "./input/types";
 import { useGroupParticipants, type GroupParticipant } from "../hooks/useGroupParticipants";
 import { MentionSuggestions, displayFor } from "./input/MentionSuggestions";
 import { toast } from "sonner";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface Props {
   conversationId: string;
@@ -354,15 +355,48 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       const phone = (p.phone || "").toLowerCase();
       return name.includes(term) || phone.includes(term);
     });
-    return list.slice(0, 8);
-  }, [mentionQuery, groupParticipants]);
+    const result: GroupParticipant[] = [];
+    // "todos" fixado no topo em grupos; se houver termo, só aparece se for prefixo de "todos" ou "all"
+    if (isGroup) {
+      const t = term.trim();
+      if (t === "" || "todos".startsWith(t) || "all".startsWith(t)) {
+        result.push({ phone: "__all__", name: "todos", admin: false, isAll: true });
+      }
+    }
+    return [...result, ...list.slice(0, 8)];
+  }, [mentionQuery, groupParticipants, isGroup]);
 
   useEffect(() => {
     setMentionIndex(0);
   }, [filteredMentionParticipants]);
 
+  // Derive @todos flag from text content (single source of truth)
+  const mentionEveryone = useMemo(() => {
+    if (!isGroup || mode !== "message") return false;
+    return /(^|\s)@todos(\s|$)/i.test(message);
+  }, [isGroup, mode, message]);
+
   const insertMention = useCallback((p: GroupParticipant) => {
     if (!mentionQuery) return;
+    if (p.isAll) {
+      const pos = Math.min(cursorPos, message.length);
+      const before = message.substring(0, mentionQuery.start);
+      const after = message.substring(pos);
+      const insert = `@todos `;
+      const newText = before + insert + after;
+      setMessage(newText);
+      setMentionQuery(null);
+      const newCursor = (before + insert).length;
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = newCursor;
+          textareaRef.current.selectionEnd = newCursor;
+          textareaRef.current.focus();
+          setCursorPos(newCursor);
+        }
+      }, 0);
+      return;
+    }
     const display = displayFor(p);
     const rawNumber = (p.phone && p.phone.replace(/\D/g, "")) || (p.lid ? p.lid.replace(/\D/g, "") : "");
     if (!display || !rawNumber) return;
@@ -386,7 +420,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         setCursorPos(newCursor);
       }
     }, 0);
-  }, [mentionQuery, cursorPos, message]);
+  }, [mentionQuery, cursorPos, message, isGroup]);
 
   // Send a single attached file as media
   const sendOneFile = useCallback(async (file: File, caption?: string) => {
@@ -443,6 +477,74 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     }
   }, [isBlocked, sendOneFile]);
 
+  // --- @todos confirmation dialog state ---
+  const [everyoneDialogOpen, setEveryoneDialogOpen] = useState(false);
+  const [everyoneCount, setEveryoneCount] = useState<number | null>(null);
+  const [everyoneCountLoading, setEveryoneCountLoading] = useState(false);
+
+  const performTextSend = useCallback((withMentionEveryone: boolean) => {
+    const content = message.trim();
+    if (!content) return;
+
+    // Resolve menções ativas presentes no texto → substitui "@<display>" por "@<number>"
+    let finalContent = content;
+    const mentionedNumbers: string[] = [];
+    if (mentionsEnabled && activeMentions.length > 0) {
+      for (const m of activeMentions) {
+        const token = `@${m.display}`;
+        if (finalContent.includes(token)) {
+          finalContent = finalContent.split(token).join(`@${m.number}`);
+          if (!mentionedNumbers.includes(m.number)) mentionedNumbers.push(m.number);
+        }
+      }
+    }
+
+    setMessage("");
+    setActiveMentions([]);
+    onCancelReply?.();
+    requestAnimationFrame(() => textareaRef.current?.focus());
+    setTimeout(() => textareaRef.current?.focus(), 100);
+
+    sendMutation.mutate(
+      {
+        conversationId,
+        content: finalContent,
+        messageType: "text",
+        quotedMessageId: replyTo?.message_id || undefined,
+        mentioned: mentionedNumbers.length > 0 ? mentionedNumbers : undefined,
+        mentionEveryone: withMentionEveryone ? true : undefined,
+      },
+      {
+        onError: (err: any) => {
+          const anyErr = err as any;
+          // Rate-limited (429) — restaura a mensagem para o usuário
+          if (anyErr?.rateLimited || /aguarde\s+\d+\s*min/i.test(anyErr?.message || "")) {
+            setMessage(content);
+            toast.error(anyErr?.message || "J\u00E1 foi marcado @todos neste grupo h\u00E1 pouco.");
+            return;
+          }
+          toast.error(err?.message || "Erro ao enviar mensagem");
+        },
+      }
+    );
+  }, [message, mentionsEnabled, activeMentions, onCancelReply, sendMutation, conversationId, replyTo]);
+
+  const openEveryoneConfirmDialog = useCallback(async () => {
+    setEveryoneCount(null);
+    setEveryoneCountLoading(true);
+    setEveryoneDialogOpen(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("get-group-participants", {
+        body: { conversationId },
+      });
+      if (!error && data?.success && typeof data.count === "number") {
+        setEveryoneCount(data.count);
+      }
+    } catch { /* fallback msg */ } finally {
+      setEveryoneCountLoading(false);
+    }
+  }, [conversationId]);
+
   const handleSend = useCallback(() => {
     // Rascunho: não envia nem salva no servidor; é apenas local por conversa
     if (isDraftMode) {
@@ -488,39 +590,14 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     const content = message.trim();
     if (!content) return;
 
-    // Resolve menções ativas presentes no texto → substitui "@<display>" por "@<number>"
-    let finalContent = content;
-    const mentionedNumbers: string[] = [];
-    if (mentionsEnabled && activeMentions.length > 0) {
-      for (const m of activeMentions) {
-        const token = `@${m.display}`;
-        if (finalContent.includes(token)) {
-          finalContent = finalContent.split(token).join(`@${m.number}`);
-          if (!mentionedNumbers.includes(m.number)) mentionedNumbers.push(m.number);
-        }
-      }
+    // @todos → confirmação primeiro
+    if (mentionEveryone) {
+      void openEveryoneConfirmDialog();
+      return;
     }
 
-    setMessage("");
-    setActiveMentions([]);
-    onCancelReply?.();
-    // Refocus imediato + fallback para garantir foco após re-render
-    requestAnimationFrame(() => textareaRef.current?.focus());
-    setTimeout(() => textareaRef.current?.focus(), 100);
-
-    sendMutation.mutate(
-      {
-        conversationId,
-        content: finalContent,
-        messageType: "text",
-        quotedMessageId: replyTo?.message_id || undefined,
-        mentioned: mentionedNumbers.length > 0 ? mentionedNumbers : undefined,
-      },
-      {
-        onError: (err: any) => { toast.error(err.message || "Erro ao enviar mensagem"); },
-      }
-    );
-  }, [isDraftMode, isInternalNote, isCreatingNote, createNote, attachedFiles, sendAttachedFilesAll, message, isBlocked, sendMutation, conversationId, replyTo, onCancelReply, mentionsEnabled, activeMentions]);
+    performTextSend(false);
+  }, [isDraftMode, isInternalNote, isCreatingNote, createNote, attachedFiles, sendAttachedFilesAll, message, isBlocked, mentionEveryone, openEveryoneConfirmDialog, performTextSend, onCancelReply]);
 
 
   const handleSendMedia = useCallback((params: MediaSendParams) => {
@@ -1070,6 +1147,32 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         disabled={mode === "note" ? false : (isBlocked || requiresTemplate)}
         disabledReason={mode === "note" ? undefined : (requiresTemplate ? "Janela de 24h fechada — use um template Meta." : (isBlocked ? "Você precisa estar ATIVO para enviar." : undefined))}
       />
+
+      <AlertDialog open={everyoneDialogOpen} onOpenChange={setEveryoneDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Marcar todos do grupo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {everyoneCountLoading
+                ? "Calculando quantos participantes ser\u00E3o notificados..."
+                : everyoneCount !== null
+                ? `Isso vai notificar ${everyoneCount} participantes \u2014 inclusive quem silenciou o grupo.`
+                : "Isso vai notificar todos os participantes do grupo \u2014 inclusive quem silenciou o grupo."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setEveryoneDialogOpen(false);
+                performTextSend(true);
+              }}
+            >
+              Marcar todos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 });

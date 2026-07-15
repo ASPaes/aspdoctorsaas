@@ -3700,6 +3700,7 @@ export type Database = {
           tenant_id: string
           ultimo_status: string
           ultimo_teste_at: string | null
+          unidades_base_ids: number[] | null
           updated_at: string
           vault_secret_id: string | null
         }
@@ -3716,6 +3717,7 @@ export type Database = {
           tenant_id: string
           ultimo_status?: string
           ultimo_teste_at?: string | null
+          unidades_base_ids?: number[] | null
           updated_at?: string
           vault_secret_id?: string | null
         }
@@ -3732,6 +3734,7 @@ export type Database = {
           tenant_id?: string
           ultimo_status?: string
           ultimo_teste_at?: string | null
+          unidades_base_ids?: number[] | null
           updated_at?: string
           vault_secret_id?: string | null
         }
@@ -8505,6 +8508,7 @@ export type Database = {
           media_size_bytes: number | null
           media_url: string | null
           mentions: Json | null
+          mentions_everyone: boolean
           message_id: string
           message_type: string
           metadata: Json | null
@@ -8541,6 +8545,7 @@ export type Database = {
           media_size_bytes?: number | null
           media_url?: string | null
           mentions?: Json | null
+          mentions_everyone?: boolean
           message_id: string
           message_type?: string
           metadata?: Json | null
@@ -8577,6 +8582,7 @@ export type Database = {
           media_size_bytes?: number | null
           media_url?: string | null
           mentions?: Json | null
+          mentions_everyone?: boolean
           message_id?: string
           message_type?: string
           metadata?: Json | null
@@ -11057,7 +11063,11 @@ export type Database = {
         Returns: Json
       }
       montar_payload_contrato_omie: {
-        Args: { p_contrato_id: string; p_tenant_id: string }
+        Args: {
+          p_contrato_id: string
+          p_incluir_situacao?: boolean
+          p_tenant_id: string
+        }
         Returns: Json
       }
       move_onboarding_stage: {
