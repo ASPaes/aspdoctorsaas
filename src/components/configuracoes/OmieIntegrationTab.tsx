@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -25,6 +25,19 @@ export default function OmieIntegrationTab() {
   const [trocando, setTrocando] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("conexao");
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const tab = typeof detail === "string" ? detail : detail?.tab;
+      if (tab === "escolher" || tab === "escolher_candidato") setActiveTab("escolher");
+      else if (tab) setActiveTab(String(tab));
+    };
+    window.addEventListener("omie-goto-tab", handler as EventListener);
+    return () => window.removeEventListener("omie-goto-tab", handler as EventListener);
+  }, []);
+
 
   const { data: integracao, isLoading, refetch } = useQuery({
     queryKey: ["omie_integration", tid],
@@ -111,7 +124,7 @@ export default function OmieIntegrationTab() {
   }
 
   return (
-    <Tabs defaultValue="conexao" className="space-y-4">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
       <TabsList>
         <TabsTrigger value="conexao">Conexão</TabsTrigger>
         <TabsTrigger value="vinculos" disabled={!configurado}>Vínculos</TabsTrigger>

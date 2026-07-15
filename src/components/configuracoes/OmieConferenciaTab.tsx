@@ -24,9 +24,32 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import OmieFilaSincronizacaoPanel from "./OmieFilaSincronizacaoPanel";
 import {
   AlertCircle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, HelpCircle, History, Lock, RefreshCw, Search,
 } from "lucide-react";
+
+function MetricHelpPopover({ children }: { children: React.ReactNode }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center justify-center rounded-full p-0.5 text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          aria-label="Ajuda"
+        >
+          <HelpCircle className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="top" className="w-[320px] text-xs leading-relaxed">
+        {children}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 
 type Bucket =
   | "vinculo_auto_ok"
@@ -941,18 +964,36 @@ function VisaoGeralPanel({
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-3">
               <div>
-                <div className="text-[11px] text-muted-foreground">Clientes</div>
+                <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  Clientes
+                  <MetricHelpPopover>
+                    Clientes ativos (não cancelados) da unidade Digi Office — a única unidade que esta integração cobre. Inclui clientes sem contrato ativo, por isso este número é maior que "Contratos ativos". Digi Up e Nutrebem não entram: não fazem parte do escopo desta integração.
+                  </MetricHelpPopover>
+                </div>
                 <div className="text-xl font-semibold">{num(ds.clientes).toLocaleString("pt-BR")}</div>
               </div>
               <div>
-                <div className="text-[11px] text-muted-foreground">Contratos ativos</div>
+                <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  Contratos ativos
+                  <MetricHelpPopover>
+                    Contratos com situação ativa cujos clientes são da unidade Digi Office. Contratos cancelados não entram. Um cliente pode ter mais de um contrato.
+                  </MetricHelpPopover>
+                </div>
                 <div className="text-xl font-semibold">{num(ds.contratos_ativos).toLocaleString("pt-BR")}</div>
               </div>
               <div>
-                <div className="text-[11px] text-muted-foreground">MRR total</div>
+                <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  MRR total
+                  <MetricHelpPopover>
+                    Soma do valor mensal de todos os contratos ativos no escopo. Cada contrato usa a mesma fórmula que a integração envia ao Omie: produtos ativos do cliente (cliente_produtos com valor mensal) + movimentos de MRR (reajuste, upsell, downsell, cross-sell). Não entram: venda avulsa, churn, reativação, e movimentos estornados.
+                  </MetricHelpPopover>
+                </div>
                 <div className="text-xl font-semibold">{formatBRL(ds.mrr_total)}</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">
+                <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
                   Conciliável: <span className="font-medium">{formatBRL(ds.mrr_conciliavel)}</span>
+                  <MetricHelpPopover>
+                    A parcela do MRR que está em contratos casados — CNPJ que existe nos dois lados com exatamente 1 contrato no DoctorSaaS e 1 no Omie, sem ambiguidade. O restante está em CNPJ com múltiplos cadastros no Omie (aguardando escolha), contratos que só existem no DoctorSaaS, ou pendentes de assunção.
+                  </MetricHelpPopover>
                 </div>
               </div>
             </CardContent>
@@ -964,15 +1005,30 @@ function VisaoGeralPanel({
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-3">
               <div>
-                <div className="text-[11px] text-muted-foreground">Clientes</div>
+                <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  Clientes
+                  <MetricHelpPopover>
+                    Todos os clientes da conta Omie do DigiOffice, lidos no último "Reconferir agora". Inclui clientes sem nenhum contrato e cadastros legados (Hiper e outros sistemas anteriores). Não tem filtro de unidade — é a conta Omie inteira. Por isso é bem maior que o lado DoctorSaaS.
+                  </MetricHelpPopover>
+                </div>
                 <div className="text-xl font-semibold">{num(omie.clientes).toLocaleString("pt-BR")}</div>
               </div>
               <div>
-                <div className="text-[11px] text-muted-foreground">Contratos ativos</div>
+                <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  Contratos ativos
+                  <MetricHelpPopover>
+                    Clientes do Omie que têm contrato de serviço vinculado. Inclui contratos de origem legada que nunca existiram no DoctorSaaS.
+                  </MetricHelpPopover>
+                </div>
                 <div className="text-xl font-semibold">{num(omie.contratos_ativos).toLocaleString("pt-BR")}</div>
               </div>
               <div>
-                <div className="text-[11px] text-muted-foreground">MRR ativo</div>
+                <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  MRR ativo
+                  <MetricHelpPopover>
+                    Soma do valor mensal dos contratos do Omie. Como inclui contratos legados e de fora do escopo Digi Office, não deve bater com o MRR do DoctorSaaS. A comparação válida é a conciliação abaixo.
+                  </MetricHelpPopover>
+                </div>
                 <div className="text-xl font-semibold">{formatBRL(omie.mrr_total_ativos)}</div>
               </div>
             </CardContent>
@@ -984,10 +1040,24 @@ function VisaoGeralPanel({
         </p>
       </div>
 
+      {/* Fila de sincronização */}
+      <OmieFilaSincronizacaoPanel
+        tid={tid}
+        onIrParaEscolherCandidato={(cnpj) => {
+          try {
+            sessionStorage.setItem("omie_escolher_cnpj", cnpj);
+          } catch {}
+          window.dispatchEvent(
+            new CustomEvent("omie-goto-tab", { detail: { tab: "escolher", cnpj } })
+          );
+        }}
+      />
+
       {/* Conciliação — herói */}
       <Card className="border-2">
         <CardHeader className="pb-3">
           <div className="flex items-baseline justify-between flex-wrap gap-2">
+
             <CardTitle className="text-base">
               <span className="text-2xl font-bold text-foreground">
                 {num(c.com_contrato_omie).toLocaleString("pt-BR")}

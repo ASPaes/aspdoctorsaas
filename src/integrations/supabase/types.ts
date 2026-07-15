@@ -11106,6 +11106,7 @@ export type Database = {
         Args: { p_tenant_id: string }
         Returns: string
       }
+      omie_fila_status: { Args: { p_tenant_id: string }; Returns: Json }
       onb_slugify: { Args: { p_txt: string }; Returns: string }
       pause_onboarding: {
         Args: {
