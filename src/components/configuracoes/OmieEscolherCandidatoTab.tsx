@@ -600,6 +600,15 @@ function GrupoCard({
     return set;
   }, [erro]);
 
+  const maxAtivosOmie = useMemo(() => {
+    let max = 0;
+    for (const c of grupo.candidatos) {
+      const n = Number(c.qtd_contratos_ativos_omie ?? 0);
+      if (n > max) max = n;
+    }
+    return max;
+  }, [grupo.candidatos]);
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -618,6 +627,15 @@ function GrupoCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <ErroBox erro={erro} />
+
+        {maxAtivosOmie > 1 && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              Este cliente tem {maxAtivosOmie} contratos ativos no Omie.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {grupo.pista === "limpo" && renderLimpo()}
         {grupo.pista === "decisao" && renderDecisao()}
