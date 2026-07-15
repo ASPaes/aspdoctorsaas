@@ -116,6 +116,8 @@ class EvolutionAdapter implements ProviderAdapter {
         body = { number: msg.to, text: msg.content };
         if (msg.quotedMessageId) body.quoted = { key: { id: msg.quotedMessageId } };
         if (Array.isArray(msg.mentioned) && msg.mentioned.length > 0) body.mentioned = msg.mentioned;
+        // CRÍTICO: só incluir quando true. Bug evolution-api#2431: false marca todos.
+        if (msg.mentionsEveryOne === true) body.mentionsEveryOne = true;
         break;
       }
       case 'audio': {
@@ -137,6 +139,8 @@ class EvolutionAdapter implements ProviderAdapter {
           ...(msg.messageType === 'document' && msg.fileName ? { fileName: msg.fileName } : {}),
         };
         if (msg.quotedMessageId) body.quoted = { key: { id: msg.quotedMessageId } };
+        // Mesma regra do texto: só quando true.
+        if (msg.mentionsEveryOne === true) body.mentionsEveryOne = true;
       }
     }
 
