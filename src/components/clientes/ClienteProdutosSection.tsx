@@ -37,6 +37,7 @@ import { Switch } from "@/components/ui/switch";
 
 import SugestaoMRRDialog from "./SugestaoMRRDialog";
 import ReajusteModulosDialog from "./ReajusteModulosDialog";
+import EnviarContratoOmieButton from "./EnviarContratoOmieButton";
 
 interface Props {
   clienteId: string;
