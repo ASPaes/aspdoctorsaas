@@ -720,6 +720,7 @@ Deno.serve(async (req) => {
           timestamp: messageTimestamp,
           quoted_message_id: body.quotedMessageId || null,
           mentions: validMentioned.length > 0 ? validMentioned : null,
+          mentions_everyone: wantsMentionEveryone,
           metadata: {
             ...(body.fileName ? { fileName: body.fileName } : {}),
             sender_signature_mode: sigMode,
