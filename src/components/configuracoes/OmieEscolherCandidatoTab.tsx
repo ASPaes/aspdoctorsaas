@@ -34,6 +34,7 @@ type ContratoDS = {
   modelo_ds: string | null;
   status_usuario: string | null;
   candidato_escolhido: number | string | null;
+  sugestao_codigo_contrato_omie?: number | null;
 };
 
 type Candidato = {
@@ -53,6 +54,7 @@ type Candidato = {
   codigo_cliente_integracao: string | null;
   ja_vinculado_hint: boolean;
   rank: number;
+  qtd_contratos_ativos_omie?: number | null;
 };
 
 type ClienteSemContrato = {
