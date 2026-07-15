@@ -60,6 +60,12 @@ export interface ProviderAdapter {
     instance: InstanceInfo,
     webhookUrl: string
   ): Promise<{ ok: boolean; action: string }>;
+  /** Opcional — só o EvolutionAdapter implementa. Lista participantes de um grupo. */
+  getGroupParticipants?(
+    secrets: InstanceSecrets,
+    instance: InstanceInfo,
+    groupJid: string
+  ): Promise<{ count: number }>;
 }
 
 // ── Evolution Adapter ─────────────────────────────────────────────────────────
