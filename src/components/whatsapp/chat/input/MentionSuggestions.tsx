@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Megaphone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { GroupParticipant } from "../../hooks/useGroupParticipants";
