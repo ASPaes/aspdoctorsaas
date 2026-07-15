@@ -27,6 +27,8 @@ export interface SupportConfig {
   support_ura_welcome_template: string;
   support_ura_invalid_option_template: string;
   support_ura_confirmation_template: string;
+  support_ura_timeout_minutes: number;
+  support_ura_default_department_id: string | null;
 
   // URA v2 (department-based routing)
   ura_enabled: boolean;
