@@ -162,6 +162,29 @@ export default function OmieEscolherCandidatoTab() {
     return grupos.filter((g) => g.pista === filtro);
   }, [grupos, filtro]);
 
+  // Pré-seleciona sugestões vindas do backend (sem forçar: só quando não há escolha manual).
+  useEffect(() => {
+    if (!grupos.length) return;
+    setEscolhas((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const g of grupos) {
+        for (const ds of g.contratos_ds) {
+          const sug = ds.sugestao_codigo_contrato_omie;
+          if (sug == null) continue;
+          const k = `${g.cnpj_norm}::${ds.ds_contract_id}`;
+          if (next[k] != null) continue;
+          // só usa a sugestão se o candidato ainda existe e não está indisponível
+          const cand = g.candidatos.find((c) => Number(c.codigo_contrato_omie) === Number(sug));
+          if (!cand || cand.ja_vinculado_hint) continue;
+          next[k] = Number(sug);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [grupos]);
+
   function keyOf(cnpj: string, ds_contract_id: string) { return `${cnpj}::${ds_contract_id}`; }
 
   function setEscolha(cnpj: string, ds_contract_id: string, codigo: number | null) {
