@@ -355,15 +355,48 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       const phone = (p.phone || "").toLowerCase();
       return name.includes(term) || phone.includes(term);
     });
-    return list.slice(0, 8);
-  }, [mentionQuery, groupParticipants]);
+    const result: GroupParticipant[] = [];
+    // "todos" fixado no topo em grupos; se houver termo, só aparece se for prefixo de "todos" ou "all"
+    if (isGroup) {
+      const t = term.trim();
+      if (t === "" || "todos".startsWith(t) || "all".startsWith(t)) {
+        result.push({ phone: "__all__", name: "todos", admin: false, isAll: true });
+      }
+    }
+    return [...result, ...list.slice(0, 8)];
+  }, [mentionQuery, groupParticipants, isGroup]);
 
   useEffect(() => {
     setMentionIndex(0);
   }, [filteredMentionParticipants]);
 
+  // Derive @todos flag from text content (single source of truth)
+  const mentionEveryone = useMemo(() => {
+    if (!isGroup || mode !== "message") return false;
+    return /(^|\s)@todos(\s|$)/i.test(message);
+  }, [isGroup, mode, message]);
+
   const insertMention = useCallback((p: GroupParticipant) => {
     if (!mentionQuery) return;
+    if (p.isAll) {
+      const pos = Math.min(cursorPos, message.length);
+      const before = message.substring(0, mentionQuery.start);
+      const after = message.substring(pos);
+      const insert = `@todos `;
+      const newText = before + insert + after;
+      setMessage(newText);
+      setMentionQuery(null);
+      const newCursor = (before + insert).length;
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = newCursor;
+          textareaRef.current.selectionEnd = newCursor;
+          textareaRef.current.focus();
+          setCursorPos(newCursor);
+        }
+      }, 0);
+      return;
+    }
     const display = displayFor(p);
     const rawNumber = (p.phone && p.phone.replace(/\D/g, "")) || (p.lid ? p.lid.replace(/\D/g, "") : "");
     if (!display || !rawNumber) return;
@@ -387,7 +420,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         setCursorPos(newCursor);
       }
     }, 0);
-  }, [mentionQuery, cursorPos, message]);
+  }, [mentionQuery, cursorPos, message, isGroup]);
 
   // Send a single attached file as media
   const sendOneFile = useCallback(async (file: File, caption?: string) => {
