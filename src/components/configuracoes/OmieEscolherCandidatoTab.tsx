@@ -35,7 +35,11 @@ type ContratoDS = {
   status_usuario: string | null;
   candidato_escolhido: number | string | null;
   sugestao_codigo_contrato_omie?: number | null;
+  sugestao_ambigua?: boolean | null;
+  sugestao_qtd_mesmo_valor?: number | null;
+  numero_ds?: string | null;
 };
+
 
 type Candidato = {
   codigo_cliente_omie: number;
@@ -482,6 +486,7 @@ function ContratoDSInfo({ ds }: { ds: ContratoDS }) {
         <div className="text-xs text-muted-foreground truncate">{ds.razao_ds}</div>
       )}
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        {ds.numero_ds && <span>Nº: <span className="font-mono text-foreground">{ds.numero_ds}</span></span>}
         <span>MRR: <span className="font-medium text-foreground">{formatBRL(ds.valor_mrr_ds)}</span></span>
         {ds.vigencia_inicial_ds && <span>Início: {formatDate(ds.vigencia_inicial_ds)}</span>}
         {ds.dia_venc_ds != null && <span>Venc: dia {ds.dia_venc_ds}</span>}
@@ -491,15 +496,35 @@ function ContratoDSInfo({ ds }: { ds: ContratoDS }) {
   );
 }
 
-function CandidatoInfo({ c, recomendado, sugerido }: { c: Candidato; recomendado?: boolean; sugerido?: boolean }) {
+
+type SugestaoInfo = { ambigua: boolean; qtd: number };
+
+function sugestaoFor(ds: ContratoDS, c: Candidato): SugestaoInfo | null {
+  if (ds.sugestao_codigo_contrato_omie == null) return null;
+  if (Number(ds.sugestao_codigo_contrato_omie) !== Number(c.codigo_contrato_omie)) return null;
+  return {
+    ambigua: !!ds.sugestao_ambigua,
+    qtd: Number(ds.sugestao_qtd_mesmo_valor ?? 0),
+  };
+}
+
+function CandidatoInfo({ c, recomendado, sugestao }: { c: Candidato; recomendado?: boolean; sugestao?: SugestaoInfo | null }) {
   return (
     <div className="space-y-1 text-sm min-w-0 flex-1">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="font-medium truncate">{c.razao_social_omie || "—"}</span>
         {recomendado && <Badge className="bg-blue-600 text-white text-[10px]">Recomendado</Badge>}
-        {sugerido && (
+        {sugestao && !sugestao.ambigua && (
           <Badge className="bg-emerald-600 text-white text-[10px] gap-1">
             <CheckCircle2 className="h-3 w-3" /> Valor confere
+          </Badge>
+        )}
+        {sugestao && sugestao.ambigua && (
+          <Badge
+            className="bg-amber-500 text-white text-[10px] gap-1"
+            title={`Valor confere, mas há ${sugestao.qtd} candidatos idênticos — o pareamento é arbitrário`}
+          >
+            <AlertCircle className="h-3 w-3" /> Valor confere (ambíguo: {sugestao.qtd})
           </Badge>
         )}
         <HealthBadge c={c} />
@@ -520,6 +545,7 @@ function CandidatoInfo({ c, recomendado, sugerido }: { c: Candidato; recomendado
     </div>
   );
 }
+
 
 function ErroBox({ erro }: { erro: ErrorState }) {
   if (!erro) return null;
@@ -609,6 +635,12 @@ function GrupoCard({
     return max;
   }, [grupo.candidatos]);
 
+  const temSugestaoAmbigua = useMemo(
+    () => grupo.contratos_ds.some((d) => d.sugestao_ambigua === true),
+    [grupo.contratos_ds]
+  );
+
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -637,6 +669,19 @@ function GrupoCard({
           </Alert>
         )}
 
+        {temSugestaoAmbigua && (
+          <Alert className="border-amber-500/50 bg-amber-500/10">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-xs">
+              Este grupo tem contratos de valor idêntico. O sistema garante que cada contrato do Omie
+              será usado uma única vez, mas não consegue determinar qual corresponde a qual. Se os
+              contratos forem realmente idênticos (mesmo produto, mesmo valor), qualquer combinação
+              dá no mesmo. Se não forem, confira no Omie antes de confirmar.
+            </AlertDescription>
+          </Alert>
+        )}
+
+
         {grupo.pista === "limpo" && renderLimpo()}
         {grupo.pista === "decisao" && renderDecisao()}
         {(grupo.pista === "parear" || grupo.pista === "conflito") && renderPareamento()}
@@ -659,7 +704,7 @@ function GrupoCard({
         </div>
         <div className="rounded border p-3 flex flex-col gap-2">
           <div className="text-[10px] uppercase text-muted-foreground">Omie</div>
-          <CandidatoInfo c={cand} recomendado sugerido={ds.sugestao_codigo_contrato_omie != null && Number(ds.sugestao_codigo_contrato_omie) === Number(cand.codigo_contrato_omie)} />
+          <CandidatoInfo c={cand} recomendado sugestao={sugestaoFor(ds, cand)} />
           <div className="mt-auto flex justify-end pt-2">
             <Button size="sm" onClick={onConfirmarLimpo} disabled={isBusy} className="gap-1">
               {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
@@ -700,7 +745,7 @@ function GrupoCard({
                   className={`flex items-start gap-2 rounded border p-2 cursor-pointer ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-accent"}`}
                 >
                   <RadioGroupItem id={id} value={String(c.codigo_contrato_omie)} disabled={disabled} className="mt-1" />
-                  <CandidatoInfo c={c} recomendado={recomendado} sugerido={ds.sugestao_codigo_contrato_omie != null && Number(ds.sugestao_codigo_contrato_omie) === Number(c.codigo_contrato_omie)} />
+                  <CandidatoInfo c={c} recomendado={recomendado} sugestao={sugestaoFor(ds, c)} />
                   {c.ja_vinculado_hint && <Badge variant="outline" className="text-[10px] shrink-0">já vinculado</Badge>}
                 </Label>
               );
@@ -779,7 +824,7 @@ function GrupoCard({
                         )}
                         {opcoes.map((c) => {
                           const recomendado = Number(c.codigo_contrato_omie) === Number(grupo.recomendado_codigo_contrato_omie);
-                          const sugerido = ds.sugestao_codigo_contrato_omie != null && Number(ds.sugestao_codigo_contrato_omie) === Number(c.codigo_contrato_omie);
+                          const sug = sugestaoFor(ds, c);
                           return (
                             <SelectItem key={c.codigo_contrato_omie} value={String(c.codigo_contrato_omie)}>
                               <span className="flex items-center gap-2 text-xs">
@@ -787,12 +832,14 @@ function GrupoCard({
                                 <span className="truncate max-w-[220px]">{c.razao_social_omie}</span>
                                 <span className="text-muted-foreground">{formatBRL(c.valor_omie)}</span>
                                 {recomendado && <Badge className="bg-blue-600 text-white text-[9px]">Rec.</Badge>}
-                                {sugerido && <Badge className="bg-emerald-600 text-white text-[9px]">Valor confere</Badge>}
+                                {sug && !sug.ambigua && <Badge className="bg-emerald-600 text-white text-[9px]">Valor confere</Badge>}
+                                {sug && sug.ambigua && <Badge className="bg-amber-500 text-white text-[9px]">Ambíguo ({sug.qtd})</Badge>}
                                 {!c.saudavel && <Badge className="bg-amber-500 text-white text-[9px]">!</Badge>}
                               </span>
                             </SelectItem>
                           );
                         })}
+
                       </SelectContent>
                     </Select>
                   )}

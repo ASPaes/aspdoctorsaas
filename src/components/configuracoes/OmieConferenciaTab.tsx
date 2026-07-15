@@ -848,7 +848,9 @@ function useReconferir(tid: string | null | undefined) {
         queryClient.invalidateQueries({ queryKey: ["omie-conf-nome-diverge-count"] }),
         queryClient.invalidateQueries({ queryKey: ["omie-conf-visao-geral"] }),
         queryClient.invalidateQueries({ queryKey: ["omie-conf-fornecedores"] }),
+        queryClient.invalidateQueries({ queryKey: ["recon-escolher-candidato", "listar", tid] }),
       ]);
+
       toast.success("Reconferência concluída");
     } catch (e: any) {
       toast.error(e?.message || "Falha ao reconferir");
