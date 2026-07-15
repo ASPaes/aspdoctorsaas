@@ -65,7 +65,17 @@ export const useWhatsAppSend = () => {
         body: sendBody,
       });
       if (error) throw new Error(error.message || 'Erro ao enviar mensagem');
-      if (data?.success === false) throw new Error(data.error || 'Erro ao enviar mensagem');
+      if (data?.success === false) {
+        // Preserva os campos estruturados que a edge function devolve (ex.: rateLimited,
+        // retryAfterMinutes do @todos). new Error(string) descartava tudo isso e obrigava
+        // o ChatInput a detectar rate limit por regex na mensagem — frágil.
+        const sendError = new Error(data.error || 'Erro ao enviar mensagem');
+        Object.assign(sendError, {
+          rateLimited: data.rateLimited === true,
+          retryAfterMinutes: typeof data.retryAfterMinutes === 'number' ? data.retryAfterMinutes : undefined,
+        });
+        throw sendError;
+      }
       return data;
     },
     onMutate: async (newMessage) => {
