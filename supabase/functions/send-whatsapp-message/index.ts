@@ -301,6 +301,59 @@ Deno.serve(async (req) => {
       ? (conversation.group_jid || contact.phone_number)
       : getDestinationNumber(contact.phone_number);
 
+    // ─── @todos (mentionsEveryOne) — guardas ────────────────────────────────────
+    const wantsMentionEveryone = body.mentionEveryone === true;
+
+    if (wantsMentionEveryone) {
+      if (!isGroupConv) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Marcar todos s\u{00F3} \u{00E9} poss\u{00ED}vel em grupos.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (providerType !== 'self_hosted' && providerType !== 'cloud') {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Marcar todos n\u{00E3}o \u{00E9} suportado neste provedor.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (body.messageType === 'audio') {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Marcar todos n\u{00E3}o \u{00E9} suportado em \u{00E1}udio.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const cutoffIso = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+      const { data: recentMention } = await supabase
+        .from('whatsapp_messages')
+        .select('timestamp')
+        .eq('conversation_id', body.conversationId)
+        .eq('mentions_everyone', true)
+        .gte('timestamp', cutoffIso)
+        .order('timestamp', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (recentMention) {
+        const elapsedMs = Date.now() - new Date(recentMention.timestamp).getTime();
+        const retryAfterMinutes = Math.max(1, Math.ceil((30 * 60 * 1000 - elapsedMs) / 60000));
+        console.warn(
+          `[send-whatsapp-message] @todos rate-limited conv=${body.conversationId} restam=${retryAfterMinutes}min`
+        );
+        return new Response(
+          JSON.stringify({
+            success: false,
+            rateLimited: true,
+            retryAfterMinutes,
+            error: `J\u{00E1} foi marcado @todos neste grupo h\u{00E1} pouco. Aguarde ${retryAfterMinutes} min.`,
+          }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────────
+
     // Upload base64 media to Supabase Storage for persistence + signed URL for Evolution
     let persistentMediaPath: string | null = null;
     let storageSignedUrl: string | null = null;
