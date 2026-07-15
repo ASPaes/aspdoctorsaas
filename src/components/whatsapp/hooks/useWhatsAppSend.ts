@@ -151,7 +151,24 @@ export const useWhatsAppSend = () => {
 
       return { previousMessages, tempId };
     },
-    onError: (_err, newMessage, context) => {
+    onError: (err, newMessage, context) => {
+      // Rate limit: a mensagem NUNCA foi enviada — o servidor recusou.
+      // Marcar como 'failed' é enganoso (sugere falha de entrega e oferece retry).
+      // O ChatInput já restaura o texto no input, então some com a bolha otimista.
+      if ((err as any)?.rateLimited === true && context?.tempId) {
+        queryClient.setQueryData<MsgPages>(
+          ['whatsapp', 'messages', newMessage.conversationId],
+          (old) => {
+            if (!old?.pages) return old;
+            return {
+              ...old,
+              pages: old.pages.map((pg) => pg.filter((m) => m.id !== context.tempId)),
+            };
+          }
+        );
+        return;
+      }
+
       // Não apaga a mensagem — marca como falhou para o técnico ver
       if (context?.tempId) {
         queryClient.setQueryData<MsgPages>(
