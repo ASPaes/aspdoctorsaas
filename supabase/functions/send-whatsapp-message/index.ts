@@ -348,7 +348,7 @@ Deno.serve(async (req) => {
             retryAfterMinutes,
             error: `J\u{00E1} foi marcado @todos neste grupo h\u{00E1} pouco. Aguarde ${retryAfterMinutes} min.`,
           }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }
