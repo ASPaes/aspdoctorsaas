@@ -124,7 +124,7 @@ export default function OmieIntegrationTab() {
   }
 
   return (
-    <Tabs defaultValue="conexao" className="space-y-4">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
       <TabsList>
         <TabsTrigger value="conexao">Conexão</TabsTrigger>
         <TabsTrigger value="vinculos" disabled={!configurado}>Vínculos</TabsTrigger>
