@@ -491,12 +491,17 @@ function ContratoDSInfo({ ds }: { ds: ContratoDS }) {
   );
 }
 
-function CandidatoInfo({ c, recomendado }: { c: Candidato; recomendado?: boolean }) {
+function CandidatoInfo({ c, recomendado, sugerido }: { c: Candidato; recomendado?: boolean; sugerido?: boolean }) {
   return (
     <div className="space-y-1 text-sm min-w-0 flex-1">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="font-medium truncate">{c.razao_social_omie || "—"}</span>
         {recomendado && <Badge className="bg-blue-600 text-white text-[10px]">Recomendado</Badge>}
+        {sugerido && (
+          <Badge className="bg-emerald-600 text-white text-[10px] gap-1">
+            <CheckCircle2 className="h-3 w-3" /> Valor confere
+          </Badge>
+        )}
         <HealthBadge c={c} />
         {c.situacao_contrato && (
           <Badge variant="outline" className="text-[10px]">Situação {c.situacao_contrato}</Badge>
