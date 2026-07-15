@@ -659,7 +659,7 @@ function GrupoCard({
         </div>
         <div className="rounded border p-3 flex flex-col gap-2">
           <div className="text-[10px] uppercase text-muted-foreground">Omie</div>
-          <CandidatoInfo c={cand} recomendado />
+          <CandidatoInfo c={cand} recomendado sugerido={ds.sugestao_codigo_contrato_omie != null && Number(ds.sugestao_codigo_contrato_omie) === Number(cand.codigo_contrato_omie)} />
           <div className="mt-auto flex justify-end pt-2">
             <Button size="sm" onClick={onConfirmarLimpo} disabled={isBusy} className="gap-1">
               {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
