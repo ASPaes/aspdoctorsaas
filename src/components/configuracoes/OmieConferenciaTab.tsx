@@ -1053,7 +1053,11 @@ function VisaoGeralPanel({
         }}
       />
 
+      {/* Conciliação — herói */}
+      <Card className="border-2">
+        <CardHeader className="pb-3">
           <div className="flex items-baseline justify-between flex-wrap gap-2">
+
             <CardTitle className="text-base">
               <span className="text-2xl font-bold text-foreground">
                 {num(c.com_contrato_omie).toLocaleString("pt-BR")}
