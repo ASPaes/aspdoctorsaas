@@ -1410,6 +1410,8 @@ function ProdutoDialog({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
