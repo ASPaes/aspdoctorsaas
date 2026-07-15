@@ -1018,12 +1018,56 @@ function ProdutoDialog({
   const origensVenda = origensVendaLookup.data ?? [];
   const formasPagamento = formasPagamentoLookup.data ?? [];
 
+  const handleClosePostSave = () => {
+    setPostSaveContrato(null);
+    onClose();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => {
+      if (o) return;
+      if (postSaveContrato) { handleClosePostSave(); return; }
+      onClose();
+    }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Editar Produto" : "Adicionar Produto"}</DialogTitle>
+          <DialogTitle>
+            {postSaveContrato
+              ? "Produto adicionado — enviar ao Omie?"
+              : isEdit ? "Editar Produto" : "Adicionar Produto"}
+          </DialogTitle>
         </DialogHeader>
+
+        {postSaveContrato ? (
+          <div className="space-y-4">
+            <div className="rounded-md border bg-muted/40 p-4 space-y-2 text-sm">
+              <div className="font-medium">Contrato criado com sucesso.</div>
+              <div className="text-muted-foreground">
+                Contrato Nº <span className="font-medium text-foreground">{postSaveContrato.numero ?? "—"}</span>. A criação no Omie é manual: envie agora se o lançamento estiver completo, ou depois pelo painel de conferência.
+              </div>
+            </div>
+            <div className="rounded-md border p-4 space-y-3">
+              <div className="text-sm">
+                Ao clicar em <span className="font-medium">Enviar ao Omie</span>, mostramos primeiro um resumo do que será criado (pré-visualização). Nada é enviado sem sua confirmação.
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <EnviarContratoOmieButton
+                  tenantId={resolvedTenantId}
+                  contratoId={postSaveContrato.id}
+                  createdAt={postSaveContrato.created_at}
+                />
+                <Button type="button" variant="ghost" onClick={handleClosePostSave}>
+                  Enviar depois
+                </Button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" onClick={handleClosePostSave}>Concluir</Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <>
+
 
         {/* Identificação */}
         <div className="space-y-2">
