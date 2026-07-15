@@ -1136,7 +1136,7 @@ export async function checkBusinessHours(supabase: any, ctx: SendContext, conver
 // ─── URA ──────────────────────────────────────────────────────────────────────
 
 async function assignDefaultDepartment(supabase: any, attendanceId: string, conversationId: string, tenantId: string, supportConfig: any): Promise<void> {
-  const defaultDeptId = supportConfig.ura_default_department_id;
+  const defaultDeptId = supportConfig.support_ura_default_department_id ?? supportConfig.ura_default_department_id;
   const nowIso = new Date().toISOString();
   const attUpdate: Record<string, any> = { ura_state: 'completed', ura_completed_at: nowIso, updated_at: nowIso };
   const convUpdate: Record<string, any> = { updated_at: nowIso };
