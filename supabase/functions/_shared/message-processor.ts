@@ -1136,7 +1136,7 @@ export async function checkBusinessHours(supabase: any, ctx: SendContext, conver
 // ─── URA ──────────────────────────────────────────────────────────────────────
 
 async function assignDefaultDepartment(supabase: any, attendanceId: string, conversationId: string, tenantId: string, supportConfig: any): Promise<void> {
-  const defaultDeptId = supportConfig.ura_default_department_id;
+  const defaultDeptId = supportConfig.support_ura_default_department_id ?? supportConfig.ura_default_department_id;
   const nowIso = new Date().toISOString();
   const attUpdate: Record<string, any> = { ura_state: 'completed', ura_completed_at: nowIso, updated_at: nowIso };
   const convUpdate: Record<string, any> = { updated_at: nowIso };
@@ -1219,7 +1219,7 @@ export async function handleUraResponse(supabase: any, ctx: SendContext, convers
   if (att.ura_option_selected !== null) { await sendWaitingAck(); return true; }
   if (att.ura_asked_at) {
     const elapsed = (Date.now() - new Date(att.ura_asked_at).getTime()) / (1000 * 60);
-    if (elapsed > (supportConfig.ura_timeout_minutes ?? 2)) { await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig); return false; }
+    if (elapsed > (supportConfig.support_ura_timeout_minutes ?? supportConfig.ura_timeout_minutes ?? 2)) { await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig); return false; }
   }
   const trimmed = (messageContent || '').trim();
   if (detectsHumanIntent(trimmed)) { await markHumanFallback(supabase, att.id); await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig); await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(HUMAN_FALLBACK_MESSAGES)); return true; }
@@ -1349,7 +1349,13 @@ export async function ensureAttendanceForIncomingMessage(supabase: any, conversa
       return;
     }
     const newStatus = skipUra ? 'in_progress' : 'waiting';
-    const { data: newAtt, error } = await supabase.from('support_attendances').insert({ tenant_id: tenantId, conversation_id: conversationId, contact_id: contactId, status: newStatus, opened_at: nowIso, ...(skipUra ? { assumed_at: nowIso } : {}), created_from: 'customer' }).select('id, attendance_code').single();
+    // ura_state='pending' JA no INSERT. O trigger trg_dispatch_on_attendance_insert roda AFTER INSERT
+    // e o guard de URA em fn_assign_conversation_if_ready le ura_state; com o default 'none' ele lia
+    // "URA nao se aplica" e distribuia ~2s ANTES de sendUraWelcome gravar 'pending'.
+    // Esta condicao TEM que ser identica a de sendUraWelcome gravar 'pending' — nao desalinhar.
+    const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
+    const willSendUra = !skipUra && !!ctx && !!uraEnabled;
+    const { data: newAtt, error } = await supabase.from('support_attendances').insert({ tenant_id: tenantId, conversation_id: conversationId, contact_id: contactId, status: newStatus, opened_at: nowIso, ura_state: willSendUra ? 'pending' : 'none', ...(skipUra ? { assumed_at: nowIso } : {}), created_from: 'customer' }).select('id, attendance_code').single();
     if (error) { console.error('[processor] Error creating attendance:', error); return; }
     insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened').catch(() => {});
     clearAfterHoursFlag(supabase, conversationId).catch(() => {});
