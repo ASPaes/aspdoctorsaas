@@ -477,6 +477,74 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     }
   }, [isBlocked, sendOneFile]);
 
+  // --- @todos confirmation dialog state ---
+  const [everyoneDialogOpen, setEveryoneDialogOpen] = useState(false);
+  const [everyoneCount, setEveryoneCount] = useState<number | null>(null);
+  const [everyoneCountLoading, setEveryoneCountLoading] = useState(false);
+
+  const performTextSend = useCallback((withMentionEveryone: boolean) => {
+    const content = message.trim();
+    if (!content) return;
+
+    // Resolve menções ativas presentes no texto → substitui "@<display>" por "@<number>"
+    let finalContent = content;
+    const mentionedNumbers: string[] = [];
+    if (mentionsEnabled && activeMentions.length > 0) {
+      for (const m of activeMentions) {
+        const token = `@${m.display}`;
+        if (finalContent.includes(token)) {
+          finalContent = finalContent.split(token).join(`@${m.number}`);
+          if (!mentionedNumbers.includes(m.number)) mentionedNumbers.push(m.number);
+        }
+      }
+    }
+
+    setMessage("");
+    setActiveMentions([]);
+    onCancelReply?.();
+    requestAnimationFrame(() => textareaRef.current?.focus());
+    setTimeout(() => textareaRef.current?.focus(), 100);
+
+    sendMutation.mutate(
+      {
+        conversationId,
+        content: finalContent,
+        messageType: "text",
+        quotedMessageId: replyTo?.message_id || undefined,
+        mentioned: mentionedNumbers.length > 0 ? mentionedNumbers : undefined,
+        mentionEveryone: withMentionEveryone ? true : undefined,
+      },
+      {
+        onError: (err: any) => {
+          const anyErr = err as any;
+          // Rate-limited (429) — restaura a mensagem para o usuário
+          if (anyErr?.rateLimited || /aguarde\s+\d+\s*min/i.test(anyErr?.message || "")) {
+            setMessage(content);
+            toast.error(anyErr?.message || "J\u00E1 foi marcado @todos neste grupo h\u00E1 pouco.");
+            return;
+          }
+          toast.error(err?.message || "Erro ao enviar mensagem");
+        },
+      }
+    );
+  }, [message, mentionsEnabled, activeMentions, onCancelReply, sendMutation, conversationId, replyTo]);
+
+  const openEveryoneConfirmDialog = useCallback(async () => {
+    setEveryoneCount(null);
+    setEveryoneCountLoading(true);
+    setEveryoneDialogOpen(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("get-group-participants", {
+        body: { conversationId },
+      });
+      if (!error && data?.success && typeof data.count === "number") {
+        setEveryoneCount(data.count);
+      }
+    } catch { /* fallback msg */ } finally {
+      setEveryoneCountLoading(false);
+    }
+  }, [conversationId]);
+
   const handleSend = useCallback(() => {
     // Rascunho: não envia nem salva no servidor; é apenas local por conversa
     if (isDraftMode) {
@@ -522,39 +590,14 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     const content = message.trim();
     if (!content) return;
 
-    // Resolve menções ativas presentes no texto → substitui "@<display>" por "@<number>"
-    let finalContent = content;
-    const mentionedNumbers: string[] = [];
-    if (mentionsEnabled && activeMentions.length > 0) {
-      for (const m of activeMentions) {
-        const token = `@${m.display}`;
-        if (finalContent.includes(token)) {
-          finalContent = finalContent.split(token).join(`@${m.number}`);
-          if (!mentionedNumbers.includes(m.number)) mentionedNumbers.push(m.number);
-        }
-      }
+    // @todos → confirmação primeiro
+    if (mentionEveryone) {
+      void openEveryoneConfirmDialog();
+      return;
     }
 
-    setMessage("");
-    setActiveMentions([]);
-    onCancelReply?.();
-    // Refocus imediato + fallback para garantir foco após re-render
-    requestAnimationFrame(() => textareaRef.current?.focus());
-    setTimeout(() => textareaRef.current?.focus(), 100);
-
-    sendMutation.mutate(
-      {
-        conversationId,
-        content: finalContent,
-        messageType: "text",
-        quotedMessageId: replyTo?.message_id || undefined,
-        mentioned: mentionedNumbers.length > 0 ? mentionedNumbers : undefined,
-      },
-      {
-        onError: (err: any) => { toast.error(err.message || "Erro ao enviar mensagem"); },
-      }
-    );
-  }, [isDraftMode, isInternalNote, isCreatingNote, createNote, attachedFiles, sendAttachedFilesAll, message, isBlocked, sendMutation, conversationId, replyTo, onCancelReply, mentionsEnabled, activeMentions]);
+    performTextSend(false);
+  }, [isDraftMode, isInternalNote, isCreatingNote, createNote, attachedFiles, sendAttachedFilesAll, message, isBlocked, mentionEveryone, openEveryoneConfirmDialog, performTextSend, onCancelReply]);
 
 
   const handleSendMedia = useCallback((params: MediaSendParams) => {
