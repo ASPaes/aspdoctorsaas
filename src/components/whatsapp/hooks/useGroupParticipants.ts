@@ -8,6 +8,7 @@ export interface GroupParticipant {
   admin: boolean;
   isLid?: boolean;
   lid?: string | null;
+  isAll?: boolean; // synthetic entry for the "todos" (mentionsEveryOne) option
 }
 
 export interface GroupData {
