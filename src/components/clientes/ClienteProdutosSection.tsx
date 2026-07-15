@@ -644,6 +644,8 @@ function ProdutoDialog({
   const [vlrCusto, setVlrCusto] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmSwapOpen, setConfirmSwapOpen] = useState(false);
+  // Após criar um novo produto/contrato, oferece o envio ao Omie no fim do fluxo
+  const [postSaveContrato, setPostSaveContrato] = useState<{ id: string; numero: string | null; created_at: string | null } | null>(null);
 
   // Novos campos
   const [dataVenda, setDataVenda] = useState("");
