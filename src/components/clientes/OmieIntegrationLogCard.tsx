@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -6,16 +7,37 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   CheckCircle,
   AlertCircle,
   Ban,
   FileText,
   History,
   Clock,
+  Link2,
+  AlertTriangle,
 } from "lucide-react";
 
 interface Props {
   clienteId: string;
+}
+
+interface LogResponse {
+  campos_enviados?: string[] | null;
+  acao?: string | null;
+  bloqueado?: string | null;
+  omie_contract_id?: string | number | null;
+  omie_contract_id_anterior?: string | number | null;
+  omie_customer_id?: string | number | null;
+  mrr?: number | null;
+  modelo_contrato?: string | null;
+  [k: string]: any;
 }
 
 interface LogItem {
@@ -27,8 +49,9 @@ interface LogItem {
   erro?: string | null;
   detalhe?: string | null;
   direcao_texto?: string | null;
-  response?: { campos_enviados?: string[] | null } | null;
+  response?: LogResponse | null;
   campos_enviados?: string[] | null;
+  payload?: Record<string, any> | null;
 }
 
 interface OmieDadosLog {
@@ -36,6 +59,8 @@ interface OmieDadosLog {
   codigoClienteOmie: string | number | null;
   codigosContratoOmie: (string | number)[];
 }
+
+type FiltroTipo = "todos" | "enviados" | "nao_enviados" | "falhas" | "vinculos";
 
 function statusConfig(status?: string | null) {
   const s = (status || "").toLowerCase();
@@ -80,13 +105,38 @@ const EVENTO_LABELS: Record<string, string> = {
   "reativar|contrato": "Contrato reativado no Omie",
 };
 
+const VINCULO_LABELS: Record<string, string> = {
+  vinculo_criado: "Contrato vinculado ao Omie",
+  vinculo_reconfirmado: "Vínculo reconfirmado",
+  vinculo_trocado: "⚠️ Vínculo TROCADO",
+};
+
+const BLOQUEIO_LABELS: Record<string, string> = {
+  documento_invalido: "Não enviado — CPF/CNPJ inválido",
+  data_ativacao: "Não enviado — contrato anterior à data de ativação",
+  sem_modelo: "Não enviado — contrato sem modelo",
+  modelo_nao_permitido: "Não enviado — modelo não habilitado",
+  sem_modelos_permitidos: "Não enviado — nenhum modelo permitido",
+  integracao_pausada: "Não enviado — integração pausada",
+  falha_vinculo_previo: "Falhou — não deu para criar o de/para",
+  colisao_no_lote: "Vínculo recusado — conflito",
+  colisao_com_existente: "Vínculo recusado — conflito",
+};
+
 function eventoLabel(log: LogItem): string {
   const ev = (log.evento || "").toLowerCase();
   const en = (log.entidade || "").toLowerCase();
   if (ev === "testar") return "Teste de conexão";
+  if (ev === "vincular") {
+    const acao = (log.response?.acao || "").toLowerCase();
+    return VINCULO_LABELS[acao] || "Vínculo atualizado";
+  }
   const key = `${ev}|${en}`;
   if (EVENTO_LABELS[key]) return EVENTO_LABELS[key];
-  // Fallback para logs antigos
+  // Bloqueio: se status ignorado com response.bloqueado
+  if ((log.status || "").toLowerCase() === "ignorado" && log.response?.bloqueado) {
+    return BLOQUEIO_LABELS[log.response.bloqueado] || "Não enviado";
+  }
   return log.direcao_texto || "Integração";
 }
 
@@ -119,6 +169,9 @@ function camposEnviados(log: LogItem): string[] {
   return (arr as string[]).filter(Boolean);
 }
 
+const brl = (v: any) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v ?? 0));
+
 function formatQuando(quando?: string | null): string {
   if (!quando) return "—";
   try {
@@ -137,8 +190,40 @@ function formatQuando(quando?: string | null): string {
   }
 }
 
+function VinculoDetalhe({ log }: { log: LogItem }) {
+  const r = log.response || {};
+  const acao = (r.acao || "").toLowerCase();
+  const omieId = r.omie_contract_id;
+  const omieAnterior = r.omie_contract_id_anterior;
+
+  if (acao === "vinculo_trocado") {
+    return (
+      <div className="rounded bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-900 px-2 py-1.5 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-1.5">
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+        <span>
+          antes apontava para <strong className="font-mono">{String(omieAnterior ?? "—")}</strong>,
+          agora aponta para <strong className="font-mono">{String(omieId ?? "—")}</strong>
+        </span>
+      </div>
+    );
+  }
+
+  const parts: string[] = [];
+  if (omieId != null) parts.push(`Omie ${omieId}`);
+  if (r.mrr != null) parts.push(brl(r.mrr));
+  if (r.modelo_contrato) parts.push(String(r.modelo_contrato));
+  if (parts.length === 0) return null;
+  return (
+    <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+      <Link2 className="h-3 w-3" />
+      {parts.join(" · ")}
+    </div>
+  );
+}
+
 export default function OmieIntegrationLogCard({ clienteId }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
+  const [filtro, setFiltro] = useState<FiltroTipo>("todos");
 
   const dadosQuery = useQuery<OmieDadosLog>({
     queryKey: ["cliente-omie-dados-log", tid, clienteId],
@@ -208,20 +293,57 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
     },
   });
 
-  if (!tid) return null;
-
   const logs = logsQuery.data ?? [];
-  const sortedLogs = [...logs].sort(
-    (a, b) => new Date(b.quando).getTime() - new Date(a.quando).getTime()
+  const sortedLogs = useMemo(
+    () =>
+      [...logs].sort((a, b) => new Date(b.quando).getTime() - new Date(a.quando).getTime()),
+    [logs]
   );
+
+  const filteredLogs = useMemo(() => {
+    return sortedLogs.filter((l) => {
+      const s = (l.status || "").toLowerCase();
+      const ev = (l.evento || "").toLowerCase();
+      switch (filtro) {
+        case "enviados":
+          return s === "sucesso" && ev !== "vincular";
+        case "nao_enviados":
+          return s === "ignorado";
+        case "falhas":
+          return s === "erro";
+        case "vinculos":
+          return ev === "vincular";
+        default:
+          return true;
+      }
+    });
+  }, [sortedLogs, filtro]);
+
+  if (!tid) return null;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <History className="h-5 w-5" />
-          Histórico de envios
-        </CardTitle>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Histórico de envios
+          </CardTitle>
+          {sortedLogs.length > 0 && (
+            <Select value={filtro} onValueChange={(v) => setFiltro(v as FiltroTipo)}>
+              <SelectTrigger className="w-[180px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Tudo</SelectItem>
+                <SelectItem value="enviados">Enviados</SelectItem>
+                <SelectItem value="nao_enviados">Não enviados</SelectItem>
+                <SelectItem value="falhas">Falhas</SelectItem>
+                <SelectItem value="vinculos">Vínculos</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {dadosQuery.isLoading || logsQuery.isLoading ? (
@@ -238,16 +360,31 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
           <div className="text-sm text-muted-foreground">
             Nenhum envio registrado para este cliente.
           </div>
+        ) : filteredLogs.length === 0 ? (
+          <div className="text-sm text-muted-foreground">
+            Nenhum registro neste filtro.
+          </div>
         ) : (
           <ScrollArea className="h-[320px] pr-3">
             <div className="space-y-3">
-              {sortedLogs.map((log, idx) => {
+              {filteredLogs.map((log, idx) => {
                 const { icon: StatusIcon, badge, label } = statusConfig(log.status);
                 const titulo = eventoLabel(log);
                 const campos = camposEnviados(log);
                 const mensagem = log.error_message || log.erro || log.detalhe || null;
+                const isVinculo = (log.evento || "").toLowerCase() === "vincular";
+                const isTrocado =
+                  isVinculo && (log.response?.acao || "").toLowerCase() === "vinculo_trocado";
                 return (
-                  <div key={idx} className="rounded-md border p-3 text-sm space-y-1.5">
+                  <div
+                    key={idx}
+                    className={
+                      "rounded-md border p-3 text-sm space-y-1.5 " +
+                      (isTrocado
+                        ? "border-amber-400 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20"
+                        : "")
+                    }
+                  >
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-2 text-muted-foreground text-xs">
                         <Clock className="h-3 w-3" />
@@ -265,6 +402,7 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
                           {campos.map(traduzCampo).join(", ")}
                         </div>
                       )}
+                      {isVinculo && <VinculoDetalhe log={log} />}
                     </div>
                     {mensagem && (
                       <div
