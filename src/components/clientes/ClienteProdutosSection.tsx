@@ -37,6 +37,7 @@ import { Switch } from "@/components/ui/switch";
 
 import SugestaoMRRDialog from "./SugestaoMRRDialog";
 import ReajusteModulosDialog from "./ReajusteModulosDialog";
+import EnviarContratoOmieButton from "./EnviarContratoOmieButton";
 
 interface Props {
   clienteId: string;
@@ -643,6 +644,8 @@ function ProdutoDialog({
   const [vlrCusto, setVlrCusto] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmSwapOpen, setConfirmSwapOpen] = useState(false);
+  // Após criar um novo produto/contrato, oferece o envio ao Omie no fim do fluxo
+  const [postSaveContrato, setPostSaveContrato] = useState<{ id: string; numero: string | null; created_at: string | null } | null>(null);
 
   // Novos campos
   const [dataVenda, setDataVenda] = useState("");
@@ -972,6 +975,23 @@ function ProdutoDialog({
         toast({ title: isEdit ? "Produto atualizado" : "Produto adicionado" });
       }
 
+      // Fluxo de lançamento novo com Omie ativo: oferece o envio ao Omie no fim do fluxo,
+      // no momento em que a pessoa sabe que terminou o lançamento. Reaproveita o
+      // EnviarContratoOmieButton (dry_run → confirmação → criar).
+      if (!isEdit && !produtoTrocou && omieAtivo && resolvedTenantId) {
+        const { data: ctr } = await (supabase.from("contratos" as any) as any)
+          .select("id, numero, created_at")
+          .eq("cliente_id", clienteId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (ctr?.id) {
+          setPostSaveContrato({ id: ctr.id as string, numero: (ctr as any).numero ?? null, created_at: (ctr as any).created_at ?? null });
+          onSaved();
+          return; // não fecha o diálogo — mostra o passo "Enviar ao Omie"
+        }
+      }
+
       onSaved();
       onClose();
     } catch (err: any) {
@@ -998,12 +1018,56 @@ function ProdutoDialog({
   const origensVenda = origensVendaLookup.data ?? [];
   const formasPagamento = formasPagamentoLookup.data ?? [];
 
+  const handleClosePostSave = () => {
+    setPostSaveContrato(null);
+    onClose();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => {
+      if (o) return;
+      if (postSaveContrato) { handleClosePostSave(); return; }
+      onClose();
+    }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Editar Produto" : "Adicionar Produto"}</DialogTitle>
+          <DialogTitle>
+            {postSaveContrato
+              ? "Produto adicionado — enviar ao Omie?"
+              : isEdit ? "Editar Produto" : "Adicionar Produto"}
+          </DialogTitle>
         </DialogHeader>
+
+        {postSaveContrato ? (
+          <div className="space-y-4">
+            <div className="rounded-md border bg-muted/40 p-4 space-y-2 text-sm">
+              <div className="font-medium">Contrato criado com sucesso.</div>
+              <div className="text-muted-foreground">
+                Contrato Nº <span className="font-medium text-foreground">{postSaveContrato.numero ?? "—"}</span>. A criação no Omie é manual: envie agora se o lançamento estiver completo, ou depois pelo painel de conferência.
+              </div>
+            </div>
+            <div className="rounded-md border p-4 space-y-3">
+              <div className="text-sm">
+                Ao clicar em <span className="font-medium">Enviar ao Omie</span>, mostramos primeiro um resumo do que será criado (pré-visualização). Nada é enviado sem sua confirmação.
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <EnviarContratoOmieButton
+                  tenantId={resolvedTenantId}
+                  contratoId={postSaveContrato.id}
+                  createdAt={postSaveContrato.created_at}
+                />
+                <Button type="button" variant="ghost" onClick={handleClosePostSave}>
+                  Enviar depois
+                </Button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" onClick={handleClosePostSave}>Concluir</Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <>
+
 
         {/* Identificação */}
         <div className="space-y-2">
@@ -1346,6 +1410,8 @@ function ProdutoDialog({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
