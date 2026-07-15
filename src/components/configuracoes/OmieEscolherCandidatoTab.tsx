@@ -667,6 +667,19 @@ function GrupoCard({
           </Alert>
         )}
 
+        {temSugestaoAmbigua && (
+          <Alert className="border-amber-500/50 bg-amber-500/10">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-xs">
+              Este grupo tem contratos de valor idêntico. O sistema garante que cada contrato do Omie
+              será usado uma única vez, mas não consegue determinar qual corresponde a qual. Se os
+              contratos forem realmente idênticos (mesmo produto, mesmo valor), qualquer combinação
+              dá no mesmo. Se não forem, confira no Omie antes de confirmar.
+            </AlertDescription>
+          </Alert>
+        )}
+
+
         {grupo.pista === "limpo" && renderLimpo()}
         {grupo.pista === "decisao" && renderDecisao()}
         {(grupo.pista === "parear" || grupo.pista === "conflito") && renderPareamento()}
