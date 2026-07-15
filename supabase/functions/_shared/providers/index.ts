@@ -186,6 +186,21 @@ class EvolutionAdapter implements ProviderAdapter {
     if (!setRes.ok) return { ok: false, action: 'reconfigure_failed' };
     return { ok: true, action: 'reconfigured' };
   }
+
+  async getGroupParticipants(
+    secrets: InstanceSecrets,
+    instance: InstanceInfo,
+    groupJid: string
+  ): Promise<{ count: number }> {
+    const base = this.getBaseUrl(secrets);
+    const id = this.getIdentifier(secrets, instance);
+    const url = `${base}/group/participants/${id}?groupJid=${encodeURIComponent(groupJid)}`;
+    const res = await fetch(url, { headers: this.getHeaders(secrets) });
+    if (!res.ok) throw new Error(`Evolution getGroupParticipants error: ${await res.text()}`);
+    const data = await res.json();
+    const participants = Array.isArray(data?.participants) ? data.participants : [];
+    return { count: participants.length };
+  }
 }
 
 // ── Z-API Adapter ─────────────────────────────────────────────────────────────
