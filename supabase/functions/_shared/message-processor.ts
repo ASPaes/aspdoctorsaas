@@ -1349,7 +1349,13 @@ export async function ensureAttendanceForIncomingMessage(supabase: any, conversa
       return;
     }
     const newStatus = skipUra ? 'in_progress' : 'waiting';
-    const { data: newAtt, error } = await supabase.from('support_attendances').insert({ tenant_id: tenantId, conversation_id: conversationId, contact_id: contactId, status: newStatus, opened_at: nowIso, ...(skipUra ? { assumed_at: nowIso } : {}), created_from: 'customer' }).select('id, attendance_code').single();
+    // ura_state='pending' JA no INSERT. O trigger trg_dispatch_on_attendance_insert roda AFTER INSERT
+    // e o guard de URA em fn_assign_conversation_if_ready le ura_state; com o default 'none' ele lia
+    // "URA nao se aplica" e distribuia ~2s ANTES de sendUraWelcome gravar 'pending'.
+    // Esta condicao TEM que ser identica a de sendUraWelcome gravar 'pending' — nao desalinhar.
+    const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
+    const willSendUra = !skipUra && !!ctx && !!uraEnabled;
+    const { data: newAtt, error } = await supabase.from('support_attendances').insert({ tenant_id: tenantId, conversation_id: conversationId, contact_id: contactId, status: newStatus, opened_at: nowIso, ura_state: willSendUra ? 'pending' : 'none', ...(skipUra ? { assumed_at: nowIso } : {}), created_from: 'customer' }).select('id, attendance_code').single();
     if (error) { console.error('[processor] Error creating attendance:', error); return; }
     insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened').catch(() => {});
     clearAfterHoursFlag(supabase, conversationId).catch(() => {});
