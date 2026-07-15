@@ -822,7 +822,7 @@ function GrupoCard({
                         )}
                         {opcoes.map((c) => {
                           const recomendado = Number(c.codigo_contrato_omie) === Number(grupo.recomendado_codigo_contrato_omie);
-                          const sugerido = ds.sugestao_codigo_contrato_omie != null && Number(ds.sugestao_codigo_contrato_omie) === Number(c.codigo_contrato_omie);
+                          const sug = sugestaoFor(ds, c);
                           return (
                             <SelectItem key={c.codigo_contrato_omie} value={String(c.codigo_contrato_omie)}>
                               <span className="flex items-center gap-2 text-xs">
@@ -830,12 +830,14 @@ function GrupoCard({
                                 <span className="truncate max-w-[220px]">{c.razao_social_omie}</span>
                                 <span className="text-muted-foreground">{formatBRL(c.valor_omie)}</span>
                                 {recomendado && <Badge className="bg-blue-600 text-white text-[9px]">Rec.</Badge>}
-                                {sugerido && <Badge className="bg-emerald-600 text-white text-[9px]">Valor confere</Badge>}
+                                {sug && !sug.ambigua && <Badge className="bg-emerald-600 text-white text-[9px]">Valor confere</Badge>}
+                                {sug && sug.ambigua && <Badge className="bg-amber-500 text-white text-[9px]">Ambíguo ({sug.qtd})</Badge>}
                                 {!c.saudavel && <Badge className="bg-amber-500 text-white text-[9px]">!</Badge>}
                               </span>
                             </SelectItem>
                           );
                         })}
+
                       </SelectContent>
                     </Select>
                   )}
