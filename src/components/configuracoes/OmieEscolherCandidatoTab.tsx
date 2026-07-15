@@ -486,6 +486,7 @@ function ContratoDSInfo({ ds }: { ds: ContratoDS }) {
         <div className="text-xs text-muted-foreground truncate">{ds.razao_ds}</div>
       )}
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        {ds.numero_ds && <span>Nº: <span className="font-mono text-foreground">{ds.numero_ds}</span></span>}
         <span>MRR: <span className="font-medium text-foreground">{formatBRL(ds.valor_mrr_ds)}</span></span>
         {ds.vigencia_inicial_ds && <span>Início: {formatDate(ds.vigencia_inicial_ds)}</span>}
         {ds.dia_venc_ds != null && <span>Venc: dia {ds.dia_venc_ds}</span>}
@@ -494,6 +495,7 @@ function ContratoDSInfo({ ds }: { ds: ContratoDS }) {
     </div>
   );
 }
+
 
 type SugestaoInfo = { ambigua: boolean; qtd: number };
 
