@@ -3745,6 +3745,7 @@ export type Database = {
       }
       omie_sync_fila: {
         Row: {
+          campos_alterados: string[] | null
           contrato_id: string
           enfileirado_em: string
           id: string
@@ -3757,6 +3758,7 @@ export type Database = {
           ultimo_erro: string | null
         }
         Insert: {
+          campos_alterados?: string[] | null
           contrato_id: string
           enfileirado_em?: string
           id?: string
@@ -3769,6 +3771,7 @@ export type Database = {
           ultimo_erro?: string | null
         }
         Update: {
+          campos_alterados?: string[] | null
           contrato_id?: string
           enfileirado_em?: string
           id?: string
@@ -9907,7 +9910,7 @@ export type Database = {
         Returns: string
       }
       enfileirar_sync_omie: {
-        Args: { p_contrato_id: string; p_origem?: string }
+        Args: { p_campos?: string[]; p_contrato_id: string; p_origem?: string }
         Returns: undefined
       }
       estornar_reajuste: { Args: { p_reajuste_id: string }; Returns: Json }
@@ -11149,6 +11152,15 @@ export type Database = {
       recon_marcar_candidatos_resolvidos: {
         Args: { p_pares: Json; p_por: string; p_tenant: string }
         Returns: number
+      }
+      recon_marcar_criado_no_omie: {
+        Args: {
+          p_codigo_cliente_omie?: number
+          p_codigo_contrato_omie: number
+          p_contrato_id: string
+          p_tenant_id: string
+        }
+        Returns: Json
       }
       reconciliacao_fornecedores: {
         Args: { p_tenant_id: string }
