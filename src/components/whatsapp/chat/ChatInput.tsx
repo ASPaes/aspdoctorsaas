@@ -516,11 +516,11 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       },
       {
         onError: (err: any) => {
-          const anyErr = err as any;
-          // Rate-limited (429) — restaura a mensagem para o usuário
-          if (anyErr?.rateLimited || /aguarde\s+\d+\s*min/i.test(anyErr?.message || "")) {
+          // Rate limit do @todos — restaura a mensagem para o usuário não perder o texto.
+          // Agora o flag vem estruturado do hook, sem depender de regex na mensagem.
+          if (err?.rateLimited === true) {
             setMessage(content);
-            toast.error(anyErr?.message || "J\u00E1 foi marcado @todos neste grupo h\u00E1 pouco.");
+            toast.error(err?.message || "J\u00E1 foi marcado @todos neste grupo h\u00E1 pouco.");
             return;
           }
           toast.error(err?.message || "Erro ao enviar mensagem");
