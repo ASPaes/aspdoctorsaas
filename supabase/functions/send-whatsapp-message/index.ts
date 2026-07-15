@@ -608,6 +608,7 @@ Deno.serve(async (req) => {
       fileName: body.fileName,
       quotedMessageId: body.quotedMessageId,
       mentioned: validMentioned.length > 0 ? validMentioned : undefined,
+      mentionsEveryOne: wantsMentionEveryone ? true : undefined,
     };
 
     let sendResult: { messageId: string; raw: unknown };
