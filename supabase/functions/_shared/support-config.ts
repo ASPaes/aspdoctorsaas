@@ -141,6 +141,8 @@ const SELECT_FIELDS = [
   'support_ura_welcome_template',
   'support_ura_invalid_option_template',
   'support_ura_confirmation_template',
+  'support_ura_timeout_minutes',
+  'support_ura_default_department_id',
   // URA v2 fields
   'ura_enabled',
   'ura_welcome_template',
