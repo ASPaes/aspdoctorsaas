@@ -975,6 +975,23 @@ function ProdutoDialog({
         toast({ title: isEdit ? "Produto atualizado" : "Produto adicionado" });
       }
 
+      // Fluxo de lançamento novo com Omie ativo: oferece o envio ao Omie no fim do fluxo,
+      // no momento em que a pessoa sabe que terminou o lançamento. Reaproveita o
+      // EnviarContratoOmieButton (dry_run → confirmação → criar).
+      if (!isEdit && !produtoTrocou && omieAtivo && resolvedTenantId) {
+        const { data: ctr } = await (supabase.from("contratos" as any) as any)
+          .select("id, numero, created_at")
+          .eq("cliente_id", clienteId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (ctr?.id) {
+          setPostSaveContrato({ id: ctr.id as string, numero: (ctr as any).numero ?? null, created_at: (ctr as any).created_at ?? null });
+          onSaved();
+          return; // não fecha o diálogo — mostra o passo "Enviar ao Omie"
+        }
+      }
+
       onSaved();
       onClose();
     } catch (err: any) {
