@@ -124,6 +124,35 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
   const availability = useAgentAvailability();
   const { instances } = useWhatsAppInstances();
+
+  // Sanity-check: evita que um instanceId salvo de uma instância removida deixe a lista vazia
+  useEffect(() => {
+    if (!instances.length || !filters.instanceId) return;
+    if (!instances.some(i => i.id === filters.instanceId)) {
+      setFiltersRaw(f => ({ ...f, instanceId: undefined }));
+    }
+  }, [instances, filters.instanceId]);
+
+  // Re-hidrata filtros salvos quando o usuário aparece após o primeiro render (auth async)
+  useEffect(() => {
+    if (!user?.id || hydratedFor === user.id) return;
+    const s = loadSaved();
+    if (s) {
+      if (s.activePill) { setActivePillRaw(s.activePill); setPillAutoSet(true); }
+      setFiltersRaw(f => ({
+        ...f,
+        sortBy: s.sortBy ?? f.sortBy,
+        status: s.status,
+        instanceId: s.instanceId,
+        assignedToMe: s.assignedToMe ?? false,
+        assignedToAgent: s.assignedToAgent,
+        autoReplyDisabledOnly: s.autoReplyDisabledOnly ?? false,
+        rulesDisabledOnly: s.rulesDisabledOnly ?? false,
+      }));
+    }
+    setHydratedFor(user.id);
+  }, [user?.id, hydratedFor]);
+
   const { filteredInstanceIds, selectedDepartmentId } = useDepartmentFilter();
   const instanceMap = useMemo(() => {
     const map: Record<string, string> = {};
