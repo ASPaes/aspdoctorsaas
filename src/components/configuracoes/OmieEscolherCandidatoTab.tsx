@@ -495,15 +495,34 @@ function ContratoDSInfo({ ds }: { ds: ContratoDS }) {
   );
 }
 
-function CandidatoInfo({ c, recomendado, sugerido }: { c: Candidato; recomendado?: boolean; sugerido?: boolean }) {
+type SugestaoInfo = { ambigua: boolean; qtd: number };
+
+function sugestaoFor(ds: ContratoDS, c: Candidato): SugestaoInfo | null {
+  if (ds.sugestao_codigo_contrato_omie == null) return null;
+  if (Number(ds.sugestao_codigo_contrato_omie) !== Number(c.codigo_contrato_omie)) return null;
+  return {
+    ambigua: !!ds.sugestao_ambigua,
+    qtd: Number(ds.sugestao_qtd_mesmo_valor ?? 0),
+  };
+}
+
+function CandidatoInfo({ c, recomendado, sugestao }: { c: Candidato; recomendado?: boolean; sugestao?: SugestaoInfo | null }) {
   return (
     <div className="space-y-1 text-sm min-w-0 flex-1">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="font-medium truncate">{c.razao_social_omie || "—"}</span>
         {recomendado && <Badge className="bg-blue-600 text-white text-[10px]">Recomendado</Badge>}
-        {sugerido && (
+        {sugestao && !sugestao.ambigua && (
           <Badge className="bg-emerald-600 text-white text-[10px] gap-1">
             <CheckCircle2 className="h-3 w-3" /> Valor confere
+          </Badge>
+        )}
+        {sugestao && sugestao.ambigua && (
+          <Badge
+            className="bg-amber-500 text-white text-[10px] gap-1"
+            title={`Valor confere, mas há ${sugestao.qtd} candidatos idênticos — o pareamento é arbitrário`}
+          >
+            <AlertCircle className="h-3 w-3" /> Valor confere (ambíguo: {sugestao.qtd})
           </Badge>
         )}
         <HealthBadge c={c} />
@@ -524,6 +543,7 @@ function CandidatoInfo({ c, recomendado, sugerido }: { c: Candidato; recomendado
     </div>
   );
 }
+
 
 function ErroBox({ erro }: { erro: ErrorState }) {
   if (!erro) return null;
