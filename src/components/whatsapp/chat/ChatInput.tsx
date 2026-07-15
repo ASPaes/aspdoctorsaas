@@ -1147,6 +1147,32 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         disabled={mode === "note" ? false : (isBlocked || requiresTemplate)}
         disabledReason={mode === "note" ? undefined : (requiresTemplate ? "Janela de 24h fechada — use um template Meta." : (isBlocked ? "Você precisa estar ATIVO para enviar." : undefined))}
       />
+
+      <AlertDialog open={everyoneDialogOpen} onOpenChange={setEveryoneDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Marcar todos do grupo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {everyoneCountLoading
+                ? "Calculando quantos participantes ser\u00E3o notificados..."
+                : everyoneCount !== null
+                ? `Isso vai notificar ${everyoneCount} participantes \u2014 inclusive quem silenciou o grupo.`
+                : "Isso vai notificar todos os participantes do grupo \u2014 inclusive quem silenciou o grupo."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setEveryoneDialogOpen(false);
+                performTextSend(true);
+              }}
+            >
+              Marcar todos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 });
