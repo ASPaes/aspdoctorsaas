@@ -47,11 +47,14 @@ const SORT_LABELS: Record<string, string> = {
 };
 
 export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: Props) {
-  const STORAGE_KEY = "whatsapp-chat-filters";
+  const { user, profile } = useAuth();
+  const navigate = useNavigate();
+  const STORAGE_KEY = user?.id ? `whatsapp-chat-filters:${user.id}` : null;
 
   const loadSaved = () => {
+    if (!STORAGE_KEY) return null;
     try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) return JSON.parse(raw);
     } catch {}
     return null;
@@ -59,14 +62,15 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
   const saved = loadSaved();
 
-  const [search, setSearch] = useState(saved?.search ?? "");
+  const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const isSearching = !!debouncedSearch && debouncedSearch.length >= 2;
   const { data: searchResults = [], isLoading: isSearchLoading } = useConversationSearch(debouncedSearch);
   const [showNewModal, setShowNewModal] = useState(false);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
-  const [activePill, setActivePillRaw] = useState("waiting");
+  const [activePill, setActivePillRaw] = useState(saved?.activePill ?? "waiting");
   const [pillAutoSet, setPillAutoSet] = useState(false);
+  const [hydratedFor, setHydratedFor] = useState<string | null>(null);
   const [forcedConvId, setForcedConvId] = useState<string | null>(null);
 
   // Tick local p/ reavaliar alertas de ausência do agente (client-side, sem request)
@@ -86,14 +90,16 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   });
 
   const persist = (patch: Record<string, any>) => {
+    if (!STORAGE_KEY) return;
     try {
       const current = loadSaved() || {};
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, ...patch }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, ...patch }));
     } catch {}
   };
 
   const setActivePill = (v: string) => {
     setActivePillRaw(v);
+    persist({ activePill: v });
   };
 
   const setFilters = (updater: FiltersState | ((prev: FiltersState) => FiltersState)) => {
@@ -114,13 +120,39 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
   const handleSearchChange = (v: string) => {
     setSearch(v);
-    persist({ search: v });
   };
-  const navigate = useNavigate();
-  const { user, profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
   const availability = useAgentAvailability();
   const { instances } = useWhatsAppInstances();
+
+  // Sanity-check: evita que um instanceId salvo de uma instância removida deixe a lista vazia
+  useEffect(() => {
+    if (!instances.length || !filters.instanceId) return;
+    if (!instances.some(i => i.id === filters.instanceId)) {
+      setFiltersRaw(f => ({ ...f, instanceId: undefined }));
+    }
+  }, [instances, filters.instanceId]);
+
+  // Re-hidrata filtros salvos quando o usuário aparece após o primeiro render (auth async)
+  useEffect(() => {
+    if (!user?.id || hydratedFor === user.id) return;
+    const s = loadSaved();
+    if (s) {
+      if (s.activePill) { setActivePillRaw(s.activePill); setPillAutoSet(true); }
+      setFiltersRaw(f => ({
+        ...f,
+        sortBy: s.sortBy ?? f.sortBy,
+        status: s.status,
+        instanceId: s.instanceId,
+        assignedToMe: s.assignedToMe ?? false,
+        assignedToAgent: s.assignedToAgent,
+        autoReplyDisabledOnly: s.autoReplyDisabledOnly ?? false,
+        rulesDisabledOnly: s.rulesDisabledOnly ?? false,
+      }));
+    }
+    setHydratedFor(user.id);
+  }, [user?.id, hydratedFor]);
+
   const { filteredInstanceIds, selectedDepartmentId } = useDepartmentFilter();
   const instanceMap = useMemo(() => {
     const map: Record<string, string> = {};
