@@ -58,6 +58,7 @@ export const useWhatsAppSend = () => {
         quotedMessageId: params.quotedMessageId,
         instanceId: params.instanceId,
         mentioned: params.mentioned && params.mentioned.length > 0 ? params.mentioned : undefined,
+        mentionEveryone: params.mentionEveryone === true ? true : undefined,
       };
 
       const { data, error } = await supabase.functions.invoke('send-whatsapp-message', {
