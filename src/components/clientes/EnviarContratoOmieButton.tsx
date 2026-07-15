@@ -73,34 +73,61 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
         },
       });
 
+      let body: any = data ?? null;
       if (error) {
-        const status = (error as any)?.context?.status ?? (error as any)?.status;
-        let body: any = null;
         try {
           body = await (error as any)?.context?.json?.();
         } catch {}
-        if (status === 422 || body?.bloqueado === "validacao") {
-          setErros(Array.isArray(body?.erros) ? body.erros : [String((error as any).message || "Validação falhou")]);
-          setErrosOpen(true);
-          return;
+        if (!body) {
+          try {
+            const txt = await (error as any)?.context?.text?.();
+            if (txt) body = JSON.parse(txt);
+          } catch {}
         }
-        toast.error("Falha ao preparar o envio. Tente novamente.");
-        return;
       }
 
-      if (data?.bloqueado === "validacao") {
-        setErros(Array.isArray(data?.erros) ? data.erros : ["Validação falhou"]);
+      // Mensagens de negócio explícitas
+      const mensagens: string[] = [];
+      if (body?.error) mensagens.push(String(body.error));
+      if (Array.isArray(body?.erros)) mensagens.push(...body.erros.map(String));
+      if (Array.isArray(body?.invalidos)) mensagens.push(...body.invalidos.map(String));
+      if (body?.aviso) mensagens.push(String(body.aviso));
+
+      if (body?.bloqueado === "cnpj_ambiguo_no_omie") {
+        const cands = Array.isArray(body?.candidatos)
+          ? body.candidatos
+              .map((c: any) => `• ${c?.razao_social ?? "—"} (código ${c?.codigo_cliente_omie ?? "—"})`)
+              .join("\n")
+          : "";
+        setErros([
+          "Este CNPJ tem mais de um cadastro no Omie. Resolva a ambiguidade antes de enviar.",
+          ...(cands ? [cands] : []),
+        ]);
         setErrosOpen(true);
         return;
       }
 
-      const modeloBloqueado =
-        data?.bloqueado === "modelo_nao_permitido" ||
-        data?.contrato_dry_run?.bloqueado === "modelo_nao_permitido";
-      if (modeloBloqueado) {
+      if (
+        body?.bloqueado === "modelo_nao_permitido" ||
+        body?.contrato_dry_run?.bloqueado === "modelo_nao_permitido"
+      ) {
+        const permitidos = Array.isArray(body?.modelos_permitidos)
+          ? ` Modelos permitidos: ${body.modelos_permitidos.join(", ")}.`
+          : "";
         toast.error(
-          "Este modelo de contrato não está habilitado para envio ao Omie. Ajuste em Padrões Omie."
+          `Este modelo de contrato não está habilitado para envio ao Omie.${permitidos} Ajuste em Padrões Omie.`
         );
+        return;
+      }
+
+      if (body?.bloqueado === "validacao" || mensagens.length > 0) {
+        setErros(mensagens.length > 0 ? mensagens : ["Validação falhou"]);
+        setErrosOpen(true);
+        return;
+      }
+
+      if (error) {
+        toast.error("Falha ao preparar o envio. Tente novamente.");
         return;
       }
 
