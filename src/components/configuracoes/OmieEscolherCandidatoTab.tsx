@@ -35,7 +35,11 @@ type ContratoDS = {
   status_usuario: string | null;
   candidato_escolhido: number | string | null;
   sugestao_codigo_contrato_omie?: number | null;
+  sugestao_ambigua?: boolean | null;
+  sugestao_qtd_mesmo_valor?: number | null;
+  numero_ds?: string | null;
 };
+
 
 type Candidato = {
   codigo_cliente_omie: number;
