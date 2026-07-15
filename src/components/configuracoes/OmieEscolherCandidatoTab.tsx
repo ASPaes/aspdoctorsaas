@@ -633,6 +633,12 @@ function GrupoCard({
     return max;
   }, [grupo.candidatos]);
 
+  const temSugestaoAmbigua = useMemo(
+    () => grupo.contratos_ds.some((d) => d.sugestao_ambigua === true),
+    [grupo.contratos_ds]
+  );
+
+
   return (
     <Card>
       <CardHeader className="pb-3">
