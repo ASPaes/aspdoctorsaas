@@ -425,7 +425,7 @@ Deno.serve(async (req) => {
 
       if (recentMention) {
         const elapsedMs = Date.now() - new Date(recentMention.timestamp).getTime();
-        const retryAfterMinutes = Math.max(1, Math.ceil((30 * 60 * 1000 - elapsedMs) / 60000));
+        const retryAfterMinutes = Math.max(1, Math.ceil((MENTION_EVERYONE_COOLDOWN_MS - elapsedMs) / 60000));
         console.warn(
           `[send-whatsapp-message] @todos rate-limited conv=${body.conversationId} restam=${retryAfterMinutes}min`
         );
