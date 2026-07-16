@@ -11095,6 +11095,7 @@ export type Database = {
       montar_payload_contrato_omie: {
         Args: {
           p_contrato_id: string
+          p_incluir_observacao?: boolean
           p_incluir_situacao?: boolean
           p_tenant_id: string
         }
