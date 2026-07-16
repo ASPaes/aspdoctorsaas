@@ -1328,8 +1328,10 @@ export default function OmieConferenciaTab() {
 
   return (
     <div className="space-y-4">
+      <ConferenciaSaudeBanner />
       {/* Topo */}
       <div className="flex items-center justify-between flex-wrap gap-2">
+
         <div className="text-sm text-muted-foreground">
           Espelho conferido em <span className="font-medium text-foreground">{formatDateTime(geradoEm)}</span>
         </div>
