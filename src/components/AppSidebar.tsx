@@ -267,49 +267,76 @@ export function AppSidebar() {
                 );
               })}
               {canOnboarding && (
-                <Collapsible
-                  defaultOpen={getGroupOpen("Onboarding")}
-                  onOpenChange={(open) => setGroupOpen("Onboarding", open)}
-                  className="group/collapsible"
-                >
+                collapsed ? (
                   <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton tooltip="Onboarding & Implantação">
-                        <Rocket className="h-4 w-4" />
-                        <span>Onboarding & Implantação</span>
-                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild>
-                            <NavLink to="/onboarding-implantacao" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                              <Rocket className="h-4 w-4" />
-                              <span>Kanban</span>
-                            </NavLink>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild>
-                            <NavLink to="/onboarding-implantacao/dashboard" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                              <BarChart3 className="h-4 w-4" />
-                              <span>Dashboard</span>
-                            </NavLink>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild>
-                            <NavLink to="/onboarding-implantacao/config" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                              <SlidersHorizontal className="h-4 w-4" />
-                              <span>Configuração</span>
-                            </NavLink>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <SidebarMenuButton>
+                          <Rocket className="h-4 w-4" />
+                          <span>Onboarding & Implantação</span>
+                        </SidebarMenuButton>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
+                        <DropdownMenuItem onClick={() => navigate("/onboarding-implantacao")}>
+                          <Rocket className="h-4 w-4 mr-2" />
+                          Kanban
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => navigate("/onboarding-implantacao/dashboard")}>
+                          <BarChart3 className="h-4 w-4 mr-2" />
+                          Dashboard
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => navigate("/onboarding-implantacao/config")}>
+                          <SlidersHorizontal className="h-4 w-4 mr-2" />
+                          Configuração
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </SidebarMenuItem>
-                </Collapsible>
+                ) : (
+                  <Collapsible
+                    defaultOpen={getGroupOpen("Onboarding")}
+                    onOpenChange={(open) => setGroupOpen("Onboarding", open)}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton tooltip="Onboarding & Implantação">
+                          <Rocket className="h-4 w-4" />
+                          <span>Onboarding & Implantação</span>
+                          <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton asChild>
+                              <NavLink to="/onboarding-implantacao" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                                <Rocket className="h-4 w-4" />
+                                <span>Kanban</span>
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton asChild>
+                              <NavLink to="/onboarding-implantacao/dashboard" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                                <BarChart3 className="h-4 w-4" />
+                                <span>Dashboard</span>
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton asChild>
+                              <NavLink to="/onboarding-implantacao/config" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                                <SlidersHorizontal className="h-4 w-4" />
+                                <span>Configuração</span>
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                )
               )}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -388,49 +415,76 @@ export function AppSidebar() {
 
         <SidebarMenu>
           {isSuperAdmin && (
-            <Collapsible
-              defaultOpen={getGroupOpen("Super Admin")}
-              onOpenChange={(open) => setGroupOpen("Super Admin", open)}
-              className="group/collapsible"
-            >
+            collapsed ? (
               <SidebarMenuItem>
-                <CollapsibleTrigger asChild>
-                  <SidebarMenuButton tooltip="Super Admin">
-                    <Crown className="h-4 w-4" />
-                    <span>Super Admin</span>
-                    <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                  </SidebarMenuButton>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <SidebarMenuSub>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild>
-                        <NavLink to="/super/tenants" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                          <Building2 className="h-4 w-4" />
-                          <span>Tenants</span>
-                        </NavLink>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild>
-                        <NavLink to="/super/templates" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                          <Library className="h-4 w-4" />
-                          <span>Templates</span>
-                        </NavLink>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild>
-                        <NavLink to="/super/monitor" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                          <Activity className="h-4 w-4" />
-                          <span>Monitor</span>
-                        </NavLink>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  </SidebarMenuSub>
-                </CollapsibleContent>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton>
+                      <Crown className="h-4 w-4" />
+                      <span>Super Admin</span>
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
+                    <DropdownMenuItem onClick={() => navigate("/super/tenants")}>
+                      <Building2 className="h-4 w-4 mr-2" />
+                      Tenants
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/super/templates")}>
+                      <Library className="h-4 w-4 mr-2" />
+                      Templates
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/super/monitor")}>
+                      <Activity className="h-4 w-4 mr-2" />
+                      Monitor
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </SidebarMenuItem>
-            </Collapsible>
+            ) : (
+              <Collapsible
+                defaultOpen={getGroupOpen("Super Admin")}
+                onOpenChange={(open) => setGroupOpen("Super Admin", open)}
+                className="group/collapsible"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton tooltip="Super Admin">
+                      <Crown className="h-4 w-4" />
+                      <span>Super Admin</span>
+                      <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild>
+                          <NavLink to="/super/tenants" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                            <Building2 className="h-4 w-4" />
+                            <span>Tenants</span>
+                          </NavLink>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild>
+                          <NavLink to="/super/templates" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                            <Library className="h-4 w-4" />
+                            <span>Templates</span>
+                          </NavLink>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild>
+                          <NavLink to="/super/monitor" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                            <Activity className="h-4 w-4" />
+                            <span>Monitor</span>
+                          </NavLink>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            )
           )}
           <SidebarMenuItem>
             <SidebarMenuButton tooltip="Suporte DoctorSaaS" onClick={handleOpenDemandas}>
