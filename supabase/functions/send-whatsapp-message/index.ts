@@ -412,7 +412,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      const cutoffIso = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+      const cutoffIso = new Date(Date.now() - MENTION_EVERYONE_COOLDOWN_MS).toISOString();
       const { data: recentMention } = await supabase
         .from('whatsapp_messages')
         .select('timestamp')
