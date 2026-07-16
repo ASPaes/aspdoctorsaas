@@ -308,7 +308,7 @@ export default function ClienteForm() {
       cancelado: false, data_cancelamento: null, motivo_cancelamento_id: null, observacao_cancelamento: null,
       cert_a1_vencimento: null, cert_a1_ultima_venda_em: null, cert_a1_ultimo_vendedor_id: null,
       contato_nome: null, contato_cpf: null, contato_fone: null, contato_aniversario: null,
-      unidade_base_id: isEditing ? null : (selectedUnidadeId ?? null),
+      unidade_base_id: null,
       matriz_id: null,
       cep: null, endereco: null, numero: null, complemento: null, bairro: null,
       dia_vencimento_mrr: null,
