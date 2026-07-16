@@ -121,7 +121,7 @@ const clienteSchema = z.object({
   contato_cpf: z.string().nullable(),
   contato_fone: z.string().nullable(),
   contato_aniversario: z.string().nullable(),
-  unidade_base_id: z.number().nullable(),
+  unidade_base_id: z.number({ invalid_type_error: "Selecione a unidade base" }).nullable().refine((v) => v != null, { message: "Selecione a unidade base" }),
   matriz_id: z.string().nullable(),
   cep: z.string().nullable(),
   endereco: z.string().nullable(),
