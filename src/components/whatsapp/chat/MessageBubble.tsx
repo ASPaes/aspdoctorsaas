@@ -544,7 +544,6 @@ export function MessageBubble({
   return (
     <div
       className={cn("group flex w-full mb-1 items-end gap-0.5", isFromMe ? "justify-end" : "justify-start")}
-      onDoubleClick={() => onReply?.(msg)}
     >
       {isFromMe && actionsMenu}
       {messageContent}
