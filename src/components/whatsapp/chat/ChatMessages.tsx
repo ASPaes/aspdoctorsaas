@@ -425,7 +425,7 @@ export function ChatMessages({
                 if (item.type === 'transfer') {
                   return (
                     <div key={`transfer-${item.event.id}`} className="flex justify-center my-2">
-                      <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full">
+                      <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full select-text">
                         <ArrowRightLeft className="h-3 w-3" />
                         Transferido para {item.event.agent_name || 'Agente'}
                         {item.event.agent_role ? ` · ${item.event.agent_role}` : ''}
