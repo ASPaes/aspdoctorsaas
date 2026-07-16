@@ -23,6 +23,12 @@ interface SendMessageRequest {
   mentionEveryone?: boolean; // @todos — marca todos os participantes do grupo (Evolution only)
 }
 
+// Rate limit do @todos por grupo. O dialog de confirmação já é a trava
+// principal (exige ato consciente); isto aqui é só backstop contra spam.
+// 5min barra duplo-clique e surto, mas libera a correção legítima
+// ("caiu o sistema" → 7min depois → "normalizou").
+const MENTION_EVERYONE_COOLDOWN_MS = 5 * 60 * 1000;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
