@@ -562,6 +562,18 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     });
   }
 
+  const renderConversation = (conv: ConversationWithContact) => (
+    <ConversationItem
+      key={conv.id}
+      conversation={conv}
+      isSelected={selectedId === conv.id}
+      onClick={() => handleSelect(conv)}
+      instanceName={instances.length > 1 ? instanceMap[conv.instance_id] : undefined}
+      attendance={attendanceMap.get(conv.id)}
+      isAgentAlert={(() => { const d = getStateForConv(conv).agent_alert_due_at; return d != null && nowMs >= new Date(d).getTime(); })()}
+    />
+  );
+
   return (
     <div className="flex flex-col h-full border-r border-border">
       {/* Header */}
