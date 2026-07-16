@@ -64,7 +64,7 @@ export interface ProviderAdapter {
     secrets: InstanceSecrets,
     instance: InstanceInfo,
     groupJid: string
-  ): Promise<{ count: number; participants: any[] }>;
+  ): Promise<{ count: number; ids: string[] }>;
 }
 
 // ── Evolution Adapter ─────────────────────────────────────────────────────────
