@@ -117,3 +117,60 @@ export function renderMentions(
 
   return nodes.length > 0 ? nodes : text;
 }
+
+// URLs http(s) ou começando com www. Pontuação final é aparada.
+const URL_RE = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+
+function linkifyString(text: string, keyPrefix: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  const re = new RegExp(URL_RE.source, "gi");
+  let key = 0;
+
+  while ((match = re.exec(text)) !== null) {
+    let raw = match[0];
+    // apara pontuação/fechamento colados no fim da URL
+    const trail = raw.match(/[.,;:!?)\]}'"»]+$/);
+    if (trail) raw = raw.slice(0, raw.length - trail[0].length);
+    if (!raw) continue;
+
+    const start = match.index;
+    if (start > lastIndex) out.push(text.slice(lastIndex, start));
+
+    const href = raw.startsWith("http") ? raw : `https://${raw}`;
+    out.push(
+      <a
+        key={`${keyPrefix}-l-${key++}-${start}`}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="underline underline-offset-2 break-all hover:opacity-80"
+      >
+        {raw}
+      </a>,
+    );
+    lastIndex = start + raw.length;
+  }
+
+  if (lastIndex < text.length) out.push(text.slice(lastIndex));
+  return out.length > 0 ? out : [text];
+}
+
+/**
+ * Render final do texto de mensagem: menções (quando houver participantes) + links clicáveis.
+ */
+export function renderMessageText(
+  text: string | null | undefined,
+  participants: GroupParticipant[] | null | undefined,
+): ReactNode {
+  if (!text) return text ?? "";
+
+  const base = participants && participants.length > 0 ? renderMentions(text, participants) : text;
+  const nodes: ReactNode[] = Array.isArray(base) ? base : [base];
+
+  return nodes.flatMap((node, i) =>
+    typeof node === "string" ? linkifyString(node, `n${i}`) : [node],
+  );
+}

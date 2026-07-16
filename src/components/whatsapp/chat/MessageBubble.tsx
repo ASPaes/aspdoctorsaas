@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { getSendErrorInfo } from "@/lib/metaSendErrors";
 import type { GroupParticipant } from "../hooks/useGroupParticipants";
-import { renderMentions } from "./mentionUtils";
+import { renderMessageText } from "./mentionUtils";
 import { MediaContent } from "./MediaContent";
 import { ContactCard } from "./ContactCard";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
@@ -206,7 +206,7 @@ export function MessageBubble({
             "rounded-lg px-3 py-1.5 text-sm relative w-full min-w-0",
             isFromMe ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-muted text-foreground rounded-bl-sm"
           )}>
-            {msg.content && <p className="whitespace-pre-wrap break-words">{groupParticipants && groupParticipants.length > 0 ? renderMentions(msg.content, groupParticipants) : msg.content}</p>}
+            {msg.content && <p className="whitespace-pre-wrap break-words">{renderMessageText(msg.content, groupParticipants)}</p>}
             <div className={cn("flex items-center gap-1 mt-0.5", isFromMe ? "justify-end" : "justify-start")}>
               <span className="text-[10px] opacity-60">{time}</span>
               {statusIcon}
@@ -342,9 +342,7 @@ export function MessageBubble({
           : (() => {
               const raw = quotedMessage.content || "Mensagem";
               const truncated = raw.length > 80 ? raw.substring(0, 80) + "..." : raw;
-              return groupParticipants && groupParticipants.length > 0
-                ? renderMentions(truncated, groupParticipants)
-                : truncated;
+              return renderMessageText(truncated, groupParticipants);
             })()}
 
       </p>
@@ -367,7 +365,7 @@ export function MessageBubble({
           <MediaContent messageId={msg.id} messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} mediaFilename={msg.media_filename} mediaExt={msg.media_ext} mediaSizeBytes={msg.media_size_bytes} mediaKind={msg.media_kind} mediaMimetype={msg.media_mimetype} mediaPath={msg.media_path} />
         </div>
       )}
-      {msg.content && msg.message_type !== 'contact' && msg.message_type !== 'contacts' && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{groupParticipants && groupParticipants.length > 0 ? renderMentions(msg.content, groupParticipants) : msg.content}</p>}
+      {msg.content && msg.message_type !== 'contact' && msg.message_type !== 'contacts' && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{renderMessageText(msg.content, groupParticipants)}</p>}
 
       {isAudio && (
         <div className="mt-1 min-w-0">
