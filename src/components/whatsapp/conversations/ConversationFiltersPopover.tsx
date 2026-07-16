@@ -47,7 +47,7 @@ const STATUS_OPTIONS = [
   { value: "archived", label: "Arquivadas" },
 ];
 
-export function ConversationFiltersPopover({ filters, onChange }: Props) {
+export function ConversationFiltersPopover({ filters, onChange, showGroupByAgent = false }: Props) {
   const { instances } = useWhatsAppInstances();
   const { profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
