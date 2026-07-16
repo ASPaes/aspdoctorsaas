@@ -79,7 +79,7 @@ export function ConversationFiltersPopover({ filters, onChange, showGroupByAgent
     (filters.rulesDisabledOnly ? 1 : 0);
 
   const handleClear = () => {
-    onChange({ sortBy: "recent", status: undefined, instanceId: undefined, assignedToMe: false, assignedToAgent: undefined, autoReplyDisabledOnly: false, rulesDisabledOnly: false });
+    onChange({ sortBy: "recent", status: undefined, instanceId: undefined, assignedToMe: false, assignedToAgent: undefined, autoReplyDisabledOnly: false, rulesDisabledOnly: false, groupByAgent: false });
   };
 
   return (
