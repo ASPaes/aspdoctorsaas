@@ -26,6 +26,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import OmieFilaSincronizacaoPanel from "./OmieFilaSincronizacaoPanel";
+import { ConferenciaSaudeBanner } from "./ConferenciaSaudeBanner";
 import {
   AlertCircle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, HelpCircle, History, Lock, RefreshCw, Search,
 } from "lucide-react";
