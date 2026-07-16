@@ -1,5 +1,65 @@
-import { Headset, LogOut, RotateCcw } from "lucide-react";
+import { Headset, LogOut, RotateCcw, Copy, Check } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+async function copyToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function CopyableCode({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const ok = await copyToClipboard(code);
+    if (!ok) return;
+    setCopied(true);
+    toast.success("Número copiado");
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      title="Copiar número do atendimento"
+      aria-label="Copiar número do atendimento"
+      className="inline-flex items-center gap-1 font-semibold cursor-pointer rounded px-1 -mx-1 py-0.5 hover:underline hover:decoration-dotted hover:bg-black/5 dark:hover:bg-white/10 transition-colors select-text"
+      style={{ minHeight: 24 }}
+    >
+      <span>{code}</span>
+      {copied ? (
+        <Check className="h-3 w-3 opacity-100" strokeWidth={2.5} />
+      ) : (
+        <Copy className="h-3 w-3 opacity-60 hover:opacity-100 transition-opacity" strokeWidth={2} />
+      )}
+    </button>
+  );
+}
 
 export type AttendanceEventType = 'opened' | 'closed' | 'reopened';
 
@@ -85,24 +145,28 @@ export function AttendanceEventBadge({ eventType, attendanceCode, timestamp }: P
   const Icon = c.icon;
 
   return (
-    <div className="flex items-center gap-3 my-3 px-2 select-none" role="status">
+    <div className="flex items-center gap-3 my-3 px-2" role="status">
       <div className={cn("flex-1 h-px", c.lineColor)} />
       <div
         className={cn(
-          "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg border",
+          "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg border select-text",
           "shadow-[0_1px_3px_0_rgb(0_0_0/0.04)] dark:shadow-[0_1px_3px_0_rgb(0_0_0/0.2)]",
           "transition-colors",
           c.bgColor
         )}
       >
         <Icon className={cn("h-3 w-3 shrink-0", c.iconColor)} strokeWidth={2} />
-        <span className={cn("text-[11px] font-medium tracking-wide", c.textColor)}>
-          Atendimento{' '}
-          <span className="font-semibold">{attendanceCode}</span>
-          {' '}{c.label}
+        <span className={cn("text-[11px] font-medium tracking-wide inline-flex items-center gap-1", c.textColor)}>
+          <span>Atendimento</span>
+          {eventType === 'opened' && attendanceCode ? (
+            <CopyableCode code={attendanceCode} />
+          ) : (
+            <span className="font-semibold">{attendanceCode}</span>
+          )}
+          <span>{c.label}</span>
         </span>
         {timestamp && (
-          <span className={cn("text-[9px] opacity-50 ml-0.5", c.textColor)}>
+          <span className={cn("text-[9px] opacity-50 ml-0.5 select-text", c.textColor)}>
             {timestamp}
           </span>
         )}
