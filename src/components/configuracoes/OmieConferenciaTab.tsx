@@ -591,6 +591,17 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
               <div className="text-[11px] text-muted-foreground/80 mt-0.5">
                 cód. {row.codigo_contrato_omie}
               </div>
+              {bucket === "vigencia_vencida_no_omie" && row.vigencia_final_omie && (
+                <div className="mt-1.5 inline-flex items-center gap-1.5 rounded border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/40 px-2 py-1 text-[11px] font-semibold text-red-700 dark:text-red-400">
+                  Vigência final no Omie: {(() => {
+                    try {
+                      const d = new Date(row.vigencia_final_omie as string);
+                      if (!isNaN(d.getTime())) return d.toLocaleDateString("pt-BR");
+                    } catch {}
+                    return row.vigencia_final_omie;
+                  })()}
+                </div>
+              )}
               {diffKeys.length > 0 && (
                 <div className="text-[11px] text-muted-foreground mt-0.5">
                   Divergências: {diffKeys.join(", ")}
