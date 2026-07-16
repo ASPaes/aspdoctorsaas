@@ -636,8 +636,9 @@ Deno.serve(async (req) => {
       mediaMimetype: body.mediaMimetype,
       fileName: body.fileName,
       quotedMessageId: body.quotedMessageId,
-      mentioned: validMentioned.length > 0 ? validMentioned : undefined,
-      mentionsEveryOne: wantsMentionEveryone ? true : undefined,
+      mentioned: wantsMentionEveryone
+        ? everyoneMentions
+        : (validMentioned.length > 0 ? validMentioned : undefined),
     };
 
     let sendResult: { messageId: string; raw: unknown };
