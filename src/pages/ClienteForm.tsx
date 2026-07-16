@@ -555,7 +555,19 @@ export default function ClienteForm() {
       toast({ title: isEditing ? "Cliente atualizado!" : "Cliente criado!", description: "Dados salvos com sucesso." });
       if (!isEditing && newId) navigate(`/clientes/${newId}`);
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      const code = error?.code || error?.details?.code;
+      const msg = String(error?.message ?? "");
+      if (code === "23514" && msg.includes("clientes_unidade_base_obrigatoria")) {
+        form.setError("unidade_base_id", { type: "manual", message: "Selecione a unidade base" });
+        toast({ title: "Selecione a unidade base antes de salvar.", variant: "destructive" });
+        setTimeout(() => {
+          const el = document.querySelector<HTMLElement>('[name="unidade_base_id"], [data-field="unidade_base_id"]');
+          el?.scrollIntoView({ behavior: "smooth", block: "center" });
+          form.setFocus("unidade_base_id");
+        }, 0);
+        return;
+      }
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
     },
   });
@@ -566,6 +578,11 @@ export default function ClienteForm() {
     const firstKey = Object.keys(errors)[0];
     const msg = errors[firstKey]?.message || "Verifique os campos obrigatórios";
     toast({ title: "Erro de validação", description: `Campo "${firstKey}": ${msg}`, variant: "destructive" });
+    setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(`[data-field="${firstKey}"], [name="${firstKey}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      try { form.setFocus(firstKey as any); } catch {}
+    }, 0);
   };
 
   // Enter key moves to next field instead of submitting the form
