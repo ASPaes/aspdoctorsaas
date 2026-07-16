@@ -450,7 +450,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     }
 
     return result;
-  }, [conversations, activePill, filters.sortBy, filters.instanceId, filters.autoReplyDisabledOnly, filters.rulesDisabledOnly, forcedConvId, isAdmin, user?.id, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv, nowMs]);
+  }, [conversations, activePill, queueLikePills, filters.sortBy, filters.instanceId, filters.autoReplyDisabledOnly, filters.rulesDisabledOnly, forcedConvId, isAdmin, user?.id, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv, nowMs]);
 
   const agentGroups = useMemo(() => {
     if (!isGroupedView) return [];
