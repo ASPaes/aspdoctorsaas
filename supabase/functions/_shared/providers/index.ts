@@ -41,7 +41,6 @@ export interface SendRequest {
   fileName?: string;
   quotedMessageId?: string;
   mentioned?: string[] | null;
-  mentionsEveryOne?: boolean; // @todos — só suportado pelo EvolutionAdapter
 }
 
 export interface SendResult {
