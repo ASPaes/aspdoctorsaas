@@ -787,7 +787,7 @@ type VisaoGeralData = {
     mrr_divergencia?: number;
     divergencia_valor_qtd?: number;
     divergencia_valor_montante?: number;
-    pendente_assuncao_mrr_omie?: number;
+    
   };
   baldes?: Record<string, number>;
   total_contratos?: number;
