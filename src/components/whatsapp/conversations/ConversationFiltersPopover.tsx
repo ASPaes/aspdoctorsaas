@@ -24,11 +24,13 @@ export interface FiltersState {
   assignedToAgent: string | undefined;
   autoReplyDisabledOnly?: boolean;
   rulesDisabledOnly?: boolean;
+  groupByAgent?: boolean;
 }
 
 interface Props {
   filters: FiltersState;
   onChange: (filters: FiltersState) => void;
+  showGroupByAgent?: boolean;
 }
 
 const SORT_OPTIONS: { value: SortBy; label: string }[] = [
@@ -45,7 +47,7 @@ const STATUS_OPTIONS = [
   { value: "archived", label: "Arquivadas" },
 ];
 
-export function ConversationFiltersPopover({ filters, onChange }: Props) {
+export function ConversationFiltersPopover({ filters, onChange, showGroupByAgent = false }: Props) {
   const { instances } = useWhatsAppInstances();
   const { profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
@@ -77,7 +79,7 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
     (filters.rulesDisabledOnly ? 1 : 0);
 
   const handleClear = () => {
-    onChange({ sortBy: "recent", status: undefined, instanceId: undefined, assignedToMe: false, assignedToAgent: undefined, autoReplyDisabledOnly: false, rulesDisabledOnly: false });
+    onChange({ sortBy: "recent", status: undefined, instanceId: undefined, assignedToMe: false, assignedToAgent: undefined, autoReplyDisabledOnly: false, rulesDisabledOnly: false, groupByAgent: false });
   };
 
   return (
@@ -216,6 +218,19 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
             </SelectContent>
           </Select>
         </div>
+
+        {showGroupByAgent && (
+          <div className="flex items-center justify-between">
+            <Label htmlFor="group-by-agent" className="text-xs font-medium text-muted-foreground">
+              Agrupar por operador
+            </Label>
+            <Switch
+              id="group-by-agent"
+              checked={!!filters.groupByAgent}
+              onCheckedChange={(v) => onChange({ ...filters, groupByAgent: v })}
+            />
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Status</label>

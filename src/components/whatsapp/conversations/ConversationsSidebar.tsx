@@ -87,6 +87,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     assignedToAgent: saved?.assignedToAgent ?? undefined,
     autoReplyDisabledOnly: saved?.autoReplyDisabledOnly ?? false,
     rulesDisabledOnly: saved?.rulesDisabledOnly ?? false,
+    groupByAgent: saved?.groupByAgent ?? false,
   });
 
   const persist = (patch: Record<string, any>) => {
@@ -113,6 +114,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         assignedToAgent: next.assignedToAgent,
         autoReplyDisabledOnly: next.autoReplyDisabledOnly,
         rulesDisabledOnly: next.rulesDisabledOnly,
+        groupByAgent: next.groupByAgent,
       });
       return next;
     });
@@ -148,6 +150,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         assignedToAgent: s.assignedToAgent,
         autoReplyDisabledOnly: s.autoReplyDisabledOnly ?? false,
         rulesDisabledOnly: s.rulesDisabledOnly ?? false,
+        groupByAgent: s.groupByAgent ?? false,
       }));
     }
     setHydratedFor(user.id);
@@ -541,7 +544,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
               </TooltipTrigger>
               <TooltipContent>Contatos</TooltipContent>
             </Tooltip>
-            <ConversationFiltersPopover filters={filters} onChange={setFilters} />
+            <ConversationFiltersPopover filters={filters} onChange={setFilters} showGroupByAgent={activePill === "in_progress"} />
             
             <Button variant="default" size="icon" className="h-7 w-7" onClick={() => setShowNewModal(true)}>
               <Plus className="h-4 w-4" />
