@@ -1106,7 +1106,7 @@ function VisaoGeralPanel({
           </div>
 
           {/* Mini-indicadores */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50/40 dark:bg-red-950/20 p-3">
               <div className="text-[11px] uppercase tracking-wide text-red-700 dark:text-red-400">
                 Divergências de valor a resolver
@@ -1118,14 +1118,6 @@ function VisaoGeralPanel({
                 <span className="text-sm text-muted-foreground">
                   ({formatBRL(c.divergencia_valor_montante)})
                 </span>
-              </div>
-            </div>
-            <div className="rounded-lg border border-muted bg-muted/30 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Sob outra integração (assunção pendente)
-              </div>
-              <div className="mt-1 text-2xl font-semibold">
-                {formatBRL(c.pendente_assuncao_mrr_omie)}
               </div>
             </div>
           </div>
