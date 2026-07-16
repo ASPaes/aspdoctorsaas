@@ -145,24 +145,28 @@ export function AttendanceEventBadge({ eventType, attendanceCode, timestamp }: P
   const Icon = c.icon;
 
   return (
-    <div className="flex items-center gap-3 my-3 px-2 select-none" role="status">
+    <div className="flex items-center gap-3 my-3 px-2" role="status">
       <div className={cn("flex-1 h-px", c.lineColor)} />
       <div
         className={cn(
-          "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg border",
+          "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg border select-text",
           "shadow-[0_1px_3px_0_rgb(0_0_0/0.04)] dark:shadow-[0_1px_3px_0_rgb(0_0_0/0.2)]",
           "transition-colors",
           c.bgColor
         )}
       >
         <Icon className={cn("h-3 w-3 shrink-0", c.iconColor)} strokeWidth={2} />
-        <span className={cn("text-[11px] font-medium tracking-wide", c.textColor)}>
-          Atendimento{' '}
-          <span className="font-semibold">{attendanceCode}</span>
-          {' '}{c.label}
+        <span className={cn("text-[11px] font-medium tracking-wide inline-flex items-center gap-1", c.textColor)}>
+          <span>Atendimento</span>
+          {eventType === 'opened' && attendanceCode ? (
+            <CopyableCode code={attendanceCode} />
+          ) : (
+            <span className="font-semibold">{attendanceCode}</span>
+          )}
+          <span>{c.label}</span>
         </span>
         {timestamp && (
-          <span className={cn("text-[9px] opacity-50 ml-0.5", c.textColor)}>
+          <span className={cn("text-[9px] opacity-50 ml-0.5 select-text", c.textColor)}>
             {timestamp}
           </span>
         )}
