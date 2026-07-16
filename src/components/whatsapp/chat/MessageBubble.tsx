@@ -342,9 +342,7 @@ export function MessageBubble({
           : (() => {
               const raw = quotedMessage.content || "Mensagem";
               const truncated = raw.length > 80 ? raw.substring(0, 80) + "..." : raw;
-              return groupParticipants && groupParticipants.length > 0
-                ? renderMentions(truncated, groupParticipants)
-                : truncated;
+              return renderMessageText(truncated, groupParticipants);
             })()}
 
       </p>
