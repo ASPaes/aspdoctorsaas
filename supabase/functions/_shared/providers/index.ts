@@ -65,7 +65,7 @@ export interface ProviderAdapter {
     secrets: InstanceSecrets,
     instance: InstanceInfo,
     groupJid: string
-  ): Promise<{ count: number }>;
+  ): Promise<{ count: number; participants: any[] }>;
 }
 
 // ── Evolution Adapter ─────────────────────────────────────────────────────────
@@ -191,7 +191,7 @@ class EvolutionAdapter implements ProviderAdapter {
     secrets: InstanceSecrets,
     instance: InstanceInfo,
     groupJid: string
-  ): Promise<{ count: number }> {
+  ): Promise<{ count: number; participants: any[] }> {
     const base = this.getBaseUrl(secrets);
     const id = this.getIdentifier(secrets, instance);
     const url = `${base}/group/participants/${id}?groupJid=${encodeURIComponent(groupJid)}`;
@@ -199,7 +199,7 @@ class EvolutionAdapter implements ProviderAdapter {
     if (!res.ok) throw new Error(`Evolution getGroupParticipants error: ${await res.text()}`);
     const data = await res.json();
     const participants = Array.isArray(data?.participants) ? data.participants : [];
-    return { count: participants.length };
+    return { count: participants.length, participants };
   }
 }
 
