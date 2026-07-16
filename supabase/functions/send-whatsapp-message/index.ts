@@ -749,7 +749,9 @@ Deno.serve(async (req) => {
           is_from_me: persistedIsFromMe,
           timestamp: messageTimestamp,
           quoted_message_id: body.quotedMessageId || null,
-          mentions: validMentioned.length > 0 ? validMentioned : null,
+          mentions: wantsMentionEveryone
+            ? everyoneMentions
+            : (validMentioned.length > 0 ? validMentioned : null),
           mentions_everyone: wantsMentionEveryone,
           metadata: {
             ...(body.fileName ? { fileName: body.fileName } : {}),
