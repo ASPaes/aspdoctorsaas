@@ -9750,7 +9750,7 @@ export type Database = {
         Args: { p_go_live_real?: string; p_journey_id: string }
         Returns: Json
       }
-      conferencia_saude: { Args: never; Returns: Json }
+      conferencia_saude: { Args: { p_tenant_id: string }; Returns: Json }
       create_access_invite: {
         Args: {
           p_access_status?: string
