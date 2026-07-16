@@ -312,7 +312,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     const groups = groupCountData?.totalGroups ?? 0;
     const groupsUnread = groupCountData?.unreadGroups ?? 0;
     return { inProgress, waiting, closed, afterHours, groups, groupsUnread };
-  }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId, groupCountData, filters.instanceId]);
+  }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId, groupCountData, filters.instanceId, filters.autoReplyDisabledOnly, filters.rulesDisabledOnly]);
 
   // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
   useEffect(() => {
