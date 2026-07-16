@@ -166,6 +166,54 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     return map;
   }, [instances]);
 
+  const { data: agentOptionsData } = useAgentOptions();
+  const agentLabelMap = useMemo(() => new Map((agentOptionsData ?? []).map(a => [a.userId, a.label])), [agentOptionsData]);
+
+  const [collapsedAgents, setCollapsedAgents] = useState<Set<string>>(new Set());
+  const toggleAgent = (key: string) => {
+    setCollapsedAgents(prev => {
+      const n = new Set(prev);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  };
+
+  const isGroupedView = !isSearching && activePill === "in_progress" && !!filters.groupByAgent;
+
+  const agentGroups = useMemo(() => {
+    if (!isGroupedView) return [];
+    const groups = new Map<string, ConversationWithContact[]>();
+    filtered.forEach(conv => {
+      const state = getStateForConv(conv);
+      const key = state.attendance_assigned_to ?? "__unassigned__";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(conv);
+    });
+
+    const entries = Array.from(groups.entries()).map(([key, convs]) => {
+      let label: string;
+      if (key === "__unassigned__") {
+        label = "Sem operador";
+      } else if (key === user?.id) {
+        label = `${agentLabelMap.get(key) ?? "Você"} (você)`;
+      } else {
+        label = agentLabelMap.get(key) ?? "Operador";
+      }
+      return { key, label, convs };
+    });
+
+    entries.sort((a, b) => {
+      if (a.key === user?.id) return -1;
+      if (b.key === user?.id) return 1;
+      if (a.key === "__unassigned__") return 1;
+      if (b.key === "__unassigned__") return -1;
+      return a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" });
+    });
+
+    return entries;
+  }, [isGroupedView, filtered, getStateForConv, agentLabelMap, user?.id]);
+
   // Determine query-level assignment filter
   const resolvedAssignedTo = useMemo(() => {
     if (filters.assignedToMe) return user?.id;
