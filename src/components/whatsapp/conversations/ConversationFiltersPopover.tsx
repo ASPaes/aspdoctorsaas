@@ -12,9 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTenantUsers } from "@/hooks/useTenantUsers";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useAgentOptions } from "../hooks/useAgentOptions";
 
 export type SortBy = "recent" | "unread" | "waiting" | "oldest";
 
