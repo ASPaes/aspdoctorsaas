@@ -16,6 +16,7 @@ import { useWhatsAppConversations, type ConversationWithContact } from "../hooks
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
 import { useConversationStates } from "../hooks/useConversationStates";
+import { useAgentOptions } from "../hooks/useAgentOptions";
 import { getConversationBucket, type ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
 import { ConversationItem } from "./ConversationItem";
 import { ConversationFiltersPopover, type FiltersState } from "./ConversationFiltersPopover";
