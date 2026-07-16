@@ -605,7 +605,12 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             </div>
           )}
 
-          {/* ─── 14. Regras do sistema ─── */}
+          {/* ─── 14. Não encerrar por inatividade ─── */}
+          {!isGroup && relevantAttendanceId && !isRelevantClosed && (
+            <InactivityHoldSection attendanceId={relevantAttendanceId} />
+          )}
+
+          {/* ─── 15. Regras do sistema ─── */}
           {!isGroup && (
             <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
