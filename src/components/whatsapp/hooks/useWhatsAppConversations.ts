@@ -200,8 +200,10 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       if (error) throw error;
 
       // Conversas "forçadas" (ex.: recém-criadas, ainda sem last_message_at) não entram
-      // no filtro acima. Busca-as à parte por PK (lookup barato) e mescla no topo. Só
-      // dispara enquanto a conversa não tem mensagem — depois ela entra na query principal.
+      // no filtro acima. Busca-as à parte por PK (lookup barato) e mescla no topo. As
+      // forçadas respeitam os filtros ativos (operador, setor, instância, status) —
+      // sem isso, includeIds reinjetaria conversas de outros operadores. Só dispara
+      // enquanto a conversa não tem mensagem — depois ela entra na query principal.
       let rawConversations = (conversationsData ?? []) as any[];
       const includeIds = filters?.includeIds;
       if (!filters?.isGroup && includeIds && includeIds.length > 0) {
@@ -212,8 +214,9 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
             .from('whatsapp_conversations')
             .select(`*, contact:whatsapp_contacts(*)`)
             .in('id', missingIds)) as any;
-          if (tid) forcedQuery = forcedQuery.eq('tenant_id', tid);
+          forcedQuery = applyFullFilter(forcedQuery, tid, filters);
           const { data: forcedData } = await forcedQuery;
+
           if (forcedData && forcedData.length > 0) {
             rawConversations = [...forcedData, ...rawConversations];
           }
