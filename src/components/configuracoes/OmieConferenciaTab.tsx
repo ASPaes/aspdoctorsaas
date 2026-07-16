@@ -56,10 +56,10 @@ type Bucket =
   | "vinculo_auto_ok"
   | "resolver"
   | "atribuir_modelo"
-  | "pendente_assuncao"
   | "escolher_candidato"
   | "criar"
   | "criar_contrato"
+  | "vigencia_vencida_no_omie"
   | "contrato_suspenso"
   | "contrato_cancelado";
 
@@ -69,10 +69,10 @@ const BUCKETS: { key: Bucket; label: string }[] = [
   { key: "vinculo_auto_ok", label: "Prontos para vincular" },
   { key: "resolver", label: "Divergências de valor" },
   { key: "atribuir_modelo", label: "Sem modelo" },
-  { key: "pendente_assuncao", label: "Pendente assunção" },
   { key: "escolher_candidato", label: "Ambíguos" },
   { key: "criar", label: "A criar no Omie" },
   { key: "criar_contrato", label: "Criar contrato" },
+  { key: "vigencia_vencida_no_omie", label: "Vigência vencida no Omie" },
   { key: "contrato_suspenso", label: "Contrato suspenso no Omie" },
   { key: "contrato_cancelado", label: "Contrato cancelado no Omie" },
 ];
@@ -84,14 +84,14 @@ const BUCKET_HELP: Record<Bucket, string> = {
     "Clientes que existem nos dois lados (mesmo CNPJ), mas o valor mensal é diferente entre DoctorSaaS e Omie. Normalmente porque o valor no Omie foi definido por outro sistema. Aqui você decide qual valor vale e atualiza.",
   atribuir_modelo:
     "Contratos ativos no DoctorSaaS que não têm um modelo de contrato definido. Sem modelo, não é possível enviá-los ao Omie. O ajuste é feito no próprio DoctorSaaS: defina o modelo para liberar o envio.",
-  pendente_assuncao:
-    "Clientes que já estão no Omie, mas sob o controle de outra integração (Ploomes, DIGI, etc.). Assumir agora sobrescreveria o código dessa integração e poderia duplicar o cadastro. Ficam travados até a integração de origem ser desligada.",
   escolher_candidato:
     "Clientes cujo CNPJ aparece em mais de um cadastro — seja no Omie (cadastros duplicados) ou no DoctorSaaS. Como não dá para saber automaticamente qual é o certo, você escolhe manualmente o cadastro correto.",
   criar:
     "Clientes do DoctorSaaS que não existem no Omie. Estão prontos (têm modelo, valor e dados válidos) para serem criados no Omie — cliente e contrato — quando você liberar.",
   criar_contrato:
     "O cliente já existe no Omie, mas não tem contrato ativo lá. Aqui será criado apenas o contrato, vinculado ao cliente que já existe (não duplica o cliente).",
+  vigencia_vencida_no_omie:
+    "Contrato está ativo no Omie mas com a vigência final no passado. O Omie não fatura contrato fora da vigência — essa mensalidade não está sendo cobrada. Renove a vigência final direto no Omie. O alerta some sozinho em até 15 minutos depois disso.",
   contrato_suspenso:
     "O cliente tem um contrato no Omie, mas está SUSPENSO. Não deve ser criado um novo contrato (duplicaria) — a ação é reativar/revisar o existente.",
   contrato_cancelado:
