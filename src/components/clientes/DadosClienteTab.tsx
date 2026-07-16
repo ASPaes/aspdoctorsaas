@@ -314,11 +314,15 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        <FormField control={form.control} name="unidade_base_id" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Unidade Base</FormLabel>
+        <FormField control={form.control} name="unidade_base_id" render={({ field, fieldState }) => (
+          <FormItem data-field="unidade_base_id">
+            <FormLabel>Unidade Base *</FormLabel>
             <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
-              <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+              <FormControl>
+                <SelectTrigger className={fieldState.error ? "border-destructive focus:ring-destructive" : ""}>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+              </FormControl>
               <SelectContent>
                 {unidadesBase.map((u) => (
                   <SelectItem key={u.id} value={u.id.toString()}>{u.nome}</SelectItem>
