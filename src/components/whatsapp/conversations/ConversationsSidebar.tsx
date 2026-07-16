@@ -436,6 +436,39 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     return result;
   }, [conversations, activePill, filters.sortBy, forcedConvId, isAdmin, user?.id, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv, nowMs]);
 
+  const agentGroups = useMemo(() => {
+    if (!isGroupedView) return [];
+    const groups = new Map<string, ConversationWithContact[]>();
+    filtered.forEach(conv => {
+      const state = getStateForConv(conv);
+      const key = state.attendance_assigned_to ?? "__unassigned__";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(conv);
+    });
+
+    const entries = Array.from(groups.entries()).map(([key, convs]) => {
+      let label: string;
+      if (key === "__unassigned__") {
+        label = "Sem operador";
+      } else if (key === user?.id) {
+        label = `${agentLabelMap.get(key) ?? "Você"} (você)`;
+      } else {
+        label = agentLabelMap.get(key) ?? "Operador";
+      }
+      return { key, label, convs };
+    });
+
+    entries.sort((a, b) => {
+      if (a.key === user?.id) return -1;
+      if (b.key === user?.id) return 1;
+      if (a.key === "__unassigned__") return 1;
+      if (b.key === "__unassigned__") return -1;
+      return a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" });
+    });
+
+    return entries;
+  }, [isGroupedView, filtered, getStateForConv, agentLabelMap, user?.id]);
+
   const handleCreated = useCallback(async (convId: string) => {
     setForcedConvId(convId);
     // Try from cache first
