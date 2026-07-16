@@ -11529,6 +11529,7 @@ export type Database = {
         }
         Returns: Json
       }
+      sweep_agent_presence_offline: { Args: never; Returns: number }
       sync_cliente_produto_to_contract: {
         Args: { p_cliente_produto_id: string }
         Returns: undefined
