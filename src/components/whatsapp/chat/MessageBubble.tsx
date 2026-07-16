@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { getSendErrorInfo } from "@/lib/metaSendErrors";
 import type { GroupParticipant } from "../hooks/useGroupParticipants";
-import { renderMessageText } from "./mentionUtils";
+import { renderMentions, renderMessageText } from "./mentionUtils";
 import { MediaContent } from "./MediaContent";
 import { ContactCard } from "./ContactCard";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
@@ -342,7 +342,9 @@ export function MessageBubble({
           : (() => {
               const raw = quotedMessage.content || "Mensagem";
               const truncated = raw.length > 80 ? raw.substring(0, 80) + "..." : raw;
-              return renderMessageText(truncated, groupParticipants);
+              return groupParticipants && groupParticipants.length > 0
+                ? renderMentions(truncated, groupParticipants)
+                : truncated;
             })()}
 
       </p>
