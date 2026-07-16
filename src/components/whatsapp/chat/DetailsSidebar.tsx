@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert, Pin, ExternalLink, User } from "lucide-react";
+import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert, Pin, ExternalLink, User, TimerOff } from "lucide-react";
 import { format } from "date-fns";
 import { AttendanceMessagesDialog } from "./AttendanceMessagesDialog";
 import { Switch } from "@/components/ui/switch";
