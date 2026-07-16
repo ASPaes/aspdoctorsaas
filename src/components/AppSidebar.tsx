@@ -125,6 +125,13 @@ export function AppSidebar() {
   const initials = getInitials(displayName);
 
   const handleLogout = async () => {
+    try {
+      if (profile?.tenant_id) {
+        await (supabase.rpc as any)("agent_presence_set_off", { p_tenant_id: profile.tenant_id });
+      }
+    } catch (e) {
+      console.warn("[presence] set_off no logout falhou:", e);
+    }
     await signOut();
     toast.success("Logout realizado.");
     navigate("/login", { replace: true });
