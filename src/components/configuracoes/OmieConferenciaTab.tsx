@@ -166,6 +166,7 @@ type ReconciliacaoRow = {
   valor_omie: number | null;
   vigencia_inicial_ds: string | null;
   vigencia_final_ds: string | null;
+  vigencia_final_omie: string | null;
   dia_venc_ds: number | null;
   dia_venc_omie: number | null;
   modelo_ds: string | null;
