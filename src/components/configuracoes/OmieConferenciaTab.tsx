@@ -28,7 +28,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import OmieFilaSincronizacaoPanel from "./OmieFilaSincronizacaoPanel";
 import { ConferenciaSaudeBanner } from "./ConferenciaSaudeBanner";
 import {
-  AlertCircle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, HelpCircle, History, Lock, RefreshCw, Search,
+  AlertCircle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, HelpCircle, History, RefreshCw, Search,
 } from "lucide-react";
 
 function MetricHelpPopover({ children }: { children: React.ReactNode }) {
@@ -56,10 +56,10 @@ type Bucket =
   | "vinculo_auto_ok"
   | "resolver"
   | "atribuir_modelo"
-  | "pendente_assuncao"
   | "escolher_candidato"
   | "criar"
   | "criar_contrato"
+  | "vigencia_vencida_no_omie"
   | "contrato_suspenso"
   | "contrato_cancelado";
 
@@ -69,10 +69,10 @@ const BUCKETS: { key: Bucket; label: string }[] = [
   { key: "vinculo_auto_ok", label: "Prontos para vincular" },
   { key: "resolver", label: "Divergências de valor" },
   { key: "atribuir_modelo", label: "Sem modelo" },
-  { key: "pendente_assuncao", label: "Pendente assunção" },
   { key: "escolher_candidato", label: "Ambíguos" },
   { key: "criar", label: "A criar no Omie" },
   { key: "criar_contrato", label: "Criar contrato" },
+  { key: "vigencia_vencida_no_omie", label: "Vigência vencida no Omie" },
   { key: "contrato_suspenso", label: "Contrato suspenso no Omie" },
   { key: "contrato_cancelado", label: "Contrato cancelado no Omie" },
 ];
@@ -84,14 +84,14 @@ const BUCKET_HELP: Record<Bucket, string> = {
     "Clientes que existem nos dois lados (mesmo CNPJ), mas o valor mensal é diferente entre DoctorSaaS e Omie. Normalmente porque o valor no Omie foi definido por outro sistema. Aqui você decide qual valor vale e atualiza.",
   atribuir_modelo:
     "Contratos ativos no DoctorSaaS que não têm um modelo de contrato definido. Sem modelo, não é possível enviá-los ao Omie. O ajuste é feito no próprio DoctorSaaS: defina o modelo para liberar o envio.",
-  pendente_assuncao:
-    "Clientes que já estão no Omie, mas sob o controle de outra integração (Ploomes, DIGI, etc.). Assumir agora sobrescreveria o código dessa integração e poderia duplicar o cadastro. Ficam travados até a integração de origem ser desligada.",
   escolher_candidato:
     "Clientes cujo CNPJ aparece em mais de um cadastro — seja no Omie (cadastros duplicados) ou no DoctorSaaS. Como não dá para saber automaticamente qual é o certo, você escolhe manualmente o cadastro correto.",
   criar:
     "Clientes do DoctorSaaS que não existem no Omie. Estão prontos (têm modelo, valor e dados válidos) para serem criados no Omie — cliente e contrato — quando você liberar.",
   criar_contrato:
     "O cliente já existe no Omie, mas não tem contrato ativo lá. Aqui será criado apenas o contrato, vinculado ao cliente que já existe (não duplica o cliente).",
+  vigencia_vencida_no_omie:
+    "Contrato está ativo no Omie mas com a vigência final no passado. O Omie não fatura contrato fora da vigência — essa mensalidade não está sendo cobrada. Renove a vigência final direto no Omie. O alerta some sozinho em até 15 minutos depois disso.",
   contrato_suspenso:
     "O cliente tem um contrato no Omie, mas está SUSPENSO. Não deve ser criado um novo contrato (duplicaria) — a ação é reativar/revisar o existente.",
   contrato_cancelado:
@@ -166,6 +166,7 @@ type ReconciliacaoRow = {
   valor_omie: number | null;
   vigencia_inicial_ds: string | null;
   vigencia_final_ds: string | null;
+  vigencia_final_omie: string | null;
   dia_venc_ds: number | null;
   dia_venc_omie: number | null;
   modelo_ds: string | null;
@@ -469,15 +470,8 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
         return enviarOmieBtn;
       case "atribuir_modelo":
         return <DisabledActionButton>Definir modelo no DS</DisabledActionButton>;
-      case "pendente_assuncao":
-        return (
-          <DisabledActionButton
-            icon={<Lock className="h-3 w-3" />}
-            tip="requer corte da integração de origem"
-          >
-            Assumir
-          </DisabledActionButton>
-        );
+      case "vigencia_vencida_no_omie":
+        return null;
       case "escolher_candidato":
         return (
           <DisabledActionButton>
@@ -520,9 +514,6 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
         <div className="p-3 min-w-0 bg-muted/20">
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-2">
             Omie
-            {bucket === "pendente_assuncao" && (
-              <Badge variant={origem.variant} className="text-[10px] normal-case">{origem.label}</Badge>
-            )}
             {row.omie_inativo && clienteNoOmie && (
               <Badge variant="destructive" className="text-[10px] normal-case">Inativo</Badge>
             )}
@@ -600,6 +591,17 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
               <div className="text-[11px] text-muted-foreground/80 mt-0.5">
                 cód. {row.codigo_contrato_omie}
               </div>
+              {bucket === "vigencia_vencida_no_omie" && row.vigencia_final_omie && (
+                <div className="mt-1.5 inline-flex items-center gap-1.5 rounded border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/40 px-2 py-1 text-[11px] font-semibold text-red-700 dark:text-red-400">
+                  Vigência final no Omie: {(() => {
+                    try {
+                      const d = new Date(row.vigencia_final_omie as string);
+                      if (!isNaN(d.getTime())) return d.toLocaleDateString("pt-BR");
+                    } catch {}
+                    return row.vigencia_final_omie;
+                  })()}
+                </div>
+              )}
               {diffKeys.length > 0 && (
                 <div className="text-[11px] text-muted-foreground mt-0.5">
                   Divergências: {diffKeys.join(", ")}
@@ -796,7 +798,7 @@ type VisaoGeralData = {
     mrr_divergencia?: number;
     divergencia_valor_qtd?: number;
     divergencia_valor_montante?: number;
-    pendente_assuncao_mrr_omie?: number;
+    
   };
   baldes?: Record<string, number>;
   total_contratos?: number;
@@ -921,10 +923,10 @@ function VisaoGeralPanel({
   const somaBaldeCriar = num(baldes.criar) + num(baldes.criar_contrato);
 
   const chips: { label: string; qtd: number; bucket: Bucket; tone: "emerald" | "amber" | "red" | "muted" }[] = [
+    { label: "Vigência vencida no Omie", qtd: num(baldes.vigencia_vencida_no_omie), bucket: "vigencia_vencida_no_omie", tone: "red" },
     { label: "Prontos para vincular", qtd: num(baldes.vinculo_auto_ok), bucket: "vinculo_auto_ok", tone: "emerald" },
     { label: "Sem modelo", qtd: num(baldes.atribuir_modelo), bucket: "atribuir_modelo", tone: "amber" },
     { label: "Ambíguos", qtd: num(baldes.escolher_candidato), bucket: "escolher_candidato", tone: "amber" },
-    { label: "Pendente assunção", qtd: num(baldes.pendente_assuncao), bucket: "pendente_assuncao", tone: "muted" },
     { label: "A criar", qtd: somaBaldeCriar, bucket: "criar", tone: "amber" },
   ];
 
@@ -1115,7 +1117,7 @@ function VisaoGeralPanel({
           </div>
 
           {/* Mini-indicadores */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50/40 dark:bg-red-950/20 p-3">
               <div className="text-[11px] uppercase tracking-wide text-red-700 dark:text-red-400">
                 Divergências de valor a resolver
@@ -1127,14 +1129,6 @@ function VisaoGeralPanel({
                 <span className="text-sm text-muted-foreground">
                   ({formatBRL(c.divergencia_valor_montante)})
                 </span>
-              </div>
-            </div>
-            <div className="rounded-lg border border-muted bg-muted/30 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Sob outra integração (assunção pendente)
-              </div>
-              <div className="mt-1 text-2xl font-semibold">
-                {formatBRL(c.pendente_assuncao_mrr_omie)}
               </div>
             </div>
           </div>
@@ -1288,10 +1282,13 @@ export default function OmieConferenciaTab() {
       let q = supabase
         .from("reconciliacao_cadastro")
         .select(
-          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id, situacao_contrato, tem_cancelado_omie",
+          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, vigencia_final_omie, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id, situacao_contrato, tem_cancelado_omie",
           { count: "exact" }
-        )
-        .neq("status_usuario", "vinculado");
+        );
+      // vigencia_vencida_no_omie precisa aparecer mesmo com status_usuario='vinculado'
+      if (bucketAtivo !== "vigencia_vencida_no_omie") {
+        q = q.neq("status_usuario", "vinculado");
+      }
 
       if (bucketAtivo !== "visao_geral") q = q.eq("acao_sugerida", bucketAtivo);
       if (bucketAtivo === "vinculo_auto_ok" && nomeFiltro === "diferentes") {
