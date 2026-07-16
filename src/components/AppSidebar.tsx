@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+
 import { usePermissions } from "@/hooks/usePermissions";
 import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles, ChevronDown, Library, Building2, Rocket, BarChart3 } from "lucide-react";
