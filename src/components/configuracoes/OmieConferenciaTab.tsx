@@ -514,9 +514,6 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
         <div className="p-3 min-w-0 bg-muted/20">
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-2">
             Omie
-            {bucket === "pendente_assuncao" && (
-              <Badge variant={origem.variant} className="text-[10px] normal-case">{origem.label}</Badge>
-            )}
             {row.omie_inativo && clienteNoOmie && (
               <Badge variant="destructive" className="text-[10px] normal-case">Inativo</Badge>
             )}
