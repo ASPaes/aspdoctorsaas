@@ -301,58 +301,7 @@ Deno.serve(async (req) => {
       ? (conversation.group_jid || contact.phone_number)
       : getDestinationNumber(contact.phone_number);
 
-    // ─── @todos (mentionsEveryOne) — guardas ────────────────────────────────────
     const wantsMentionEveryone = body.mentionEveryone === true;
-
-    if (wantsMentionEveryone) {
-      if (!isGroupConv) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Marcar todos s\u{00F3} \u{00E9} poss\u{00ED}vel em grupos.' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (providerType !== 'self_hosted' && providerType !== 'cloud') {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Marcar todos n\u{00E3}o \u{00E9} suportado neste provedor.' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (body.messageType === 'audio') {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Marcar todos n\u{00E3}o \u{00E9} suportado em \u{00E1}udio.' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const cutoffIso = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-      const { data: recentMention } = await supabase
-        .from('whatsapp_messages')
-        .select('timestamp')
-        .eq('conversation_id', body.conversationId)
-        .eq('mentions_everyone', true)
-        .gte('timestamp', cutoffIso)
-        .order('timestamp', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (recentMention) {
-        const elapsedMs = Date.now() - new Date(recentMention.timestamp).getTime();
-        const retryAfterMinutes = Math.max(1, Math.ceil((30 * 60 * 1000 - elapsedMs) / 60000));
-        console.warn(
-          `[send-whatsapp-message] @todos rate-limited conv=${body.conversationId} restam=${retryAfterMinutes}min`
-        );
-        return new Response(
-          JSON.stringify({
-            success: false,
-            rateLimited: true,
-            retryAfterMinutes,
-            error: `J\u{00E1} foi marcado @todos neste grupo h\u{00E1} pouco. Aguarde ${retryAfterMinutes} min.`,
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-    // ────────────────────────────────────────────────────────────────────────────
 
     // Upload base64 media to Supabase Storage for persistence + signed URL for Evolution
     let persistentMediaPath: string | null = null;
@@ -434,6 +383,86 @@ Deno.serve(async (req) => {
     // ------ Montar SendRequest para o adapter ---------------------------------------------------------------------------------------------------------------------
     const mediaActualUrl = storageSignedUrl || body.mediaUrl || undefined;
     const adapter = getAdapter(providerType);
+
+    // ─── @todos (mentionsEveryOne) — guardas + resolução da lista viva ────────
+    let everyoneMentions: string[] = [];
+    if (wantsMentionEveryone) {
+      if (!isGroupConv) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Marcar todos s\u{00F3} \u{00E9} poss\u{00ED}vel em grupos.' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (providerType !== 'self_hosted' && providerType !== 'cloud') {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Marcar todos n\u{00E3}o \u{00E9} suportado neste provedor.' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (body.messageType === 'audio') {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Marcar todos n\u{00E3}o \u{00E9} suportado em \u{00E1}udio.' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const cutoffIso = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+      const { data: recentMention } = await supabase
+        .from('whatsapp_messages')
+        .select('timestamp')
+        .eq('conversation_id', body.conversationId)
+        .eq('mentions_everyone', true)
+        .gte('timestamp', cutoffIso)
+        .order('timestamp', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (recentMention) {
+        const elapsedMs = Date.now() - new Date(recentMention.timestamp).getTime();
+        const retryAfterMinutes = Math.max(1, Math.ceil((30 * 60 * 1000 - elapsedMs) / 60000));
+        console.warn(
+          `[send-whatsapp-message] @todos rate-limited conv=${body.conversationId} restam=${retryAfterMinutes}min`
+        );
+        return new Response(
+          JSON.stringify({
+            success: false,
+            rateLimited: true,
+            retryAfterMinutes,
+            error: `J\u{00E1} foi marcado @todos neste grupo h\u{00E1} pouco. Aguarde ${retryAfterMinutes} min.`,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Lista VIVA de participantes (o cache do mentionsEveryOne da Evolution vem vazio).
+      try {
+        const { ids } = await adapter.getGroupParticipants!(secrets, instanceData, destinationNumber);
+        everyoneMentions = ids;
+      } catch (e) {
+        console.error('[send-whatsapp-message] @todos falha ao buscar participantes:', e);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'N\u{00E3}o foi poss\u{00ED}vel obter os participantes do grupo. Tente novamente.',
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (everyoneMentions.length === 0) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'O grupo n\u{00E3}o retornou participantes. Marca\u{00E7}\u{00E3}o cancelada.',
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`[send-whatsapp-message] @todos conv=${body.conversationId} participantes=${everyoneMentions.length}`);
+    }
+    // ──────────────────────────────────────────────────────────────────────────
+
 
     // --- PRE-SEND: If agent is sending and no active attendance exists, create it and send opening notification BEFORE the agent's message ---
     let preCreatedAttendance: { id: string; attendance_code: string } | null = null;
@@ -607,8 +636,9 @@ Deno.serve(async (req) => {
       mediaMimetype: body.mediaMimetype,
       fileName: body.fileName,
       quotedMessageId: body.quotedMessageId,
-      mentioned: validMentioned.length > 0 ? validMentioned : undefined,
-      mentionsEveryOne: wantsMentionEveryone ? true : undefined,
+      mentioned: wantsMentionEveryone
+        ? everyoneMentions
+        : (validMentioned.length > 0 ? validMentioned : undefined),
     };
 
     let sendResult: { messageId: string; raw: unknown };
@@ -719,7 +749,9 @@ Deno.serve(async (req) => {
           is_from_me: persistedIsFromMe,
           timestamp: messageTimestamp,
           quoted_message_id: body.quotedMessageId || null,
-          mentions: validMentioned.length > 0 ? validMentioned : null,
+          mentions: wantsMentionEveryone
+            ? everyoneMentions
+            : (validMentioned.length > 0 ? validMentioned : null),
           mentions_everyone: wantsMentionEveryone,
           metadata: {
             ...(body.fileName ? { fileName: body.fileName } : {}),

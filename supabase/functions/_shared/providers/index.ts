@@ -41,7 +41,6 @@ export interface SendRequest {
   fileName?: string;
   quotedMessageId?: string;
   mentioned?: string[] | null;
-  mentionsEveryOne?: boolean; // @todos — só suportado pelo EvolutionAdapter
 }
 
 export interface SendResult {
@@ -65,7 +64,7 @@ export interface ProviderAdapter {
     secrets: InstanceSecrets,
     instance: InstanceInfo,
     groupJid: string
-  ): Promise<{ count: number; participants: any[] }>;
+  ): Promise<{ count: number; ids: string[] }>;
 }
 
 // ── Evolution Adapter ─────────────────────────────────────────────────────────
@@ -116,8 +115,6 @@ class EvolutionAdapter implements ProviderAdapter {
         body = { number: msg.to, text: msg.content };
         if (msg.quotedMessageId) body.quoted = { key: { id: msg.quotedMessageId } };
         if (Array.isArray(msg.mentioned) && msg.mentioned.length > 0) body.mentioned = msg.mentioned;
-        // CRÍTICO: só incluir quando true. Bug evolution-api#2431: false marca todos.
-        if (msg.mentionsEveryOne === true) body.mentionsEveryOne = true;
         break;
       }
       case 'audio': {
@@ -139,8 +136,7 @@ class EvolutionAdapter implements ProviderAdapter {
           ...(msg.messageType === 'document' && msg.fileName ? { fileName: msg.fileName } : {}),
         };
         if (msg.quotedMessageId) body.quoted = { key: { id: msg.quotedMessageId } };
-        // Mesma regra do texto: só quando true.
-        if (msg.mentionsEveryOne === true) body.mentionsEveryOne = true;
+        if (Array.isArray(msg.mentioned) && msg.mentioned.length > 0) body.mentioned = msg.mentioned;
       }
     }
 
@@ -191,7 +187,7 @@ class EvolutionAdapter implements ProviderAdapter {
     secrets: InstanceSecrets,
     instance: InstanceInfo,
     groupJid: string
-  ): Promise<{ count: number; participants: any[] }> {
+  ): Promise<{ count: number; ids: string[] }> {
     const base = this.getBaseUrl(secrets);
     const id = this.getIdentifier(secrets, instance);
     const url = `${base}/group/participants/${id}?groupJid=${encodeURIComponent(groupJid)}`;
@@ -199,7 +195,8 @@ class EvolutionAdapter implements ProviderAdapter {
     if (!res.ok) throw new Error(`Evolution getGroupParticipants error: ${await res.text()}`);
     const data = await res.json();
     const participants = Array.isArray(data?.participants) ? data.participants : [];
-    return { count: participants.length, participants };
+    const ids = participants.map((p: any) => p?.id).filter(Boolean).map(String);
+    return { count: ids.length, ids };
   }
 }
 

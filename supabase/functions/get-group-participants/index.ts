@@ -92,10 +92,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { count, participants: rawParticipants } = await adapter.getGroupParticipants(
+    const { count } = await adapter.getGroupParticipants(
       secrets, instanceData, conversation.group_jid
     );
-    console.log('[DIAG participants]', JSON.stringify(rawParticipants?.slice(0, 3) ?? []));
 
     return new Response(JSON.stringify({ success: true, count }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
