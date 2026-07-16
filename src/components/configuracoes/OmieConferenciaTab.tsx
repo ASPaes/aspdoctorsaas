@@ -1328,7 +1328,7 @@ export default function OmieConferenciaTab() {
 
   return (
     <div className="space-y-4">
-      <ConferenciaSaudeBanner />
+      <ConferenciaSaudeBanner tenantId={tid} />
       {/* Topo */}
       <div className="flex items-center justify-between flex-wrap gap-2">
 
