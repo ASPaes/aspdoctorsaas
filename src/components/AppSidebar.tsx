@@ -199,6 +199,28 @@ export function AppSidebar() {
                     return can(c.resource!, "view");
                   });
                   if (visibleChildren.length === 0) return null;
+                  if (collapsed) {
+                    return (
+                      <SidebarMenuItem key={item.title}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <SidebarMenuButton>
+                              <item.icon className="h-4 w-4" />
+                              <span>{item.title}</span>
+                            </SidebarMenuButton>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
+                            {visibleChildren.map((child) => (
+                              <DropdownMenuItem key={child.title} onClick={() => navigate(child.url!)}>
+                                <child.icon className="h-4 w-4 mr-2" />
+                                {child.title}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </SidebarMenuItem>
+                    );
+                  }
                   return (
                     <Collapsible
                       key={item.title}
