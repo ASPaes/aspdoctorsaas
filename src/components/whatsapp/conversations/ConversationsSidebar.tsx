@@ -150,6 +150,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         assignedToAgent: s.assignedToAgent,
         autoReplyDisabledOnly: s.autoReplyDisabledOnly ?? false,
         rulesDisabledOnly: s.rulesDisabledOnly ?? false,
+        groupByAgent: s.groupByAgent ?? false,
       }));
     }
     setHydratedFor(user.id);
