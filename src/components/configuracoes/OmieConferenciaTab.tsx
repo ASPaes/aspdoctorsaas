@@ -470,15 +470,8 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
         return enviarOmieBtn;
       case "atribuir_modelo":
         return <DisabledActionButton>Definir modelo no DS</DisabledActionButton>;
-      case "pendente_assuncao":
-        return (
-          <DisabledActionButton
-            icon={<Lock className="h-3 w-3" />}
-            tip="requer corte da integração de origem"
-          >
-            Assumir
-          </DisabledActionButton>
-        );
+      case "vigencia_vencida_no_omie":
+        return null;
       case "escolher_candidato":
         return (
           <DisabledActionButton>
