@@ -544,7 +544,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
               </TooltipTrigger>
               <TooltipContent>Contatos</TooltipContent>
             </Tooltip>
-            <ConversationFiltersPopover filters={filters} onChange={setFilters} />
+            <ConversationFiltersPopover filters={filters} onChange={setFilters} showGroupByAgent={activePill === "in_progress"} />
             
             <Button variant="default" size="icon" className="h-7 w-7" onClick={() => setShowNewModal(true)}>
               <Plus className="h-4 w-4" />
