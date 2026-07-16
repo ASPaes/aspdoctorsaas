@@ -24,11 +24,13 @@ export interface FiltersState {
   assignedToAgent: string | undefined;
   autoReplyDisabledOnly?: boolean;
   rulesDisabledOnly?: boolean;
+  groupByAgent?: boolean;
 }
 
 interface Props {
   filters: FiltersState;
   onChange: (filters: FiltersState) => void;
+  showGroupByAgent?: boolean;
 }
 
 const SORT_OPTIONS: { value: SortBy; label: string }[] = [
