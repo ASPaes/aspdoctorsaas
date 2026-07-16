@@ -276,6 +276,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       // Grupos não entram nas pills normais
       if ((conv as any).is_group === true) continue;
 
+      if (filters.instanceId && conv.instance_id !== filters.instanceId) continue;
+
       const state = getStateForConv(conv);
 
       // Department filter for counts (skip for after_hours which is tenant-wide)
@@ -309,7 +311,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     const groups = groupCountData?.totalGroups ?? 0;
     const groupsUnread = groupCountData?.unreadGroups ?? 0;
     return { inProgress, waiting, closed, afterHours, groups, groupsUnread };
-  }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId, groupCountData]);
+  }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId, groupCountData, filters.instanceId]);
 
   // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
   useEffect(() => {
@@ -341,6 +343,11 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       });
     }
 
+    // Filtro manual de instância: reaplica no client porque conversas resgatadas por
+    // includeIds (atendimentos ativos) entram por PK, sem passar pelo filtro do servidor.
+    if (filters.instanceId) {
+      result = result.filter(c => (c as any).is_group === true || c.instance_id === filters.instanceId);
+    }
 
     // Pill filters com visibilidade por papel
     if (activePill === "in_progress") {
@@ -442,7 +449,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     }
 
     return result;
-  }, [conversations, activePill, filters.sortBy, forcedConvId, isAdmin, user?.id, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv, nowMs]);
+  }, [conversations, activePill, filters.sortBy, filters.instanceId, filters.autoReplyDisabledOnly, filters.rulesDisabledOnly, forcedConvId, isAdmin, user?.id, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv, nowMs]);
 
   const agentGroups = useMemo(() => {
     if (!isGroupedView) return [];
