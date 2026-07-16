@@ -5,6 +5,9 @@ import { X, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AttachmentCard } from "./AttachmentCard";
 
+const INLINE_TYPES = new Set(["image", "sticker", "audio", "video"]);
+
+
 function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -59,7 +62,7 @@ interface MediaContentProps {
   mediaPath?: string | null;
 }
 
-function useProxyUrl(messageId: string, mediaUrl: string | null | undefined, mode: "inline" | "attachment" = "inline"): string | null {
+function useProxyUrl(messageId: string, mediaUrl: string | null | undefined, mode: "inline" | "attachment" = "inline", enabledForType = true): string | null {
   const isTemp = messageId?.startsWith('temp-');
 
   const { data: blobUrl } = useQuery<string | null>({
@@ -74,7 +77,7 @@ function useProxyUrl(messageId: string, mediaUrl: string | null | undefined, mod
       const blob = await res.blob();
       return URL.createObjectURL(blob);
     },
-    enabled: !!messageId && !isTemp,
+    enabled: !!messageId && !isTemp && enabledForType,
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -98,7 +101,7 @@ export function MediaContent({
   mediaMimetype,
   mediaPath,
 }: MediaContentProps) {
-  const resolvedInlineUrl = useProxyUrl(messageId, mediaUrl, "inline");
+  const resolvedInlineUrl = useProxyUrl(messageId, mediaUrl, "inline", INLINE_TYPES.has(messageType));
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
   if (messageType === "document" || (messageType !== "image" && messageType !== "sticker" && messageType !== "audio" && messageType !== "video")) {
