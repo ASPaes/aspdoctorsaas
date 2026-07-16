@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      _bkp_obs_cliente_20260716: {
+        Row: {
+          id: string | null
+          observacao_cliente: string | null
+          tenant_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string | null
+          observacao_cliente?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string | null
+          observacao_cliente?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       access_invites: {
         Row: {
           accepted_at: string | null

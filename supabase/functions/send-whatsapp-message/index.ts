@@ -23,6 +23,12 @@ interface SendMessageRequest {
   mentionEveryone?: boolean; // @todos — marca todos os participantes do grupo (Evolution only)
 }
 
+// Rate limit do @todos por grupo. O dialog de confirmação já é a trava
+// principal (exige ato consciente); isto aqui é só backstop contra spam.
+// 5min barra duplo-clique e surto, mas libera a correção legítima
+// ("caiu o sistema" → 7min depois → "normalizou").
+const MENTION_EVERYONE_COOLDOWN_MS = 5 * 60 * 1000;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -406,7 +412,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      const cutoffIso = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+      const cutoffIso = new Date(Date.now() - MENTION_EVERYONE_COOLDOWN_MS).toISOString();
       const { data: recentMention } = await supabase
         .from('whatsapp_messages')
         .select('timestamp')
@@ -419,7 +425,7 @@ Deno.serve(async (req) => {
 
       if (recentMention) {
         const elapsedMs = Date.now() - new Date(recentMention.timestamp).getTime();
-        const retryAfterMinutes = Math.max(1, Math.ceil((30 * 60 * 1000 - elapsedMs) / 60000));
+        const retryAfterMinutes = Math.max(1, Math.ceil((MENTION_EVERYONE_COOLDOWN_MS - elapsedMs) / 60000));
         console.warn(
           `[send-whatsapp-message] @todos rate-limited conv=${body.conversationId} restam=${retryAfterMinutes}min`
         );
