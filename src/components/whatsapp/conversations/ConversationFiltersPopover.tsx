@@ -52,38 +52,7 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const [operadorOpen, setOperadorOpen] = useState(false);
 
-  const { data: tenantUsers } = useTenantUsers();
-
-  const tenantUsersKey = (tenantUsers ?? []).map((u) => `${u.user_id}:${u.funcionario_id ?? ""}:${u.status}`).join(",");
-  const agentOptions = useQuery({
-    queryKey: ["whatsapp-agent-options", tenantUsersKey],
-    enabled: isAdmin && !!tenantUsers && tenantUsers.length > 0,
-    queryFn: async () => {
-      if (!tenantUsers) return [];
-      const funcIds = tenantUsers
-        .filter((u) => u.funcionario_id && u.status === "ativo")
-        .map((u) => u.funcionario_id!);
-
-      if (funcIds.length === 0) return tenantUsers.filter(u => u.status === "ativo").map(u => ({
-        userId: u.user_id,
-        label: u.email,
-      }));
-
-      const { data: funcs } = await supabase
-        .from("funcionarios")
-        .select("id, nome")
-        .in("id", funcIds);
-
-      const funcMap = new Map((funcs ?? []).map((f) => [f.id, f.nome]));
-
-      return tenantUsers
-        .filter((u) => u.status === "ativo")
-        .map((u) => ({
-          userId: u.user_id,
-          label: u.funcionario_id ? funcMap.get(u.funcionario_id) || u.email : u.email,
-        }));
-    },
-  });
+  const agentOptions = useAgentOptions();
 
   const sortedAgents = useMemo(() => {
     return [...(agentOptions.data ?? [])].sort((a, b) =>
