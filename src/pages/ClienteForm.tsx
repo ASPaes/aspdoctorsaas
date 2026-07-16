@@ -121,7 +121,7 @@ const clienteSchema = z.object({
   contato_cpf: z.string().nullable(),
   contato_fone: z.string().nullable(),
   contato_aniversario: z.string().nullable(),
-  unidade_base_id: z.number().nullable(),
+  unidade_base_id: z.number({ invalid_type_error: "Selecione a unidade base" }).nullable().refine((v) => v != null, { message: "Selecione a unidade base" }),
   matriz_id: z.string().nullable(),
   cep: z.string().nullable(),
   endereco: z.string().nullable(),
@@ -308,7 +308,7 @@ export default function ClienteForm() {
       cancelado: false, data_cancelamento: null, motivo_cancelamento_id: null, observacao_cancelamento: null,
       cert_a1_vencimento: null, cert_a1_ultima_venda_em: null, cert_a1_ultimo_vendedor_id: null,
       contato_nome: null, contato_cpf: null, contato_fone: null, contato_aniversario: null,
-      unidade_base_id: isEditing ? null : (selectedUnidadeId ?? null),
+      unidade_base_id: null,
       matriz_id: null,
       cep: null, endereco: null, numero: null, complemento: null, bairro: null,
       dia_vencimento_mrr: null,
@@ -555,7 +555,19 @@ export default function ClienteForm() {
       toast({ title: isEditing ? "Cliente atualizado!" : "Cliente criado!", description: "Dados salvos com sucesso." });
       if (!isEditing && newId) navigate(`/clientes/${newId}`);
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      const code = error?.code || error?.details?.code;
+      const msg = String(error?.message ?? "");
+      if (code === "23514" && msg.includes("clientes_unidade_base_obrigatoria")) {
+        form.setError("unidade_base_id", { type: "manual", message: "Selecione a unidade base" });
+        toast({ title: "Selecione a unidade base antes de salvar.", variant: "destructive" });
+        setTimeout(() => {
+          const el = document.querySelector<HTMLElement>('[name="unidade_base_id"], [data-field="unidade_base_id"]');
+          el?.scrollIntoView({ behavior: "smooth", block: "center" });
+          form.setFocus("unidade_base_id");
+        }, 0);
+        return;
+      }
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
     },
   });
@@ -566,6 +578,11 @@ export default function ClienteForm() {
     const firstKey = Object.keys(errors)[0];
     const msg = errors[firstKey]?.message || "Verifique os campos obrigatórios";
     toast({ title: "Erro de validação", description: `Campo "${firstKey}": ${msg}`, variant: "destructive" });
+    setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(`[data-field="${firstKey}"], [name="${firstKey}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      try { form.setFocus(firstKey as any); } catch {}
+    }, 0);
   };
 
   // Enter key moves to next field instead of submitting the form

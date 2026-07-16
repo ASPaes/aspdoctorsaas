@@ -11132,15 +11132,26 @@ export type Database = {
         Args: { p_pairs: Json; p_tenant_id: string }
         Returns: Json
       }
-      montar_payload_contrato_omie: {
-        Args: {
-          p_contrato_id: string
-          p_incluir_observacao?: boolean
-          p_incluir_situacao?: boolean
-          p_tenant_id: string
-        }
-        Returns: Json
-      }
+      montar_payload_contrato_omie:
+        | {
+            Args: {
+              p_contrato_id: string
+              p_incluir_observacao?: boolean
+              p_incluir_situacao?: boolean
+              p_tenant_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_contrato_id: string
+              p_incluir_observacao?: boolean
+              p_incluir_situacao?: boolean
+              p_incluir_vigencia?: boolean
+              p_tenant_id: string
+            }
+            Returns: Json
+          }
       move_onboarding_stage: {
         Args: {
           p_completed_checklist_ids?: string[]
