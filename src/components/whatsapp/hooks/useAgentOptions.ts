@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useTenantUsers } from "@/hooks/useTenantUsers";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
 export interface AgentOption {
   userId: string;
@@ -8,44 +8,25 @@ export interface AgentOption {
 }
 
 export function useAgentOptions() {
-  const { data: tenantUsers } = useTenantUsers();
-
-  const tenantUsersKey = (tenantUsers ?? [])
-    .map((u) => `${u.user_id}:${u.funcionario_id ?? ""}:${u.status}`)
-    .join(",");
+  const { effectiveTenantId: tid } = useTenantFilter();
 
   return useQuery<AgentOption[]>({
-    queryKey: ["whatsapp-agent-options", tenantUsersKey],
-    enabled: !!tenantUsers && tenantUsers.length > 0,
+    queryKey: ["whatsapp-agent-options", tid],
+    enabled: !!tid,
+    staleTime: 300_000,
     queryFn: async () => {
-      if (!tenantUsers) return [];
+      if (!tid) return [];
 
-      const funcIds = tenantUsers
-        .filter((u) => u.funcionario_id && u.status === "ativo")
-        .map((u) => u.funcionario_id!);
+      const { data, error } = await (supabase.rpc as any)("get_tenant_agent_names", {
+        p_tenant_id: tid,
+      });
 
-      if (funcIds.length === 0) {
-        return tenantUsers
-          .filter((u) => u.status === "ativo")
-          .map((u) => ({
-            userId: u.user_id,
-            label: u.email,
-          }));
-      }
+      if (error) throw error;
 
-      const { data: funcs } = await supabase
-        .from("funcionarios")
-        .select("id, nome")
-        .in("id", funcIds);
-
-      const funcMap = new Map((funcs ?? []).map((f) => [f.id, f.nome]));
-
-      return tenantUsers
-        .filter((u) => u.status === "ativo")
-        .map((u) => ({
-          userId: u.user_id,
-          label: u.funcionario_id ? funcMap.get(u.funcionario_id) || u.email : u.email,
-        }));
+      return (data ?? []).map((r: any) => ({
+        userId: r.user_id,
+        label: r.nome || "Operador",
+      }));
     },
   });
 }

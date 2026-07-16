@@ -10841,6 +10841,13 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_tenant_agent_names: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          nome: string
+          user_id: string
+        }[]
+      }
       get_tenant_conselho_config: {
         Args: { p_tab_key: string; p_tenant_id: string }
         Returns: {
