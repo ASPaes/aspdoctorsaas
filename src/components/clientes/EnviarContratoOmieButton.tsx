@@ -1,17 +1,9 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Send, Loader2, AlertTriangle } from "lucide-react";
+import { Send, Loader2, CheckCircle2, AlertTriangle, Ban, RefreshCw } from "lucide-react";
 
 interface Props {
   tenantId: string | null | undefined;
@@ -19,26 +11,28 @@ interface Props {
   createdAt: string | null | undefined;
 }
 
-const brl = (v: any) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v ?? 0));
+type FilaRow = {
+  contrato_id: string;
+  status: "pendente" | "processando" | "ok" | "ignorado" | "erro" | "invalido" | string;
+  ultimo_erro: string | null;
+  enfileirado_em: string | null;
+  processado_em: string | null;
+};
 
-const fmtDate = (v: any) => {
-  if (!v) return "—";
-  const s = String(v);
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-    const [y, m, d] = s.slice(0, 10).split("-");
-    return `${d}/${m}/${y}`;
+const fmtDateTime = (v: string | null | undefined) => {
+  if (!v) return "";
+  try {
+    return new Date(v).toLocaleString("pt-BR");
+  } catch {
+    return String(v);
   }
-  return s;
 };
 
 export default function EnviarContratoOmieButton({ tenantId, contratoId, createdAt }: Props) {
-  const [loading, setLoading] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [errosOpen, setErrosOpen] = useState(false);
-  const [erros, setErros] = useState<string[]>([]);
-  const [preview, setPreview] = useState<any | null>(null);
+  const [sending, setSending] = useState(false);
+  const qc = useQueryClient();
 
+  // Gate: só mostra se há data de corte configurada e o contrato é posterior.
   const { data: dataCorte, isLoading: cutoffLoading } = useQuery({
     queryKey: ["omie-data-corte", tenantId],
     enabled: !!tenantId,
@@ -52,238 +46,130 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
     },
   });
 
+  // Estado real do envio vem da fila. Polling condicional: só quando há algo em voo.
+  const { data: filaRow } = useQuery({
+    queryKey: ["omie-sync-fila", contratoId],
+    enabled: !!contratoId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("omie_sync_fila" as any) as any)
+        .select("contrato_id, status, ultimo_erro, enfileirado_em, processado_em")
+        .eq("contrato_id", contratoId)
+        .order("enfileirado_em", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return ((data?.[0] as FilaRow) ?? null);
+    },
+    refetchInterval: (query) => {
+      const row = query.state.data as FilaRow | null | undefined;
+      if (!row) return false;
+      return row.status === "pendente" || row.status === "processando" ? 3000 : false;
+    },
+  });
+
   if (cutoffLoading) return null;
   if (!dataCorte) return null;
   if (!createdAt) return null;
-
   const created = createdAt.slice(0, 10);
   const corte = dataCorte.slice(0, 10);
   if (created < corte) return null;
 
-  const handlePreview = async () => {
-    if (!tenantId) return;
-    setLoading(true);
+  const handleEnviar = async () => {
+    if (!contratoId) return;
+    setSending(true);
     try {
-      const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: {
-          acao: "criar_cliente_contrato",
-          tenant_id: tenantId,
-          modo: "dry_run",
-          contrato_id: contratoId,
-        },
+      const { error } = await (supabase.rpc as any)("enfileirar_sync_omie", {
+        p_contrato_id: contratoId,
+        p_origem: "manual",
       });
+      if (error) throw error;
 
-      let body: any = data ?? null;
-      if (error) {
-        try {
-          body = await (error as any)?.context?.json?.();
-        } catch {}
-        if (!body) {
-          try {
-            const txt = await (error as any)?.context?.text?.();
-            if (txt) body = JSON.parse(txt);
-          } catch {}
-        }
-      }
+      // fire-and-forget: cron */2 é a rede de retry
+      void supabase.functions.invoke("omie-sync-processar");
 
-      // Mensagens de negócio explícitas
-      const mensagens: string[] = [];
-      if (body?.error) mensagens.push(String(body.error));
-      if (Array.isArray(body?.erros)) mensagens.push(...body.erros.map(String));
-      if (Array.isArray(body?.invalidos)) mensagens.push(...body.invalidos.map(String));
-      if (body?.aviso) mensagens.push(String(body.aviso));
-
-      if (body?.bloqueado === "cnpj_ambiguo_no_omie") {
-        const cands = Array.isArray(body?.candidatos)
-          ? body.candidatos
-              .map((c: any) => `• ${c?.razao_social ?? "—"} (código ${c?.codigo_cliente_omie ?? "—"})`)
-              .join("\n")
-          : "";
-        setErros([
-          "Este CNPJ tem mais de um cadastro no Omie. Resolva a ambiguidade antes de enviar.",
-          ...(cands ? [cands] : []),
-        ]);
-        setErrosOpen(true);
-        return;
-      }
-
-      if (
-        body?.bloqueado === "modelo_nao_permitido" ||
-        body?.contrato_dry_run?.bloqueado === "modelo_nao_permitido"
-      ) {
-        const permitidos = Array.isArray(body?.modelos_permitidos)
-          ? ` Modelos permitidos: ${body.modelos_permitidos.join(", ")}.`
-          : "";
-        toast.error(
-          `Este modelo de contrato não está habilitado para envio ao Omie.${permitidos} Ajuste em Padrões Omie.`
-        );
-        return;
-      }
-
-      if (body?.bloqueado === "validacao" || mensagens.length > 0) {
-        setErros(mensagens.length > 0 ? mensagens : ["Validação falhou"]);
-        setErrosOpen(true);
-        return;
-      }
-
-      if (error) {
-        toast.error("Falha ao preparar o envio. Tente novamente.");
-        return;
-      }
-
-      if (data?.ok && data?.modo === "dry_run") {
-        setPreview(data);
-        setConfirmOpen(true);
-        return;
-      }
-
-      toast.error("Falha ao preparar o envio. Tente novamente.");
-    } catch {
-      toast.error("Falha ao preparar o envio. Tente novamente.");
+      qc.invalidateQueries({ queryKey: ["omie-sync-fila"] });
+      toast.success("Envio enfileirado. Acompanhe o status aqui.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao enfileirar o envio.");
     } finally {
-      setLoading(false);
+      setSending(false);
     }
   };
 
-  const handleConfirm = async () => {
-    if (!tenantId) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: {
-          acao: "criar_cliente_contrato",
-          tenant_id: tenantId,
-          modo: "criar",
-          contrato_id: contratoId,
-        },
-      });
+  const status = filaRow?.status;
+  const inFlight = status === "pendente" || status === "processando";
 
-      if (error) {
-        toast.error("Falha ao enviar ao Omie. Tente novamente.");
-        return;
-      }
-
-      if (data?.ok && data?.etapa === "completo") {
-        toast.success("Contrato enviado ao Omie com sucesso.");
-        setConfirmOpen(false);
-        setPreview(null);
-        return;
-      }
-
-      if (data?.ok === false && data?.etapa === "cliente") {
-        toast.error(
-          data?.erro
-            ? `Falha ao enviar o cliente ao Omie. O contrato não foi enviado. ${data.erro}`
-            : "Falha ao enviar o cliente ao Omie. O contrato não foi enviado."
-        );
-        return;
-      }
-
-      if (data?.ok === false && data?.etapa === "contrato") {
-        toast.error(
-          "O cliente foi enviado, mas houve falha ao criar o contrato no Omie. Você pode tentar novamente com segurança."
-        );
-        return;
-      }
-
-      toast.error("Falha ao enviar ao Omie. Tente novamente.");
-    } catch {
-      toast.error("Falha ao enviar ao Omie. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const cli = preview?.cliente_seria_enviado;
-  const ctr = preview?.contrato_seria_enviado;
-
-  return (
-    <>
-      <Button type="button" variant="outline" size="sm" onClick={handlePreview} disabled={loading}>
-        {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-        Enviar ao Omie
+  if (inFlight) {
+    return (
+      <Button type="button" variant="outline" size="sm" disabled>
+        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        Enviando…
       </Button>
+    );
+  }
 
-      {/* Modal de erros de validação */}
-      <Dialog open={errosOpen} onOpenChange={setErrosOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Não é possível enviar este contrato
-            </DialogTitle>
-            <DialogDescription>
-              Corrija os itens abaixo antes de enviar ao Omie.
-            </DialogDescription>
-          </DialogHeader>
-          <ul className="list-disc pl-5 space-y-1 text-sm">
-            {erros.map((e, i) => (
-              <li key={i}>{e}</li>
-            ))}
-          </ul>
-          <DialogFooter>
-            <Button onClick={() => setErrosOpen(false)}>Entendi</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+  if (status === "ok") {
+    return (
+      <div className="inline-flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+        <CheckCircle2 className="h-4 w-4" />
+        <span>Contrato sincronizado</span>
+        {filaRow?.processado_em && (
+          <span className="text-xs text-muted-foreground">em {fmtDateTime(filaRow.processado_em)}</span>
+        )}
+      </div>
+    );
+  }
 
-      {/* Modal de confirmação (preview) */}
-      <Dialog open={confirmOpen} onOpenChange={(v) => !loading && setConfirmOpen(v)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Confirmar envio ao Omie</DialogTitle>
-            <DialogDescription>Confira os dados que serão enviados.</DialogDescription>
-          </DialogHeader>
+  if (status === "ignorado") {
+    return (
+      <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+        <Ban className="h-4 w-4" />
+        <span>Sem vínculo com o Omie — resolver na Conferência</span>
+      </div>
+    );
+  }
 
-          {preview && (
-            <div className="space-y-3 text-sm">
-              {preview?.cliente_pendente_no_omie && (
-                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
-                  O cliente será criado/atualizado no Omie antes do contrato.
-                </div>
-              )}
-              <div className="rounded-md border p-3 space-y-1">
-                <div className="text-xs uppercase text-muted-foreground">Cliente</div>
-                <div>
-                  <span className="font-medium">{cli?.razao_social ?? "—"}</span>
-                </div>
-                <div className="text-muted-foreground text-xs">
-                  CNPJ/CPF: {cli?.cnpj_cpf ?? "—"}
-                </div>
-              </div>
-              <div className="rounded-md border p-3 space-y-1">
-                <div className="text-xs uppercase text-muted-foreground">Contrato</div>
-                <div>
-                  <span className="font-medium">Nº {ctr?.numero ?? "—"}</span>
-                </div>
-                <div>Valor mensal: {brl(ctr?.valor_mensal)}</div>
-                <div>
-                  Vigência: {fmtDate(ctr?.vigencia_inicial)} até {fmtDate(ctr?.vigencia_final)}
-                </div>
-                {ctr?.cidade_prestacao && (
-                  <div className="text-muted-foreground text-xs">
-                    Cidade de prestação: {ctr.cidade_prestacao}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+  if (status === "erro") {
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="inline-flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+          <RefreshCw className="h-4 w-4" />
+          <span>Tentando novamente automaticamente</span>
+        </div>
+        {filaRow?.ultimo_erro && (
+          <div className="text-xs text-muted-foreground max-w-md break-words">{filaRow.ultimo_erro}</div>
+        )}
+        <div>
+          <Button type="button" variant="outline" size="sm" onClick={handleEnviar} disabled={sending}>
+            {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+            Tentar agora
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setConfirmOpen(false)}
-              disabled={loading}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handleConfirm} disabled={loading}>
-              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Confirmar envio
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+  if (status === "invalido") {
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="inline-flex items-center gap-2 text-sm text-destructive font-medium">
+          <AlertTriangle className="h-4 w-4" />
+          <span>{filaRow?.ultimo_erro ?? "Cadastro inválido para envio ao Omie"}</span>
+        </div>
+        <div>
+          <Button type="button" variant="outline" size="sm" onClick={handleEnviar} disabled={sending}>
+            {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+            Enviar para Omie
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Sem linha na fila
+  return (
+    <Button type="button" variant="outline" size="sm" onClick={handleEnviar} disabled={sending}>
+      {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+      Enviar para Omie
+    </Button>
   );
 }
