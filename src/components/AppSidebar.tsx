@@ -56,7 +56,7 @@ function getInitials(name: string): string {
 }
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const navigate = useNavigate();
   const { signOut, profile, user, profileLoading } = useAuth();
@@ -172,7 +172,19 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-3">
-        <Logo size={collapsed ? "sm" : "md"} />
+        {collapsed ? (
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            title="Expandir menu"
+            aria-label="Expandir menu"
+            className="flex items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring hover:opacity-80 transition-opacity cursor-pointer"
+          >
+            <Logo size="sm" />
+          </button>
+        ) : (
+          <Logo size="md" />
+        )}
       </div>
 
       <SidebarContent>
