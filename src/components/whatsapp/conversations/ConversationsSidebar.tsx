@@ -9,13 +9,14 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, MessageSquare, Users, X, FileSearch } from "lucide-react";
+import { Search, Plus, MessageSquare, Users, X, FileSearch, ChevronRight } from "lucide-react";
 import { MessageSearchModal } from "./MessageSearchModal";
 
 import { useWhatsAppConversations, type ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
 import { useConversationStates } from "../hooks/useConversationStates";
+import { useAgentOptions } from "../hooks/useAgentOptions";
 import { getConversationBucket, type ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
 import { ConversationItem } from "./ConversationItem";
 import { ConversationFiltersPopover, type FiltersState } from "./ConversationFiltersPopover";
@@ -164,6 +165,21 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     });
     return map;
   }, [instances]);
+
+  const { data: agentOptionsData } = useAgentOptions();
+  const agentLabelMap = useMemo(() => new Map((agentOptionsData ?? []).map(a => [a.userId, a.label])), [agentOptionsData]);
+
+  const [collapsedAgents, setCollapsedAgents] = useState<Set<string>>(new Set());
+  const toggleAgent = (key: string) => {
+    setCollapsedAgents(prev => {
+      const n = new Set(prev);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  };
+
+  const isGroupedView = !isSearching && activePill === "in_progress" && !!filters.groupByAgent;
 
   // Determine query-level assignment filter
   const resolvedAssignedTo = useMemo(() => {
@@ -420,6 +436,39 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     return result;
   }, [conversations, activePill, filters.sortBy, forcedConvId, isAdmin, user?.id, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv, nowMs]);
 
+  const agentGroups = useMemo(() => {
+    if (!isGroupedView) return [];
+    const groups = new Map<string, ConversationWithContact[]>();
+    filtered.forEach(conv => {
+      const state = getStateForConv(conv);
+      const key = state.attendance_assigned_to ?? "__unassigned__";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(conv);
+    });
+
+    const entries = Array.from(groups.entries()).map(([key, convs]) => {
+      let label: string;
+      if (key === "__unassigned__") {
+        label = "Sem operador";
+      } else if (key === user?.id) {
+        label = `${agentLabelMap.get(key) ?? "Você"} (você)`;
+      } else {
+        label = agentLabelMap.get(key) ?? "Operador";
+      }
+      return { key, label, convs };
+    });
+
+    entries.sort((a, b) => {
+      if (a.key === user?.id) return -1;
+      if (b.key === user?.id) return 1;
+      if (a.key === "__unassigned__") return 1;
+      if (b.key === "__unassigned__") return -1;
+      return a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" });
+    });
+
+    return entries;
+  }, [isGroupedView, filtered, getStateForConv, agentLabelMap, user?.id]);
+
   const handleCreated = useCallback(async (convId: string) => {
     setForcedConvId(convId);
     // Try from cache first
@@ -512,6 +561,18 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       onRemove: () => setFilters(f => ({ ...f, rulesDisabledOnly: false })),
     });
   }
+
+  const renderConversation = (conv: ConversationWithContact) => (
+    <ConversationItem
+      key={conv.id}
+      conversation={conv}
+      isSelected={selectedId === conv.id}
+      onClick={() => handleSelect(conv)}
+      instanceName={instances.length > 1 ? instanceMap[conv.instance_id] : undefined}
+      attendance={attendanceMap.get(conv.id)}
+      isAgentAlert={(() => { const d = getStateForConv(conv).agent_alert_due_at; return d != null && nowMs >= new Date(d).getTime(); })()}
+    />
+  );
 
   return (
     <div className="flex flex-col h-full border-r border-border">
@@ -644,17 +705,22 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
           </div>
         ) : (
           <div className="space-y-px p-1">
-            {(isSearching ? searchResults : filtered).map((conv) => (
-              <ConversationItem
-                key={conv.id}
-                conversation={conv}
-                isSelected={selectedId === conv.id}
-                onClick={() => handleSelect(conv)}
-                instanceName={instances.length > 1 ? instanceMap[conv.instance_id] : undefined}
-                attendance={attendanceMap.get(conv.id)}
-                isAgentAlert={(() => { const d = getStateForConv(conv).agent_alert_due_at; return d != null && nowMs >= new Date(d).getTime(); })()}
-              />
-            ))}
+            {isGroupedView
+              ? agentGroups.map((group) => (
+                  <div key={group.key} className="mb-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleAgent(group.key)}
+                      className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronRight className={`h-3.5 w-3.5 transition-transform ${!collapsedAgents.has(group.key) ? "rotate-90" : ""}`} />
+                      <span className="truncate">{group.label}</span>
+                      <span className="ml-auto text-[10px] font-normal opacity-70">{group.convs.length}</span>
+                    </button>
+                    {!collapsedAgents.has(group.key) && group.convs.map(renderConversation)}
+                  </div>
+                ))
+              : (isSearching ? searchResults : filtered).map(renderConversation)}
           </div>
         )}
       </ScrollArea>
