@@ -2419,6 +2419,33 @@ export type Database = {
           },
         ]
       }
+      cron_estado: {
+        Row: {
+          falhas_seguidas: number
+          jobname: string
+          ultima_execucao: string | null
+          ultima_falha_em: string | null
+          ultima_falha_msg: string | null
+          ultimo_request_id: number | null
+        }
+        Insert: {
+          falhas_seguidas?: number
+          jobname: string
+          ultima_execucao?: string | null
+          ultima_falha_em?: string | null
+          ultima_falha_msg?: string | null
+          ultimo_request_id?: number | null
+        }
+        Update: {
+          falhas_seguidas?: number
+          jobname?: string
+          ultima_execucao?: string | null
+          ultima_falha_em?: string | null
+          ultima_falha_msg?: string | null
+          ultimo_request_id?: number | null
+        }
+        Relationships: []
+      }
       cs_ticket_reassignments: {
         Row: {
           criado_em: string
@@ -9723,6 +9750,7 @@ export type Database = {
         Args: { p_go_live_real?: string; p_journey_id: string }
         Returns: Json
       }
+      conferencia_saude: { Args: never; Returns: Json }
       create_access_invite: {
         Args: {
           p_access_status?: string
@@ -9874,6 +9902,11 @@ export type Database = {
           p_tipo_horario: string
         }
         Returns: string
+      }
+      cron_recon_espelho: { Args: never; Returns: undefined }
+      cron_verificar_anterior: {
+        Args: { p_jobname: string }
+        Returns: undefined
       }
       current_department_id: { Args: never; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
@@ -11144,6 +11177,7 @@ export type Database = {
         Args: { p_tenant_id: string }
         Returns: string
       }
+      obter_segredo_cron_espelho: { Args: never; Returns: string }
       omie_fila_status: { Args: { p_tenant_id: string }; Returns: Json }
       onb_slugify: { Args: { p_txt: string }; Returns: string }
       pause_onboarding: {
