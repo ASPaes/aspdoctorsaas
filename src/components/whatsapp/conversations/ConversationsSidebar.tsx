@@ -705,17 +705,22 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
           </div>
         ) : (
           <div className="space-y-px p-1">
-            {(isSearching ? searchResults : filtered).map((conv) => (
-              <ConversationItem
-                key={conv.id}
-                conversation={conv}
-                isSelected={selectedId === conv.id}
-                onClick={() => handleSelect(conv)}
-                instanceName={instances.length > 1 ? instanceMap[conv.instance_id] : undefined}
-                attendance={attendanceMap.get(conv.id)}
-                isAgentAlert={(() => { const d = getStateForConv(conv).agent_alert_due_at; return d != null && nowMs >= new Date(d).getTime(); })()}
-              />
-            ))}
+            {isGroupedView
+              ? agentGroups.map((group) => (
+                  <div key={group.key} className="mb-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleAgent(group.key)}
+                      className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronRight className={`h-3.5 w-3.5 transition-transform ${!collapsedAgents.has(group.key) ? "rotate-90" : ""}`} />
+                      <span className="truncate">{group.label}</span>
+                      <span className="ml-auto text-[10px] font-normal opacity-70">{group.convs.length}</span>
+                    </button>
+                    {!collapsedAgents.has(group.key) && group.convs.map(renderConversation)}
+                  </div>
+                ))
+              : (isSearching ? searchResults : filtered).map(renderConversation)}
           </div>
         )}
       </ScrollArea>
