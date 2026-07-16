@@ -5,25 +5,35 @@ import { AlertTriangle, AlertOctagon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-type SaudeEstado = "ok" | "atrasado" | "parado";
+type SaudeEstado = "ok" | "atrasado" | "parado" | "sem_integracao";
 
 interface ConferenciaSaude {
   estado: SaudeEstado;
   motivo: string | null;
-  espelho_em: string | null;
-  espelho_idade_min: number | null;
-  deteccao_em: string | null;
-  cron_ativo: boolean;
-  cron_ultima_execucao: string | null;
-  falhas_seguidas: number;
+  espelho_em?: string | null;
+  espelho_idade_min?: number | null;
+  deteccao_em?: string | null;
+  cron_ativo?: boolean;
+  cron_ultima_execucao?: string | null;
+  falhas_seguidas?: number;
 }
 
-export function ConferenciaSaudeBanner() {
+interface Props {
+  tenantId: string | null | undefined;
+}
+
+export function ConferenciaSaudeBanner({ tenantId }: Props) {
   const { data, isLoading } = useQuery({
-    queryKey: ["conferencia_saude"],
+    queryKey: ["conferencia_saude", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("conferencia_saude");
-      if (error) throw error;
+      const { data, error } = await supabase.rpc("conferencia_saude", {
+        p_tenant_id: tenantId as string,
+      });
+      if (error) {
+        console.warn("[ConferenciaSaudeBanner] RPC falhou:", error.message);
+        return null;
+      }
       return data as unknown as ConferenciaSaude;
     },
     refetchInterval: 60_000,
@@ -31,7 +41,7 @@ export function ConferenciaSaudeBanner() {
   });
 
   if (isLoading || !data) return null;
-  if (data.estado === "ok") return null;
+  if (data.estado === "ok" || data.estado === "sem_integracao") return null;
 
   const motivo = data.motivo ?? "";
 
