@@ -346,7 +346,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
     // Filtro manual de instância: reaplica no client porque conversas resgatadas por
     // includeIds (atendimentos ativos) entram por PK, sem passar pelo filtro do servidor.
-    if (filters.instanceId) {
+    if (filters.instanceId && !queueLikePills) {
       result = result.filter(c => (c as any).is_group === true || c.instance_id === filters.instanceId);
     }
 
@@ -368,11 +368,11 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       });
     }
 
-    if (filters.autoReplyDisabledOnly) {
+    if (filters.autoReplyDisabledOnly && !queueLikePills) {
       result = result.filter((c) => c.auto_reply_disabled === true);
     }
 
-    if (filters.rulesDisabledOnly) {
+    if (filters.rulesDisabledOnly && !queueLikePills) {
       result = result.filter((c) => (c.contact as any)?.rules_disabled === true);
     }
 
