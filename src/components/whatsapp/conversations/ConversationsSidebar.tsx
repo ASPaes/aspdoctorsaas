@@ -276,23 +276,24 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       // Grupos não entram nas pills normais
       if ((conv as any).is_group === true) continue;
 
-      if (filters.instanceId && conv.instance_id !== filters.instanceId) continue;
-
       const state = getStateForConv(conv);
+
+      const bucket = getConversationBucket(state);
+      const isQueueLike = bucket === "waiting_in_hours" || bucket === "waiting_out_of_hours";
 
       // Department filter for counts (skip for after_hours which is tenant-wide)
       if (selectedDepartmentId && state.department_id && state.department_id !== selectedDepartmentId) {
-        // Still count after_hours regardless of department
-        const bucket = getConversationBucket(state);
         if (bucket === "waiting_out_of_hours") { afterHours++; }
         continue;
       }
 
-      const bucket = getConversationBucket(state);
+      // Filtros do popover NÃO se aplicam às pills de fila (mostram o total do setor)
+      if (!isQueueLike) {
+        if (filters.instanceId && conv.instance_id !== filters.instanceId) continue;
+        if (filters.autoReplyDisabledOnly && conv.auto_reply_disabled !== true) continue;
+        if (filters.rulesDisabledOnly && (conv.contact as any)?.rules_disabled !== true) continue;
+      }
 
-      // Atendendo e Fila já mostram o setor inteiro (RLS limita ao setor).
-      // "Encerradas" continua só os que o operador atendeu — vínculo de setor
-      // nas encerradas depende de fix da view, tratado em fase posterior.
       if (!isAdmin && user?.id) {
         if (bucket === "closed") {
           const att = attendanceMap.get(conv.id);
@@ -311,7 +312,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     const groups = groupCountData?.totalGroups ?? 0;
     const groupsUnread = groupCountData?.unreadGroups ?? 0;
     return { inProgress, waiting, closed, afterHours, groups, groupsUnread };
-  }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId, groupCountData, filters.instanceId]);
+  }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId, groupCountData, filters.instanceId, filters.autoReplyDisabledOnly, filters.rulesDisabledOnly]);
 
   // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
   useEffect(() => {
@@ -345,7 +346,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
     // Filtro manual de instância: reaplica no client porque conversas resgatadas por
     // includeIds (atendimentos ativos) entram por PK, sem passar pelo filtro do servidor.
-    if (filters.instanceId) {
+    if (filters.instanceId && !queueLikePills) {
       result = result.filter(c => (c as any).is_group === true || c.instance_id === filters.instanceId);
     }
 
@@ -367,11 +368,11 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       });
     }
 
-    if (filters.autoReplyDisabledOnly) {
+    if (filters.autoReplyDisabledOnly && !queueLikePills) {
       result = result.filter((c) => c.auto_reply_disabled === true);
     }
 
-    if (filters.rulesDisabledOnly) {
+    if (filters.rulesDisabledOnly && !queueLikePills) {
       result = result.filter((c) => (c.contact as any)?.rules_disabled === true);
     }
 
@@ -449,7 +450,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     }
 
     return result;
-  }, [conversations, activePill, filters.sortBy, filters.instanceId, filters.autoReplyDisabledOnly, filters.rulesDisabledOnly, forcedConvId, isAdmin, user?.id, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv, nowMs]);
+  }, [conversations, activePill, queueLikePills, filters.sortBy, filters.instanceId, filters.autoReplyDisabledOnly, filters.rulesDisabledOnly, forcedConvId, isAdmin, user?.id, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv, nowMs]);
 
   const agentGroups = useMemo(() => {
     if (!isGroupedView) return [];
