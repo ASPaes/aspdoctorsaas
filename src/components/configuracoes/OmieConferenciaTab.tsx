@@ -26,6 +26,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import OmieFilaSincronizacaoPanel from "./OmieFilaSincronizacaoPanel";
+import { ConferenciaSaudeBanner } from "./ConferenciaSaudeBanner";
 import {
   AlertCircle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, HelpCircle, History, Lock, RefreshCw, Search,
 } from "lucide-react";
@@ -1327,8 +1328,10 @@ export default function OmieConferenciaTab() {
 
   return (
     <div className="space-y-4">
+      <ConferenciaSaudeBanner />
       {/* Topo */}
       <div className="flex items-center justify-between flex-wrap gap-2">
+
         <div className="text-sm text-muted-foreground">
           Espelho conferido em <span className="font-medium text-foreground">{formatDateTime(geradoEm)}</span>
         </div>
