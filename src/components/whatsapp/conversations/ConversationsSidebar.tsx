@@ -276,23 +276,24 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       // Grupos não entram nas pills normais
       if ((conv as any).is_group === true) continue;
 
-      if (filters.instanceId && conv.instance_id !== filters.instanceId) continue;
-
       const state = getStateForConv(conv);
+
+      const bucket = getConversationBucket(state);
+      const isQueueLike = bucket === "waiting_in_hours" || bucket === "waiting_out_of_hours";
 
       // Department filter for counts (skip for after_hours which is tenant-wide)
       if (selectedDepartmentId && state.department_id && state.department_id !== selectedDepartmentId) {
-        // Still count after_hours regardless of department
-        const bucket = getConversationBucket(state);
         if (bucket === "waiting_out_of_hours") { afterHours++; }
         continue;
       }
 
-      const bucket = getConversationBucket(state);
+      // Filtros do popover NÃO se aplicam às pills de fila (mostram o total do setor)
+      if (!isQueueLike) {
+        if (filters.instanceId && conv.instance_id !== filters.instanceId) continue;
+        if (filters.autoReplyDisabledOnly && conv.auto_reply_disabled !== true) continue;
+        if (filters.rulesDisabledOnly && (conv.contact as any)?.rules_disabled !== true) continue;
+      }
 
-      // Atendendo e Fila já mostram o setor inteiro (RLS limita ao setor).
-      // "Encerradas" continua só os que o operador atendeu — vínculo de setor
-      // nas encerradas depende de fix da view, tratado em fase posterior.
       if (!isAdmin && user?.id) {
         if (bucket === "closed") {
           const att = attendanceMap.get(conv.id);
