@@ -219,6 +219,19 @@ export function ConversationFiltersPopover({ filters, onChange, showGroupByAgent
           </Select>
         </div>
 
+        {showGroupByAgent && (
+          <div className="flex items-center justify-between">
+            <Label htmlFor="group-by-agent" className="text-xs font-medium text-muted-foreground">
+              Agrupar por operador
+            </Label>
+            <Switch
+              id="group-by-agent"
+              checked={!!filters.groupByAgent}
+              onCheckedChange={(v) => onChange({ ...filters, groupByAgent: v })}
+            />
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Status</label>
           <Select
