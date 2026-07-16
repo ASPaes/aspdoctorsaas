@@ -114,6 +114,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         assignedToAgent: next.assignedToAgent,
         autoReplyDisabledOnly: next.autoReplyDisabledOnly,
         rulesDisabledOnly: next.rulesDisabledOnly,
+        groupByAgent: next.groupByAgent,
       });
       return next;
     });
