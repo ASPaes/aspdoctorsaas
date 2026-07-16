@@ -912,10 +912,10 @@ function VisaoGeralPanel({
   const somaBaldeCriar = num(baldes.criar) + num(baldes.criar_contrato);
 
   const chips: { label: string; qtd: number; bucket: Bucket; tone: "emerald" | "amber" | "red" | "muted" }[] = [
+    { label: "Vigência vencida no Omie", qtd: num(baldes.vigencia_vencida_no_omie), bucket: "vigencia_vencida_no_omie", tone: "red" },
     { label: "Prontos para vincular", qtd: num(baldes.vinculo_auto_ok), bucket: "vinculo_auto_ok", tone: "emerald" },
     { label: "Sem modelo", qtd: num(baldes.atribuir_modelo), bucket: "atribuir_modelo", tone: "amber" },
     { label: "Ambíguos", qtd: num(baldes.escolher_candidato), bucket: "escolher_candidato", tone: "amber" },
-    { label: "Pendente assunção", qtd: num(baldes.pendente_assuncao), bucket: "pendente_assuncao", tone: "muted" },
     { label: "A criar", qtd: somaBaldeCriar, bucket: "criar", tone: "amber" },
   ];
 
