@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert, Pin, ExternalLink, User } from "lucide-react";
+import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert, Pin, ExternalLink, User, TimerOff } from "lucide-react";
 import { format } from "date-fns";
 import { AttendanceMessagesDialog } from "./AttendanceMessagesDialog";
 import { Switch } from "@/components/ui/switch";
@@ -605,7 +605,12 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             </div>
           )}
 
-          {/* ─── 14. Regras do sistema ─── */}
+          {/* ─── 14. Não encerrar por inatividade ─── */}
+          {!isGroup && relevantAttendanceId && !isRelevantClosed && (
+            <InactivityHoldSection attendanceId={relevantAttendanceId} />
+          )}
+
+          {/* ─── 15. Regras do sistema ─── */}
           {!isGroup && (
             <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -849,6 +854,62 @@ function GroupAttendancesSection({
         </div>
       )}
     </CollapsibleSection>
+  );
+}
+
+/* ─── Inactivity hold toggle for the current open attendance ─── */
+function InactivityHoldSection({ attendanceId }: { attendanceId: string }) {
+  const qc = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [localValue, setLocalValue] = useState<boolean | null>(null);
+
+  const { data: att } = useQuery({
+    queryKey: ["attendance-inactivity-hold", attendanceId],
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data } = await (supabase.from("support_attendances" as any) as any)
+        .select("inactivity_hold")
+        .eq("id", attendanceId)
+        .maybeSingle();
+      return (data as any) ?? null;
+    },
+  });
+
+  const effective = localValue ?? (att?.inactivity_hold === true);
+
+  const handleToggle = async (v: boolean) => {
+    setSaving(true);
+    setLocalValue(v);
+    try {
+      const { error } = await (supabase.from("support_attendances" as any) as any)
+        .update({ inactivity_hold: v } as any)
+        .eq("id", attendanceId);
+      if (error) throw error;
+      toast.success(v ? "Encerramento por inatividade desativado neste atendimento" : "Encerramento por inatividade reativado");
+      qc.invalidateQueries({ queryKey: ["attendance-inactivity-hold", attendanceId] });
+    } catch (e: any) {
+      setLocalValue(null);
+      toast.error(e?.message ?? "Falha ao atualizar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <TimerOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="text-xs font-medium">Não encerrar por inatividade</span>
+        </div>
+        <Switch checked={effective} disabled={saving} onCheckedChange={handleToggle} />
+      </div>
+      <p className="text-[10px] text-muted-foreground leading-relaxed">
+        Vale só para este atendimento: ele não será encerrado automaticamente por falta de
+        interação, nem por falta de resposta do agente. As demais regras continuam ativas.
+        Ao encerrar o atendimento, a opção volta ao normal sozinha.
+      </p>
+    </div>
   );
 }
 

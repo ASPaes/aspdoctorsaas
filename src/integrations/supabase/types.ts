@@ -5868,6 +5868,7 @@ export type Database = {
           handle_seconds: number
           handoffs_count: number
           id: string
+          inactivity_hold: boolean
           inactivity_warning_sent_at: string | null
           instance_id: string | null
           is_group: boolean
@@ -5947,6 +5948,7 @@ export type Database = {
           handle_seconds?: number
           handoffs_count?: number
           id?: string
+          inactivity_hold?: boolean
           inactivity_warning_sent_at?: string | null
           instance_id?: string | null
           is_group?: boolean
@@ -6026,6 +6028,7 @@ export type Database = {
           handle_seconds?: number
           handoffs_count?: number
           id?: string
+          inactivity_hold?: boolean
           inactivity_warning_sent_at?: string | null
           instance_id?: string | null
           is_group?: boolean
