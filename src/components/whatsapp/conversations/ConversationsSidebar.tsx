@@ -17,6 +17,7 @@ import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
 import { useConversationStates } from "../hooks/useConversationStates";
 import { useAgentOptions } from "../hooks/useAgentOptions";
+import { useActiveAttendanceConvIds } from "../hooks/useActiveAttendanceConvIds";
 import { getConversationBucket, type ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
 import { ConversationItem } from "./ConversationItem";
 import { ConversationFiltersPopover, type FiltersState } from "./ConversationFiltersPopover";
@@ -191,6 +192,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const resolvedUnassigned = filters.assignedToAgent === "__unassigned__";
 
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { data: activeAttendanceIds } = useActiveAttendanceConvIds();
+
+  const includeIds = useMemo(() => {
+    const ids = new Set<string>(activeAttendanceIds ?? []);
+    if (forcedConvId) ids.add(forcedConvId);
+    return ids.size > 0 ? [...ids].sort() : undefined;
+  }, [activeAttendanceIds, forcedConvId]);
 
   const isGroupsPill = activePill === "groups";
   const queueLikePills = activePill === "waiting" || activePill === "after_hours";
@@ -203,7 +211,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     unassigned: isGroupsPill || queueLikePills ? undefined : (resolvedUnassigned || undefined),
     isGroup: isGroupsPill ? true : activePill === "all" ? undefined : false,
     pageSize: 100,
-    includeIds: forcedConvId ? [forcedConvId] : undefined,
+    includeIds,
   });
 
   // Get attendance data for all loaded conversations (still used for ConversationItem display)
