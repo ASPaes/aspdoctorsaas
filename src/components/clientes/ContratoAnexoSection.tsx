@@ -119,6 +119,8 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewIsBlob, setPreviewIsBlob] = useState(false);
+  const [previewFallbackUrl, setPreviewFallbackUrl] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [locallyRemoved, setLocallyRemoved] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -131,18 +133,62 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
   const isPdf = anexo?.mime_type === "application/pdf" || anexo?.nome_original?.toLowerCase().endsWith(".pdf");
   const isImage = anexo?.mime_type?.startsWith("image/") || /\.(jpe?g|png)$/i.test(anexo?.nome_original ?? "");
 
+  // Revoke blob URL on unmount / when previewUrl changes
+  useEffect(() => {
+    return () => {
+      if (previewIsBlob && previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl, previewIsBlob]);
+
+  const clearPreview = () => {
+    if (previewIsBlob && previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setPreviewIsBlob(false);
+    setPreviewFallbackUrl(null);
+  };
+
   const loadPreview = async () => {
     if (!anexo) return;
+    clearPreview();
     setLoadingPreview(true);
     const { data, error } = await supabase.storage
       .from("contrato-anexos")
       .createSignedUrl(anexo.storage_path, 300);
-    setLoadingPreview(false);
     if (error || !data?.signedUrl) {
+      setLoadingPreview(false);
       toast({ title: "Erro ao gerar preview", description: error?.message, variant: "destructive" });
       return;
     }
-    setPreviewUrl(data.signedUrl);
+
+    // Imagens carregam direto pela signed URL (tag <img> não é bloqueada por origem)
+    if (!isPdf) {
+      setPreviewUrl(data.signedUrl);
+      setPreviewIsBlob(false);
+      setLoadingPreview(false);
+      return;
+    }
+
+    // PDFs: buscar como blob e servir via object URL (mesma origem, evita bloqueio do Chrome)
+    try {
+      const res = await fetch(data.signedUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setPreviewUrl(url);
+      setPreviewIsBlob(true);
+    } catch (err: any) {
+      // Fallback: mostra ícone + "Abrir em nova aba" com a signed URL
+      setPreviewFallbackUrl(data.signedUrl);
+      toast({
+        title: "Não foi possível carregar o preview",
+        description: err?.message ?? "Tente abrir em nova aba.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPreview(false);
+    }
   };
 
   const handleDownload = async () => {
