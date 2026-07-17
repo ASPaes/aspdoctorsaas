@@ -6,6 +6,12 @@ import {
   ensureAttendanceForOperatorMessage,
   incrementAttendanceCounter,
 } from '../_shared/message-processor.ts';
+import {
+  parseTemplateParams,
+  resolveValues,
+  buildBodyComponent,
+  renderTemplateText,
+} from '../_shared/meta-template-params.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,7 +42,7 @@ Deno.serve(async (req) => {
       instance_id?: string;
       to?: string;
       template_id?: string;
-      parameters?: string[];
+      parameters?: string[] | Record<string, string>;
     };
 
     if (!instance_id || !to || !template_id) {
@@ -69,7 +75,7 @@ Deno.serve(async (req) => {
 
     const { data: template, error: tplErr } = await supabase
       .from('whatsapp_meta_templates')
-      .select('id, tenant_id, instance_id, name, language, status, body_text, body_variables_count')
+      .select('id, tenant_id, instance_id, name, language, status, body_text, components')
       .eq('id', template_id)
       .single();
 
@@ -86,12 +92,15 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: `template is not approved (status: ${template.status})` }, 400);
     }
 
-    const params = parameters || [];
-    if (params.length !== template.body_variables_count) {
-      return jsonResponse({
-        error: `template requires ${template.body_variables_count} variables, but ${params.length} provided`,
-      }, 400);
+    const spec = parseTemplateParams((template as any).components);
+    if (spec.unsupported.length > 0) {
+      return jsonResponse({ error: `Template não suportado: ${spec.unsupported.join('; ')}` }, 400);
     }
+    const resolved = resolveValues(spec, parameters);
+    if (!resolved.ok) {
+      return jsonResponse({ error: resolved.error }, 400);
+    }
+    const values = resolved.values;
 
     const secrets = await getInstanceSecrets(supabase, instance.id);
     const accessToken = (secrets as any).meta_access_token;
@@ -111,13 +120,7 @@ Deno.serve(async (req) => {
       normalizedTo = normalizedTo.slice(0, 4) + '9' + normalizedTo.slice(4);
     }
 
-    const components: any[] = [];
-    if (params.length > 0) {
-      components.push({
-        type: 'body',
-        parameters: params.map((p) => ({ type: 'text', text: p })),
-      });
-    }
+    const bodyComponent = buildBodyComponent(spec, values);
 
     const graphBody = {
       messaging_product: 'whatsapp',
@@ -126,7 +129,7 @@ Deno.serve(async (req) => {
       template: {
         name: template.name,
         language: { code: template.language },
-        ...(components.length > 0 ? { components } : {}),
+        ...(bodyComponent ? { components: [bodyComponent] } : {}),
       },
     };
 
@@ -145,9 +148,15 @@ Deno.serve(async (req) => {
     const graphData = await graphResp.json();
 
     if (!graphResp.ok) {
-      console.error(`${LOG} Graph API error ${graphResp.status}:`, graphData);
+      const metaCode = graphData?.error?.code;
+      const metaMsg = graphData?.error?.message ?? 'erro desconhecido';
+      const metaDetails = graphData?.error?.error_data?.details;
+      console.error(
+        `${LOG} Graph API error ${graphResp.status} code=${metaCode}:`,
+        JSON.stringify(graphData),
+      );
       return jsonResponse({
-        error: 'Graph API request failed',
+        error: `A Meta recusou o envio${metaCode ? ` (código ${metaCode})` : ''}: ${metaDetails || metaMsg}`,
         status: graphResp.status,
         detail: graphData,
       }, 502);
@@ -188,7 +197,9 @@ Deno.serve(async (req) => {
     }
 
     const nowIso = new Date().toISOString();
-    const messageContent = template.body_text || `[Template: ${template.name}]`;
+    const messageContent = template.body_text
+      ? renderTemplateText(template.body_text, spec, values)
+      : `[Template: ${template.name}]`;
 
     const { error: msgErr } = await supabase.from('whatsapp_messages').insert({
       conversation_id: conversationId,
@@ -206,7 +217,13 @@ Deno.serve(async (req) => {
         template_name: template.name,
         template_language: template.language,
         template_id: template.id,
-        ...(params.length > 0 ? { template_parameters: params } : {}),
+        ...(values.length > 0
+          ? {
+              template_parameters: values,
+              template_param_names: spec.names,
+              template_param_format: spec.format,
+            }
+          : {}),
       },
     });
 

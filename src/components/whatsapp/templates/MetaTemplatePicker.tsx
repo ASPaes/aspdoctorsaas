@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  parseTemplateParams,
+  hasInvalidParamChars,
+  renderTemplateText,
+  type TemplateParamSpec,
+} from '@/lib/metaTemplateParams';
 
 interface Props {
   open: boolean;
@@ -43,6 +49,14 @@ export function MetaTemplatePicker({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const specById = useMemo(() => {
+    const m = new Map<string, TemplateParamSpec>();
+    for (const t of templates ?? []) m.set(t.id, parseTemplateParams(t.components));
+    return m;
+  }, [templates]);
+
+  const spec = selected ? specById.get(selected.id) ?? null : null;
+
   useEffect(() => {
     if (!open) {
       setSelected(null);
@@ -52,17 +66,36 @@ export function MetaTemplatePicker({
   }, [open]);
 
   useEffect(() => {
-    if (selected) {
-      setParameters(new Array(selected.body_variables_count).fill(''));
-    }
+    const s = selected ? specById.get(selected.id) : null;
+    setParameters(s ? new Array(s.names.length).fill('') : []);
+    // dep só em selected?.id de propósito: refetch não pode limpar o que o usuário digitou
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id]);
 
-  const handleSend = async () => {
-    if (!selected) return;
+  const readErrorBody = async (err: any): Promise<string | null> => {
+    try {
+      const body = await err?.context?.json();
+      if (body?.error) return String(body.error);
+    } catch {
+      /* corpo não-JSON */
+    }
+    return null;
+  };
 
-    if (selected.body_variables_count > 0) {
-      const allFilled = parameters.every((p) => p.trim().length > 0);
-      if (!allFilled) {
+  const handleSend = async () => {
+    if (!selected || !spec) return;
+
+    if (spec.unsupported.length > 0) {
+      toast({
+        title: 'Template não suportado',
+        description: spec.unsupported.join('; '),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (spec.names.length > 0) {
+      if (!parameters.every((p) => p.trim().length > 0)) {
         toast({
           title: 'Preencha todas as variáveis',
           description: 'O template tem variáveis obrigatórias.',
@@ -70,7 +103,23 @@ export function MetaTemplatePicker({
         });
         return;
       }
+      const bad = spec.names.filter((_, i) => hasInvalidParamChars(parameters[i]));
+      if (bad.length > 0) {
+        toast({
+          title: 'Valor inválido',
+          description: `A Meta não aceita quebra de linha, tab ou 5+ espaços seguidos em: ${bad.join(', ')}`,
+          variant: 'destructive',
+        });
+        return;
+      }
     }
+
+    const paramsPayload =
+      spec.names.length === 0
+        ? {}
+        : spec.format === 'NAMED'
+          ? { parameters: Object.fromEntries(spec.names.map((n, i) => [n, parameters[i]])) }
+          : { parameters };
 
     setSending(true);
     try {
@@ -81,29 +130,22 @@ export function MetaTemplatePicker({
             instance_id: instanceId,
             to,
             template_id: selected.id,
-            ...(parameters.length > 0 ? { parameters } : {}),
+            ...paramsPayload,
           },
         },
       );
 
       if (invokeErr) throw invokeErr;
-      if (!data?.success) {
-        throw new Error(data?.error || 'Falha no envio do template');
-      }
+      if (!data?.success) throw new Error(data?.error || 'Falha no envio do template');
 
-      toast({
-        title: 'Template enviado',
-        description: `${selected.name} enviado com sucesso.`,
-      });
-      onSent?.({
-        conversation_id: data.conversation_id,
-        message_id: data.message_id,
-      });
+      toast({ title: 'Template enviado', description: `${selected.name} enviado com sucesso.` });
+      onSent?.({ conversation_id: data.conversation_id, message_id: data.message_id });
       onOpenChange(false);
     } catch (err: any) {
+      const bodyMsg = await readErrorBody(err);
       toast({
         title: 'Erro ao enviar template',
-        description: err?.message || 'Tente novamente em alguns segundos.',
+        description: bodyMsg || err?.message || 'Tente novamente em alguns segundos.',
         variant: 'destructive',
       });
     } finally {
@@ -125,9 +167,10 @@ export function MetaTemplatePicker({
       });
       queryClient.invalidateQueries({ queryKey: ['meta-templates', instanceId] });
     } catch (err: any) {
+      const bodyMsg = await readErrorBody(err);
       toast({
         title: 'Erro ao sincronizar',
-        description: err?.message || 'Tente novamente.',
+        description: bodyMsg || err?.message || 'Tente novamente.',
         variant: 'destructive',
       });
     } finally {
@@ -185,63 +228,78 @@ export function MetaTemplatePicker({
           {!isLoading && templates && templates.length > 0 && (
             <ScrollArea className="h-[300px] pr-3">
               <div className="space-y-2">
-                {templates.map((tpl) => (
-                  <Card
-                    key={tpl.id}
-                    onClick={() => setSelected(tpl)}
-                    className={cn(
-                      'cursor-pointer transition-colors hover:bg-accent',
-                      selected?.id === tpl.id && 'border-primary bg-accent',
-                    )}
-                  >
-                    <CardContent className="p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-medium truncate">{tpl.name}</span>
-                          <Badge variant="outline" className="shrink-0">
-                            {tpl.language}
+                {templates.map((tpl) => {
+                  const tplSpec = specById.get(tpl.id);
+                  const varCount = tplSpec?.names.length ?? 0;
+                  return (
+                    <Card
+                      key={tpl.id}
+                      onClick={() => setSelected(tpl)}
+                      className={cn(
+                        'cursor-pointer transition-colors hover:bg-accent',
+                        selected?.id === tpl.id && 'border-primary bg-accent',
+                      )}
+                    >
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-medium truncate">{tpl.name}</span>
+                            <Badge variant="outline" className="shrink-0">
+                              {tpl.language}
+                            </Badge>
+                          </div>
+                          <Badge variant="secondary" className="shrink-0">
+                            {tpl.category}
                           </Badge>
                         </div>
-                        <Badge variant="secondary" className="shrink-0">
-                          {tpl.category}
-                        </Badge>
-                      </div>
-                      {tpl.body_text && (
-                        <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
-                          {tpl.body_text}
-                        </p>
-                      )}
-                      {tpl.body_variables_count > 0 && (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {tpl.body_variables_count} variável(is)
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                        {tpl.body_text && (
+                          <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
+                            {tpl.body_text}
+                          </p>
+                        )}
+                        {varCount > 0 && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {varCount} variável(is): {tplSpec!.names.join(', ')}
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </ScrollArea>
           )}
 
-          {selected && selected.body_variables_count > 0 && (
+          {spec && spec.unsupported.length > 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              <AlertTriangle className="mt-0.5" />
+              <span>Este template ainda não pode ser enviado por aqui: {spec.unsupported.join('; ')}</span>
+            </div>
+          )}
+
+          {spec && spec.names.length > 0 && spec.unsupported.length === 0 && (
             <div className="space-y-2 border-t pt-3">
               <p className="text-sm font-medium">Variáveis do template</p>
-              {parameters.map((value, idx) => (
-                <div key={idx} className="space-y-1">
-                  <Label className="text-xs">
-                    Variável {`{{${idx + 1}}}`}
-                  </Label>
+              {spec.names.map((name, idx) => (
+                <div key={name} className="space-y-1">
+                  <Label className="text-xs">{`{{${name}}}`}</Label>
                   <Input
-                    value={value}
+                    value={parameters[idx] ?? ''}
                     onChange={(e) => {
                       const next = [...parameters];
                       next[idx] = e.target.value;
                       setParameters(next);
                     }}
-                    placeholder={`Valor para a variável ${idx + 1}`}
+                    placeholder={spec.examples[idx] || `Valor para ${name}`}
                   />
                 </div>
               ))}
+              <div className="mt-3 rounded-md border bg-muted/40 p-3">
+                <p className="text-xs font-medium text-muted-foreground mb-1">Prévia</p>
+                <p className="text-sm whitespace-pre-wrap">
+                  {renderTemplateText(selected?.body_text ?? '', spec, parameters)}
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -254,7 +312,10 @@ export function MetaTemplatePicker({
           >
             Cancelar
           </Button>
-          <Button onClick={handleSend} disabled={!selected || sending}>
+          <Button
+            onClick={handleSend}
+            disabled={!selected || !spec || sending || spec.unsupported.length > 0}
+          >
             {sending && <Loader2 className="animate-spin" />}
             Enviar template
           </Button>
