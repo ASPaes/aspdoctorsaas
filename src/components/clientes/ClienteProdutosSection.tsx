@@ -648,7 +648,10 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         fornecedores={fornecedoresLookup.data ?? []}
         onSaved={invalidateAll}
         modulosCountForEdit={produtoDialog.edit ? (modulosByProduto[produtoDialog.edit.id]?.length ?? 0) : 0}
+        editContratoId={produtoDialog.edit ? (contratoIdByCliProd[produtoDialog.edit.id] ?? null) : null}
+        onProductCreated={(cliProdId) => setExpanded(s => ({ ...s, [cliProdId]: true }))}
       />
+
 
       <ModuloDialog
         open={moduloDialog.open}
