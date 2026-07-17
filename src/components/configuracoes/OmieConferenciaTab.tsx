@@ -582,6 +582,21 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
         // o caminho real é o "Escolher este" dentro de "Ver candidatos" abaixo.
         return null;
       case "contrato_suspenso":
+        return (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              onClick={handleVincularAssimMesmo}
+              disabled={vincLoading || !tid || !row.ds_contract_id}
+            >
+              {vincLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+              {vincLoading ? "Vinculando..." : "Está correto — vincular"}
+            </Button>
+            <DisabledActionButton>Reativar/Revisar no Omie</DisabledActionButton>
+          </div>
+        );
       case "contrato_cancelado":
         return <DisabledActionButton>Reativar/Revisar no Omie</DisabledActionButton>;
       default:
