@@ -117,41 +117,17 @@ export default function GroupParticipantsSheet({
     setConfirm(null);
   };
 
-  const checkNumber = async () => {
+  const runAdd = async () => {
     const clean = addPhone.replace(/\D/g, "");
     if (clean.length < 10) {
       toast.error("Informe um telefone válido com DDD");
       return;
     }
-    setAddChecking(true);
-    setAddResolved(null);
-    try {
-      // usa a mesma edge function que o backend usa, para dar feedback antes
-      const { data, error } = await supabase.functions.invoke("check-whatsapp-number", {
-        body: { instanceId: null, phone: clean, conversationId },
-      });
-      if (error) throw error;
-      if (data?.exists) {
-        setAddResolved({ phone: String(data.phone ?? clean), exists: true });
-      } else {
-        setAddResolved({ phone: clean, exists: false });
-        toast.error("Número não encontrado no WhatsApp");
-      }
-    } catch {
-      // se check falhar, deixamos o backend validar de novo
-      setAddResolved({ phone: clean, exists: true });
-    } finally {
-      setAddChecking(false);
-    }
-  };
-
-  const runAdd = async () => {
-    if (!addResolved?.exists) return;
-    await mutation.mutateAsync({ action: "add", phone: addResolved.phone });
+    await mutation.mutateAsync({ action: "add", phone: clean });
     setAddOpen(false);
     setAddPhone("");
-    setAddResolved(null);
   };
+
 
   if (!supportsMgmt) {
     return (
