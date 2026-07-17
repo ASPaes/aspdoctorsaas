@@ -194,6 +194,8 @@ type ReconciliacaoRow = {
   fornecedor_id: number | null;
   situacao_contrato: string | null;
   tem_cancelado_omie: boolean | null;
+  status_usuario: string | null;
+  candidato_escolhido: number | string | null;
 };
 
 
