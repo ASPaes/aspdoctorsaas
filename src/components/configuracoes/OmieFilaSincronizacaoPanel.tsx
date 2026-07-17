@@ -378,6 +378,7 @@ export default function OmieFilaSincronizacaoPanel({
                 {itensFiltrados.map((item, i) => {
                   const status = (item.status || "").toLowerCase();
                   const isIgnorado = status === "ignorado";
+                  const canReprocess = (status === "ignorado" || status === "invalido" || status === "erro") && !!item.fila_id;
                   return (
                     <div
                       key={item.fila_id ?? i}
