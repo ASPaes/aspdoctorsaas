@@ -1339,18 +1339,23 @@ export default function OmieConferenciaTab() {
   const to = from + PAGE_SIZE - 1;
 
   const { data: lista, isLoading: loadingLista } = useQuery({
-    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro, fornecedorParam],
+    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro, fornecedorParam, verResolvidosCandidato],
     enabled: !!tid && bucketAtivo !== "visao_geral",
     queryFn: async () => {
       let q = supabase
         .from("reconciliacao_cadastro")
         .select(
-          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, vigencia_final_omie, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id, situacao_contrato, tem_cancelado_omie",
+          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, vigencia_final_omie, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id, situacao_contrato, tem_cancelado_omie, status_usuario, candidato_escolhido",
           { count: "exact" }
         );
-      // vigencia_vencida_no_omie precisa aparecer mesmo com status_usuario='vinculado'
-      if (bucketAtivo !== "vigencia_vencida_no_omie") {
-        q = q.neq("status_usuario", "vinculado");
+
+      // Filtro fila × alarme: alarme NÃO filtra por status_usuario (some sozinho
+      // quando o Omie muda). Fila filtra 'novo' — igual ao card.
+      // escolher_candidato: toggle "Ver resolvidos" desligado por padrão.
+      if (bucketAtivo === "escolher_candidato") {
+        if (!verResolvidosCandidato) q = q.eq("status_usuario", "novo");
+      } else if (!ALARM_BUCKETS.has(bucketAtivo)) {
+        q = q.eq("status_usuario", "novo");
       }
 
       if (bucketAtivo !== "visao_geral") q = q.eq("acao_sugerida", bucketAtivo);
