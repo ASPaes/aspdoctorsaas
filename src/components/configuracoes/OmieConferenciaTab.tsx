@@ -449,20 +449,18 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
   function renderBotao() {
     switch (bucket) {
       case "vinculo_auto_ok":
-        if (nomesDiferem) {
-          return (
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1"
-              onClick={() => setConfirmVincular(true)}
-              disabled={vincLoading || !tid || !row.ds_contract_id}
-            >
-              Vincular assim mesmo
-            </Button>
-          );
-        }
-        return <DisabledActionButton>Vincular cliente + contrato</DisabledActionButton>;
+        return (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1"
+            onClick={() => (nomesDiferem ? setConfirmVincular(true) : handleVincularAssimMesmo())}
+            disabled={vincLoading || !tid || !row.ds_contract_id}
+          >
+            {vincLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+            {vincLoading ? "Vinculando..." : nomesDiferem ? "Vincular assim mesmo" : "Vincular cliente + contrato"}
+          </Button>
+        );
       case "resolver":
         return <DisabledActionButton>Atualizar valor no Omie</DisabledActionButton>;
       case "criar":
