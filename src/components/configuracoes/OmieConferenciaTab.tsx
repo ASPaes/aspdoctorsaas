@@ -1227,33 +1227,70 @@ export default function OmieConferenciaTab() {
     },
   });
 
-  const { data: resumo, isLoading: loadingResumo } = useQuery({
+  // Um único fetch em reconciliacao_cadastro para derivar TODAS as contagens.
+  // Distinção fila × alarme:
+  //   - Fila (vinculo_auto_ok, atribuir_modelo, escolher_candidato, criar, criar_contrato):
+  //     conta só status_usuario='novo' (é tarefa; some da lista quando o operador resolve).
+  //   - Alarme (vigencia_vencida_no_omie, contrato_suspenso, contrato_cancelado, resolver):
+  //     conta tudo, independente de status_usuario (é derivado do espelho e some
+  //     sozinho quando o Omie muda; filtrar por progresso do usuário esconde
+  //     o problema exatamente quando ele existe).
+  const { data: resumoRows, isLoading: loadingResumo } = useQuery({
     queryKey: ["omie-conf-resumo", tid, fornecedorParam],
     enabled: !!tid,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("reconciliacao_resumo" as any, {
-        p_tenant_id: tid,
-        p_fornecedor_ids: fornecedorParam,
-      });
-      if (error) throw error;
-      return (data ?? []) as ResumoLinha[];
+      const rows = await fetchAllRows<{ acao_sugerida: string | null; status_usuario: string | null; gerado_em: string | null }>(
+        () => {
+          let q = supabase
+            .from("reconciliacao_cadastro")
+            .select("acao_sugerida, status_usuario, gerado_em");
+          if (fornecedorParam != null && fornecedorParam.length > 0) {
+            const ids = fornecedorParam.filter((n) => n !== -1);
+            const incluirNull = fornecedorParam.includes(-1);
+            if (incluirNull && ids.length > 0) {
+              q = q.or(`fornecedor_id.in.(${ids.join(",")}),fornecedor_id.is.null`);
+            } else if (incluirNull) {
+              q = q.is("fornecedor_id", null);
+            } else {
+              q = q.in("fornecedor_id", ids);
+            }
+          }
+          return q;
+        }
+      );
+      return rows;
     },
   });
 
 
   const contadores = useMemo(() => {
     const map = new Map<string, number>();
-    (resumo ?? []).forEach(r => map.set(r.acao_sugerida, (map.get(r.acao_sugerida) ?? 0) + Number(r.qtd || 0)));
+    (resumoRows ?? []).forEach((r) => {
+      const acao = r.acao_sugerida;
+      if (!acao) return;
+      const isAlarm = ALARM_BUCKETS.has(acao);
+      if (isAlarm || r.status_usuario === "novo") {
+        map.set(acao, (map.get(acao) ?? 0) + 1);
+      }
+    });
     return map;
-  }, [resumo]);
+  }, [resumoRows]);
+
+  // Contagem de linhas de escolher_candidato já resolvidas (para o toggle "Ver resolvidos").
+  const escolherCandidatoResolvidos = useMemo(() => {
+    return (resumoRows ?? []).filter(
+      (r) => r.acao_sugerida === "escolher_candidato" && r.status_usuario !== "novo"
+    ).length;
+  }, [resumoRows]);
 
   const geradoEm = useMemo(() => {
-    if (!resumo?.length) return null;
-    return resumo.reduce<string | null>((acc, r) => {
+    if (!resumoRows?.length) return null;
+    return resumoRows.reduce<string | null>((acc, r) => {
+      if (!r.gerado_em) return acc;
       if (!acc) return r.gerado_em;
       return new Date(r.gerado_em) > new Date(acc) ? r.gerado_em : acc;
     }, null);
-  }, [resumo]);
+  }, [resumoRows]);
 
   const { data: nomeDivergeCount, isLoading: loadingNomeDivergeCount } = useQuery({
     queryKey: ["omie-conf-nome-diverge-count", tid, fornecedorParam],
