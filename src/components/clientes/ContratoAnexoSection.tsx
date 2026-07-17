@@ -8,8 +8,12 @@ import {
   Tooltip, TooltipContent, TooltipTrigger, TooltipProvider,
 } from "@/components/ui/tooltip";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Paperclip, Upload, Download, ExternalLink, FileText, Image as ImageIcon,
-  Loader2,
+  Loader2, Trash2,
 } from "lucide-react";
 
 export interface ContratoAnexo {
@@ -110,12 +114,17 @@ function omieBadge(status: string | null, erro: string | null) {
   );
 }
 
-export default function ContratoAnexoSection({ contratoId, tenantId, anexo, invalidateKey }: Props) {
+export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anexoProp, invalidateKey }: Props) {
   const qc = useQueryClient();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [locallyRemoved, setLocallyRemoved] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  const anexo = locallyRemoved ? null : anexoProp;
 
   const disabled = !contratoId;
   const ios = isIOS();
@@ -222,6 +231,7 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo, inva
 
       toast({ title: "Anexo enviado", description: file.name });
       setPreviewUrl(null);
+      setLocallyRemoved(false);
       qc.invalidateQueries({ queryKey: invalidateKey });
     } catch (err: any) {
       if (uploadedPath) {
@@ -230,6 +240,26 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo, inva
       toast({ title: "Erro ao enviar anexo", description: err?.message ?? String(err), variant: "destructive" });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!contratoId) return;
+    setRemoving(true);
+    try {
+      const { error } = await (supabase.rpc as any)("contrato_anexo_remover", {
+        p_contrato_id: contratoId,
+      });
+      if (error) throw error;
+      setLocallyRemoved(true);
+      setPreviewUrl(null);
+      setConfirmRemove(false);
+      toast({ title: "Anexo removido", description: "A remoção no Omie será feita pelo cron." });
+      qc.invalidateQueries({ queryKey: invalidateKey });
+    } catch (err: any) {
+      toast({ title: "Erro ao remover anexo", description: err?.message ?? String(err), variant: "destructive" });
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -295,6 +325,18 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo, inva
             <Button type="button" variant="outline" size="sm" onClick={handleDownload}>
               <Download className="h-4 w-4 mr-1" /> Baixar
             </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              onClick={() => setConfirmRemove(true)}
+              disabled={removing}
+              aria-label="Remover anexo"
+              title="Remover anexo"
+            >
+              {removing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            </Button>
           </div>
 
           {previewUrl && !ios && (
@@ -308,6 +350,28 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo, inva
           )}
         </div>
       )}
+
+      <AlertDialog open={confirmRemove} onOpenChange={(o) => { if (!removing) setConfirmRemove(o); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover anexo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remover o anexo deste contrato? Ele também será removido do Omie.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removing}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleRemove(); }}
+              disabled={removing}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {removing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

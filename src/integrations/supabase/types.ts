@@ -9843,6 +9843,10 @@ export type Database = {
         Returns: Json
       }
       conferencia_saude: { Args: { p_tenant_id: string }; Returns: Json }
+      contrato_anexo_remover: {
+        Args: { p_contrato_id: string }
+        Returns: string
+      }
       contrato_anexo_substituir: {
         Args: {
           p_contrato_id: string
