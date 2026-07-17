@@ -12,6 +12,17 @@ dist
 dist-ssr
 *.local
 
+# Environment
+# .env e versionado de proposito: o build do Lovable le as VITE_SUPABASE_*
+# dele, e as chaves sao anon/publishable. Chave real (service_role, tokens)
+# nunca vai no .env - use .env.local, ignorado abaixo.
+.env.*
+!.env.example
+
+# Supabase CLI (estado local do Docker, nao versionar)
+supabase/.branches
+supabase/.temp
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
