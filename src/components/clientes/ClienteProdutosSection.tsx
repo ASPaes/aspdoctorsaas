@@ -193,7 +193,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await (supabase.from("contrato_anexos" as any) as any)
-        .select("id, contrato_id, tenant_id, storage_path, nome_original, nome_omie, mime_type, tamanho_bytes, omie_status, omie_erro")
+        .select("id, contrato_id, tenant_id, storage_path, nome_original, nome_omie, mime_type, tamanho_bytes, omie_status, omie_erro, omie_enviado_em, created_at")
         .in("contrato_id", contratoIds)
         .eq("ativo", true);
       if (error) throw error;
