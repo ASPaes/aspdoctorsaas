@@ -229,14 +229,25 @@ function DisabledActionButton({
   );
 }
 
-function CandidatosLinha({ cnpj }: { cnpj: string }) {
+function CandidatosLinha({
+  cnpj,
+  tid,
+  dsContractId,
+}: {
+  cnpj: string;
+  tid: string | null | undefined;
+  dsContractId: string | null | undefined;
+}) {
+  const queryClient = useQueryClient();
+  const [escolhendo, setEscolhendo] = useState<string | number | null>(null);
+
   const { data, isLoading } = useQuery({
     queryKey: ["omie-conf-candidatos", cnpj],
     enabled: !!cnpj,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("omie_espelho_cadastro")
-        .select("codigo_cliente_omie, razao_social_omie, valor_omie, situacao_contrato, omie_inativo, origem_codigo")
+        .select("codigo_cliente_omie, codigo_contrato_omie, razao_social_omie, valor_omie, situacao_contrato, omie_inativo, origem_codigo")
         .eq("cnpj_norm", cnpj)
         .limit(20);
       if (error) throw error;
@@ -244,26 +255,96 @@ function CandidatosLinha({ cnpj }: { cnpj: string }) {
     },
   });
 
+  const escolher = async (candidato: any) => {
+    if (!tid || !dsContractId) {
+      toast.error("Dados insuficientes para escolher o candidato.");
+      return;
+    }
+    const codigoContrato = candidato.codigo_contrato_omie;
+    if (codigoContrato == null || String(codigoContrato) === "") {
+      toast.error("Candidato sem código de contrato Omie.");
+      return;
+    }
+    setEscolhendo(codigoContrato);
+    try {
+      const { data: resp, error } = await supabase.functions.invoke("recon-candidato-confirmar", {
+        body: {
+          tenant_id: tid,
+          confirmacoes: [
+            { ds_contract_id: dsContractId, codigo_contrato_omie: codigoContrato },
+          ],
+        },
+      });
+      if (error) {
+        toast.error(`Falha ao escolher candidato: ${error.message || "erro desconhecido"}`);
+        return;
+      }
+      const okResp = (resp as any) ?? {};
+      if (okResp.ok === true) {
+        toast.success("Candidato escolhido. De/para gravado.");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-resumo"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-lista"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-escolher-resolvidos"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-visao-geral"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-fornecedores"] }),
+        ]);
+        return;
+      }
+      const errMsg = okResp.error || "Não foi possível escolher este candidato.";
+      if (errMsg === "Escolha inválida") {
+        const inv = okResp.invalidos?.[0];
+        const motivo = typeof inv === "string" ? inv : inv?.motivo || "espelho desatualizado";
+        toast.warning(`Escolha inválida: ${motivo}. Tente "Reconferir agora".`);
+      } else if (errMsg === "Falha ao gravar de/para") {
+        toast.error(`Falha ao gravar de/para: ${okResp.detalhe || "erro no DoctorOMIE"}`);
+      } else {
+        toast.error(errMsg);
+      }
+    } catch (e: any) {
+      toast.error(`Erro ao escolher candidato: ${e?.message || "erro desconhecido"}`);
+    } finally {
+      setEscolhendo(null);
+    }
+  };
+
   if (isLoading) return <Skeleton className="h-16 w-full" />;
   if (!data?.length) return <p className="text-sm text-muted-foreground">Nenhum candidato encontrado no Omie.</p>;
 
+  const algumEscolhendo = escolhendo !== null;
+
   return (
     <div className="space-y-2">
-      {data.map((c: any, i: number) => (
-        <div key={i} className="flex items-center justify-between rounded border p-2 text-sm">
-          <div className="min-w-0 flex-1">
-            <div className="font-medium truncate">{c.razao_social_omie || "—"}</div>
-            <div className="text-xs text-muted-foreground flex flex-wrap gap-2 mt-1">
-              <span>Cód: {c.codigo_cliente_omie || "—"}</span>
-              <span>Valor: {formatBRL(c.valor_omie)}</span>
-              {c.situacao_contrato && <Badge variant="outline" className="text-[10px]">{c.situacao_contrato}</Badge>}
-              {c.omie_inativo && <Badge variant="destructive" className="text-[10px]">Inativo</Badge>}
-              {c.origem_codigo && <Badge variant="secondary" className="text-[10px]">{originLabel(c.origem_codigo).label}</Badge>}
+      {data.map((c: any, i: number) => {
+        const codigo = c.codigo_contrato_omie;
+        const semContrato = codigo == null || String(codigo) === "";
+        const isThis = escolhendo != null && String(escolhendo) === String(codigo);
+        return (
+          <div key={i} className="flex items-center justify-between rounded border p-2 text-sm">
+            <div className="min-w-0 flex-1">
+              <div className="font-medium truncate">{c.razao_social_omie || "—"}</div>
+              <div className="text-xs text-muted-foreground flex flex-wrap gap-2 mt-1">
+                <span>Cód cliente: {c.codigo_cliente_omie || "—"}</span>
+                <span>Cód contrato: {codigo || "—"}</span>
+                <span>Valor: {formatBRL(c.valor_omie)}</span>
+                {c.situacao_contrato && <Badge variant="outline" className="text-[10px]">{c.situacao_contrato}</Badge>}
+                {c.omie_inativo && <Badge variant="destructive" className="text-[10px]">Inativo</Badge>}
+                {c.origem_codigo && <Badge variant="secondary" className="text-[10px]">{originLabel(c.origem_codigo).label}</Badge>}
+              </div>
             </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              disabled={semContrato || algumEscolhendo}
+              onClick={() => escolher(c)}
+            >
+              {isThis ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+              Escolher este
+            </Button>
           </div>
-          <DisabledActionButton>Escolher este</DisabledActionButton>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
