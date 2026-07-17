@@ -231,6 +231,7 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
 
       toast({ title: "Anexo enviado", description: file.name });
       setPreviewUrl(null);
+      setLocallyRemoved(false);
       qc.invalidateQueries({ queryKey: invalidateKey });
     } catch (err: any) {
       if (uploadedPath) {
