@@ -412,7 +412,26 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
       }
 
     } catch (e: any) {
-      toast.error(e?.message || "Falha ao vincular");
+      const status = e?.context?.status ?? e?.status;
+      if (status === 409) {
+        toast.error("Este contrato já foi vinculado.");
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-resumo"] }),
+          queryClient.invalidateQueries({ queryKey: ["omie-conf-lista"] }),
+        ]);
+      } else if (status === 401) {
+        toast.error("Sessão expirada. Faça login novamente.");
+      } else if (status === 502) {
+        toast.error("Falha ao gravar o de/para. Tente de novo.");
+      } else {
+        // 422 e demais: mostra a mensagem como veio
+        let msg = e?.message || "Falha ao vincular";
+        try {
+          const body = await e?.context?.json?.();
+          if (body?.error) msg = body.error;
+        } catch {}
+        toast.error(msg);
+      }
     } finally {
       setVincLoading(false);
     }
