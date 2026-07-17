@@ -767,7 +767,7 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
 
       {bucket === "escolher_candidato" && row.cnpj_norm && open && (
         <div className="border-t px-3 py-2">
-          <CandidatosLinha cnpj={row.cnpj_norm} />
+          <CandidatosLinha cnpj={row.cnpj_norm} tid={tid} dsContractId={row.ds_contract_id} />
         </div>
       )}
 
