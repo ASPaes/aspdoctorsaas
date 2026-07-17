@@ -1188,6 +1188,10 @@ export default function OmieConferenciaTab() {
   const [page, setPage] = useState(0);
   const [nomeFiltro, setNomeFiltro] = useState<"todos" | "diferentes">("todos");
   const [fornecedorSel, setFornecedorSel] = useState<number[]>([]);
+  // "Ver resolvidos" só aparece no balde 'escolher_candidato' — o acao_sugerida
+  // continua marcando linhas já resolvidas (o CNPJ segue ambíguo para sempre),
+  // mas o card só conta as 'novo'. Toggle para consulta.
+  const [verResolvidosCandidato, setVerResolvidosCandidato] = useState(false);
 
   // Array de IDs (usar -1 para "Sem fornecedor"). Vazio = todos.
   const fornecedorParam = useMemo<number[] | null>(
