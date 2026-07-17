@@ -70,8 +70,7 @@ export default function GroupParticipantsSheet({
   >(null);
   const [addOpen, setAddOpen] = useState(false);
   const [addPhone, setAddPhone] = useState("");
-  const [addChecking, setAddChecking] = useState(false);
-  const [addResolved, setAddResolved] = useState<{ phone: string; exists: boolean } | null>(null);
+
 
   const mutation = useMutation({
     mutationFn: async (payload: {
