@@ -485,11 +485,21 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
       case "vigencia_vencida_no_omie":
         return null;
       case "escolher_candidato":
-        return (
-          <DisabledActionButton>
-            Escolher cadastro Omie ({row.qtd_candidatos_omie ?? 0})
-          </DisabledActionButton>
-        );
+        // Linhas já resolvidas: mostrar badge com o candidato escolhido em vez de botão.
+        if (row.status_usuario && row.status_usuario !== "novo") {
+          return (
+            <Badge
+              variant="outline"
+              className="text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-900 gap-1"
+            >
+              <CheckCircle2 className="h-3 w-3" />
+              Escolhido: cód. {row.candidato_escolhido ?? "—"}
+            </Badge>
+          );
+        }
+        // O botão em nível de linha ("Escolher cadastro Omie (N)") era um stub —
+        // o caminho real é o "Escolher este" dentro de "Ver candidatos" abaixo.
+        return null;
       case "contrato_suspenso":
       case "contrato_cancelado":
         return <DisabledActionButton>Reativar/Revisar no Omie</DisabledActionButton>;
