@@ -27,8 +27,13 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Package, Plus, Pencil, Trash2, ChevronDown, ChevronRight,
-  ExternalLink, Loader2, Puzzle, Percent, AlertTriangle,
+  ExternalLink, Loader2, Puzzle, Percent, AlertTriangle, Paperclip,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NumericInput } from "@/components/ui/numeric-input";
