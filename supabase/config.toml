@@ -102,3 +102,10 @@ verify_jwt = true
 [functions.delete-conversation-note]
 verify_jwt = true
 
+[functions.get-group-participants]
+verify_jwt = false
+
+[functions.manage-group-participants]
+verify_jwt = false
+
+
