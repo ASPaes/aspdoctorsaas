@@ -49,24 +49,31 @@ function fmtBytes(n: number | null | undefined): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function normalizeNomeOmie(originalName: string): string {
-  const lastDot = originalName.lastIndexOf(".");
-  const rawExt = lastDot > 0 ? originalName.slice(lastDot + 1) : "";
-  const rawBase = lastDot > 0 ? originalName.slice(0, lastDot) : originalName;
+const NOME_OMIE_REGEX = /^[A-Za-z0-9_-]{1,80}\.[A-Za-z0-9]{1,10}$/;
 
-  const clean = (s: string) =>
-    s
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9_-]+/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_+|_+$/g, "");
+function normalizeNomeOmie(nomeOriginal: string): string | null {
+  const i = nomeOriginal.lastIndexOf(".");
+  if (i <= 0) return null;
 
-  let base = clean(rawBase);
-  const ext = clean(rawExt).toLowerCase();
-  if (base.length > 80) base = base.slice(0, 80);
-  if (!base) base = "arquivo";
-  return ext ? `${base}.${ext}` : base;
+  const ext = nomeOriginal
+    .slice(i + 1)
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toLowerCase()
+    .slice(0, 10);
+
+  const base = nomeOriginal
+    .slice(0, i)
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^[_-]+|[_-]+$/g, "")
+    .slice(0, 80);
+
+  if (!base || !ext) return null;
+
+  const nome = `${base}.${ext}`;
+  return NOME_OMIE_REGEX.test(nome) ? nome : null;
 }
 
 async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
@@ -176,14 +183,23 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo, inva
       return;
     }
 
+    const nomeOmie = normalizeNomeOmie(file.name);
+    if (!nomeOmie) {
+      toast({
+        title: "Nome de arquivo não suportado",
+        description: "Renomeie o arquivo e tente de novo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setUploading(true);
     let uploadedPath: string | null = null;
     try {
       const buffer = await file.arrayBuffer();
       const hash = await sha256Hex(buffer);
-      const nomeOmie = normalizeNomeOmie(file.name);
       const lastDot = nomeOmie.lastIndexOf(".");
-      const ext = lastDot > 0 ? nomeOmie.slice(lastDot + 1) : "bin";
+      const ext = nomeOmie.slice(lastDot + 1);
       const uuid = crypto.randomUUID();
       const path = `${tenantId}/${contratoId}/${uuid}.${ext}`;
 
