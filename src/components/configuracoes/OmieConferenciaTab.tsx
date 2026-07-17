@@ -28,7 +28,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import OmieFilaSincronizacaoPanel from "./OmieFilaSincronizacaoPanel";
 import { ConferenciaSaudeBanner } from "./ConferenciaSaudeBanner";
 import {
-  AlertCircle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, HelpCircle, History, RefreshCw, Search,
+  AlertCircle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, HelpCircle, History, Link2, Loader2, RefreshCw, Search,
 } from "lucide-react";
 
 function MetricHelpPopover({ children }: { children: React.ReactNode }) {
