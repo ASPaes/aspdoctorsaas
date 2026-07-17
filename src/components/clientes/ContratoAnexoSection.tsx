@@ -114,12 +114,17 @@ function omieBadge(status: string | null, erro: string | null) {
   );
 }
 
-export default function ContratoAnexoSection({ contratoId, tenantId, anexo, invalidateKey }: Props) {
+export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anexoProp, invalidateKey }: Props) {
   const qc = useQueryClient();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [locallyRemoved, setLocallyRemoved] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  const anexo = locallyRemoved ? null : anexoProp;
 
   const disabled = !contratoId;
   const ios = isIOS();
