@@ -39,6 +39,7 @@ import {
 const ALARM_BUCKETS = new Set<string>([
   "vigencia_vencida_no_omie",
   "contrato_suspenso",
+  "fora_do_escopo",
   "contrato_cancelado",
   "resolver",
 ]);
