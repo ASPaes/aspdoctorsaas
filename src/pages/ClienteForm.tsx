@@ -712,15 +712,6 @@ export default function ClienteForm() {
             </div>
           )}
 
-          {isEditing && id && (hasNonImplicitContracts || forceShowContracts) && (
-            <ClienteContratosSection clienteId={id} />
-          )}
-
-          {isEditing && id && <IntegracaoOmieCard clienteId={id} />}
-
-          {isEditing && id && <OmieIntegrationLogCard clienteId={id} />}
-
-
           {isEditing && id && !hasNonImplicitContracts && !forceShowContracts && (
             <div className="flex justify-center">
               <Button
@@ -735,6 +726,14 @@ export default function ClienteForm() {
               </Button>
             </div>
           )}
+
+          {isEditing && id && (hasNonImplicitContracts || forceShowContracts) && (
+            <ClienteContratosSection clienteId={id} />
+          )}
+
+          {isEditing && id && <IntegracaoOmieCard clienteId={id} />}
+
+          {isEditing && id && <OmieIntegrationLogCard clienteId={id} />}
 
           {isEditing && id && (
             <FinanceiroCard
