@@ -10,12 +10,23 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert, Pin, ExternalLink, User, TimerOff } from "lucide-react";
+import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert, Pin, ExternalLink, User, TimerOff, PowerOff } from "lucide-react";
 import { format } from "date-fns";
 import { AttendanceMessagesDialog } from "./AttendanceMessagesDialog";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
+import { usePermissions } from "@/hooks/usePermissions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ContactHistoryUnifiedModal } from "./ContactHistoryUnifiedModal";
 import { ContactTicketsSection } from "./ContactTicketsSection";
 import { formatBRPhone } from "@/lib/phoneBR";
@@ -45,9 +56,10 @@ interface Props {
   conversation: ConversationWithContact;
   onClose: () => void;
   onNavigateToConversation?: (conversationId: string) => void;
+  onConversationClosed?: () => void;
 }
 
-export function DetailsSidebar({ conversation, onClose, onNavigateToConversation }: Props) {
+export function DetailsSidebar({ conversation, onClose, onNavigateToConversation, onConversationClosed }: Props) {
   const contact = conversation.contact;
   const isGroup = (conversation as any)?.is_group === true;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
@@ -591,6 +603,17 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               tenantId={(conversation as any).tenant_id}
               monitorUserId={(conversation as any).monitor_user_id ?? null}
               isAdminOrHead={!!isAdminOrHead}
+            />
+          )}
+
+          {/* ─── 12b. Grupo ativo no DoctorSaaS ─── */}
+          {isGroup && (
+            <GroupEnabledSection
+              tenantId={(conversation as any).tenant_id ?? null}
+              instanceId={(conversation as any).instance_id ?? null}
+              groupJid={(conversation as any).group_jid ?? null}
+              groupEnabled={(conversation as any).group_enabled !== false}
+              onDisabled={onConversationClosed}
             />
           )}
 
