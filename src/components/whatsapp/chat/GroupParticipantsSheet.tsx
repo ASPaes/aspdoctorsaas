@@ -331,43 +331,34 @@ export default function GroupParticipantsSheet({
       </Dialog>
 
       {/* Add */}
-      <Dialog open={addOpen} onOpenChange={(o) => { if (!o) { setAddOpen(false); setAddPhone(""); setAddResolved(null); } }}>
+      <Dialog open={addOpen} onOpenChange={(o) => { if (!o) { setAddOpen(false); setAddPhone(""); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Adicionar ao grupo</DialogTitle>
             <DialogDescription>
-              Informe o telefone com DDD. Se as configurações de privacidade da pessoa bloquearem
-              adição em grupos, ela receberá um convite em vez de entrar direto.
+              Informe o telefone com DDD. O número será validado antes de adicionar. Se as
+              configurações de privacidade da pessoa bloquearem adição em grupos, ela receberá
+              um convite em vez de entrar direto.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <Input
               placeholder="(11) 99999-9999"
               value={addPhone}
-              onChange={(e) => { setAddPhone(e.target.value); setAddResolved(null); }}
-              disabled={addChecking || mutation.isPending}
+              onChange={(e) => setAddPhone(e.target.value)}
+              disabled={mutation.isPending}
             />
-            {addResolved?.exists && (
-              <p className="text-xs text-muted-foreground">
-                Número validado: <b>{formatBRPhone(addResolved.phone)}</b>. Confirme para adicionar.
-              </p>
-            )}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAddOpen(false)} disabled={mutation.isPending}>
               Cancelar
             </Button>
-            {!addResolved?.exists ? (
-              <Button onClick={checkNumber} disabled={addChecking || !addPhone.trim()}>
-                {addChecking && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Validar número
-              </Button>
-            ) : (
-              <Button onClick={runAdd} disabled={mutation.isPending}>
-                {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Adicionar
-              </Button>
-            )}
+            <Button onClick={runAdd} disabled={mutation.isPending || !addPhone.trim()}>
+              {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Adicionar
+            </Button>
+          </DialogFooter>
+
           </DialogFooter>
         </DialogContent>
       </Dialog>
