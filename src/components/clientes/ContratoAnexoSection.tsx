@@ -183,14 +183,23 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo, inva
       return;
     }
 
+    const nomeOmie = normalizeNomeOmie(file.name);
+    if (!nomeOmie) {
+      toast({
+        title: "Nome de arquivo não suportado",
+        description: "Renomeie o arquivo e tente de novo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setUploading(true);
     let uploadedPath: string | null = null;
     try {
       const buffer = await file.arrayBuffer();
       const hash = await sha256Hex(buffer);
-      const nomeOmie = normalizeNomeOmie(file.name);
       const lastDot = nomeOmie.lastIndexOf(".");
-      const ext = lastDot > 0 ? nomeOmie.slice(lastDot + 1) : "bin";
+      const ext = nomeOmie.slice(lastDot + 1);
       const uuid = crypto.randomUUID();
       const path = `${tenantId}/${contratoId}/${uuid}.${ext}`;
 
