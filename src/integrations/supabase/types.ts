@@ -11189,6 +11189,7 @@ export type Database = {
         Returns: string
       }
       obter_segredo_cron_espelho: { Args: never; Returns: string }
+      omie_fila_reprocessar: { Args: { p_fila_id: string }; Returns: Json }
       omie_fila_status: { Args: { p_tenant_id: string }; Returns: Json }
       onb_slugify: { Args: { p_txt: string }; Returns: string }
       pause_onboarding: {
