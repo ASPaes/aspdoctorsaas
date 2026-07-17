@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
 
     const { data: template, error: tplErr } = await supabase
       .from('whatsapp_meta_templates')
-      .select('id, tenant_id, instance_id, name, language, status, body_text, body_variables_count')
+      .select('id, tenant_id, instance_id, name, language, status, body_text, components')
       .eq('id', template_id)
       .single();
 
