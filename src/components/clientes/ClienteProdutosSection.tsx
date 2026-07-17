@@ -38,6 +38,7 @@ import { Switch } from "@/components/ui/switch";
 import SugestaoMRRDialog from "./SugestaoMRRDialog";
 import ReajusteModulosDialog from "./ReajusteModulosDialog";
 import EnviarContratoOmieButton from "./EnviarContratoOmieButton";
+import ContratoAnexoSection, { type ContratoAnexo } from "./ContratoAnexoSection";
 
 interface Props {
   clienteId: string;
@@ -141,6 +142,62 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     });
     return map;
   }, [modulosQuery.data]);
+
+  // ---- Anexos de contrato ----
+  const contratoItensQuery = useQuery<{ cliente_produto_id: string; contrato_id: string }[]>({
+    queryKey: ["contrato_itens_cliente", tid, clienteId, produtoIds.join(",")],
+    enabled: produtoIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("contrato_itens" as any) as any)
+        .select("cliente_produto_id, contrato_id")
+        .in("cliente_produto_id", produtoIds);
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+
+  const contratoIdByCliProd = useMemo(() => {
+    const map: Record<string, string> = {};
+    (contratoItensQuery.data ?? []).forEach(r => {
+      if (r.contrato_id && !map[r.cliente_produto_id]) {
+        map[r.cliente_produto_id] = r.contrato_id;
+      }
+    });
+    return map;
+  }, [contratoItensQuery.data]);
+
+  const contratoIds = useMemo(
+    () => Array.from(new Set(Object.values(contratoIdByCliProd))),
+    [contratoIdByCliProd],
+  );
+
+  const anexosQueryKey = useMemo(
+    () => ["contrato_anexos_cliente", tid, clienteId, contratoIds.join(",")] as const,
+    [tid, clienteId, contratoIds],
+  );
+
+  const anexosQuery = useQuery<ContratoAnexo[]>({
+    queryKey: anexosQueryKey,
+    enabled: contratoIds.length > 0,
+    refetchOnWindowFocus: true,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("contrato_anexos" as any) as any)
+        .select("id, contrato_id, tenant_id, storage_path, nome_original, nome_omie, mime_type, tamanho_bytes, omie_status, omie_erro")
+        .in("contrato_id", contratoIds)
+        .eq("ativo", true);
+      if (error) throw error;
+      return (data ?? []) as ContratoAnexo[];
+    },
+  });
+
+  const anexoByContrato = useMemo(() => {
+    const map: Record<string, ContratoAnexo> = {};
+    (anexosQuery.data ?? []).forEach(a => {
+      map[a.contrato_id] = a;
+    });
+    return map;
+  }, [anexosQuery.data]);
+
 
   const clienteTenantQuery = useQuery<{ tenant_id: string | null }>({
     queryKey: ["cliente_tenant_lookup", clienteId],
@@ -442,7 +499,15 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                           <Percent className="h-4 w-4 mr-1" /> Reajuste %
                         </Button>
                       </div>
+
+                      <ContratoAnexoSection
+                        contratoId={contratoIdByCliProd[p.id] ?? null}
+                        tenantId={lookupTenantId}
+                        anexo={anexoByContrato[contratoIdByCliProd[p.id] ?? ""] ?? null}
+                        invalidateKey={anexosQueryKey}
+                      />
                     </div>
+
                   </CollapsibleContent>
                 </div>
               </Collapsible>

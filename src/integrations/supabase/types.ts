@@ -2050,6 +2050,89 @@ export type Database = {
         }
         Relationships: []
       }
+      contrato_anexos: {
+        Row: {
+          ativo: boolean
+          contrato_id: string
+          created_at: string
+          criado_por: string | null
+          hash_sha256: string
+          id: string
+          mime_type: string
+          nome_omie: string
+          nome_original: string
+          omie_cod_int_anexo: string | null
+          omie_enviado_em: string | null
+          omie_erro: string | null
+          omie_id_anexo: number | null
+          omie_ncodctr: number | null
+          omie_proxima_tentativa_em: string
+          omie_status: string
+          omie_tentativas: number
+          storage_path: string
+          substituido_em: string | null
+          tamanho_bytes: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          contrato_id: string
+          created_at?: string
+          criado_por?: string | null
+          hash_sha256: string
+          id?: string
+          mime_type: string
+          nome_omie: string
+          nome_original: string
+          omie_cod_int_anexo?: string | null
+          omie_enviado_em?: string | null
+          omie_erro?: string | null
+          omie_id_anexo?: number | null
+          omie_ncodctr?: number | null
+          omie_proxima_tentativa_em?: string
+          omie_status?: string
+          omie_tentativas?: number
+          storage_path: string
+          substituido_em?: string | null
+          tamanho_bytes: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          contrato_id?: string
+          created_at?: string
+          criado_por?: string | null
+          hash_sha256?: string
+          id?: string
+          mime_type?: string
+          nome_omie?: string
+          nome_original?: string
+          omie_cod_int_anexo?: string | null
+          omie_enviado_em?: string | null
+          omie_erro?: string | null
+          omie_id_anexo?: number | null
+          omie_ncodctr?: number | null
+          omie_proxima_tentativa_em?: string
+          omie_status?: string
+          omie_tentativas?: number
+          storage_path?: string
+          substituido_em?: string | null
+          tamanho_bytes?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contrato_anexos_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contrato_eventos: {
         Row: {
           acao: string
@@ -9760,6 +9843,18 @@ export type Database = {
         Returns: Json
       }
       conferencia_saude: { Args: { p_tenant_id: string }; Returns: Json }
+      contrato_anexo_substituir: {
+        Args: {
+          p_contrato_id: string
+          p_hash_sha256: string
+          p_mime_type: string
+          p_nome_omie: string
+          p_nome_original: string
+          p_storage_path: string
+          p_tamanho_bytes: number
+        }
+        Returns: string
+      }
       create_access_invite: {
         Args: {
           p_access_status?: string
@@ -9912,6 +10007,7 @@ export type Database = {
         }
         Returns: string
       }
+      cron_anexo_omie: { Args: never; Returns: undefined }
       cron_recon_espelho: { Args: never; Returns: undefined }
       cron_verificar_anterior: {
         Args: { p_jobname: string }
@@ -11326,6 +11422,10 @@ export type Database = {
         Returns: Json
       }
       resolve_vendor_return: { Args: { p_journey_id: string }; Returns: Json }
+      resolver_ncodctr: {
+        Args: { p_contrato_id: string; p_tenant_id: string }
+        Returns: number
+      }
       resume_onboarding: { Args: { p_journey_id: string }; Returns: Json }
       return_to_vendor: {
         Args: {
