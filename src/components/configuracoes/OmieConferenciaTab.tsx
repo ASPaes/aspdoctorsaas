@@ -27,9 +27,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import OmieFilaSincronizacaoPanel from "./OmieFilaSincronizacaoPanel";
 import { ConferenciaSaudeBanner } from "./ConferenciaSaudeBanner";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 import {
-  AlertCircle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, HelpCircle, History, Link2, Loader2, RefreshCw, Search,
+  AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, HelpCircle, History, Link2, Loader2, RefreshCw, Search,
 } from "lucide-react";
+
+// Baldes que representam ALARME (derivados do espelho do Omie).
+// Alarme não é fila: some sozinho quando o dado real muda no Omie —
+// NÃO filtrar por status_usuario, senão o card esconde o problema exatamente
+// quando ele existe (ex.: vigência vencida numa linha já vinculada).
+const ALARM_BUCKETS = new Set<string>([
+  "vigencia_vencida_no_omie",
+  "contrato_suspenso",
+  "contrato_cancelado",
+  "resolver",
+]);
 
 function MetricHelpPopover({ children }: { children: React.ReactNode }) {
   return (
@@ -93,7 +105,7 @@ const BUCKET_HELP: Record<Bucket, string> = {
   vigencia_vencida_no_omie:
     "Contrato está ativo no Omie mas com a vigência final no passado. O Omie não fatura contrato fora da vigência — essa mensalidade não está sendo cobrada. Renove a vigência final direto no Omie. O alerta some sozinho em até 15 minutos depois disso.",
   contrato_suspenso:
-    "O cliente tem um contrato no Omie, mas está SUSPENSO. Não deve ser criado um novo contrato (duplicaria) — a ação é reativar/revisar o existente.",
+    "Contrato suspenso no Omie. Normal em Cobrança Fornecedor: o cliente paga o fornecedor, não há o que faturar. Vincular apenas registra o de/para.",
   contrato_cancelado:
     "O cliente tinha um contrato no Omie, mas foi CANCELADO. Avalie reativar o cancelado ou criar um novo.",
 };
@@ -182,6 +194,8 @@ type ReconciliacaoRow = {
   fornecedor_id: number | null;
   situacao_contrato: string | null;
   tem_cancelado_omie: boolean | null;
+  status_usuario: string | null;
+  candidato_escolhido: number | string | null;
 };
 
 
@@ -471,11 +485,21 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
       case "vigencia_vencida_no_omie":
         return null;
       case "escolher_candidato":
-        return (
-          <DisabledActionButton>
-            Escolher cadastro Omie ({row.qtd_candidatos_omie ?? 0})
-          </DisabledActionButton>
-        );
+        // Linhas já resolvidas: mostrar badge com o candidato escolhido em vez de botão.
+        if (row.status_usuario && row.status_usuario !== "novo") {
+          return (
+            <Badge
+              variant="outline"
+              className="text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-900 gap-1"
+            >
+              <CheckCircle2 className="h-3 w-3" />
+              Escolhido: cód. {row.candidato_escolhido ?? "—"}
+            </Badge>
+          );
+        }
+        // O botão em nível de linha ("Escolher cadastro Omie (N)") era um stub —
+        // o caminho real é o "Escolher este" dentro de "Ver candidatos" abaixo.
+        return null;
       case "contrato_suspenso":
       case "contrato_cancelado":
         return <DisabledActionButton>Reativar/Revisar no Omie</DisabledActionButton>;
@@ -1164,6 +1188,10 @@ export default function OmieConferenciaTab() {
   const [page, setPage] = useState(0);
   const [nomeFiltro, setNomeFiltro] = useState<"todos" | "diferentes">("todos");
   const [fornecedorSel, setFornecedorSel] = useState<number[]>([]);
+  // "Ver resolvidos" só aparece no balde 'escolher_candidato' — o acao_sugerida
+  // continua marcando linhas já resolvidas (o CNPJ segue ambíguo para sempre),
+  // mas o card só conta as 'novo'. Toggle para consulta.
+  const [verResolvidosCandidato, setVerResolvidosCandidato] = useState(false);
 
   // Array de IDs (usar -1 para "Sem fornecedor"). Vazio = todos.
   const fornecedorParam = useMemo<number[] | null>(
@@ -1199,33 +1227,70 @@ export default function OmieConferenciaTab() {
     },
   });
 
-  const { data: resumo, isLoading: loadingResumo } = useQuery({
+  // Um único fetch em reconciliacao_cadastro para derivar TODAS as contagens.
+  // Distinção fila × alarme:
+  //   - Fila (vinculo_auto_ok, atribuir_modelo, escolher_candidato, criar, criar_contrato):
+  //     conta só status_usuario='novo' (é tarefa; some da lista quando o operador resolve).
+  //   - Alarme (vigencia_vencida_no_omie, contrato_suspenso, contrato_cancelado, resolver):
+  //     conta tudo, independente de status_usuario (é derivado do espelho e some
+  //     sozinho quando o Omie muda; filtrar por progresso do usuário esconde
+  //     o problema exatamente quando ele existe).
+  const { data: resumoRows, isLoading: loadingResumo } = useQuery({
     queryKey: ["omie-conf-resumo", tid, fornecedorParam],
     enabled: !!tid,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("reconciliacao_resumo" as any, {
-        p_tenant_id: tid,
-        p_fornecedor_ids: fornecedorParam,
-      });
-      if (error) throw error;
-      return (data ?? []) as ResumoLinha[];
+      const rows = await fetchAllRows<{ acao_sugerida: string | null; status_usuario: string | null; gerado_em: string | null }>(
+        () => {
+          let q = supabase
+            .from("reconciliacao_cadastro")
+            .select("acao_sugerida, status_usuario, gerado_em");
+          if (fornecedorParam != null && fornecedorParam.length > 0) {
+            const ids = fornecedorParam.filter((n) => n !== -1);
+            const incluirNull = fornecedorParam.includes(-1);
+            if (incluirNull && ids.length > 0) {
+              q = q.or(`fornecedor_id.in.(${ids.join(",")}),fornecedor_id.is.null`);
+            } else if (incluirNull) {
+              q = q.is("fornecedor_id", null);
+            } else {
+              q = q.in("fornecedor_id", ids);
+            }
+          }
+          return q;
+        }
+      );
+      return rows;
     },
   });
 
 
   const contadores = useMemo(() => {
     const map = new Map<string, number>();
-    (resumo ?? []).forEach(r => map.set(r.acao_sugerida, (map.get(r.acao_sugerida) ?? 0) + Number(r.qtd || 0)));
+    (resumoRows ?? []).forEach((r) => {
+      const acao = r.acao_sugerida;
+      if (!acao) return;
+      const isAlarm = ALARM_BUCKETS.has(acao);
+      if (isAlarm || r.status_usuario === "novo") {
+        map.set(acao, (map.get(acao) ?? 0) + 1);
+      }
+    });
     return map;
-  }, [resumo]);
+  }, [resumoRows]);
+
+  // Contagem de linhas de escolher_candidato já resolvidas (para o toggle "Ver resolvidos").
+  const escolherCandidatoResolvidos = useMemo(() => {
+    return (resumoRows ?? []).filter(
+      (r) => r.acao_sugerida === "escolher_candidato" && r.status_usuario !== "novo"
+    ).length;
+  }, [resumoRows]);
 
   const geradoEm = useMemo(() => {
-    if (!resumo?.length) return null;
-    return resumo.reduce<string | null>((acc, r) => {
+    if (!resumoRows?.length) return null;
+    return resumoRows.reduce<string | null>((acc, r) => {
+      if (!r.gerado_em) return acc;
       if (!acc) return r.gerado_em;
       return new Date(r.gerado_em) > new Date(acc) ? r.gerado_em : acc;
     }, null);
-  }, [resumo]);
+  }, [resumoRows]);
 
   const { data: nomeDivergeCount, isLoading: loadingNomeDivergeCount } = useQuery({
     queryKey: ["omie-conf-nome-diverge-count", tid, fornecedorParam],
@@ -1274,18 +1339,23 @@ export default function OmieConferenciaTab() {
   const to = from + PAGE_SIZE - 1;
 
   const { data: lista, isLoading: loadingLista } = useQuery({
-    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro, fornecedorParam],
+    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro, fornecedorParam, verResolvidosCandidato],
     enabled: !!tid && bucketAtivo !== "visao_geral",
     queryFn: async () => {
       let q = supabase
         .from("reconciliacao_cadastro")
         .select(
-          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, vigencia_final_omie, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id, situacao_contrato, tem_cancelado_omie",
+          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, vigencia_final_omie, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id, situacao_contrato, tem_cancelado_omie, status_usuario, candidato_escolhido",
           { count: "exact" }
         );
-      // vigencia_vencida_no_omie precisa aparecer mesmo com status_usuario='vinculado'
-      if (bucketAtivo !== "vigencia_vencida_no_omie") {
-        q = q.neq("status_usuario", "vinculado");
+
+      // Filtro fila × alarme: alarme NÃO filtra por status_usuario (some sozinho
+      // quando o Omie muda). Fila filtra 'novo' — igual ao card.
+      // escolher_candidato: toggle "Ver resolvidos" desligado por padrão.
+      if (bucketAtivo === "escolher_candidato") {
+        if (!verResolvidosCandidato) q = q.eq("status_usuario", "novo");
+      } else if (!ALARM_BUCKETS.has(bucketAtivo)) {
+        q = q.eq("status_usuario", "novo");
       }
 
       if (bucketAtivo !== "visao_geral") q = q.eq("acao_sugerida", bucketAtivo);
@@ -1546,6 +1616,19 @@ export default function OmieConferenciaTab() {
                   {loadingNomeDivergeCount ? <Skeleton className="h-3 w-4" /> : nomeDivergeCount ?? 0}
                 </Badge>
               </button>
+            </div>
+          )}
+          {bucketAtivo === "escolher_candidato" && escolherCandidatoResolvidos > 0 && (
+            <div className="flex items-center gap-2 mt-3">
+              <Switch
+                id="ver-resolvidos-candidato"
+                checked={verResolvidosCandidato}
+                onCheckedChange={(v) => { setVerResolvidosCandidato(v); setPage(0); }}
+              />
+              <Label htmlFor="ver-resolvidos-candidato" className="text-xs text-muted-foreground cursor-pointer">
+                Ver resolvidos ({escolherCandidatoResolvidos.toLocaleString("pt-BR")})
+                <span className="ml-1 opacity-70">— consulta apenas; CNPJ ambíguo é permanente</span>
+              </Label>
             </div>
           )}
         </CardHeader>
