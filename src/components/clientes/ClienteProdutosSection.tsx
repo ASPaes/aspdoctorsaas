@@ -203,6 +203,12 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     return map;
   }, [anexosQuery.data]);
 
+  const anexosMap = useMemo(() => {
+    const map = new Map<string, ContratoAnexo>();
+    (anexosQuery.data ?? []).forEach(a => map.set(a.contrato_id, a));
+    return map;
+  }, [anexosQuery.data]);
+
 
   const clienteTenantQuery = useQuery<{ tenant_id: string | null }>({
     queryKey: ["cliente_tenant_lookup", clienteId],
