@@ -751,6 +751,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
 // ============ Produto Dialog ============
 function ProdutoDialog({
   open, edit, onClose, clienteId, tid, produtos, fornecedores, onSaved, modulosCountForEdit,
+  editContratoId, onProductCreated,
 }: {
   open: boolean;
   edit: ClienteProduto | null;
@@ -761,13 +762,18 @@ function ProdutoDialog({
   fornecedores: { id: number; nome: string }[];
   onSaved: () => void;
   modulosCountForEdit: number;
+  editContratoId?: string | null;
+  onProductCreated?: (cliProdId: string) => void;
 }) {
   const isEdit = !!edit;
   const { profile } = useAuth();
   const isSuperAdmin = profile?.is_super_admin === true;
   const isTenantAdmin = profile?.role === "admin";
   const isHead = profile?.role === "head";
+  const canAttach = isAdminLike(profile);
   const canSwapProduto = isEdit && (isSuperAdmin || isTenantAdmin || isHead) && modulosCountForEdit === 0;
+  const [stagedFile, setStagedFile] = useState<File | null>(null);
+  const stagedFileInputRef = useRef<HTMLInputElement | null>(null);
   const [produtoId, setProdutoId] = useState<string>("");
   const [fornecedorId, setFornecedorId] = useState<string>("");
   const [codigo, setCodigo] = useState("");
