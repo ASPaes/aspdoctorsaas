@@ -2,8 +2,18 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Send, Loader2, CheckCircle2, AlertTriangle, Ban, RefreshCw } from "lucide-react";
+import { Send, Loader2, AlertTriangle } from "lucide-react";
 
 interface Props {
   tenantId: string | null | undefined;
@@ -11,25 +21,24 @@ interface Props {
   createdAt: string | null | undefined;
 }
 
-type FilaRow = {
-  contrato_id: string;
-  status: "pendente" | "processando" | "ok" | "ignorado" | "erro" | "invalido" | string;
-  ultimo_erro: string | null;
-  enfileirado_em: string | null;
-  processado_em: string | null;
-};
-
-const fmtDateTime = (v: string | null | undefined) => {
-  if (!v) return "";
-  try {
-    return new Date(v).toLocaleString("pt-BR");
-  } catch {
-    return String(v);
-  }
+type DryRunOk = {
+  ok: true;
+  operacao: "criar" | "alterar";
+  aviso?: string;
+  cliente_seria_enviado?: any;
+  contrato_seria_enviado?: any;
+  cliente_pendente_no_omie?: boolean;
+  contrato_dry_run?: any;
 };
 
 export default function EnviarContratoOmieButton({ tenantId, contratoId, createdAt }: Props) {
   const [sending, setSending] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [dryRun, setDryRun] = useState<DryRunOk | null>(null);
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [errorTitle, setErrorTitle] = useState<string>("");
+  const [errorMsg, setErrorMsg] = useState<string>("");
+  const [errorList, setErrorList] = useState<string[] | null>(null);
   const qc = useQueryClient();
 
   // Gate: só mostra se há data de corte configurada e o contrato é posterior.
@@ -46,26 +55,6 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
     },
   });
 
-  // Estado real do envio vem da fila. Polling condicional: só quando há algo em voo.
-  const { data: filaRow } = useQuery({
-    queryKey: ["omie-sync-fila", contratoId],
-    enabled: !!contratoId,
-    queryFn: async () => {
-      const { data, error } = await (supabase.from("omie_sync_fila" as any) as any)
-        .select("contrato_id, status, ultimo_erro, enfileirado_em, processado_em")
-        .eq("contrato_id", contratoId)
-        .order("enfileirado_em", { ascending: false })
-        .limit(1);
-      if (error) throw error;
-      return ((data?.[0] as FilaRow) ?? null);
-    },
-    refetchInterval: (query) => {
-      const row = query.state.data as FilaRow | null | undefined;
-      if (!row) return false;
-      return row.status === "pendente" || row.status === "processando" ? 3000 : false;
-    },
-  });
-
   if (cutoffLoading) return null;
   if (!dataCorte) return null;
   if (!createdAt) return null;
@@ -73,103 +62,157 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
   const corte = dataCorte.slice(0, 10);
   if (created < corte) return null;
 
-  const handleEnviar = async () => {
+  const showError = (title: string, msg: string, list?: string[]) => {
+    setErrorTitle(title);
+    setErrorMsg(msg);
+    setErrorList(list ?? null);
+    setErrorOpen(true);
+  };
+
+  const invokeCall = async (modo: "dry_run" | "criar") => {
+    return await supabase.functions.invoke("omie-integration-call", {
+      body: { acao: "criar_cliente_contrato", contrato_id: contratoId, modo },
+    });
+  };
+
+  const handlePreview = async () => {
     if (!contratoId) return;
     setSending(true);
     try {
-      const { error } = await (supabase.rpc as any)("enfileirar_sync_omie", {
-        p_contrato_id: contratoId,
-        p_origem: "manual",
-      });
-      if (error) throw error;
+      const { data, error } = await invokeCall("dry_run");
+      // FunctionsHttpError não lança quando ok:false com HTTP 200; para 4xx/5xx com body JSON,
+      // supabase-js retorna error + o body em (error as any).context.
+      const body: any = data ?? (error as any)?.context ?? null;
 
-      // fire-and-forget: cron */2 é a rede de retry
-      void supabase.functions.invoke("omie-sync-processar");
+      if (body?.ok === true) {
+        setDryRun(body as DryRunOk);
+        return;
+      }
 
-      qc.invalidateQueries({ queryKey: ["omie-sync-fila"] });
-      toast.success("Envio enfileirado. Acompanhe o status aqui.");
+      if (body?.bloqueado === "validacao" && Array.isArray(body?.erros)) {
+        showError(
+          "Não é possível enviar este contrato",
+          "Corrija os pontos abaixo antes de reenviar:",
+          body.erros.map((e: any) => (typeof e === "string" ? e : e?.mensagem ?? JSON.stringify(e))),
+        );
+        return;
+      }
+
+      const msg = body?.error || body?.detalhe || error?.message || "Resposta inesperada do servidor.";
+      showError("Não é possível enviar este contrato", String(msg));
     } catch (e: any) {
-      toast.error(e?.message ?? "Falha ao enfileirar o envio.");
+      showError("Falha ao preparar o envio", e?.message ?? "Erro desconhecido.");
     } finally {
       setSending(false);
     }
   };
 
-  const status = filaRow?.status;
-  const inFlight = status === "pendente" || status === "processando";
+  const handleConfirm = async () => {
+    setConfirming(true);
+    try {
+      const { data, error } = await invokeCall("criar");
+      const body: any = data ?? (error as any)?.context ?? null;
 
-  if (inFlight) {
-    return (
-      <Button type="button" variant="outline" size="sm" disabled>
-        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-        Enviando…
-      </Button>
-    );
-  }
+      if (body?.ok === true) {
+        setDryRun(null);
+        const aviso = body?.aviso;
+        if (aviso) {
+          toast.warning(String(aviso));
+        } else {
+          const opTxt = body?.operacao === "alterar" ? "atualizado" : "criado";
+          toast.success(`Contrato ${opTxt} no Omie com sucesso.`);
+        }
+        qc.invalidateQueries({ queryKey: ["contratos"] });
+        qc.invalidateQueries({ queryKey: ["contrato", contratoId] });
+        qc.invalidateQueries({ queryKey: ["omie-sync-fila"] });
+        return;
+      }
 
-  if (status === "ok") {
-    return (
-      <div className="inline-flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
-        <CheckCircle2 className="h-4 w-4" />
-        <span>Contrato sincronizado</span>
-        {filaRow?.processado_em && (
-          <span className="text-xs text-muted-foreground">em {fmtDateTime(filaRow.processado_em)}</span>
-        )}
-      </div>
-    );
-  }
+      // Erros específicos do passo criar
+      const etapa = body?.etapa;
+      const msg = body?.error || body?.aviso || body?.detalhe || error?.message || "Falha ao enviar ao Omie.";
+      const title =
+        etapa === "cliente"
+          ? "Falha ao enviar o cliente ao Omie"
+          : etapa === "contrato"
+          ? "Falha ao enviar o contrato ao Omie"
+          : "Falha ao enviar ao Omie";
+      setDryRun(null);
+      showError(title, String(msg));
+    } catch (e: any) {
+      setDryRun(null);
+      showError("Falha ao enviar ao Omie", e?.message ?? "Erro desconhecido.");
+    } finally {
+      setConfirming(false);
+    }
+  };
 
-  if (status === "ignorado") {
-    return (
-      <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-        <Ban className="h-4 w-4" />
-        <span>Sem vínculo com o Omie — resolver na Conferência</span>
-      </div>
-    );
-  }
-
-  if (status === "erro") {
-    return (
-      <div className="flex flex-col gap-1">
-        <div className="inline-flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
-          <RefreshCw className="h-4 w-4" />
-          <span>Tentando novamente automaticamente</span>
-        </div>
-        {filaRow?.ultimo_erro && (
-          <div className="text-xs text-muted-foreground max-w-md break-words">{filaRow.ultimo_erro}</div>
-        )}
-        <div>
-          <Button type="button" variant="outline" size="sm" onClick={handleEnviar} disabled={sending}>
-            {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-            Tentar agora
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (status === "invalido") {
-    return (
-      <div className="flex flex-col gap-1">
-        <div className="inline-flex items-center gap-2 text-sm text-destructive font-medium">
-          <AlertTriangle className="h-4 w-4" />
-          <span>{filaRow?.ultimo_erro ?? "Cadastro inválido para envio ao Omie"}</span>
-        </div>
-        <div>
-          <Button type="button" variant="outline" size="sm" onClick={handleEnviar} disabled={sending}>
-            {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-            Enviar para Omie
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // Sem linha na fila
   return (
-    <Button type="button" variant="outline" size="sm" onClick={handleEnviar} disabled={sending}>
-      {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-      Enviar para Omie
-    </Button>
+    <>
+      <Button type="button" variant="outline" size="sm" onClick={handlePreview} disabled={sending}>
+        {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+        Enviar para Omie
+      </Button>
+
+      <AlertDialog
+        open={!!dryRun}
+        onOpenChange={(v) => {
+          if (!confirming && !v) setDryRun(null);
+        }}
+      >
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {dryRun?.operacao === "alterar"
+                ? "Confirmar atualização no Omie"
+                : "Confirmar envio ao Omie"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="whitespace-pre-wrap">
+              {dryRun?.aviso ??
+                (dryRun?.operacao === "alterar"
+                  ? "Este contrato já existe no Omie e será atualizado."
+                  : "O cliente e o contrato serão enviados ao Omie.")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={confirming}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleConfirm();
+              }}
+              disabled={confirming}
+            >
+              {confirming && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {dryRun?.operacao === "alterar" ? "Confirmar atualização" : "Confirmar envio"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={errorOpen} onOpenChange={setErrorOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              {errorTitle}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="whitespace-pre-wrap">
+              {errorMsg}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {errorList && errorList.length > 0 && (
+            <ul className="list-disc pl-6 text-sm space-y-1 max-h-64 overflow-auto">
+              {errorList.map((e, i) => (
+                <li key={i} className="break-words">{e}</li>
+              ))}
+            </ul>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogAction>Entendi</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
