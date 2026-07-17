@@ -28,7 +28,6 @@ interface ParsedTemplate {
 function parseTemplate(t: any): ParsedTemplate {
   const components = t.components || [];
   let body_text: string | null = null;
-  let body_variables_count = 0;
   let header_type: string | null = null;
   let header_content: string | null = null;
   let footer_text: string | null = null;
@@ -37,8 +36,6 @@ function parseTemplate(t: any): ParsedTemplate {
   for (const comp of components) {
     if (comp.type === 'BODY') {
       body_text = comp.text || null;
-      const matches = (comp.text || '').match(/\{\{\d+\}\}/g);
-      body_variables_count = matches ? matches.length : 0;
     } else if (comp.type === 'HEADER') {
       header_type = comp.format || 'TEXT';
       header_content = comp.text || null;
@@ -48,6 +45,9 @@ function parseTemplate(t: any): ParsedTemplate {
       buttons = comp.buttons || null;
     }
   }
+
+  const body_variables_count = parseTemplateParams(components).names.length;
+
 
   return {
     meta_template_id: t.id || null,
