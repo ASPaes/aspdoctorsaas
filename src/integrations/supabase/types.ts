@@ -3076,16 +3076,19 @@ export type Database = {
         Row: {
           id: number
           nome: string
+          sincroniza_omie: boolean
           tenant_id: string | null
         }
         Insert: {
           id?: number
           nome: string
+          sincroniza_omie?: boolean
           tenant_id?: string | null
         }
         Update: {
           id?: number
           nome?: string
+          sincroniza_omie?: boolean
           tenant_id?: string | null
         }
         Relationships: []
@@ -11552,6 +11555,7 @@ export type Database = {
           qtd_contratos_ativos_cliente: number
           qtd_itens: number
           razao_social: string
+          sincroniza_omie: boolean
           tem_datas: boolean
           tem_modelo: boolean
           valor_mrr: number
