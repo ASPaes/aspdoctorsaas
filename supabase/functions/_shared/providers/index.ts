@@ -22,6 +22,7 @@ export interface InstanceInfo {
   provider_type: ProviderType;
   instance_id_external?: string | null;
   meta_phone_number_id?: string | null;
+  phone_number?: string | null;
 }
 
 export interface ConnectionStatus {
