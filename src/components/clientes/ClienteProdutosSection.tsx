@@ -38,6 +38,7 @@ import { Switch } from "@/components/ui/switch";
 import SugestaoMRRDialog from "./SugestaoMRRDialog";
 import ReajusteModulosDialog from "./ReajusteModulosDialog";
 import EnviarContratoOmieButton from "./EnviarContratoOmieButton";
+import ContratoAnexoSection, { type ContratoAnexo } from "./ContratoAnexoSection";
 
 interface Props {
   clienteId: string;
