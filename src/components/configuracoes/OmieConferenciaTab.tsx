@@ -89,6 +89,7 @@ const BUCKETS: { key: Bucket; label: string }[] = [
   { key: "vigencia_vencida_no_omie", label: "Vigência vencida no Omie" },
   { key: "contrato_suspenso", label: "Contrato suspenso no Omie" },
   { key: "contrato_cancelado", label: "Contrato cancelado no Omie" },
+  { key: "fora_do_escopo", label: "Fora do escopo (não integra com Omie)" },
 ];
 
 const BUCKET_HELP: Record<Bucket, string> = {
