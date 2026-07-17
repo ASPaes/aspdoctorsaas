@@ -209,7 +209,6 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     return map;
   }, [anexosQuery.data]);
 
-
   const clienteTenantQuery = useQuery<{ tenant_id: string | null }>({
     queryKey: ["cliente_tenant_lookup", clienteId],
     enabled: !!clienteId,
