@@ -414,17 +414,22 @@ export default function OmieFilaSincronizacaoPanel({
                           )}
                         </div>
                       </div>
-                      {isIgnorado && item.cnpj && onIrParaEscolherCandidato && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1 shrink-0"
-                          onClick={() => onIrParaEscolherCandidato(item.cnpj as string)}
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          Resolver na Conferência
-                        </Button>
-                      )}
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                        {isIgnorado && item.cnpj && onIrParaEscolherCandidato && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            onClick={() => onIrParaEscolherCandidato(item.cnpj as string)}
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Resolver na Conferência
+                          </Button>
+                        )}
+                        {canReprocess && (
+                          <ReprocessarButton filaId={item.fila_id as string} onDone={() => query.refetch()} />
+                        )}
+                      </div>
                     </div>
                   );
                 })}
