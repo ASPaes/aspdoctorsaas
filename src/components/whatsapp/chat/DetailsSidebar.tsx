@@ -10,12 +10,23 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert, Pin, ExternalLink, User, TimerOff } from "lucide-react";
+import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert, Pin, ExternalLink, User, TimerOff, PowerOff } from "lucide-react";
 import { format } from "date-fns";
 import { AttendanceMessagesDialog } from "./AttendanceMessagesDialog";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
+import { usePermissions } from "@/hooks/usePermissions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ContactHistoryUnifiedModal } from "./ContactHistoryUnifiedModal";
 import { ContactTicketsSection } from "./ContactTicketsSection";
 import { formatBRPhone } from "@/lib/phoneBR";
@@ -45,9 +56,10 @@ interface Props {
   conversation: ConversationWithContact;
   onClose: () => void;
   onNavigateToConversation?: (conversationId: string) => void;
+  onConversationClosed?: () => void;
 }
 
-export function DetailsSidebar({ conversation, onClose, onNavigateToConversation }: Props) {
+export function DetailsSidebar({ conversation, onClose, onNavigateToConversation, onConversationClosed }: Props) {
   const contact = conversation.contact;
   const isGroup = (conversation as any)?.is_group === true;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
@@ -594,6 +606,17 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             />
           )}
 
+          {/* ─── 12b. Grupo ativo no DoctorSaaS ─── */}
+          {isGroup && (
+            <GroupEnabledSection
+              tenantId={(conversation as any).tenant_id ?? null}
+              instanceId={(conversation as any).instance_id ?? null}
+              groupJid={(conversation as any).group_jid ?? null}
+              groupEnabled={(conversation as any).group_enabled !== false}
+              onDisabled={onConversationClosed}
+            />
+          )}
+
           {/* ─── 13. Avisos e bloqueios do contato ─── */}
           {!isGroup && isAdminOrHead && contact?.id && (
             <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
@@ -910,6 +933,99 @@ function InactivityHoldSection({ attendanceId }: { attendanceId: string }) {
         Ao encerrar o atendimento, a opção volta ao normal sozinha.
       </p>
     </div>
+  );
+}
+
+/* ─── Group enabled toggle for group conversations ─── */
+function GroupEnabledSection({
+  tenantId,
+  instanceId,
+  groupJid,
+  groupEnabled,
+  onDisabled,
+}: {
+  tenantId: string | null;
+  instanceId: string | null;
+  groupJid: string | null;
+  groupEnabled: boolean;
+  onDisabled?: () => void;
+}) {
+  const qc = useQueryClient();
+  const { can, isLoading: permsLoading } = usePermissions();
+  const [saving, setSaving] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  if (permsLoading || !can("nav.configuracoes", "view")) return null;
+  if (!tenantId || !instanceId || !groupJid) return null;
+
+  const handleDisable = async () => {
+    setSaving(true);
+    try {
+      const { error } = await (supabase.from("whatsapp_groups" as any) as any)
+        .update({ enabled: false, updated_at: new Date().toISOString() })
+        .eq("tenant_id", tenantId)
+        .eq("instance_id", instanceId)
+        .eq("group_jid", groupJid);
+      if (error) throw error;
+      toast.success("Grupo desativado. Para reativar: Configurações › Atendimento › Operação › Grupos.");
+      qc.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+      qc.invalidateQueries({ queryKey: ["whatsapp", "conversation-counts"] });
+      qc.invalidateQueries({ queryKey: ["whatsapp", "group-counts"] });
+      qc.invalidateQueries({ queryKey: ["whatsapp-groups"] });
+      setConfirmOpen(false);
+      onDisabled?.();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao desativar o grupo");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <PowerOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-xs font-medium">Grupo ativo no DoctorSaaS</span>
+          </div>
+          <Switch
+            checked={groupEnabled}
+            disabled={saving || !groupEnabled}
+            onCheckedChange={(v) => { if (!v) setConfirmOpen(true); }}
+          />
+        </div>
+        <p className="text-[10px] text-muted-foreground leading-relaxed">
+          Ao desativar, o grupo sai da lista de conversas para todos os usuários e este chat será
+          fechado. O histórico é preservado. A reativação só pode ser feita em Configurações ›
+          Atendimento › Operação › Grupos.
+        </p>
+        {!groupEnabled && (
+          <p className="text-[10px] text-amber-600 dark:text-amber-400">
+            Grupo já desativado — reative em Configurações.
+          </p>
+        )}
+      </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desativar este grupo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O grupo será removido da lista de conversas para todos os usuários. Este chat será
+              fechado. O histórico é preservado. Para voltar a aparecer, um administrador deve
+              reativar o grupo em Configurações › Atendimento › Operação › Grupos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDisable} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Desativar grupo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 

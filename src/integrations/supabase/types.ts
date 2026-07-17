@@ -8089,6 +8089,8 @@ export type Database = {
       whatsapp_groups: {
         Row: {
           created_at: string
+          disabled_at: string | null
+          disabled_by: string | null
           enabled: boolean
           group_jid: string
           group_name: string | null
@@ -8106,6 +8108,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          disabled_at?: string | null
+          disabled_by?: string | null
           enabled?: boolean
           group_jid: string
           group_name?: string | null
@@ -8123,6 +8127,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          disabled_at?: string | null
+          disabled_by?: string | null
           enabled?: boolean
           group_jid?: string
           group_name?: string | null
