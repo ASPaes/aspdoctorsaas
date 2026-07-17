@@ -499,7 +499,15 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                           <Percent className="h-4 w-4 mr-1" /> Reajuste %
                         </Button>
                       </div>
+
+                      <ContratoAnexoSection
+                        contratoId={contratoIdByCliProd[p.id] ?? null}
+                        tenantId={lookupTenantId}
+                        anexo={anexoByContrato[contratoIdByCliProd[p.id] ?? ""] ?? null}
+                        invalidateKey={anexosQueryKey}
+                      />
                     </div>
+
                   </CollapsibleContent>
                 </div>
               </Collapsible>
