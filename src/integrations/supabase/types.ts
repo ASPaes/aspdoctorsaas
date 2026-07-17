@@ -11554,6 +11554,7 @@ export type Database = {
         }[]
       }
       soft_delete_ticket: { Args: { p_ticket_id: string }; Returns: undefined }
+      solicitar_sync_omie: { Args: { p_contrato_id: string }; Returns: Json }
       start_conversation_from_ticket: {
         Args: {
           p_contact_name?: string
