@@ -359,7 +359,6 @@ export default function GroupParticipantsSheet({
             </Button>
           </DialogFooter>
 
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </TooltipProvider>
