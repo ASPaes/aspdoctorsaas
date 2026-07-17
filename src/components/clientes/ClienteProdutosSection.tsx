@@ -1133,6 +1133,35 @@ function ProdutoDialog({
 
         <Separator />
 
+        {/* Pagamento */}
+        <div className="space-y-2">
+          <h4 className="text-sm font-semibold text-muted-foreground">Pagamento</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Forma Pag. Ativação</Label>
+              <Select value={formaPagAtivacaoId || "__none__"} onValueChange={(v) => setFormaPagAtivacaoId(v === "__none__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhuma —</SelectItem>
+                  {formasPagamento.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Forma Pag. Mensalidade</Label>
+              <Select value={formaPagMensalidadeId || "__none__"} onValueChange={(v) => setFormaPagMensalidadeId(v === "__none__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhuma —</SelectItem>
+                  {formasPagamento.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
         {/* Vigência & Reajuste */}
         <div className="space-y-2">
           <h4 className="text-sm font-semibold text-muted-foreground">Vigência & Reajuste</h4>
@@ -1228,35 +1257,6 @@ function ProdutoDialog({
                 <SelectContent>
                   <SelectItem value="__none__">— Nenhuma —</SelectItem>
                   {origensVenda.map(o => <SelectItem key={o.id} value={String(o.id)}>{o.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Pagamento */}
-        <div className="space-y-2">
-          <h4 className="text-sm font-semibold text-muted-foreground">Pagamento</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label>Forma Pag. Ativação</Label>
-              <Select value={formaPagAtivacaoId || "__none__"} onValueChange={(v) => setFormaPagAtivacaoId(v === "__none__" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— Nenhuma —</SelectItem>
-                  {formasPagamento.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Forma Pag. Mensalidade</Label>
-              <Select value={formaPagMensalidadeId || "__none__"} onValueChange={(v) => setFormaPagMensalidadeId(v === "__none__" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— Nenhuma —</SelectItem>
-                  {formasPagamento.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
