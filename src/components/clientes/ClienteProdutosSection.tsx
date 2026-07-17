@@ -1076,13 +1076,49 @@ function ProdutoDialog({
           forma_pagamento_mensalidade_id: formaPagMensalidadeId ? Number(formaPagMensalidadeId) : null,
           observacoes_contratuais: observacoesContratuais || null,
         };
-        const { error } = await (supabase.rpc as any)("create_cliente_produto_with_contract", {
+        const { data: novoCliProdId, error } = await (supabase.rpc as any)("create_cliente_produto_with_contract", {
           p_cliente_id: clienteId,
           p_produto_id: Number(produtoId),
           p_dados: dados,
         });
         if (error) throw error;
+
+        // Upload do anexo staged (arquivo escolhido antes de existir o contrato).
+        // Ordem obrigatória: RPC cria produto+contrato → busca contrato_id → sobe → RPC substituir.
+        // Se falhar, o produto já existe: avisa e expande o card para retry pelo painel.
+        if (stagedFile && canAttach && novoCliProdId && resolvedTenantId) {
+          try {
+            const { data: ci, error: ciErr } = await (supabase.from("contrato_itens" as any) as any)
+              .select("contrato_id")
+              .eq("cliente_produto_id", novoCliProdId as string)
+              .limit(1)
+              .maybeSingle();
+            if (ciErr) throw ciErr;
+            const novoContratoId = (ci as any)?.contrato_id as string | undefined;
+            if (!novoContratoId) throw new Error("Contrato não encontrado para o produto recém-criado.");
+            await uploadContratoAnexo({
+              contratoId: novoContratoId,
+              tenantId: resolvedTenantId,
+              file: stagedFile,
+            });
+          } catch (upErr: any) {
+            toast({
+              title: "Produto criado. Falha ao anexar o contrato — anexe pelo painel do produto.",
+              description: upErr?.message ?? String(upErr),
+              variant: "destructive",
+            });
+            onProductCreated?.(novoCliProdId as string);
+            onSaved();
+            onClose();
+            return;
+          }
+        }
+
+        if (novoCliProdId && onProductCreated) {
+          onProductCreated(novoCliProdId as string);
+        }
       }
+
 
       // Salva campos omie_* na tabela produtos (escopado por tenant) se Omie ativo
       if (omieAtivo && produtoId && resolvedTenantId) {
