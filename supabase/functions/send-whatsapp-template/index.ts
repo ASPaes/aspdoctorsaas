@@ -148,9 +148,15 @@ Deno.serve(async (req) => {
     const graphData = await graphResp.json();
 
     if (!graphResp.ok) {
-      console.error(`${LOG} Graph API error ${graphResp.status}:`, graphData);
+      const metaCode = graphData?.error?.code;
+      const metaMsg = graphData?.error?.message ?? 'erro desconhecido';
+      const metaDetails = graphData?.error?.error_data?.details;
+      console.error(
+        `${LOG} Graph API error ${graphResp.status} code=${metaCode}:`,
+        JSON.stringify(graphData),
+      );
       return jsonResponse({
-        error: 'Graph API request failed',
+        error: `A Meta recusou o envio${metaCode ? ` (código ${metaCode})` : ''}: ${metaDetails || metaMsg}`,
         status: graphResp.status,
         detail: graphData,
       }, 502);
