@@ -298,7 +298,7 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
       });
       if (error) throw error;
       setLocallyRemoved(true);
-      setPreviewUrl(null);
+      clearPreview();
       setConfirmRemove(false);
       toast({ title: "Anexo removido", description: "A remoção no Omie será feita pelo cron." });
       qc.invalidateQueries({ queryKey: invalidateKey });
