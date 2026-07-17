@@ -105,7 +105,7 @@ const BUCKET_HELP: Record<Bucket, string> = {
   vigencia_vencida_no_omie:
     "Contrato está ativo no Omie mas com a vigência final no passado. O Omie não fatura contrato fora da vigência — essa mensalidade não está sendo cobrada. Renove a vigência final direto no Omie. O alerta some sozinho em até 15 minutos depois disso.",
   contrato_suspenso:
-    "O cliente tem um contrato no Omie, mas está SUSPENSO. Não deve ser criado um novo contrato (duplicaria) — a ação é reativar/revisar o existente.",
+    "Contrato suspenso no Omie. Normal em Cobrança Fornecedor: o cliente paga o fornecedor, não há o que faturar. Vincular apenas registra o de/para.",
   contrato_cancelado:
     "O cliente tinha um contrato no Omie, mas foi CANCELADO. Avalie reativar o cancelado ou criar um novo.",
 };
