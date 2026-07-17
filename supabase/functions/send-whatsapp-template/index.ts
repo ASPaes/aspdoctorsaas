@@ -197,7 +197,9 @@ Deno.serve(async (req) => {
     }
 
     const nowIso = new Date().toISOString();
-    const messageContent = template.body_text || `[Template: ${template.name}]`;
+    const messageContent = template.body_text
+      ? renderTemplateText(template.body_text, spec, values)
+      : `[Template: ${template.name}]`;
 
     const { error: msgErr } = await supabase.from('whatsapp_messages').insert({
       conversation_id: conversationId,
