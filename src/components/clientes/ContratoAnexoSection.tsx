@@ -243,6 +243,26 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
     }
   };
 
+  const handleRemove = async () => {
+    if (!contratoId) return;
+    setRemoving(true);
+    try {
+      const { error } = await (supabase.rpc as any)("contrato_anexo_remover", {
+        p_contrato_id: contratoId,
+      });
+      if (error) throw error;
+      setLocallyRemoved(true);
+      setPreviewUrl(null);
+      setConfirmRemove(false);
+      toast({ title: "Anexo removido", description: "A remoção no Omie será feita pelo cron." });
+      qc.invalidateQueries({ queryKey: invalidateKey });
+    } catch (err: any) {
+      toast({ title: "Erro ao remover anexo", description: err?.message ?? String(err), variant: "destructive" });
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   return (
     <div className="rounded border bg-background/50 p-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
