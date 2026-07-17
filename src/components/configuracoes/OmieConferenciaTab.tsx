@@ -108,8 +108,6 @@ const BUCKET_HELP: Record<Bucket, string> = {
     "Contrato suspenso no Omie. Normal em Cobrança Fornecedor: o cliente paga o fornecedor, não há o que faturar. Vincular apenas registra o de/para.",
   contrato_cancelado:
     "O cliente tinha um contrato no Omie, mas foi CANCELADO. Avalie reativar o cancelado ou criar um novo.",
-  fora_do_escopo:
-    "Contratos marcados para não integrar com o Omie (ex.: Cobrança Fornecedor, Gula Menu). Ficam aqui apenas para inventário — nenhuma ação é necessária.",
 };
 
 
