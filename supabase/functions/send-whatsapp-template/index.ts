@@ -6,6 +6,12 @@ import {
   ensureAttendanceForOperatorMessage,
   incrementAttendanceCounter,
 } from '../_shared/message-processor.ts';
+import {
+  parseTemplateParams,
+  resolveValues,
+  buildBodyComponent,
+  renderTemplateText,
+} from '../_shared/meta-template-params.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
