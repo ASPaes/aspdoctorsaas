@@ -217,7 +217,13 @@ Deno.serve(async (req) => {
         template_name: template.name,
         template_language: template.language,
         template_id: template.id,
-        ...(params.length > 0 ? { template_parameters: params } : {}),
+        ...(values.length > 0
+          ? {
+              template_parameters: values,
+              template_param_names: spec.names,
+              template_param_format: spec.format,
+            }
+          : {}),
       },
     });
 
