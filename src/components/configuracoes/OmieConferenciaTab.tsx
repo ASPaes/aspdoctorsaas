@@ -584,8 +584,6 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
       case "contrato_suspenso":
       case "contrato_cancelado":
         return <DisabledActionButton>Reativar/Revisar no Omie</DisabledActionButton>;
-      case "fora_do_escopo":
-        return null;
       default:
         return null;
     }
