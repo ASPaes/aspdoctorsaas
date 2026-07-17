@@ -27,8 +27,13 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Package, Plus, Pencil, Trash2, ChevronDown, ChevronRight,
-  ExternalLink, Loader2, Puzzle, Percent, AlertTriangle,
+  ExternalLink, Loader2, Puzzle, Percent, AlertTriangle, Paperclip,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -198,6 +203,11 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     return map;
   }, [anexosQuery.data]);
 
+  const anexosMap = useMemo(() => {
+    const map = new Map<string, ContratoAnexo>();
+    (anexosQuery.data ?? []).forEach(a => map.set(a.contrato_id, a));
+    return map;
+  }, [anexosQuery.data]);
 
   const clienteTenantQuery = useQuery<{ tenant_id: string | null }>({
     queryKey: ["cliente_tenant_lookup", clienteId],
@@ -371,7 +381,19 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                       </Button>
                     </CollapsibleTrigger>
                     <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
-                      <div className="font-semibold truncate">{p.produtos?.nome ?? "—"}</div>
+                      <div className="font-semibold truncate flex items-center gap-1.5">
+                        {p.produtos?.nome ?? "—"}
+                        {anexosMap.has(contratoIdByCliProd[p.id]) && (
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Paperclip className="h-4 w-4 text-muted-foreground" aria-label="Contrato anexado" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Contrato anexado</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
                       <div className="text-sm text-muted-foreground truncate">{p.fornecedores?.nome ?? "—"}</div>
                       <div className="flex flex-wrap items-center gap-1.5">
                         <Badge variant={p.ativo ? "default" : "secondary"} className="shrink-0">
