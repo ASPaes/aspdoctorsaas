@@ -92,12 +92,15 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: `template is not approved (status: ${template.status})` }, 400);
     }
 
-    const params = parameters || [];
-    if (params.length !== template.body_variables_count) {
-      return jsonResponse({
-        error: `template requires ${template.body_variables_count} variables, but ${params.length} provided`,
-      }, 400);
+    const spec = parseTemplateParams((template as any).components);
+    if (spec.unsupported.length > 0) {
+      return jsonResponse({ error: `Template não suportado: ${spec.unsupported.join('; ')}` }, 400);
     }
+    const resolved = resolveValues(spec, parameters);
+    if (!resolved.ok) {
+      return jsonResponse({ error: resolved.error }, 400);
+    }
+    const values = resolved.values;
 
     const secrets = await getInstanceSecrets(supabase, instance.id);
     const accessToken = (secrets as any).meta_access_token;
