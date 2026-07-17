@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
+import { useTenantUsers } from "@/hooks/useTenantUsers";
 import { formatDateLabel } from "@/lib/formatDateWithTimezone";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RefreshCw, Users, Calendar, Loader2, Ticket } from "lucide-react";
+import { RefreshCw, Users, Calendar, Loader2, Ticket, PowerOff } from "lucide-react";
 import { toast } from "sonner";
 
 interface WhatsAppInstance {
@@ -37,6 +38,8 @@ interface WhatsAppGroup {
   enabled: boolean;
   retention_days?: number | null;
   last_synced_at?: string | null;
+  disabled_by?: string | null;
+  disabled_at?: string | null;
 }
 
 export default function WhatsAppGroupsTab() {
@@ -69,7 +72,7 @@ export default function WhatsAppGroupsTab() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("whatsapp_groups")
-        .select("id, group_jid, group_name, group_picture_url, participant_count, enabled, retention_days, last_synced_at")
+        .select("id, group_jid, group_name, group_picture_url, participant_count, enabled, retention_days, last_synced_at, disabled_by, disabled_at")
         .eq("tenant_id", tid)
         .eq("instance_id", selectedInstanceId)
         .order("group_name");
