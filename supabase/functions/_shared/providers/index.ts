@@ -223,16 +223,106 @@ class EvolutionAdapter implements ProviderAdapter {
     secrets: InstanceSecrets,
     instance: InstanceInfo,
     groupJid: string
-  ): Promise<{ count: number; ids: string[] }> {
+  ): Promise<GroupRoster> {
     const base = this.getBaseUrl(secrets);
     const id = this.getIdentifier(secrets, instance);
+
+    // 1) Roster
     const url = `${base}/group/participants/${id}?groupJid=${encodeURIComponent(groupJid)}`;
     const res = await fetch(url, { headers: this.getHeaders(secrets) });
     if (!res.ok) throw new Error(`Evolution getGroupParticipants error: ${await res.text()}`);
     const data = await res.json();
-    const participants = Array.isArray(data?.participants) ? data.participants : [];
-    const ids = participants.map((p: any) => p?.id).filter(Boolean).map(String);
-    return { count: ids.length, ids };
+    const raw = Array.isArray(data?.participants) ? data.participants
+              : Array.isArray(data?.participantsData) ? data.participantsData
+              : Array.isArray(data) ? data
+              : [];
+    const groupName = data?.subject ?? data?.groupMetadata?.subject ?? null;
+
+    const norm = (s?: string | null) => (s ?? '').replace(/\D/g, '');
+    const participants: GroupParticipant[] = raw.map((p: any) => {
+      const pid = String(p?.id ?? p?.jid ?? '');
+      const phoneSrc = p?.phoneNumber ?? p?.jid ?? (pid.includes('@s.whatsapp.net') ? pid : null);
+      return {
+        id: pid,
+        admin: p?.admin === 'superadmin' ? 'superadmin' : p?.admin === 'admin' ? 'admin' : null,
+        phone: phoneSrc ? norm(String(phoneSrc).split('@')[0]) : null,
+        name: p?.name ?? p?.pushName ?? p?.notify ?? null,
+      } as GroupParticipant;
+    }).filter((p: GroupParticipant) => p.id);
+
+    // 2) Auto-detect self — FAIL CLOSED
+    let selfId: string | null = null;
+    let selfResolved = false;
+
+    // 2a) fetchInstances → ownerJid
+    try {
+      const fiRes = await fetch(`${base}/instance/fetchInstances?instanceName=${encodeURIComponent(id)}`, {
+        headers: this.getHeaders(secrets),
+      });
+      if (fiRes.ok) {
+        const fiData = await fiRes.json();
+        const arr = Array.isArray(fiData) ? fiData : [fiData];
+        const inst = arr[0]?.instance ?? arr[0];
+        const ownerRaw = inst?.ownerJid ?? inst?.owner ?? inst?.wuid ?? null;
+        if (ownerRaw) {
+          const ownerLocal = String(ownerRaw).split('@')[0];
+          const ownerPhone = norm(ownerLocal);
+          const match = participants.find((p) =>
+            p.id.split('@')[0] === ownerLocal ||
+            (p.phone && ownerPhone && phoneMatches(p.phone, ownerPhone))
+          );
+          if (match) { selfId = match.id; selfResolved = true; }
+        }
+      }
+    } catch (e) {
+      console.warn('[getGroupParticipants] fetchInstances failed:', (e as any)?.message);
+    }
+
+    // 2b) Fallback: whatsapp_instances.phone_number
+    if (!selfResolved) {
+      const instPhone = norm((instance as any)?.phone_number ?? '');
+      if (instPhone) {
+        const match = participants.find((p) => p.phone && phoneMatches(p.phone, instPhone));
+        if (match) { selfId = match.id; selfResolved = true; }
+      }
+    }
+
+    const selfIsAdmin = !!(selfId && participants.find((p) => p.id === selfId)?.admin);
+    return { participants, selfId, selfIsAdmin, selfResolved, groupName };
+  }
+
+  async updateGroupParticipant(
+    secrets: InstanceSecrets,
+    instance: InstanceInfo,
+    groupJid: string,
+    action: 'add' | 'remove' | 'promote' | 'demote',
+    participants: string[],
+  ): Promise<UpdateParticipantResult> {
+    const base = this.getBaseUrl(secrets);
+    const id = this.getIdentifier(secrets, instance);
+    const url = `${base}/group/updateParticipant/${id}?groupJid=${encodeURIComponent(groupJid)}`;
+    const headers = { ...this.getHeaders(secrets), 'Content-Type': 'application/json' };
+    const body = JSON.stringify({ action, participants });
+
+    let res = await fetch(url, { method: 'POST', headers, body });
+    if (res.status === 404) {
+      console.warn('[updateGroupParticipant] POST 404, retrying PUT');
+      res = await fetch(url, { method: 'PUT', headers, body });
+    }
+    if (!res.ok) throw new Error(`Evolution updateParticipant HTTP ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+
+    const arr = Array.isArray(data?.updateParticipants) ? data.updateParticipants
+              : Array.isArray(data) ? data
+              : [];
+    const results = arr.length > 0
+      ? arr.map((r: any) => ({
+          jid: String(r?.jid ?? ''),
+          status: String(r?.status ?? r?.content?.attrs?.error ?? 'unknown'),
+          ok: String(r?.status ?? '') === '200',
+        }))
+      : participants.map((jid) => ({ jid, status: 'unknown', ok: false }));
+    return { results, raw: data };
   }
 }
 
