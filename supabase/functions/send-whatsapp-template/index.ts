@@ -120,13 +120,7 @@ Deno.serve(async (req) => {
       normalizedTo = normalizedTo.slice(0, 4) + '9' + normalizedTo.slice(4);
     }
 
-    const components: any[] = [];
-    if (params.length > 0) {
-      components.push({
-        type: 'body',
-        parameters: params.map((p) => ({ type: 'text', text: p })),
-      });
-    }
+    const bodyComponent = buildBodyComponent(spec, values);
 
     const graphBody = {
       messaging_product: 'whatsapp',
@@ -135,7 +129,7 @@ Deno.serve(async (req) => {
       template: {
         name: template.name,
         language: { code: template.language },
-        ...(components.length > 0 ? { components } : {}),
+        ...(bodyComponent ? { components: [bodyComponent] } : {}),
       },
     };
 
