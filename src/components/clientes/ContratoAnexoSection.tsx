@@ -394,6 +394,23 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
               ) : null}
             </div>
           )}
+
+          {previewFallbackUrl && !previewUrl && (
+            <div className="rounded border bg-muted/30 p-4 flex items-center gap-3">
+              <FileText className="h-8 w-8 text-muted-foreground shrink-0" />
+              <div className="flex-1 text-sm text-muted-foreground">
+                Não foi possível exibir o preview aqui.
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(previewFallbackUrl, "_blank", "noopener,noreferrer")}
+              >
+                <ExternalLink className="h-4 w-4 mr-1" /> Abrir em nova aba
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
