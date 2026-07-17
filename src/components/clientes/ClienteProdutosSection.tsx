@@ -958,6 +958,7 @@ function ProdutoDialog({
       setFormaPagAtivacaoId(e?.forma_pagamento_ativacao_id ? String(e.forma_pagamento_ativacao_id) : "");
       setFormaPagMensalidadeId(e?.forma_pagamento_mensalidade_id ? String(e.forma_pagamento_mensalidade_id) : "");
       setObservacoesContratuais(e?.observacoes_contratuais ?? "");
+      setStagedFile(null);
       setTimeout(() => setDataProximoReajuste(e?.data_proximo_reajuste ?? ""), 0);
     }
   }, [open, edit]);
