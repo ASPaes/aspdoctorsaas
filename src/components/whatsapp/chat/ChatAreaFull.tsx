@@ -365,6 +365,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           conversation={conversation}
           onClose={() => setShowDetails(false)}
           onNavigateToConversation={onNavigateToConversation}
+          onConversationClosed={onClose}
         />
       )}
 
