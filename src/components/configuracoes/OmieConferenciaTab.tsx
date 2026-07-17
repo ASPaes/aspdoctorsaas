@@ -74,7 +74,8 @@ type Bucket =
   | "criar_contrato"
   | "vigencia_vencida_no_omie"
   | "contrato_suspenso"
-  | "contrato_cancelado";
+  | "contrato_cancelado"
+  | "fora_do_escopo";
 
 type View = "visao_geral" | Bucket;
 
