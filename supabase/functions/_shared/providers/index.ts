@@ -22,6 +22,7 @@ export interface InstanceInfo {
   provider_type: ProviderType;
   instance_id_external?: string | null;
   meta_phone_number_id?: string | null;
+  phone_number?: string | null;
 }
 
 export interface ConnectionStatus {
@@ -48,23 +49,59 @@ export interface SendResult {
   raw: unknown;
 }
 
+export interface GroupParticipant {
+  id: string;
+  admin: 'superadmin' | 'admin' | null;
+  phone: string | null;
+  name: string | null;
+}
+
+export interface GroupRoster {
+  participants: GroupParticipant[];
+  selfId: string | null;
+  selfIsAdmin: boolean;
+  selfResolved: boolean;
+  groupName?: string | null;
+}
+
+export interface UpdateParticipantResult {
+  results: Array<{ jid: string; status: string; ok: boolean }>;
+  raw: unknown;
+}
+
 export interface ProviderAdapter {
-  /** Testa conexão e retorna status */
   checkStatus(secrets: InstanceSecrets, instance: InstanceInfo): Promise<ConnectionStatus>;
-  /** Constrói e envia mensagem — retorna messageId externo */
   send(secrets: InstanceSecrets, instance: InstanceInfo, msg: SendRequest): Promise<SendResult>;
-  /** Configura webhook (se suportado pelo provider) */
   configureWebhook(
     secrets: InstanceSecrets,
     instance: InstanceInfo,
     webhookUrl: string
   ): Promise<{ ok: boolean; action: string }>;
-  /** Opcional — só o EvolutionAdapter implementa. Lista participantes de um grupo. */
   getGroupParticipants?(
     secrets: InstanceSecrets,
     instance: InstanceInfo,
     groupJid: string
-  ): Promise<{ count: number; ids: string[] }>;
+  ): Promise<GroupRoster>;
+  updateGroupParticipant?(
+    secrets: InstanceSecrets,
+    instance: InstanceInfo,
+    groupJid: string,
+    action: 'add' | 'remove' | 'promote' | 'demote',
+    participants: string[],
+  ): Promise<UpdateParticipantResult>;
+}
+
+function onlyDigitsShared(s?: string | null): string {
+  return (s ?? '').replace(/\D/g, '');
+}
+
+export function phoneMatches(a: string, b: string): boolean {
+  const na = onlyDigitsShared(a), nb = onlyDigitsShared(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  const tail = (s: string) => s.slice(-8);
+  const head = (s: string) => s.slice(0, Math.max(0, s.length - 8)).replace(/9$/, '');
+  return tail(na) === tail(nb) && head(na) === head(nb);
 }
 
 // ── Evolution Adapter ─────────────────────────────────────────────────────────
@@ -187,16 +224,106 @@ class EvolutionAdapter implements ProviderAdapter {
     secrets: InstanceSecrets,
     instance: InstanceInfo,
     groupJid: string
-  ): Promise<{ count: number; ids: string[] }> {
+  ): Promise<GroupRoster> {
     const base = this.getBaseUrl(secrets);
     const id = this.getIdentifier(secrets, instance);
+
+    // 1) Roster
     const url = `${base}/group/participants/${id}?groupJid=${encodeURIComponent(groupJid)}`;
     const res = await fetch(url, { headers: this.getHeaders(secrets) });
     if (!res.ok) throw new Error(`Evolution getGroupParticipants error: ${await res.text()}`);
     const data = await res.json();
-    const participants = Array.isArray(data?.participants) ? data.participants : [];
-    const ids = participants.map((p: any) => p?.id).filter(Boolean).map(String);
-    return { count: ids.length, ids };
+    const raw = Array.isArray(data?.participants) ? data.participants
+              : Array.isArray(data?.participantsData) ? data.participantsData
+              : Array.isArray(data) ? data
+              : [];
+    const groupName = data?.subject ?? data?.groupMetadata?.subject ?? null;
+
+    const norm = (s?: string | null) => (s ?? '').replace(/\D/g, '');
+    const participants: GroupParticipant[] = raw.map((p: any) => {
+      const pid = String(p?.id ?? p?.jid ?? '');
+      const phoneSrc = p?.phoneNumber ?? p?.jid ?? (pid.includes('@s.whatsapp.net') ? pid : null);
+      return {
+        id: pid,
+        admin: p?.admin === 'superadmin' ? 'superadmin' : p?.admin === 'admin' ? 'admin' : null,
+        phone: phoneSrc ? norm(String(phoneSrc).split('@')[0]) : null,
+        name: p?.name ?? p?.pushName ?? p?.notify ?? null,
+      } as GroupParticipant;
+    }).filter((p: GroupParticipant) => p.id);
+
+    // 2) Auto-detect self — FAIL CLOSED
+    let selfId: string | null = null;
+    let selfResolved = false;
+
+    // 2a) fetchInstances → ownerJid
+    try {
+      const fiRes = await fetch(`${base}/instance/fetchInstances?instanceName=${encodeURIComponent(id)}`, {
+        headers: this.getHeaders(secrets),
+      });
+      if (fiRes.ok) {
+        const fiData = await fiRes.json();
+        const arr = Array.isArray(fiData) ? fiData : [fiData];
+        const inst = arr[0]?.instance ?? arr[0];
+        const ownerRaw = inst?.ownerJid ?? inst?.owner ?? inst?.wuid ?? null;
+        if (ownerRaw) {
+          const ownerLocal = String(ownerRaw).split('@')[0];
+          const ownerPhone = norm(ownerLocal);
+          const match = participants.find((p) =>
+            p.id.split('@')[0] === ownerLocal ||
+            (p.phone && ownerPhone && phoneMatches(p.phone, ownerPhone))
+          );
+          if (match) { selfId = match.id; selfResolved = true; }
+        }
+      }
+    } catch (e) {
+      console.warn('[getGroupParticipants] fetchInstances failed:', (e as any)?.message);
+    }
+
+    // 2b) Fallback: whatsapp_instances.phone_number
+    if (!selfResolved) {
+      const instPhone = norm((instance as any)?.phone_number ?? '');
+      if (instPhone) {
+        const match = participants.find((p) => p.phone && phoneMatches(p.phone, instPhone));
+        if (match) { selfId = match.id; selfResolved = true; }
+      }
+    }
+
+    const selfIsAdmin = !!(selfId && participants.find((p) => p.id === selfId)?.admin);
+    return { participants, selfId, selfIsAdmin, selfResolved, groupName };
+  }
+
+  async updateGroupParticipant(
+    secrets: InstanceSecrets,
+    instance: InstanceInfo,
+    groupJid: string,
+    action: 'add' | 'remove' | 'promote' | 'demote',
+    participants: string[],
+  ): Promise<UpdateParticipantResult> {
+    const base = this.getBaseUrl(secrets);
+    const id = this.getIdentifier(secrets, instance);
+    const url = `${base}/group/updateParticipant/${id}?groupJid=${encodeURIComponent(groupJid)}`;
+    const headers = { ...this.getHeaders(secrets), 'Content-Type': 'application/json' };
+    const body = JSON.stringify({ action, participants });
+
+    let res = await fetch(url, { method: 'POST', headers, body });
+    if (res.status === 404) {
+      console.warn('[updateGroupParticipant] POST 404, retrying PUT');
+      res = await fetch(url, { method: 'PUT', headers, body });
+    }
+    if (!res.ok) throw new Error(`Evolution updateParticipant HTTP ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+
+    const arr = Array.isArray(data?.updateParticipants) ? data.updateParticipants
+              : Array.isArray(data) ? data
+              : [];
+    const results = arr.length > 0
+      ? arr.map((r: any) => ({
+          jid: String(r?.jid ?? ''),
+          status: String(r?.status ?? r?.content?.attrs?.error ?? 'unknown'),
+          ok: String(r?.status ?? '') === '200',
+        }))
+      : participants.map((jid) => ({ jid, status: 'unknown', ok: false }));
+    return { results, raw: data };
   }
 }
 

@@ -1466,9 +1466,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
       <GroupParticipantsSheet
         open={showParticipants}
         onOpenChange={setShowParticipants}
-        groupJid={(conversation as any)?.group_jid || ""}
-        instanceId={conversation?.instance_id || ""}
+        conversationId={conversation?.id || ""}
+        providerType={(conversation as any)?.instance?.provider_type ?? null}
       />
+
 
       <Dialog open={showDeleteDialog} onOpenChange={(o) => { if (!o) { setShowDeleteDialog(false); setDeleteConfirmText(""); } }}>
         <DialogContent className="sm:max-w-md">
