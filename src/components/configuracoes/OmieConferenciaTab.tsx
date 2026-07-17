@@ -27,9 +27,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import OmieFilaSincronizacaoPanel from "./OmieFilaSincronizacaoPanel";
 import { ConferenciaSaudeBanner } from "./ConferenciaSaudeBanner";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 import {
-  AlertCircle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, HelpCircle, History, Link2, Loader2, RefreshCw, Search,
+  AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, HelpCircle, History, Link2, Loader2, RefreshCw, Search,
 } from "lucide-react";
+
+// Baldes que representam ALARME (derivados do espelho do Omie).
+// Alarme não é fila: some sozinho quando o dado real muda no Omie —
+// NÃO filtrar por status_usuario, senão o card esconde o problema exatamente
+// quando ele existe (ex.: vigência vencida numa linha já vinculada).
+const ALARM_BUCKETS = new Set<string>([
+  "vigencia_vencida_no_omie",
+  "contrato_suspenso",
+  "contrato_cancelado",
+  "resolver",
+]);
 
 function MetricHelpPopover({ children }: { children: React.ReactNode }) {
   return (
