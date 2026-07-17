@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -15,30 +15,129 @@ import {
   Paperclip, Upload, Download, ExternalLink, FileText, Image as ImageIcon,
   Loader2, Trash2,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { isAdminLike } from "@/lib/permissions";
 
 export interface ContratoAnexo {
   id: string;
   contrato_id: string;
-  tenant_id: string;
+  tenant_id?: string | null;
   storage_path: string;
   nome_original: string;
-  nome_omie: string;
+  nome_omie?: string | null;
   mime_type: string | null;
   tamanho_bytes: number | null;
   omie_status: string | null;
   omie_erro: string | null;
+  omie_enviado_em?: string | null;
+  created_at?: string | null;
 }
 
-interface Props {
+/**
+ * Controlled: parent passes the row (already fetched in bulk) plus invalidateKey.
+ * Self-fetch: parent only passes contratoId (+ tenantId to allow writes); component
+ * queries its own anexo row and invalidates itself.
+ */
+interface BaseProps {
   contratoId: string | null;
   tenantId: string | null;
-  anexo?: ContratoAnexo | null;
+  readOnly?: boolean;
+}
+interface ControlledProps extends BaseProps {
+  anexo: ContratoAnexo | null;
   invalidateKey: readonly unknown[];
 }
+interface SelfFetchProps extends BaseProps {
+  anexo?: undefined;
+  invalidateKey?: undefined;
+}
+type Props = ControlledProps | SelfFetchProps;
 
-const MAX_BYTES = 10 * 1024 * 1024;
-const ACCEPT = "application/pdf,image/jpeg,image/png";
+// ---------- shared helpers (exported for the modal's staged-upload flow) ----------
+
+export const ANEXO_MAX_BYTES = 10 * 1024 * 1024;
+export const ANEXO_ACCEPT = "application/pdf,image/jpeg,image/png";
 const ACCEPTED_MIMES = new Set(["application/pdf", "image/jpeg", "image/png", "image/jpg"]);
+const NOME_OMIE_REGEX = /^[A-Za-z0-9_-]{1,80}\.[A-Za-z0-9]{1,10}$/;
+
+export function validateAnexoFile(file: File): string | null {
+  if (!ACCEPTED_MIMES.has(file.type)) return "Formato inválido. Aceito: PDF, JPG, PNG.";
+  if (file.size > ANEXO_MAX_BYTES) return "Arquivo muito grande (máximo 10 MB).";
+  if (!normalizeNomeOmie(file.name)) return "Nome de arquivo não suportado. Renomeie e tente de novo.";
+  return null;
+}
+
+export function normalizeNomeOmie(nomeOriginal: string): string | null {
+  const i = nomeOriginal.lastIndexOf(".");
+  if (i <= 0) return null;
+  const ext = nomeOriginal
+    .slice(i + 1)
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toLowerCase()
+    .slice(0, 10);
+  const base = nomeOriginal
+    .slice(0, i)
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^[_-]+|[_-]+$/g, "")
+    .slice(0, 80);
+  if (!base || !ext) return null;
+  const nome = `${base}.${ext}`;
+  return NOME_OMIE_REGEX.test(nome) ? nome : null;
+}
+
+async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
+  const hash = await crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * End-to-end upload: validate → hash → upload to storage → call RPC.
+ * On RPC failure the uploaded blob is removed from storage.
+ * Reused by both the section (inline upload) and the create-product modal
+ * (staged file uploaded right after the RPC that creates the contract).
+ */
+export async function uploadContratoAnexo(args: {
+  contratoId: string;
+  tenantId: string;
+  file: File;
+}): Promise<void> {
+  const { contratoId, tenantId, file } = args;
+  const err = validateAnexoFile(file);
+  if (err) throw new Error(err);
+
+  const nomeOmie = normalizeNomeOmie(file.name)!;
+  const buffer = await file.arrayBuffer();
+  const hash = await sha256Hex(buffer);
+  const ext = nomeOmie.slice(nomeOmie.lastIndexOf(".") + 1);
+  const uuid = crypto.randomUUID();
+  const path = `${tenantId}/${contratoId}/${uuid}.${ext}`;
+
+  const { error: upErr } = await supabase.storage
+    .from("contrato-anexos")
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (upErr) throw upErr;
+
+  const { error: rpcErr } = await (supabase.rpc as any)("contrato_anexo_substituir", {
+    p_contrato_id: contratoId,
+    p_storage_path: path,
+    p_nome_original: file.name,
+    p_nome_omie: nomeOmie,
+    p_mime_type: file.type,
+    p_tamanho_bytes: file.size,
+    p_hash_sha256: hash,
+  });
+  if (rpcErr) {
+    await supabase.storage.from("contrato-anexos").remove([path]).catch(() => {});
+    throw rpcErr;
+  }
+}
+
+// ---------- UI helpers ----------
 
 function isIOS(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -53,69 +152,46 @@ function fmtBytes(n: number | null | undefined): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const NOME_OMIE_REGEX = /^[A-Za-z0-9_-]{1,80}\.[A-Za-z0-9]{1,10}$/;
-
-function normalizeNomeOmie(nomeOriginal: string): string | null {
-  const i = nomeOriginal.lastIndexOf(".");
-  if (i <= 0) return null;
-
-  const ext = nomeOriginal
-    .slice(i + 1)
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9]/g, "")
-    .toLowerCase()
-    .slice(0, 10);
-
-  const base = nomeOriginal
-    .slice(0, i)
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9_-]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^[_-]+|[_-]+$/g, "")
-    .slice(0, 80);
-
-  if (!base || !ext) return null;
-
-  const nome = `${base}.${ext}`;
-  return NOME_OMIE_REGEX.test(nome) ? nome : null;
+function fmtDateTime(iso: string | null | undefined): string {
+  if (!iso) return "";
+  try { return new Date(iso).toLocaleString("pt-BR"); } catch { return ""; }
 }
 
-async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
-  const hash = await crypto.subtle.digest("SHA-256", buffer);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function omieBadge(status: string | null, erro: string | null) {
+function omieBadge(status: string | null, erro: string | null, enviadoEm: string | null | undefined) {
   const map: Record<string, { label: string; variant: "secondary" | "default" | "destructive" | "outline"; className?: string }> = {
-    pendente: { label: "Aguardando envio", variant: "secondary" },
-    aguardando_contrato_omie: { label: "Contrato ainda não existe no Omie", variant: "outline", className: "text-amber-600 border-amber-500/40" },
-    enviado: { label: "No Omie", variant: "default", className: "bg-emerald-600 hover:bg-emerald-600 text-white" },
-    erro: { label: "Falha no envio", variant: "outline", className: "text-amber-600 border-amber-500/40" },
-    invalido: { label: "Falha — precisa de ajuste", variant: "destructive" },
-    fora_do_escopo: { label: "Não sincroniza", variant: "secondary" },
+    pendente:                  { label: "Na fila para o Omie", variant: "secondary" },
+    aguardando_contrato_omie:  { label: "Aguardando o contrato existir no Omie", variant: "outline", className: "text-amber-600 border-amber-500/40" },
+    enviado:                   { label: "No Omie", variant: "default", className: "bg-emerald-600 hover:bg-emerald-600 text-white" },
+    erro:                      { label: "Falha temporária, vai retentar", variant: "outline", className: "text-amber-600 border-amber-500/40" },
+    invalido:                  { label: "Falhou definitivamente", variant: "destructive" },
+    fora_do_escopo:            { label: "Não sincroniza", variant: "secondary" },
   };
   const info = map[status ?? "pendente"] ?? { label: status ?? "—", variant: "secondary" as const };
   const badge = (
     <Badge variant={info.variant} className={info.className}>
       {info.label}
+      {status === "enviado" && enviadoEm ? ` · ${fmtDateTime(enviadoEm)}` : null}
     </Badge>
   );
-  const showTip = (status === "erro" || status === "invalido") && !!erro;
-  if (!showTip) return badge;
+  const tip = (status === "erro" || status === "invalido") ? erro : null;
+  if (!tip) return badge;
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild><span>{badge}</span></TooltipTrigger>
-        <TooltipContent className="max-w-xs whitespace-pre-wrap">{erro}</TooltipContent>
+        <TooltipContent className="max-w-xs whitespace-pre-wrap">{tip}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
 }
 
-export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anexoProp, invalidateKey }: Props) {
+export default function ContratoAnexoSection(props: Props) {
+  const { contratoId, tenantId, readOnly = false } = props;
+  const controlled = "invalidateKey" in props && props.invalidateKey !== undefined;
   const qc = useQueryClient();
+  const { profile } = useAuth();
+  const canWrite = !readOnly && isAdminLike(profile) && !!contratoId && !!tenantId;
+
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -126,19 +202,37 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removing, setRemoving] = useState(false);
 
-  const anexo = locallyRemoved ? null : anexoProp;
+  // Self-fetch mode: query the single active row for this contract.
+  const selfQueryKey = useMemo(
+    () => ["contrato_anexo_single", contratoId] as const,
+    [contratoId],
+  );
+  const selfQuery = useQuery<ContratoAnexo | null>({
+    queryKey: selfQueryKey,
+    enabled: !controlled && !!contratoId,
+    refetchOnWindowFocus: true,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("contrato_anexos" as any) as any)
+        .select("id, contrato_id, storage_path, nome_original, nome_omie, mime_type, tamanho_bytes, omie_status, omie_erro, omie_enviado_em, created_at")
+        .eq("contrato_id", contratoId)
+        .eq("ativo", true)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as ContratoAnexo | null;
+    },
+  });
+
+  const rawAnexo = controlled ? (props as ControlledProps).anexo : (selfQuery.data ?? null);
+  const anexo = locallyRemoved ? null : rawAnexo;
 
   const disabled = !contratoId;
   const ios = isIOS();
   const isPdf = anexo?.mime_type === "application/pdf" || anexo?.nome_original?.toLowerCase().endsWith(".pdf");
   const isImage = anexo?.mime_type?.startsWith("image/") || /\.(jpe?g|png)$/i.test(anexo?.nome_original ?? "");
 
-  // Revoke blob URL on unmount / when previewUrl changes
   useEffect(() => {
     return () => {
-      if (previewIsBlob && previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
+      if (previewIsBlob && previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl, previewIsBlob]);
 
@@ -147,6 +241,14 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
     setPreviewUrl(null);
     setPreviewIsBlob(false);
     setPreviewFallbackUrl(null);
+  };
+
+  const invalidateAnexo = () => {
+    if (controlled) {
+      qc.invalidateQueries({ queryKey: (props as ControlledProps).invalidateKey });
+    } else {
+      qc.invalidateQueries({ queryKey: selfQueryKey });
+    }
   };
 
   const loadPreview = async () => {
@@ -161,16 +263,12 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
       toast({ title: "Erro ao gerar preview", description: error?.message, variant: "destructive" });
       return;
     }
-
-    // Imagens carregam direto pela signed URL (tag <img> não é bloqueada por origem)
     if (!isPdf) {
       setPreviewUrl(data.signedUrl);
       setPreviewIsBlob(false);
       setLoadingPreview(false);
       return;
     }
-
-    // PDFs: buscar como blob e servir via object URL (mesma origem, evita bloqueio do Chrome)
     try {
       const res = await fetch(data.signedUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -179,7 +277,6 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
       setPreviewUrl(url);
       setPreviewIsBlob(true);
     } catch (err: any) {
-      // Fallback: mostra ícone + "Abrir em nova aba" com a signed URL
       setPreviewFallbackUrl(data.signedUrl);
       toast({
         title: "Não foi possível carregar o preview",
@@ -216,7 +313,7 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
   };
 
   const handlePickFile = () => {
-    if (disabled || uploading) return;
+    if (!canWrite || uploading) return;
     inputRef.current?.click();
   };
 
@@ -228,61 +325,14 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
       toast({ title: "Salve o produto para anexar arquivos", variant: "destructive" });
       return;
     }
-
-    if (!ACCEPTED_MIMES.has(file.type)) {
-      toast({ title: "Formato inválido", description: "Aceito: PDF, JPG, PNG.", variant: "destructive" });
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      toast({ title: "Arquivo muito grande", description: "Máximo 10 MB.", variant: "destructive" });
-      return;
-    }
-
-    const nomeOmie = normalizeNomeOmie(file.name);
-    if (!nomeOmie) {
-      toast({
-        title: "Nome de arquivo não suportado",
-        description: "Renomeie o arquivo e tente de novo.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setUploading(true);
-    let uploadedPath: string | null = null;
     try {
-      const buffer = await file.arrayBuffer();
-      const hash = await sha256Hex(buffer);
-      const lastDot = nomeOmie.lastIndexOf(".");
-      const ext = nomeOmie.slice(lastDot + 1);
-      const uuid = crypto.randomUUID();
-      const path = `${tenantId}/${contratoId}/${uuid}.${ext}`;
-
-      const { error: upErr } = await supabase.storage
-        .from("contrato-anexos")
-        .upload(path, file, { contentType: file.type, upsert: false });
-      if (upErr) throw upErr;
-      uploadedPath = path;
-
-      const { error: rpcErr } = await (supabase.rpc as any)("contrato_anexo_substituir", {
-        p_contrato_id: contratoId,
-        p_storage_path: path,
-        p_nome_original: file.name,
-        p_nome_omie: nomeOmie,
-        p_mime_type: file.type,
-        p_tamanho_bytes: file.size,
-        p_hash_sha256: hash,
-      });
-      if (rpcErr) throw rpcErr;
-
+      await uploadContratoAnexo({ contratoId, tenantId, file });
       toast({ title: "Anexo enviado", description: file.name });
       clearPreview();
       setLocallyRemoved(false);
-      qc.invalidateQueries({ queryKey: invalidateKey });
+      invalidateAnexo();
     } catch (err: any) {
-      if (uploadedPath) {
-        await supabase.storage.from("contrato-anexos").remove([uploadedPath]).catch(() => {});
-      }
       toast({ title: "Erro ao enviar anexo", description: err?.message ?? String(err), variant: "destructive" });
     } finally {
       setUploading(false);
@@ -301,7 +351,7 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
       clearPreview();
       setConfirmRemove(false);
       toast({ title: "Anexo removido", description: "A remoção no Omie será feita pelo cron." });
-      qc.invalidateQueries({ queryKey: invalidateKey });
+      invalidateAnexo();
     } catch (err: any) {
       toast({ title: "Erro ao remover anexo", description: err?.message ?? String(err), variant: "destructive" });
     } finally {
@@ -316,33 +366,44 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
           <Paperclip className="h-4 w-4" />
           Anexo do contrato
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            ref={inputRef}
-            type="file"
-            accept={ACCEPT}
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handlePickFile}
-            disabled={disabled || uploading}
-            title={disabled ? "Salve o produto para anexar arquivos" : undefined}
-          >
-            {uploading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
-            {anexo ? "Substituir" : "Enviar arquivo"}
-          </Button>
-        </div>
+        {canWrite && (
+          <div className="flex items-center gap-2">
+            <input
+              ref={inputRef}
+              type="file"
+              accept={ANEXO_ACCEPT}
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handlePickFile}
+              disabled={disabled || uploading}
+              title={disabled ? "Salve o produto para anexar arquivos" : undefined}
+            >
+              {uploading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+              {anexo ? "Substituir" : "Enviar arquivo"}
+            </Button>
+          </div>
+        )}
       </div>
+
+      {readOnly && anexo && (
+        <p className="text-xs text-amber-600">
+          Este contrato já tem anexo, compartilhado com os outros produtos vinculados a ele.
+          Para trocar, use o painel do produto.
+        </p>
+      )}
 
       {disabled ? (
         <p className="text-xs text-muted-foreground">Salve o produto para anexar arquivos.</p>
       ) : !anexo ? (
         <p className="text-xs text-muted-foreground">
-          Nenhum arquivo anexado. Aceito: PDF, JPG, PNG (até 10 MB).
+          {canWrite
+            ? "Nenhum arquivo anexado. Aceito: PDF, JPG, PNG (até 10 MB)."
+            : "Nenhum arquivo anexado."}
         </p>
       ) : (
         <div className="space-y-2">
@@ -354,7 +415,7 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
             {anexo.tamanho_bytes ? (
               <span className="text-xs text-muted-foreground">{fmtBytes(anexo.tamanho_bytes)}</span>
             ) : null}
-            {omieBadge(anexo.omie_status, anexo.omie_erro)}
+            {omieBadge(anexo.omie_status, anexo.omie_erro, anexo.omie_enviado_em)}
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -371,18 +432,20 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
             <Button type="button" variant="outline" size="sm" onClick={handleDownload}>
               <Download className="h-4 w-4 mr-1" /> Baixar
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-              onClick={() => setConfirmRemove(true)}
-              disabled={removing}
-              aria-label="Remover anexo"
-              title="Remover anexo"
-            >
-              {removing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-            </Button>
+            {canWrite && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                onClick={() => setConfirmRemove(true)}
+                disabled={removing}
+                aria-label="Remover anexo"
+                title="Remover anexo"
+              >
+                {removing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              </Button>
+            )}
           </div>
 
           {previewUrl && !ios && (
