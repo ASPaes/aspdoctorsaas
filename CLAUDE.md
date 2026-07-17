@@ -18,8 +18,9 @@ Não existe CI de migrations. Muita coisa foi aplicada via `apply_migration` / S
 - Para saber o schema: consultar o banco (Supabase MCP: `list_tables`, `pg_proc`, `information_schema`). Nunca inferir de `supabase/migrations/`.
 - **NUNCA** rodar `supabase db reset`, `db push` ou tratar `db diff` como verdade.
 - Na prática: 163 migrations contêm apenas 45 `CREATE TABLE` cobrindo 41 tabelas. **Sem DDL versionado:** `contratos`, `contrato_itens`, `cliente_produtos`, `cliente_produto_modulos`, `produto_modulos`, `contrato_eventos`, `whatsapp_groups`, `service_categories`, `service_category_products`, `ai_usage_log`, `ai_settings`, `modelos_contrato`, `support_tickets`, `support_attendances`, `support_kb_articles`, `support_ticket_events`, `clientes_old_import`, `clientes_csv_map`, `clientes_match_log`, as colunas `is_group` / `group_jid` / `auto_reply_disabled`, e ~5 RPCs de ticket.
-- **`supabase start` não funciona** — morre na migration 16/163 (`ALTER TABLE public.clientes_old_import`, tabela que nenhuma migration cria). Não perca tempo tentando.
+- **`supabase start` puro não funciona** — ele replica as migrations e morre na 16/163 (`ALTER TABLE public.clientes_old_import`, tabela fantasma que nem existe mais em produção). **Não tente consertar migration por migration.** Use `./scripts/setup-local-db.sh`, que copia a estrutura pronta da produção — ver "Banco local" abaixo.
 - **Fonte de verdade prática do schema no repo: `src/integrations/supabase/types.ts`**, gerado a partir do banco de produção. Se um objeto não está lá, provavelmente não existe em prod.
+- Medido em jul/2026: produção tem **148 tabelas**; as migrations conhecem 41. Menos de um terço.
 
 ### 3. O Lovable escreve na mesma `main`
 Repo sincronizado bidirecionalmente com o Lovable — todos os commits recentes são de `gpt-engineer-app[bot]`. Commits aparecem sem que o Alexandre tenha feito. Sempre `git pull --rebase` antes de push. Não editar em paralelo os mesmos arquivos que o Lovable está mexendo.
@@ -27,13 +28,42 @@ Repo sincronizado bidirecionalmente com o Lovable — todos os commits recentes 
 ### 4. `.env` está commitado e aponta para PRODUÇÃO
 Só contém chaves anon/publishable (públicas por design), nenhum segredo real. **Não colocar segredo novo nele** — credenciais de servidor vivem em Supabase Secrets / Vault. Chave local vai em `.env.local`, que é ignorado pelo git.
 
-**Não existe staging.** `bun run dev` sobe o frontend em `localhost:8080` contra o Supabase **de produção**. Mudança só de frontend é segura no local; qualquer coisa que toque dados, migration ou edge function já é produção no instante do teste.
+**Não existe staging remoto.** Por padrão (só `.env`), `bun run dev` sobe o frontend contra o Supabase **de produção** — mudança de frontend é segura assim, mas qualquer coisa que toque dados, migration ou edge function já é produção no instante do teste.
+
+Para isolar de verdade, use o banco local (seção abaixo). Com `.env.local` presente, o app aponta para o Docker e nada vaza.
 
 ### 5. Três lockfiles (`bun.lock`, `bun.lockb`, `package-lock.json`)
 Confirmar qual é o vigente antes de instalar dependência. Não trocar de package manager por conta própria.
 
 ### 6. Write no banco só com OK explícito do Alexandre
 Diagnóstico/leitura: livre. `apply_migration` / `execute_sql` com DML/DDL: **pedir autorização antes**.
+
+---
+
+## Banco local (Docker) — como testar sem tocar produção
+
+```bash
+./scripts/setup-local-db.sh     # monta do zero (~2 min)
+bun run dev                     # app contra o banco LOCAL
+```
+
+O script copia a **estrutura** da produção via `supabase db dump` (leitura pura) e carrega num Postgres local. Ele **não** replica `supabase/migrations/` — é justamente por isso que funciona.
+
+Pré-requisitos: Docker rodando, Supabase CLI (`brew install supabase/tap/supabase`) e `supabase login` feito uma vez.
+
+O que ele garante, e verifica antes de terminar:
+
+- **148 tabelas** — a estrutura inteira da produção, não o subconjunto das migrations.
+- **Zero dados de cliente.** `--schema public` traz só DDL. O script **aborta** se encontrar `INSERT`/`COPY` no dump (guarda de LGPD).
+- **Zero vazamento para produção.** Três funções do schema `public` fazem `net.http_post` contra a URL de produção: `cron_recon_espelho`, `fn_schedule_group_syncs` e — a perigosa — `fn_onboarding_send_welcome`, que é **trigger**: dispara sozinha e mandaria um WhatsApp real para um cliente real a partir do banco de testes. O script redefine as três como no-op no local e confirma que sobrou `0`.
+- **Migrations intactas.** Para subir o stack ele precisa tirar `supabase/migrations/` do caminho; um `trap` devolve a pasta mesmo se o script morrer no meio. **Sem isso, o git enxerga as 163 migrations como apagadas e um commit distraído some com elas.**
+
+Para o app voltar a apontar para produção: **apague `.env.local`**.
+
+Limites honestos:
+- O banco local nasce **sem dados**. Serve para estrutura, RLS, RPC e migration — não para "ver meus números".
+- Ele **congela no tempo**. Lovable e painel mudam a produção sem migration; rode o script de novo para re-sincronizar.
+- `supabase db push` continua **proibido** (ver seção ⚠️ acima). SQL validado no local vai para produção via SQL Editor / `apply_migration`, com OK do Alexandre.
 
 ---
 
