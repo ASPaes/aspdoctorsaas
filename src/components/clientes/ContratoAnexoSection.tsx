@@ -8,8 +8,12 @@ import {
   Tooltip, TooltipContent, TooltipTrigger, TooltipProvider,
 } from "@/components/ui/tooltip";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Paperclip, Upload, Download, ExternalLink, FileText, Image as ImageIcon,
-  Loader2,
+  Loader2, Trash2,
 } from "lucide-react";
 
 export interface ContratoAnexo {
