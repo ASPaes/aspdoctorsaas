@@ -48,23 +48,59 @@ export interface SendResult {
   raw: unknown;
 }
 
+export interface GroupParticipant {
+  id: string;
+  admin: 'superadmin' | 'admin' | null;
+  phone: string | null;
+  name: string | null;
+}
+
+export interface GroupRoster {
+  participants: GroupParticipant[];
+  selfId: string | null;
+  selfIsAdmin: boolean;
+  selfResolved: boolean;
+  groupName?: string | null;
+}
+
+export interface UpdateParticipantResult {
+  results: Array<{ jid: string; status: string; ok: boolean }>;
+  raw: unknown;
+}
+
 export interface ProviderAdapter {
-  /** Testa conexão e retorna status */
   checkStatus(secrets: InstanceSecrets, instance: InstanceInfo): Promise<ConnectionStatus>;
-  /** Constrói e envia mensagem — retorna messageId externo */
   send(secrets: InstanceSecrets, instance: InstanceInfo, msg: SendRequest): Promise<SendResult>;
-  /** Configura webhook (se suportado pelo provider) */
   configureWebhook(
     secrets: InstanceSecrets,
     instance: InstanceInfo,
     webhookUrl: string
   ): Promise<{ ok: boolean; action: string }>;
-  /** Opcional — só o EvolutionAdapter implementa. Lista participantes de um grupo. */
   getGroupParticipants?(
     secrets: InstanceSecrets,
     instance: InstanceInfo,
     groupJid: string
-  ): Promise<{ count: number; ids: string[] }>;
+  ): Promise<GroupRoster>;
+  updateGroupParticipant?(
+    secrets: InstanceSecrets,
+    instance: InstanceInfo,
+    groupJid: string,
+    action: 'add' | 'remove' | 'promote' | 'demote',
+    participants: string[],
+  ): Promise<UpdateParticipantResult>;
+}
+
+function onlyDigitsShared(s?: string | null): string {
+  return (s ?? '').replace(/\D/g, '');
+}
+
+export function phoneMatches(a: string, b: string): boolean {
+  const na = onlyDigitsShared(a), nb = onlyDigitsShared(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  const tail = (s: string) => s.slice(-8);
+  const head = (s: string) => s.slice(0, Math.max(0, s.length - 8)).replace(/9$/, '');
+  return tail(na) === tail(nb) && head(na) === head(nb);
 }
 
 // ── Evolution Adapter ─────────────────────────────────────────────────────────
