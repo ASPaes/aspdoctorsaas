@@ -209,6 +209,44 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     return map;
   }, [anexosQuery.data]);
 
+  useEffect(() => {
+    console.log("[ContratoAnexoSection][diagnostico]", {
+      clienteId,
+      tid,
+      produtoIds,
+      contratoItensQuery: {
+        enabled: produtoIds.length > 0,
+        table: "contrato_itens",
+        select: "cliente_produto_id, contrato_id",
+        filter: { cliente_produto_id: produtoIds },
+        rows: contratoItensQuery.data?.length ?? 0,
+        error: contratoItensQuery.error?.message ?? null,
+      },
+      contratoIdByCliProdSize: Object.keys(contratoIdByCliProd).length,
+      contratoIds,
+      anexosQuery: {
+        enabled: contratoIds.length > 0,
+        table: "contrato_anexos",
+        select: "id, contrato_id, tenant_id, storage_path, nome_original, nome_omie, mime_type, tamanho_bytes, omie_status, omie_erro",
+        filter: { contrato_id: contratoIds, ativo: true },
+        rows: anexosQuery.data?.length ?? 0,
+        error: anexosQuery.error?.message ?? null,
+      },
+      anexosMapSize: anexosMap.size,
+    });
+  }, [
+    clienteId,
+    tid,
+    produtoIds,
+    contratoItensQuery.data,
+    contratoItensQuery.error,
+    contratoIdByCliProd,
+    contratoIds,
+    anexosQuery.data,
+    anexosQuery.error,
+    anexosMap,
+  ]);
+
   const clienteTenantQuery = useQuery<{ tenant_id: string | null }>({
     queryKey: ["cliente_tenant_lookup", clienteId],
     enabled: !!clienteId,
