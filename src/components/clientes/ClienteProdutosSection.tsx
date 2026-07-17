@@ -43,7 +43,13 @@ import { Switch } from "@/components/ui/switch";
 import SugestaoMRRDialog from "./SugestaoMRRDialog";
 import ReajusteModulosDialog from "./ReajusteModulosDialog";
 import EnviarContratoOmieButton from "./EnviarContratoOmieButton";
-import ContratoAnexoSection, { type ContratoAnexo } from "./ContratoAnexoSection";
+import ContratoAnexoSection, {
+  type ContratoAnexo,
+  ANEXO_ACCEPT,
+  validateAnexoFile,
+  uploadContratoAnexo,
+} from "./ContratoAnexoSection";
+import { isAdminLike } from "@/lib/permissions";
 
 interface Props {
   clienteId: string;
