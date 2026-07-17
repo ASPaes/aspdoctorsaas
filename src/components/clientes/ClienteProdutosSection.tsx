@@ -1452,8 +1452,76 @@ function ProdutoDialog({
           />
         </div>
 
+        <Separator />
 
-        {omieAtivo && (
+        {/* Anexo do contrato */}
+        {isEdit && editContratoId ? (
+          <ContratoAnexoSection
+            contratoId={editContratoId}
+            tenantId={resolvedTenantId}
+          />
+        ) : !isEdit ? (
+          <div className="rounded border bg-background/50 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Paperclip className="h-4 w-4" />
+                Anexo do contrato
+              </div>
+              {canAttach && (
+                <>
+                  <input
+                    ref={stagedFileInputRef}
+                    type="file"
+                    accept={ANEXO_ACCEPT}
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      e.target.value = "";
+                      if (!f) { setStagedFile(null); return; }
+                      const err = validateAnexoFile(f);
+                      if (err) {
+                        toast({ title: "Arquivo inválido", description: err, variant: "destructive" });
+                        return;
+                      }
+                      setStagedFile(f);
+                    }}
+                  />
+                  <div className="flex items-center gap-2">
+                    {stagedFile && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setStagedFile(null)}>
+                        Remover
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => stagedFileInputRef.current?.click()}
+                    >
+                      <Paperclip className="h-4 w-4 mr-1" />
+                      {stagedFile ? "Trocar arquivo" : "Selecionar arquivo"}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+            {!canAttach ? (
+              <p className="text-xs text-muted-foreground">
+                Somente admin ou head podem anexar o contrato. Peça a um responsável para anexar depois pelo painel do produto.
+              </p>
+            ) : stagedFile ? (
+              <p className="text-xs text-muted-foreground truncate" title={stagedFile.name}>
+                Selecionado: <span className="font-medium">{stagedFile.name}</span> — será enviado após criar o produto.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Opcional. Aceito: PDF, JPG, PNG (até 10 MB). O arquivo é enviado logo após o produto ser criado.
+              </p>
+            )}
+          </div>
+        ) : null}
+
+
           <>
             <Separator />
             <div className="space-y-2">
