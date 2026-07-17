@@ -1618,6 +1618,19 @@ export default function OmieConferenciaTab() {
               </button>
             </div>
           )}
+          {bucketAtivo === "escolher_candidato" && escolherCandidatoResolvidos > 0 && (
+            <div className="flex items-center gap-2 mt-3">
+              <Switch
+                id="ver-resolvidos-candidato"
+                checked={verResolvidosCandidato}
+                onCheckedChange={(v) => { setVerResolvidosCandidato(v); setPage(0); }}
+              />
+              <Label htmlFor="ver-resolvidos-candidato" className="text-xs text-muted-foreground cursor-pointer">
+                Ver resolvidos ({escolherCandidatoResolvidos.toLocaleString("pt-BR")})
+                <span className="ml-1 opacity-70">— consulta apenas; CNPJ ambíguo é permanente</span>
+              </Label>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-2">
           {loadingLista ? (
