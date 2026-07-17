@@ -23,12 +23,12 @@ interface Props {
 
 type DryRunOk = {
   ok: true;
+  modo: "dry_run";
   operacao: "criar" | "alterar";
   aviso?: string;
-  cliente_seria_enviado?: any;
-  contrato_seria_enviado?: any;
-  cliente_pendente_no_omie?: boolean;
-  contrato_dry_run?: any;
+  casado_no_omie?: boolean;
+  vinculo_previo?: any;
+  contrato_dry_run?: { ok?: boolean; error?: string; [k: string]: any };
 };
 
 export default function EnviarContratoOmieButton({ tenantId, contratoId, createdAt }: Props) {
@@ -70,9 +70,58 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
   };
 
   const invokeCall = async (modo: "dry_run" | "criar") => {
-    return await supabase.functions.invoke("omie-integration-call", {
-      body: { acao: "criar_cliente_contrato", contrato_id: contratoId, modo },
+    // Não enviar tenant_id — a função resolve pelo perfil do usuário.
+    return await supabase.functions.invoke("recon-omie-escrever", {
+      body: { ds_contract_id: contratoId, modo },
     });
+  };
+
+  // Extrai body mesmo quando supabase-js lança FunctionsHttpError (4xx/5xx).
+  const extractBody = (data: any, error: any) => {
+    return data ?? (error as any)?.context ?? null;
+  };
+
+  const formatContratosNoOmie = (contratos: any[]) =>
+    contratos
+      .map((c) => {
+        if (typeof c === "string" || typeof c === "number") return `nCodCtr ${c}`;
+        const cod = c?.nCodCtr ?? c?.codigo ?? c?.omie_contract_id;
+        const num = c?.numero ?? c?.cNumCtr;
+        return num ? `nCodCtr ${cod} (nº ${num})` : `nCodCtr ${cod}`;
+      })
+      .filter(Boolean);
+
+  const handleBlockedResponse = (body: any): boolean => {
+    if (!body) return false;
+    // Bloqueios explícitos
+    if (body.bloqueado === "validacao" && Array.isArray(body.erros)) {
+      showError(
+        "Não é possível enviar este contrato",
+        body.error || "Corrija os pontos abaixo antes de reenviar:",
+        body.erros.map((e: any) => (typeof e === "string" ? e : e?.mensagem ?? JSON.stringify(e))),
+      );
+      return true;
+    }
+    if (body.bloqueado === "cliente_ja_tem_contrato_ativo") {
+      const list = Array.isArray(body.contratos_no_omie)
+        ? formatContratosNoOmie(body.contratos_no_omie)
+        : undefined;
+      showError(
+        "Cliente já possui contrato ativo no Omie",
+        body.error || "Este cliente já tem um contrato ativo no Omie.",
+        list,
+      );
+      return true;
+    }
+    if (body.bloqueado) {
+      showError("Não é possível enviar este contrato", String(body.error || body.bloqueado));
+      return true;
+    }
+    if (body.ok === false && body.error) {
+      showError("Não é possível enviar este contrato", String(body.error));
+      return true;
+    }
+    return false;
   };
 
   const handlePreview = async () => {
@@ -80,25 +129,24 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
     setSending(true);
     try {
       const { data, error } = await invokeCall("dry_run");
-      // FunctionsHttpError não lança quando ok:false com HTTP 200; para 4xx/5xx com body JSON,
-      // supabase-js retorna error + o body em (error as any).context.
-      const body: any = data ?? (error as any)?.context ?? null;
+      const body: any = extractBody(data, error);
 
       if (body?.ok === true) {
+        // Limitação conhecida: contrato_dry_run pode falhar sem propagar para o ok de cima.
+        if (body?.contrato_dry_run && body.contrato_dry_run.ok === false) {
+          showError(
+            "Não é possível enviar este contrato",
+            String(body.contrato_dry_run.error || "Falha na validação do contrato."),
+          );
+          return;
+        }
         setDryRun(body as DryRunOk);
         return;
       }
 
-      if (body?.bloqueado === "validacao" && Array.isArray(body?.erros)) {
-        showError(
-          "Não é possível enviar este contrato",
-          "Corrija os pontos abaixo antes de reenviar:",
-          body.erros.map((e: any) => (typeof e === "string" ? e : e?.mensagem ?? JSON.stringify(e))),
-        );
-        return;
-      }
+      if (handleBlockedResponse(body)) return;
 
-      const msg = body?.error || body?.detalhe || error?.message || "Resposta inesperada do servidor.";
+      const msg = body?.error || error?.message || "Resposta inesperada do servidor.";
       showError("Não é possível enviar este contrato", String(msg));
     } catch (e: any) {
       showError("Falha ao preparar o envio", e?.message ?? "Erro desconhecido.");
@@ -111,7 +159,7 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
     setConfirming(true);
     try {
       const { data, error } = await invokeCall("criar");
-      const body: any = data ?? (error as any)?.context ?? null;
+      const body: any = extractBody(data, error);
 
       if (body?.ok === true) {
         setDryRun(null);
@@ -125,20 +173,29 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
         qc.invalidateQueries({ queryKey: ["contratos"] });
         qc.invalidateQueries({ queryKey: ["contrato", contratoId] });
         qc.invalidateQueries({ queryKey: ["omie-sync-fila"] });
+        qc.invalidateQueries({ queryKey: ["contratos_ativos_omie"] });
         return;
       }
 
-      // Erros específicos do passo criar
+      // Falhas do modo criar — tratar por etapa.
       const etapa = body?.etapa;
-      const msg = body?.error || body?.aviso || body?.detalhe || error?.message || "Falha ao enviar ao Omie.";
-      const title =
-        etapa === "cliente"
-          ? "Falha ao enviar o cliente ao Omie"
-          : etapa === "contrato"
-          ? "Falha ao enviar o contrato ao Omie"
-          : "Falha ao enviar ao Omie";
       setDryRun(null);
-      showError(title, String(msg));
+
+      if (handleBlockedResponse(body)) return;
+
+      const msgFallback = body?.error || body?.aviso || error?.message || "Falha ao enviar ao Omie.";
+      if (etapa === "cliente") {
+        showError(
+          "Falha ao enviar o cliente ao Omie",
+          String(body?.error || msgFallback),
+        );
+      } else if (etapa === "contrato") {
+        // 502 etapa:'contrato' — usar aviso (reexecução segura). 409 — usar error.
+        const txt = body?.error || body?.aviso || msgFallback;
+        showError("Falha ao enviar o contrato ao Omie", String(txt));
+      } else {
+        showError("Falha ao enviar ao Omie", String(msgFallback));
+      }
     } catch (e: any) {
       setDryRun(null);
       showError("Falha ao enviar ao Omie", e?.message ?? "Erro desconhecido.");
@@ -170,7 +227,7 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
             <AlertDialogDescription className="whitespace-pre-wrap">
               {dryRun?.aviso ??
                 (dryRun?.operacao === "alterar"
-                  ? "Este contrato já existe no Omie e será atualizado."
+                  ? "Este contrato já existe no Omie e será ATUALIZADO (não duplicado)."
                   : "O cliente e o contrato serão enviados ao Omie.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
