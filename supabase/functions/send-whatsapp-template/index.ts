@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
       instance_id?: string;
       to?: string;
       template_id?: string;
-      parameters?: string[];
+      parameters?: string[] | Record<string, string>;
     };
 
     if (!instance_id || !to || !template_id) {
