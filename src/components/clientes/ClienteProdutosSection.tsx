@@ -1522,7 +1522,9 @@ function ProdutoDialog({
         ) : null}
 
 
+        {omieAtivo && (
           <>
+
             <Separator />
             <div className="space-y-2">
               <h4 className="text-sm font-semibold text-muted-foreground">Integração Omie</h4>
