@@ -7,7 +7,63 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { AlertTriangle, ChevronDown, ChevronRight, RefreshCw, Clock, Pause, TestTube2, ExternalLink } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, RefreshCw, Clock, Pause, TestTube2, ExternalLink, RotateCw, Loader2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "sonner";
+
+type ReprocessarResp = {
+  ok?: boolean;
+  acao?: string;
+  mensagem?: string;
+  erro?: string;
+  aviso?: string;
+  revalidou?: boolean;
+  motivos?: string[];
+};
+
+function ReprocessarButton({ filaId, onDone }: { filaId: string; onDone: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const handle = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await (supabase.rpc as any)("omie_fila_reprocessar", { p_fila_id: filaId });
+      if (error) {
+        toast.error("Falha ao reprocessar. Tente novamente.");
+        return;
+      }
+      const r = (data ?? {}) as ReprocessarResp;
+      if (r.ok) {
+        toast.success(r.mensagem ?? (r.acao === "absorvido" ? "Item absorvido em outro da fila." : "Item devolvido para a fila."));
+        if (r.aviso) toast.warning(r.aviso);
+        onDone();
+        return;
+      }
+      if (r.revalidou === false) {
+        const motivos = Array.isArray(r.motivos) && r.motivos.length ? r.motivos.join("\n• ") : "Sem detalhes.";
+        toast.warning("A causa ainda não foi resolvida.", { description: `• ${motivos}` });
+        return;
+      }
+      toast.error(r.erro ?? "Não foi possível reprocessar.");
+    } catch {
+      toast.error("Falha ao reprocessar. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button size="sm" variant="secondary" className="gap-1 shrink-0" onClick={handle} disabled={loading}>
+            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
+            Reprocessar
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Devolve este item para a fila. Use depois de corrigir a causa.</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 type FilaItem = {
   prio?: string | number | null;
@@ -322,6 +378,7 @@ export default function OmieFilaSincronizacaoPanel({
                 {itensFiltrados.map((item, i) => {
                   const status = (item.status || "").toLowerCase();
                   const isIgnorado = status === "ignorado";
+                  const canReprocess = (status === "ignorado" || status === "invalido" || status === "erro") && !!item.fila_id;
                   return (
                     <div
                       key={item.fila_id ?? i}
@@ -357,17 +414,22 @@ export default function OmieFilaSincronizacaoPanel({
                           )}
                         </div>
                       </div>
-                      {isIgnorado && item.cnpj && onIrParaEscolherCandidato && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1 shrink-0"
-                          onClick={() => onIrParaEscolherCandidato(item.cnpj as string)}
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          Resolver na Conferência
-                        </Button>
-                      )}
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                        {isIgnorado && item.cnpj && onIrParaEscolherCandidato && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            onClick={() => onIrParaEscolherCandidato(item.cnpj as string)}
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Resolver na Conferência
+                          </Button>
+                        )}
+                        {canReprocess && (
+                          <ReprocessarButton filaId={item.fila_id as string} onDone={() => query.refetch()} />
+                        )}
+                      </div>
                     </div>
                   );
                 })}
