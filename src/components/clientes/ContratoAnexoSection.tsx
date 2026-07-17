@@ -325,6 +325,18 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
             <Button type="button" variant="outline" size="sm" onClick={handleDownload}>
               <Download className="h-4 w-4 mr-1" /> Baixar
             </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              onClick={() => setConfirmRemove(true)}
+              disabled={removing}
+              aria-label="Remover anexo"
+              title="Remover anexo"
+            >
+              {removing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            </Button>
           </div>
 
           {previewUrl && !ios && (
