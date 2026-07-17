@@ -350,6 +350,28 @@ export default function ContratoAnexoSection({ contratoId, tenantId, anexo: anex
           )}
         </div>
       )}
+
+      <AlertDialog open={confirmRemove} onOpenChange={(o) => { if (!removing) setConfirmRemove(o); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover anexo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remover o anexo deste contrato? Ele também será removido do Omie.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removing}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleRemove(); }}
+              disabled={removing}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {removing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
