@@ -431,7 +431,7 @@ export default function MovimentosMrrTab() {
                     {Number(m.custo_delta) ? fmt.format(Number(m.custo_delta)) : "—"}
                   </TableCell>
                   <TableCell className="text-sm">
-                    {m.funcionario_id ? funcMap[m.funcionario_id] || "—" : "—"}
+                    {m.funcionario_nome || (m.funcionario_id ? funcMap[m.funcionario_id] : null) || "—"}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
                     {m.descricao || "—"}
