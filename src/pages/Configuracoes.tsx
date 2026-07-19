@@ -52,6 +52,7 @@ import ClienteImportModal from "@/components/import/ClienteImportModal";
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
 import CategoriasServicosTab from "@/components/configuracoes/CategoriasServicosTab";
 import OmieIntegrationTab from "@/components/configuracoes/OmieIntegrationTab";
+import HiperIntegrationTab from "@/components/configuracoes/HiperIntegrationTab";
 import PermissoesPapeisContent from "@/components/configuracoes/PermissoesPapeisContent";
 import { usePermissions } from "@/hooks/usePermissions";
 import AccessDenied from "@/pages/AccessDenied";
@@ -102,6 +103,7 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   setup: { breadcrumb: ["Sistema", "Guia de configuração"], title: "Guia de configuração", description: "Passos recomendados para configurar a plataforma." },
   notificacoes: { breadcrumb: ["Sistema", "Théo"], title: "Théo", description: "O Théo é quem envia todos os avisos da plataforma — do pulso diário aos alertas críticos. Configure aqui quem recebe cada aviso e por quais canais." },
   "integracoes-omie": { breadcrumb: ["Integrações", "Omie"], title: "Omie", description: "Conecte o sistema ao Omie para sincronizar clientes e contratos." },
+  "integracoes-hiper": { breadcrumb: ["Integrações", "Hiper"], title: "Hiper", description: "Conecte o sistema ao PortalHiper para sincronizar a carteira de clientes." },
 };
 
 
@@ -458,6 +460,8 @@ export default function Configuracoes() {
         return <NotificacoesTab />;
       case "integracoes-omie":
         return <OmieIntegrationTab />;
+      case "integracoes-hiper":
+        return <HiperIntegrationTab />;
       default:
         return null;
     }
