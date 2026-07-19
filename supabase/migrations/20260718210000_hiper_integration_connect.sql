@@ -49,5 +49,8 @@ begin
 end;
 $$;
 
-revoke all on function public.hiper_integration_connect(uuid, text, text) from public;
+-- só service_role executa. Revoga explicitamente authenticated/anon porque o
+-- default privileges do Supabase concede execute a eles na criação da função —
+-- "revoke from public" sozinho não os remove.
+revoke all on function public.hiper_integration_connect(uuid, text, text) from public, authenticated, anon;
 grant execute on function public.hiper_integration_connect(uuid, text, text) to service_role;
