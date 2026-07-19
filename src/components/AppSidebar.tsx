@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 
 import { usePermissions } from "@/hooks/usePermissions";
 import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
@@ -176,6 +176,79 @@ export function AppSidebar() {
   }, [temNovo]);
 
 
+  const onboardingMenu = canOnboarding && (
+    collapsed ? (
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton>
+              <Rocket className="h-4 w-4" />
+              <span>Onboarding & Implantação</span>
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
+            <DropdownMenuItem onClick={() => navigate("/onboarding-implantacao")}>
+              <Rocket className="h-4 w-4 mr-2" />
+              Kanban
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/onboarding-implantacao/dashboard")}>
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Dashboard
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/onboarding-implantacao/config")}>
+              <SlidersHorizontal className="h-4 w-4 mr-2" />
+              Configuração
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    ) : (
+      <Collapsible
+        defaultOpen={getGroupOpen("Onboarding")}
+        onOpenChange={(open) => setGroupOpen("Onboarding", open)}
+        className="group/collapsible"
+      >
+        <SidebarMenuItem>
+          <CollapsibleTrigger asChild>
+            <SidebarMenuButton tooltip="Onboarding & Implantação">
+              <Rocket className="h-4 w-4" />
+              <span>Onboarding & Implantação</span>
+              <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+            </SidebarMenuButton>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <SidebarMenuSub>
+              <SidebarMenuSubItem>
+                <SidebarMenuSubButton asChild>
+                  <NavLink to="/onboarding-implantacao" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <Rocket className="h-4 w-4" />
+                    <span>Kanban</span>
+                  </NavLink>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+              <SidebarMenuSubItem>
+                <SidebarMenuSubButton asChild>
+                  <NavLink to="/onboarding-implantacao/dashboard" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <BarChart3 className="h-4 w-4" />
+                    <span>Dashboard</span>
+                  </NavLink>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+              <SidebarMenuSubItem>
+                <SidebarMenuSubButton asChild>
+                  <NavLink to="/onboarding-implantacao/config" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                    <SlidersHorizontal className="h-4 w-4" />
+                    <span>Configuração</span>
+                  </NavLink>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+            </SidebarMenuSub>
+          </CollapsibleContent>
+        </SidebarMenuItem>
+      </Collapsible>
+    )
+  );
+
   return (
     <Sidebar collapsible="icon">
       <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-3">
@@ -261,8 +334,7 @@ export function AppSidebar() {
                     </Collapsible>
                   );
                 }
-                if (!can(item.resource!, "view")) return null;
-                return (
+                const leaf = can(item.resource!, "view") ? (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild tooltip={item.title}>
                       <NavLink to={item.url!} end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
@@ -271,80 +343,17 @@ export function AppSidebar() {
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                );
+                ) : null;
+                if (item.resource === "nav.painel_uso") {
+                  return (
+                    <Fragment key={item.title}>
+                      {onboardingMenu}
+                      {leaf}
+                    </Fragment>
+                  );
+                }
+                return leaf;
               })}
-              {canOnboarding && (
-                collapsed ? (
-                  <SidebarMenuItem>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <SidebarMenuButton>
-                          <Rocket className="h-4 w-4" />
-                          <span>Onboarding & Implantação</span>
-                        </SidebarMenuButton>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
-                        <DropdownMenuItem onClick={() => navigate("/onboarding-implantacao")}>
-                          <Rocket className="h-4 w-4 mr-2" />
-                          Kanban
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => navigate("/onboarding-implantacao/dashboard")}>
-                          <BarChart3 className="h-4 w-4 mr-2" />
-                          Dashboard
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => navigate("/onboarding-implantacao/config")}>
-                          <SlidersHorizontal className="h-4 w-4 mr-2" />
-                          Configuração
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </SidebarMenuItem>
-                ) : (
-                  <Collapsible
-                    defaultOpen={getGroupOpen("Onboarding")}
-                    onOpenChange={(open) => setGroupOpen("Onboarding", open)}
-                    className="group/collapsible"
-                  >
-                    <SidebarMenuItem>
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton tooltip="Onboarding & Implantação">
-                          <Rocket className="h-4 w-4" />
-                          <span>Onboarding & Implantação</span>
-                          <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton asChild>
-                              <NavLink to="/onboarding-implantacao" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                                <Rocket className="h-4 w-4" />
-                                <span>Kanban</span>
-                              </NavLink>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton asChild>
-                              <NavLink to="/onboarding-implantacao/dashboard" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                                <BarChart3 className="h-4 w-4" />
-                                <span>Dashboard</span>
-                              </NavLink>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton asChild>
-                              <NavLink to="/onboarding-implantacao/config" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                                <SlidersHorizontal className="h-4 w-4" />
-                                <span>Configuração</span>
-                              </NavLink>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </SidebarMenuItem>
-                  </Collapsible>
-                )
-              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
