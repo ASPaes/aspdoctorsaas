@@ -1251,6 +1251,7 @@ export type Database = {
           cert_a1_vencimento: string | null
           cidade_id: number | null
           cnpj: string | null
+          cnpj_digits: string | null
           codigo_sequencial: number
           complemento: string | null
           contato_aniversario: string | null
@@ -1313,6 +1314,7 @@ export type Database = {
           cert_a1_vencimento?: string | null
           cidade_id?: number | null
           cnpj?: string | null
+          cnpj_digits?: string | null
           codigo_sequencial?: number
           complemento?: string | null
           contato_aniversario?: string | null
@@ -1375,6 +1377,7 @@ export type Database = {
           cert_a1_vencimento?: string | null
           cidade_id?: number | null
           cnpj?: string | null
+          cnpj_digits?: string | null
           codigo_sequencial?: number
           complemento?: string | null
           contato_aniversario?: string | null
@@ -9271,6 +9274,7 @@ export type Database = {
           cert_a1_vencimento: string | null
           cidade_id: number | null
           cnpj: string | null
+          cnpj_digits: string | null
           codigo_sequencial: number | null
           created_at: string | null
           custo_fixo_percentual: number | null

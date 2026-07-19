@@ -60,26 +60,18 @@ function buildSearchOr(term: string): string {
   const parts = [
     `razao_social.ilike.${s}`,
     `nome_fantasia.ilike.${s}`,
-    `cnpj.ilike.${s}`,
   ];
-  const isNumeric = /^\d+$/.test(trimmed);
-  if (isNumeric) {
-    const digits = trimmed.replace(/\D/g, "");
-    if (digits.length >= 3) {
-      // Tenta as duas máscaras possíveis (CPF e CNPJ parcial), pois
-      // dígitos intermediários (ex.: 11) são ambíguos entre CPF e CNPJ.
-      const candidatos = new Set<string>();
-      candidatos.add(maskCNPJ(digits));
-      if (digits.length === 11) candidatos.add(maskCPF(digits));
-      for (const masked of candidatos) {
-        if (masked && masked !== digits) {
-          parts.push(`cnpj.ilike.%${escapeLike(masked)}%`);
-        }
-      }
-    }
-    const codigoSequencial = Number(trimmed);
-    if (Number.isInteger(codigoSequencial) && codigoSequencial <= POSTGRES_INT_MAX) {
-      parts.push(`codigo_sequencial.eq.${codigoSequencial}`);
+  // cnpj_digits = coluna gerada (só dígitos). Normaliza o termo pra dígitos e
+  // compara — funciona digitando formatado OU não, independente de como o
+  // cnpj original está gravado.
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length >= 3) {
+    parts.push(`cnpj_digits.ilike.%${digits}%`);
+  }
+  if (/^\d+$/.test(trimmed)) {
+    const codigo = Number(trimmed);
+    if (Number.isInteger(codigo) && codigo <= POSTGRES_INT_MAX) {
+      parts.push(`codigo_sequencial.eq.${codigo}`);
     }
   }
   return parts.join(",");
