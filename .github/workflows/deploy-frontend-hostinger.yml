@@ -1,0 +1,53 @@
+name: Deploy Frontend (Hostinger)
+
+# Auto-deploy do app (app.doctorsaas.com.br) no Hostinger.
+# A cada push na main que toque o frontend, builda o Vite e envia SÓ o dist/ via FTPS.
+# NÃO roda em push que só mexa em backend/docs (paths-ignore abaixo) — o deploy de
+# edge functions é outro workflow (deploy-edge-functions.yml).
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'supabase/**'
+      - 'docs/**'
+      - '**.md'
+  workflow_dispatch:
+
+# Evita dois deploys simultâneos sobrescrevendo um ao outro
+concurrency:
+  group: deploy-frontend-hostinger
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      # Sem --frozen-lockfile de propósito: o repo tem 3 lockfiles e pode haver
+      # drift; frozen quebraria o CI sem ganho real aqui.
+      - name: Install deps
+        run: bun install
+
+      # As envs VITE_* vêm do .env commitado (Vite carrega automático). Nenhum
+      # segredo de build é necessário — só as credenciais de FTP do Hostinger.
+      - name: Build
+        run: bun run build
+
+      - name: Deploy via FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.HOSTINGER_FTP_SERVER }}
+          username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
+          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          local-dir: ./dist/
+          # Pasta-raiz do subdomínio no Hostinger. Se a conta FTP já abrir dentro
+          # do docroot do app, use ./ ; senão o caminho completo (terminar com /).
+          server-dir: ${{ secrets.HOSTINGER_FTP_SERVER_DIR }}
