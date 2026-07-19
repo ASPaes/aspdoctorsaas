@@ -54,15 +54,36 @@ Pré-requisitos: Docker rodando, Supabase CLI (`brew install supabase/tap/supaba
 O que ele garante, e verifica antes de terminar:
 
 - **148 tabelas** — a estrutura inteira da produção, não o subconjunto das migrations.
-- **Zero dados de cliente.** `--schema public` traz só DDL. O script **aborta** se encontrar `INSERT`/`COPY` no dump (guarda de LGPD).
 - **Zero vazamento para produção.** Três funções do schema `public` fazem `net.http_post` contra a URL de produção: `cron_recon_espelho`, `fn_schedule_group_syncs` e — a perigosa — `fn_onboarding_send_welcome`, que é **trigger**: dispara sozinha e mandaria um WhatsApp real para um cliente real a partir do banco de testes. O script redefine as três como no-op no local e confirma que sobrou `0`.
 - **Migrations intactas.** Para subir o stack ele precisa tirar `supabase/migrations/` do caminho; um `trap` devolve a pasta mesmo se o script morrer no meio. **Sem isso, o git enxerga as 163 migrations como apagadas e um commit distraído some com elas.**
 
 Para o app voltar a apontar para produção: **apague `.env.local`**.
 
+### Dados: o local HOJE tem a base real completa
+
+O script (linha 66) traz **só estrutura** e **aborta** se o dump vier com `INSERT`/`COPY` — guarda de LGPD. Mas em **16/07/2026** a base de produção foi copiada para o local **por fora do script**, e é assim que a máquina do Alexandre está agora. Verificado no banco local nessa data:
+
+| | local | = produção |
+|---|---|---|
+| `clientes` | 3.704 | ✓ |
+| `contratos` | 3.697 | ✓ |
+| `whatsapp_messages` | 387.662 | ✓ |
+| `whatsapp_conversations` | 5.135 | ✓ |
+| `profiles` / `tenants` | 101 / 13 | ✓ |
+
+**Isso é uma base de testes deliberada**, decisão do Alexandre — serve para reproduzir bug de cliente com o dado que causou o bug. Não "conserte" removendo os dados.
+
+Isolamento reconferido **com os dados dentro** (16/07/2026): as 3 funções de egress estão no-op · `trg_onboarding_send_welcome` continua ativo mas aponta pro no-op · **`pg_cron` não está instalado** (nada dispara sozinho) · nenhum trigger usa `supabase_functions.http_request` · **`vault.secrets` = 0** — sem credencial, nenhuma edge function local manda WhatsApp de verdade. `pg_net` existe mas ninguém chama.
+
+⚠️ **Não existe caminho repetível para atualizar esses dados.** O script não faz isso e não sobrou rastro de como foi feito (sem dump em disco, nada no `~/.zsh_history` — provavelmente outra sessão de agente). Quando o Alexandre pedir "atualiza o local igual à produção", **isso precisa ser construído, não executado de memória**. Requisitos inegociáveis de qualquer carga de dados:
+1. Os no-ops das 3 funções entram **antes** dos dados — carga com trigger vivo dispara `fn_onboarding_send_welcome`.
+2. `session_replication_role = replica` durante a carga (evita triggers e ordem de FK).
+3. Reconferir `vault.secrets = 0` e `pg_cron` ausente depois.
+
+**LGPD:** são conversas e telefones de clientes reais num notebook. A guarda do script existia para impedir exatamente isso; ela foi contornada conscientemente. Disco criptografado e a pasta fora de backup em nuvem passam a ser parte do controle.
+
 Limites honestos:
-- O banco local nasce **sem dados**. Serve para estrutura, RLS, RPC e migration — não para "ver meus números".
-- Ele **congela no tempo**. Lovable e painel mudam a produção sem migration; rode o script de novo para re-sincronizar.
+- O local **congela no tempo** — em estrutura *e agora também em dados*. Lovable e painel mudam a produção sem migration.
 - `supabase db push` continua **proibido** (ver seção ⚠️ acima). SQL validado no local vai para produção via SQL Editor / `apply_migration`, com OK do Alexandre.
 
 ---
