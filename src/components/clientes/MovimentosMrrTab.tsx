@@ -67,8 +67,8 @@ export default function MovimentosMrrTab() {
     queryFn: async () => {
       const data = await fetchAllRows<any>(() => {
         let q = supabase
-          .from("movimentos_mrr")
-          .select("id, tipo, valor_delta, custo_delta, valor_venda_avulsa, data_movimento, descricao, status, estornado_por, estorno_de, cliente_id, funcionario_id, fornecedor_id, origem_venda, criado_em")
+          .from("vw_movimentos_mrr" as any)
+          .select("id, tipo, valor_delta, custo_delta, valor_venda_avulsa, data_movimento, descricao, status, estornado_por, estorno_de, cliente_id, funcionario_id, fornecedor_efetivo, origem_venda, criado_em, cliente_razao_social, cliente_nome_fantasia, funcionario_nome")
           .eq("status", "ativo")
           .is("estornado_por", null)
           .is("estorno_de", null)
@@ -81,9 +81,9 @@ export default function MovimentosMrrTab() {
         if (tipoFilter) q = q.eq("tipo", tipoFilter as any);
         if (funcionarioFilter) q = q.eq("funcionario_id", Number(funcionarioFilter));
         if (fornecedorFilter === "__null__") {
-          q = q.is("fornecedor_id", null);
+          q = q.is("fornecedor_efetivo", null);
         } else if (fornecedorFilter) {
-          q = q.eq("fornecedor_id", Number(fornecedorFilter));
+          q = q.eq("fornecedor_efetivo", Number(fornecedorFilter));
         }
 
         return q;
@@ -93,15 +93,15 @@ export default function MovimentosMrrTab() {
   });
 
   const { data: fornecedores } = useQuery({
-    queryKey: ["movimentos_mrr_fornecedores", tid],
+    queryKey: ["movimentos_mrr_fornecedores_efetivo", tid],
     queryFn: async () => {
       if (!tid) return [];
       const { data: idsRaw } = await supabase
-        .from("movimentos_mrr")
-        .select("fornecedor_id")
+        .from("vw_movimentos_mrr" as any)
+        .select("fornecedor_efetivo")
         .eq("tenant_id", tid)
-        .not("fornecedor_id", "is", null);
-      const ids = [...new Set((idsRaw || []).map((x: any) => x.fornecedor_id))].filter(Boolean);
+        .not("fornecedor_efetivo", "is", null);
+      const ids = [...new Set((idsRaw || []).map((x: any) => x.fornecedor_efetivo))].filter(Boolean);
       if (!ids.length) return [];
       const { data } = await supabase
         .from("fornecedores")
@@ -114,28 +114,16 @@ export default function MovimentosMrrTab() {
     enabled: !!tid,
   });
 
-  // Fetch client names for display
-  const clienteIds = useMemo(() => [...new Set((movimentos || []).map(m => m.cliente_id))], [movimentos]);
-  const { data: clientesMap } = useQuery({
-    queryKey: ["clientes_nomes", clienteIds],
-    queryFn: async () => {
-      if (!clienteIds.length) return {};
-      const map: Record<string, string> = {};
-      // Fetch in batches of 100
-      for (let i = 0; i < clienteIds.length; i += 100) {
-        const batch = clienteIds.slice(i, i + 100);
-        const { data } = await supabase
-          .from("clientes")
-          .select("id, razao_social, nome_fantasia")
-          .in("id", batch);
-        data?.forEach(c => {
-          map[c.id] = c.razao_social || c.nome_fantasia || "—";
-        });
+  // Build cliente name map from flat view columns (no extra query)
+  const clientesMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (movimentos || []).forEach((m: any) => {
+      if (m.cliente_id) {
+        map[m.cliente_id] = m.cliente_razao_social || m.cliente_nome_fantasia || "—";
       }
-      return map;
-    },
-    enabled: clienteIds.length > 0,
-  });
+    });
+    return map;
+  }, [movimentos]);
 
   // Fetch funcionario names
   const funcMap = useMemo(() => {
@@ -197,7 +185,7 @@ export default function MovimentosMrrTab() {
           cmp = ((clientesMap?.[a.cliente_id] || "").localeCompare(clientesMap?.[b.cliente_id] || ""));
           break;
         case "funcionario_nome":
-          cmp = ((funcMap[a.funcionario_id || 0] || "").localeCompare(funcMap[b.funcionario_id || 0] || ""));
+          cmp = ((a.funcionario_nome || funcMap[a.funcionario_id || 0] || "").localeCompare(b.funcionario_nome || funcMap[b.funcionario_id || 0] || ""));
           break;
       }
       return sortDir === "asc" ? cmp : -cmp;
@@ -443,7 +431,7 @@ export default function MovimentosMrrTab() {
                     {Number(m.custo_delta) ? fmt.format(Number(m.custo_delta)) : "—"}
                   </TableCell>
                   <TableCell className="text-sm">
-                    {m.funcionario_id ? funcMap[m.funcionario_id] || "—" : "—"}
+                    {m.funcionario_nome || (m.funcionario_id ? funcMap[m.funcionario_id] : null) || "—"}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
                     {m.descricao || "—"}

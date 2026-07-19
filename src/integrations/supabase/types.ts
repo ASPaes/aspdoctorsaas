@@ -2802,6 +2802,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cs_tickets_avulsa_movimento_id_fkey"
+            columns: ["avulsa_movimento_id"]
+            isOneToOne: false
+            referencedRelation: "vw_movimentos_mrr"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "cs_tickets_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -3334,10 +3341,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "movimentos_mrr_estornado_por_fkey"
+            columns: ["estornado_por"]
+            isOneToOne: false
+            referencedRelation: "vw_movimentos_mrr"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "movimentos_mrr_estorno_de_fkey"
             columns: ["estorno_de"]
             isOneToOne: false
             referencedRelation: "movimentos_mrr"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_estorno_de_fkey"
+            columns: ["estorno_de"]
+            isOneToOne: false
+            referencedRelation: "vw_movimentos_mrr"
             referencedColumns: ["id"]
           },
           {
@@ -9389,6 +9410,113 @@ export type Database = {
           tenant_id: string | null
         }
         Relationships: []
+      }
+      vw_movimentos_mrr: {
+        Row: {
+          cliente_id: string | null
+          cliente_nome_fantasia: string | null
+          cliente_produto_modulo_id: string | null
+          cliente_razao_social: string | null
+          contrato_id: string | null
+          criado_em: string | null
+          custo_delta: number | null
+          data_movimento: string | null
+          descricao: string | null
+          estornado_por: string | null
+          estorno_de: string | null
+          fornecedor_efetivo: number | null
+          fornecedor_id: number | null
+          funcionario_id: number | null
+          funcionario_nome: string | null
+          id: string | null
+          inativado_em: string | null
+          inativado_por_id: number | null
+          origem_venda: string | null
+          status: string | null
+          tenant_id: string | null
+          tipo: Database["public"]["Enums"]["movimento_mrr_tipo"] | null
+          valor_delta: number | null
+          valor_venda_avulsa: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimentos_mrr_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_cliente_produto_modulo_id_fkey"
+            columns: ["cliente_produto_modulo_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_produto_modulos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_estornado_por_fkey"
+            columns: ["estornado_por"]
+            isOneToOne: false
+            referencedRelation: "movimentos_mrr"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_estornado_por_fkey"
+            columns: ["estornado_por"]
+            isOneToOne: false
+            referencedRelation: "vw_movimentos_mrr"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_estorno_de_fkey"
+            columns: ["estorno_de"]
+            isOneToOne: false
+            referencedRelation: "movimentos_mrr"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_estorno_de_fkey"
+            columns: ["estorno_de"]
+            isOneToOne: false
+            referencedRelation: "vw_movimentos_mrr"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_inativado_por_id_fkey"
+            columns: ["inativado_por_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vw_onboarding_journeys: {
         Row: {
