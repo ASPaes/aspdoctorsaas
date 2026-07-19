@@ -185,7 +185,7 @@ export default function MovimentosMrrTab() {
           cmp = ((clientesMap?.[a.cliente_id] || "").localeCompare(clientesMap?.[b.cliente_id] || ""));
           break;
         case "funcionario_nome":
-          cmp = ((funcMap[a.funcionario_id || 0] || "").localeCompare(funcMap[b.funcionario_id || 0] || ""));
+          cmp = ((a.funcionario_nome || funcMap[a.funcionario_id || 0] || "").localeCompare(b.funcionario_nome || funcMap[b.funcionario_id || 0] || ""));
           break;
       }
       return sortDir === "asc" ? cmp : -cmp;
