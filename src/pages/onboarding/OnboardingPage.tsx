@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
-import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2, Ban, X, Search } from "lucide-react";
+import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2, Ban, X, Search, GraduationCap } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { NewJourneyModal } from "./NewJourneyModal";
@@ -91,6 +91,20 @@ function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+}
+
+function formatTrainingDateTime(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const dia = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const hora = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${dia} ${hora}`;
+}
+
+// treino hoje ou atrasado (America/Sao_Paulo, UTC-3 fixo) => sinaliza com pulse
+function isTrainingUrgent(iso: string | null): boolean {
+  if (!iso) return false;
+  return new Date(iso).getTime() <= Date.now() + 24 * 60 * 60 * 1000;
 }
 
 export default function OnboardingPage() {
@@ -193,6 +207,56 @@ export default function OnboardingPage() {
 
   const stages = stagesQuery.data ?? [];
   const journeys = journeysQuery.data ?? [];
+
+  // Treinos agendados por jornada — destaque no card da Implantação (data + especialista)
+  const trainingsQuery = useQuery({
+    queryKey: ["onboarding-board-trainings", effectiveTenantId, fase],
+    enabled: canAccess && !!effectiveTenantId && fase === "implantacao",
+    queryFn: async () => {
+      const rows = await fetchAllRows<any>(() =>
+        (supabase.from("onboarding_training_sessions" as any) as any)
+          .select("journey_id, agendado_para, conduzido_por")
+          .eq("tenant_id", effectiveTenantId)
+          .eq("status", "agendado")
+          .not("agendado_para", "is", null)
+          .order("agendado_para", { ascending: true })
+      );
+      // treino mais próximo por jornada (rows já vêm em ordem asc)
+      const perJourney = new Map<string, { agendado_para: string; conduzido_por: string | null }>();
+      for (const r of rows) {
+        if (r.journey_id && !perJourney.has(r.journey_id)) {
+          perJourney.set(r.journey_id, { agendado_para: r.agendado_para, conduzido_por: r.conduzido_por ?? null });
+        }
+      }
+      // nome do especialista: user_id -> profiles.funcionario_id -> funcionarios.nome
+      const userIds = Array.from(new Set(rows.map((r: any) => r.conduzido_por).filter(Boolean))) as string[];
+      const nameMap = new Map<string, string>();
+      if (userIds.length) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("user_id, funcionario_id")
+          .in("user_id", userIds);
+        const funcIds = (profs ?? []).map((p: any) => p.funcionario_id).filter(Boolean) as number[];
+        const { data: funcs } = funcIds.length
+          ? await supabase.from("funcionarios").select("id, nome").in("id", funcIds)
+          : { data: [] as any[] };
+        const funcMap = new Map((funcs ?? []).map((f: any) => [f.id, f.nome]));
+        (profs ?? []).forEach((p: any) => {
+          nameMap.set(p.user_id, (p.funcionario_id ? funcMap.get(p.funcionario_id) : null) || "");
+        });
+      }
+      const result: Record<string, { agendado_para: string; especialista: string | null }> = {};
+      perJourney.forEach((v, jid) => {
+        result[jid] = {
+          agendado_para: v.agendado_para,
+          especialista: v.conduzido_por ? (nameMap.get(v.conduzido_por) || null) : null,
+        };
+      });
+      return result;
+    },
+  });
+
+  const trainingByJourney = trainingsQuery.data ?? {};
 
   const ONB_DONE_COL_ID = "__onb_concluido__";
 
@@ -300,6 +364,9 @@ export default function OnboardingPage() {
       }
       toast.success("Etapa atualizada");
       queryClient.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+      queryClient.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+      queryClient.invalidateQueries({ queryKey: ["onboarding-journey-checklist"] });
+      queryClient.invalidateQueries({ queryKey: ["onboarding-stage-history"] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao mover jornada");
     }
@@ -494,6 +561,7 @@ export default function OnboardingPage() {
                         const concluida = j.situacao === "concluido";
                         const cancelada = j.situacao === "cancelado";
                         const semaforo = (concluida || cancelada) ? "sem_sla" : (j.etapa_semaforo || "sem_sla");
+                        const treino = trainingByJourney[j.journey_id];
                         return (
                           <div
                             key={j.journey_id}
@@ -516,6 +584,25 @@ export default function OnboardingPage() {
                                 : undefined
                             }
                           >
+                            {treino && !concluida && !cancelada && (
+                              <div
+                                className="flex items-center gap-1.5 -mx-2.5 -mt-2.5 mb-2 px-2.5 py-1.5 rounded-t-md text-[10px] font-medium text-white"
+                                style={{ background: "linear-gradient(90deg, #0EA5E9, #0284C7)" }}
+                                title={`Treino agendado${treino.especialista ? ` · ${treino.especialista}` : ""}`}
+                              >
+                                <GraduationCap className="h-3 w-3 shrink-0" />
+                                <span className="truncate">
+                                  Treino {formatTrainingDateTime(treino.agendado_para)}
+                                  {treino.especialista ? ` · ${treino.especialista}` : ""}
+                                </span>
+                                {isTrainingUrgent(treino.agendado_para) && (
+                                  <span className="relative flex h-2 w-2 ml-auto shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                                  </span>
+                                )}
+                              </div>
+                            )}
                             <div className="flex items-center gap-1.5 mb-1">
                               {concluida ? (
                                 <CheckCircle2 className="h-3 w-3 shrink-0" style={{ color: "#22C55E" }} />

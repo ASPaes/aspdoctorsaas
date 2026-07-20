@@ -71,9 +71,17 @@ interface Stage {
   visible_sections: string[] | null;
 }
 
+interface ChecklistGroup {
+  id: string;
+  stage_id: string;
+  nome: string;
+  position: number;
+}
+
 interface ChecklistItem {
   id: string;
   stage_id: string;
+  group_id: string | null;
   texto: string;
   is_required: boolean;
   position: number;
@@ -141,12 +149,24 @@ export function PipelinesPanel({ fase }: Props) {
     },
   });
 
+  const groupsQuery = useQuery({
+    queryKey: ["onb-checklist-groups", effectiveTenantId, selectedStageId],
+    enabled: !!effectiveTenantId && !!selectedStageId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_stage_checklist_groups" as any) as any)
+        .select("id, stage_id, nome, position")
+        .eq("tenant_id", effectiveTenantId).eq("stage_id", selectedStageId).order("position");
+      if (error) throw error;
+      return (data ?? []) as ChecklistGroup[];
+    },
+  });
+
   const checklistQuery = useQuery({
     queryKey: ["onb-checklist", effectiveTenantId, selectedStageId],
     enabled: !!effectiveTenantId && !!selectedStageId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_stage_checklist" as any) as any)
-        .select("id, stage_id, texto, is_required, position, ativo")
+        .select("id, stage_id, group_id, texto, is_required, position, ativo")
         .eq("tenant_id", effectiveTenantId).eq("stage_id", selectedStageId).order("position");
       if (error) throw error;
       return (data ?? []) as ChecklistItem[];
@@ -155,6 +175,7 @@ export function PipelinesPanel({ fase }: Props) {
 
   const pipelines = pipelinesQuery.data ?? [];
   const stages = stagesQuery.data ?? [];
+  const groups = groupsQuery.data ?? [];
   const checklist = checklistQuery.data ?? [];
   const produtos = produtosQuery.data ?? [];
 
@@ -269,13 +290,63 @@ export function PipelinesPanel({ fase }: Props) {
     }
   }
 
-  // ==================== Checklist ops ====================
-  async function addChecklistItem(texto: string) {
+  // ==================== Checklist group ops ====================
+  async function addGroup(nome: string) {
+    if (!effectiveTenantId || !selectedStageId || !nome.trim()) return;
+    const maxPos = groups.reduce((m, g) => Math.max(m, g.position ?? 0), 0);
+    const { error } = await (supabase.from("onboarding_stage_checklist_groups" as any) as any).insert({
+      tenant_id: effectiveTenantId,
+      stage_id: selectedStageId,
+      nome: nome.trim(),
+      position: maxPos + 1,
+    });
+    if (error) toast.error(error.message);
+    else qc.invalidateQueries({ queryKey: ["onb-checklist-groups"] });
+  }
+
+  async function renameGroup(id: string, nome: string) {
+    if (!nome.trim()) return;
+    const { error } = await (supabase.from("onboarding_stage_checklist_groups" as any) as any)
+      .update({ nome: nome.trim() }).eq("id", id).eq("tenant_id", effectiveTenantId);
+    if (error) toast.error(error.message);
+    else qc.invalidateQueries({ queryKey: ["onb-checklist-groups"] });
+  }
+
+  async function deleteGroup(id: string) {
+    if (!confirm("Remover este checklist e todos os seus itens?")) return;
+    const { error } = await (supabase.from("onboarding_stage_checklist_groups" as any) as any)
+      .delete().eq("id", id).eq("tenant_id", effectiveTenantId);
+    if (error) toast.error(error.message);
+    else {
+      qc.invalidateQueries({ queryKey: ["onb-checklist-groups"] });
+      qc.invalidateQueries({ queryKey: ["onb-checklist"] });
+    }
+  }
+
+  async function reorderGroups(reordered: ChecklistGroup[]) {
+    qc.setQueryData(["onb-checklist-groups", effectiveTenantId, selectedStageId],
+      reordered.map((g, i) => ({ ...g, position: i + 1 })));
+    try {
+      await Promise.all(reordered.map((g, i) =>
+        (supabase.from("onboarding_stage_checklist_groups" as any) as any)
+          .update({ position: i + 1 }).eq("id", g.id).eq("tenant_id", effectiveTenantId)
+      ));
+    } catch {
+      toast.error("Erro ao reordenar checklists");
+      qc.invalidateQueries({ queryKey: ["onb-checklist-groups"] });
+    }
+  }
+
+  // ==================== Checklist item ops ====================
+  async function addChecklistItem(groupId: string, texto: string) {
     if (!effectiveTenantId || !selectedStageId || !texto.trim()) return;
-    const maxPos = checklist.reduce((m, i) => Math.max(m, i.position ?? 0), 0);
+    const maxPos = checklist
+      .filter((i) => i.group_id === groupId)
+      .reduce((m, i) => Math.max(m, i.position ?? 0), 0);
     const { error } = await (supabase.from("onboarding_stage_checklist" as any) as any).insert({
       tenant_id: effectiveTenantId,
       stage_id: selectedStageId,
+      group_id: groupId,
       texto: texto.trim(),
       is_required: false,
       position: maxPos + 1,
@@ -299,9 +370,13 @@ export function PipelinesPanel({ fase }: Props) {
     else qc.invalidateQueries({ queryKey: ["onb-checklist"] });
   }
 
-  async function reorderChecklist(reordered: ChecklistItem[]) {
+  async function reorderChecklist(groupId: string, reordered: ChecklistItem[]) {
     qc.setQueryData(["onb-checklist", effectiveTenantId, selectedStageId],
-      reordered.map((r, i) => ({ ...r, position: i + 1 })));
+      (old: ChecklistItem[] | undefined) => {
+        const others = (old ?? []).filter((i) => i.group_id !== groupId);
+        const updated = reordered.map((r, i) => ({ ...r, position: i + 1 }));
+        return [...others, ...updated];
+      });
     try {
       await Promise.all(reordered.map((r, i) =>
         (supabase.from("onboarding_stage_checklist" as any) as any)
@@ -422,12 +497,17 @@ export function PipelinesPanel({ fase }: Props) {
             <div className="text-xs text-muted-foreground text-center py-8">Selecione uma etapa</div>
           ) : (
             <ChecklistEditor
+              groups={groups}
               items={checklist}
-              loading={checklistQuery.isLoading}
-              onAdd={addChecklistItem}
-              onUpdate={updateChecklistItem}
-              onDelete={deleteChecklistItem}
-              onReorder={reorderChecklist}
+              loading={checklistQuery.isLoading || groupsQuery.isLoading}
+              onAddGroup={addGroup}
+              onRenameGroup={renameGroup}
+              onDeleteGroup={deleteGroup}
+              onReorderGroups={reorderGroups}
+              onAddItem={addChecklistItem}
+              onUpdateItem={updateChecklistItem}
+              onDeleteItem={deleteChecklistItem}
+              onReorderItems={reorderChecklist}
               sensors={sensors}
             />
           )}
@@ -507,59 +587,199 @@ function SortableStageRow({
 // Checklist editor
 // ============================================================================
 function ChecklistEditor({
-  items, loading, onAdd, onUpdate, onDelete, onReorder, sensors,
+  groups, items, loading,
+  onAddGroup, onRenameGroup, onDeleteGroup, onReorderGroups,
+  onAddItem, onUpdateItem, onDeleteItem, onReorderItems, sensors,
 }: {
-  items: ChecklistItem[]; loading: boolean;
-  onAdd: (t: string) => void;
-  onUpdate: (id: string, patch: Partial<ChecklistItem>) => void;
-  onDelete: (id: string) => void;
-  onReorder: (items: ChecklistItem[]) => void;
+  groups: ChecklistGroup[];
+  items: ChecklistItem[];
+  loading: boolean;
+  onAddGroup: (nome: string) => void;
+  onRenameGroup: (id: string, nome: string) => void;
+  onDeleteGroup: (id: string) => void;
+  onReorderGroups: (groups: ChecklistGroup[]) => void;
+  onAddItem: (groupId: string, texto: string) => void;
+  onUpdateItem: (id: string, patch: Partial<ChecklistItem>) => void;
+  onDeleteItem: (id: string) => void;
+  onReorderItems: (groupId: string, items: ChecklistItem[]) => void;
   sensors: any;
 }) {
-  const [novo, setNovo] = useState("");
+  const [novoGrupo, setNovoGrupo] = useState("");
+  const itemsByGroup = useMemo(() => {
+    const map: Record<string, ChecklistItem[]> = {};
+    for (const it of items) {
+      const k = it.group_id ?? "__none__";
+      (map[k] ??= []).push(it);
+    }
+    for (const k of Object.keys(map)) map[k].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    return map;
+  }, [items]);
+  const ungrouped = itemsByGroup["__none__"] ?? [];
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {/* Novo checklist (grupo) */}
       <div className="flex items-center gap-1">
         <Input
-          value={novo}
-          onChange={(e) => setNovo(e.target.value)}
-          placeholder="Novo item do checklist"
+          value={novoGrupo}
+          onChange={(e) => setNovoGrupo(e.target.value)}
+          placeholder="Adicionar checklist"
           className="h-8 text-sm"
-          onKeyDown={(e) => { if (e.key === "Enter" && novo.trim()) { onAdd(novo); setNovo(""); } }}
+          onKeyDown={(e) => { if (e.key === "Enter" && novoGrupo.trim()) { onAddGroup(novoGrupo); setNovoGrupo(""); } }}
         />
         <Button size="icon" className="h-8 w-8"
-          onClick={() => { if (novo.trim()) { onAdd(novo); setNovo(""); } }}>
+          onClick={() => { if (novoGrupo.trim()) { onAddGroup(novoGrupo); setNovoGrupo(""); } }}>
           <Plus className="h-4 w-4" />
         </Button>
       </div>
+
       {loading ? (
         <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
-      ) : items.length === 0 ? (
-        <div className="text-xs text-muted-foreground text-center py-4">Nenhum item</div>
+      ) : groups.length === 0 && ungrouped.length === 0 ? (
+        <div className="text-xs text-muted-foreground text-center py-4">Nenhum checklist. Crie um acima.</div>
       ) : (
-        <DndContext
-          sensors={sensors} collisionDetection={closestCenter}
-          onDragEnd={(e) => {
-            if (!e.over || e.active.id === e.over.id) return;
-            const oldIdx = items.findIndex((i) => i.id === e.active.id);
-            const newIdx = items.findIndex((i) => i.id === e.over!.id);
-            if (oldIdx < 0 || newIdx < 0) return;
-            onReorder(arrayMove(items, oldIdx, newIdx));
-          }}
-        >
-          <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-1">
-              {items.map((it) => (
-                <SortableChecklistRow key={it.id} item={it} onUpdate={onUpdate} onDelete={onDelete} />
+        <>
+          <DndContext
+            sensors={sensors} collisionDetection={closestCenter}
+            onDragEnd={(e) => {
+              if (!e.over || e.active.id === e.over.id) return;
+              const oldIdx = groups.findIndex((g) => g.id === e.active.id);
+              const newIdx = groups.findIndex((g) => g.id === e.over!.id);
+              if (oldIdx < 0 || newIdx < 0) return;
+              onReorderGroups(arrayMove(groups, oldIdx, newIdx));
+            }}
+          >
+            <SortableContext items={groups.map((g) => g.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-3">
+                {groups.map((g) => (
+                  <SortableGroup
+                    key={g.id}
+                    group={g}
+                    items={itemsByGroup[g.id] ?? []}
+                    sensors={sensors}
+                    onRename={onRenameGroup}
+                    onDelete={onDeleteGroup}
+                    onAddItem={onAddItem}
+                    onUpdateItem={onUpdateItem}
+                    onDeleteItem={onDeleteItem}
+                    onReorderItems={onReorderItems}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+
+          {ungrouped.length > 0 && (
+            <div className="rounded-md border border-dashed border-border p-2 space-y-1">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide px-1">Sem checklist</p>
+              {ungrouped.map((it) => (
+                <div key={it.id} className="flex items-center gap-1.5 p-1.5 rounded-md border border-border bg-card">
+                  {it.is_required && <span className="h-2 w-2 rounded-full bg-destructive/70 shrink-0" title="Obrigatório" />}
+                  <span className="flex-1 text-xs truncate">{it.texto}</span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDeleteItem(it.id)}>
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                  </Button>
+                </div>
               ))}
             </div>
-          </SortableContext>
-        </DndContext>
+          )}
+        </>
       )}
+
       <p className="text-[10px] text-muted-foreground pt-1 border-t border-border">
         <span className="inline-block w-2 h-2 rounded-full bg-destructive/70 mr-1 align-middle" />
         Itens obrigatórios travam a passagem de etapa.
       </p>
+    </div>
+  );
+}
+
+// ============================================================================
+// Sortable checklist group (Trello: checklist nomeado com seus itens)
+// ============================================================================
+function SortableGroup({
+  group, items, sensors, onRename, onDelete, onAddItem, onUpdateItem, onDeleteItem, onReorderItems,
+}: {
+  group: ChecklistGroup;
+  items: ChecklistItem[];
+  sensors: any;
+  onRename: (id: string, nome: string) => void;
+  onDelete: (id: string) => void;
+  onAddItem: (groupId: string, texto: string) => void;
+  onUpdateItem: (id: string, patch: Partial<ChecklistItem>) => void;
+  onDeleteItem: (id: string) => void;
+  onReorderItems: (groupId: string, items: ChecklistItem[]) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const [novo, setNovo] = useState("");
+  const [editingName, setEditingName] = useState(false);
+  const [nameVal, setNameVal] = useState(group.nome);
+
+  return (
+    <div ref={setNodeRef} style={style} className="rounded-md border border-border bg-card/40">
+      {/* Header do grupo */}
+      <div className="group/head flex items-center gap-1.5 px-2 py-1.5 border-b border-border">
+        <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground p-0.5">
+          <GripVertical className="h-3.5 w-3.5" />
+        </button>
+        {editingName ? (
+          <Input
+            value={nameVal} autoFocus className="h-7 text-xs font-semibold"
+            onChange={(e) => setNameVal(e.target.value)}
+            onBlur={() => { setEditingName(false); if (nameVal.trim() && nameVal.trim() !== group.nome) onRename(group.id, nameVal.trim()); else setNameVal(group.nome); }}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { setNameVal(group.nome); setEditingName(false); } }}
+          />
+        ) : (
+          <button onClick={() => setEditingName(true)} className="flex-1 text-left text-xs font-semibold truncate">
+            {group.nome}
+          </button>
+        )}
+        <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">{items.length}</Badge>
+        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/head:opacity-100"
+          onClick={() => onDelete(group.id)}>
+          <Trash2 className="h-3 w-3 text-destructive" />
+        </Button>
+      </div>
+
+      {/* Itens do grupo */}
+      <div className="p-2 space-y-1.5">
+        <div className="flex items-center gap-1">
+          <Input
+            value={novo}
+            onChange={(e) => setNovo(e.target.value)}
+            placeholder="Novo item do checklist"
+            className="h-8 text-sm"
+            onKeyDown={(e) => { if (e.key === "Enter" && novo.trim()) { onAddItem(group.id, novo); setNovo(""); } }}
+          />
+          <Button size="icon" className="h-8 w-8"
+            onClick={() => { if (novo.trim()) { onAddItem(group.id, novo); setNovo(""); } }}>
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        {items.length === 0 ? (
+          <div className="text-[11px] text-muted-foreground text-center py-2">Nenhum item</div>
+        ) : (
+          <DndContext
+            sensors={sensors} collisionDetection={closestCenter}
+            onDragEnd={(e) => {
+              if (!e.over || e.active.id === e.over.id) return;
+              const oldIdx = items.findIndex((i) => i.id === e.active.id);
+              const newIdx = items.findIndex((i) => i.id === e.over!.id);
+              if (oldIdx < 0 || newIdx < 0) return;
+              onReorderItems(group.id, arrayMove(items, oldIdx, newIdx));
+            }}
+          >
+            <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-1">
+                {items.map((it) => (
+                  <SortableChecklistRow key={it.id} item={it} onUpdate={onUpdateItem} onDelete={onDeleteItem} />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        )}
+      </div>
     </div>
   );
 }

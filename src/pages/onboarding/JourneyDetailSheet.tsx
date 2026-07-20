@@ -20,6 +20,8 @@ import {
   Loader2, Clock, Pause, Play, ChevronRight, Calendar, CheckCircle2,
   Circle, AlertCircle, MessageSquare, GraduationCap, User, ArrowRight,
   UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle, Ban, Building2,
+  ExternalLink, Link2,
+  Sparkles, Rocket, StickyNote, Undo2, XCircle,
 } from "lucide-react";
 
 
@@ -127,10 +129,68 @@ const EVENT_LABELS: Record<string, string> = {
   onboarding_participante: "Participante alterado",
 };
 
+// Timeline: rótulo, ícone e cor por tipo de evento. Fonte real: support_ticket_events.event_type
+// (todos os tipos de onboarding são prefixados com "onboarding_"; EVENT_LABELS acima é legado do suporte).
+type TLTone = "emerald" | "sky" | "violet" | "amber" | "red" | "slate";
+const TL_TONES: Record<TLTone, string> = {
+  emerald: "text-emerald-500 bg-emerald-500/10",
+  sky: "text-sky-500 bg-sky-500/10",
+  violet: "text-violet-500 bg-violet-500/10",
+  amber: "text-amber-500 bg-amber-500/10",
+  red: "text-red-500 bg-red-500/10",
+  slate: "text-slate-400 bg-slate-400/10",
+};
+const TL_META: Record<string, { label: string; Icon: any; tone: TLTone }> = {
+  onboarding_criado: { label: "Jornada criada", Icon: Sparkles, tone: "emerald" },
+  onboarding_mudou_etapa: { label: "Mudança de etapa", Icon: ArrowRight, tone: "sky" },
+  onboarding_fase_implantacao: { label: "Implantação iniciada", Icon: Rocket, tone: "violet" },
+  onboarding_treino_criado: { label: "Treinamento agendado", Icon: GraduationCap, tone: "violet" },
+  onboarding_participante: { label: "Participante alterado", Icon: UserPlus, tone: "sky" },
+  onboarding_pausado: { label: "Onboarding pausado", Icon: Pause, tone: "amber" },
+  onboarding_retomado: { label: "Onboarding retomado", Icon: Play, tone: "emerald" },
+  onboarding_retorno_vendedor: { label: "Retorno ao vendedor", Icon: Undo2, tone: "amber" },
+  onboarding_retorno_vendedor_resolvido: { label: "Retorno resolvido", Icon: CheckCircle2, tone: "emerald" },
+  onboarding_cancelado: { label: "Jornada cancelada", Icon: XCircle, tone: "red" },
+  onboarding_concluido: { label: "Jornada concluída", Icon: CheckCircle2, tone: "emerald" },
+  nota_agente: { label: "Nota do agente", Icon: StickyNote, tone: "slate" },
+};
+const tlMeta = (t: string) => TL_META[t] ?? { label: EVENT_LABELS[t] ?? t, Icon: Circle, tone: "slate" as TLTone };
+
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatDayLabel(iso: string): string {
+  const d = new Date(iso);
+  const today = new Date();
+  const yest = new Date(today);
+  yest.setDate(today.getDate() - 1);
+  const same = (a: Date, b: Date) =>
+    a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
+  if (same(d, today)) return "Hoje";
+  if (same(d, yest)) return "Ontem";
+  return formatDate(iso);
+}
+
+interface JourneyChecklistRow {
+  id: string;
+  stage_id: string | null;
+  grupo_nome: string | null;
+  grupo_pos: number;
+  texto: string;
+  is_required: boolean;
+  position: number;
+  origem: string;
+  source_item_id: string | null;
+  done: boolean;
+  done_at: string | null;
+  done_by: string | null;
+}
+
 export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tenantId }: Props) {
   const { user, profile } = useAuth();
   const qc = useQueryClient();
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [note, setNote] = useState("");
   const [pauseReasonId, setPauseReasonId] = useState<string>("");
   const [pauseText, setPauseText] = useState("");
@@ -153,9 +213,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [newTrainingConductor, setNewTrainingConductor] = useState<string>("");
   const [newTrainingRetreat, setNewTrainingRetreat] = useState(false);
   const [newTrainingTypeId, setNewTrainingTypeId] = useState<string>("");
+  const [newTrainingLink, setNewTrainingLink] = useState("");
 
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
+  const [linkEditId, setLinkEditId] = useState<string | null>(null);
+  const [linkEditValue, setLinkEditValue] = useState("");
 
   // Modules
   const [addModuleOpen, setAddModuleOpen] = useState(false);
@@ -169,14 +232,15 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [returnText, setReturnText] = useState("");
   const [returnPauseSla, setReturnPauseSla] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<"atividade" | "geral">("atividade");
+  const [activeTab, setActiveTab] = useState<"atividade" | "timeline" | "geral">("atividade");
   const [secOpen, setSecOpen] = useState<Record<string, boolean>>({ treinos: true, modulos: true, anexos: true, atendimentos: true });
   const toggleSec = (k: string) => setSecOpen((s) => ({ ...s, [k]: !s[k] }));
+  const [novoManual, setNovoManual] = useState("");
+  const [novoManualReq, setNovoManualReq] = useState(false);
 
 
   useEffect(() => {
     if (!open) {
-      setChecked({});
       setNote("");
       setPauseReasonId("");
       setPauseText("");
@@ -190,9 +254,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       setNewTrainingConductor("");
       setNewTrainingRetreat(false);
       setNewTrainingTypeId("");
+      setNewTrainingLink("");
 
       setRescheduleId(null);
       setRescheduleDate("");
+      setLinkEditId(null);
+      setLinkEditValue("");
     }
   }, [open, journeyId]);
 
@@ -270,16 +337,31 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     },
   });
 
-  const checklistQ = useQuery({
-    queryKey: ["onboarding-stage-checklist", journey?.current_stage_id],
-    enabled: !!journey?.current_stage_id,
+  // Checklist da etapa ATUAL — materializado (snapshot) e persistido por jornada.
+  const journeyChecklistQ = useQuery({
+    queryKey: ["onboarding-journey-checklist", journeyId, journey?.current_stage_id],
+    enabled: !!journeyId && !!journey?.current_stage_id,
     queryFn: async () => {
-      const { data, error } = await (supabase.from("onboarding_stage_checklist" as any) as any)
-        .select("id, texto, is_required, position")
-        .eq("stage_id", journey!.current_stage_id!)
-        .order("position");
+      const { data, error } = await (supabase.rpc as any)("sync_journey_stage_checklist", {
+        p_journey_id: journeyId,
+        p_stage_id: journey!.current_stage_id,
+      });
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; texto: string; is_required: boolean; position: number }>;
+      return (data ?? []) as JourneyChecklistRow[];
+    },
+  });
+
+  // Todos os checklists da jornada (histórico p/ Visão geral).
+  const journeyChecklistAllQ = useQuery({
+    queryKey: ["onboarding-journey-checklist-all", journeyId],
+    enabled: !!journeyId && activeTab === "geral",
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_journey_checklist" as any) as any)
+        .select("id, stage_id, grupo_nome, grupo_pos, texto, is_required, position, origem, done, done_at, done_by")
+        .eq("journey_id", journeyId)
+        .order("grupo_pos").order("position");
+      if (error) throw error;
+      return (data ?? []) as JourneyChecklistRow[];
     },
   });
 
@@ -347,7 +429,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journeyId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_training_sessions" as any) as any)
-        .select("id, titulo, status, agendado_para, realizado_em, tentativas, no_show, proprietario_presente, is_retreinamento, conduzido_por, ticket_id")
+        .select("id, titulo, status, agendado_para, realizado_em, tentativas, no_show, proprietario_presente, is_retreinamento, conduzido_por, ticket_id, link_agendamento")
         .eq("journey_id", journeyId)
         .order("agendado_para", { ascending: true, nullsFirst: false });
       if (error) throw error;
@@ -544,10 +626,26 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
 
   const stages = stagesQ.data ?? [];
   const history = historyQ.data ?? [];
-  const checklist = checklistQ.data ?? [];
+  const checklist = journeyChecklistQ.data ?? [];
   const events = eventsQ.data ?? [];
   const trainings = trainingQ.data ?? [];
   const attendances = attendancesQ.data ?? [];
+
+  // Timeline: eventos (já vêm ordenados desc) agrupados por dia p/ a aba dedicada.
+  const eventsByDay = useMemo(() => {
+    const groups: Array<{ key: string; label: string; items: any[] }> = [];
+    let last: { key: string; label: string; items: any[] } | null = null;
+    for (const ev of events) {
+      const d = new Date(ev.created_at);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      if (!last || last.key !== key) {
+        last = { key, label: formatDayLabel(ev.created_at), items: [] };
+        groups.push(last);
+      }
+      last.items.push(ev);
+    }
+    return groups;
+  }, [events]);
 
   const historyByStage = useMemo(() => {
     const m: Record<string, { entrou_em: string; saiu_em: string | null; duracao_minutos: number | null }> = {};
@@ -563,6 +661,95 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     () => stages.findIndex((s) => s.id === journey?.current_stage_id),
     [stages, journey?.current_stage_id]
   );
+
+  // Checklist agrupado (modelo Trello): agrupa as linhas da jornada por nome do grupo
+  // (snapshot em grupo_nome/grupo_pos). Itens já vêm ordenados por grupo_pos, position.
+  const checklistSections = useMemo(() => {
+    const map = new Map<string, { key: string; nome: string; pos: number; items: JourneyChecklistRow[] }>();
+    for (const c of checklist) {
+      const nome = c.grupo_nome ?? "Checklist";
+      if (!map.has(nome)) map.set(nome, { key: nome, nome, pos: c.grupo_pos ?? 0, items: [] });
+      map.get(nome)!.items.push(c);
+    }
+    return Array.from(map.values()).sort((a, b) => a.pos - b.pos || a.nome.localeCompare(b.nome));
+  }, [checklist]);
+
+  async function toggleChecklistItem(item: JourneyChecklistRow, done: boolean) {
+    qc.setQueryData(
+      ["onboarding-journey-checklist", journeyId, journey?.current_stage_id],
+      (old: JourneyChecklistRow[] | undefined) =>
+        (old ?? []).map((r) => (r.id === item.id ? { ...r, done } : r)),
+    );
+    const { error } = await (supabase.rpc as any)("set_journey_checklist_done", {
+      p_item_id: item.id,
+      p_done: done,
+    });
+    if (error) {
+      toast.error(error.message);
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-checklist", journeyId, journey?.current_stage_id] });
+    }
+  }
+
+  async function addManualChecklistItem() {
+    const texto = novoManual.trim();
+    if (!texto || !journeyId || !journey?.current_stage_id) return;
+    const maxPos = checklist.filter((c) => c.origem === "manual").reduce((m, c) => Math.max(m, c.position ?? 0), 0);
+    const { error } = await (supabase.from("onboarding_journey_checklist" as any) as any).insert({
+      tenant_id: tenantId,
+      journey_id: journeyId,
+      stage_id: journey.current_stage_id,
+      grupo_nome: "Personalizado",
+      grupo_pos: 9999,
+      texto,
+      is_required: novoManualReq,
+      position: maxPos + 1,
+      origem: "manual",
+    });
+    if (error) { toast.error(error.message); return; }
+    setNovoManual("");
+    setNovoManualReq(false);
+    qc.invalidateQueries({ queryKey: ["onboarding-journey-checklist", journeyId, journey.current_stage_id] });
+    qc.invalidateQueries({ queryKey: ["onboarding-journey-checklist-all", journeyId] });
+  }
+
+  async function deleteManualChecklistItem(id: string) {
+    const { error } = await (supabase.from("onboarding_journey_checklist" as any) as any)
+      .delete().eq("id", id).eq("origem", "manual");
+    if (error) { toast.error(error.message); return; }
+    qc.invalidateQueries({ queryKey: ["onboarding-journey-checklist", journeyId, journey?.current_stage_id] });
+    qc.invalidateQueries({ queryKey: ["onboarding-journey-checklist-all", journeyId] });
+  }
+
+  // Histórico de checklists por etapa (Visão geral): agrupa todas as linhas da
+  // jornada por etapa (na ordem do pipeline) e, dentro dela, por grupo.
+  const checklistHistory = useMemo(() => {
+    const rows = journeyChecklistAllQ.data ?? [];
+    const stageOrder = new Map(stages.map((s, i) => [s.id, i]));
+    const byStage = new Map<string, JourneyChecklistRow[]>();
+    for (const r of rows) {
+      const k = r.stage_id ?? "__none__";
+      if (!byStage.has(k)) byStage.set(k, []);
+      byStage.get(k)!.push(r);
+    }
+    return Array.from(byStage.entries())
+      .map(([stageId, items]) => {
+        const gm = new Map<string, { nome: string; pos: number; items: JourneyChecklistRow[] }>();
+        for (const it of items) {
+          const gn = it.grupo_nome ?? "Checklist";
+          if (!gm.has(gn)) gm.set(gn, { nome: gn, pos: it.grupo_pos ?? 0, items: [] });
+          gm.get(gn)!.items.push(it);
+        }
+        return {
+          stageId,
+          nome: stages.find((s) => s.id === stageId)?.nome ?? "Etapa",
+          order: stageOrder.get(stageId) ?? 999,
+          groups: Array.from(gm.values()).sort((a, b) => a.pos - b.pos),
+          total: items.length,
+          done: items.filter((i) => i.done).length,
+        };
+      })
+      .sort((a, b) => a.order - b.order);
+  }, [journeyChecklistAllQ.data, stages]);
 
   const canScheduleTraining = useMemo(() => {
     if (!journey) return false;
@@ -633,7 +820,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       toast.error("Selecione a próxima etapa");
       return;
     }
-    const checkedIds = Object.entries(checked).filter(([, v]) => v).map(([k]) => k);
+    const checkedIds = checklist.filter((c) => c.done && c.source_item_id).map((c) => c.source_item_id);
     try {
       const { data, error } = await (supabase.rpc as any)("move_onboarding_stage", {
         p_journey_id: journey.journey_id,
@@ -655,8 +842,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
       qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
       qc.invalidateQueries({ queryKey: ["onboarding-stage-history"] });
-      qc.invalidateQueries({ queryKey: ["onboarding-stage-checklist"] });
-      setChecked({});
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-checklist"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-checklist-all"] });
       setNextStageId("");
     } catch (e: any) {
       toast.error(e.message || "Erro ao avançar");
@@ -857,7 +1044,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         p_conduzido_por: newTrainingConductor || null,
         p_is_retreinamento: newTrainingRetreat,
         p_training_type_id: newTrainingTypeId || null,
-
+        p_link: newTrainingLink.trim() || null,
       });
       if (error) throw error;
       toast.success(
@@ -872,7 +1059,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       setNewTrainingConductor("");
       setNewTrainingRetreat(false);
       setNewTrainingTypeId("");
+      setNewTrainingLink("");
       qc.invalidateQueries({ queryKey: ["onboarding-training", journeyId] });
+      qc.invalidateQueries({ queryKey: ["onboarding-board-trainings"] });
       qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
       qc.invalidateQueries({ queryKey: ["onboarding-journey-row", journeyId] });
       qc.invalidateQueries({ queryKey: ["onboarding-detail-stages"] });
@@ -894,6 +1083,18 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       .eq("tenant_id", tenantId);
     if (error) throw error;
     qc.invalidateQueries({ queryKey: ["onboarding-training", journeyId] });
+    qc.invalidateQueries({ queryKey: ["onboarding-board-trainings"] });
+  }
+
+  async function handleSaveLink(id: string) {
+    try {
+      await updateTraining(id, { link_agendamento: linkEditValue.trim() || null });
+      setLinkEditId(null);
+      setLinkEditValue("");
+      toast.success("Link salvo");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao salvar link");
+    }
   }
 
   async function handleMarkRealized(id: string) {
@@ -1180,6 +1381,16 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                             </SelectContent>
                           </Select>
                         </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium">Link do agendamento</label>
+                          <Input
+                            type="url"
+                            value={newTrainingLink}
+                            onChange={(e) => setNewTrainingLink(e.target.value)}
+                            placeholder="https://meet.google.com/..."
+                            className="h-8 text-xs"
+                          />
+                        </div>
                         <label className="flex items-center gap-2 text-xs cursor-pointer">
                           <Checkbox
                             checked={newTrainingRetreat}
@@ -1358,6 +1569,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                 <div className="inline-flex bg-muted/40 border border-border rounded-lg p-0.5">
                   <button onClick={() => setActiveTab("atividade")}
                     className={`px-4 py-1.5 text-xs rounded-md transition-colors ${activeTab==="atividade" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>Atividade</button>
+                  <button onClick={() => setActiveTab("timeline")}
+                    className={`px-4 py-1.5 text-xs rounded-md transition-colors ${activeTab==="timeline" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>Timeline</button>
                   <button onClick={() => setActiveTab("geral")}
                     className={`px-4 py-1.5 text-xs rounded-md transition-colors ${activeTab==="geral" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>Visão geral</button>
                 </div>
@@ -1378,23 +1591,64 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         {checklist.length === 0 ? (
                           <p className="text-xs text-muted-foreground py-2 text-center">Sem itens de checklist para esta etapa.</p>
                         ) : (
-                          checklist.map((c) => (
-                            <label key={c.id} className="flex items-start gap-2 cursor-pointer">
-                              <Checkbox
-                                checked={!!checked[c.id]}
-                                onCheckedChange={(v) => setChecked((prev) => ({ ...prev, [c.id]: !!v }))}
-                                className="mt-0.5"
-                              />
-                              <span className="text-xs">
-                                {c.texto}
-                                {c.is_required && (
-                                  <span className="ml-1.5 inline-flex items-center gap-0.5 text-[9px] text-destructive font-medium uppercase">
-                                    <AlertCircle className="h-2.5 w-2.5" />obrigatório
+                          <div className="space-y-3">
+                            {checklistSections.map((sec) => (
+                              <div key={sec.key} className="space-y-1.5">
+                                <p className="text-[11px] font-semibold text-foreground/80 flex items-center gap-1.5">
+                                  {sec.nome}
+                                  <span className="text-[10px] text-muted-foreground font-normal">
+                                    {sec.items.filter((i) => i.done).length}/{sec.items.length}
                                   </span>
-                                )}
-                              </span>
+                                </p>
+                                {sec.items.map((c) => (
+                                  <div key={c.id} className="group/ci flex items-start gap-2 pl-1">
+                                    <Checkbox
+                                      id={`ci-${c.id}`}
+                                      checked={c.done}
+                                      onCheckedChange={(v) => toggleChecklistItem(c, !!v)}
+                                      className="mt-0.5"
+                                    />
+                                    <label htmlFor={`ci-${c.id}`} className={`flex-1 text-xs cursor-pointer ${c.done ? "line-through text-muted-foreground" : ""}`}>
+                                      {c.texto}
+                                      {c.is_required && (
+                                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-[9px] text-destructive font-medium uppercase">
+                                          <AlertCircle className="h-2.5 w-2.5" />obrigatório
+                                        </span>
+                                      )}
+                                    </label>
+                                    {c.origem === "manual" && (
+                                      <button
+                                        onClick={() => deleteManualChecklistItem(c.id)}
+                                        className="opacity-0 group-hover/ci:opacity-100 text-muted-foreground hover:text-destructive shrink-0 mt-0.5"
+                                        title="Remover item personalizado"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {/* Adicionar item personalizado (independe da etapa) */}
+                        {!isConcluded && (
+                          <div className="flex items-center gap-1.5 pt-1">
+                            <Input
+                              value={novoManual}
+                              onChange={(e) => setNovoManual(e.target.value)}
+                              placeholder="+ item personalizado"
+                              className="h-8 text-xs"
+                              onKeyDown={(e) => { if (e.key === "Enter") addManualChecklistItem(); }}
+                            />
+                            <label className="flex items-center gap-1 text-[10px] text-muted-foreground shrink-0 cursor-pointer" title="Obrigatório trava o avanço">
+                              <Checkbox checked={novoManualReq} onCheckedChange={(v) => setNovoManualReq(!!v)} className="scale-90" />
+                              obrig.
                             </label>
-                          ))
+                            <Button size="icon" variant="secondary" className="h-8 w-8 shrink-0" onClick={addManualChecklistItem} disabled={!novoManual.trim()}>
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
                         )}
                         <Separator className="my-2" />
                         <div className="flex items-center gap-2">
@@ -1494,8 +1748,16 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                     </SelectContent>
                                   </Select>
                                 </div>
-
-
+                                <div className="space-y-1">
+                                  <label className="text-[11px] font-medium">Link do agendamento</label>
+                                  <Input
+                                    type="url"
+                                    value={newTrainingLink}
+                                    onChange={(e) => setNewTrainingLink(e.target.value)}
+                                    placeholder="https://meet.google.com/..."
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
                                 <label className="flex items-center gap-2 text-xs cursor-pointer">
                                   <Checkbox
                                     checked={newTrainingRetreat}
@@ -1562,6 +1824,18 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                       </Badge>
                                     )}
                                   </div>
+                                  {t.link_agendamento && (
+                                    <a
+                                      href={t.link_agendamento}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-[hsl(199_89%_48%)] hover:underline max-w-full"
+                                      title={t.link_agendamento}
+                                    >
+                                      <ExternalLink className="h-3 w-3 shrink-0" />
+                                      <span className="truncate">Link do agendamento</span>
+                                    </a>
+                                  )}
                                   {!isCancelled && (
                                     <div className="flex items-center gap-1 mt-2 flex-wrap">
                                       {!isDone && (
@@ -1599,6 +1873,33 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                           <Button size="sm" className="w-full h-7 text-xs"
                                             onClick={() => handleReschedule(t.id, t.tentativas ?? 0)}>
                                             Confirmar
+                                          </Button>
+                                        </PopoverContent>
+                                      </Popover>
+                                      <Popover
+                                        open={linkEditId === t.id}
+                                        onOpenChange={(o) => {
+                                          setLinkEditId(o ? t.id : null);
+                                          setLinkEditValue(o ? (t.link_agendamento ?? "") : "");
+                                        }}
+                                      >
+                                        <PopoverTrigger asChild>
+                                          <Button size="sm" variant="outline" className="h-6 text-[10px] px-2">
+                                            <Link2 className="h-3 w-3 mr-1" /> {t.link_agendamento ? "Editar link" : "Adicionar link"}
+                                          </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-72 space-y-2" align="start">
+                                          <label className="text-[11px] font-medium">Link do agendamento</label>
+                                          <Input
+                                            type="url"
+                                            value={linkEditValue}
+                                            onChange={(e) => setLinkEditValue(e.target.value)}
+                                            placeholder="https://meet.google.com/..."
+                                            className="h-8 text-xs"
+                                          />
+                                          <Button size="sm" className="w-full h-7 text-xs"
+                                            onClick={() => handleSaveLink(t.id)}>
+                                            Salvar
                                           </Button>
                                         </PopoverContent>
                                       </Popover>
@@ -1932,68 +2233,113 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     </section>
                   )}
 
-                    {/* Eventos */}
-                  {secVisible("eventos") && (
-                    <section className="rounded-lg border border-border">
-                      <div className="p-3 border-b border-border">
-                        <h3 className="text-sm font-semibold">Timeline de eventos</h3>
-                      </div>
-                      <div className="p-3 space-y-3">
-                        <div className="space-y-2">
-                          <Textarea
-                            value={note}
-                            onChange={(e) => setNote(e.target.value)}
-                            placeholder="Adicionar nota do agente..."
-                            rows={2}
-                            className="text-xs"
-                          />
-                          <Button size="sm" onClick={handleAddNote} disabled={!note.trim()}>
-                            Adicionar nota
-                          </Button>
-                        </div>
-                        <Separator />
-                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                          {events.length === 0 ? (
-                            <p className="text-xs text-muted-foreground py-2 text-center">Sem eventos registrados.</p>
-                          ) : (
-                            events.map((ev: any) => {
-                              const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-                              const isStageChange = ev.event_type === "onboarding_mudou_etapa";
-                              const oldIsUuid = ev.old_value && UUID_RE.test(String(ev.old_value).trim());
-                              const newIsUuid = ev.new_value && UUID_RE.test(String(ev.new_value).trim());
-                              const hideRawValues = isStageChange && (oldIsUuid || newIsUuid);
-                              const showRawValues = (ev.old_value || ev.new_value) && !hideRawValues && !oldIsUuid && !newIsUuid;
-                              const legacyStageFallback = isStageChange && hideRawValues && !ev.content;
-                              const authorName = ev.user_id ? (eventUsersQ.data?.[ev.user_id] ?? "Usuário") : "Sistema";
-                              return (
-                                <div key={ev.id} className="flex items-start gap-2 text-xs">
-                                  <div className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="font-medium">{EVENT_LABELS[ev.event_type] || ev.event_type}</span>
-                                      <span className="text-[10px] text-muted-foreground">{formatDateTime(ev.created_at)}</span>
-                                      <span className="text-[10px] text-muted-foreground">· {authorName}</span>
-                                    </div>
-                                    {ev.content && <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{ev.content}</p>}
-                                    {legacyStageFallback && (
-                                      <p className="text-xs text-muted-foreground mt-0.5">Mudança de etapa</p>
-                                    )}
-                                    {showRawValues && (
-                                      <p className="text-[10px] text-muted-foreground/80 mt-0.5">
-                                        {ev.old_value || "—"} <ChevronRight className="inline h-3 w-3" /> {ev.new_value || "—"}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-                    </section>
-                  )}
                 </div>
               </div>
+              )}
+
+              {activeTab === "timeline" && (
+                <div className="p-5">
+                  <div className="max-w-3xl mx-auto space-y-4">
+                    {/* Compositor de nota */}
+                    {!isConcluded && (
+                      <section className="rounded-lg border border-border p-3">
+                        <Textarea
+                          value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                          placeholder="Adicionar nota do agente à timeline..."
+                          rows={2}
+                          className="text-xs"
+                        />
+                        <div className="flex justify-end mt-2">
+                          <Button size="sm" onClick={handleAddNote} disabled={!note.trim()}>
+                            <StickyNote className="h-3.5 w-3.5 mr-1.5" /> Adicionar nota
+                          </Button>
+                        </div>
+                      </section>
+                    )}
+
+                    {/* Resumo */}
+                    {events.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="rounded-lg border border-border p-2.5">
+                          <div className="text-[10px] text-muted-foreground">Eventos</div>
+                          <div className="text-lg font-semibold tabular-nums leading-tight">{events.length}</div>
+                        </div>
+                        <div className="rounded-lg border border-border p-2.5">
+                          <div className="text-[10px] text-muted-foreground">Início da jornada</div>
+                          <div className="text-xs font-semibold mt-1">{formatDate(events[events.length - 1].created_at)}</div>
+                        </div>
+                        <div className="rounded-lg border border-border p-2.5">
+                          <div className="text-[10px] text-muted-foreground">Última atividade</div>
+                          <div className="text-xs font-semibold mt-1">{formatDateTime(events[0].created_at)}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Timeline agrupada por dia */}
+                    {events.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-border py-12 text-center">
+                        <Clock className="h-8 w-8 mx-auto text-muted-foreground/40" />
+                        <p className="text-xs text-muted-foreground mt-2">Sem eventos registrados ainda.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-5">
+                        {eventsByDay.map((day) => (
+                          <div key={day.key}>
+                            <div className="flex items-center gap-2 mb-2.5">
+                              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{day.label}</span>
+                              <div className="h-px bg-border flex-1" />
+                              <span className="text-[10px] text-muted-foreground">{day.items.length} {day.items.length === 1 ? "evento" : "eventos"}</span>
+                            </div>
+                            <div className="relative">
+                              {/* linha conectora do dia */}
+                              <div className="absolute left-[11px] top-3 bottom-3 w-px bg-border" />
+                              <div className="space-y-3">
+                                {day.items.map((ev: any) => {
+                                  const meta = tlMeta(ev.event_type);
+                                  const Icon = meta.Icon;
+                                  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                                  const cleanVal = (v: any) => (v && !UUID_RE.test(String(v).trim()) ? String(v) : null);
+                                  const oldV = cleanVal(ev.old_value);
+                                  const newV = cleanVal(ev.new_value);
+                                  const isStageChange = ev.event_type === "onboarding_mudou_etapa";
+                                  const hasChips = isStageChange && !!oldV && !!newV;
+                                  const authorName = ev.user_id ? (eventUsersQ.data?.[ev.user_id] ?? "Usuário") : "Sistema";
+                                  // Na mudança de etapa o content repete "Etapa: X → Y" — escondemos p/ não duplicar os chips.
+                                  const showContent = ev.content && !hasChips;
+                                  return (
+                                    <div key={ev.id} className="relative flex items-start gap-3">
+                                      <div className={`relative z-10 h-6 w-6 rounded-full flex items-center justify-center ring-4 ring-background shrink-0 ${TL_TONES[meta.tone]}`}>
+                                        <Icon className="h-3.5 w-3.5" />
+                                      </div>
+                                      <div className="flex-1 min-w-0 pt-0.5">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="text-xs font-semibold">{meta.label}</span>
+                                          <span className="text-[10px] text-muted-foreground font-mono">{formatTime(ev.created_at)}</span>
+                                          <span className="text-[10px] text-muted-foreground">· {authorName}</span>
+                                        </div>
+                                        {hasChips && (
+                                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{oldV}</span>
+                                            <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium">{newV}</span>
+                                          </div>
+                                        )}
+                                        {showContent && (
+                                          <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{ev.content}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
 
               {activeTab === "geral" && (
@@ -2055,6 +2401,48 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                             </div>
                           );
                         })}
+                      </div>
+                    </section>
+                  )}
+
+                    {/* Histórico de checklists por etapa */}
+                  {secVisible("checklist") && (journeyChecklistAllQ.data?.length ?? 0) > 0 && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border">
+                        <h3 className="text-sm font-semibold">Checklists por etapa</h3>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Histórico do que foi realizado na jornada</p>
+                      </div>
+                      <div className="p-3 space-y-3">
+                        {checklistHistory.map((st) => (
+                          <div key={st.stageId} className="rounded-md border border-border/60">
+                            <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 border-b border-border/60 bg-muted/30">
+                              <span className="text-xs font-medium truncate">{st.nome}</span>
+                              <span className="text-[10px] text-muted-foreground shrink-0">{st.done}/{st.total}</span>
+                            </div>
+                            <div className="p-2 space-y-2">
+                              {st.groups.map((g) => (
+                                <div key={g.nome} className="space-y-1">
+                                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{g.nome}</p>
+                                  {g.items.map((it) => (
+                                    <div key={it.id} className="flex items-start gap-2">
+                                      {it.done ? (
+                                        <CheckCircle2 className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                                      ) : (
+                                        <Circle className="h-3.5 w-3.5 text-muted-foreground/60 mt-0.5 shrink-0" />
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        <span className={`text-xs ${it.done ? "text-foreground" : "text-muted-foreground"}`}>{it.texto}</span>
+                                        {it.done && it.done_at && (
+                                          <span className="text-[10px] text-muted-foreground ml-1.5">{formatDateTime(it.done_at)}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </section>
                   )}
