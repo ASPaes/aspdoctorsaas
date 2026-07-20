@@ -22,8 +22,11 @@ export const RULES: DiagnosticoRule[] = [
     buildCause: (i) => {
       const entrada = (i.newMrr ?? 0) + (i.upsellMrr ?? 0) + (i.crossSellMrr ?? 0) + (i.reativacaoMrr ?? 0);
       const saida = (i.mrrCancelado ?? 0) + (i.downsellMrr ?? 0);
-      const ratio = saida > 0 && entrada > 0 ? (saida / entrada).toFixed(0) : '∞';
-      return `Quick Ratio = ${fmtX(i.quickRatio!)} — a cada R$ 1 que entra, R$ ${ratio} saem (meta ≥ 4x)`;
+      // Entrada arredonda pra R$ 0: a razão saída/entrada divide por ~zero e vira número sem sentido.
+      const comparativo = entrada < 1
+        ? `entrou ${fmtBRL(entrada)} e saíram ${fmtBRL(saida)}`
+        : `a cada R$ 1 que entra, R$ ${(saida / entrada).toFixed(0)} saem`;
+      return `Quick Ratio = ${fmtX(i.quickRatio!)} — ${comparativo} (meta ≥ 4x)`;
     },
     actionIds: ['audit_cancellations', 'upsell_playbook', 'funnel_optimization'],
   },

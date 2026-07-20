@@ -1,5 +1,7 @@
 import type { DiagnosticoInput, DiagnosticoTab, Severity } from './types';
 
+const fmtBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v);
+
 /**
  * Seleciona a melhor headline para o estado atual.
  * Prioridade: padrões específicos da aba > padrões genéricos de problema > padrões saudáveis.
@@ -123,10 +125,15 @@ export function buildHeadline(
   }
 
   // Padrão #1: Motor comercial vs hemorragia (mais grave e mais comum)
-  const newMrr = input.newMrr ?? 0;
+  // "entrada" = MRR novo + expansão (upsell/cross) + reativação — mesma definição usada em rules.ts.
+  const entrada = (input.newMrr ?? 0) + (input.upsellMrr ?? 0) + (input.crossSellMrr ?? 0) + (input.reativacaoMrr ?? 0);
   const lost = (input.mrrCancelado ?? 0) + (input.downsellMrr ?? 0);
-  if (lost > 0 && newMrr > 0 && newMrr / lost < 0.15) {
-    const ratio = Math.round(lost / newMrr);
+  if (lost > 0 && entrada / lost < 0.15) {
+    // Entrada arredonda pra R$ 0: uma razão numérica aqui divide por ~zero e vira um número sem sentido.
+    if (entrada < 1) {
+      return `O motor comercial praticamente parou: entrou ${fmtBRL(entrada)} e saíram ${fmtBRL(lost)} no período.`;
+    }
+    const ratio = Math.round(lost / entrada);
     return `O motor comercial não compensa a hemorragia da base. A cada R$ 1 que entra, R$ ${ratio} saem.`;
   }
 
