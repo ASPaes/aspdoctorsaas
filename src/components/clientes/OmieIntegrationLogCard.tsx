@@ -225,9 +225,26 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [filtro, setFiltro] = useState<FiltroTipo>("todos");
 
+  // Só toca a integração Omie se ela estiver ativa neste tenant — igual ao IntegracaoOmieCard.
+  // Sem isso, a EF omie-integration-call responde 400 e o card quebra em tenant sem Omie.
+  const integracaoAtivaQuery = useQuery({
+    queryKey: ["omie_integration_ativa", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("omie_integration")
+        .select("ativo")
+        .eq("tenant_id", tid as string)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.ativo === true;
+    },
+  });
+  const omieAtivo = integracaoAtivaQuery.data === true;
+
   const dadosQuery = useQuery<OmieDadosLog>({
     queryKey: ["cliente-omie-dados-log", tid, clienteId],
-    enabled: !!tid && !!clienteId,
+    enabled: !!tid && !!clienteId && omieAtivo,
     queryFn: async () => {
       let q = (supabase.from("contratos") as any)
         .select("id")
@@ -274,7 +291,7 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
       dadosQuery.data?.codigoClienteOmie,
       dadosQuery.data?.codigosContratoOmie,
     ],
-    enabled: !!tid && !!clienteId && !!dadosQuery.data,
+    enabled: !!tid && !!clienteId && omieAtivo && !!dadosQuery.data,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
         body: {
@@ -319,7 +336,8 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
     });
   }, [sortedLogs, filtro]);
 
-  if (!tid) return null;
+  // Integração inativa (ou ainda carregando o status): não renderiza o card nem chama a EF.
+  if (!tid || !omieAtivo) return null;
 
   return (
     <Card>
