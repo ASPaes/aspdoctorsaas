@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
-import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2, Ban, X, Search, GraduationCap } from "lucide-react";
+import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2, Ban, X, Search, GraduationCap, Tag, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { NewJourneyModal } from "./NewJourneyModal";
@@ -93,6 +95,15 @@ function formatDate(iso: string | null): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
+// cor de texto legível sobre a cor da tag
+function readableOn(hex: string): string {
+  const h = (hex || "").replace("#", "");
+  if (h.length < 6) return "#ffffff";
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? "#111827" : "#ffffff";
+}
+
 function formatTrainingDateTime(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -123,6 +134,7 @@ export default function OnboardingPage() {
   const [filtroDemanda, setFiltroDemanda] = useState<string>("todos");
   const [filtroSemaforo, setFiltroSemaforo] = useState<string>("todos");
   const [filtroSituacao, setFiltroSituacao] = useState<string>("todos");
+  const [filtroTags, setFiltroTags] = useState<string[]>([]);
   const [periodoEntrada, setPeriodoEntrada] = useState<{ from: Date; to: Date } | null>(null);
 
   // Pipelines + stages
@@ -258,6 +270,42 @@ export default function OnboardingPage() {
 
   const trainingByJourney = trainingsQuery.data ?? {};
 
+  // Tags de controle por jornada (exclusivas de onboarding/implantação).
+  const journeyTagsQuery = useQuery({
+    queryKey: ["onboarding-journeys-tags", effectiveTenantId],
+    enabled: canAccess && !!effectiveTenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_journey_tags" as any) as any)
+        .select("journey_id, tag:tag_id(id, name, color)")
+        .eq("tenant_id", effectiveTenantId);
+      if (error) throw error;
+      return (data ?? []) as Array<{ journey_id: string; tag: { id: string; name: string; color: string } | null }>;
+    },
+  });
+
+  const availableTagsQuery = useQuery({
+    queryKey: ["onboarding-tags-available", effectiveTenantId],
+    enabled: canAccess && !!effectiveTenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_tags" as any) as any)
+        .select("id, name, color")
+        .eq("tenant_id", effectiveTenantId)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; color: string }>;
+    },
+  });
+
+  const tagsByJourney = useMemo(() => {
+    const m: Record<string, Array<{ id: string; name: string; color: string }>> = {};
+    (journeyTagsQuery.data ?? []).forEach((r) => {
+      if (!r.tag) return;
+      (m[r.journey_id] ||= []).push(r.tag);
+    });
+    return m;
+  }, [journeyTagsQuery.data]);
+
   const ONB_DONE_COL_ID = "__onb_concluido__";
 
   const opcoesResponsavel = useMemo(() => {
@@ -304,9 +352,13 @@ export default function OnboardingPage() {
       } else if (periodoEntrada && !j.data_inicio_planejado) {
         return false;
       }
+      if (filtroTags.length > 0) {
+        const jt = (tagsByJourney[j.journey_id] ?? []).map((t) => t.id);
+        if (!filtroTags.some((id) => jt.includes(id))) return false;
+      }
       return true;
     });
-  }, [journeys, busca, filtroResponsavel, filtroDemanda, filtroSemaforo, filtroSituacao, periodoEntrada]);
+  }, [journeys, busca, filtroResponsavel, filtroDemanda, filtroSemaforo, filtroSituacao, periodoEntrada, filtroTags, tagsByJourney]);
 
   function limparFiltros() {
     setBusca("");
@@ -314,6 +366,7 @@ export default function OnboardingPage() {
     setFiltroDemanda("todos");
     setFiltroSemaforo("todos");
     setFiltroSituacao("todos");
+    setFiltroTags([]);
     setPeriodoEntrada(null);
   }
 
@@ -323,6 +376,7 @@ export default function OnboardingPage() {
     filtroDemanda !== "todos" ||
     filtroSemaforo !== "todos" ||
     filtroSituacao !== "todos" ||
+    filtroTags.length > 0 ||
     periodoEntrada !== null;
 
   const journeysByStage = useMemo(() => {
@@ -489,6 +543,44 @@ export default function OnboardingPage() {
             <SelectItem value="cancelado" className="text-xs">Cancelada</SelectItem>
           </SelectContent>
         </Select>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className={`h-8 text-xs gap-1 ${filtroTags.length > 0 ? "border-primary/50 text-primary" : ""}`}>
+              <Tag className="h-3.5 w-3.5" />
+              {filtroTags.length > 0 ? `${filtroTags.length} tag${filtroTags.length > 1 ? "s" : ""}` : "Tags"}
+              <ChevronDown className="h-3 w-3 opacity-60" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-2" align="start">
+            {(availableTagsQuery.data ?? []).length === 0 ? (
+              <p className="text-[11px] text-muted-foreground px-2 py-1.5 text-center">Nenhuma tag criada. Marque em uma jornada.</p>
+            ) : (
+              <div className="space-y-0.5 max-h-60 overflow-y-auto">
+                {(availableTagsQuery.data ?? []).map((t) => {
+                  const checked = filtroTags.includes(t.id);
+                  return (
+                    <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => setFiltroTags((prev) => (v ? [...prev, t.id] : prev.filter((x) => x !== t.id)))}
+                      />
+                      <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: t.color }} />
+                      <span className="text-xs truncate flex-1">{t.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {filtroTags.length > 0 && (
+              <>
+                <div className="border-t border-border my-1.5" />
+                <Button variant="ghost" size="sm" className="w-full h-7 text-xs" onClick={() => setFiltroTags([])}>
+                  Limpar tags
+                </Button>
+              </>
+            )}
+          </PopoverContent>
+        </Popover>
         <div className="flex items-center gap-1">
           <DateRangePicker
             dateRange={periodoEntrada ?? { from: new Date(), to: new Date() }}
@@ -656,6 +748,20 @@ export default function OnboardingPage() {
                               </span>
                             )}
 
+                            {(tagsByJourney[j.journey_id] ?? []).length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {(tagsByJourney[j.journey_id] ?? []).map((t) => (
+                                  <span
+                                    key={t.id}
+                                    className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium"
+                                    style={{ background: t.color, color: readableOn(t.color) }}
+                                  >
+                                    {t.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
                             <div className="flex items-center gap-2 text-[10px] text-muted-foreground/90 mt-1.5 flex-wrap">
                               <span className="inline-flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
@@ -739,6 +845,19 @@ export default function OnboardingPage() {
                               >
                                 {j.demand_type_nome}
                               </span>
+                            )}
+                            {(tagsByJourney[j.journey_id] ?? []).length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {(tagsByJourney[j.journey_id] ?? []).map((t) => (
+                                  <span
+                                    key={t.id}
+                                    className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium"
+                                    style={{ background: t.color, color: readableOn(t.color) }}
+                                  >
+                                    {t.name}
+                                  </span>
+                                ))}
+                              </div>
                             )}
                             <div className="flex items-center gap-2 text-[10px] text-muted-foreground/90 mt-1.5 flex-wrap">
                               <span className="inline-flex items-center gap-1" title="SLA do onboarding (congelado)">

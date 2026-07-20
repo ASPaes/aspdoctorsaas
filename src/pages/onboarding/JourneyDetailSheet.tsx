@@ -21,7 +21,7 @@ import {
   Circle, AlertCircle, MessageSquare, GraduationCap, User, ArrowRight,
   UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle, Ban, Building2,
   ExternalLink, Link2,
-  Sparkles, Rocket, StickyNote, Undo2, XCircle,
+  Sparkles, Rocket, StickyNote, Undo2, XCircle, Tag,
 } from "lucide-react";
 
 
@@ -173,6 +173,16 @@ function formatDayLabel(iso: string): string {
   return formatDate(iso);
 }
 
+// Paleta de cores das tags de controle + cor de texto legível sobre a cor da tag.
+const TAG_PALETTE = ["#ef4444", "#f59e0b", "#22c55e", "#0ea5e9", "#6366f1", "#a855f7", "#ec4899", "#64748b"];
+function readableOn(hex: string): string {
+  const h = (hex || "").replace("#", "");
+  if (h.length < 6) return "#ffffff";
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? "#111827" : "#ffffff";
+}
+
 interface JourneyChecklistRow {
   id: string;
   stage_id: string | null;
@@ -233,6 +243,10 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [returnPauseSla, setReturnPauseSla] = useState(true);
 
   const [activeTab, setActiveTab] = useState<"atividade" | "timeline" | "geral">("atividade");
+  const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+  const [quickTagName, setQuickTagName] = useState("");
+  const [quickTagColor, setQuickTagColor] = useState("#0ea5e9");
+  const [creatingTag, setCreatingTag] = useState(false);
   const [secOpen, setSecOpen] = useState<Record<string, boolean>>({ treinos: true, modulos: true, anexos: true, atendimentos: true });
   const toggleSec = (k: string) => setSecOpen((s) => ({ ...s, [k]: !s[k] }));
   const [novoManual, setNovoManual] = useState("");
@@ -389,6 +403,38 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Array<any>;
+    },
+  });
+
+  // Tags de controle da jornada (exclusivas de onboarding/implantação).
+  const journeyTagsQ = useQuery({
+    queryKey: ["onboarding-journey-tags", journeyId],
+    enabled: !!journeyId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_journey_tags" as any) as any)
+        .select("id, tag:tag_id(id, name, color)")
+        .eq("journey_id", journeyId);
+      if (error) throw error;
+      return ((data ?? []) as any[]).filter((a) => a.tag).map((a) => ({
+        assignmentId: a.id as string,
+        id: a.tag.id as string,
+        name: a.tag.name as string,
+        color: a.tag.color as string,
+      }));
+    },
+  });
+
+  const availableTagsQ = useQuery({
+    queryKey: ["onboarding-tags-available", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_tags" as any) as any)
+        .select("id, name, color")
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; color: string }>;
     },
   });
 
@@ -961,6 +1007,61 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao adicionar nota");
+    }
+  }
+
+  async function handleAddTag(tagId: string) {
+    if (!journeyId || !tenantId) return;
+    try {
+      const { error } = await (supabase.from("onboarding_journey_tags" as any) as any)
+        .insert({ tenant_id: tenantId, journey_id: journeyId, tag_id: tagId });
+      if (error) throw error;
+      journeyTagsQ.refetch();
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys-tags"] });
+      setTagPopoverOpen(false);
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao adicionar tag");
+    }
+  }
+
+  async function handleRemoveTag(assignmentId: string) {
+    try {
+      const { error } = await (supabase.from("onboarding_journey_tags" as any) as any)
+        .delete().eq("id", assignmentId);
+      if (error) throw error;
+      journeyTagsQ.refetch();
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys-tags"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao remover tag");
+    }
+  }
+
+  async function handleCreateAndAddTag() {
+    const name = quickTagName.trim();
+    if (!name || !tenantId || !journeyId) return;
+    setCreatingTag(true);
+    try {
+      let tagId: string | null = null;
+      const { data: newTag, error: insertError } = await (supabase.from("onboarding_tags" as any) as any)
+        .insert({ tenant_id: tenantId, name, color: quickTagColor, is_active: true })
+        .select("id").single();
+      if (insertError) {
+        // nome duplicado → reaproveita a tag existente do tenant
+        const { data: existing } = await (supabase.from("onboarding_tags" as any) as any)
+          .select("id").eq("tenant_id", tenantId).eq("is_active", true).ilike("name", name).maybeSingle();
+        if (!existing?.id) throw insertError;
+        tagId = existing.id;
+      } else {
+        tagId = newTag?.id ?? null;
+      }
+      if (tagId) await handleAddTag(tagId);
+      setQuickTagName("");
+      setQuickTagColor("#0ea5e9");
+      qc.invalidateQueries({ queryKey: ["onboarding-tags-available"] });
+    } catch (e: any) {
+      toast.error("Erro: " + (e.message ?? ""));
+    } finally {
+      setCreatingTag(false);
     }
   }
 
@@ -1947,6 +2048,103 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
 
                 {/* RIGHT */}
                 <div className="space-y-5">
+                    {/* Tags de controle */}
+                  <section className="rounded-lg border border-border">
+                    <div className="p-3 border-b border-border flex items-center justify-between">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Tag className="h-4 w-4" /> Tags de controle
+                      </h3>
+                      <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button size="sm" variant="outline" className="h-7 text-xs">
+                            <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64 p-2" align="end">
+                          <div className="space-y-1 max-h-48 overflow-y-auto">
+                            {(() => {
+                              const assignedIds = new Set((journeyTagsQ.data ?? []).map((a) => a.id));
+                              const disponiveis = (availableTagsQ.data ?? []).filter((t) => !assignedIds.has(t.id));
+                              if (disponiveis.length === 0) {
+                                return <p className="text-[11px] text-muted-foreground px-2 py-1.5 text-center">Nenhuma tag disponível.</p>;
+                              }
+                              return disponiveis.map((t) => (
+                                <button
+                                  key={t.id}
+                                  onClick={() => handleAddTag(t.id)}
+                                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted text-left transition-colors"
+                                >
+                                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: t.color }} />
+                                  <span className="text-xs truncate">{t.name}</span>
+                                </button>
+                              ));
+                            })()}
+                          </div>
+                          <Separator className="my-2" />
+                          <div className="space-y-1.5">
+                            <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium px-1">Criar nova</p>
+                            <div className="flex items-center gap-1 px-1">
+                              {TAG_PALETTE.map((c) => (
+                                <button
+                                  key={c}
+                                  type="button"
+                                  onClick={() => setQuickTagColor(c)}
+                                  className={`h-5 w-5 rounded-full transition-transform ${quickTagColor === c ? "ring-2 ring-foreground/50 scale-110" : ""}`}
+                                  style={{ background: c }}
+                                  title={c}
+                                />
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Input
+                                value={quickTagName}
+                                onChange={(e) => setQuickTagName(e.target.value)}
+                                placeholder="Ex: Pendente faturamento"
+                                className="h-8 text-xs"
+                                onKeyDown={(e) => { if (e.key === "Enter") handleCreateAndAddTag(); }}
+                              />
+                              <Button
+                                size="icon"
+                                variant="secondary"
+                                className="h-8 w-8 shrink-0"
+                                onClick={handleCreateAndAddTag}
+                                disabled={!quickTagName.trim() || creatingTag}
+                              >
+                                {creatingTag ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="p-3">
+                      {(journeyTagsQ.data ?? []).length === 0 ? (
+                        <p className="text-xs text-muted-foreground py-1 text-center">
+                          Nenhuma tag. Use “Adicionar” para sinalizar controle (ex: pendente faturamento).
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {(journeyTagsQ.data ?? []).map((t) => (
+                            <span
+                              key={t.assignmentId}
+                              className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-[11px] font-medium"
+                              style={{ background: t.color, color: readableOn(t.color) }}
+                            >
+                              {t.name}
+                              <button
+                                onClick={() => handleRemoveTag(t.assignmentId)}
+                                className="opacity-70 hover:opacity-100"
+                                title="Remover tag"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </section>
+
                     {/* Participantes */}
                   {secVisible("participantes") && (
                     <section className="rounded-lg border border-border">
