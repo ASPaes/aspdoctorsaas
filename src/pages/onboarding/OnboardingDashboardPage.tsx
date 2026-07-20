@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { startOfMonth, endOfMonth } from "date-fns";
+import OnboardingSlaOverview from "./OnboardingSlaOverview";
 
 interface JourneyRow {
   journey_id: string;
@@ -23,6 +24,18 @@ interface JourneyRow {
   etapa_semaforo: "verde" | "amarelo" | "vermelho" | "sem_sla" | null;
   sla_util_min: number | null;
   sla_corrido_min: number | null;
+  // Campos usados pela visão de SLA (corrido vs. efetivo)
+  concluido_em: string | null;
+  pipeline_onboarding_id: string | null;
+  pipeline_implantacao_id: string | null;
+  demand_type_nome: string | null;
+  setor_nome: string | null;
+  sla_onb_corrido_min: number | null;
+  sla_onb_util_min: number | null;
+  sla_imp_corrido_min: number | null;
+  sla_imp_util_min: number | null;
+  sla_total_corrido_min: number | null;
+  sla_total_pausado_min: number | null;
 }
 
 interface TrainingRow {
@@ -106,7 +119,7 @@ export default function OnboardingDashboardPage() {
     queryFn: async () => {
       const rows = await fetchAllRows<JourneyRow>(() => {
         let q = (supabase.from("vw_onboarding_journeys" as any) as any)
-          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id")
+          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, concluido_em, pipeline_onboarding_id, pipeline_implantacao_id, demand_type_nome, setor_nome, sla_onb_corrido_min, sla_onb_util_min, sla_imp_corrido_min, sla_imp_util_min, sla_total_corrido_min, sla_total_pausado_min")
           .eq("tenant_id", effectiveTenantId);
         if (selectedUnidadeIds.length > 0) q = q.in("cliente_unidade_id", selectedUnidadeIds);
         return q;
@@ -295,12 +308,7 @@ export default function OnboardingDashboardPage() {
   const journeys = journeysQ.data ?? [];
   const names = namesQ.data ?? {};
 
-  // KPIs jornadas (SLA)
-  const totalJ = journeys.length;
-  const noPrazo = journeys.filter((j) => j.etapa_semaforo === "verde" || j.etapa_semaforo === "amarelo").length;
-  const foraPrazo = journeys.filter((j) => j.etapa_semaforo === "vermelho").length;
-  const semSla = journeys.filter((j) => !j.etapa_semaforo || j.etapa_semaforo === "sem_sla").length;
-  const noPrazoPct = pct(noPrazo, totalJ - semSla);
+  // KPIs jornadas
   const concluidas = journeys.filter((j) => j.situacao === "concluido").length;
 
   // KPIs treinos
@@ -384,44 +392,8 @@ export default function OnboardingDashboardPage() {
         </div>
       ) : (
         <div className="p-4 space-y-5">
-          {/* KPI Row 1: SLA jornadas */}
-          <section>
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">SLA de Jornadas</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <KpiCard
-                icon={CheckCircle2}
-                label="No prazo"
-                value={`${noPrazoPct}%`}
-                sub={`${noPrazo} de ${totalJ - semSla} jornadas`}
-                tone="success"
-                subTone="muted"
-              />
-              <KpiCard
-                icon={AlertTriangle}
-                label="Fora do prazo"
-                value={String(foraPrazo)}
-                sub={`${pct(foraPrazo, totalJ - semSla)}% do total`}
-                tone="danger"
-                subTone="muted"
-              />
-              <KpiCard
-                icon={TrendingUp}
-                label="Total ativas"
-                value={String(totalJ)}
-                sub={`${semSla} sem SLA definido`}
-                tone="info"
-                subTone="muted"
-              />
-              <KpiCard
-                icon={GraduationCap}
-                label="Retreinamentos"
-                value={String(retreinos)}
-                sub="no período"
-                tone="warning"
-                subTone="muted"
-              />
-            </div>
-          </section>
+          {/* SLA — visão corrido vs. efetivo (total, pipeline, etapa, área) */}
+          <OnboardingSlaOverview journeys={journeys} tenantId={effectiveTenantId} />
 
           {/* KPI Row 1b: PDV + previsto/realizado */}
           <section>
