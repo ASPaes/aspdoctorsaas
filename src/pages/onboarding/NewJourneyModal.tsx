@@ -30,6 +30,7 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
   const [assunto, setAssunto] = useState<string>("");
   const [dataInicio, setDataInicio] = useState<string>("");
   const [goLive, setGoLive] = useState<string>("");
+  const [goLiveEdited, setGoLiveEdited] = useState(false);
   const [demandTypeId, setDemandTypeId] = useState<string>("");
   const [implantadorUserId, setImplantadorUserId] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -40,6 +41,7 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
     if (!open) {
       setClienteId(""); setClienteLabel(""); setClienteBusca("");
       setProdutoId(""); setAssunto(""); setDataInicio(""); setGoLive("");
+      setGoLiveEdited(false);
       setDemandTypeId(""); setImplantadorUserId("");
     }
   }, [open]);
@@ -75,14 +77,16 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
   const demandTypesQuery = useQuery({
     queryKey: ["onb-demand-types-lookup", tenantId],
     enabled: open && !!tenantId,
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_demand_types" as any) as any)
-        .select("id, nome, cor")
+        .select("id, nome, cor, sla_total_minutos")
         .eq("tenant_id", tenantId!)
         .eq("ativo", true)
         .order("position");
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; nome: string; cor: string | null }>;
+      return (data ?? []) as Array<{ id: string; nome: string; cor: string | null; sla_total_minutos: number | null }>;
     },
   });
 
@@ -110,6 +114,35 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
         .sort((a, b) => a.nome.localeCompare(b.nome));
     },
   });
+
+  const selectedDemand = (demandTypesQuery.data ?? []).find((d) => d.id === demandTypeId);
+  const slaDays = selectedDemand?.sla_total_minutos
+    ? Math.ceil(selectedDemand.sla_total_minutos / 1440)
+    : 0;
+  const slaLabel = `${slaDays} ${slaDays === 1 ? "dia útil" : "dias úteis"}`;
+
+  // Golive previsto = início + SLA do tipo de demanda em dias úteis (fn_journey_go_live).
+  const goLiveCalcQuery = useQuery({
+    queryKey: ["onb-golive-calc", tenantId, demandTypeId, dataInicio],
+    enabled: open && !!tenantId && !!demandTypeId,
+    staleTime: 0,
+    refetchOnMount: "always",
+    queryFn: async () => {
+      const startIso = dataInicio ? `${dataInicio}T12:00:00-03:00` : new Date().toISOString();
+      const { data, error } = await (supabase.rpc as any)("fn_journey_go_live", {
+        p_tenant_id: tenantId,
+        p_start: startIso,
+        p_demand_type_id: demandTypeId,
+        p_department_id: null,
+      });
+      if (error) throw error;
+      return (data as string | null) ?? null;
+    },
+  });
+
+  useEffect(() => {
+    if (!goLiveEdited && goLiveCalcQuery.data) setGoLive(goLiveCalcQuery.data);
+  }, [goLiveCalcQuery.data, goLiveEdited]);
 
   async function handleSubmit() {
     if (!tenantId) return;
@@ -248,7 +281,7 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
           </div>
           <div className="space-y-1.5">
             <Label>Tipo de demanda</Label>
-            <Select value={demandTypeId} onValueChange={setDemandTypeId}>
+            <Select value={demandTypeId} onValueChange={(v) => { setDemandTypeId(v); setGoLiveEdited(false); }}>
               <SelectTrigger>
                 <SelectValue placeholder={demandTypesQuery.isLoading ? "Carregando..." : "Selecione (opcional)"} />
               </SelectTrigger>
@@ -275,13 +308,32 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Início planejado</Label>
-              <Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+              <Input type="date" value={dataInicio} onChange={(e) => { setDataInicio(e.target.value); setGoLiveEdited(false); }} />
             </div>
             <div className="space-y-1.5">
               <Label>Go-live previsto</Label>
-              <Input type="date" value={goLive} onChange={(e) => setGoLive(e.target.value)} />
+              <Input type="date" value={goLive} onChange={(e) => { setGoLive(e.target.value); setGoLiveEdited(true); }} />
             </div>
           </div>
+          {demandTypeId && (
+            <div className="text-[11px] -mt-1">
+              {goLiveCalcQuery.isFetching ? (
+                <span className="text-muted-foreground">Calculando go-live…</span>
+              ) : selectedDemand && !selectedDemand.sla_total_minutos ? (
+                <span className="text-amber-500">Este tipo de demanda não tem SLA definido — go-live não calculado.</span>
+              ) : goLiveEdited ? (
+                <button
+                  type="button"
+                  onClick={() => setGoLiveEdited(false)}
+                  className="text-primary hover:underline"
+                >
+                  Editado manualmente · recalcular pelo SLA ({slaLabel})
+                </button>
+              ) : goLiveCalcQuery.data ? (
+                <span className="text-muted-foreground">Calculado: {slaLabel} a partir do início.</span>
+              ) : null}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>

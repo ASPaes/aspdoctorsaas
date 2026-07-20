@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, GripVertical, Trash2, Loader2 } from "lucide-react";
+import { Plus, GripVertical, Trash2, Loader2, Clock } from "lucide-react";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from "@dnd-kit/core";
@@ -15,6 +15,8 @@ import {
   arrayMove, SortableContext, useSortable, verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { SlaInput } from "./SlaInput";
+import { formatSlaHuman } from "./utils";
 
 interface DemandType {
   id: string;
@@ -23,6 +25,7 @@ interface DemandType {
   cor: string | null;
   ativo: boolean;
   position: number;
+  sla_total_minutos: number;
 }
 
 const COLOR_PRESETS = [
@@ -71,13 +74,40 @@ function ColorPicker({ value, onChange }: { value: string | null; onChange: (v: 
   );
 }
 
+function SlaPopover({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value);
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setDraft(value); }}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 transition shrink-0"
+          title="SLA total (base do golive)"
+        >
+          <Clock className="h-3 w-3" />
+          {formatSlaHuman(value)}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-3 space-y-3" align="end">
+        <SlaInput label="SLA total (base do golive)" value={draft} onChange={setDraft} />
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" className="h-8" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button size="sm" className="h-8" onClick={() => { onChange(draft); setOpen(false); }}>Salvar</Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function SortableRow({
-  item, onToggle, onRename, onColor, onDelete,
+  item, onToggle, onRename, onColor, onSla, onDelete,
 }: {
   item: DemandType;
   onToggle: (id: string, v: boolean) => void;
   onRename: (id: string, nome: string) => void;
   onColor: (id: string, cor: string) => void;
+  onSla: (id: string, minutes: number) => void;
   onDelete: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
@@ -112,6 +142,7 @@ function SortableRow({
           {item.nome}
         </button>
       )}
+      <SlaPopover value={item.sla_total_minutos ?? 0} onChange={(m) => onSla(item.id, m)} />
       <div className="flex items-center gap-1.5 text-xs">
         <span className="text-muted-foreground">Ativo</span>
         <Switch checked={item.ativo} onCheckedChange={(v) => onToggle(item.id, v)} />
@@ -128,6 +159,7 @@ export function DemandTypesPanel() {
   const qc = useQueryClient();
   const [novo, setNovo] = useState("");
   const [novaCor, setNovaCor] = useState("#0EA5E9");
+  const [novoSla, setNovoSla] = useState(0);
   const [saving, setSaving] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -137,7 +169,7 @@ export function DemandTypesPanel() {
     enabled: !!effectiveTenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_demand_types" as any) as any)
-        .select("id, nome, descricao, cor, ativo, position")
+        .select("id, nome, descricao, cor, ativo, position, sla_total_minutos")
         .eq("tenant_id", effectiveTenantId)
         .order("position");
       if (error) throw error;
@@ -156,9 +188,11 @@ export function DemandTypesPanel() {
         cor: novaCor,
         ativo: true,
         position: maxPos + 1,
+        sla_total_minutos: novoSla,
       });
       if (error) throw error;
       setNovo("");
+      setNovoSla(0);
       toast.success("Tipo de demanda adicionado");
       qc.invalidateQueries({ queryKey: ["onb-demand-types"] });
     } catch (e: any) {
@@ -187,6 +221,13 @@ export function DemandTypesPanel() {
       .update({ ativo }).eq("id", id).eq("tenant_id", effectiveTenantId);
     if (error) toast.error(error.message);
     else qc.invalidateQueries({ queryKey: ["onb-demand-types"] });
+  }
+
+  async function handleSla(id: string, sla_total_minutos: number) {
+    const { error } = await (supabase.from("onboarding_demand_types" as any) as any)
+      .update({ sla_total_minutos }).eq("id", id).eq("tenant_id", effectiveTenantId);
+    if (error) toast.error(error.message);
+    else { toast.success("SLA atualizado"); qc.invalidateQueries({ queryKey: ["onb-demand-types"] }); }
   }
 
   async function handleDelete(id: string) {
@@ -231,7 +272,10 @@ export function DemandTypesPanel() {
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-1" /> Adicionar</>}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">Digite o nome e clique em Adicionar (ou tecle Enter).</p>
+        <div className="rounded-md border border-border bg-card/50 p-3">
+          <SlaInput label="SLA total (base do golive)" value={novoSla} onChange={setNovoSla} />
+        </div>
+        <p className="text-xs text-muted-foreground">Digite o nome, defina o SLA e clique em Adicionar (ou tecle Enter).</p>
       </div>
 
       {isLoading ? (
@@ -251,6 +295,7 @@ export function DemandTypesPanel() {
                   onToggle={handleToggle}
                   onRename={handleRename}
                   onColor={handleColor}
+                  onSla={handleSla}
                   onDelete={handleDelete}
                 />
               ))}
