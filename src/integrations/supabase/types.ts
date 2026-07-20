@@ -1672,6 +1672,7 @@ export type Database = {
           support_csat_score_min: number
           support_csat_thanks_template: string
           support_csat_timeout_minutes: number
+          support_inactivity_enabled: boolean
           support_inactivity_warning_before_minutes: number
           support_inactivity_warning_template: string
           support_reopen_window_minutes: number
@@ -1738,6 +1739,7 @@ export type Database = {
           support_csat_score_min?: number
           support_csat_thanks_template?: string
           support_csat_timeout_minutes?: number
+          support_inactivity_enabled?: boolean
           support_inactivity_warning_before_minutes?: number
           support_inactivity_warning_template?: string
           support_reopen_window_minutes?: number
@@ -1804,6 +1806,7 @@ export type Database = {
           support_csat_score_min?: number
           support_csat_thanks_template?: string
           support_csat_timeout_minutes?: number
+          support_inactivity_enabled?: boolean
           support_inactivity_warning_before_minutes?: number
           support_inactivity_warning_template?: string
           support_reopen_window_minutes?: number
@@ -3124,6 +3127,170 @@ export type Database = {
           },
         ]
       }
+      hiper_espelho_cadastro: {
+        Row: {
+          a_pagar: number | null
+          a_pagar_ultima: number | null
+          atraso_dias: number | null
+          bruto_mes: number | null
+          cancelada_em: string | null
+          cancelada_por: string | null
+          cidade: string | null
+          cliente_desde: string | null
+          cnpj: string | null
+          cnpj_norm: string | null
+          custo_mes: number | null
+          extrato_mes_ultima: string | null
+          id: string
+          id_portal: string
+          last_scraped_at: string | null
+          mensalidade_ultima: number | null
+          mrr: number | null
+          nome_fantasia: string | null
+          plano: string | null
+          pulled_at: string
+          qt_modulos: number | null
+          raw: Json | null
+          razao_social: string | null
+          responsavel_tipo: string | null
+          saude: number | null
+          situacao: string | null
+          tenant_id: string
+          total_aberto: number | null
+          uf: string | null
+          ultimo_acesso: string | null
+          usuarios_ativos_30d: number | null
+          usuarios_contratados: number | null
+        }
+        Insert: {
+          a_pagar?: number | null
+          a_pagar_ultima?: number | null
+          atraso_dias?: number | null
+          bruto_mes?: number | null
+          cancelada_em?: string | null
+          cancelada_por?: string | null
+          cidade?: string | null
+          cliente_desde?: string | null
+          cnpj?: string | null
+          cnpj_norm?: string | null
+          custo_mes?: number | null
+          extrato_mes_ultima?: string | null
+          id?: string
+          id_portal: string
+          last_scraped_at?: string | null
+          mensalidade_ultima?: number | null
+          mrr?: number | null
+          nome_fantasia?: string | null
+          plano?: string | null
+          pulled_at?: string
+          qt_modulos?: number | null
+          raw?: Json | null
+          razao_social?: string | null
+          responsavel_tipo?: string | null
+          saude?: number | null
+          situacao?: string | null
+          tenant_id: string
+          total_aberto?: number | null
+          uf?: string | null
+          ultimo_acesso?: string | null
+          usuarios_ativos_30d?: number | null
+          usuarios_contratados?: number | null
+        }
+        Update: {
+          a_pagar?: number | null
+          a_pagar_ultima?: number | null
+          atraso_dias?: number | null
+          bruto_mes?: number | null
+          cancelada_em?: string | null
+          cancelada_por?: string | null
+          cidade?: string | null
+          cliente_desde?: string | null
+          cnpj?: string | null
+          cnpj_norm?: string | null
+          custo_mes?: number | null
+          extrato_mes_ultima?: string | null
+          id?: string
+          id_portal?: string
+          last_scraped_at?: string | null
+          mensalidade_ultima?: number | null
+          mrr?: number | null
+          nome_fantasia?: string | null
+          plano?: string | null
+          pulled_at?: string
+          qt_modulos?: number | null
+          raw?: Json | null
+          razao_social?: string | null
+          responsavel_tipo?: string | null
+          saude?: number | null
+          situacao?: string | null
+          tenant_id?: string
+          total_aberto?: number | null
+          uf?: string | null
+          ultimo_acesso?: string | null
+          usuarios_ativos_30d?: number | null
+          usuarios_contratados?: number | null
+        }
+        Relationships: []
+      }
+      hiper_integration: {
+        Row: {
+          ativo: boolean
+          base_url: string
+          fornecedor_id: number | null
+          id: string
+          integracao_pausada: boolean
+          puxar_desde: string | null
+          sync_automatica_ativa: boolean
+          sync_lote_tamanho: number
+          sync_max_tentativas: number
+          tenant_id: string
+          ultimo_status: string
+          ultimo_teste_at: string | null
+          updated_at: string
+          vault_secret_id: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          base_url?: string
+          fornecedor_id?: number | null
+          id?: string
+          integracao_pausada?: boolean
+          puxar_desde?: string | null
+          sync_automatica_ativa?: boolean
+          sync_lote_tamanho?: number
+          sync_max_tentativas?: number
+          tenant_id: string
+          ultimo_status?: string
+          ultimo_teste_at?: string | null
+          updated_at?: string
+          vault_secret_id?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          base_url?: string
+          fornecedor_id?: number | null
+          id?: string
+          integracao_pausada?: boolean
+          puxar_desde?: string | null
+          sync_automatica_ativa?: boolean
+          sync_lote_tamanho?: number
+          sync_max_tentativas?: number
+          tenant_id?: string
+          ultimo_status?: string
+          ultimo_teste_at?: string | null
+          updated_at?: string
+          vault_secret_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hiper_integration_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invites: {
         Row: {
           created_at: string
@@ -3996,6 +4163,7 @@ export type Database = {
           id: string
           nome: string
           position: number
+          sla_total_minutos: number
           tenant_id: string
           updated_at: string
         }
@@ -4007,6 +4175,7 @@ export type Database = {
           id?: string
           nome: string
           position?: number
+          sla_total_minutos?: number
           tenant_id: string
           updated_at?: string
         }
@@ -4018,6 +4187,7 @@ export type Database = {
           id?: string
           nome?: string
           position?: number
+          sla_total_minutos?: number
           tenant_id?: string
           updated_at?: string
         }
@@ -4090,6 +4260,82 @@ export type Database = {
           },
         ]
       }
+      onboarding_journey_checklist: {
+        Row: {
+          created_at: string
+          done: boolean
+          done_at: string | null
+          done_by: string | null
+          grupo_nome: string | null
+          grupo_pos: number
+          id: string
+          is_required: boolean
+          journey_id: string
+          origem: string
+          position: number
+          source_item_id: string | null
+          stage_id: string | null
+          tenant_id: string
+          texto: string
+        }
+        Insert: {
+          created_at?: string
+          done?: boolean
+          done_at?: string | null
+          done_by?: string | null
+          grupo_nome?: string | null
+          grupo_pos?: number
+          id?: string
+          is_required?: boolean
+          journey_id: string
+          origem?: string
+          position?: number
+          source_item_id?: string | null
+          stage_id?: string | null
+          tenant_id: string
+          texto: string
+        }
+        Update: {
+          created_at?: string
+          done?: boolean
+          done_at?: string | null
+          done_by?: string | null
+          grupo_nome?: string | null
+          grupo_pos?: number
+          id?: string
+          is_required?: boolean
+          journey_id?: string
+          origem?: string
+          position?: number
+          source_item_id?: string | null
+          stage_id?: string | null
+          tenant_id?: string
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_journey_checklist_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_checklist_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_checklist_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_journey_modules: {
         Row: {
           created_at: string
@@ -4145,6 +4391,52 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_journey_tags: {
+        Row: {
+          created_at: string
+          id: string
+          journey_id: string
+          tag_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          journey_id: string
+          tag_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          journey_id?: string
+          tag_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_journey_tags_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_tags_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_tags"
             referencedColumns: ["id"]
           },
         ]
@@ -4544,6 +4836,7 @@ export type Database = {
         Row: {
           ativo: boolean
           created_at: string
+          group_id: string | null
           id: string
           is_required: boolean
           position: number
@@ -4554,6 +4847,7 @@ export type Database = {
         Insert: {
           ativo?: boolean
           created_at?: string
+          group_id?: string | null
           id?: string
           is_required?: boolean
           position?: number
@@ -4564,6 +4858,7 @@ export type Database = {
         Update: {
           ativo?: boolean
           created_at?: string
+          group_id?: string | null
           id?: string
           is_required?: boolean
           position?: number
@@ -4572,6 +4867,13 @@ export type Database = {
           texto?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "onboarding_stage_checklist_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_stage_checklist_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "onboarding_stage_checklist_stage_id_fkey"
             columns: ["stage_id"]
@@ -4584,6 +4886,41 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_stage_checklist_groups: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string
+          position: number
+          stage_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome: string
+          position?: number
+          stage_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string
+          position?: number
+          stage_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_stage_checklist_groups_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_stages"
             referencedColumns: ["id"]
           },
         ]
@@ -4721,6 +5058,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      onboarding_tags: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       onboarding_training_sessions: {
         Row: {
@@ -10215,6 +10582,15 @@ export type Database = {
       exec_db_health_query: { Args: { query_text: string }; Returns: Json }
       exec_db_maintenance: { Args: { action: string }; Returns: string }
       fmt_brl: { Args: { n: number }; Returns: string }
+      fn_add_business_days: {
+        Args: {
+          p_days: number
+          p_department_id?: string
+          p_start: string
+          p_tenant_id: string
+        }
+        Returns: string
+      }
       fn_assign_conversation_if_ready: {
         Args: { p_conversation_id: string }
         Returns: Json
@@ -10352,6 +10728,15 @@ export type Database = {
         }[]
       }
       fn_is_business_hours: { Args: { p_tenant_id: string }; Returns: boolean }
+      fn_journey_go_live: {
+        Args: {
+          p_demand_type_id: string
+          p_department_id?: string
+          p_start: string
+          p_tenant_id: string
+        }
+        Returns: string
+      }
       fn_process_ura_timeouts: { Args: never; Returns: Json }
       fn_retry_waiting_conversations: { Args: never; Returns: Json }
       fn_schedule_group_syncs: { Args: never; Returns: undefined }
@@ -11272,6 +11657,17 @@ export type Database = {
           p75: number
         }[]
       }
+      hiper_integration_connect: {
+        Args: { p_base_url?: string; p_tenant_id: string; p_token: string }
+        Returns: undefined
+      }
+      hiper_integration_credentials: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          base_url: string
+          token: string
+        }[]
+      }
       import_clientes_produtos_batch: { Args: { p_rows: Json }; Returns: Json }
       import_service_catalog_template: {
         Args: {
@@ -11754,6 +12150,10 @@ export type Database = {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: Json
       }
+      set_journey_checklist_done: {
+        Args: { p_done: boolean; p_item_id: string }
+        Returns: undefined
+      }
       set_unidade_default_filter: {
         Args: { p_unidade_id: number }
         Returns: undefined
@@ -11816,6 +12216,32 @@ export type Database = {
       sync_cliente_produto_to_contract: {
         Args: { p_cliente_produto_id: string }
         Returns: undefined
+      }
+      sync_journey_stage_checklist: {
+        Args: { p_journey_id: string; p_stage_id: string }
+        Returns: {
+          created_at: string
+          done: boolean
+          done_at: string | null
+          done_by: string | null
+          grupo_nome: string | null
+          grupo_pos: number
+          id: string
+          is_required: boolean
+          journey_id: string
+          origem: string
+          position: number
+          source_item_id: string | null
+          stage_id: string | null
+          tenant_id: string
+          texto: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "onboarding_journey_checklist"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
       theo_daily_payload: {
