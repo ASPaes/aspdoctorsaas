@@ -76,6 +76,17 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
 
   const persistClienteLink = async (clienteId: string) => {
     if (!conversationId) return;
+
+    // Grupos: fonte de verdade é whatsapp_contacts.cliente_id — gravado pela RPC set_group_cliente
+    if (isGroup) {
+      const { error } = await (supabase as any).rpc('set_group_cliente', {
+        p_conversation_id: conversationId,
+        p_cliente_id: clienteId,
+      });
+      if (error) throw error;
+      return;
+    }
+
     // 1) Prefer attendance RPC (writes to attendance + propagates to conversation metadata)
     let resolvedAttendanceId = attendanceId ?? null;
     if (!resolvedAttendanceId) {
@@ -103,10 +114,11 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
       .eq('id', conversationId)
       .maybeSingle();
     const currentMeta = (conv?.metadata && typeof conv.metadata === 'object') ? conv.metadata : {};
-    await (supabase as any)
+    const { error: updErr } = await (supabase as any)
       .from('whatsapp_conversations')
       .update({ metadata: { ...currentMeta, cliente_id: clienteId } })
       .eq('id', conversationId);
+    if (updErr) throw updErr;
   };
 
   const invalidateClienteQueries = () => {
@@ -115,7 +127,9 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
     queryClient.invalidateQueries({ queryKey: ['cliente-candidatos-by-phone'] });
     queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
     queryClient.invalidateQueries({ queryKey: ['relevant-attendance'] });
+    queryClient.invalidateQueries({ queryKey: ['group-linked-cliente'] });
   };
+
 
   const onSubmit = async (data: ContactFormData) => {
     if (isNewContact) {
