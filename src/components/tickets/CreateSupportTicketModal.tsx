@@ -207,6 +207,8 @@ export function CreateSupportTicketModal({
       setClienteSearchTerm("");
       setCanalOrigem("whatsapp");
       setTipoHorario("comercial");
+      setModoHorario("auto");
+      setTipoDetectado(null);
       setPrioridade("media");
       setAgendadoPara("");
       setContatoSolicitante("");
