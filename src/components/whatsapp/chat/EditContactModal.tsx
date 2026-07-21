@@ -184,28 +184,31 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
           toast.success(`Contato "${data.name}" salvo com sucesso`);
         }
 
-        // If a cliente was linked, sync to cliente_contatos + persist link on conversation/attendance
-        if (linkedCliente && linkedCliente.id !== originalClienteId) {
-          const { data: existingContato } = await supabase
-            .from('cliente_contatos')
-            .select('id')
-            .eq('cliente_id', linkedCliente.id)
-            .eq('fone', digits)
-            .maybeSingle();
-
-          if (!existingContato) {
-            await supabase
+        // If a cliente is set, sync to cliente_contatos (dedup vs original) e sempre persistir vínculo
+        if (linkedCliente) {
+          if (linkedCliente.id !== originalClienteId) {
+            const { data: existingContato } = await supabase
               .from('cliente_contatos')
-              .insert({
-                cliente_id: linkedCliente.id,
-                nome: data.name,
-                fone: digits,
-                tenant_id: profile.tenant_id,
-              });
+              .select('id')
+              .eq('cliente_id', linkedCliente.id)
+              .eq('fone', digits)
+              .maybeSingle();
+
+            if (!existingContato) {
+              await supabase
+                .from('cliente_contatos')
+                .insert({
+                  cliente_id: linkedCliente.id,
+                  nome: data.name,
+                  fone: digits,
+                  tenant_id: profile.tenant_id,
+                });
+            }
           }
           await persistClienteLink(linkedCliente.id);
           toast.success(`Contato vinculado ao cliente ${linkedCliente.label}`);
         }
+
 
         invalidateClienteQueries();
         onOpenChange(false);
