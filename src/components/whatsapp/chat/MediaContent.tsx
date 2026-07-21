@@ -86,7 +86,12 @@ export function MediaContent({
       return (
         <>
           {lightboxOpen && resolvedInlineUrl && (
-            <ImageLightbox src={resolvedInlineUrl} onClose={() => setLightboxOpen(false)} />
+            <ZoomableImageLightbox
+              src={resolvedInlineUrl}
+              alt={messageType === "sticker" ? "Sticker" : "Imagem"}
+              downloadName={mediaFilename ?? metadata?.fileName ?? "imagem"}
+              onClose={() => setLightboxOpen(false)}
+            />
           )}
           <img
             src={resolvedInlineUrl}
