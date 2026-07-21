@@ -156,6 +156,9 @@ export default function HorarioPlantaoTab() {
   // ── Contexto: Global vs Setor ──
   const [selectedContext, setSelectedContext] = useState<string>("global");
 
+  // ── Re-hydration guard: only hydrate when context actually changes ──
+  const lastHydratedContext = useRef<string | null>(null);
+
   // ── Departments query (for context selector) ──
   const { effectiveTenantId: deptTid } = useTenantFilter();
   const qcDept = useQueryClient();
