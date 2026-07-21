@@ -251,6 +251,14 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
     const channelName = `conversations-rt-${tid ?? 'none'}`;
     return subscribeSharedChannel(channelName, (channel) => {
       let invalidateThrottle = 0;
+      let pillCountsTimer: ReturnType<typeof setTimeout> | null = null;
+      const invalidatePillCounts = () => {
+        if (pillCountsTimer) clearTimeout(pillCountsTimer);
+        pillCountsTimer = setTimeout(() => {
+          pillCountsTimer = null;
+          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'pill-counts'] });
+        }, 1000);
+      };
       let insertDebounce: ReturnType<typeof setTimeout> | null = null;
       let softRefetchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -261,6 +269,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         filter: tid ? `tenant_id=eq.${tid}` : undefined,
       }, (payload) => {
         const updated = payload.new as any;
+        invalidatePillCounts();
         // Grupos têm seu próprio badge na pill "Grupos" (query separada).
         // Invalidar group-counts em tempo real ao receber atualização de grupo
         // (unread_count, last_message_at, etc.).
@@ -322,6 +331,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         filter: tid ? `tenant_id=eq.${tid}` : undefined,
       }, (payload) => {
         const inserted = payload.new as any;
+        invalidatePillCounts();
         if (inserted?.is_group === true) {
           queryClient.invalidateQueries({ queryKey: ['whatsapp', 'group-counts'] });
         }
@@ -343,6 +353,15 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           invalidateThrottle = now;
           queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
         }
+      });
+
+      channel.on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'support_attendances',
+        filter: tid ? `tenant_id=eq.${tid}` : undefined,
+      } as any, () => {
+        invalidatePillCounts();
       });
     });
   }, [queryClient, tid]);

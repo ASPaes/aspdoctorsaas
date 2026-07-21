@@ -10235,6 +10235,10 @@ export type Database = {
         }
         Returns: Json
       }
+      advance_onboarding_to_implantacao: {
+        Args: { p_force?: boolean; p_journey_id: string }
+        Returns: Json
+      }
       agent_presence_extend_pause: {
         Args: { p_minutes: number; p_tenant_id: string }
         Returns: undefined
@@ -10490,6 +10494,7 @@ export type Database = {
       create_onboarding_training: {
         Args: {
           p_agendado_para?: string
+          p_concluir_onboarding?: boolean
           p_conduzido_por?: string
           p_is_retreinamento?: boolean
           p_journey_id: string
@@ -11997,6 +12002,10 @@ export type Database = {
         }
         Returns: string
       }
+      revert_onboarding_to_onboarding: {
+        Args: { p_journey_id: string }
+        Returns: Json
+      }
       rodar_deteccao_reconciliacao: {
         Args: { p_tenant_id: string }
         Returns: number
@@ -12418,6 +12427,15 @@ export type Database = {
           p_tenant_id: string
         }
         Returns: Json
+      }
+      whatsapp_pill_counts: {
+        Args: { p_department_id?: string }
+        Returns: {
+          aguardando: number
+          bucket: string
+          msgs_nao_lidas: number
+          total_conversas: number
+        }[]
       }
     }
     Enums: {
