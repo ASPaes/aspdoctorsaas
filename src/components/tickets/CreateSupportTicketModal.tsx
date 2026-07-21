@@ -593,26 +593,44 @@ export function CreateSupportTicketModal({
       let ticketId: string | null = null;
 
       if (fromClosure && attendanceId) {
-        const closureRpcName =
-          mode === "additional"
-            ? "create_additional_ticket_from_attendance"
-            : mode === "demanda_externa"
-              ? "create_demand_ticket_from_attendance"
-              : "create_ticket_from_closure";
-        const { data: rpcData, error } = await (supabase.rpc as any)(closureRpcName, {
-          p_attendance_id: attendanceId,
-          p_produto_id: Number(produtoId),
-          p_category_id: categoryId,
-          p_subcategory_id: subcategoryId,
-          p_service_type_id: serviceTypeId,
-          p_observacao_agente: observacaoAgente || null,
-          p_observacao_ia: closureAiSummary || null,
-          p_tipo_horario: tipoHorario,
-          p_department_id: departamentoId || null,
-          p_responsavel_user_id: responsavelId || null,
-        });
-        if (error) throw error;
-        ticketId = typeof rpcData === "string" ? rpcData : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
+        if (mode === "classificacao_aberta") {
+          const { data: rpcData, error } = await (supabase.rpc as any)("create_classification_ticket_open", {
+            p_attendance_id: attendanceId,
+            p_category_id: categoryId,
+            p_subcategory_id: subcategoryId,
+            p_service_type_id: serviceTypeId,
+            p_produto_id: Number(produtoId),
+            p_tipo_horario: tipoHorario,
+            p_observacao_agente: observacaoAgente || null,
+            p_observacao_ia: null,
+            p_department_id: null,
+            p_responsavel_user_id: null,
+          });
+          if (error) throw error;
+          ticketId = typeof rpcData === "string" ? rpcData : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
+        } else {
+          const closureRpcName =
+            mode === "additional"
+              ? "create_additional_ticket_from_attendance"
+              : mode === "demanda_externa"
+                ? "create_demand_ticket_from_attendance"
+                : "create_ticket_from_closure";
+          const { data: rpcData, error } = await (supabase.rpc as any)(closureRpcName, {
+            p_attendance_id: attendanceId,
+            p_produto_id: Number(produtoId),
+            p_category_id: categoryId,
+            p_subcategory_id: subcategoryId,
+            p_service_type_id: serviceTypeId,
+            p_observacao_agente: observacaoAgente || null,
+            p_observacao_ia: closureAiSummary || null,
+            p_tipo_horario: tipoHorario,
+            p_department_id: departamentoId || null,
+            p_responsavel_user_id: responsavelId || null,
+          });
+          if (error) throw error;
+          ticketId = typeof rpcData === "string" ? rpcData : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
+        }
+
       } else {
         const { data: rpcData, error } = await (supabase.rpc as any)("create_manual_ticket", {
           p_cliente_id: selectedCliente.id,
