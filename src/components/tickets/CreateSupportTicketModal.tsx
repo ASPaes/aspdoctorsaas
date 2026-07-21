@@ -46,11 +46,12 @@ interface Props {
   // Closure mode props
   fromClosure?: boolean;
   /**
-   * 'initial'         → create_ticket_from_closure (atendimento sem ticket vinculado)
-   * 'additional'      → create_additional_ticket_from_attendance (atendimento reaberto, novo ticket adicional)
-   * 'demanda_externa' → create_demand_ticket_from_attendance (ticket avulso aberto a partir de atendimento, inclusive em andamento)
+   * 'initial'             → create_ticket_from_closure (atendimento encerrado sem ticket vinculado)
+   * 'additional'          → create_additional_ticket_from_attendance (atendimento reaberto, ticket adicional)
+   * 'demanda_externa'     → create_demand_ticket_from_attendance (ticket avulso a partir de atendimento)
+   * 'classificacao_aberta'→ create_classification_ticket_open (classifica ticket ABERTO com atendimento em andamento)
    */
-  mode?: "initial" | "additional" | "demanda_externa";
+  mode?: "initial" | "additional" | "demanda_externa" | "classificacao_aberta";
   attendanceId?: string | null;
   closureClienteId?: string | null;
   closureClienteNome?: string | null;
@@ -68,6 +69,11 @@ interface Props {
   closureSentimentLabel?: string | null;
   closureSentimentConfidence?: number | null;
   closureSentimentSummary?: string | null;
+  // Manual mode defaults (não-closure): pré-selecionar cliente/setor a partir do chat
+  defaultClienteId?: string | null;
+  defaultClienteNome?: string | null;
+  defaultClienteCodigo?: number | null;
+
 }
 
 const Req = () => <span className="text-destructive">*</span>;
