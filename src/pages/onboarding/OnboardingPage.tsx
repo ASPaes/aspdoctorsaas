@@ -399,6 +399,32 @@ export default function OnboardingPage() {
 
   async function handleDrop(journeyId: string, targetStageId: string, fromStageId: string) {
     if (fromStageId === targetStageId) return;
+    // Soltar na coluna "Onboarding concluído" → conclui o onboarding e vai p/ implantação
+    if (targetStageId === ONB_DONE_COL_ID) {
+      try {
+        const { data, error } = await (supabase.rpc as any)("advance_onboarding_to_implantacao", {
+          p_journey_id: journeyId,
+          p_force: false,
+        });
+        if (error) throw error;
+        const res = data as any;
+        if (res && res.ok === false) {
+          toast.error(
+            res.reason === "nao_etapa_final" ? "Conclua as etapas do onboarding antes de avançar." :
+            res.reason === "nao_em_onboarding" ? "A jornada não está mais em Onboarding." :
+            "Não foi possível concluir o onboarding."
+          );
+          return;
+        }
+        toast.success("Onboarding concluído — jornada em Implantação.");
+        queryClient.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+        queryClient.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+        queryClient.invalidateQueries({ queryKey: ["onboarding-stage-history"] });
+      } catch (e: any) {
+        toast.error(e.message || "Erro ao concluir onboarding");
+      }
+      return;
+    }
     try {
       const { data, error } = await (supabase.rpc as any)("move_onboarding_stage", {
         p_journey_id: journeyId,
@@ -788,7 +814,19 @@ export default function OnboardingPage() {
               return (
                 <div
                   key={ONB_DONE_COL_ID}
-                  className="flex flex-col min-w-[280px] w-[280px] rounded-lg border border-emerald-500/40 bg-emerald-500/5"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOverCol(ONB_DONE_COL_ID);
+                  }}
+                  onDragLeave={() => setDragOverCol(null)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const jid = e.dataTransfer.getData("journeyId");
+                    const from = e.dataTransfer.getData("fromStageId");
+                    if (jid) handleDrop(jid, ONB_DONE_COL_ID, from);
+                    setDragOverCol(null);
+                  }}
+                  className={`flex flex-col min-w-[280px] w-[280px] rounded-lg border border-emerald-500/40 bg-emerald-500/5 transition-all ${dragOverCol === ONB_DONE_COL_ID ? "ring-2 ring-emerald-500/60" : ""}`}
                 >
                   <div className="flex items-center gap-2 px-3 py-2 border-b border-emerald-500/30 bg-emerald-500/10 rounded-t-lg">
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: doneColor }} />

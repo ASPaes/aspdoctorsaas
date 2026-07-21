@@ -854,6 +854,29 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const etapaFinal = stages.find((s) => s.id === journey?.current_stage_id)?.is_final === true;
   const canGoLive = (journey?.fase_atual === "implantacao" && etapaFinal) || isAdmin;
 
+  // Ao agendar na fase de onboarding, o usuário escolhe concluir (→ implantação) ou manter.
+  const isOnbPhase = journey?.fase_atual === "onboarding";
+  const scheduleAlert = isOnbPhase ? (
+    <Alert className="border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300 [&>svg]:text-sky-500 py-2 text-xs">
+      <AlertTriangle className="h-4 w-4" />
+      <AlertDescription className="text-xs">
+        Escolha ao agendar: concluir o Onboarding e iniciar a Implantação agora, ou apenas agendar mantendo em Onboarding.
+      </AlertDescription>
+    </Alert>
+  ) : null;
+  const scheduleButtons = isOnbPhase ? (
+    <div className="space-y-2 pt-1">
+      <Button size="sm" className="w-full text-white border-0" style={{ background: "#22C55E" }} onClick={() => handleCreateTraining(true)}>
+        Concluir onboarding e iniciar Implantação
+      </Button>
+      <Button size="sm" variant="outline" className="w-full" onClick={() => handleCreateTraining(false)}>
+        Só agendar, manter em Onboarding
+      </Button>
+    </div>
+  ) : (
+    <Button size="sm" className="w-full" onClick={() => handleCreateTraining(false)}>Agendar</Button>
+  );
+
   const currentStageSections = useMemo(() => {
     const cur = stages.find((s) => s.id === journey?.current_stage_id);
     return cur?.visible_sections ?? null;
@@ -1134,12 +1157,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     }
   }
 
-  async function handleCreateTraining() {
+  async function handleCreateTraining(concluir: boolean) {
     if (!journeyId || !newTrainingTitle.trim()) {
       toast.error("Informe o título do treino");
       return;
     }
-    const movesToImplantation = journey?.fase_atual === "onboarding";
+    const movesToImplantation = journey?.fase_atual === "onboarding" && concluir;
     try {
       const { error } = await (supabase.rpc as any)("create_onboarding_training", {
         p_journey_id: journeyId,
@@ -1149,11 +1172,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         p_is_retreinamento: newTrainingRetreat,
         p_training_type_id: newTrainingTypeId || null,
         p_link: newTrainingLink.trim() || null,
+        p_concluir_onboarding: concluir,
       });
       if (error) throw error;
       toast.success(
         movesToImplantation
-          ? "Treino agendado — jornada movida para Implantação."
+          ? "Treino agendado — onboarding concluído, jornada em Implantação."
           : "Treino agendado"
       );
       setAddTrainingOpen(false);
@@ -1176,6 +1200,35 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao criar treino");
+    }
+  }
+
+  async function handleConcludeOnboarding() {
+    if (!journey) return;
+    try {
+      const { data, error } = await (supabase.rpc as any)("advance_onboarding_to_implantacao", {
+        p_journey_id: journey.journey_id,
+        p_force: false,
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res && res.ok === false) {
+        const msg =
+          res.reason === "nao_etapa_final" ? "Conclua as etapas do onboarding antes de avançar." :
+          res.reason === "nao_em_onboarding" ? "A jornada não está mais em Onboarding." :
+          "Não foi possível concluir o onboarding.";
+        toast.error(msg);
+        return;
+      }
+      toast.success("Onboarding concluído — jornada em Implantação.");
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-row", journeyId] });
+      qc.invalidateQueries({ queryKey: ["onboarding-detail-stages"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-stage-history", journeyId] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao concluir onboarding");
     }
   }
 
@@ -1435,14 +1488,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-96 space-y-3" align="end">
-                        {journey?.fase_atual === "onboarding" && (
-                          <Alert className="border-warning/50 bg-warning/15 text-warning [&>svg]:text-warning py-2 text-xs">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertDescription className="text-xs">
-                              Ao agendar este treino, a jornada será concluída no Onboarding e iniciará a fase de Implantação.
-                            </AlertDescription>
-                          </Alert>
-                        )}
+                        {scheduleAlert}
                         <div className="space-y-1">
                           <label className="text-[11px] font-medium">Título *</label>
                           <Input
@@ -1502,9 +1548,14 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           />
                           É retreinamento?
                         </label>
-                        <Button size="sm" className="w-full" onClick={handleCreateTraining}>Agendar</Button>
+                        {scheduleButtons}
                       </PopoverContent>
                     </Popover>
+                  )}
+                  {isOnbPhase && etapaFinal && !isTerminal && (
+                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleConcludeOnboarding}>
+                      <Rocket className="h-3.5 w-3.5 mr-1" /> Concluir onboarding → Implantação
+                    </Button>
                   )}
                   {!isConcluded && (
                     openVendorReturn ? (
@@ -1811,14 +1862,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                 </Button>
                               </PopoverTrigger>
                               <PopoverContent className="w-96 space-y-3" align="end">
-                                {journey?.fase_atual === "onboarding" && (
-                                  <Alert className="border-warning/50 bg-warning/15 text-warning [&>svg]:text-warning py-2 text-xs">
-                                    <AlertTriangle className="h-4 w-4" />
-                                    <AlertDescription className="text-xs">
-                                      Ao agendar este treino, a jornada será concluída no Onboarding e iniciará a fase de Implantação.
-                                    </AlertDescription>
-                                  </Alert>
-                                )}
+                                {scheduleAlert}
                                 <div className="space-y-1">
                                   <label className="text-[11px] font-medium">Título *</label>
                                   <Input
@@ -1878,7 +1922,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                   />
                                   É retreinamento?
                                 </label>
-                                <Button size="sm" className="w-full" onClick={handleCreateTraining}>Agendar</Button>
+                                {scheduleButtons}
                               </PopoverContent>
                             </Popover>
                           )}
