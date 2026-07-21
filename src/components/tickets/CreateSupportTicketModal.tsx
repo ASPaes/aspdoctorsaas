@@ -137,6 +137,8 @@ export function CreateSupportTicketModal({
   const [serviceTypeId, setServiceTypeId] = useState<string>("");
   const [canalOrigem, setCanalOrigem] = useState<string>("telefone");
   const [tipoHorario, setTipoHorario] = useState<string>("comercial");
+  const [modoHorario, setModoHorario] = useState<"auto" | "manual">("auto");
+  const [tipoDetectado, setTipoDetectado] = useState<"comercial" | "plantao" | null>(null);
   const [horarioInicio, setHorarioInicio] = useState<string>("");
   const [horarioFim, setHorarioFim] = useState<string>("");
   const [prioridade, setPrioridade] = useState<string>("media");
@@ -178,6 +180,8 @@ export function CreateSupportTicketModal({
     setServiceTypeId("");
     setCanalOrigem("telefone");
     setTipoHorario("comercial");
+    setModoHorario("auto");
+    setTipoDetectado(null);
     setPrioridade("media");
     setStatusId("");
     setAgendadoPara("");
@@ -203,6 +207,8 @@ export function CreateSupportTicketModal({
       setClienteSearchTerm("");
       setCanalOrigem("whatsapp");
       setTipoHorario("comercial");
+      setModoHorario("auto");
+      setTipoDetectado(null);
       setPrioridade("media");
       setAgendadoPara("");
       setContatoSolicitante("");
@@ -250,6 +256,44 @@ export function CreateSupportTicketModal({
       reset();
     }
   }, [open]);
+
+  // Detecta tipo de horário (comercial/plantão) ao abrir o modal e ao trocar setor.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setTipoDetectado(null);
+    (async () => {
+      try {
+        const { data, error } = await (supabase.rpc as any)("check_tipo_horario", {
+          p_department_id: departamentoId || null,
+        });
+        if (cancelled) return;
+        if (error) return;
+        const val = (typeof data === "string" ? data : (Array.isArray(data) ? data[0] : null)) as
+          | "comercial"
+          | "plantao"
+          | null;
+        if (val === "comercial" || val === "plantao") {
+          setTipoDetectado(val);
+          setModoHorario((mode) => {
+            if (mode === "auto") {
+              setTipoHorario(val);
+              if (val === "comercial") {
+                setHorarioInicio("");
+                setHorarioFim("");
+              }
+            }
+            return mode;
+          });
+        }
+      } catch {
+        /* silent */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, departamentoId]);
 
   useEffect(() => {
     if (open && !fromClosure) {
@@ -871,27 +915,59 @@ export function CreateSupportTicketModal({
           <div className="flex-1" />
 
           {/* Tipo horário */}
-          <div className="flex gap-1">
-            {["comercial", "plantao"].map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => {
-                  setTipoHorario(t);
-                  if (t === "comercial") {
-                    setHorarioInicio("");
-                    setHorarioFim("");
-                  }
-                }}
-                className={`px-3 py-1 text-[11px] rounded-md border transition-colors ${
-                  tipoHorario === t
-                    ? "bg-primary/10 text-primary border-primary"
-                    : "border-border text-muted-foreground hover:text-foreground"
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1">
+              {(["auto", "comercial", "plantao"] as const).map((t) => {
+                const isActive =
+                  t === "auto" ? modoHorario === "auto" : modoHorario === "manual" && tipoHorario === t;
+                const label = t === "auto" ? "Automático" : t === "comercial" ? "Comercial" : "Plantão";
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      if (t === "auto") {
+                        setModoHorario("auto");
+                        if (tipoDetectado) {
+                          setTipoHorario(tipoDetectado);
+                          if (tipoDetectado === "comercial") {
+                            setHorarioInicio("");
+                            setHorarioFim("");
+                          }
+                        }
+                      } else {
+                        setModoHorario("manual");
+                        setTipoHorario(t);
+                        if (t === "comercial") {
+                          setHorarioInicio("");
+                          setHorarioFim("");
+                        }
+                      }
+                    }}
+                    className={`px-3 py-1 text-[11px] rounded-md border transition-colors ${
+                      isActive
+                        ? "bg-primary/10 text-primary border-primary"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            {modoHorario === "auto" && (
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-md border ${
+                  tipoDetectado
+                    ? "border-primary/40 text-primary bg-primary/5"
+                    : "border-border text-muted-foreground"
                 }`}
               >
-                {t === "comercial" ? "Comercial" : "Plantão"}
-              </button>
-            ))}
+                {tipoDetectado
+                  ? `Detectado: ${tipoDetectado === "comercial" ? "Comercial" : "Plantão"}`
+                  : "Detectando..."}
+              </span>
+            )}
           </div>
         </div>
 
