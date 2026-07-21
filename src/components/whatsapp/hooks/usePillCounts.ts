@@ -53,7 +53,7 @@ export function usePillCounts() {
         map[key] = {
           total: Number(row.total_conversas) || 0,
           aguardando: Number(row.aguardando) || 0,
-          unread: Number(row.msgs_nao_lidas) || 0,
+          unread: 0,
         };
       }
 
@@ -62,7 +62,7 @@ export function usePillCounts() {
         (acc, k) => ({
           total: acc.total + map[k].total,
           aguardando: acc.aguardando + map[k].aguardando,
-          unread: acc.unread + map[k].unread,
+          unread: 0,
         }),
         { ...EMPTY }
       );
