@@ -1322,6 +1322,22 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         />
       )}
 
+      {/* Ticket avulso (manual, sem atendimento) — cliente/setor do chat pré-selecionados */}
+      <CreateSupportTicketModal
+        open={isAvulsoTicketOpen}
+        onOpenChange={(o) => { if (!o) setIsAvulsoTicketOpen(false); }}
+        onCreated={() => {
+          setIsAvulsoTicketOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+          toast.success('Ticket avulso criado');
+        }}
+        defaultDepartmentId={(conversation as any).department_id ?? undefined}
+        defaultClienteId={(linkedCliente as any)?.id ?? null}
+        defaultClienteNome={(linkedCliente as any)?.nome_fantasia ?? (linkedCliente as any)?.razao_social ?? null}
+        defaultClienteCodigo={(linkedCliente as any)?.codigo_sequencial ?? null}
+      />
+
+
       {/* Fluxo REOPEN: atendimento já tem ticket vinculado ao encerrar */}
       <TicketReopenChoiceDialog
         open={showReopenChoice}
