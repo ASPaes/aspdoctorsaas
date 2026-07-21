@@ -221,8 +221,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     const target = (attendanceTicketList as any[]).find((a) => a.id === pickerSelectedId);
     if (!target) return;
     if (!canPickAttendance(target)) return;
+    if (getPickMode(target) === 'view_ticket') {
+      setShowAttendanceTicketPicker(false);
+      setReadOnlyTicketId(target.ticket_id);
+      return;
+    }
     await openTicketForAttendance(target);
-  }, [attendanceTicketList, pickerSelectedId, canPickAttendance, openTicketForAttendance]);
+  }, [attendanceTicketList, pickerSelectedId, canPickAttendance, openTicketForAttendance, getPickMode]);
+
 
   const handleAttendanceTicketCreated = useCallback(() => {
     setShowAttendanceTicketModal(false);
