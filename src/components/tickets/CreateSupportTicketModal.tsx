@@ -257,18 +257,39 @@ export function CreateSupportTicketModal({
     }
   }, [open]);
 
-  // Detecta tipo de horário (comercial/plantão) ao abrir o modal e ao trocar setor.
+  // Dados do atendimento de origem (closure) para ancorar a detecção de horário.
+  const { data: closureAttendance } = useQuery({
+    queryKey: ["create_support_ticket_closure_attendance", attendanceId],
+    enabled: open && fromClosure && !!attendanceId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_attendances" as any) as any)
+        .select("opened_at, department_id")
+        .eq("id", attendanceId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { opened_at: string; department_id: string | null } | null;
+    },
+  });
+
+  // Detecta tipo de horário (comercial/plantão) ao abrir o modal, trocar setor
+  // ou, no modo closure, quando os dados do atendimento carregam.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
     setTipoDetectado(null);
     (async () => {
+      const isClosure = fromClosure && closureAttendance?.opened_at;
+      const p_department_id = isClosure
+        ? (closureAttendance?.department_id ?? departamentoId ?? null)
+        : (departamentoId || null);
+      const p_at = isClosure ? closureAttendance?.opened_at : undefined;
       try {
         const { data, error } = await (supabase.rpc as any)("check_tipo_horario", {
-          p_department_id: departamentoId || null,
+          p_department_id,
+          ...(p_at !== undefined ? { p_at } : {}),
           p_tenant_id: tid,
         });
-        console.log("[check_tipo_horario] retorno:", data, "erro:", error);
+        console.log("[check_tipo_horario]", fromClosure ? "closure" : "manual", "retorno:", data, "erro:", error);
         if (cancelled) return;
         if (error) {
           console.error("[check_tipo_horario] erro ao detectar horário:", error);
@@ -310,7 +331,8 @@ export function CreateSupportTicketModal({
     return () => {
       cancelled = true;
     };
-  }, [open, departamentoId]);
+  }, [open, departamentoId, closureAttendance, fromClosure, attendanceId, tid]);
+
 
   useEffect(() => {
     if (open && !fromClosure) {
