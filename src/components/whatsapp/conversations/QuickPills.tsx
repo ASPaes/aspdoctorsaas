@@ -1,5 +1,10 @@
 import { cn } from "@/lib/utils";
 
+interface PillBadgeCounts {
+  aguardando?: number;
+  unread?: number;
+}
+
 interface Props {
   active: string;
   onChange: (pill: string) => void;
@@ -9,6 +14,8 @@ interface Props {
   afterHoursCount: number;
   groupsCount: number;
   groupsHasUnread?: boolean;
+  /** Badges (bolinhas) por pill */
+  badges?: Partial<Record<"waiting" | "in_progress" | "after_hours" | "all" | "groups", PillBadgeCounts>>;
 }
 
 const pills = [
@@ -20,37 +27,81 @@ const pills = [
   { key: "closed", label: "Encerrados" },
 ];
 
-export function QuickPills({ active, onChange, inProgressCount, waitingCount, closedCount, afterHoursCount, groupsCount, groupsHasUnread }: Props) {
+const formatCap = (n: number, cap: number) => (n > cap ? `${cap}+` : String(Math.trunc(n)));
+
+export function QuickPills({
+  active,
+  onChange,
+  inProgressCount,
+  waitingCount,
+  closedCount,
+  afterHoursCount,
+  groupsCount,
+  groupsHasUnread,
+  badges,
+}: Props) {
   const getCount = (key: string) => {
     if (key === "in_progress") return inProgressCount;
     if (key === "waiting") return waitingCount;
     if (key === "closed") return closedCount;
     if (key === "after_hours") return afterHoursCount;
     if (key === "groups") return groupsCount;
+    if (key === "all")
+      return inProgressCount + waitingCount + afterHoursCount;
     return 0;
   };
 
+  const showRedFor = new Set(["waiting", "in_progress", "after_hours", "all"]);
+  const showGreenFor = new Set(["waiting", "in_progress", "after_hours", "all", "groups"]);
+
   return (
-    <div className="flex gap-1 px-3 pb-2 overflow-x-auto">
+    // pt-2.5 evita que as bolinhas absolutas sejam cortadas pelo overflow-x da barra
+    <div className="flex gap-1 px-3 pt-2.5 pb-2 overflow-x-auto overflow-y-visible">
       {pills.map((p) => {
         const count = getCount(p.key);
+        const isActive = active === p.key;
+        const b = (badges as any)?.[p.key] as PillBadgeCounts | undefined;
+        const aguardando = showRedFor.has(p.key) ? Math.max(0, Math.trunc(b?.aguardando ?? 0)) : 0;
+        const unread = showGreenFor.has(p.key) ? Math.max(0, Math.trunc(b?.unread ?? 0)) : 0;
+
         return (
-          <button
-            key={p.key}
-            onClick={() => onChange(p.key)}
-            className={cn(
-              "px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
-              active === p.key
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-accent",
-              p.key === "groups" && groupsHasUnread && "bg-orange-500/20 text-orange-400 border border-orange-500/50"
+          <div key={p.key} className="relative shrink-0">
+            <button
+              onClick={() => onChange(p.key)}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-accent",
+                p.key === "groups" && groupsHasUnread && "bg-orange-500/20 text-orange-400 border border-orange-500/50"
+              )}
+            >
+              {p.label}
+              {count > 0 && <span className="ml-1 text-[10px] opacity-70">({count})</span>}
+            </button>
+
+            {aguardando > 0 && (
+              <span
+                title={`${aguardando} aguardando resposta`}
+                className="pointer-events-none absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold leading-none flex items-center justify-center text-white border-[1.5px] border-background z-10"
+                style={{ backgroundColor: "#d85a30" }}
+              >
+                {formatCap(aguardando, 9)}
+              </span>
             )}
-          >
-            {p.label}
-            {count > 0 && (
-              <span className="ml-1 text-[10px]">({count})</span>
+            {unread > 0 && (
+              <span
+                title={`${unread} mensagens não lidas`}
+                className="pointer-events-none absolute right-[-6px] min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold leading-none flex items-center justify-center text-slate-900 border-[1.5px] border-background z-10"
+                style={{
+                  backgroundColor: "#1d9e75",
+                  top: aguardando > 0 ? "14px" : "-6px",
+                }}
+              >
+                {formatCap(unread, 99)}
+              </span>
             )}
-          </button>
+          </div>
         );
       })}
     </div>
