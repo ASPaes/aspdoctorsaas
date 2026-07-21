@@ -265,54 +265,31 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     enabled: !!tid,
   });
 
-  // Compute pill counts using centralized bucket logic
+  // Contagens das pills vêm agregadas do servidor (RPC whatsapp_pill_counts).
+  // Grupos continuam no hook dedicado (a RPC filtra is_group=false).
+  const { data: pillCountsData } = usePillCounts();
   const pillCounts = useMemo(() => {
-    let inProgress = 0;
-    let waiting = 0;
-    let closed = 0;
-    let afterHours = 0;
-
-    for (const conv of conversations) {
-      // Grupos não entram nas pills normais
-      if ((conv as any).is_group === true) continue;
-
-      const state = getStateForConv(conv);
-
-      const bucket = getConversationBucket(state);
-      const isQueueLike = bucket === "waiting_in_hours" || bucket === "waiting_out_of_hours";
-
-      // Department filter for counts (skip for after_hours which is tenant-wide)
-      if (selectedDepartmentId && state.department_id && state.department_id !== selectedDepartmentId) {
-        if (bucket === "waiting_out_of_hours") { afterHours++; }
-        continue;
-      }
-
-      // Filtros do popover NÃO se aplicam às pills de fila (mostram o total do setor)
-      if (!isQueueLike) {
-        if (filters.instanceId && conv.instance_id !== filters.instanceId) continue;
-        if (filters.autoReplyDisabledOnly && conv.auto_reply_disabled !== true) continue;
-        if (filters.rulesDisabledOnly && (conv.contact as any)?.rules_disabled !== true) continue;
-      }
-
-      if (!isAdmin && user?.id) {
-        if (bucket === "closed") {
-          const att = attendanceMap.get(conv.id);
-          if (att && att.assigned_to !== user.id) continue;
-        }
-      }
-
-      switch (bucket) {
-        case "in_progress": inProgress++; break;
-        case "waiting_in_hours": waiting++; break;
-        case "waiting_out_of_hours": afterHours++; break;
-        case "closed": closed++; break;
-      }
-    }
-
-    const groups = groupCountData?.totalGroups ?? 0;
-    const groupsUnread = groupCountData?.unreadGroups ?? 0;
-    return { inProgress, waiting, closed, afterHours, groups, groupsUnread };
-  }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId, groupCountData, filters.instanceId, filters.autoReplyDisabledOnly, filters.rulesDisabledOnly]);
+    const w = pillCountsData?.waiting ?? { total: 0, aguardando: 0, unread: 0 };
+    const ip = pillCountsData?.in_progress ?? { total: 0, aguardando: 0, unread: 0 };
+    const ah = pillCountsData?.after_hours ?? { total: 0, aguardando: 0, unread: 0 };
+    const cl = pillCountsData?.closed ?? { total: 0, aguardando: 0, unread: 0 };
+    const all = pillCountsData?.all ?? { total: 0, aguardando: 0, unread: 0 };
+    return {
+      waiting: w.total,
+      inProgress: ip.total,
+      afterHours: ah.total,
+      closed: cl.total,
+      groups: groupCountData?.totalGroups ?? 0,
+      groupsUnread: groupCountData?.unreadGroups ?? 0,
+      badges: {
+        waiting: { aguardando: w.aguardando, unread: w.unread },
+        in_progress: { aguardando: ip.aguardando, unread: ip.unread },
+        after_hours: { aguardando: ah.aguardando, unread: ah.unread },
+        all: { aguardando: all.aguardando, unread: all.unread },
+        groups: { unread: groupCountData?.unreadGroups ?? 0 },
+      },
+    };
+  }, [pillCountsData, groupCountData]);
 
   // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
   useEffect(() => {
