@@ -10322,6 +10322,11 @@ export type Database = {
         }
         Returns: Json
       }
+      check_tipo_horario: {
+        Args: { p_at?: string; p_department_id: string; p_tenant_id?: string }
+        Returns: string
+      }
+      check_tipo_horario_teste: { Args: never; Returns: string }
       claim_conversation: {
         Args: { p_conversation_id: string; p_reason?: string }
         Returns: undefined
@@ -10373,13 +10378,13 @@ export type Database = {
           p_attendance_id: string
           p_category_id: string
           p_department_id?: string
-          p_observacao_agente: string
-          p_observacao_ia: string
+          p_observacao_agente?: string
+          p_observacao_ia?: string
           p_produto_id: number
           p_responsavel_user_id?: string
           p_service_type_id: string
           p_subcategory_id: string
-          p_tipo_horario: string
+          p_tipo_horario?: string
         }
         Returns: string
       }
@@ -10407,13 +10412,13 @@ export type Database = {
           p_attendance_id: string
           p_category_id: string
           p_department_id?: string
-          p_observacao_agente: string
-          p_observacao_ia: string
+          p_observacao_agente?: string
+          p_observacao_ia?: string
           p_produto_id: number
           p_responsavel_user_id?: string
           p_service_type_id: string
           p_subcategory_id: string
-          p_tipo_horario: string
+          p_tipo_horario?: string
         }
         Returns: string
       }
@@ -10431,13 +10436,13 @@ export type Database = {
           p_attendance_id: string
           p_category_id: string
           p_department_id?: string
-          p_observacao_agente: string
-          p_observacao_ia: string
+          p_observacao_agente?: string
+          p_observacao_ia?: string
           p_produto_id: number
           p_responsavel_user_id?: string
           p_service_type_id: string
           p_subcategory_id: string
-          p_tipo_horario: string
+          p_tipo_horario?: string
         }
         Returns: string
       }
@@ -10515,13 +10520,13 @@ export type Database = {
           p_attendance_id: string
           p_category_id: string
           p_department_id?: string
-          p_observacao_agente: string
-          p_observacao_ia: string
+          p_observacao_agente?: string
+          p_observacao_ia?: string
           p_produto_id: number
           p_responsavel_user_id?: string
           p_service_type_id: string
           p_subcategory_id: string
-          p_tipo_horario: string
+          p_tipo_horario?: string
         }
         Returns: string
       }
@@ -11703,6 +11708,10 @@ export type Database = {
       is_tenant_admin: { Args: never; Returns: boolean }
       is_tenant_admin_or_head: { Args: never; Returns: boolean }
       is_wa_quiet_hours: { Args: { p_now?: string }; Returns: boolean }
+      is_within_business_hours: {
+        Args: { p_at?: string; p_department_id: string; p_tenant_id: string }
+        Returns: boolean
+      }
       kpi_cap_seconds: { Args: { p_metric: string }; Returns: number }
       link_cliente_to_attendance: {
         Args: { p_attendance_id: string; p_cliente_id: string }
