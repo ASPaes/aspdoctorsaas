@@ -249,6 +249,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [creatingTag, setCreatingTag] = useState(false);
   const [secOpen, setSecOpen] = useState<Record<string, boolean>>({ treinos: true, modulos: true, anexos: true, atendimentos: true });
   const toggleSec = (k: string) => setSecOpen((s) => ({ ...s, [k]: !s[k] }));
+  // Colapso por grupo do checklist da etapa (default: aberto).
+  const [checklistCollapsed, setChecklistCollapsed] = useState<Record<string, boolean>>({});
+  const toggleChecklistGroup = (k: string) => setChecklistCollapsed((s) => ({ ...s, [k]: !s[k] }));
   const [novoManual, setNovoManual] = useState("");
   const [novoManualReq, setNovoManualReq] = useState(false);
 
@@ -1693,15 +1696,23 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           <p className="text-xs text-muted-foreground py-2 text-center">Sem itens de checklist para esta etapa.</p>
                         ) : (
                           <div className="space-y-3">
-                            {checklistSections.map((sec) => (
+                            {checklistSections.map((sec) => {
+                              const collapsed = checklistCollapsed[sec.key];
+                              const doneCount = sec.items.filter((i) => i.done).length;
+                              return (
                               <div key={sec.key} className="space-y-1.5">
-                                <p className="text-[11px] font-semibold text-foreground/80 flex items-center gap-1.5">
-                                  {sec.nome}
-                                  <span className="text-[10px] text-muted-foreground font-normal">
-                                    {sec.items.filter((i) => i.done).length}/{sec.items.length}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleChecklistGroup(sec.key)}
+                                  className="w-full flex items-center gap-1.5 text-left"
+                                >
+                                  <ChevronRight className={`h-3 w-3 text-muted-foreground shrink-0 transition-transform ${collapsed ? "" : "rotate-90"}`} />
+                                  <span className="text-[11px] font-semibold text-foreground/80">{sec.nome}</span>
+                                  <span className={`text-[10px] font-normal ${doneCount === sec.items.length ? "text-primary" : "text-muted-foreground"}`}>
+                                    {doneCount}/{sec.items.length}
                                   </span>
-                                </p>
-                                {sec.items.map((c) => (
+                                </button>
+                                {!collapsed && sec.items.map((c) => (
                                   <div key={c.id} className="group/ci flex items-start gap-2 pl-1">
                                     <Checkbox
                                       id={`ci-${c.id}`}
@@ -1729,7 +1740,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                   </div>
                                 ))}
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                         {/* Adicionar item personalizado (independe da etapa) */}
