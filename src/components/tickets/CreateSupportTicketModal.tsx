@@ -281,13 +281,16 @@ export function CreateSupportTicketModal({
         const raw = typeof data === "string" ? data : null;
         if (raw === "comercial" || raw === "plantao") {
           setTipoDetectado(raw);
-          if (modoHorario === "auto") {
-            setTipoHorario(raw);
-            if (raw === "comercial") {
-              setHorarioInicio("");
-              setHorarioFim("");
+          setModoHorario((currentMode) => {
+            if (currentMode === "auto") {
+              setTipoHorario(raw);
+              if (raw === "comercial") {
+                setHorarioInicio("");
+                setHorarioFim("");
+              }
             }
-          }
+            return currentMode;
+          });
         } else {
           console.error("[check_tipo_horario] valor inesperado:", raw);
           setTipoDetectado(null);
