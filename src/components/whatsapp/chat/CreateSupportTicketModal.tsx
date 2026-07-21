@@ -55,7 +55,13 @@ export function CreateSupportTicketModal({
   const [subcategoryId, setSubcategoryId] = useState<string>("");
   const [serviceTypeId, setServiceTypeId] = useState<string>("");
   const [observacaoAgente, setObservacaoAgente] = useState<string>("");
-  const [tipoHorario, setTipoHorario] = useState<string>("comercial");
+  const [modoHorario, setModoHorario] = useState<'auto' | 'manual'>('auto');
+  const [tipoDetectado, setTipoDetectado] = useState<'comercial' | 'plantao' | null>(null);
+  const [manualTipoHorario, setManualTipoHorario] = useState<'comercial' | 'plantao'>('comercial');
+  const tipoHorario = useMemo(() => {
+    if (modoHorario === 'auto') return tipoDetectado ?? 'comercial';
+    return manualTipoHorario;
+  }, [modoHorario, tipoDetectado, manualTipoHorario]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const hasCliente = !!clienteId;
@@ -68,7 +74,9 @@ export function CreateSupportTicketModal({
       setSubcategoryId("");
       setServiceTypeId("");
       setObservacaoAgente("");
-      setTipoHorario("comercial");
+      setModoHorario('auto');
+      setTipoDetectado(null);
+      setManualTipoHorario('comercial');
     }
   }, [open]);
 
