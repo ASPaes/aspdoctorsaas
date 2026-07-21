@@ -508,7 +508,7 @@ export function CreateSupportTicketModal({
 
   useEffect(() => {
     if (ticketStatuses.length > 0) {
-      if (fromClosure && mode !== "demanda_externa") {
+      if (fromClosure && mode !== "demanda_externa" && mode !== "classificacao_aberta") {
         const terminal = ticketStatuses.find((s) => s.is_terminal);
         if (terminal) setStatusId(terminal.id);
         else setStatusId(ticketStatuses[ticketStatuses.length - 1].id);
