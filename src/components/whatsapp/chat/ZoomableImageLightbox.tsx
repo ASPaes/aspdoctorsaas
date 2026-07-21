@@ -12,6 +12,9 @@ interface ZoomableImageLightboxProps {
 const roundBtn =
   "flex items-center justify-center h-8 w-8 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors";
 
+const controlBtn =
+  "flex items-center justify-center h-10 w-10 rounded-full bg-black/70 hover:bg-black/90 text-white transition-colors";
+
 export function ZoomableImageLightbox({
   src,
   onClose,
