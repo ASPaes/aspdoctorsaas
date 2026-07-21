@@ -121,6 +121,10 @@ export function CreateSupportTicketModal({
   closureSentimentLabel = null,
   closureSentimentConfidence = null,
   closureSentimentSummary = null,
+  defaultClienteId = null,
+  defaultClienteNome = null,
+  defaultClienteCodigo = null,
+
 }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
