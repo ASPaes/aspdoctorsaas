@@ -257,6 +257,44 @@ export function CreateSupportTicketModal({
     }
   }, [open]);
 
+  // Detecta tipo de horário (comercial/plantão) ao abrir o modal e ao trocar setor.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setTipoDetectado(null);
+    (async () => {
+      try {
+        const { data, error } = await (supabase.rpc as any)("check_tipo_horario", {
+          p_department_id: departamentoId || null,
+        });
+        if (cancelled) return;
+        if (error) return;
+        const val = (typeof data === "string" ? data : (Array.isArray(data) ? data[0] : null)) as
+          | "comercial"
+          | "plantao"
+          | null;
+        if (val === "comercial" || val === "plantao") {
+          setTipoDetectado(val);
+          setModoHorario((mode) => {
+            if (mode === "auto") {
+              setTipoHorario(val);
+              if (val === "comercial") {
+                setHorarioInicio("");
+                setHorarioFim("");
+              }
+            }
+            return mode;
+          });
+        }
+      } catch {
+        /* silent */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, departamentoId]);
+
   useEffect(() => {
     if (open && !fromClosure) {
       supabase.auth.getUser().then(({ data }) => {
