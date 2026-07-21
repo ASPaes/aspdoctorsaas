@@ -259,6 +259,21 @@ export function CreateSupportTicketModal({
     }
   }, [open, fromClosure]);
 
+  // Manual mode: pré-selecionar cliente/setor a partir do chat (editáveis)
+  useEffect(() => {
+    if (!open || fromClosure) return;
+    if (defaultClienteId) {
+      setSelectedCliente({
+        id: defaultClienteId,
+        nome_fantasia: defaultClienteNome || null,
+        razao_social: null,
+        codigo_sequencial: defaultClienteCodigo || null,
+        cnpj: null,
+      } as any);
+    }
+  }, [open, fromClosure, defaultClienteId, defaultClienteNome, defaultClienteCodigo]);
+
+
   const { data: produtos = [] } = useQuery({
     queryKey: ["create_manual_ticket_produtos", tid],
     enabled: open && !!tid,
