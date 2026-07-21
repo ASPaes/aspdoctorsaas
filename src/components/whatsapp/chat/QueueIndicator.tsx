@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { UserCheck, ArrowRightLeft, Loader2, Users, User, Clock, Ban } from "lucide-react";
+import { UserCheck, ArrowRightLeft, Loader2, Users, User, Clock, Ban, RotateCcw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConversationAssignment } from "../hooks/useConversationAssignment";
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
@@ -36,17 +36,22 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
   const { claimConversation, unassignConversation, isAssigning, isClaiming } = useConversationAssignment();
 
   // Use attendance status as source of truth (it updates via realtime)
-  const { attendanceMap } = useAttendanceStatus([conversationId], true);
+  const { attendanceMap, isLoading: attendanceLoading } = useAttendanceStatus([conversationId], true);
   const attendance = attendanceMap.get(conversationId);
 
-  // Determine effective assignment from attendance (more accurate) or fallback to conversation prop
-  const effectiveAssignedTo = attendance?.assigned_to ?? assignedTo;
+  // Só consideramos "em atendimento" quando o status é ATIVO (waiting/in_progress).
+  // Um atendimento ENCERRADO não conta como atribuído a ninguém — senão o chip
+  // mostra o dono antigo e o botão vira "assumir de outro" numa conversa já fechada.
+  const ACTIVE_STATUSES = ["waiting", "in_progress"];
   const effectiveStatus = attendance?.status;
+  const isActiveAttendance = !!effectiveStatus && ACTIVE_STATUSES.includes(effectiveStatus);
 
-  const isAssignedToMe = effectiveAssignedTo === user?.id;
+  const activeAssignedTo = isActiveAttendance ? (attendance?.assigned_to ?? null) : null;
+  const isAssignedToMe = isActiveAttendance && attendance?.assigned_to === user?.id;
   // Only show as "queue" if status=waiting AND no one is assigned
-  const isInQueue = effectiveStatus === "waiting" && !effectiveAssignedTo;
+  const isInQueue = effectiveStatus === "waiting" && !attendance?.assigned_to;
   const isInProgress = effectiveStatus === "in_progress";
+  const isClosedOrNone = !isActiveAttendance; // encerrado, inativo ou sem atendimento
 
   // Department guard: user can only claim if conversation belongs to their department
   const { userDepartmentId, canSeeAllDepartments } = useDepartmentFilter();
@@ -122,16 +127,18 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
       ? { icon: User, label: assignedOperatorName ? `Comigo • ${assignedOperatorName}` : "Comigo", className: "bg-primary/10 text-primary border-primary/20" }
       : isAssignedToMe
         ? { icon: Clock, label: assignedOperatorName ? `Comigo • ${assignedOperatorName}` : "Comigo (fila)", className: "bg-primary/10 text-primary border-primary/20" }
-        : effectiveAssignedTo
+        : activeAssignedTo
           ? { icon: UserCheck, label: assignedOperatorName ? `Atribuída • ${assignedOperatorName}` : "Atribuída", className: "bg-accent/10 text-accent border-accent/20" }
           : { icon: Users, label: "Sem atendimento", className: "bg-muted text-muted-foreground border-border" };
 
   const ChipIcon = chipConfig.icon;
 
-  // Assumir button: only when in queue (waiting + no assigned_to)
+  // Assumir: conversa na fila (waiting + sem dono)
   const canClaim = isInQueue && !isAssignedToMe && isInUserDepartment;
-  // Assumir de outro operador do mesmo setor (chat já tem dono que não sou eu)
-  const canTakeOver = !!effectiveAssignedTo && !isAssignedToMe && isInUserDepartment;
+  // Takeover: chat ATIVO com dono que não sou eu
+  const canTakeOver = !!activeAssignedTo && !isAssignedToMe && isInUserDepartment;
+  // Reabrir: conversa encerrada / sem atendimento ativo (não-grupo). Gate no loading evita flash.
+  const canReopen = isClosedOrNone && isInUserDepartment && !attendanceLoading && !attendance?.is_group;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -161,6 +168,17 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
         >
           {(isAssigning || isClaiming) ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
           Assumir
+        </Button>
+      ) : canReopen ? (
+        <Button
+          variant="default"
+          size="sm"
+          className="h-7 text-xs gap-1.5 rounded-full"
+          onClick={handleClaim}
+          disabled={isAssigning || isClaiming || isBlocked}
+        >
+          {(isAssigning || isClaiming) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+          Reabrir
         </Button>
       ) : (
         <>
