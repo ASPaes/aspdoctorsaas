@@ -93,6 +93,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showAttendanceTicketModal, setShowAttendanceTicketModal] = useState(false);
   const [attendanceTicketTarget, setAttendanceTicketTarget] = useState<any | null>(null);
   const [pickerSelectedId, setPickerSelectedId] = useState<string | null>(null);
+  const [isAvulsoTicketOpen, setIsAvulsoTicketOpen] = useState(false);
+
   const [showAttachTicketModal, setShowAttachTicketModal] = useState(false);
   const [attachNote, setAttachNote] = useState("");
   // Reopen flow (attendance.ticket_id IS NOT NULL no encerramento que exige ticket)
