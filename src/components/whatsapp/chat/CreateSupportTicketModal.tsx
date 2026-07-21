@@ -172,6 +172,44 @@ export function CreateSupportTicketModal({
     },
   });
 
+  // Dados do atendimento para ancorar a detecção de tipo de horário
+  const { data: attendance } = useQuery({
+    queryKey: ["support_ticket_modal_attendance", attendanceId],
+    enabled: open && !!attendanceId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_attendances" as any) as any)
+        .select("opened_at, department_id")
+        .eq("id", attendanceId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { opened_at: string; department_id: string | null } | null;
+    },
+  });
+
+  // Detecção automática do tipo de horário baseada no início do atendimento
+  useEffect(() => {
+    if (!open || !attendance) return;
+    let cancelled = false;
+    const detect = async () => {
+      const { data, error } = await (supabase.rpc as any)("check_tipo_horario", {
+        p_department_id: attendance?.department_id ?? null,
+        p_at: attendance?.opened_at ?? null,
+        p_tenant_id: tid,
+      });
+      console.log("[check_tipo_horario wpp] retorno:", data, "erro:", error);
+      if (cancelled) return;
+      if (!error && (data === "comercial" || data === "plantao")) {
+        setTipoDetectado(data);
+      } else {
+        setTipoDetectado(null);
+      }
+    };
+    detect();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, attendance, tid]);
+
   const produtoIdNum = produtoId ? Number(produtoId) : null;
 
   const filteredCategories = useMemo(() => {
@@ -413,15 +451,43 @@ export function CreateSupportTicketModal({
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Tipo de horário</Label>
-                <Select value={tipoHorario} onValueChange={setTipoHorario}>
-                  <SelectTrigger className="h-9 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="comercial">Horário comercial</SelectItem>
-                    <SelectItem value="plantao">Plantão</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={modoHorario === 'auto' ? 'default' : 'outline'}
+                    size="sm"
+                    className="flex-1 text-xs"
+                    onClick={() => setModoHorario('auto')}
+                  >
+                    Automático
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={modoHorario === 'manual' && manualTipoHorario === 'comercial' ? 'default' : 'outline'}
+                    size="sm"
+                    className="flex-1 text-xs"
+                    onClick={() => { setModoHorario('manual'); setManualTipoHorario('comercial'); }}
+                  >
+                    Comercial
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={modoHorario === 'manual' && manualTipoHorario === 'plantao' ? 'default' : 'outline'}
+                    size="sm"
+                    className="flex-1 text-xs"
+                    onClick={() => { setModoHorario('manual'); setManualTipoHorario('plantao'); }}
+                  >
+                    Plantão
+                  </Button>
+                </div>
+                {modoHorario === 'auto' && (
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span>Detectado:</span>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {tipoDetectado === 'comercial' ? 'Comercial' : tipoDetectado === 'plantao' ? 'Plantão' : 'Detectando...'}
+                    </Badge>
+                  </div>
+                )}
               </div>
             </div>
           </fieldset>
