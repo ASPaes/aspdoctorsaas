@@ -52,7 +52,6 @@ export function QuickPills({
   };
 
   const showRedFor = new Set(["waiting", "in_progress", "after_hours", "all"]);
-  const showGreenFor = new Set(["waiting", "in_progress", "after_hours", "all", "groups"]);
 
   return (
     // pt-2.5 evita que as bolinhas absolutas sejam cortadas pelo overflow-x da barra
@@ -62,7 +61,6 @@ export function QuickPills({
         const isActive = active === p.key;
         const b = (badges as any)?.[p.key] as PillBadgeCounts | undefined;
         const aguardando = showRedFor.has(p.key) ? Math.max(0, Math.trunc(b?.aguardando ?? 0)) : 0;
-        const unread = showGreenFor.has(p.key) ? Math.max(0, Math.trunc(b?.unread ?? 0)) : 0;
 
         return (
           <div key={p.key} className="relative shrink-0">
@@ -83,22 +81,10 @@ export function QuickPills({
             {aguardando > 0 && (
               <span
                 title={`${aguardando} aguardando resposta`}
-                className="pointer-events-none absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold leading-none flex items-center justify-center text-white border-[1.5px] border-background z-10"
+                className="pointer-events-none absolute top-1/2 -translate-y-1/2 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold leading-none flex items-center justify-center text-white border-[1.5px] border-background z-10"
                 style={{ backgroundColor: "#d85a30" }}
               >
                 {formatCap(aguardando, 9)}
-              </span>
-            )}
-            {unread > 0 && (
-              <span
-                title={`${unread} mensagens não lidas`}
-                className="pointer-events-none absolute right-[-6px] min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold leading-none flex items-center justify-center text-slate-900 border-[1.5px] border-background z-10"
-                style={{
-                  backgroundColor: "#1d9e75",
-                  top: aguardando > 0 ? "14px" : "-6px",
-                }}
-              >
-                {formatCap(unread, 99)}
               </span>
             )}
           </div>
