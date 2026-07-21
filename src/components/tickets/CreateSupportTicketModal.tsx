@@ -267,27 +267,43 @@ export function CreateSupportTicketModal({
         const { data, error } = await (supabase.rpc as any)("check_tipo_horario", {
           p_department_id: departamentoId || null,
         });
+        console.log("[check_tipo_horario] retorno:", data, "erro:", error);
         if (cancelled) return;
-        if (error) return;
-        const val = (typeof data === "string" ? data : (Array.isArray(data) ? data[0] : null)) as
-          | "comercial"
-          | "plantao"
-          | null;
-        if (val === "comercial" || val === "plantao") {
-          setTipoDetectado(val);
-          setModoHorario((mode) => {
-            if (mode === "auto") {
-              setTipoHorario(val);
-              if (val === "comercial") {
+        if (error) {
+          console.error("[check_tipo_horario] erro ao detectar horário:", error);
+          setTipoDetectado(null);
+          setTipoHorario("comercial");
+          setHorarioInicio("");
+          setHorarioFim("");
+          return;
+        }
+        // A RPC retorna um texto simples diretamente em data.
+        const raw = typeof data === "string" ? data : null;
+        if (raw === "comercial" || raw === "plantao") {
+          setTipoDetectado(raw);
+          setModoHorario((currentMode) => {
+            if (currentMode === "auto") {
+              setTipoHorario(raw);
+              if (raw === "comercial") {
                 setHorarioInicio("");
                 setHorarioFim("");
               }
             }
-            return mode;
+            return currentMode;
           });
+        } else {
+          console.error("[check_tipo_horario] valor inesperado:", raw);
+          setTipoDetectado(null);
+          setTipoHorario("comercial");
+          setHorarioInicio("");
+          setHorarioFim("");
         }
-      } catch {
-        /* silent */
+      } catch (err) {
+        console.error("[check_tipo_horario] exceção:", err);
+        setTipoDetectado(null);
+        setTipoHorario("comercial");
+        setHorarioInicio("");
+        setHorarioFim("");
       }
     })();
     return () => {
