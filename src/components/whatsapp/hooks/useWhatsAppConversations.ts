@@ -354,6 +354,15 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
         }
       });
+
+      channel.on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'support_attendances',
+        filter: tid ? `tenant_id=eq.${tid}` : undefined,
+      } as any, () => {
+        invalidatePillCounts();
+      });
     });
   }, [queryClient, tid]);
 
