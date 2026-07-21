@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
+import { ZoomableImageLightbox } from "./ZoomableImageLightbox";
 
 interface Props {
   noteId: string;
@@ -62,15 +62,14 @@ export function NoteMediaPreview({ noteId, mediaType }: Props) {
           className="max-h-[200px] max-w-full object-contain rounded-md"
         />
       </button>
-      <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
-        <DialogContent className="max-w-5xl p-2 bg-background/95">
-          <img
-            src={data.url}
-            alt="Mídia da nota"
-            className="max-h-[85vh] w-auto mx-auto object-contain"
-          />
-        </DialogContent>
-      </Dialog>
+      {lightboxOpen && (
+        <ZoomableImageLightbox
+          src={data.url}
+          alt="Mídia da nota"
+          downloadName="nota"
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </>
   );
 }

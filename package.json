@@ -69,6 +69,7 @@
     "react-resizable-panels": "^2.1.9",
     "react-router-dom": "^6",
     "react-simple-maps": "^3.0.0",
+    "react-zoom-pan-pinch": "^4.0.3",
     "recharts": "^2.15.4",
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.6.0",
