@@ -76,6 +76,17 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
 
   const persistClienteLink = async (clienteId: string) => {
     if (!conversationId) return;
+
+    // Grupos: fonte de verdade é whatsapp_contacts.cliente_id — gravado pela RPC set_group_cliente
+    if (isGroup) {
+      const { error } = await (supabase as any).rpc('set_group_cliente', {
+        p_conversation_id: conversationId,
+        p_cliente_id: clienteId,
+      });
+      if (error) throw error;
+      return;
+    }
+
     // 1) Prefer attendance RPC (writes to attendance + propagates to conversation metadata)
     let resolvedAttendanceId = attendanceId ?? null;
     if (!resolvedAttendanceId) {
@@ -103,10 +114,11 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
       .eq('id', conversationId)
       .maybeSingle();
     const currentMeta = (conv?.metadata && typeof conv.metadata === 'object') ? conv.metadata : {};
-    await (supabase as any)
+    const { error: updErr } = await (supabase as any)
       .from('whatsapp_conversations')
       .update({ metadata: { ...currentMeta, cliente_id: clienteId } })
       .eq('id', conversationId);
+    if (updErr) throw updErr;
   };
 
   const invalidateClienteQueries = () => {
@@ -115,7 +127,9 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
     queryClient.invalidateQueries({ queryKey: ['cliente-candidatos-by-phone'] });
     queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
     queryClient.invalidateQueries({ queryKey: ['relevant-attendance'] });
+    queryClient.invalidateQueries({ queryKey: ['group-linked-cliente'] });
   };
+
 
   const onSubmit = async (data: ContactFormData) => {
     if (isNewContact) {
@@ -170,28 +184,31 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
           toast.success(`Contato "${data.name}" salvo com sucesso`);
         }
 
-        // If a cliente was linked, sync to cliente_contatos + persist link on conversation/attendance
-        if (linkedCliente && linkedCliente.id !== originalClienteId) {
-          const { data: existingContato } = await supabase
-            .from('cliente_contatos')
-            .select('id')
-            .eq('cliente_id', linkedCliente.id)
-            .eq('fone', digits)
-            .maybeSingle();
-
-          if (!existingContato) {
-            await supabase
+        // If a cliente is set, sync to cliente_contatos (dedup vs original) e sempre persistir vínculo
+        if (linkedCliente) {
+          if (linkedCliente.id !== originalClienteId) {
+            const { data: existingContato } = await supabase
               .from('cliente_contatos')
-              .insert({
-                cliente_id: linkedCliente.id,
-                nome: data.name,
-                fone: digits,
-                tenant_id: profile.tenant_id,
-              });
+              .select('id')
+              .eq('cliente_id', linkedCliente.id)
+              .eq('fone', digits)
+              .maybeSingle();
+
+            if (!existingContato) {
+              await supabase
+                .from('cliente_contatos')
+                .insert({
+                  cliente_id: linkedCliente.id,
+                  nome: data.name,
+                  fone: digits,
+                  tenant_id: profile.tenant_id,
+                });
+            }
           }
           await persistClienteLink(linkedCliente.id);
           toast.success(`Contato vinculado ao cliente ${linkedCliente.label}`);
         }
+
 
         invalidateClienteQueries();
         onOpenChange(false);
@@ -226,35 +243,37 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
         },
         {
           onSuccess: async () => {
-            if (linkedCliente && linkedCliente.id !== originalClienteId) {
+            if (linkedCliente) {
               try {
-                // Sync cliente_contatos
-                const digits = (normalized || contactPhone || '').replace(/\D/g, '');
-                if (digits) {
-                  const { data: profile } = await supabase.auth.getUser().then(async (r) => {
-                    const uid = r.data.user?.id;
-                    if (!uid) return { data: null } as any;
-                    return supabase
-                      .from('profiles')
-                      .select('tenant_id')
-                      .eq('user_id', uid)
-                      .eq('status', 'ativo')
-                      .maybeSingle();
-                  });
-                  if (profile?.tenant_id) {
-                    const { data: existingContato } = await supabase
-                      .from('cliente_contatos')
-                      .select('id')
-                      .eq('cliente_id', linkedCliente.id)
-                      .eq('fone', digits)
-                      .maybeSingle();
-                    if (!existingContato) {
-                      await supabase.from('cliente_contatos').insert({
-                        cliente_id: linkedCliente.id,
-                        nome: data.name,
-                        fone: digits,
-                        tenant_id: profile.tenant_id,
-                      });
+                // Sync cliente_contatos apenas quando cliente mudou (dedup)
+                if (linkedCliente.id !== originalClienteId) {
+                  const digits = (normalized || contactPhone || '').replace(/\D/g, '');
+                  if (digits) {
+                    const { data: profile } = await supabase.auth.getUser().then(async (r) => {
+                      const uid = r.data.user?.id;
+                      if (!uid) return { data: null } as any;
+                      return supabase
+                        .from('profiles')
+                        .select('tenant_id')
+                        .eq('user_id', uid)
+                        .eq('status', 'ativo')
+                        .maybeSingle();
+                    });
+                    if (profile?.tenant_id) {
+                      const { data: existingContato } = await supabase
+                        .from('cliente_contatos')
+                        .select('id')
+                        .eq('cliente_id', linkedCliente.id)
+                        .eq('fone', digits)
+                        .maybeSingle();
+                      if (!existingContato) {
+                        await supabase.from('cliente_contatos').insert({
+                          cliente_id: linkedCliente.id,
+                          nome: data.name,
+                          fone: digits,
+                          tenant_id: profile.tenant_id,
+                        });
+                      }
                     }
                   }
                 }
@@ -269,6 +288,7 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
             onOpenChange(false);
             onSuccess?.();
           },
+
         }
       );
     }

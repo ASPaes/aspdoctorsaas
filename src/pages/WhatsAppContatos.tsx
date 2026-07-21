@@ -204,10 +204,19 @@ export default function WhatsAppContatos() {
               {linkedCliente && (
                 <Card>
                   <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
                         <Building2 className="h-4 w-4" />
                         Cliente Vinculado
+                        {linkedCliente.origem === 'vinculo' ? (
+                          <Badge className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/20 text-[10px] h-5">
+                            Vinculado
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-amber-500/15 text-amber-600 border-amber-500/30 hover:bg-amber-500/20 text-[10px] h-5">
+                            Sugerido pelo telefone
+                          </Badge>
+                        )}
                       </CardTitle>
                       <Button
                         variant="ghost"
@@ -220,6 +229,7 @@ export default function WhatsAppContatos() {
                       </Button>
                     </div>
                   </CardHeader>
+
                   <CardContent className="space-y-4">
                     {/* Client name */}
                     <div>

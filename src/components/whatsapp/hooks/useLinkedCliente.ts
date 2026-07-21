@@ -18,6 +18,7 @@ export interface LinkedCliente {
   produto: string | null;
   cidade: string | null;
   estado_sigla: string | null;
+  origem: 'vinculo' | 'telefone';
   contatos: Array<{
     id: string;
     nome: string;
@@ -26,6 +27,7 @@ export interface LinkedCliente {
     cargo: string | null;
   }>;
 }
+
 
 export const useLinkedCliente = (contactId: string | null, phoneNumber: string | null) => {
   const { effectiveTenantId } = useTenantFilter();
@@ -36,6 +38,7 @@ export const useLinkedCliente = (contactId: string | null, phoneNumber: string |
       if (!contactId && !phoneNumber) return null;
 
       let clienteId: string | null = null;
+      let origem: 'vinculo' | 'telefone' = 'vinculo';
 
       // 1. Try to find cliente_id from conversation metadata
       if (contactId) {
@@ -51,6 +54,7 @@ export const useLinkedCliente = (contactId: string | null, phoneNumber: string |
           const meta = typeof conv.metadata === 'string' ? JSON.parse(conv.metadata) : conv.metadata;
           if (meta?.cliente_id) {
             clienteId = meta.cliente_id;
+            origem = 'vinculo';
             break;
           }
         }
@@ -71,6 +75,7 @@ export const useLinkedCliente = (contactId: string | null, phoneNumber: string |
             const cDigits = (c.telefone_whatsapp || '').replace(/\D/g, '');
             if (cDigits && digits.endsWith(cDigits.slice(-10)) && cDigits.slice(-10) === digits.slice(-10)) {
               clienteId = c.id;
+              origem = 'telefone';
               break;
             }
           }
@@ -78,6 +83,7 @@ export const useLinkedCliente = (contactId: string | null, phoneNumber: string |
       }
 
       if (!clienteId) return null;
+
 
       // 3. Fetch client (RLS + explicit tenant scoping)
       let clienteQ = supabase
@@ -129,6 +135,8 @@ export const useLinkedCliente = (contactId: string | null, phoneNumber: string |
         produto: prodRes.data?.nome || null,
         cidade: cidRes.data?.nome || null,
         estado_sigla: estRes.data?.sigla || null,
+        origem,
+
         contatos: ((contatosRes.data as any[]) || []).map((c: any) => ({
           id: c.id,
           nome: c.nome,

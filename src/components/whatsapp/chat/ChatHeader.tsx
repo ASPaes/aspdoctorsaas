@@ -113,13 +113,19 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { user, profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || (profile as any)?.is_super_admin;
 
+  // Attendance status (single source of truth) — declarado ANTES do link-suggestion
+  // para que o hook receba o attendanceId correto (fonte oficial do vínculo).
+  const { attendanceMap } = useAttendanceStatus([conversation.id], true);
+  const attendance = attendanceMap.get(conversation.id);
+
   // Client link status (declarado antes dos handlers que dependem de linkedCliente)
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
   const phoneNumber = conversation.contact?.phone_number || "";
-  const { linkedCliente, isLinked } = useClienteLinkSuggestion(conversation.id, phoneNumber, metadata, null, conversation.tenant_id);
+  const { linkedCliente, isLinked } = useClienteLinkSuggestion(conversation.id, phoneNumber, metadata, attendance?.id ?? null, conversation.tenant_id);
   const linkedClienteName = isLinked && linkedCliente
     ? (linkedCliente.nome_fantasia || linkedCliente.razao_social || `#${linkedCliente.codigo_sequencial}`)
     : null;
+
 
   // Lazy query: atendimentos da conversa (apenas quando o picker abre)
   const { data: attendanceTicketList = [], isLoading: isLoadingAttendanceList } = useQuery({
@@ -297,9 +303,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const contact = conversation.contact;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
 
-  // Use attendance status as single source of truth for status display
-  const { attendanceMap } = useAttendanceStatus([conversation.id], true);
-  const attendance = attendanceMap.get(conversation.id);
+  // (attendanceMap/attendance já declarados no topo, próximo ao link-suggestion)
+
 
   const groupAttendance = ((conversation as any)?.is_group === true)
     && attendance
