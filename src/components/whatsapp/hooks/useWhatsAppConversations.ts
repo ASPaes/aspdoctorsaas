@@ -331,6 +331,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         filter: tid ? `tenant_id=eq.${tid}` : undefined,
       }, (payload) => {
         const inserted = payload.new as any;
+        invalidatePillCounts();
         if (inserted?.is_group === true) {
           queryClient.invalidateQueries({ queryKey: ['whatsapp', 'group-counts'] });
         }
