@@ -266,6 +266,7 @@ export function CreateSupportTicketModal({
       try {
         const { data, error } = await (supabase.rpc as any)("check_tipo_horario", {
           p_department_id: departamentoId || null,
+          p_tenant_id: tid,
         });
         console.log("[check_tipo_horario] retorno:", data, "erro:", error);
         if (cancelled) return;
