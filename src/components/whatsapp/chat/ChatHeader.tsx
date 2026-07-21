@@ -1259,17 +1259,19 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             })}
           </div>
 
-          <div className="pt-1 pb-2 border-t border-border/60">
-            <button
+          <div className="pt-3 mt-1 border-t border-border/60">
+            <Button
               type="button"
+              variant="outline"
+              className="w-full gap-2"
               onClick={() => {
                 setShowAttendanceTicketPicker(false);
                 setIsAvulsoTicketOpen(true);
               }}
-              className="text-xs text-primary hover:underline"
             >
+              <Plus className="h-4 w-4" />
               Abrir ticket avulso (sem atendimento)
-            </button>
+            </Button>
           </div>
 
           <DialogFooter>
@@ -1281,10 +1283,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               {(() => {
                 const sel = (attendanceTicketList as any[]).find(a => a.id === pickerSelectedId);
                 if (!sel) return 'Continuar';
-                return getPickMode(sel) === 'view_ticket' ? 'Ver ticket' : 'Abrir ticket';
+                const m = getPickMode(sel);
+                if (m === 'view_ticket') return 'Ver ticket';
+                if (m === 'classificacao') return 'Gerar ticket';
+                return 'Abrir ticket';
               })()}
             </Button>
           </DialogFooter>
+
 
         </DialogContent>
       </Dialog>
