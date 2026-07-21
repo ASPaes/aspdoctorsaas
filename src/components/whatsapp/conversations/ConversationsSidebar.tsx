@@ -18,6 +18,7 @@ import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
 import { useConversationStates } from "../hooks/useConversationStates";
 import { useAgentOptions } from "../hooks/useAgentOptions";
 import { useActiveAttendanceConvIds } from "../hooks/useActiveAttendanceConvIds";
+import { usePillCounts } from "../hooks/usePillCounts";
 import { getConversationBucket, type ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
 import { ConversationItem } from "./ConversationItem";
 import { ConversationFiltersPopover, type FiltersState } from "./ConversationFiltersPopover";
