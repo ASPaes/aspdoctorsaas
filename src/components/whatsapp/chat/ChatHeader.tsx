@@ -1170,7 +1170,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               const pickMode = getPickMode(a);
               const allowed = canPickAttendance(a);
               const selected = pickerSelectedId === a.id;
-              const noPermissionClassif = pickMode === 'classificacao' && !allowed;
+              const hasCliente = !!a?.cliente_id || !!(linkedCliente as any)?.id;
+              const noPermissionClassif =
+                (pickMode === 'classificacao' || pickMode === 'classificacao_aberta') &&
+                !allowed && hasCliente;
+              const noClienteBlock =
+                (pickMode === 'classificacao' || pickMode === 'classificacao_aberta') && !hasCliente;
 
               const handleClick = () => {
                 if (!allowed) return;
@@ -1202,11 +1207,6 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                       <p className="text-[11px] text-muted-foreground">
                         {format(new Date(a.created_at), 'dd/MM/yyyy HH:mm')} · {a.status}
                       </p>
-                      {pickMode === 'demanda_externa' && allowed && (
-                        <p className={`text-[11px] text-muted-foreground mt-1 ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
-                          Abre um ticket de demanda externa (não encerra o atendimento).
-                        </p>
-                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {isOpen && !hasTicket ? (
@@ -1235,6 +1235,16 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                   </div>
                 </div>
               );
+              if (noClienteBlock) {
+                return (
+                  <Tooltip key={a.id}>
+                    <TooltipTrigger asChild><div>{row}</div></TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      Vincule um cliente ao atendimento para abrir o ticket.
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
               if (noPermissionClassif) {
                 return (
                   <Tooltip key={a.id}>
@@ -1246,15 +1256,34 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               return row;
             })}
           </div>
+
+          <div className="pt-1 pb-2 border-t border-border/60">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAttendanceTicketPicker(false);
+                setIsAvulsoTicketOpen(true);
+              }}
+              className="text-xs text-primary hover:underline"
+            >
+              Abrir ticket avulso (sem atendimento)
+            </button>
+          </div>
+
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowAttendanceTicketPicker(false)}>Cancelar</Button>
             <Button
               onClick={handleConfirmPickerSelection}
               disabled={!pickerSelectedId || !canPickAttendance((attendanceTicketList as any[]).find(a => a.id === pickerSelectedId))}
             >
-              Continuar
+              {(() => {
+                const sel = (attendanceTicketList as any[]).find(a => a.id === pickerSelectedId);
+                if (!sel) return 'Continuar';
+                return getPickMode(sel) === 'view_ticket' ? 'Ver ticket' : 'Abrir ticket';
+              })()}
             </Button>
           </DialogFooter>
+
         </DialogContent>
       </Dialog>
 
