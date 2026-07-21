@@ -5097,6 +5097,7 @@ export type Database = {
           id: string
           is_retreinamento: boolean
           journey_id: string
+          link_agendamento: string | null
           no_show: boolean
           observacao: string | null
           participantes: string | null
@@ -5117,6 +5118,7 @@ export type Database = {
           id?: string
           is_retreinamento?: boolean
           journey_id: string
+          link_agendamento?: string | null
           no_show?: boolean
           observacao?: string | null
           participantes?: string | null
@@ -5137,6 +5139,7 @@ export type Database = {
           id?: string
           is_retreinamento?: boolean
           journey_id?: string
+          link_agendamento?: string | null
           no_show?: boolean
           observacao?: string | null
           participantes?: string | null
@@ -10490,6 +10493,7 @@ export type Database = {
           p_conduzido_por?: string
           p_is_retreinamento?: boolean
           p_journey_id: string
+          p_link?: string
           p_titulo: string
           p_training_type_id?: string
         }
