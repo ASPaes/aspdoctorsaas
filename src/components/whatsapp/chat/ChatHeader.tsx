@@ -93,6 +93,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showAttendanceTicketModal, setShowAttendanceTicketModal] = useState(false);
   const [attendanceTicketTarget, setAttendanceTicketTarget] = useState<any | null>(null);
   const [pickerSelectedId, setPickerSelectedId] = useState<string | null>(null);
+  const [isAvulsoTicketOpen, setIsAvulsoTicketOpen] = useState(false);
+
   const [showAttachTicketModal, setShowAttachTicketModal] = useState(false);
   const [attachNote, setAttachNote] = useState("");
   // Reopen flow (attendance.ticket_id IS NOT NULL no encerramento que exige ticket)
@@ -135,20 +137,23 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     },
   });
 
-  const getPickMode = useCallback((a: any): 'classificacao' | 'demanda_externa' => {
+  const getPickMode = useCallback((a: any): 'classificacao' | 'classificacao_aberta' | 'view_ticket' => {
+    if (a?.ticket_id) return 'view_ticket';
     const isClosed = a?.status === 'closed' || a?.status === 'inactive_closed';
-    if (isClosed && !a?.ticket_id) return 'classificacao';
-    return 'demanda_externa';
+    return isClosed ? 'classificacao' : 'classificacao_aberta';
   }, []);
 
   const canPickAttendance = useCallback((a: any) => {
     if (!a) return false;
     const mode = getPickMode(a);
-    if (mode === 'demanda_externa') return true;
-    // classificacao: mantém regra original (admin/head ou assigned_to)
+    if (mode === 'view_ticket') return true;
+    // classificacao/classificacao_aberta: gate por cliente + permissão
+    const hasCliente = !!a?.cliente_id || !!(linkedCliente as any)?.id;
+    if (!hasCliente) return false;
     if (isAdmin) return true;
     return !!user?.id && a?.assigned_to === user.id;
-  }, [isAdmin, user?.id, getPickMode]);
+  }, [isAdmin, user?.id, getPickMode, linkedCliente]);
+
 
   // Carimba cliente no atendimento (se faltar) antes de abrir o modal
   const openTicketForAttendance = useCallback(async (target: any) => {
@@ -218,8 +223,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     const target = (attendanceTicketList as any[]).find((a) => a.id === pickerSelectedId);
     if (!target) return;
     if (!canPickAttendance(target)) return;
+    if (getPickMode(target) === 'view_ticket') {
+      setShowAttendanceTicketPicker(false);
+      setReadOnlyTicketId(target.ticket_id);
+      return;
+    }
     await openTicketForAttendance(target);
-  }, [attendanceTicketList, pickerSelectedId, canPickAttendance, openTicketForAttendance]);
+  }, [attendanceTicketList, pickerSelectedId, canPickAttendance, openTicketForAttendance, getPickMode]);
+
 
   const handleAttendanceTicketCreated = useCallback(() => {
     setShowAttendanceTicketModal(false);
@@ -1161,7 +1172,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               const pickMode = getPickMode(a);
               const allowed = canPickAttendance(a);
               const selected = pickerSelectedId === a.id;
-              const noPermissionClassif = pickMode === 'classificacao' && !allowed;
+              const hasCliente = !!a?.cliente_id || !!(linkedCliente as any)?.id;
+              const noPermissionClassif =
+                (pickMode === 'classificacao' || pickMode === 'classificacao_aberta') &&
+                !allowed && hasCliente;
+              const noClienteBlock =
+                (pickMode === 'classificacao' || pickMode === 'classificacao_aberta') && !hasCliente;
 
               const handleClick = () => {
                 if (!allowed) return;
@@ -1193,11 +1209,6 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                       <p className="text-[11px] text-muted-foreground">
                         {format(new Date(a.created_at), 'dd/MM/yyyy HH:mm')} · {a.status}
                       </p>
-                      {pickMode === 'demanda_externa' && allowed && (
-                        <p className={`text-[11px] text-muted-foreground mt-1 ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
-                          Abre um ticket de demanda externa (não encerra o atendimento).
-                        </p>
-                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {isOpen && !hasTicket ? (
@@ -1226,6 +1237,16 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                   </div>
                 </div>
               );
+              if (noClienteBlock) {
+                return (
+                  <Tooltip key={a.id}>
+                    <TooltipTrigger asChild><div>{row}</div></TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      Vincule um cliente ao atendimento para abrir o ticket.
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
               if (noPermissionClassif) {
                 return (
                   <Tooltip key={a.id}>
@@ -1237,15 +1258,34 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               return row;
             })}
           </div>
+
+          <div className="pt-1 pb-2 border-t border-border/60">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAttendanceTicketPicker(false);
+                setIsAvulsoTicketOpen(true);
+              }}
+              className="text-xs text-primary hover:underline"
+            >
+              Abrir ticket avulso (sem atendimento)
+            </button>
+          </div>
+
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowAttendanceTicketPicker(false)}>Cancelar</Button>
             <Button
               onClick={handleConfirmPickerSelection}
               disabled={!pickerSelectedId || !canPickAttendance((attendanceTicketList as any[]).find(a => a.id === pickerSelectedId))}
             >
-              Continuar
+              {(() => {
+                const sel = (attendanceTicketList as any[]).find(a => a.id === pickerSelectedId);
+                if (!sel) return 'Continuar';
+                return getPickMode(sel) === 'view_ticket' ? 'Ver ticket' : 'Abrir ticket';
+              })()}
             </Button>
           </DialogFooter>
+
         </DialogContent>
       </Dialog>
 
@@ -1281,6 +1321,22 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           closureSentimentSummary={attendanceTicketTarget.id === attendance?.id ? (sentimentData?.summary ?? null) : null}
         />
       )}
+
+      {/* Ticket avulso (manual, sem atendimento) — cliente/setor do chat pré-selecionados */}
+      <CreateSupportTicketModal
+        open={isAvulsoTicketOpen}
+        onOpenChange={(o) => { if (!o) setIsAvulsoTicketOpen(false); }}
+        onCreated={() => {
+          setIsAvulsoTicketOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+          toast.success('Ticket avulso criado');
+        }}
+        defaultDepartmentId={(conversation as any).department_id ?? undefined}
+        defaultClienteId={(linkedCliente as any)?.id ?? null}
+        defaultClienteNome={(linkedCliente as any)?.nome_fantasia ?? (linkedCliente as any)?.razao_social ?? null}
+        defaultClienteCodigo={(linkedCliente as any)?.codigo_sequencial ?? null}
+      />
+
 
       {/* Fluxo REOPEN: atendimento já tem ticket vinculado ao encerrar */}
       <TicketReopenChoiceDialog

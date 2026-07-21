@@ -46,11 +46,12 @@ interface Props {
   // Closure mode props
   fromClosure?: boolean;
   /**
-   * 'initial'         → create_ticket_from_closure (atendimento sem ticket vinculado)
-   * 'additional'      → create_additional_ticket_from_attendance (atendimento reaberto, novo ticket adicional)
-   * 'demanda_externa' → create_demand_ticket_from_attendance (ticket avulso aberto a partir de atendimento, inclusive em andamento)
+   * 'initial'             → create_ticket_from_closure (atendimento encerrado sem ticket vinculado)
+   * 'additional'          → create_additional_ticket_from_attendance (atendimento reaberto, ticket adicional)
+   * 'demanda_externa'     → create_demand_ticket_from_attendance (ticket avulso a partir de atendimento)
+   * 'classificacao_aberta'→ create_classification_ticket_open (classifica ticket ABERTO com atendimento em andamento)
    */
-  mode?: "initial" | "additional" | "demanda_externa";
+  mode?: "initial" | "additional" | "demanda_externa" | "classificacao_aberta";
   attendanceId?: string | null;
   closureClienteId?: string | null;
   closureClienteNome?: string | null;
@@ -68,6 +69,11 @@ interface Props {
   closureSentimentLabel?: string | null;
   closureSentimentConfidence?: number | null;
   closureSentimentSummary?: string | null;
+  // Manual mode defaults (não-closure): pré-selecionar cliente/setor a partir do chat
+  defaultClienteId?: string | null;
+  defaultClienteNome?: string | null;
+  defaultClienteCodigo?: number | null;
+
 }
 
 const Req = () => <span className="text-destructive">*</span>;
@@ -115,6 +121,10 @@ export function CreateSupportTicketModal({
   closureSentimentLabel = null,
   closureSentimentConfidence = null,
   closureSentimentSummary = null,
+  defaultClienteId = null,
+  defaultClienteNome = null,
+  defaultClienteCodigo = null,
+
 }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
@@ -248,6 +258,21 @@ export function CreateSupportTicketModal({
       });
     }
   }, [open, fromClosure]);
+
+  // Manual mode: pré-selecionar cliente/setor a partir do chat (editáveis)
+  useEffect(() => {
+    if (!open || fromClosure) return;
+    if (defaultClienteId) {
+      setSelectedCliente({
+        id: defaultClienteId,
+        nome_fantasia: defaultClienteNome || null,
+        razao_social: null,
+        codigo_sequencial: defaultClienteCodigo || null,
+        cnpj: null,
+      } as any);
+    }
+  }, [open, fromClosure, defaultClienteId, defaultClienteNome, defaultClienteCodigo]);
+
 
   const { data: produtos = [] } = useQuery({
     queryKey: ["create_manual_ticket_produtos", tid],
@@ -483,7 +508,7 @@ export function CreateSupportTicketModal({
 
   useEffect(() => {
     if (ticketStatuses.length > 0) {
-      if (fromClosure && mode !== "demanda_externa") {
+      if (fromClosure && mode !== "demanda_externa" && mode !== "classificacao_aberta") {
         const terminal = ticketStatuses.find((s) => s.is_terminal);
         if (terminal) setStatusId(terminal.id);
         else setStatusId(ticketStatuses[ticketStatuses.length - 1].id);
@@ -568,26 +593,44 @@ export function CreateSupportTicketModal({
       let ticketId: string | null = null;
 
       if (fromClosure && attendanceId) {
-        const closureRpcName =
-          mode === "additional"
-            ? "create_additional_ticket_from_attendance"
-            : mode === "demanda_externa"
-              ? "create_demand_ticket_from_attendance"
-              : "create_ticket_from_closure";
-        const { data: rpcData, error } = await (supabase.rpc as any)(closureRpcName, {
-          p_attendance_id: attendanceId,
-          p_produto_id: Number(produtoId),
-          p_category_id: categoryId,
-          p_subcategory_id: subcategoryId,
-          p_service_type_id: serviceTypeId,
-          p_observacao_agente: observacaoAgente || null,
-          p_observacao_ia: closureAiSummary || null,
-          p_tipo_horario: tipoHorario,
-          p_department_id: departamentoId || null,
-          p_responsavel_user_id: responsavelId || null,
-        });
-        if (error) throw error;
-        ticketId = typeof rpcData === "string" ? rpcData : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
+        if (mode === "classificacao_aberta") {
+          const { data: rpcData, error } = await (supabase.rpc as any)("create_classification_ticket_open", {
+            p_attendance_id: attendanceId,
+            p_category_id: categoryId,
+            p_subcategory_id: subcategoryId,
+            p_service_type_id: serviceTypeId,
+            p_produto_id: Number(produtoId),
+            p_tipo_horario: tipoHorario,
+            p_observacao_agente: observacaoAgente || null,
+            p_observacao_ia: null,
+            p_department_id: null,
+            p_responsavel_user_id: null,
+          });
+          if (error) throw error;
+          ticketId = typeof rpcData === "string" ? rpcData : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
+        } else {
+          const closureRpcName =
+            mode === "additional"
+              ? "create_additional_ticket_from_attendance"
+              : mode === "demanda_externa"
+                ? "create_demand_ticket_from_attendance"
+                : "create_ticket_from_closure";
+          const { data: rpcData, error } = await (supabase.rpc as any)(closureRpcName, {
+            p_attendance_id: attendanceId,
+            p_produto_id: Number(produtoId),
+            p_category_id: categoryId,
+            p_subcategory_id: subcategoryId,
+            p_service_type_id: serviceTypeId,
+            p_observacao_agente: observacaoAgente || null,
+            p_observacao_ia: closureAiSummary || null,
+            p_tipo_horario: tipoHorario,
+            p_department_id: departamentoId || null,
+            p_responsavel_user_id: responsavelId || null,
+          });
+          if (error) throw error;
+          ticketId = typeof rpcData === "string" ? rpcData : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
+        }
+
       } else {
         const { data: rpcData, error } = await (supabase.rpc as any)("create_manual_ticket", {
           p_cliente_id: selectedCliente.id,
