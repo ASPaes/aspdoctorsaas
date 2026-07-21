@@ -1263,7 +1263,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             <Button
               type="button"
               variant="outline"
-              className="w-full gap-2"
+              className="w-full gap-2 border-primary text-green-400 hover:bg-primary/10 hover:text-green-300"
               onClick={() => {
                 setShowAttendanceTicketPicker(false);
                 setIsAvulsoTicketOpen(true);
