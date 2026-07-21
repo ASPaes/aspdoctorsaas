@@ -135,6 +135,8 @@ export const useLinkedCliente = (contactId: string | null, phoneNumber: string |
         produto: prodRes.data?.nome || null,
         cidade: cidRes.data?.nome || null,
         estado_sigla: estRes.data?.sigla || null,
+        origem,
+
         contatos: ((contatosRes.data as any[]) || []).map((c: any) => ({
           id: c.id,
           nome: c.nome,
