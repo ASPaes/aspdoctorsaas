@@ -180,6 +180,8 @@ export function CreateSupportTicketModal({
     setServiceTypeId("");
     setCanalOrigem("telefone");
     setTipoHorario("comercial");
+    setModoHorario("auto");
+    setTipoDetectado(null);
     setPrioridade("media");
     setStatusId("");
     setAgendadoPara("");
