@@ -251,6 +251,14 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
     const channelName = `conversations-rt-${tid ?? 'none'}`;
     return subscribeSharedChannel(channelName, (channel) => {
       let invalidateThrottle = 0;
+      let pillCountsTimer: ReturnType<typeof setTimeout> | null = null;
+      const invalidatePillCounts = () => {
+        if (pillCountsTimer) clearTimeout(pillCountsTimer);
+        pillCountsTimer = setTimeout(() => {
+          pillCountsTimer = null;
+          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'pill-counts'] });
+        }, 1000);
+      };
       let insertDebounce: ReturnType<typeof setTimeout> | null = null;
       let softRefetchTimer: ReturnType<typeof setTimeout> | null = null;
 
