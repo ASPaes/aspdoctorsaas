@@ -18,6 +18,7 @@ export interface LinkedCliente {
   produto: string | null;
   cidade: string | null;
   estado_sigla: string | null;
+  origem: 'vinculo' | 'telefone';
   contatos: Array<{
     id: string;
     nome: string;
@@ -26,6 +27,7 @@ export interface LinkedCliente {
     cargo: string | null;
   }>;
 }
+
 
 export const useLinkedCliente = (contactId: string | null, phoneNumber: string | null) => {
   const { effectiveTenantId } = useTenantFilter();
