@@ -269,6 +269,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         filter: tid ? `tenant_id=eq.${tid}` : undefined,
       }, (payload) => {
         const updated = payload.new as any;
+        invalidatePillCounts();
         // Grupos têm seu próprio badge na pill "Grupos" (query separada).
         // Invalidar group-counts em tempo real ao receber atualização de grupo
         // (unread_count, last_message_at, etc.).
