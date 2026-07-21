@@ -137,6 +137,8 @@ export function CreateSupportTicketModal({
   const [serviceTypeId, setServiceTypeId] = useState<string>("");
   const [canalOrigem, setCanalOrigem] = useState<string>("telefone");
   const [tipoHorario, setTipoHorario] = useState<string>("comercial");
+  const [modoHorario, setModoHorario] = useState<"auto" | "manual">("auto");
+  const [tipoDetectado, setTipoDetectado] = useState<"comercial" | "plantao" | null>(null);
   const [horarioInicio, setHorarioInicio] = useState<string>("");
   const [horarioFim, setHorarioFim] = useState<string>("");
   const [prioridade, setPrioridade] = useState<string>("media");
