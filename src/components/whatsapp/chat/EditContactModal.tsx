@@ -243,35 +243,37 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
         },
         {
           onSuccess: async () => {
-            if (linkedCliente && linkedCliente.id !== originalClienteId) {
+            if (linkedCliente) {
               try {
-                // Sync cliente_contatos
-                const digits = (normalized || contactPhone || '').replace(/\D/g, '');
-                if (digits) {
-                  const { data: profile } = await supabase.auth.getUser().then(async (r) => {
-                    const uid = r.data.user?.id;
-                    if (!uid) return { data: null } as any;
-                    return supabase
-                      .from('profiles')
-                      .select('tenant_id')
-                      .eq('user_id', uid)
-                      .eq('status', 'ativo')
-                      .maybeSingle();
-                  });
-                  if (profile?.tenant_id) {
-                    const { data: existingContato } = await supabase
-                      .from('cliente_contatos')
-                      .select('id')
-                      .eq('cliente_id', linkedCliente.id)
-                      .eq('fone', digits)
-                      .maybeSingle();
-                    if (!existingContato) {
-                      await supabase.from('cliente_contatos').insert({
-                        cliente_id: linkedCliente.id,
-                        nome: data.name,
-                        fone: digits,
-                        tenant_id: profile.tenant_id,
-                      });
+                // Sync cliente_contatos apenas quando cliente mudou (dedup)
+                if (linkedCliente.id !== originalClienteId) {
+                  const digits = (normalized || contactPhone || '').replace(/\D/g, '');
+                  if (digits) {
+                    const { data: profile } = await supabase.auth.getUser().then(async (r) => {
+                      const uid = r.data.user?.id;
+                      if (!uid) return { data: null } as any;
+                      return supabase
+                        .from('profiles')
+                        .select('tenant_id')
+                        .eq('user_id', uid)
+                        .eq('status', 'ativo')
+                        .maybeSingle();
+                    });
+                    if (profile?.tenant_id) {
+                      const { data: existingContato } = await supabase
+                        .from('cliente_contatos')
+                        .select('id')
+                        .eq('cliente_id', linkedCliente.id)
+                        .eq('fone', digits)
+                        .maybeSingle();
+                      if (!existingContato) {
+                        await supabase.from('cliente_contatos').insert({
+                          cliente_id: linkedCliente.id,
+                          nome: data.name,
+                          fone: digits,
+                          tenant_id: profile.tenant_id,
+                        });
+                      }
                     }
                   }
                 }
@@ -286,6 +288,7 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
             onOpenChange(false);
             onSuccess?.();
           },
+
         }
       );
     }
