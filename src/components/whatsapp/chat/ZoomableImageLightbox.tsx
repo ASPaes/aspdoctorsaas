@@ -12,6 +12,9 @@ interface ZoomableImageLightboxProps {
 const roundBtn =
   "flex items-center justify-center h-8 w-8 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors";
 
+const controlBtn =
+  "flex items-center justify-center h-10 w-10 rounded-full bg-black/70 hover:bg-black/90 text-white transition-colors";
+
 export function ZoomableImageLightbox({
   src,
   onClose,
@@ -59,8 +62,9 @@ export function ZoomableImageLightbox({
         maxScale={6}
         centerOnInit
         limitToBounds
+        smooth={false}
         doubleClick={{ mode: "toggle", step: 2 }}
-        wheel={{ step: 0.2 }}
+        wheel={{ step: 0.15 }}
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
@@ -102,7 +106,7 @@ export function ZoomableImageLightbox({
             </TransformComponent>
 
             <div
-              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-2 bg-black/60 rounded-full px-2 py-1"
+              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-3 bg-black/60 rounded-full px-3 py-1.5"
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
               onPointerUp={(e) => e.stopPropagation()}
@@ -110,32 +114,32 @@ export function ZoomableImageLightbox({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  zoomOut();
+                  zoomOut(0.3);
                 }}
-                className={roundBtn}
+                className={controlBtn}
                 title="Diminuir zoom"
               >
-                <ZoomOut className="h-4 w-4" />
+                <ZoomOut className="h-5 w-5" />
               </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   resetTransform();
                 }}
-                className={roundBtn}
+                className={controlBtn}
                 title="Ajustar à tela"
               >
-                <Maximize2 className="h-4 w-4" />
+                <Maximize2 className="h-5 w-5" />
               </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  zoomIn();
+                  zoomIn(0.3);
                 }}
-                className={roundBtn}
+                className={controlBtn}
                 title="Aumentar zoom"
               >
-                <ZoomIn className="h-4 w-4" />
+                <ZoomIn className="h-5 w-5" />
               </button>
             </div>
           </>
