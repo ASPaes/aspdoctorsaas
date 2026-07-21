@@ -645,6 +645,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
           afterHoursCount={pillCounts.afterHours}
           groupsCount={pillCounts.groups}
           groupsHasUnread={pillCounts.groupsUnread > 0}
+          badges={pillCounts.badges}
         />
       </div>
       )}
