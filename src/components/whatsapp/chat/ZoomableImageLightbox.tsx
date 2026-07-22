@@ -23,6 +23,8 @@ export function ZoomableImageLightbox({
   onClose,
   alt,
   downloadName,
+  enableCopy,
+  onOpenNewTab,
 }: ZoomableImageLightboxProps) {
   const downPos = useRef<{ x: number; y: number } | null>(null);
 
