@@ -12437,6 +12437,7 @@ export type Database = {
         Returns: {
           aguardando: number
           bucket: string
+          conversas_nao_lidas: number
           msgs_nao_lidas: number
           total_conversas: number
         }[]
