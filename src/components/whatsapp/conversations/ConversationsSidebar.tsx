@@ -280,18 +280,25 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   // Grupos continuam no hook dedicado (a RPC filtra is_group=false).
   const { data: pillCountsData } = usePillCounts();
   const pillCounts = useMemo(() => {
-    const w = pillCountsData?.waiting ?? { total: 0, aguardando: 0, unread: 0 };
-    const ip = pillCountsData?.in_progress ?? { total: 0, aguardando: 0, unread: 0 };
-    const ah = pillCountsData?.after_hours ?? { total: 0, aguardando: 0, unread: 0 };
-    const cl = pillCountsData?.closed ?? { total: 0, aguardando: 0, unread: 0 };
-    const all = pillCountsData?.all ?? { total: 0, aguardando: 0, unread: 0 };
+    const EMPTY = { total: 0, aguardando: 0, unread: 0, unreadConvs: 0 };
+    const w = pillCountsData?.waiting ?? EMPTY;
+    const ip = pillCountsData?.in_progress ?? EMPTY;
+    const ah = pillCountsData?.after_hours ?? EMPTY;
+    const cl = pillCountsData?.closed ?? EMPTY;
+    const all = pillCountsData?.all ?? EMPTY;
     const groupsUnreadMsgs = groupCountData?.groupsUnreadMsgs ?? 0;
+    const groupsUnreadConvs = groupCountData?.groupsUnreadConvs ?? 0;
+    const totalGroups = groupCountData?.totalGroups ?? 0;
     return {
-      waiting: w.total,
-      inProgress: ip.total,
-      afterHours: ah.total,
-      closed: cl.total,
-      groups: groupCountData?.totalGroups ?? 0,
+      counts: {
+        waiting: { total: w.total, unreadConvs: w.unreadConvs },
+        in_progress: { total: ip.total, unreadConvs: ip.unreadConvs },
+        after_hours: { total: ah.total, unreadConvs: ah.unreadConvs },
+        closed: { total: cl.total, unreadConvs: cl.unreadConvs },
+        all: { total: all.total, unreadConvs: all.unreadConvs },
+        groups: { total: totalGroups, unreadConvs: groupsUnreadConvs },
+      },
+      groups: totalGroups,
       groupsUnread: groupsUnreadMsgs,
       badges: {
         waiting: { unread: w.unread },
