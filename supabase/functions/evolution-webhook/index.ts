@@ -52,7 +52,23 @@ function touchLastEvent(supabase: any, instanceName: string) {
 
 // ── Helpers de tipo de mensagem ───────────────────────────────────────────────
 
+// Desembrulha wrappers do WhatsApp (temporária, ver-uma-vez, doc-com-legenda) até a
+// mensagem real, ANTES de classificar/extrair. NÃO desce em editedMessage (edição tem
+// roteamento próprio). Idempotente; limite de profundidade contra payload malformado.
+function unwrapMessage(message: any, depth = 0): any {
+  if (!message || typeof message !== 'object' || depth > 5) return message || {};
+  const inner =
+    message.ephemeralMessage?.message ||
+    message.viewOnceMessage?.message ||
+    message.viewOnceMessageV2?.message ||
+    message.viewOnceMessageV2Extension?.message ||
+    message.documentWithCaptionMessage?.message ||
+    null;
+  return inner ? unwrapMessage(inner, depth + 1) : message;
+}
+
 function getMessageType(message: any): NormalizedInboundMessage['messageType'] {
+  message = unwrapMessage(message);
   if (!message) return 'text';
   if (message.reactionMessage) return 'reaction';
   if (message.protocolMessage?.type === 0 || message.protocolMessage?.type === 'REVOKE') return 'revoke';
@@ -68,6 +84,7 @@ function getMessageType(message: any): NormalizedInboundMessage['messageType'] {
   if (message.contactsArrayMessage) return 'contacts';
   return 'text';
 }
+
 
 function resolveDocumentMessage(message: any): any {
   return message.documentMessage
