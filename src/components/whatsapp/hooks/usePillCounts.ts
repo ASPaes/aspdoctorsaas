@@ -7,6 +7,7 @@ export interface PillCount {
   total: number;
   aguardando: number;
   unread: number;
+  unreadConvs: number;
 }
 
 export type PillCountsMap = Record<
@@ -14,7 +15,7 @@ export type PillCountsMap = Record<
   PillCount
 >;
 
-const EMPTY: PillCount = { total: 0, aguardando: 0, unread: 0 };
+const EMPTY: PillCount = { total: 0, aguardando: 0, unread: 0, unreadConvs: 0 };
 
 const BUCKET_KEYS = ["waiting", "in_progress", "after_hours", "closed"] as const;
 type BucketKey = (typeof BUCKET_KEYS)[number];
@@ -48,6 +49,7 @@ export function usePillCounts() {
         total_conversas: number | string;
         aguardando: number | string;
         msgs_nao_lidas: number | string;
+        conversas_nao_lidas: number | string;
       }>) {
         const key = row.bucket as BucketKey;
         if (!BUCKET_KEYS.includes(key)) continue;
@@ -55,6 +57,7 @@ export function usePillCounts() {
           total: Number(row.total_conversas) || 0,
           aguardando: Number(row.aguardando) || 0,
           unread: Number(row.msgs_nao_lidas) || 0,
+          unreadConvs: Number(row.conversas_nao_lidas) || 0,
         };
       }
 
@@ -64,6 +67,7 @@ export function usePillCounts() {
           total: acc.total + map[k].total,
           aguardando: acc.aguardando + map[k].aguardando,
           unread: acc.unread + map[k].unread,
+          unreadConvs: acc.unreadConvs + map[k].unreadConvs,
         }),
         { ...EMPTY }
       );
