@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -10,8 +10,20 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, MessageSquare, Users, X, FileSearch, ChevronRight } from "lucide-react";
+import { Search, Plus, MessageSquare, Users, X, FileSearch, ChevronRight, CheckCheck } from "lucide-react";
 import { MessageSearchModal } from "./MessageSearchModal";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 import { useWhatsAppConversations, type ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
