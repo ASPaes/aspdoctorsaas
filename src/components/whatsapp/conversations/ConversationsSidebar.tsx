@@ -32,6 +32,7 @@ import { useConversationStates } from "../hooks/useConversationStates";
 import { useAgentOptions } from "../hooks/useAgentOptions";
 import { useActiveAttendanceConvIds } from "../hooks/useActiveAttendanceConvIds";
 import { usePillCounts } from "../hooks/usePillCounts";
+import { useSupportDepartments } from "../hooks/useSupportDepartments";
 import { getConversationBucket, type ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
 import { ConversationItem } from "./ConversationItem";
 import { ConversationFiltersPopover, type FiltersState } from "./ConversationFiltersPopover";
@@ -193,6 +194,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     });
     return map;
   }, [instances]);
+
+  const { data: departments = [] } = useSupportDepartments();
+
+  const departmentNameMap = useMemo(
+    () => new Map(departments.map((d) => [d.id, d.name])),
+    [departments]
+  );
 
   const { data: agentOptionsData } = useAgentOptions();
   const agentLabelMap = useMemo(() => new Map((agentOptionsData ?? []).map(a => [a.userId, a.label])), [agentOptionsData]);
@@ -611,6 +619,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       instanceName={instances.length > 1 ? instanceMap[conv.instance_id] : undefined}
       attendance={attendanceMap.get(conv.id)}
       isAgentAlert={(() => { const d = getStateForConv(conv).agent_alert_due_at; return d != null && nowMs >= new Date(d).getTime(); })()}
+      showDepartment={!selectedDepartmentId && !isSearching}
+      departmentName={conv.department_id ? (departmentNameMap.get(conv.department_id) ?? null) : null}
     />
   );
 
