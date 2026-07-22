@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils";
 
 interface PillBadgeCounts {
-  aguardando?: number;
   unread?: number;
 }
 
@@ -15,7 +14,7 @@ interface Props {
   groupsCount: number;
   groupsHasUnread?: boolean;
   /** Badges (bolinhas) por pill */
-  badges?: Partial<Record<"waiting" | "in_progress" | "after_hours" | "all" | "groups", PillBadgeCounts>>;
+  badges?: Partial<Record<"waiting" | "in_progress" | "after_hours" | "all" | "groups" | "closed", PillBadgeCounts>>;
 }
 
 const pills = [
@@ -51,7 +50,7 @@ export function QuickPills({
     return 0;
   };
 
-  const showRedFor = new Set(["waiting", "in_progress", "after_hours", "all"]);
+  const showUnreadFor = new Set(["waiting", "in_progress", "after_hours", "all", "groups"]);
 
   return (
     // pt-2.5 evita que as bolinhas absolutas sejam cortadas pelo overflow-x da barra
@@ -60,7 +59,7 @@ export function QuickPills({
         const count = getCount(p.key);
         const isActive = active === p.key;
         const b = (badges as any)?.[p.key] as PillBadgeCounts | undefined;
-        const aguardando = showRedFor.has(p.key) ? Math.max(0, Math.trunc(b?.aguardando ?? 0)) : 0;
+        const unread = showUnreadFor.has(p.key) ? Math.max(0, Math.trunc(b?.unread ?? 0)) : 0;
 
         return (
           <div key={p.key} className="relative shrink-0">
@@ -78,13 +77,13 @@ export function QuickPills({
               {count > 0 && <span className="ml-1 text-[10px] opacity-70">({count})</span>}
             </button>
 
-            {aguardando > 0 && (
+            {unread > 0 && (
               <span
-                title={`${aguardando} aguardando resposta`}
-                className="pointer-events-none absolute top-1/2 -translate-y-1/2 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold leading-none flex items-center justify-center text-white border-[1.5px] border-background z-10"
+                title={`${unread} mensagens não lidas`}
+                className="pointer-events-none absolute -top-1 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold leading-none flex items-center justify-center text-white border-[1.5px] border-background z-10"
                 style={{ backgroundColor: "#d85a30" }}
               >
-                {formatCap(aguardando, 9)}
+                {formatCap(unread, 99)}
               </span>
             )}
           </div>
