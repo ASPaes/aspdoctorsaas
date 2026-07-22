@@ -1,12 +1,15 @@
-import { useEffect, useRef } from "react";
-import { X, Download, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { X, Download, ZoomIn, ZoomOut, Maximize2, Copy, Check, ExternalLink } from "lucide-react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { toast } from "sonner";
 
 interface ZoomableImageLightboxProps {
   src: string;
   onClose: () => void;
   alt?: string;
   downloadName?: string;
+  enableCopy?: boolean;        // NOVO
+  onOpenNewTab?: () => void;   // NOVO
 }
 
 const roundBtn =
@@ -20,8 +23,47 @@ export function ZoomableImageLightbox({
   onClose,
   alt,
   downloadName,
+  enableCopy,
+  onOpenNewTab,
 }: ZoomableImageLightboxProps) {
   const downPos = useRef<{ x: number; y: number } | null>(null);
+
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyImage = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      // src é um blob: URL same-origin -> canvas não fica "tainted", sem CORS.
+      // Converte sempre para PNG (formato aceito de forma confiável no clipboard).
+      const pngBlob = await new Promise<Blob>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            reject(new Error("no 2d context"));
+            return;
+          }
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob(
+            (b) => (b ? resolve(b) : reject(new Error("toBlob returned null"))),
+            "image/png"
+          );
+        };
+        img.onerror = () => reject(new Error("image load failed"));
+        img.src = src; // reaproveita o blob já em memória, sem novo fetch
+      });
+
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch (err) {
+      console.error("Copy image failed:", err);
+      toast.error("Não foi possível copiar a imagem");
+    }
+  };
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -72,6 +114,27 @@ export function ZoomableImageLightbox({
               className="absolute top-2 right-2 z-10 flex gap-2"
               onClick={(e) => e.stopPropagation()}
             >
+              {enableCopy && (
+                <button
+                  onClick={handleCopyImage}
+                  className={roundBtn}
+                  title={copied ? "Copiado!" : "Copiar imagem"}
+                >
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                </button>
+              )}
+              {onOpenNewTab && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenNewTab();
+                  }}
+                  className={roundBtn}
+                  title="Abrir em nova guia"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </button>
+              )}
               <a
                 href={src}
                 download={downloadName ?? "imagem"}
