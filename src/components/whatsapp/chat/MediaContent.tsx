@@ -108,6 +108,8 @@ export function MediaContent({
               alt={messageType === "sticker" ? "Sticker" : "Imagem"}
               downloadName={mediaFilename ?? metadata?.fileName ?? "imagem"}
               onClose={() => setLightboxOpen(false)}
+              enableCopy
+              onOpenNewTab={handleOpenNewTab}
             />
           )}
           <img
