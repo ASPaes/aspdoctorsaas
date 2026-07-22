@@ -740,7 +740,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         ) : (isSearching ? searchResults : filtered).length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <MessageSquare className="h-10 w-10 mb-2 opacity-50" />
-            <p className="text-sm">{isSearching ? "Nenhum contato encontrado" : "Nenhuma conversa encontrada"}</p>
+            <p className="text-sm">
+              {isSearching
+                ? "Nenhum contato encontrado"
+                : unreadOnly
+                  ? `Nenhuma conversa não lida em ${PILL_LABELS[activePill] ?? "esta aba"}`
+                  : "Nenhuma conversa encontrada"}
+            </p>
           </div>
         ) : (
           <div className="space-y-px p-1">
