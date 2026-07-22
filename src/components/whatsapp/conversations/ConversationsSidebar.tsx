@@ -256,12 +256,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         .eq("tenant_id", tid)
         .eq("is_group", true)
         .eq("group_enabled", true);
-      const { count: unreadGroups } = await (supabase.from("whatsapp_conversations" as any) as any)
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", tid)
-        .eq("is_group", true)
-        .gt("unread_count", 0);
-      return { totalGroups: totalGroups || 0, unreadGroups: unreadGroups || 0 };
+      const { data: unreadSum } = await (supabase as any).rpc("whatsapp_group_unread_sum", {
+        p_tenant_id: tid,
+      });
+      return {
+        totalGroups: totalGroups || 0,
+        groupsUnreadMsgs: Number(unreadSum) || 0,
+      };
     },
     enabled: !!tid,
   });
@@ -275,19 +276,20 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     const ah = pillCountsData?.after_hours ?? { total: 0, aguardando: 0, unread: 0 };
     const cl = pillCountsData?.closed ?? { total: 0, aguardando: 0, unread: 0 };
     const all = pillCountsData?.all ?? { total: 0, aguardando: 0, unread: 0 };
+    const groupsUnreadMsgs = groupCountData?.groupsUnreadMsgs ?? 0;
     return {
       waiting: w.total,
       inProgress: ip.total,
       afterHours: ah.total,
       closed: cl.total,
       groups: groupCountData?.totalGroups ?? 0,
-      groupsUnread: groupCountData?.unreadGroups ?? 0,
+      groupsUnread: groupsUnreadMsgs,
       badges: {
-        waiting: { aguardando: w.aguardando, unread: w.unread },
-        in_progress: { aguardando: ip.aguardando, unread: ip.unread },
-        after_hours: { aguardando: ah.aguardando, unread: ah.unread },
-        all: { aguardando: all.aguardando, unread: all.unread },
-        groups: { unread: groupCountData?.unreadGroups ?? 0 },
+        waiting: { unread: w.unread },
+        in_progress: { unread: ip.unread },
+        after_hours: { unread: ah.unread },
+        all: { unread: all.unread },
+        groups: { unread: groupsUnreadMsgs },
       },
     };
   }, [pillCountsData, groupCountData]);
