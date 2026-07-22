@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { processInboundMessage } from '../_shared/message-processor.ts';
-import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets } from '../_shared/message-types.ts';
+import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets, UNSUPPORTED_MESSAGE_LABEL } from '../_shared/message-types.ts';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
 import { normalizeBRPhone, phoneSearchVariants } from '../_shared/phone.ts';
 
@@ -52,7 +52,23 @@ function touchLastEvent(supabase: any, instanceName: string) {
 
 // ── Helpers de tipo de mensagem ───────────────────────────────────────────────
 
+// Desembrulha wrappers do WhatsApp (temporária, ver-uma-vez, doc-com-legenda) até a
+// mensagem real, ANTES de classificar/extrair. NÃO desce em editedMessage (edição tem
+// roteamento próprio). Idempotente; limite de profundidade contra payload malformado.
+function unwrapMessage(message: any, depth = 0): any {
+  if (!message || typeof message !== 'object' || depth > 5) return message || {};
+  const inner =
+    message.ephemeralMessage?.message ||
+    message.viewOnceMessage?.message ||
+    message.viewOnceMessageV2?.message ||
+    message.viewOnceMessageV2Extension?.message ||
+    message.documentWithCaptionMessage?.message ||
+    null;
+  return inner ? unwrapMessage(inner, depth + 1) : message;
+}
+
 function getMessageType(message: any): NormalizedInboundMessage['messageType'] {
+  message = unwrapMessage(message);
   if (!message) return 'text';
   if (message.reactionMessage) return 'reaction';
   if (message.protocolMessage?.type === 0 || message.protocolMessage?.type === 'REVOKE') return 'revoke';
@@ -68,6 +84,7 @@ function getMessageType(message: any): NormalizedInboundMessage['messageType'] {
   if (message.contactsArrayMessage) return 'contacts';
   return 'text';
 }
+
 
 function resolveDocumentMessage(message: any): any {
   return message.documentMessage
@@ -175,14 +192,21 @@ function normalizePhoneNumber(remoteJid: string): { phone: string; isGroup: bool
 }
 
 function getMessageContent(message: any, type: string): string {
+  message = unwrapMessage(message);
   if (message.conversation) return message.conversation;
   if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
+  // Respostas interativas: o texto É a escolha do cliente
+  if (message.buttonsResponseMessage?.selectedDisplayText) return message.buttonsResponseMessage.selectedDisplayText;
+  if (message.templateButtonReplyMessage?.selectedDisplayText) return message.templateButtonReplyMessage.selectedDisplayText;
+  if (message.listResponseMessage) {
+    const l = message.listResponseMessage;
+    return l.title || l.singleSelectReply?.selectedRowId || l.description || '📋 Resposta de lista';
+  }
   if (message.contactMessage) return message.contactMessage.displayName || '📇 Contato';
   if (message.contactsArrayMessage) {
     const count = message.contactsArrayMessage.contacts?.length || 0;
     return `📇 ${count} contato${count !== 1 ? 's' : ''}`;
   }
-  // PATCH: handle documentWithCaptionMessage caption
   if (type === 'document') {
     const docMsg = resolveDocumentMessage(message);
     if (docMsg?.caption) return docMsg.caption;
@@ -192,12 +216,17 @@ function getMessageContent(message: any, type: string): string {
   if (type === 'reaction') {
     return message.reactionMessage?.text || '';
   }
+  // Enquete / localização → rótulo (permanece message_type='text')
+  const poll = message.pollCreationMessage || message.pollCreationMessageV2 || message.pollCreationMessageV3;
+  if (poll) return `📊 Enquete: ${poll.name || ''}`.trim();
+  if (message.locationMessage || message.liveLocationMessage) return '📍 Localização';
   const descriptions: Record<string, string> = {
     image: '📷 Imagem', audio: '🎵 Áudio', video: '🎥 Vídeo',
     document: '📄 Documento', sticker: '🎨 Sticker',
   };
-  return descriptions[type] || 'Mensagem';
+  return descriptions[type] || UNSUPPORTED_MESSAGE_LABEL;
 }
+
 
 // ── Download de mídia (Evolution API) ────────────────────────────────────────
 
@@ -964,7 +993,9 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
 
 async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: any): Promise<void> {
   const { instance, data } = payload;
-  const { key, pushName, message, messageTimestamp } = data;
+  const { key, pushName, message: rawMessage, messageTimestamp } = data;
+  const message = unwrapMessage(rawMessage);
+
   console.log(`${LOG} Processing message: ${key?.id} type=${getMessageType(message)}`);
 
   try {
