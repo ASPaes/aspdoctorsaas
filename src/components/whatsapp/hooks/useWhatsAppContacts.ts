@@ -5,6 +5,12 @@ import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 export type ContactSortOption = 'last_interaction' | 'name_asc' | 'name_desc' | 'conversations';
 
+/** Filtro por vínculo com cliente. 'cliente' exige clienteId. */
+export type ContactClienteFilter =
+  | { mode: 'all' }
+  | { mode: 'none' }
+  | { mode: 'cliente'; clienteId: string };
+
 export interface ContactWithMetrics {
   id: string;
   name: string;
@@ -12,6 +18,8 @@ export interface ContactWithMetrics {
   profile_picture_url: string | null;
   notes: string | null;
   instance_id: string;
+  cliente_id: string | null;
+  is_group: boolean;
   total_conversations: number;
   total_messages: number;
   last_interaction: string | null;
@@ -28,19 +36,31 @@ export const useWhatsAppContacts = (
   searchTerm?: string,
   sortBy: ContactSortOption = 'last_interaction',
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 20,
+  clienteFilter: ContactClienteFilter = { mode: 'all' }
 ) => {
   const { effectiveTenantId: tid } = useTenantFilter();
 
+  const clienteFilterKey =
+    clienteFilter.mode === 'cliente' ? `cliente:${clienteFilter.clienteId}` : clienteFilter.mode;
+
+  // Aplica o filtro de vínculo a query (dados) e countQuery. Chamado nas duas.
+  const applyClienteFilter = (q: any) => {
+    if (clienteFilter.mode === 'none') return q.is('cliente_id', null);
+    if (clienteFilter.mode === 'cliente') return q.eq('cliente_id', clienteFilter.clienteId);
+    return q;
+  };
+
   return useQuery({
-    queryKey: ['whatsapp-contacts', instanceId, searchTerm, sortBy, page, pageSize, tid],
+    queryKey: ['whatsapp-contacts', instanceId, searchTerm, sortBy, page, pageSize, tid, clienteFilterKey],
     queryFn: async (): Promise<ContactsResult> => {
       let query = supabase
         .from('whatsapp_contacts')
-        .select('id, name, phone_number, profile_picture_url, notes, instance_id');
+        .select('id, name, phone_number, profile_picture_url, notes, instance_id, cliente_id, is_group');
 
       if (tid) query = query.eq('tenant_id', tid);
       if (instanceId) query = query.eq('instance_id', instanceId);
+      query = applyClienteFilter(query);
       if (searchTerm && searchTerm.length > 0) {
         const escaped = escapeLike(searchTerm);
         query = query.or(`name.ilike.%${escaped}%,phone_number.ilike.%${escaped}%`);
@@ -50,6 +70,7 @@ export const useWhatsAppContacts = (
       let countQuery = supabase.from('whatsapp_contacts').select('*', { count: 'exact', head: true });
       if (tid) countQuery = countQuery.eq('tenant_id', tid);
       if (instanceId) countQuery = countQuery.eq('instance_id', instanceId);
+      countQuery = applyClienteFilter(countQuery);
       if (searchTerm && searchTerm.length > 0) {
         const escaped = escapeLike(searchTerm);
         countQuery = countQuery.or(`name.ilike.%${escaped}%,phone_number.ilike.%${escaped}%`);

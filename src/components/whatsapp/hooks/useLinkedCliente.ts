@@ -40,8 +40,24 @@ export const useLinkedCliente = (contactId: string | null, phoneNumber: string |
       let clienteId: string | null = null;
       let origem: 'vinculo' | 'telefone' = 'vinculo';
 
-      // 1. Try to find cliente_id from conversation metadata
+      // 0. Fonte canônica: whatsapp_contacts.cliente_id (mantida pelo trigger
+      //    sync_contact_cliente e escrita direto no cadastro de diretório).
+      //    Tem prioridade sobre metadata da conversa e match por telefone.
       if (contactId) {
+        let q = supabase
+          .from('whatsapp_contacts')
+          .select('cliente_id')
+          .eq('id', contactId) as any;
+        if (effectiveTenantId) q = q.eq('tenant_id', effectiveTenantId);
+        const { data: contactRow } = await q.maybeSingle();
+        if (contactRow?.cliente_id) {
+          clienteId = contactRow.cliente_id;
+          origem = 'vinculo';
+        }
+      }
+
+      // 1. Fallback: cliente_id na metadata da conversa
+      if (!clienteId && contactId) {
         let q = supabase
           .from('whatsapp_conversations')
           .select('metadata')

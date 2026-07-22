@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Search, Users, MessageSquare, Clock, TrendingUp, ChevronLeft, ChevronRight, SmilePlus, ThumbsUp, ThumbsDown, Minus, Building2, Mail, ExternalLink, Phone, Send, User } from "lucide-react";
+import { ArrowLeft, Search, Users, MessageSquare, Clock, TrendingUp, ChevronLeft, ChevronRight, SmilePlus, ThumbsUp, ThumbsDown, Minus, Building2, Mail, ExternalLink, Phone, Send, User, UserPlus, Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useWhatsAppContacts, type ContactSortOption } from "@/components/whatsapp/hooks/useWhatsAppContacts";
+import { useWhatsAppContacts, type ContactSortOption, type ContactClienteFilter } from "@/components/whatsapp/hooks/useWhatsAppContacts";
 import { useContactDetails } from "@/components/whatsapp/hooks/useContactDetails";
 import { useLinkedCliente } from "@/components/whatsapp/hooks/useLinkedCliente";
+import { ContactDirectoryDialog, type EditableContact } from "@/components/whatsapp/contatos/ContactDirectoryDialog";
+import { ClienteSearchSelect, type SelectedCliente } from "@/components/whatsapp/contatos/ClienteSearchSelect";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,9 +25,20 @@ export default function WhatsAppContatos() {
   const [sortBy, setSortBy] = useState<ContactSortOption>("last_interaction");
   const [instanceId, setInstanceId] = useState<string | undefined>();
   const [page, setPage] = useState(1);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogContact, setDialogContact] = useState<EditableContact | null>(null);
+  const [vinculo, setVinculo] = useState<"all" | "none" | "cliente">("all");
+  const [filterCliente, setFilterCliente] = useState<SelectedCliente | null>(null);
   const { instances } = useWhatsAppInstances();
 
-  const { data: contactsData, isLoading } = useWhatsAppContacts(instanceId, search, sortBy, page, 30);
+  const clienteFilter: ContactClienteFilter =
+    vinculo === "none"
+      ? { mode: "none" }
+      : vinculo === "cliente" && filterCliente
+      ? { mode: "cliente", clienteId: filterCliente.id }
+      : { mode: "all" };
+
+  const { data: contactsData, isLoading } = useWhatsAppContacts(instanceId, search, sortBy, page, 30, clienteFilter);
   const contacts = contactsData?.contacts || [];
   const totalPages = contactsData?.totalPages || 1;
   const totalCount = contactsData?.totalCount || 0;
@@ -42,15 +54,19 @@ export default function WhatsAppContatos() {
 
   return (
     <div className="flex h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background">
-      {/* Contacts List */}
-      <div className="w-80 shrink-0 border-r border-border flex flex-col">
+      {/* Contacts List — em telas estreitas some quando um contato está aberto */}
+      <div className={`${selectedContactId ? "hidden lg:flex" : "flex"} w-full lg:w-80 shrink-0 border-r border-border flex-col`}>
         <div className="p-3 border-b border-border space-y-2">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/whatsapp")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <h2 className="text-sm font-semibold">Contatos</h2>
-            <Badge variant="secondary" className="ml-auto text-[10px]">{totalCount}</Badge>
+            <Badge variant="secondary" className="text-[10px]">{totalCount}</Badge>
+            <Button size="sm" className="ml-auto h-8 gap-1.5" onClick={() => { setDialogContact(null); setDialogOpen(true); }}>
+              <UserPlus className="h-3.5 w-3.5" />
+              Adicionar
+            </Button>
           </div>
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -80,8 +96,28 @@ export default function WhatsAppContatos() {
               </SelectContent>
             </Select>
           </div>
+          <Select
+            value={vinculo}
+            onValueChange={(v) => { setVinculo(v as "all" | "none" | "cliente"); setFilterCliente(null); setPage(1); }}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os contatos</SelectItem>
+              <SelectItem value="none">Sem cliente vinculado</SelectItem>
+              <SelectItem value="cliente">Cliente específico</SelectItem>
+            </SelectContent>
+          </Select>
+          {vinculo === "cliente" && (
+            <ClienteSearchSelect
+              value={filterCliente}
+              onChange={(c) => { setFilterCliente(c); setPage(1); }}
+              placeholder="Escolher cliente..."
+            />
+          )}
         </div>
-        <ScrollArea className="flex-1">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           {isLoading ? (
             <div className="p-2 space-y-1">
               {Array.from({ length: 10 }).map((_, i) => (
@@ -112,14 +148,17 @@ export default function WhatsAppContatos() {
                     <p className="text-sm font-medium truncate">{c.name || c.phone_number}</p>
                     <p className="text-xs text-muted-foreground truncate">{c.phone_number}</p>
                   </div>
-                  {c.total_conversations > 0 && (
-                    <Badge variant="outline" className="text-[10px] shrink-0">{c.total_conversations}</Badge>
-                  )}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {c.cliente_id && <Building2 className="h-3.5 w-3.5 text-emerald-500" aria-label="Vinculado a cliente" />}
+                    {c.total_conversations > 0 && (
+                      <Badge variant="outline" className="text-[10px]">{c.total_conversations}</Badge>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="p-2 border-t border-border flex items-center justify-between">
@@ -134,8 +173,8 @@ export default function WhatsAppContatos() {
         )}
       </div>
 
-      {/* Contact Details */}
-      <div className="flex-1 overflow-auto">
+      {/* Contact Details — em telas estreitas ocupa tudo; escondido quando nada selecionado */}
+      <div className={`${selectedContactId ? "block" : "hidden lg:block"} flex-1 min-w-0 overflow-y-auto`}>
         {!selectedContactId ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
             <Users className="h-16 w-16 mb-4 opacity-30" />
@@ -148,23 +187,52 @@ export default function WhatsAppContatos() {
             <Skeleton className="h-40 w-full" />
           </div>
         ) : details ? (
-          <ScrollArea className="h-full">
-            <div className="p-6 space-y-6">
+          <div className="p-4 sm:p-6 space-y-6">
               {/* Header */}
-              <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16">
-                  {details.contact?.profile_picture_url && <AvatarImage src={details.contact.profile_picture_url} />}
-                  <AvatarFallback>{(details.contact?.name || "?").substring(0, 2).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <h2 className="text-lg font-semibold">{details.contact?.name || details.contact?.phone_number}</h2>
-                  <p className="text-sm text-muted-foreground">{details.contact?.phone_number}</p>
-                  {details.contact?.tags?.length > 0 && (
-                    <div className="flex gap-1 mt-1 flex-wrap">
-                      {details.contact.tags.map((t: string) => <Badge key={t} variant="secondary" className="text-[10px]">{t}</Badge>)}
-                    </div>
-                  )}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 lg:hidden shrink-0 -ml-1"
+                    onClick={() => setSelectedContactId(null)}
+                    aria-label="Voltar para a lista"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <Avatar className="h-16 w-16 shrink-0">
+                    {details.contact?.profile_picture_url && <AvatarImage src={details.contact.profile_picture_url} />}
+                    <AvatarFallback>{(details.contact?.name || "?").substring(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-semibold truncate">{details.contact?.name || details.contact?.phone_number}</h2>
+                    <p className="text-sm text-muted-foreground">{details.contact?.phone_number}</p>
+                    {details.contact?.tags?.length > 0 && (
+                      <div className="flex gap-1 mt-1 flex-wrap">
+                        {details.contact.tags.map((t: string) => <Badge key={t} variant="secondary" className="text-[10px]">{t}</Badge>)}
+                      </div>
+                    )}
+                  </div>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 shrink-0"
+                  onClick={() => {
+                    if (!details.contact) return;
+                    setDialogContact({
+                      id: details.contact.id,
+                      name: details.contact.name,
+                      phone_number: details.contact.phone_number,
+                      notes: details.contact.notes ?? null,
+                      is_group: details.contact.is_group,
+                    });
+                    setDialogOpen(true);
+                  }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Editar
+                </Button>
               </div>
 
               {/* Notes */}
@@ -221,11 +289,12 @@ export default function WhatsAppContatos() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 text-xs"
+                        className="h-7 text-xs shrink-0"
                         onClick={() => navigate(`/clientes/${linkedCliente.id}`)}
                       >
                         <ExternalLink className="h-3 w-3 mr-1" />
-                        Abrir Cadastro
+                        <span className="hidden sm:inline">Abrir Cadastro</span>
+                        <span className="sm:hidden">Abrir</span>
                       </Button>
                     </div>
                   </CardHeader>
@@ -242,7 +311,7 @@ export default function WhatsAppContatos() {
                     <Separator />
 
                     {/* Client details grid */}
-                    <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs">
                       {linkedCliente.cnpj && (
                         <div>
                           <span className="text-muted-foreground">CNPJ</span>
@@ -447,9 +516,23 @@ export default function WhatsAppContatos() {
                 </Card>
               )}
             </div>
-          </ScrollArea>
         ) : null}
       </div>
+
+      <ContactDirectoryDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        contact={dialogContact}
+        initialCliente={
+          dialogContact && linkedCliente
+            ? {
+                id: linkedCliente.id,
+                label: linkedCliente.nome_fantasia || linkedCliente.razao_social || "Cliente vinculado",
+              }
+            : null
+        }
+        onSaved={(contactId) => setSelectedContactId(contactId)}
+      />
     </div>
   );
 }
