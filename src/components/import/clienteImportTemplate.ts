@@ -104,8 +104,8 @@ const TEMPLATE_MINIMO_EXEMPLO = [
   'contato@empresa.com',     // Email
   '(11) 99999-0000',         // WhatsApp
   'Sede',                    // Unidade Base
-  '2024-01-10',              // Data de Cadastro
-  '2024-01-15',              // Data da Venda
+  '10/01/2024',              // Data de Cadastro (DD/MM/AAAA)
+  '15/01/2024',              // Data da Venda (DD/MM/AAAA)
   'Plano Pro',               // Produto
   'mensal',                  // Recorrência
   '299.90',                  // Mensalidade
@@ -135,8 +135,8 @@ const TEMPLATE_COMPLETO_EXEMPLO = TEMPLATE_COMPLETO_HEADERS.map(h => {
     contato_nome: 'João Silva',
     contato_cpf: '12345678901',
     contato_fone: '(11) 98888-0000',
-    data_reajuste: '2025-01-15',
-    data_ativacao: '2024-02-01',
+    data_reajuste: '15/01/2025',
+    data_ativacao: '01/02/2024',
     dia_vencimento_mrr: '10',
     valor_ativacao: '499.90',
     fornecedor: 'Fornecedor XYZ',

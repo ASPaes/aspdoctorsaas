@@ -166,14 +166,40 @@ function toNullableFloat(v: string | undefined): number | null {
   return isNaN(n) ? null : n;
 }
 
+/**
+ * Parser único de data para a importação (validação E conversão usam este).
+ * Padrão brasileiro: DD/MM/AAAA ou DD-MM-AAAA (dia/mês com 1-2 dígitos).
+ * Também aceita ISO AAAA-MM-DD para round-trip com exports do sistema.
+ * Retorna canônico "AAAA-MM-DD" ou null se a data for inválida/vazia.
+ */
+function parseBRDateToISO(v: string | undefined | null): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+
+  let y: number, mo: number, d: number;
+
+  // ISO primeiro: AAAA-MM-DD (ou AAAA/MM/DD). Ano de 4 dígitos NA FRENTE = ISO.
+  const iso = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (iso) {
+    y = +iso[1]; mo = +iso[2]; d = +iso[3];
+  } else {
+    // Brasileiro: DD/MM/AAAA ou DD-MM-AAAA (aceita 1-2 dígitos em dia/mês).
+    const br = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (!br) return null;
+    d = +br[1]; mo = +br[2]; y = +br[3];
+  }
+
+  // Validação de calendário real (rejeita 31/02, mês 13, dia 0, etc.)
+  if (y < 1900 || y > 2100 || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+
+  return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
 function toNullableDate(v: string | undefined): string | null {
-  if (!v || v.trim() === "") return null;
-  const s = v.trim();
-  // Converte DD/MM/YYYY → YYYY-MM-DD
-  const ddmmyyyy = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (ddmmyyyy) return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
-  // Já está em YYYY-MM-DD ou formato aceito
-  return s;
+  return parseBRDateToISO(v);
 }
 
 // Normaliza removendo acentos, maiúsculas e caracteres especiais
@@ -263,10 +289,15 @@ function validateRow(values: Record<string, string>): string[] {
   for (const { field, label } of DATE_FIELDS) {
     const raw = (values[field] ?? "").trim();
     if (!raw) continue;
-    const parsed = new Date(raw);
-    if (isNaN(parsed.getTime())) {
-      errors.push(`${label}: data inválida "${raw}"`);
-    } else if (parsed > today) {
+    const iso = parseBRDateToISO(raw);
+    if (!iso) {
+      errors.push(`${label}: data inválida "${raw}" — use DD/MM/AAAA`);
+      continue;
+    }
+    // Compara pela data local ao meio-dia (evita deslocamento de fuso).
+    const [yy, mm, dd] = iso.split("-").map(Number);
+    const parsedLocal = new Date(yy, mm - 1, dd, 12, 0, 0, 0);
+    if (parsedLocal > today) {
       errors.push(`${label}: data futura não permitida (${raw})`);
     }
   }
@@ -1577,7 +1608,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                 <span className="text-xs text-muted-foreground hidden group-open:inline">▲ recolher</span>
               </summary>
               <ul className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-                <li>📅 <strong>Datas:</strong> DD/MM/AAAA ou AAAA-MM-DD (ex: 15/01/2024 ou 2024-01-15)</li>
+                <li>📅 <strong>Datas:</strong> DD/MM/AAAA (padrão brasileiro — ex: 15/01/2024). Também aceita traço (15-01-2024) e AAAA-MM-DD.</li>
                 <li>📱 <strong>Telefone:</strong> (DD) NNNNN-NNNN (ex: (11) 99999-0000)</li>
                 <li>🔢 <strong>CNPJ:</strong> só números, sem pontuação (ex: 12345678000199)</li>
                 <li>💰 <strong>Valores:</strong> use ponto como decimal — sem símbolo R$ (ex: 1500.00)</li>

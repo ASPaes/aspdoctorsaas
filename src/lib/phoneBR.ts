@@ -22,8 +22,11 @@ export function normalizeBRPhone(input: string): string {
   // Remove leading zeros (e.g. 0xx style)
   digits = digits.replace(/^0+/, "");
 
-  // If 10-11 digits and doesn't start with 55, prepend 55
-  if (digits.length >= 10 && digits.length <= 11 && !digits.startsWith("55")) {
+  // 10-11 dígitos = número nacional (DDD + 8/9 dígitos), SEM código de país.
+  // Sempre prefixa 55 — inclusive quando o DDD é 55 (RS: Santa Maria/região central).
+  // Um número COM código de país tem 12-13 dígitos, nunca 10-11, então o comprimento
+  // desambigua: não dá pra confundir o DDD 55 com o código de país aqui.
+  if (digits.length >= 10 && digits.length <= 11) {
     digits = "55" + digits;
   }
 
@@ -97,8 +100,9 @@ export function maskBRPhoneLive(input: string): string {
   // Remove leading zeros
   digits = digits.replace(/^0+/, "");
 
-  // Auto-prepend 55 if user typed 10+ digits without country code
-  if (digits.length >= 10 && digits.length <= 11 && !digits.startsWith("55")) {
+  // Auto-prepend 55 quando o usuário digitou um número nacional (10-11 dígitos),
+  // inclusive com DDD 55 — igual a normalizeBRPhone. Com código de país são 12-13.
+  if (digits.length >= 10 && digits.length <= 11) {
     digits = "55" + digits;
   }
 
