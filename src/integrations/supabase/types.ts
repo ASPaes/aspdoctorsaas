@@ -12429,7 +12429,7 @@ export type Database = {
         Returns: Json
       }
       whatsapp_pill_counts: {
-        Args: { p_department_id?: string }
+        Args: { p_department_id?: string; p_tenant_id: string }
         Returns: {
           aguardando: number
           bucket: string

@@ -30,6 +30,7 @@ export function usePillCounts() {
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc("whatsapp_pill_counts", {
+        p_tenant_id: tid,
         p_department_id: selectedDepartmentId ?? null,
       });
       if (error) throw error;
