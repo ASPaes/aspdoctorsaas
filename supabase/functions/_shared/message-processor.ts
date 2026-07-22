@@ -2,7 +2,7 @@
 import { getSupportConfig, SupportConfig, resolveCsatTemplates } from './support-config.ts';
 import { getAIConfig, callAI } from './ai-client.ts';
 import { getAdapter } from './providers/index.ts';
-import { NormalizedInboundMessage, SendContext, PhoneParseResult } from './message-types.ts';
+import { NormalizedInboundMessage, SendContext, PhoneParseResult, UNSUPPORTED_MESSAGE_LABEL } from './message-types.ts';
 import { normalizeBRPhone, phoneSearchVariants } from './phone.ts';
 
 const AUTO_SENTIMENT_THRESHOLD = 5;
