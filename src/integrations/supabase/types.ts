@@ -12428,6 +12428,10 @@ export type Database = {
         }
         Returns: Json
       }
+      whatsapp_group_unread_sum: {
+        Args: { p_tenant_id: string }
+        Returns: number
+      }
       whatsapp_pill_counts: {
         Args: { p_department_id?: string; p_tenant_id: string }
         Returns: {
