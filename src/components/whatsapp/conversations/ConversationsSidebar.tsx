@@ -651,17 +651,42 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         <DepartmentSelector />
       </div>
 
+      {/* Toggle Todos / Não lidos */}
+      {!isSearching && (
+        <div className="px-3 pt-2 flex items-center">
+          <div className="inline-flex rounded-full bg-muted p-0.5 text-[11px]">
+            <button
+              type="button"
+              onClick={() => setUnreadOnly(false)}
+              className={cn(
+                "px-3 py-1 rounded-full font-medium transition-colors",
+                !unreadOnly ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Todos
+            </button>
+            <button
+              type="button"
+              onClick={() => setUnreadOnly(true)}
+              className={cn(
+                "px-3 py-1 rounded-full font-medium transition-colors",
+                unreadOnly ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Não lidos
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Quick Pills */}
       {!isSearching && (
       <div className="pt-1.5">
         <QuickPills
           active={activePill}
           onChange={setActivePill}
-          inProgressCount={pillCounts.inProgress}
-          waitingCount={pillCounts.waiting}
-          closedCount={pillCounts.closed}
-          afterHoursCount={pillCounts.afterHours}
-          groupsCount={pillCounts.groups}
+          unreadOnly={unreadOnly}
+          counts={pillCounts.counts}
           groupsHasUnread={pillCounts.groupsUnread > 0}
           badges={pillCounts.badges}
         />
