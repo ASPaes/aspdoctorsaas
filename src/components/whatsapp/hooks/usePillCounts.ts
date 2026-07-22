@@ -58,7 +58,7 @@ export function usePillCounts() {
         };
       }
 
-      const active: BucketKey[] = ["waiting", "in_progress", "after_hours"];
+      const active: BucketKey[] = ["waiting", "in_progress", "after_hours", "closed"];
       map.all = active.reduce<PillCount>(
         (acc, k) => ({
           total: acc.total + map[k].total,
