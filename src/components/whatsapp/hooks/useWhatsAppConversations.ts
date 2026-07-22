@@ -56,6 +56,7 @@ export interface ConversationsFilters {
   status?: string;
   assignedTo?: string;
   unassigned?: boolean;
+  unreadOnly?: boolean;
   page?: number;
   pageSize?: number;
   includeIds?: string[];
