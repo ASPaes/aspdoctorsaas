@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
-import { X, Download, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { X, Download, ZoomIn, ZoomOut, Maximize2, Copy, Check, ExternalLink } from "lucide-react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { toast } from "sonner";
 
 interface ZoomableImageLightboxProps {
   src: string;
