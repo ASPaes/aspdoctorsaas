@@ -50,6 +50,15 @@ const SORT_LABELS: Record<string, string> = {
   oldest: "Mais Antigas",
 };
 
+const PILL_LABELS: Record<string, string> = {
+  waiting: "Fila",
+  in_progress: "Atendendo",
+  groups: "Grupos",
+  after_hours: "Fora do horário",
+  all: "Todos",
+  closed: "Encerrados",
+};
+
 export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: Props) {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
