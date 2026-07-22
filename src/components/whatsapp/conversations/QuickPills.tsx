@@ -39,7 +39,7 @@ export function QuickPills({
   groupsHasUnread,
   badges,
 }: Props) {
-  const showUnreadFor = new Set(["waiting", "in_progress", "after_hours", "all", "groups"]);
+  const showUnreadFor = new Set(["waiting", "in_progress", "after_hours", "all", "groups", "closed"]);
 
   return (
     // pt-2.5 evita que as bolinhas absolutas sejam cortadas pelo overflow-x da barra
