@@ -9,6 +9,10 @@ export type MessageType =
   | 'text' | 'image' | 'audio' | 'video' | 'document'
   | 'sticker' | 'contact' | 'contacts' | 'reaction' | 'revoke' | 'system';
 
+// Rótulo p/ tipo de mensagem não reconhecido. Sinaliza ao processor gravar as chaves brutas.
+export const UNSUPPORTED_MESSAGE_LABEL = '📎 Mensagem não suportada';
+
+
 export interface InstanceSecrets {
   api_url?: string | null;
   api_key?: string | null;
