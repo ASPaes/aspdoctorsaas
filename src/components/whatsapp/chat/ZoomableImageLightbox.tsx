@@ -8,6 +8,8 @@ interface ZoomableImageLightboxProps {
   onClose: () => void;
   alt?: string;
   downloadName?: string;
+  enableCopy?: boolean;        // NOVO
+  onOpenNewTab?: () => void;   // NOVO
 }
 
 const roundBtn =
