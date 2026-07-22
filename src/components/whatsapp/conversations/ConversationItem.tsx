@@ -42,6 +42,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const hasUnread = unreadCount > 0;
 
   const isGroup = (conv as any).is_group === true;
+  const showDeptChip = showDepartment && !isGroup;
   const { lookup: groupMentionLookup } = useGroupMentionLookup();
 
 
@@ -233,7 +234,25 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
           {conv.isLastMessageFromMe && (
             <CheckCheck className="h-3 w-3 text-muted-foreground shrink-0" />
           )}
-          <span className="text-xs text-muted-foreground truncate">{previewText}</span>
+          {showDeptChip && (
+            departmentName ? (
+              <Badge
+                variant="outline"
+                title={departmentName}
+                className="shrink-0 max-w-[45%] h-4 px-1 py-0 text-[9px] font-normal border-border/60 bg-muted/40 text-muted-foreground"
+              >
+                <span className="truncate">{departmentName}</span>
+              </Badge>
+            ) : (
+              <Badge
+                variant="outline"
+                className="shrink-0 h-4 px-1 py-0 text-[9px] font-normal border-dashed border-border/60 text-muted-foreground/60"
+              >
+                Sem setor
+              </Badge>
+            )
+          )}
+          <span className="text-xs text-muted-foreground truncate min-w-0">{previewText}</span>
         </div>
         {instanceName && (
           <p className="text-[10px] text-muted-foreground/60 truncate mt-0.5">{instanceName}</p>
