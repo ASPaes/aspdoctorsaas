@@ -331,6 +331,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         waiting: { unread: w.unread },
         in_progress: { unread: ip.unread },
         after_hours: { unread: ah.unread },
+        closed: { unread: cl.unread },
         all: { unread: all.unread },
         groups: { unread: groupsUnreadMsgs },
       },
