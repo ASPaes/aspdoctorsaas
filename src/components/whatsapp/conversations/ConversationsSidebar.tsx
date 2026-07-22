@@ -216,7 +216,9 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const resolvedUnassigned = filters.assignedToAgent === "__unassigned__";
 
   const { effectiveTenantId: tid } = useTenantFilter();
+  const queryClient = useQueryClient();
   const { data: activeAttendanceIds } = useActiveAttendanceConvIds();
+
 
   const includeIds = useMemo(() => {
     const ids = new Set<string>(activeAttendanceIds ?? []);
