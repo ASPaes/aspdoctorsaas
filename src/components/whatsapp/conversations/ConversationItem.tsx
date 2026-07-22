@@ -20,9 +20,11 @@ interface Props {
   instanceName?: string;
   attendance?: AttendanceInfo;
   isAgentAlert?: boolean;
+  showDepartment?: boolean;
+  departmentName?: string | null;
 }
 
-export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance, isAgentAlert }: Props) {
+export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance, isAgentAlert, showDepartment, departmentName }: Props) {
   const contact = conv.contact;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
   const sentimentData = conv.sentiment as any;
