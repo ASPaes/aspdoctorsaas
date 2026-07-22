@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -10,8 +10,20 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, MessageSquare, Users, X, FileSearch, ChevronRight } from "lucide-react";
+import { Search, Plus, MessageSquare, Users, X, FileSearch, ChevronRight, CheckCheck } from "lucide-react";
 import { MessageSearchModal } from "./MessageSearchModal";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 import { useWhatsAppConversations, type ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
@@ -86,6 +98,9 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const [hydratedFor, setHydratedFor] = useState<string | null>(null);
   const [forcedConvId, setForcedConvId] = useState<string | null>(null);
   const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
+  const [markAllOpen, setMarkAllOpen] = useState(false);
+  const [markAllLoading, setMarkAllLoading] = useState(false);
+
 
   // Tick local p/ reavaliar alertas de ausência do agente (client-side, sem request)
   const [nowMs, setNowMs] = useState<number>(Date.now());
@@ -204,7 +219,9 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const resolvedUnassigned = filters.assignedToAgent === "__unassigned__";
 
   const { effectiveTenantId: tid } = useTenantFilter();
+  const queryClient = useQueryClient();
   const { data: activeAttendanceIds } = useActiveAttendanceConvIds();
+
 
   const includeIds = useMemo(() => {
     const ids = new Set<string>(activeAttendanceIds ?? []);
@@ -663,7 +680,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
       {/* Toggle Todos / Não lidos */}
       {!isSearching && (
-        <div className="px-3 pt-2 flex items-center">
+        <div className="px-3 pt-2 flex items-center justify-between gap-2">
           <div className="inline-flex rounded-full bg-muted p-0.5 text-[11px]">
             <button
               type="button"
@@ -686,8 +703,73 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
               Não lidos
             </button>
           </div>
+          {(() => {
+            const currentUnread = (pillCounts.counts as any)?.[activePill]?.unreadConvs ?? 0;
+            if (currentUnread <= 0) return null;
+            return (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-[11px] gap-1"
+                    onClick={() => setMarkAllOpen(true)}
+                  >
+                    <CheckCheck className="h-3.5 w-3.5" />
+                    Marcar todas como lidas
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Marca as {currentUnread} conversas não lidas desta aba</TooltipContent>
+              </Tooltip>
+            );
+          })()}
         </div>
       )}
+
+      <AlertDialog open={markAllOpen} onOpenChange={(o) => !markAllLoading && setMarkAllOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Marcar {(pillCounts.counts as any)?.[activePill]?.unreadConvs ?? 0} conversas como lidas?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              As mensagens não serão respondidas. Isso apenas remove o indicador de não lido.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={markAllLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={markAllLoading}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!tid) return;
+                setMarkAllLoading(true);
+                try {
+                  const { data, error } = await (supabase as any).rpc("whatsapp_mark_bucket_read", {
+                    p_tenant_id: tid,
+                    p_bucket: activePill,
+                    p_department_id: selectedDepartmentId ?? null,
+                  });
+                  if (error) throw error;
+                  const affected = Number(data) || 0;
+                  toast.success(`${affected} conversas marcadas como lidas`);
+                  queryClient.invalidateQueries({ queryKey: ["whatsapp-conversations"] });
+                  queryClient.invalidateQueries({ queryKey: ["whatsapp-pill-counts"] });
+                  queryClient.invalidateQueries({ queryKey: ["group-counts"] });
+                  setMarkAllOpen(false);
+                } catch (err: any) {
+                  toast.error(err?.message ?? "Falha ao marcar como lidas");
+                } finally {
+                  setMarkAllLoading(false);
+                }
+              }}
+            >
+              {markAllLoading ? "Marcando..." : "Marcar como lidas"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       {/* Quick Pills */}
       {!isSearching && (
