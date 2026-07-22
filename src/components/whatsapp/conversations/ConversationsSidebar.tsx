@@ -212,6 +212,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     assignedTo: queueLikePills ? undefined : resolvedAssignedTo,
     unassigned: isGroupsPill || queueLikePills ? undefined : (resolvedUnassigned || undefined),
     isGroup: isGroupsPill ? true : activePill === "all" ? undefined : false,
+    unreadOnly,
     pageSize: 100,
     includeIds,
   });
