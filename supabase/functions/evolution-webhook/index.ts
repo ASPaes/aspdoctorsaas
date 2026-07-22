@@ -993,7 +993,9 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
 
 async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: any): Promise<void> {
   const { instance, data } = payload;
-  const { key, pushName, message, messageTimestamp } = data;
+  const { key, pushName, message: rawMessage, messageTimestamp } = data;
+  const message = unwrapMessage(rawMessage);
+
   console.log(`${LOG} Processing message: ${key?.id} type=${getMessageType(message)}`);
 
   try {
