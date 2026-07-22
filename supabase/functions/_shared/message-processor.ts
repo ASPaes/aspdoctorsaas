@@ -1691,7 +1691,19 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
         }
       } catch { /* ignore */ }
 
+      // Observability: tipo não reconhecido → grava as chaves brutas p/ diagnóstico
+      if (content === UNSUPPORTED_MESSAGE_LABEL) {
+        try {
+          const rawMsg = (msg.rawPayload as any)?.message || {};
+          base.unsupportedKeys = Object.keys(rawMsg);
+          const inner = rawMsg.ephemeralMessage?.message || rawMsg.viewOnceMessage?.message
+            || rawMsg.viewOnceMessageV2?.message || rawMsg.documentWithCaptionMessage?.message || null;
+          if (inner) base.unsupportedInnerKeys = Object.keys(inner);
+        } catch { /* ignore */ }
+      }
+
       if ((messageType === 'contact' || messageType === 'contacts') && msg.rawPayload) {
+
         const raw = msg.rawPayload as any;
         const evoSingle = raw?.message?.contactMessage;
         const evoMulti = raw?.message?.contactsArrayMessage?.contacts;
