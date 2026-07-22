@@ -253,17 +253,24 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     staleTime: 60_000,
     refetchInterval: 60_000,
     queryFn: async () => {
-      const { count: totalGroups } = await (supabase.from("whatsapp_conversations" as any) as any)
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", tid)
-        .eq("is_group", true)
-        .eq("group_enabled", true);
-      const { data: unreadSum } = await (supabase as any).rpc("whatsapp_group_unread_sum", {
-        p_tenant_id: tid,
-      });
+      const [{ count: totalGroups }, { count: unreadConvs }, unreadSumResp] = await Promise.all([
+        (supabase.from("whatsapp_conversations" as any) as any)
+          .select("*", { count: "exact", head: true })
+          .eq("tenant_id", tid)
+          .eq("is_group", true)
+          .eq("group_enabled", true),
+        (supabase.from("whatsapp_conversations" as any) as any)
+          .select("*", { count: "exact", head: true })
+          .eq("tenant_id", tid)
+          .eq("is_group", true)
+          .eq("group_enabled", true)
+          .gt("unread_count", 0),
+        (supabase as any).rpc("whatsapp_group_unread_sum", { p_tenant_id: tid }),
+      ]);
       return {
         totalGroups: totalGroups || 0,
-        groupsUnreadMsgs: Number(unreadSum) || 0,
+        groupsUnreadConvs: unreadConvs || 0,
+        groupsUnreadMsgs: Number(unreadSumResp?.data) || 0,
       };
     },
     enabled: !!tid,
