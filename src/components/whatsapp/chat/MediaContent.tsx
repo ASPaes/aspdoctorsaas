@@ -63,6 +63,23 @@ export function MediaContent({
   const resolvedInlineUrl = useProxyUrl(messageId, mediaUrl, "inline", INLINE_TYPES.has(messageType));
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
+  const handleOpenNewTab = async () => {
+    if (messageId?.startsWith("temp-")) return;
+    const base = import.meta.env.VITE_SUPABASE_URL;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      const proxyUrl = `${base}/functions/v1/whatsapp-media-proxy?message_row_id=${messageId}&mode=inline${token ? `&token=${token}` : ""}`;
+      window.open(proxyUrl, "_blank", "noopener,noreferrer");
+    } catch {
+      window.open(
+        `${base}/functions/v1/whatsapp-media-proxy?message_row_id=${messageId}&mode=inline`,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    }
+  };
+
   if (messageType === "document" || (messageType !== "image" && messageType !== "sticker" && messageType !== "audio" && messageType !== "video")) {
     return (
       <AttachmentCard
