@@ -75,6 +75,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const [pillAutoSet, setPillAutoSet] = useState(false);
   const [hydratedFor, setHydratedFor] = useState<string | null>(null);
   const [forcedConvId, setForcedConvId] = useState<string | null>(null);
+  const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
 
   // Tick local p/ reavaliar alertas de ausência do agente (client-side, sem request)
   const [nowMs, setNowMs] = useState<number>(Date.now());
