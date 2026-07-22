@@ -114,6 +114,27 @@ export function ZoomableImageLightbox({
               className="absolute top-2 right-2 z-10 flex gap-2"
               onClick={(e) => e.stopPropagation()}
             >
+              {enableCopy && (
+                <button
+                  onClick={handleCopyImage}
+                  className={roundBtn}
+                  title={copied ? "Copiado!" : "Copiar imagem"}
+                >
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                </button>
+              )}
+              {onOpenNewTab && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenNewTab();
+                  }}
+                  className={roundBtn}
+                  title="Abrir em nova guia"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </button>
+              )}
               <a
                 href={src}
                 download={downloadName ?? "imagem"}
