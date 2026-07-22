@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -49,6 +50,15 @@ const SORT_LABELS: Record<string, string> = {
   oldest: "Mais Antigas",
 };
 
+const PILL_LABELS: Record<string, string> = {
+  waiting: "Fila",
+  in_progress: "Atendendo",
+  groups: "Grupos",
+  after_hours: "Fora do horário",
+  all: "Todos",
+  closed: "Encerrados",
+};
+
 export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: Props) {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
@@ -75,6 +85,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const [pillAutoSet, setPillAutoSet] = useState(false);
   const [hydratedFor, setHydratedFor] = useState<string | null>(null);
   const [forcedConvId, setForcedConvId] = useState<string | null>(null);
+  const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
 
   // Tick local p/ reavaliar alertas de ausência do agente (client-side, sem request)
   const [nowMs, setNowMs] = useState<number>(Date.now());
@@ -211,6 +222,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     assignedTo: queueLikePills ? undefined : resolvedAssignedTo,
     unassigned: isGroupsPill || queueLikePills ? undefined : (resolvedUnassigned || undefined),
     isGroup: isGroupsPill ? true : activePill === "all" ? undefined : false,
+    unreadOnly,
     pageSize: 100,
     includeIds,
   });
@@ -251,17 +263,24 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     staleTime: 60_000,
     refetchInterval: 60_000,
     queryFn: async () => {
-      const { count: totalGroups } = await (supabase.from("whatsapp_conversations" as any) as any)
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", tid)
-        .eq("is_group", true)
-        .eq("group_enabled", true);
-      const { data: unreadSum } = await (supabase as any).rpc("whatsapp_group_unread_sum", {
-        p_tenant_id: tid,
-      });
+      const [{ count: totalGroups }, { count: unreadConvs }, unreadSumResp] = await Promise.all([
+        (supabase.from("whatsapp_conversations" as any) as any)
+          .select("*", { count: "exact", head: true })
+          .eq("tenant_id", tid)
+          .eq("is_group", true)
+          .eq("group_enabled", true),
+        (supabase.from("whatsapp_conversations" as any) as any)
+          .select("*", { count: "exact", head: true })
+          .eq("tenant_id", tid)
+          .eq("is_group", true)
+          .eq("group_enabled", true)
+          .gt("unread_count", 0),
+        (supabase as any).rpc("whatsapp_group_unread_sum", { p_tenant_id: tid }),
+      ]);
       return {
         totalGroups: totalGroups || 0,
-        groupsUnreadMsgs: Number(unreadSum) || 0,
+        groupsUnreadConvs: unreadConvs || 0,
+        groupsUnreadMsgs: Number(unreadSumResp?.data) || 0,
       };
     },
     enabled: !!tid,
@@ -271,18 +290,25 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   // Grupos continuam no hook dedicado (a RPC filtra is_group=false).
   const { data: pillCountsData } = usePillCounts();
   const pillCounts = useMemo(() => {
-    const w = pillCountsData?.waiting ?? { total: 0, aguardando: 0, unread: 0 };
-    const ip = pillCountsData?.in_progress ?? { total: 0, aguardando: 0, unread: 0 };
-    const ah = pillCountsData?.after_hours ?? { total: 0, aguardando: 0, unread: 0 };
-    const cl = pillCountsData?.closed ?? { total: 0, aguardando: 0, unread: 0 };
-    const all = pillCountsData?.all ?? { total: 0, aguardando: 0, unread: 0 };
+    const EMPTY = { total: 0, aguardando: 0, unread: 0, unreadConvs: 0 };
+    const w = pillCountsData?.waiting ?? EMPTY;
+    const ip = pillCountsData?.in_progress ?? EMPTY;
+    const ah = pillCountsData?.after_hours ?? EMPTY;
+    const cl = pillCountsData?.closed ?? EMPTY;
+    const all = pillCountsData?.all ?? EMPTY;
     const groupsUnreadMsgs = groupCountData?.groupsUnreadMsgs ?? 0;
+    const groupsUnreadConvs = groupCountData?.groupsUnreadConvs ?? 0;
+    const totalGroups = groupCountData?.totalGroups ?? 0;
     return {
-      waiting: w.total,
-      inProgress: ip.total,
-      afterHours: ah.total,
-      closed: cl.total,
-      groups: groupCountData?.totalGroups ?? 0,
+      counts: {
+        waiting: { total: w.total, unreadConvs: w.unreadConvs },
+        in_progress: { total: ip.total, unreadConvs: ip.unreadConvs },
+        after_hours: { total: ah.total, unreadConvs: ah.unreadConvs },
+        closed: { total: cl.total, unreadConvs: cl.unreadConvs },
+        all: { total: all.total, unreadConvs: all.unreadConvs },
+        groups: { total: totalGroups, unreadConvs: groupsUnreadConvs },
+      },
+      groups: totalGroups,
       groupsUnread: groupsUnreadMsgs,
       badges: {
         waiting: { unread: w.unread },
@@ -635,17 +661,42 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         <DepartmentSelector />
       </div>
 
+      {/* Toggle Todos / Não lidos */}
+      {!isSearching && (
+        <div className="px-3 pt-2 flex items-center">
+          <div className="inline-flex rounded-full bg-muted p-0.5 text-[11px]">
+            <button
+              type="button"
+              onClick={() => setUnreadOnly(false)}
+              className={cn(
+                "px-3 py-1 rounded-full font-medium transition-colors",
+                !unreadOnly ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Todos
+            </button>
+            <button
+              type="button"
+              onClick={() => setUnreadOnly(true)}
+              className={cn(
+                "px-3 py-1 rounded-full font-medium transition-colors",
+                unreadOnly ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Não lidos
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Quick Pills */}
       {!isSearching && (
       <div className="pt-1.5">
         <QuickPills
           active={activePill}
           onChange={setActivePill}
-          inProgressCount={pillCounts.inProgress}
-          waitingCount={pillCounts.waiting}
-          closedCount={pillCounts.closed}
-          afterHoursCount={pillCounts.afterHours}
-          groupsCount={pillCounts.groups}
+          unreadOnly={unreadOnly}
+          counts={pillCounts.counts}
           groupsHasUnread={pillCounts.groupsUnread > 0}
           badges={pillCounts.badges}
         />
@@ -698,7 +749,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         ) : (isSearching ? searchResults : filtered).length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <MessageSquare className="h-10 w-10 mb-2 opacity-50" />
-            <p className="text-sm">{isSearching ? "Nenhum contato encontrado" : "Nenhuma conversa encontrada"}</p>
+            <p className="text-sm">
+              {isSearching
+                ? "Nenhum contato encontrado"
+                : unreadOnly
+                  ? `Nenhuma conversa não lida em ${PILL_LABELS[activePill] ?? "esta aba"}`
+                  : "Nenhuma conversa encontrada"}
+            </p>
           </div>
         ) : (
           <div className="space-y-px p-1">

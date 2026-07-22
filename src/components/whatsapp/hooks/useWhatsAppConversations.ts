@@ -56,6 +56,7 @@ export interface ConversationsFilters {
   status?: string;
   assignedTo?: string;
   unassigned?: boolean;
+  unreadOnly?: boolean;
   page?: number;
   pageSize?: number;
   includeIds?: string[];
@@ -97,6 +98,7 @@ function applyFullFilter(q: any, tid: string | null, filters?: ConversationsFilt
   if (filters?.unassigned) q = q.is('assigned_to', null);
   if (filters?.isGroup === true) q = q.eq('is_group', true).eq('group_enabled', true);
   if (filters?.isGroup === false) q = q.eq('is_group', false);
+  if (filters?.unreadOnly) q = q.gt('unread_count', 0);
   return q;
 }
 

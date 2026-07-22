@@ -4,16 +4,19 @@ interface PillBadgeCounts {
   unread?: number;
 }
 
+interface PillCounts {
+  total: number;
+  unreadConvs: number;
+}
+
 interface Props {
   active: string;
   onChange: (pill: string) => void;
-  inProgressCount: number;
-  waitingCount: number;
-  closedCount: number;
-  afterHoursCount: number;
-  groupsCount: number;
+  unreadOnly?: boolean;
+  /** Contagens totais (default) e de conversas não lidas por pill */
+  counts: Partial<Record<"waiting" | "in_progress" | "after_hours" | "all" | "groups" | "closed", PillCounts>>;
   groupsHasUnread?: boolean;
-  /** Badges (bolinhas) por pill */
+  /** Badges (bolinhas) por pill — mensagens não lidas */
   badges?: Partial<Record<"waiting" | "in_progress" | "after_hours" | "all" | "groups" | "closed", PillBadgeCounts>>;
 }
 
@@ -31,32 +34,19 @@ const formatCap = (n: number, cap: number) => (n > cap ? `${cap}+` : String(Math
 export function QuickPills({
   active,
   onChange,
-  inProgressCount,
-  waitingCount,
-  closedCount,
-  afterHoursCount,
-  groupsCount,
+  unreadOnly,
+  counts,
   groupsHasUnread,
   badges,
 }: Props) {
-  const getCount = (key: string) => {
-    if (key === "in_progress") return inProgressCount;
-    if (key === "waiting") return waitingCount;
-    if (key === "closed") return closedCount;
-    if (key === "after_hours") return afterHoursCount;
-    if (key === "groups") return groupsCount;
-    if (key === "all")
-      return inProgressCount + waitingCount + afterHoursCount;
-    return 0;
-  };
-
   const showUnreadFor = new Set(["waiting", "in_progress", "after_hours", "all", "groups"]);
 
   return (
     // pt-2.5 evita que as bolinhas absolutas sejam cortadas pelo overflow-x da barra
     <div className="flex gap-1 px-3 pt-2.5 pb-2 overflow-x-auto overflow-y-visible">
       {pills.map((p) => {
-        const count = getCount(p.key);
+        const c = (counts as any)?.[p.key] as PillCounts | undefined;
+        const count = unreadOnly ? (c?.unreadConvs ?? 0) : (c?.total ?? 0);
         const isActive = active === p.key;
         const b = (badges as any)?.[p.key] as PillBadgeCounts | undefined;
         const unread = showUnreadFor.has(p.key) ? Math.max(0, Math.trunc(b?.unread ?? 0)) : 0;
