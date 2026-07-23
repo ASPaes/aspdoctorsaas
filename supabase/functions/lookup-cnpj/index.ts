@@ -21,6 +21,8 @@ type NormalizedCnpj = {
   uf: string | null;
   municipio: string | null;
   cep: string | null;
+  cnae_fiscal: number | null;
+  cnae_fiscal_descricao: string | null;
 };
 
 async function checkRateLimit(
@@ -94,11 +96,15 @@ function normalizeBrasilApi(d: any): NormalizedCnpj {
     uf: d.uf ?? null,
     municipio: d.municipio ?? null,
     cep: d.cep ? String(d.cep).replace(/\D/g, "") : null,
+    cnae_fiscal: d.cnae_fiscal ? Number(String(d.cnae_fiscal).replace(/\D/g, "")) : null,
+    cnae_fiscal_descricao: d.cnae_fiscal_descricao ?? null,
   };
 }
 
 function normalizeReceitaWs(d: any): NormalizedCnpj {
   const tel = d.telefone ? String(d.telefone).split("/")[0].trim() : null;
+  const ativ = Array.isArray(d.atividade_principal) ? d.atividade_principal[0] : null;
+  const cnaeDigits = ativ?.code ? String(ativ.code).replace(/\D/g, "") : "";
   return {
     cnpj: String(d.cnpj ?? "").replace(/\D/g, ""),
     razao_social: d.nome ?? null,
@@ -111,6 +117,8 @@ function normalizeReceitaWs(d: any): NormalizedCnpj {
     uf: d.uf ?? null,
     municipio: d.municipio ?? null,
     cep: d.cep ? String(d.cep).replace(/\D/g, "") : null,
+    cnae_fiscal: cnaeDigits ? Number(cnaeDigits) : null,
+    cnae_fiscal_descricao: ativ?.text ?? null,
   };
 }
 
