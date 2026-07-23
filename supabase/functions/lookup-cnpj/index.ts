@@ -21,6 +21,8 @@ type NormalizedCnpj = {
   uf: string | null;
   municipio: string | null;
   cep: string | null;
+  cnae_fiscal: number | null;
+  cnae_fiscal_descricao: string | null;
 };
 
 async function checkRateLimit(
