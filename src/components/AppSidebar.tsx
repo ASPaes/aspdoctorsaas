@@ -183,7 +183,7 @@ export function AppSidebar() {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton>
               <Rocket className="h-4 w-4" />
-              <span>Onboarding & Implantação</span>
+              <span>Implantação</span>
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
@@ -210,9 +210,9 @@ export function AppSidebar() {
       >
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton tooltip="Onboarding & Implantação">
+            <SidebarMenuButton tooltip="Implantação">
               <Rocket className="h-4 w-4" />
-              <span>Onboarding & Implantação</span>
+              <span>Implantação</span>
               <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -344,7 +344,7 @@ export function AppSidebar() {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ) : null;
-                if (item.resource === "nav.painel_uso") {
+                if (item.resource === "nav.certificados_a1") {
                   return (
                     <Fragment key={item.title}>
                       {onboardingMenu}

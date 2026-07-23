@@ -47,7 +47,7 @@ export default function OnboardingConfigPage() {
           <Button asChild variant="ghost" size="sm">
             <Link to="/onboarding-implantacao"><ArrowLeft className="h-4 w-4 mr-1" />Kanban</Link>
           </Button>
-          <h1 className="text-lg font-semibold">Configuração · Onboarding & Implantação</h1>
+          <h1 className="text-lg font-semibold">Configuração · Implantação</h1>
         </div>
         <div className="flex items-center gap-2">
           {canGenerateAI && (

@@ -474,7 +474,7 @@ export default function OnboardingPage() {
     <div className="flex flex-col h-full w-full min-h-0">
       <div className="flex items-center justify-between gap-3 p-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold">Onboarding & Implantação</h1>
+          <h1 className="text-lg font-semibold">Implantação</h1>
           <div className="inline-flex rounded-md border border-border p-0.5">
             <button
               onClick={() => setFase("onboarding")}
