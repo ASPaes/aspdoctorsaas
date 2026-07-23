@@ -764,9 +764,10 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
                   if (error) throw error;
                   const affected = Number(data) || 0;
                   toast.success(`${affected} conversas marcadas como lidas`);
-                  queryClient.invalidateQueries({ queryKey: ["whatsapp-conversations"] });
-                  queryClient.invalidateQueries({ queryKey: ["whatsapp-pill-counts"] });
-                  queryClient.invalidateQueries({ queryKey: ["group-counts"] });
+                  queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+                  queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversation-counts"] });
+                  queryClient.invalidateQueries({ queryKey: ["whatsapp", "pill-counts"] });
+                  queryClient.invalidateQueries({ queryKey: ["whatsapp", "group-counts"] });
                   setMarkAllOpen(false);
                 } catch (err: any) {
                   toast.error(err?.message ?? "Falha ao marcar como lidas");
