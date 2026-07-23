@@ -60,7 +60,7 @@ export default function Onboarding() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
-            <Logo className="h-10" />
+            <Logo size="lg" />
           </div>
           <CardTitle className="flex items-center justify-center gap-2 text-xl">
             <Building2 className="h-5 w-5" />

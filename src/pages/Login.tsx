@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Logo } from "@/components/Logo";
-import { TechBackground } from "@/components/TechBackground";
+import { LoginBackdrop } from "@/components/LoginBackdrop";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,30 +32,19 @@ export default function Login() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-background">
-      <TechBackground />
+      <LoginBackdrop />
 
-      {/* Glow behind card */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-          "radial-gradient(ellipse 60% 50% at 50% 50%, hsl(142 71% 45% / 0.05) 0%, transparent 70%)"
-        }}
-        aria-hidden="true" />
-
-      <Card className="relative z-10 w-full max-w-[440px] mx-4 border-border/60 bg-card/95 shadow-xl backdrop-blur-sm">
-        <CardHeader className="space-y-4 pb-2 text-center">
-          <div className="mx-auto">
-            <Logo size="xl" />
-          </div>
-          <div className="space-y-1">
-            <h1 className="text-xl font-bold tracking-tight text-foreground">
-              Bem-vindo ao DoctorSaaS
-            </h1>
-            <p className="text-sm font-light italic text-muted-foreground">Business Analytics
-Measured Success
+      <Card className="relative z-10 w-full max-w-[480px] mx-4 rounded-2xl border border-white/10 bg-card/70 shadow-[0_28px_80px_-24px_rgba(0,0,0,0.85)] backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-inset ring-white/5">
+        <CardHeader className="space-y-3 pb-2 text-center">
+          <div className="mx-auto flex flex-col items-center gap-1.5">
+            <Logo size="2xl" />
+            <p className="text-[11px] font-light italic tracking-wide text-muted-foreground/70">
+              Business Analytics · Measured Success
             </p>
           </div>
+          <h1 className="text-xl font-bold tracking-tight text-foreground">
+            Seja bem-vindo
+          </h1>
         </CardHeader>
 
         <CardContent>
@@ -92,7 +81,11 @@ Measured Success
                 </button>
               </div>
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full shadow-[0_10px_34px_-8px_hsl(142_71%_45%/0.65)] transition-shadow hover:shadow-[0_12px_40px_-6px_hsl(142_71%_45%/0.8)]"
+              disabled={loading}
+            >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Entrar
             </Button>

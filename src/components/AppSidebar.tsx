@@ -260,7 +260,7 @@ export function AppSidebar() {
             aria-label="Expandir menu"
             className="flex items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring hover:opacity-80 transition-opacity cursor-pointer"
           >
-            <Logo size="sm" />
+            <Logo iconOnly size="sm" />
           </button>
         ) : (
           <Logo size="md" />

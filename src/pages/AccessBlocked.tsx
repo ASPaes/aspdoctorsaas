@@ -32,7 +32,7 @@ export default function AccessBlocked() {
       <Card className="w-full max-w-md text-center">
         <CardHeader>
           <div className="mx-auto mb-4">
-            <Logo className="h-10" />
+            <Logo size="lg" />
           </div>
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/15">
             <ShieldX className="h-6 w-6 text-destructive" />
