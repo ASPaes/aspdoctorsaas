@@ -28,7 +28,8 @@ export function usePillCounts() {
     queryKey: ["whatsapp", "pill-counts", tid, selectedDepartmentId ?? null],
     enabled: !!tid,
     staleTime: 15_000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc("whatsapp_pill_counts", {
         p_tenant_id: tid,

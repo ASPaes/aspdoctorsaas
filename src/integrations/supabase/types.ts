@@ -10539,6 +10539,19 @@ export type Database = {
         }
         Returns: string
       }
+      create_wa_directory_contact: {
+        Args: {
+          p_cliente_id?: string
+          p_instance_id?: string
+          p_name: string
+          p_phone: string
+          p_tenant_id: string
+        }
+        Returns: {
+          already_existed: boolean
+          contact_id: string
+        }[]
+      }
       cron_anexo_omie: { Args: never; Returns: undefined }
       cron_recon_espelho: { Args: never; Returns: undefined }
       cron_verificar_anterior: {
@@ -12360,6 +12373,16 @@ export type Database = {
           p_new_status_id: string
           p_previsao_encerramento?: string
           p_ticket_id: string
+        }
+        Returns: undefined
+      }
+      update_wa_directory_contact: {
+        Args: {
+          p_cliente_id?: string
+          p_contact_id: string
+          p_name: string
+          p_notes?: string
+          p_phone?: string
         }
         Returns: undefined
       }
