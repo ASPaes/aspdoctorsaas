@@ -258,7 +258,7 @@ export function CreateSupportTicketModal({
   }, [open]);
 
   // Dados do atendimento de origem (closure) para ancorar a detecção de horário.
-  const { data: closureAttendance } = useQuery({
+  const { data: closureAttendance, isLoading: isLoadingClosureAttendance } = useQuery({
     queryKey: ["create_support_ticket_closure_attendance", attendanceId],
     enabled: open && fromClosure && !!attendanceId,
     queryFn: async () => {
@@ -271,10 +271,36 @@ export function CreateSupportTicketModal({
     },
   });
 
+  // Formatação pt-BR / America/Sao_Paulo (usada no painel lateral e no badge).
+  const formatSpDateTime = (iso: string) =>
+    new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "America/Sao_Paulo",
+    }).format(new Date(iso));
+
+  const formatSpShort = (iso: string) =>
+    new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "America/Sao_Paulo",
+    }).format(new Date(iso));
+
   // Detecta tipo de horário (comercial/plantão) ao abrir o modal, trocar setor
   // ou, no modo closure, quando os dados do atendimento carregam.
   useEffect(() => {
     if (!open) return;
+    // No modo closure, aguardar closureAttendance carregar para não disparar
+    // uma detecção com p_at=undefined (now) que depois seria substituída.
+    if (fromClosure && (isLoadingClosureAttendance || !closureAttendance?.opened_at)) {
+      setTipoDetectado(null);
+      return;
+    }
     let cancelled = false;
     setTipoDetectado(null);
     (async () => {
@@ -299,7 +325,6 @@ export function CreateSupportTicketModal({
           setHorarioFim("");
           return;
         }
-        // A RPC retorna um texto simples diretamente em data.
         const raw = typeof data === "string" ? data : null;
         if (raw === "comercial" || raw === "plantao") {
           setTipoDetectado(raw);
@@ -321,6 +346,7 @@ export function CreateSupportTicketModal({
           setHorarioFim("");
         }
       } catch (err) {
+        if (cancelled) return;
         console.error("[check_tipo_horario] exceção:", err);
         setTipoDetectado(null);
         setTipoHorario("comercial");
@@ -331,7 +357,7 @@ export function CreateSupportTicketModal({
     return () => {
       cancelled = true;
     };
-  }, [open, departamentoId, closureAttendance, fromClosure, attendanceId, tid]);
+  }, [open, departamentoId, closureAttendance, fromClosure, attendanceId, tid, isLoadingClosureAttendance]);
 
 
   useEffect(() => {
@@ -1003,7 +1029,11 @@ export function CreateSupportTicketModal({
                 }`}
               >
                 {tipoDetectado
-                  ? `Detectado: ${tipoDetectado === "comercial" ? "Comercial" : "Plantão"}`
+                  ? `Detectado: ${tipoDetectado === "comercial" ? "Comercial" : "Plantão"}${
+                      fromClosure && closureAttendance?.opened_at
+                        ? ` (atendimento aberto ${formatSpShort(closureAttendance.opened_at)})`
+                        : " (agora)"
+                    }`
                   : "Detectando..."}
               </span>
             )}
@@ -1558,16 +1588,20 @@ export function CreateSupportTicketModal({
             <div className="space-y-2 text-xs">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="h-3 w-3 shrink-0" />
-                <span className="text-[10px] uppercase tracking-wide">Aberto em</span>
+                <span className="text-[10px] uppercase tracking-wide">
+                  {fromClosure && closureAttendance?.opened_at ? "Atendimento aberto em" : "Aberto em"}
+                </span>
               </div>
               <p className="text-xs pl-5">
-                {new Date().toLocaleString("pt-BR", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+                {fromClosure && closureAttendance?.opened_at
+                  ? formatSpDateTime(closureAttendance.opened_at)
+                  : new Date().toLocaleString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
               </p>
 
               <div className="flex items-center gap-2 text-muted-foreground pt-1">
