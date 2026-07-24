@@ -10,6 +10,7 @@ import AppLayout from "@/components/AppLayout";
 import { TenantFilterProvider } from "@/contexts/TenantFilterContext";
 import { UnidadeFilterProvider } from "@/contexts/UnidadeFilterContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { PresenceHeartbeatProvider } from "@/contexts/PresenceHeartbeatProvider";
 import { Loader2 } from "lucide-react";
 import RequirePermission from "@/components/auth/RequirePermission";
 import RequireRole from "@/components/auth/RequireRole";
@@ -91,7 +92,7 @@ const App = () => (
             <Route path="/access-blocked" element={<AuthGuard><AccessBlocked /></AuthGuard>} />
 
             {/* Protected routes */}
-            <Route element={<AuthGuard><TenantFilterProvider><UnidadeFilterProvider><NotificationProvider><AppLayout /></NotificationProvider></UnidadeFilterProvider></TenantFilterProvider></AuthGuard>}>
+            <Route element={<AuthGuard><TenantFilterProvider><UnidadeFilterProvider><NotificationProvider><PresenceHeartbeatProvider><AppLayout /></PresenceHeartbeatProvider></NotificationProvider></UnidadeFilterProvider></TenantFilterProvider></AuthGuard>}>
               <Route index element={<LandingRedirect />} />
               <Route path="/dashboard" element={<RequirePermission resource="nav.dashboard"><Dashboard /></RequirePermission>} />
               <Route path="/clientes" element={<RequirePermission resource="nav.clientes"><Clientes /></RequirePermission>} />
