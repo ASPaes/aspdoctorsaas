@@ -1,30 +1,13 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePresenceRow } from "@/hooks/usePresenceRow";
+import type { AgentPresence, AgentStatus } from "@/hooks/usePresenceRow";
 
-const presenceChannels = new Map<
-  string,
-  { channel: RealtimeChannel; refCount: number; listeners: Set<() => void> }
->();
-
-/** Allowed presence statuses — must match DB check constraint */
-export type AgentStatus = "active" | "paused" | "offline";
-
-export interface AgentPresence {
-  user_id: string;
-  tenant_id: string;
-  status: AgentStatus;
-  pause_reason_id: string | null;
-  pause_started_at: string | null;
-  pause_expected_end_at: string | null;
-  shift_started_at: string | null;
-  shift_ended_at: string | null;
-  last_heartbeat_at: string | null;
-  updated_at: string;
-}
+// Reexports para manter compatibilidade com consumidores existentes.
+export type { AgentPresence, AgentStatus } from "@/hooks/usePresenceRow";
 
 export interface PauseReason {
   id: string;
@@ -41,38 +24,7 @@ export function useAgentPresence() {
   const userId = user?.id;
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
 
-  const { data: presence, isLoading: presenceLoading } = useQuery({
-    queryKey: ["agent_presence", tid, userId],
-    enabled: !!tid && !!userId,
-    refetchInterval: 30_000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("support_agent_presence")
-        .select("*")
-        .eq("tenant_id", tid!)
-        .eq("user_id", userId!)
-        .maybeSingle();
-      if (error) throw error;
-      if (data) return data as unknown as AgentPresence;
-
-      // Row doesn't exist yet — create with "offline"
-      const { data: created, error: insertErr } = await supabase
-        .from("support_agent_presence")
-        .insert({ tenant_id: tid!, user_id: userId!, status: "offline" })
-        .select()
-        .single();
-      if (insertErr) {
-        const { data: retry } = await supabase
-          .from("support_agent_presence")
-          .select("*")
-          .eq("tenant_id", tid!)
-          .eq("user_id", userId!)
-          .maybeSingle();
-        return (retry as unknown as AgentPresence) ?? null;
-      }
-      return created as unknown as AgentPresence;
-    },
-  });
+  const { presence, presenceLoading, invalidate } = usePresenceRow();
 
   const { data: pauseReasons = [] } = useQuery({
     queryKey: ["support_pause_reasons_active", tid],
@@ -92,11 +44,6 @@ export function useAgentPresence() {
     },
   });
 
-  const invalidate = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["agent_presence", tid, userId] });
-    queryClient.invalidateQueries({ queryKey: ["team_presence", tid] });
-  }, [queryClient, tid, userId]);
-
   /** Optimistically update presence cache to avoid stale timer rendering */
   const optimisticUpdate = useCallback((patch: Partial<AgentPresence>) => {
     queryClient.setQueryData(["agent_presence", tid, userId], (old: AgentPresence | null | undefined) => {
@@ -104,71 +51,6 @@ export function useAgentPresence() {
       return { ...old, ...patch };
     });
   }, [queryClient, tid, userId]);
-
-  useEffect(() => {
-    if (!tid || !userId) return;
-    const key = `agent-presence-${userId}`;
-    let entry = presenceChannels.get(key);
-    if (!entry) {
-      const listeners = new Set<() => void>();
-      const channel = supabase
-        .channel(key)
-        .on("postgres_changes", {
-          event: "UPDATE",
-          schema: "public",
-          table: "support_agent_presence",
-          filter: `user_id=eq.${userId}`,
-        }, () => {
-          listeners.forEach((fn) => fn());
-        });
-      channel.subscribe();
-      entry = { channel, refCount: 0, listeners };
-      presenceChannels.set(key, entry);
-    }
-    entry.refCount += 1;
-    entry.listeners.add(invalidate);
-    return () => {
-      const e = presenceChannels.get(key);
-      if (!e) return;
-      e.listeners.delete(invalidate);
-      e.refCount -= 1;
-      if (e.refCount <= 0) {
-        supabase.removeChannel(e.channel);
-        presenceChannels.delete(key);
-      }
-    };
-  }, [tid, userId, invalidate]);
-
-
-  // ── Auto-activate only if no record exists + heartbeat every 30s ──
-  const didAutoActivateRef = useRef(false);
-
-  useEffect(() => {
-    if (!tid || !userId) return;
-
-    if (!didAutoActivateRef.current) {
-      didAutoActivateRef.current = true;
-      // Check if presence record already exists before activating
-      supabase
-        .from("support_agent_presence")
-        .select("status")
-        .eq("tenant_id", tid)
-        .eq("user_id", userId)
-        .maybeSingle()
-        .then(({ data }) => {
-          // Only auto-activate if no record exists or status is null/empty
-          if (!data || !data.status) {
-            supabase.rpc("agent_presence_set_active", { p_tenant_id: tid })
-              .then(({ error }) => {
-                if (error) console.warn("[presence] auto-activate failed:", error.message);
-                else invalidate();
-              });
-          }
-        });
-    }
-
-    // Heartbeat centralized in PresenceHeartbeatProvider (mounted once in AppLayout).
-  }, [tid, userId, invalidate]);
 
   // ── RPC-based actions ──
 
@@ -259,14 +141,12 @@ export function useAgentPresence() {
   const keepAssignmentsAndEndShift = useCallback(async (attendanceIds: string[]) => {
     if (!tid || !userId) return;
     try {
-      // Log the event
       await supabase.from("support_agent_presence_events").insert({
         tenant_id: tid,
         user_id: userId,
         event_type: "shift_end_keep_assignments",
         payload: { count: attendanceIds.length, attendance_ids: attendanceIds },
       });
-      // Just set off without touching attendances
       const { error } = await supabase.rpc("agent_presence_set_off", {
         p_tenant_id: tid,
       });
