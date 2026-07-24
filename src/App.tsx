@@ -10,6 +10,7 @@ import AppLayout from "@/components/AppLayout";
 import { TenantFilterProvider } from "@/contexts/TenantFilterContext";
 import { UnidadeFilterProvider } from "@/contexts/UnidadeFilterContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { PresenceHeartbeatProvider } from "@/contexts/PresenceHeartbeatProvider";
 import { Loader2 } from "lucide-react";
 import RequirePermission from "@/components/auth/RequirePermission";
 import RequireRole from "@/components/auth/RequireRole";
