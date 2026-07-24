@@ -295,6 +295,12 @@ export function CreateSupportTicketModal({
   // ou, no modo closure, quando os dados do atendimento carregam.
   useEffect(() => {
     if (!open) return;
+    // No modo closure, aguardar closureAttendance carregar para não disparar
+    // uma detecção com p_at=undefined (now) que depois seria substituída.
+    if (fromClosure && (isLoadingClosureAttendance || !closureAttendance?.opened_at)) {
+      setTipoDetectado(null);
+      return;
+    }
     let cancelled = false;
     setTipoDetectado(null);
     (async () => {
@@ -319,7 +325,6 @@ export function CreateSupportTicketModal({
           setHorarioFim("");
           return;
         }
-        // A RPC retorna um texto simples diretamente em data.
         const raw = typeof data === "string" ? data : null;
         if (raw === "comercial" || raw === "plantao") {
           setTipoDetectado(raw);
@@ -341,6 +346,7 @@ export function CreateSupportTicketModal({
           setHorarioFim("");
         }
       } catch (err) {
+        if (cancelled) return;
         console.error("[check_tipo_horario] exceção:", err);
         setTipoDetectado(null);
         setTipoHorario("comercial");
@@ -351,7 +357,7 @@ export function CreateSupportTicketModal({
     return () => {
       cancelled = true;
     };
-  }, [open, departamentoId, closureAttendance, fromClosure, attendanceId, tid]);
+  }, [open, departamentoId, closureAttendance, fromClosure, attendanceId, tid, isLoadingClosureAttendance]);
 
 
   useEffect(() => {
