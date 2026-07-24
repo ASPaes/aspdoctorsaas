@@ -7,7 +7,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Filter, X, Sparkles, Check, ChevronsUpDown, HelpCircle, ShieldOff } from "lucide-react";
+import { Filter, X, Sparkles, Check, ChevronsUpDown, HelpCircle, ShieldOff, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
@@ -31,6 +31,8 @@ interface Props {
   filters: FiltersState;
   onChange: (filters: FiltersState) => void;
   showGroupByAgent?: boolean;
+  /** true nas abas "Fila"/"Fora do horário", onde o filtro de operador não é aplicado */
+  operatorFilterInactive?: boolean;
 }
 
 const SORT_OPTIONS: { value: SortBy; label: string }[] = [
@@ -47,7 +49,7 @@ const STATUS_OPTIONS = [
   { value: "archived", label: "Arquivadas" },
 ];
 
-export function ConversationFiltersPopover({ filters, onChange, showGroupByAgent = false }: Props) {
+export function ConversationFiltersPopover({ filters, onChange, showGroupByAgent = false, operatorFilterInactive = false }: Props) {
   const { instances } = useWhatsAppInstances();
   const { profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
@@ -68,6 +70,13 @@ export function ConversationFiltersPopover({ filters, onChange, showGroupByAgent
     const found = sortedAgents.find((a) => a.userId === filters.assignedToAgent);
     return found?.label ?? "Operador";
   }, [filters.assignedToAgent, sortedAgents]);
+
+  // Operador específico selecionado numa aba que não aplica o filtro (Fila / Fora do horário).
+  // Mesma regra do badge riscado no ConversationsSidebar.
+  const operatorSelectionInactive =
+    operatorFilterInactive &&
+    !!filters.assignedToAgent &&
+    filters.assignedToAgent !== "__unassigned__";
 
   const activeCount =
     (filters.sortBy !== "recent" ? 1 : 0) +
@@ -118,9 +127,14 @@ export function ConversationFiltersPopover({ filters, onChange, showGroupByAgent
                   variant="outline"
                   role="combobox"
                   aria-expanded={operadorOpen}
-                  className="w-full h-8 justify-between text-xs font-normal"
+                  className={cn(
+                    "w-full h-8 justify-between text-xs font-normal",
+                    operatorSelectionInactive && "opacity-60"
+                  )}
                 >
-                  <span className="truncate">{selectedOperadorLabel}</span>
+                  <span className={cn("truncate", operatorSelectionInactive && "line-through")}>
+                    {selectedOperadorLabel}
+                  </span>
                   <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -186,6 +200,12 @@ export function ConversationFiltersPopover({ filters, onChange, showGroupByAgent
                 </Command>
               </PopoverContent>
             </Popover>
+            {operatorSelectionInactive && (
+              <p className="flex items-center gap-1 text-[11px] leading-tight text-amber-500">
+                <Info className="h-3 w-3 shrink-0" />
+                Não se aplica nas abas "Fila" e "Fora do horário".
+              </p>
+            )}
           </div>
         ) : (
           <div className="flex items-center justify-between">
