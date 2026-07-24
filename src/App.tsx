@@ -92,7 +92,7 @@ const App = () => (
             <Route path="/access-blocked" element={<AuthGuard><AccessBlocked /></AuthGuard>} />
 
             {/* Protected routes */}
-            <Route element={<AuthGuard><TenantFilterProvider><UnidadeFilterProvider><NotificationProvider><AppLayout /></NotificationProvider></UnidadeFilterProvider></TenantFilterProvider></AuthGuard>}>
+            <Route element={<AuthGuard><TenantFilterProvider><UnidadeFilterProvider><NotificationProvider><PresenceHeartbeatProvider><AppLayout /></PresenceHeartbeatProvider></NotificationProvider></UnidadeFilterProvider></TenantFilterProvider></AuthGuard>}>
               <Route index element={<LandingRedirect />} />
               <Route path="/dashboard" element={<RequirePermission resource="nav.dashboard"><Dashboard /></RequirePermission>} />
               <Route path="/clientes" element={<RequirePermission resource="nav.clientes"><Clientes /></RequirePermission>} />
