@@ -167,14 +167,7 @@ export function useAgentPresence() {
         });
     }
 
-    const interval = setInterval(() => {
-      supabase.rpc("agent_presence_heartbeat", { p_tenant_id: tid })
-        .then(({ error }) => {
-          if (error) console.warn("[presence] heartbeat failed:", error.message);
-        });
-    }, 30_000);
-
-    return () => clearInterval(interval);
+    // Heartbeat centralized in PresenceHeartbeatProvider (mounted once in AppLayout).
   }, [tid, userId, invalidate]);
 
   // ── RPC-based actions ──
