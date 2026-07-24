@@ -44,7 +44,69 @@ const fmtDate = (v: any) => {
   return s;
 };
 
+function extrairMensagemErro(corpo: any): string {
+  if (corpo == null) return "";
+
+  const mensagemDe = (obj: any): string => {
+    if (obj == null) return "";
+    return (
+      (obj.error ? String(obj.error) : "") ||
+      (obj.erro ? String(obj.erro) : "") ||
+      (obj.mensagem ? String(obj.mensagem) : "") ||
+      (obj.bloqueado != null ? `Bloqueado: ${obj.bloqueado}` : "")
+    );
+  };
+
+  const raiz = mensagemDe(corpo);
+
+  let detalhe: any = null;
+  if (corpo?.cliente_resultado && typeof corpo.cliente_resultado === "object") {
+    detalhe = corpo.cliente_resultado;
+  } else if (corpo?.contrato?.resultado && typeof corpo.contrato.resultado === "object") {
+    detalhe = corpo.contrato.resultado;
+  } else if (corpo?.detalhe && typeof corpo.detalhe === "object") {
+    detalhe = corpo.detalhe;
+  } else if (
+    corpo?.cliente_resultado?.resultado &&
+    typeof corpo.cliente_resultado.resultado === "object"
+  ) {
+    detalhe = corpo.cliente_resultado.resultado;
+  }
+
+  const detalheMsg = mensagemDe(detalhe);
+
+  let msg = "";
+  if (raiz && detalheMsg && raiz !== detalheMsg) {
+    msg = `${raiz}\n\nMotivo: ${detalheMsg}`;
+  } else if (raiz || detalheMsg) {
+    msg = raiz || detalheMsg;
+  }
+
+  const candidatos =
+    Array.isArray(corpo?.candidatos) && corpo.candidatos.length > 0
+      ? corpo.candidatos
+      : Array.isArray(detalhe?.candidatos) && detalhe.candidatos.length > 0
+      ? detalhe.candidatos
+      : [];
+
+  if (candidatos.length > 0) {
+    const lines = candidatos
+      .filter((c: any) => c && typeof c === "object")
+      .map(
+        (c: any) =>
+          `\u2022 ${c?.razao_social ?? "(sem razão social)"} \u2014 c\u00f3digo ${c?.codigo_cliente_omie ?? "\u2014"}`
+      )
+      .join("\n");
+    if (lines) {
+      msg = `${msg}\n\nCadastros encontrados no Omie:\n${lines}`;
+    }
+  }
+
+  return msg;
+}
+
 function SincronizadoBadge({ codigo }: { codigo: string | number | null }) {
+
   return (
     <Badge
       variant="outline"
@@ -72,26 +134,6 @@ function EnviarBotao({
   const [bloqueioMsg, setBloqueioMsg] = useState<string>("");
   const [dryRun, setDryRun] = useState<any | null>(null);
 
-  const buildBloqueioMessage = (payload: any) => {
-    let msg =
-      payload?.error ||
-      payload?.erro ||
-      payload?.mensagem ||
-      (payload?.bloqueado ? `Bloqueado: ${payload.bloqueado}` : "Não é possível enviar este contrato.");
-    const candidatos = Array.isArray(payload?.candidatos) ? payload.candidatos : [];
-    if (candidatos.length > 0) {
-      const lines = candidatos
-        .map(
-          (c: any) =>
-            `\u2022 ${c?.razao_social ?? "(sem razão social)"} \u2014 c\u00f3digo ${c?.codigo_cliente_omie ?? "\u2014"}`
-        )
-        .join("\n");
-      msg = `${String(msg)}\n\nCadastros encontrados no Omie:\n${lines}`;
-    }
-    return String(msg);
-  };
-
-
   if (contrato.sincronizado) {
     return <SincronizadoBadge codigo={contrato.codigo_contrato_omie} />;
   }
@@ -107,15 +149,11 @@ function EnviarBotao({
         return;
       }
       if (data?.ok === false) {
-        const msg =
-          data?.error ||
-          data?.erro ||
-          data?.mensagem ||
-          (data?.bloqueado ? `Bloqueado: ${data.bloqueado}` : "Não é possível enviar este contrato.");
-        setBloqueioMsg(String(msg));
+        setBloqueioMsg(extrairMensagemErro(data));
         setBloqueioOpen(true);
         return;
       }
+
 
       if (data?.ok) {
         setDryRun(data);
@@ -139,13 +177,18 @@ function EnviarBotao({
       if (error) {
         let body: any = {};
         try {
-          body = await error.context?.json?.() ?? {};
+          body = await error?.context?.json?.() ?? {};
         } catch {
           toast.error("Falha ao enviar ao Omie. Tente novamente.");
           return;
         }
+        const msg = extrairMensagemErro(body);
+        if (!msg) {
+          toast.error("Falha ao enviar ao Omie. Tente novamente.");
+          return;
+        }
         setConfirmOpen(false);
-        setBloqueioMsg(buildBloqueioMessage(body));
+        setBloqueioMsg(msg);
         setBloqueioOpen(true);
         return;
       }
@@ -165,10 +208,11 @@ function EnviarBotao({
         setDryRun(null);
         return;
       }
-      const msg = buildBloqueioMessage(data);
+      const msg = extrairMensagemErro(data);
       setConfirmOpen(false);
       setBloqueioMsg(msg);
       setBloqueioOpen(true);
+
     } catch {
       toast.error("Falha ao enviar ao Omie. Tente novamente.");
     } finally {
