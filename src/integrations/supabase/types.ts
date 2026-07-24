@@ -10548,6 +10548,8 @@ export type Database = {
           p_attendance_id: string
           p_category_id: string
           p_department_id?: string
+          p_horario_fim?: string
+          p_horario_inicio?: string
           p_observacao_agente?: string
           p_observacao_ia?: string
           p_produto_id: number
@@ -10658,6 +10660,8 @@ export type Database = {
           p_attendance_id: string
           p_category_id: string
           p_department_id?: string
+          p_horario_fim?: string
+          p_horario_inicio?: string
           p_observacao_agente?: string
           p_observacao_ia?: string
           p_produto_id: number
