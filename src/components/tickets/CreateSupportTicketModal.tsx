@@ -258,7 +258,7 @@ export function CreateSupportTicketModal({
   }, [open]);
 
   // Dados do atendimento de origem (closure) para ancorar a detecção de horário.
-  const { data: closureAttendance } = useQuery({
+  const { data: closureAttendance, isLoading: isLoadingClosureAttendance } = useQuery({
     queryKey: ["create_support_ticket_closure_attendance", attendanceId],
     enabled: open && fromClosure && !!attendanceId,
     queryFn: async () => {
@@ -270,6 +270,26 @@ export function CreateSupportTicketModal({
       return data as { opened_at: string; department_id: string | null } | null;
     },
   });
+
+  // Formatação pt-BR / America/Sao_Paulo (usada no painel lateral e no badge).
+  const formatSpDateTime = (iso: string) =>
+    new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "America/Sao_Paulo",
+    }).format(new Date(iso));
+
+  const formatSpShort = (iso: string) =>
+    new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "America/Sao_Paulo",
+    }).format(new Date(iso));
 
   // Detecta tipo de horário (comercial/plantão) ao abrir o modal, trocar setor
   // ou, no modo closure, quando os dados do atendimento carregam.
