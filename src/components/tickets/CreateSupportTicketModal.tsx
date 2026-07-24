@@ -1588,16 +1588,20 @@ export function CreateSupportTicketModal({
             <div className="space-y-2 text-xs">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="h-3 w-3 shrink-0" />
-                <span className="text-[10px] uppercase tracking-wide">Aberto em</span>
+                <span className="text-[10px] uppercase tracking-wide">
+                  {fromClosure && closureAttendance?.opened_at ? "Atendimento aberto em" : "Aberto em"}
+                </span>
               </div>
               <p className="text-xs pl-5">
-                {new Date().toLocaleString("pt-BR", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+                {fromClosure && closureAttendance?.opened_at
+                  ? formatSpDateTime(closureAttendance.opened_at)
+                  : new Date().toLocaleString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
               </p>
 
               <div className="flex items-center gap-2 text-muted-foreground pt-1">
