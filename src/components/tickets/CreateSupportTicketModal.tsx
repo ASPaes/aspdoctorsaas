@@ -1029,7 +1029,11 @@ export function CreateSupportTicketModal({
                 }`}
               >
                 {tipoDetectado
-                  ? `Detectado: ${tipoDetectado === "comercial" ? "Comercial" : "Plantão"}`
+                  ? `Detectado: ${tipoDetectado === "comercial" ? "Comercial" : "Plantão"}${
+                      fromClosure && closureAttendance?.opened_at
+                        ? ` (atendimento aberto ${formatSpShort(closureAttendance.opened_at)})`
+                        : " (agora)"
+                    }`
                   : "Detectando..."}
               </span>
             )}
