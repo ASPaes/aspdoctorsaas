@@ -72,6 +72,26 @@ function EnviarBotao({
   const [bloqueioMsg, setBloqueioMsg] = useState<string>("");
   const [dryRun, setDryRun] = useState<any | null>(null);
 
+  const buildBloqueioMessage = (payload: any) => {
+    let msg =
+      payload?.error ||
+      payload?.erro ||
+      payload?.mensagem ||
+      (payload?.bloqueado ? `Bloqueado: ${payload.bloqueado}` : "Não é possível enviar este contrato.");
+    const candidatos = Array.isArray(payload?.candidatos) ? payload.candidatos : [];
+    if (candidatos.length > 0) {
+      const lines = candidatos
+        .map(
+          (c: any) =>
+            `\u2022 ${c?.razao_social ?? "(sem razão social)"} \u2014 c\u00f3digo ${c?.codigo_cliente_omie ?? "\u2014"}`
+        )
+        .join("\n");
+      msg = `${String(msg)}\n\nCadastros encontrados no Omie:\n${lines}`;
+    }
+    return String(msg);
+  };
+
+
   if (contrato.sincronizado) {
     return <SincronizadoBadge codigo={contrato.codigo_contrato_omie} />;
   }
@@ -88,6 +108,7 @@ function EnviarBotao({
       }
       if (data?.ok === false) {
         const msg =
+          data?.error ||
           data?.erro ||
           data?.mensagem ||
           (data?.bloqueado ? `Bloqueado: ${data.bloqueado}` : "Não é possível enviar este contrato.");
@@ -95,6 +116,7 @@ function EnviarBotao({
         setBloqueioOpen(true);
         return;
       }
+
       if (data?.ok) {
         setDryRun(data);
         setConfirmOpen(true);
@@ -115,7 +137,16 @@ function EnviarBotao({
         body: { tenant_id: tenantId, ds_contract_id: contrato.id, modo: "criar" },
       });
       if (error) {
-        toast.error("Falha ao enviar ao Omie. Tente novamente.");
+        let body: any = {};
+        try {
+          body = await error.context?.json?.() ?? {};
+        } catch {
+          toast.error("Falha ao enviar ao Omie. Tente novamente.");
+          return;
+        }
+        setConfirmOpen(false);
+        setBloqueioMsg(buildBloqueioMessage(body));
+        setBloqueioOpen(true);
         return;
       }
       if (data?.ok) {
@@ -134,14 +165,17 @@ function EnviarBotao({
         setDryRun(null);
         return;
       }
-      const msg = data?.erro || data?.mensagem || "Falha ao enviar ao Omie.";
-      toast.error(String(msg));
+      const msg = buildBloqueioMessage(data);
+      setConfirmOpen(false);
+      setBloqueioMsg(msg);
+      setBloqueioOpen(true);
     } catch {
       toast.error("Falha ao enviar ao Omie. Tente novamente.");
     } finally {
       setLoading(false);
     }
   };
+
 
   const cli = dryRun?.cliente_seria_enviado;
   const ctr = dryRun?.contrato_seria_enviado;
