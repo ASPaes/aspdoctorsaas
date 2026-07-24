@@ -700,6 +700,8 @@ export function CreateSupportTicketModal({
     setSubmitMode(nextAction);
     try {
       let ticketId: string | null = null;
+      const horarioInicioIso = tipoHorario === "plantao" && horarioInicio ? new Date(horarioInicio).toISOString() : null;
+      const horarioFimIso = tipoHorario === "plantao" && horarioFim ? new Date(horarioFim).toISOString() : null;
 
       if (fromClosure && attendanceId) {
         if (mode === "classificacao_aberta") {
@@ -710,6 +712,8 @@ export function CreateSupportTicketModal({
             p_service_type_id: serviceTypeId,
             p_produto_id: Number(produtoId),
             p_tipo_horario: tipoHorario,
+            p_horario_inicio: horarioInicioIso,
+            p_horario_fim: horarioFimIso,
             p_observacao_agente: observacaoAgente || null,
             p_observacao_ia: null,
             p_department_id: null,
@@ -733,12 +737,15 @@ export function CreateSupportTicketModal({
             p_observacao_agente: observacaoAgente || null,
             p_observacao_ia: closureAiSummary || null,
             p_tipo_horario: tipoHorario,
+            p_horario_inicio: horarioInicioIso,
+            p_horario_fim: horarioFimIso,
             p_department_id: departamentoId || null,
             p_responsavel_user_id: responsavelId || null,
           });
           if (error) throw error;
           ticketId = typeof rpcData === "string" ? rpcData : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
         }
+
 
       } else {
         const { data: rpcData, error } = await (supabase.rpc as any)("create_manual_ticket", {
