@@ -1,10 +1,9 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
-import type { AgentPresence } from "@/hooks/useAgentPresence";
+import { usePresenceRow } from "@/hooks/usePresenceRow";
 
 interface PresenceHeartbeatContextValue {
   isDegraded: boolean;
@@ -16,12 +15,13 @@ const PresenceHeartbeatContext = createContext<PresenceHeartbeatContextValue>({
 
 const HEARTBEAT_INTERVAL_MS = 60_000;
 const THROTTLE_MS = 20_000;
+const STALE_THRESHOLD_MS = 150_000; // 2,5 min sem heartbeat confirmado => degradado
 const DEGRADED_TOAST_ID = "presence-degraded";
 
 export function PresenceHeartbeatProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { effectiveTenantId: tid } = useTenantFilter();
-  const queryClient = useQueryClient();
+  const { presence } = usePresenceRow();
   const userId = user?.id;
 
   const [isDegraded, setIsDegraded] = useState(false);
@@ -30,21 +30,39 @@ export function PresenceHeartbeatProvider({ children }: { children: React.ReactN
   const inFlightRef = useRef(false);
   const failureCountRef = useRef(0);
   const degradedRef = useRef(false);
+  const presenceRef = useRef(presence);
+  presenceRef.current = presence;
+
+  const markDegraded = () => {
+    if (degradedRef.current) return;
+    degradedRef.current = true;
+    setIsDegraded(true);
+    toast.error(
+      "Conexão de presença instável. Seu expediente pode ser encerrado automaticamente. Recarregue a página.",
+      { id: DEGRADED_TOAST_ID, duration: Infinity }
+    );
+  };
+
+  const clearDegraded = () => {
+    if (!degradedRef.current) return;
+    degradedRef.current = false;
+    setIsDegraded(false);
+    toast.dismiss(DEGRADED_TOAST_ID);
+  };
 
   useEffect(() => {
     if (!tid || !userId) return;
 
     let cancelled = false;
 
+    const guardsPass = () => {
+      const p = presenceRef.current;
+      return !!p && p.status !== "offline";
+    };
+
     const sendHeartbeat = async () => {
       if (cancelled) return;
-      // Guard: only heartbeat when presence exists and is not offline
-      const presence = queryClient.getQueryData<AgentPresence | null | undefined>([
-        "agent_presence",
-        tid,
-        userId,
-      ]);
-      if (!presence || presence.status === "offline") return;
+      if (!guardsPass()) return;
 
       const now = Date.now();
       if (now - lastSuccessRef.current < THROTTLE_MS) return;
@@ -58,31 +76,33 @@ export function PresenceHeartbeatProvider({ children }: { children: React.ReactN
         if (error) throw error;
         lastSuccessRef.current = Date.now();
         failureCountRef.current = 0;
-        if (degradedRef.current) {
-          degradedRef.current = false;
-          setIsDegraded(false);
-          toast.dismiss(DEGRADED_TOAST_ID);
-        }
+        clearDegraded();
       } catch (err) {
         failureCountRef.current += 1;
         console.warn("[presence] heartbeat failed:", err);
-        if (failureCountRef.current >= 2 && !degradedRef.current) {
-          degradedRef.current = true;
-          setIsDegraded(true);
-          toast.error(
-            "Conexão de presença instável. Seu expediente pode ser encerrado automaticamente. Recarregue a página.",
-            { id: DEGRADED_TOAST_ID, duration: Infinity }
-          );
-        }
+        if (failureCountRef.current >= 2) markDegraded();
       } finally {
         inFlightRef.current = false;
       }
     };
 
-    // Fire immediately once guards pass
+    const tick = () => {
+      if (!guardsPass()) return;
+      // Watchdog: se ficou muito tempo sem sucesso, sinaliza degradado
+      // mesmo sem erro explícito (guarda contra falha silenciosa).
+      if (
+        lastSuccessRef.current > 0 &&
+        Date.now() - lastSuccessRef.current > STALE_THRESHOLD_MS
+      ) {
+        markDegraded();
+      }
+      void sendHeartbeat();
+    };
+
+    // Disparo imediato
     void sendHeartbeat();
 
-    const interval = window.setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+    const interval = window.setInterval(tick, HEARTBEAT_INTERVAL_MS);
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") void sendHeartbeat();
@@ -101,7 +121,7 @@ export function PresenceHeartbeatProvider({ children }: { children: React.ReactN
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("online", onOnline);
     };
-  }, [tid, userId, queryClient]);
+  }, [tid, userId]);
 
   return (
     <PresenceHeartbeatContext.Provider value={{ isDegraded }}>
