@@ -460,6 +460,39 @@ export type Database = {
         }
         Relationships: []
       }
+      bkp_clientes_classificacao_jul2026: {
+        Row: {
+          area_atuacao_id: number | null
+          cep: string | null
+          cidade_id: number | null
+          estado_id: number | null
+          id: string
+          segmento_id: number | null
+          snapshot_em: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          area_atuacao_id?: number | null
+          cep?: string | null
+          cidade_id?: number | null
+          estado_id?: number | null
+          id: string
+          segmento_id?: number | null
+          snapshot_em?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          area_atuacao_id?: number | null
+          cep?: string | null
+          cidade_id?: number | null
+          estado_id?: number | null
+          id?: string
+          segmento_id?: number | null
+          snapshot_em?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
       business_hours_exceptions: {
         Row: {
           created_at: string
@@ -1600,6 +1633,58 @@ export type Database = {
           },
         ]
       }
+      cnae_classificacao_map: {
+        Row: {
+          area_atuacao_id: number | null
+          cnae_prefix: string
+          created_at: string
+          id: number
+          nota: string | null
+          segmento_id: number | null
+          tenant_id: string
+        }
+        Insert: {
+          area_atuacao_id?: number | null
+          cnae_prefix: string
+          created_at?: string
+          id?: number
+          nota?: string | null
+          segmento_id?: number | null
+          tenant_id: string
+        }
+        Update: {
+          area_atuacao_id?: number | null
+          cnae_prefix?: string
+          created_at?: string
+          id?: number
+          nota?: string | null
+          segmento_id?: number | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cnae_classificacao_map_area_atuacao_id_fkey"
+            columns: ["area_atuacao_id"]
+            isOneToOne: false
+            referencedRelation: "areas_atuacao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cnae_classificacao_map_segmento_id_fkey"
+            columns: ["segmento_id"]
+            isOneToOne: false
+            referencedRelation: "segmentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cnae_classificacao_map_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cnpj_cache: {
         Row: {
           cnpj: string
@@ -1623,6 +1708,50 @@ export type Database = {
           source?: string
         }
         Relationships: []
+      }
+      cnpj_enrich_queue: {
+        Row: {
+          attempts: number
+          cnpj: string
+          created_at: string
+          done_at: string | null
+          last_error: string | null
+          request_id: number | null
+          requested_at: string | null
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          attempts?: number
+          cnpj: string
+          created_at?: string
+          done_at?: string | null
+          last_error?: string | null
+          request_id?: number | null
+          requested_at?: string | null
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          attempts?: number
+          cnpj?: string
+          created_at?: string
+          done_at?: string | null
+          last_error?: string | null
+          request_id?: number | null
+          requested_at?: string | null
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cnpj_enrich_queue_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       configuracoes: {
         Row: {
@@ -10657,6 +10786,7 @@ export type Database = {
         Returns: Json
       }
       fn_close_attendances_no_agent_response: { Args: never; Returns: Json }
+      fn_cnpj_enrich_tick: { Args: { p_batch?: number }; Returns: Json }
       fn_cohort_logos: {
         Args: {
           p_fornecedor_id?: number
