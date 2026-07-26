@@ -176,7 +176,11 @@ UPDATE public.onboarding_stage_history h
 --    Colunas novas no fim: aberta_em, sla_total_util_min.
 -- ---------------------------------------------------------------------------
 
-CREATE OR REPLACE VIEW public.vw_onboarding_journeys AS
+-- security_invoker = on e OBRIGATORIO: sem ele a view roda com os direitos do owner
+-- e ignora o RLS de onboarding_journeys -> vazamento entre tenants. CREATE OR REPLACE
+-- preserva a opcao quando a view ja existe, mas uma recriacao do zero a perderia.
+CREATE OR REPLACE VIEW public.vw_onboarding_journeys
+WITH (security_invoker = on) AS
 WITH jbase AS (
   SELECT j.id AS journey_id,
          j.tenant_id,
