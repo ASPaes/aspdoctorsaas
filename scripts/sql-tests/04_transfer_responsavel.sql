@@ -14,8 +14,11 @@ DECLARE
   v_atual     uuid;
   v_novo      uuid;
   v_caller    uuid;
+  v_terceiro  uuid;
+  v_ticket    uuid;
   v_ret       jsonb;
   v_qtd       int;
+  v_antes     int;
   v_impl      uuid;
 BEGIN
   -- cenário: uma jornada com responsável e outro usuário do mesmo tenant
@@ -26,12 +29,19 @@ BEGIN
    LIMIT 1;
   IF v_jid IS NULL THEN RAISE EXCEPTION 'SETUP: nenhuma jornada com responsável no banco local'; END IF;
 
+  -- v_novo precisa estar FORA da lista de participantes: a asserção 7 valida
+  -- justamente o caso "não é participante ainda -> entra como implantador".
+  SELECT j.ticket_id INTO v_ticket FROM public.onboarding_journeys j WHERE j.id = v_jid;
+
   SELECT p.user_id INTO v_novo
     FROM public.profiles p
    WHERE p.tenant_id = v_tenant AND p.user_id <> v_atual AND p.user_id IS NOT NULL
      AND p.access_status = 'active' AND coalesce(p.status, 'ativo') = 'ativo'
+     AND p.user_id NOT IN (
+       SELECT op.user_id FROM public.onboarding_participants op WHERE op.ticket_id = v_ticket
+     )
    LIMIT 1;
-  IF v_novo IS NULL THEN RAISE EXCEPTION 'SETUP: tenant sem um segundo usuário ativo para receber a transferência'; END IF;
+  IF v_novo IS NULL THEN RAISE EXCEPTION 'SETUP: tenant sem usuário ativo fora da equipe para receber a transferência'; END IF;
 
   -- simula o JWT de um membro ativo do tenant (exigência de can_access_tenant_row)
   SELECT p.user_id INTO v_caller
@@ -89,7 +99,7 @@ BEGIN
    WHERE journey_id = v_jid AND ate IS NULL AND user_id = v_novo AND motivo = 'Férias do implantador';
   IF v_qtd <> 1 THEN RAISE EXCEPTION 'FALHOU 6: período aberto do novo responsável não confere (%)' , v_qtd; END IF;
 
-  -- 7. o novo virou participante do papel implantador
+  -- 7. quem NÃO era participante entra como implantador
   v_impl := public.fn_onboarding_role_id(v_tenant, 'implantador');
   PERFORM 1 FROM public.onboarding_participants op
     JOIN public.onboarding_journeys j ON j.ticket_id = op.ticket_id
@@ -146,7 +156,47 @@ BEGIN
      AND pg_get_functiondef(p.oid) LIKE '%onboarding_participants%';
   IF FOUND THEN RAISE EXCEPTION 'FALHOU 14: fn_snapshot_onboarding_phase ainda lê onboarding_participants'; END IF;
 
-  RAISE NOTICE 'OK: 04_transfer_responsavel — 14 asserções passaram';
+  -- 15. quem JÁ é participante em outro papel NÃO ganha linha nova.
+  --     Regra do owner: transferir só move a responsabilidade; a pessoa não
+  --     pode aparecer duas vezes na lista (ex: Renan como Especialista viraria
+  --     também Implantador).
+  SELECT j.ticket_id INTO v_ticket FROM public.onboarding_journeys j WHERE j.id = v_jid;
+  SELECT p.user_id INTO v_terceiro
+    FROM public.profiles p
+   WHERE p.tenant_id = v_tenant AND p.user_id IS NOT NULL
+     AND p.access_status = 'active' AND coalesce(p.status, 'ativo') = 'ativo'
+     AND p.user_id NOT IN (
+       SELECT op.user_id FROM public.onboarding_participants op WHERE op.ticket_id = v_ticket
+     )
+   LIMIT 1;
+  IF v_terceiro IS NULL THEN RAISE EXCEPTION 'SETUP 15: sem usuário livre para o cenário'; END IF;
+
+  -- entra como Especialista (papel diferente de implantador)
+  INSERT INTO public.onboarding_participants (tenant_id, ticket_id, user_id, role_id)
+  VALUES (v_tenant, v_ticket, v_terceiro, public.fn_onboarding_role_id(v_tenant, 'especialista'));
+
+  SELECT count(*) INTO v_antes FROM public.onboarding_participants WHERE ticket_id = v_ticket;
+  PERFORM public.transfer_onboarding_responsavel(v_jid, v_terceiro, 'Assume quem já estava no time');
+  SELECT count(*) INTO v_qtd FROM public.onboarding_participants WHERE ticket_id = v_ticket;
+  IF v_qtd <> v_antes THEN
+    RAISE EXCEPTION 'FALHOU 15a: transferência criou % linha(s) de participante para quem já estava na lista', v_qtd - v_antes;
+  END IF;
+
+  SELECT count(*) INTO v_qtd FROM public.onboarding_participants
+   WHERE ticket_id = v_ticket AND user_id = v_terceiro;
+  IF v_qtd <> 1 THEN RAISE EXCEPTION 'FALHOU 15b: o novo responsável aparece % vezes na lista', v_qtd; END IF;
+
+  -- e continua no papel original, sem virar implantador
+  PERFORM 1 FROM public.onboarding_participants
+   WHERE ticket_id = v_ticket AND user_id = v_terceiro
+     AND role_id = public.fn_onboarding_role_id(v_tenant, 'especialista');
+  IF NOT FOUND THEN RAISE EXCEPTION 'FALHOU 15c: o papel original do participante foi trocado'; END IF;
+
+  -- mas a responsabilidade mudou de fato
+  PERFORM 1 FROM public.onboarding_journeys WHERE id = v_jid AND responsavel_user_id = v_terceiro;
+  IF NOT FOUND THEN RAISE EXCEPTION 'FALHOU 15d: a responsabilidade não foi transferida'; END IF;
+
+  RAISE NOTICE 'OK: 04_transfer_responsavel — 15 asserções passaram';
 END $$;
 
 ROLLBACK;

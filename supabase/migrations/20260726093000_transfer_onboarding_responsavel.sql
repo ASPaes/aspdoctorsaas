@@ -67,11 +67,19 @@ BEGIN
          updated_at = now()
    WHERE id = p_journey_id;
 
-  -- garante o novo responsável na equipe; o antigo permanece
-  v_impl := public.fn_onboarding_role_id(v_tenant, 'implantador');
-  INSERT INTO public.onboarding_participants (tenant_id, ticket_id, user_id, role_id)
-  VALUES (v_tenant, v_ticket, p_novo_user_id, v_impl)
-  ON CONFLICT DO NOTHING;
+  -- Só entra na equipe quem ainda não participa da jornada em papel NENHUM.
+  -- Se o novo responsável já é participante (ex.: como Especialista), a
+  -- transferência apenas move a responsabilidade — não cria uma segunda linha
+  -- para a mesma pessoa. O responsável antigo permanece como estava.
+  IF NOT EXISTS (
+    SELECT 1 FROM public.onboarding_participants op
+     WHERE op.ticket_id = v_ticket AND op.user_id = p_novo_user_id
+  ) THEN
+    v_impl := public.fn_onboarding_role_id(v_tenant, 'implantador');
+    INSERT INTO public.onboarding_participants (tenant_id, ticket_id, user_id, role_id)
+    VALUES (v_tenant, v_ticket, p_novo_user_id, v_impl)
+    ON CONFLICT DO NOTHING;
+  END IF;
 
   SELECT f.nome INTO v_nome_novo
     FROM public.profiles p LEFT JOIN public.funcionarios f ON f.id = p.funcionario_id

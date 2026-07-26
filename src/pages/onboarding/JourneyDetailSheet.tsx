@@ -256,7 +256,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       setNextStageId("");
       setAddParticipantOpen(false);
       setNewParticipantUserId("");
-      setNewParticipantPapel("especialista");
+      setNewParticipantRoleId("");
       setAddTrainingOpen(false);
       setNewTrainingTitle("");
       setNewTrainingDate("");
@@ -2270,7 +2270,6 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           roles.map((role) => {
                             const rows = (participantsQ.data ?? []).filter((p) => p.role_id === role.id);
                             if (!rows.length) return null;
-                            const isRespGroup = role.slug === "implantador";
                             return (
                               <div key={role.id} className="space-y-1.5">
                                 <div className="flex items-center gap-1.5">
@@ -2278,18 +2277,27 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                     className="text-[10px] uppercase tracking-wide font-semibold"
                                     style={{ color: role.cor }}
                                   >
-                                    {isRespGroup ? "Responsável" : role.nome}
+                                    {role.nome}
                                   </span>
                                   {!role.ativo && (
                                     <span className="text-[9px] text-muted-foreground">(papel inativo)</span>
                                   )}
                                 </div>
-                                {rows.map((p) => (
+                                {rows.map((p) => {
+                                  // O responsavel e marcado onde ele estiver: a responsabilidade
+                                  // nao depende mais do papel.
+                                  const isResp = p.user_id === journey?.responsavel_user_id;
+                                  return (
                                   <div
                                     key={p.id}
-                                    className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-1.5"
+                                    className="flex items-center gap-2 rounded-md border px-2.5 py-1.5"
+                                    style={
+                                      isResp
+                                        ? { borderColor: role.cor, background: `${role.cor}14` }
+                                        : undefined
+                                    }
                                   >
-                                    {isRespGroup && p.user_id === journey?.responsavel_user_id ? (
+                                    {isResp ? (
                                       <Star className="h-3.5 w-3.5 shrink-0" style={{ color: role.cor }} fill={role.cor} />
                                     ) : (
                                       <User className="h-3.5 w-3.5 shrink-0" style={{ color: role.cor }} />
@@ -2297,6 +2305,14 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                     <span className="text-xs flex-1 truncate">
                                       {memberNameMap.get(p.user_id) || "—"}
                                     </span>
+                                    {isResp && (
+                                      <Badge
+                                        className="text-[9px] border-0 text-white"
+                                        style={{ background: role.cor }}
+                                      >
+                                        Responsável
+                                      </Badge>
+                                    )}
                                     <Badge
                                       variant="outline"
                                       className="text-[9px]"
@@ -2304,16 +2320,23 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                     >
                                       {role.nome}
                                     </Badge>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-6 w-6 shrink-0"
-                                      onClick={() => handleRemoveParticipant(p.id, p.user_id, role.nome)}
-                                    >
-                                      <X className="h-3.5 w-3.5" />
-                                    </Button>
+                                    {isResp ? (
+                                      // Remover o responsavel deixaria a jornada com um
+                                      // responsavel que nao aparece na lista. Transfira antes.
+                                      <span className="w-6 shrink-0" />
+                                    ) : (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-6 w-6 shrink-0"
+                                        onClick={() => handleRemoveParticipant(p.id, p.user_id, role.nome)}
+                                      >
+                                        <X className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
                                   </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             );
                           })
