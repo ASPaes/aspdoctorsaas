@@ -4,14 +4,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { PhoneInputBR } from "@/components/ui/PhoneInputBR";
 import { supabase } from "@/integrations/supabase/client";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { Loader2, Phone, User, Building2, MessageCircle } from "lucide-react";
+import { Loader2, User, Building2, MessageCircle, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface Props {
@@ -24,6 +26,22 @@ interface Props {
   departmentId?: string | null;
   onCreated?: () => void;
 }
+
+interface ContatoOption {
+  id: string;
+  nome: string;
+  /** Digits-only, já normalizado com DDI 55 — é o que vai para o RPC */
+  phone: string;
+  /** Formatado para exibição: +55 (DD) NNNNN-NNNN */
+  display: string;
+  detalhe: string;
+}
+
+/** Referência estável: evita re-disparar o efeito de pré-seleção a cada render */
+const EMPTY_CONTATOS: { contatos: ContatoOption[]; invalidCount: number } = {
+  contatos: [],
+  invalidCount: 0,
+};
 
 function StartConversationFromTicketDialog({
   open,
@@ -43,7 +61,7 @@ function StartConversationFromTicketDialog({
   const [instanceId, setInstanceId] = useState("");
   const [selectedContactPhone, setSelectedContactPhone] = useState("");
   const [selectedContactName, setSelectedContactName] = useState("");
-  const [thirdPartyPhone, setThirdPartyPhone] = useState("55");
+  const [thirdPartyPhone, setThirdPartyPhone] = useState("");
   const [thirdPartyName, setThirdPartyName] = useState("");
   const [thirdPartyLabel, setThirdPartyLabel] = useState("");
   const [sending, setSending] = useState(false);
@@ -54,11 +72,11 @@ function StartConversationFromTicketDialog({
     }
   }, [open, instances, instanceId]);
 
-  const { data: clienteContatos = [] } = useQuery({
+  const { data: contatosData = EMPTY_CONTATOS } = useQuery({
     queryKey: ["ticket_start_conv_contatos", clienteId],
     enabled: !!clienteId && open,
     queryFn: async () => {
-      if (!clienteId) return [];
+      if (!clienteId) return EMPTY_CONTATOS;
 
       const { data: cli } = await (supabase.from("clientes" as any) as any)
         .select("contato_nome, contato_fone, telefone_whatsapp, nome_fantasia")
@@ -71,70 +89,93 @@ function StartConversationFromTicketDialog({
         .not("fone", "is", null)
         .order("nome");
 
-      const result: Array<{ id: string; nome: string; phone: string; detalhe: string }> = [];
+      const result: ContatoOption[] = [];
+      let invalidCount = 0;
+
+      // Normaliza para DDI 55 antes de ofertar: contato salvo sem o 55 passa a funcionar,
+      // o mesmo número salvo com e sem DDI deduplica, e telefone quebrado não é oferecido.
+      const push = (id: string, nome: string, rawPhone: string | null, detalhe: string) => {
+        const digits = (rawPhone ?? "").replace(/\D/g, "");
+        if (!digits) return;
+
+        const phone = normalizeBRPhone(digits);
+        if (!isValidBRPhone(phone)) {
+          invalidCount++;
+          return;
+        }
+        if (result.some((r) => r.phone === phone)) return;
+
+        result.push({ id, nome, phone, display: formatBRPhone(phone), detalhe });
+      };
 
       if (cli?.telefone_whatsapp) {
-        result.push({
-          id: "whatsapp_principal",
-          nome: cli.nome_fantasia ?? "Principal",
-          phone: cli.telefone_whatsapp.replace(/\D/g, ""),
-          detalhe: "WhatsApp principal",
-        });
+        push(
+          "whatsapp_principal",
+          cli.nome_fantasia ?? "Principal",
+          cli.telefone_whatsapp,
+          "WhatsApp principal",
+        );
       }
 
       if (cli?.contato_nome && cli?.contato_fone) {
-        const cleanPhone = cli.contato_fone.replace(/\D/g, "");
-        if (!result.find((r) => r.phone === cleanPhone)) {
-          result.push({
-            id: "contato_principal",
-            nome: cli.contato_nome,
-            phone: cleanPhone,
-            detalhe: "Contato principal",
-          });
-        }
+        push("contato_principal", cli.contato_nome, cli.contato_fone, "Contato principal");
       }
 
       (contatos ?? []).forEach((c: any) => {
-        const cleanPhone = (c.fone ?? "").replace(/\D/g, "");
-        if (cleanPhone.length >= 10 && !result.find((r) => r.phone === cleanPhone)) {
-          result.push({
-            id: c.id,
-            nome: c.nome,
-            phone: cleanPhone,
-            detalhe: c.cargo ?? "Contato",
-          });
-        }
+        push(c.id, c.nome, c.fone, c.cargo ?? "Contato");
       });
 
-      return result;
+      return { contatos: result, invalidCount };
     },
   });
+
+  const clienteContatos = contatosData.contatos;
+  const contatosDescartados = contatosData.invalidCount;
+
+  // Contato único já vem marcado — mesmo padrão da instância única acima.
+  useEffect(() => {
+    if (open && mode === "client" && !selectedContactPhone && clienteContatos.length === 1) {
+      setSelectedContactPhone(clienteContatos[0].phone);
+      setSelectedContactName(clienteContatos[0].nome);
+    }
+  }, [open, mode, selectedContactPhone, clienteContatos]);
+
+  const thirdPartyNormalized = normalizeBRPhone(thirdPartyPhone);
+  const thirdPartyValid = isValidBRPhone(thirdPartyNormalized);
+
+  const needInstance = !instanceId;
+  const needContact = mode === "client" && !selectedContactPhone;
+  const needPhone = mode === "third_party" && !thirdPartyValid;
+  const canStart = !needInstance && !needContact && !needPhone;
+
+  let hint: string | null = null;
+  if (needInstance && needContact) hint = "Selecione a instância e o contato para continuar";
+  else if (needInstance && needPhone) hint = "Selecione a instância e informe o telefone para continuar";
+  else if (needInstance) hint = "Selecione a instância para continuar";
+  else if (needContact) hint = "Selecione o contato para continuar";
+  else if (needPhone) {
+    hint = thirdPartyPhone.replace(/\D/g, "").length > 0
+      ? "Telefone incompleto ou inválido"
+      : "Informe o telefone para continuar";
+  }
 
   const resetForm = () => {
     setMode("client");
     setInstanceId(instances.length === 1 ? instances[0].id : "");
     setSelectedContactPhone("");
     setSelectedContactName("");
-    setThirdPartyPhone("55");
+    setThirdPartyPhone("");
     setThirdPartyName("");
     setThirdPartyLabel("");
   };
 
   const handleStart = async () => {
-    if (!instanceId) {
-      toast.error("Selecione uma instância");
-      return;
-    }
+    if (!canStart) return;
 
-    const phone = mode === "client" ? selectedContactPhone : thirdPartyPhone.replace(/\D/g, "");
+    const phone = mode === "client" ? selectedContactPhone : thirdPartyNormalized;
     const contactName = mode === "client" ? selectedContactName : thirdPartyName.trim();
     const participantType = mode;
     const participantLabel = mode === "third_party" ? thirdPartyLabel.trim() || thirdPartyName.trim() : null;
-
-    if (!phone || phone.length < 10) {
-      toast.error("Telefone inválido");
-      return;
-    }
 
     setSending(true);
     try {
@@ -223,40 +264,74 @@ function StartConversationFromTicketDialog({
           {mode === "client" && (
             <div className="space-y-1.5">
               {clienteContatos.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-4 text-center border rounded-md">
-                  Nenhum contato com telefone cadastrado
-                </p>
-              ) : (
-                <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                  {clienteContatos.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedContactPhone(c.phone);
-                        setSelectedContactName(c.nome);
-                      }}
-                      className={`w-full flex items-center gap-2 p-2.5 rounded-md border text-left text-sm transition-colors ${
-                        selectedContactPhone === c.phone
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:bg-muted/50"
-                      }`}
-                    >
-                      <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{c.nome}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {c.phone} · {c.detalhe}
-                        </p>
-                      </div>
-                      {selectedContactPhone === c.phone && (
-                        <Badge variant="secondary" className="text-[10px]">
-                          Selecionado
-                        </Badge>
-                      )}
-                    </button>
-                  ))}
+                <div className="rounded-md border border-dashed p-4 text-center space-y-2.5">
+                  <p className="text-xs text-muted-foreground">
+                    {contatosDescartados > 0
+                      ? "Nenhum contato do cliente tem telefone válido cadastrado"
+                      : "Nenhum contato com telefone cadastrado"}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => setMode("third_party")}
+                  >
+                    <Building2 className="h-3.5 w-3.5" /> Informar telefone manualmente
+                  </Button>
                 </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Contato</Label>
+                    {!selectedContactPhone && (
+                      <span className="text-[11px] text-muted-foreground">Selecione um</span>
+                    )}
+                  </div>
+                  <div
+                    role="radiogroup"
+                    aria-label="Contato do cliente"
+                    className="space-y-1.5 max-h-64 overflow-y-auto"
+                  >
+                    {clienteContatos.map((c) => {
+                      const selected = selectedContactPhone === c.phone;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => {
+                            setSelectedContactPhone(c.phone);
+                            setSelectedContactName(c.nome);
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-2.5 p-2.5 rounded-md border text-left text-sm transition-colors",
+                            selected
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:bg-muted/50",
+                          )}
+                        >
+                          <span
+                            aria-hidden
+                            className={cn(
+                              "h-4 w-4 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors",
+                              selected ? "border-primary" : "border-muted-foreground/40",
+                            )}
+                          >
+                            {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{c.nome}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {c.display} · {c.detalhe}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -265,10 +340,10 @@ function StartConversationFromTicketDialog({
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Telefone *</Label>
-                <Input
+                <PhoneInputBR
                   value={thirdPartyPhone}
-                  onChange={(e) => setThirdPartyPhone(e.target.value.replace(/\D/g, ""))}
-                  placeholder="5549999999999"
+                  onChange={setThirdPartyPhone}
+                  showError
                   className="h-9"
                 />
               </div>
@@ -296,10 +371,26 @@ function StartConversationFromTicketDialog({
             </div>
           )}
 
-          <Button onClick={handleStart} disabled={sending} className="w-full">
-            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
-            Iniciar conversa
-          </Button>
+          <div className="space-y-1.5">
+            <Button
+              onClick={handleStart}
+              disabled={sending || !canStart}
+              aria-describedby={hint ? "start-conv-hint" : undefined}
+              className="w-full"
+            >
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+              Iniciar conversa
+            </Button>
+            {hint && !sending && (
+              <p
+                id="start-conv-hint"
+                className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground"
+              >
+                <AlertCircle className="h-3 w-3 shrink-0" />
+                {hint}
+              </p>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
