@@ -28,13 +28,13 @@ export function SlaInput({ value, onChange, label, hideMinutes }: Props) {
             placeholder="0"
             onChange={(e) => update(Number(e.target.value) || 0, horas, minutos)}
           />
-          <span className="text-[10px] text-muted-foreground mt-0.5 block">dias</span>
+          <span className="text-[10px] text-muted-foreground mt-0.5 block">dias úteis</span>
         </div>
         <div>
           <Input
             type="number"
             min={0}
-            max={23}
+            max={7}
             value={horas || ""}
             placeholder="0"
             onChange={(e) => update(dias, Number(e.target.value) || 0, minutos)}
@@ -55,6 +55,7 @@ export function SlaInput({ value, onChange, label, hideMinutes }: Props) {
           </div>
         )}
       </div>
+      <p className="text-[10px] text-muted-foreground">Horário útil do setor · 1 dia = 8h</p>
     </div>
   );
 }

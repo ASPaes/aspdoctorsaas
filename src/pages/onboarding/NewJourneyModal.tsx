@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -31,6 +31,12 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
   const [dataInicio, setDataInicio] = useState<string>("");
   const [goLive, setGoLive] = useState<string>("");
   const [goLiveEdited, setGoLiveEdited] = useState(false);
+  // Data de abertura = created_at da jornada, gravado pelo banco. Aqui só se mostra
+  // a data de hoje como prévia, sempre desabilitada.
+  const hojeISO = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
   const [demandTypeId, setDemandTypeId] = useState<string>("");
   // "auto" = deixa o motor de distribuição escolher (padrão).
   const [implantadorUserId, setImplantadorUserId] = useState<string>("auto");
@@ -347,6 +353,15 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
           <div className="space-y-1.5">
             <Label>Assunto *</Label>
             <Input value={assunto} onChange={(e) => setAssunto(e.target.value)} maxLength={200} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Data de abertura</Label>
+            <Input type="date" value={hojeISO} disabled readOnly />
+            <p className="text-[10px] text-muted-foreground">
+              Registrada automaticamente na criação e não editável. Diferente do início
+              planejado, que é a data combinada com o cliente.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

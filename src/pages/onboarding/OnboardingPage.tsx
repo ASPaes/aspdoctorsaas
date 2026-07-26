@@ -55,6 +55,8 @@ interface JourneyRow {
   etapa_atual_min: number | null;
   etapa_semaforo: "verde" | "amarelo" | "vermelho" | "sem_sla" | null;
   go_live_previsto: string | null;
+  /** Data de abertura da jornada (onboarding_journeys.created_at). Somente leitura. */
+  aberta_em: string | null;
   data_inicio_planejado: string | null;
   onboarding_concluido?: boolean | null;
   sla_onb_util_min?: number | null;
@@ -78,6 +80,9 @@ const SEMAFORO_COLOR: Record<string, string> = {
   sem_sla: "#6B7280",
 };
 
+import { formatMinUtil } from "./slaFormat";
+
+/** Duração de CALENDÁRIO (1 dia = 24h). Para minutos de expediente use formatMinUtil. */
 function formatMin(min: number | null | undefined): string {
   if (min == null) return "—";
   if (min < 60) return `${Math.round(min)}m`;
@@ -795,8 +800,14 @@ export default function OnboardingPage() {
                             <div className="flex items-center gap-2 text-[10px] text-muted-foreground/90 mt-1.5 flex-wrap">
                               <span className="inline-flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                SLA {formatMin(j.sla_util_min)}
+                                SLA {formatMinUtil(j.sla_util_min)}
                               </span>
+                              {j.aberta_em && (
+                                <span className="inline-flex items-center gap-1" title="Data de abertura da jornada">
+                                  <Calendar className="h-3 w-3" />
+                                  Aberta {formatDate(j.aberta_em)}
+                                </span>
+                              )}
                               {j.go_live_previsto && (
                                 <span className="inline-flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
@@ -904,8 +915,14 @@ export default function OnboardingPage() {
                             <div className="flex items-center gap-2 text-[10px] text-muted-foreground/90 mt-1.5 flex-wrap">
                               <span className="inline-flex items-center gap-1" title="SLA do onboarding (congelado)">
                                 <Clock className="h-3 w-3" />
-                                SLA onb {formatMin(slaOnb)}
+                                SLA onb {formatMinUtil(slaOnb)}
                               </span>
+                              {j.aberta_em && (
+                                <span className="inline-flex items-center gap-1" title="Data de abertura da jornada">
+                                  <Calendar className="h-3 w-3" />
+                                  Aberta {formatDate(j.aberta_em)}
+                                </span>
+                              )}
                               {j.go_live_previsto && (
                                 <span className="inline-flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />

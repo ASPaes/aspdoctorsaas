@@ -4283,6 +4283,60 @@ export type Database = {
           },
         ]
       }
+      onboarding_assignment_rules: {
+        Row: {
+          created_at: string
+          department_id: string
+          excluded_agents: string[]
+          fixed_agent_id: string | null
+          id: string
+          is_active: boolean
+          round_robin_last_index: number
+          strategy: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department_id: string
+          excluded_agents?: string[]
+          fixed_agent_id?: string | null
+          id?: string
+          is_active?: boolean
+          round_robin_last_index?: number
+          strategy?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string
+          excluded_agents?: string[]
+          fixed_agent_id?: string | null
+          id?: string
+          is_active?: boolean
+          round_robin_last_index?: number
+          strategy?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_assignment_rules_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_assignment_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_demand_types: {
         Row: {
           ativo: boolean
@@ -4588,6 +4642,7 @@ export type Database = {
           pipeline_implantacao_id: string | null
           pipeline_onboarding_id: string | null
           produto_id: number | null
+          responsavel_user_id: string | null
           situacao: Database["public"]["Enums"]["onb_situacao"]
           sla_iniciado_em: string | null
           tenant_id: string
@@ -4611,6 +4666,7 @@ export type Database = {
           pipeline_implantacao_id?: string | null
           pipeline_onboarding_id?: string | null
           produto_id?: number | null
+          responsavel_user_id?: string | null
           situacao?: Database["public"]["Enums"]["onb_situacao"]
           sla_iniciado_em?: string | null
           tenant_id: string
@@ -4634,6 +4690,7 @@ export type Database = {
           pipeline_implantacao_id?: string | null
           pipeline_onboarding_id?: string | null
           produto_id?: number | null
+          responsavel_user_id?: string | null
           situacao?: Database["public"]["Enums"]["onb_situacao"]
           sla_iniciado_em?: string | null
           tenant_id?: string
@@ -4692,11 +4749,56 @@ export type Database = {
           },
         ]
       }
+      onboarding_participant_roles: {
+        Row: {
+          ativo: boolean
+          cor: string
+          created_at: string
+          id: string
+          nome: string
+          position: number
+          slug: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cor?: string
+          created_at?: string
+          id?: string
+          nome: string
+          position?: number
+          slug?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cor?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          position?: number
+          slug?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_participant_roles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_participants: {
         Row: {
           created_at: string
           id: string
-          papel: Database["public"]["Enums"]["onb_participante_papel"]
+          papel: Database["public"]["Enums"]["onb_participante_papel"] | null
+          role_id: string
           tenant_id: string
           ticket_id: string
           user_id: string
@@ -4704,7 +4806,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
-          papel?: Database["public"]["Enums"]["onb_participante_papel"]
+          papel?: Database["public"]["Enums"]["onb_participante_papel"] | null
+          role_id: string
           tenant_id: string
           ticket_id: string
           user_id: string
@@ -4712,12 +4815,20 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
-          papel?: Database["public"]["Enums"]["onb_participante_papel"]
+          papel?: Database["public"]["Enums"]["onb_participante_papel"] | null
+          role_id?: string
           tenant_id?: string
           ticket_id?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "onboarding_participants_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_participant_roles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "onboarding_participants_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -4908,6 +5019,7 @@ export type Database = {
         Row: {
           ativo: boolean
           created_at: string
+          department_id: string | null
           descricao: string | null
           fase: Database["public"]["Enums"]["onb_fase"]
           id: string
@@ -4921,6 +5033,7 @@ export type Database = {
         Insert: {
           ativo?: boolean
           created_at?: string
+          department_id?: string | null
           descricao?: string | null
           fase: Database["public"]["Enums"]["onb_fase"]
           id?: string
@@ -4934,6 +5047,7 @@ export type Database = {
         Update: {
           ativo?: boolean
           created_at?: string
+          department_id?: string | null
           descricao?: string | null
           fase?: Database["public"]["Enums"]["onb_fase"]
           id?: string
@@ -4946,6 +5060,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "onboarding_pipelines_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "onboarding_pipelines_produto_id_fkey"
             columns: ["produto_id"]
             isOneToOne: false
@@ -4954,6 +5075,64 @@ export type Database = {
           },
           {
             foreignKeyName: "onboarding_pipelines_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_responsavel_history: {
+        Row: {
+          ate: string | null
+          created_at: string
+          de: string
+          id: string
+          journey_id: string
+          motivo: string | null
+          tenant_id: string
+          transferido_por: string | null
+          user_id: string
+        }
+        Insert: {
+          ate?: string | null
+          created_at?: string
+          de?: string
+          id?: string
+          journey_id: string
+          motivo?: string | null
+          tenant_id: string
+          transferido_por?: string | null
+          user_id: string
+        }
+        Update: {
+          ate?: string | null
+          created_at?: string
+          de?: string
+          id?: string
+          journey_id?: string
+          motivo?: string | null
+          tenant_id?: string
+          transferido_por?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_responsavel_history_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_responsavel_history_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_responsavel_history_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -5125,6 +5304,7 @@ export type Database = {
           cor: string
           created_at: string
           id: string
+          inicia_sla: boolean
           is_final: boolean
           is_initial: boolean
           nome: string
@@ -5142,6 +5322,7 @@ export type Database = {
           cor?: string
           created_at?: string
           id?: string
+          inicia_sla?: boolean
           is_final?: boolean
           is_initial?: boolean
           nome: string
@@ -5159,6 +5340,7 @@ export type Database = {
           cor?: string
           created_at?: string
           id?: string
+          inicia_sla?: boolean
           is_final?: boolean
           is_initial?: boolean
           nome?: string
@@ -10019,6 +10201,7 @@ export type Database = {
       }
       vw_onboarding_journeys: {
         Row: {
+          aberta_em: string | null
           assunto: string | null
           cliente_id: string | null
           cliente_unidade_id: number | null
@@ -10049,6 +10232,8 @@ export type Database = {
           setor_nome: string | null
           situacao: Database["public"]["Enums"]["onb_situacao"] | null
           sla_corrido_min: number | null
+          sla_dept_imp_id: string | null
+          sla_dept_onb_id: string | null
           sla_imp_corrido_min: number | null
           sla_imp_pausado_min: number | null
           sla_imp_util_min: number | null
@@ -10059,6 +10244,7 @@ export type Database = {
           sla_pausado_min: number | null
           sla_total_corrido_min: number | null
           sla_total_pausado_min: number | null
+          sla_total_util_min: number | null
           sla_util_min: number | null
           stage_fase: Database["public"]["Enums"]["onb_fase"] | null
           stage_nome: string | null
@@ -10913,9 +11099,39 @@ export type Database = {
         }
         Returns: string
       }
+      fn_onb_util_min: {
+        Args: {
+          p_department_id: string
+          p_end: string
+          p_start: string
+          p_tenant_id: string
+        }
+        Returns: number
+      }
+      fn_onboarding_assignment_pool: {
+        Args: {
+          p_department_id?: string
+          p_fase?: string
+          p_produto_id?: number
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
+      fn_onboarding_pick_assignee: {
+        Args: { p_department_id: string; p_tenant_id: string }
+        Returns: string
+      }
+      fn_onboarding_role_id: {
+        Args: { p_slug: string; p_tenant_id: string }
+        Returns: string
+      }
       fn_process_ura_timeouts: { Args: never; Returns: Json }
       fn_retry_waiting_conversations: { Args: never; Returns: Json }
       fn_schedule_group_syncs: { Args: never; Returns: undefined }
+      fn_seed_onboarding_participant_roles: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
+      }
       fn_snapshot_onboarding_phase: {
         Args: {
           p_fase: Database["public"]["Enums"]["onb_fase"]
@@ -12338,6 +12554,10 @@ export type Database = {
         Args: { p_done: boolean; p_item_id: string }
         Returns: undefined
       }
+      set_onboarding_participant_role: {
+        Args: { p_participant_id: string; p_role_id: string }
+        Returns: Json
+      }
       set_unidade_default_filter: {
         Args: { p_unidade_id: number }
         Returns: undefined
@@ -12452,6 +12672,10 @@ export type Database = {
           p_reason?: string
         }
         Returns: undefined
+      }
+      transfer_onboarding_responsavel: {
+        Args: { p_journey_id: string; p_motivo: string; p_novo_user_id: string }
+        Returns: Json
       }
       try_claim_off_hours_notice: {
         Args: { p_conversation_id: string; p_cooldown_minutes?: number }

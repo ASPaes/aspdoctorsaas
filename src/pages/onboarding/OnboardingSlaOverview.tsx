@@ -6,19 +6,25 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Clock, CheckCircle2, Pause, TrendingUp } from "lucide-react";
+import { formatMinUtil as formatMin, formatMinCal } from "./slaFormat";
 
 /**
- * Visão de SLA do onboarding — separa TEMPO CORRIDO (relógio) de TEMPO EFETIVO
- * (descontando pausas). Substitui a antiga linha "SLA de Jornadas".
+ * Visão de SLA do onboarding — separa o TEMPO BRUTO de expediente do TEMPO EFETIVO
+ * (bruto menos as pausas manuais).
+ *
+ * TUDO que é comparado com o SLA alvo está em HORÁRIO ÚTIL (expediente do setor do
+ * pipeline). O tempo de CALENDÁRIO aparece só como referência secundária — comparar
+ * calendário com um alvo em minutos úteis daria "0% no prazo" sempre.
  *
  * Fontes de verdade:
- *  - vw_onboarding_journeys: sla_onb_corrido_min / sla_onb_util_min,
- *    sla_imp_corrido_min / sla_imp_util_min, sla_total_corrido_min / sla_total_pausado_min
- *  - onboarding_pipelines.sla_total_minutos  → SLA alvo da fase/pipeline
- *  - onboarding_stages.sla_minutos           → SLA alvo da etapa
- *  - onboarding_stage_history: duracao_minutos (corrido) vs duracao_util_minutos (efetivo)
+ *  - vw_onboarding_journeys: sla_*_util_min (útil já sem pausas) e sla_*_pausado_min
+ *    (pausas, também em minutos úteis). Bruto = util + pausado.
+ *    sla_*_corrido_min = calendário, só informativo.
+ *  - onboarding_pipelines.sla_total_minutos  → SLA alvo da fase/pipeline (minutos úteis)
+ *  - onboarding_stages.sla_minutos           → SLA alvo da etapa (minutos úteis)
+ *  - onboarding_stage_history: duracao_util_minutos (expediente) vs duracao_minutos (calendário)
  *
- * Regra de "no prazo": tempo acumulado ≤ SLA alvo, avaliado nas duas bases.
+ * Regra de "no prazo": tempo acumulado ≤ SLA alvo, avaliado em bruto e em efetivo.
  *  Jornada no prazo = todas as fases já iniciadas dentro do orçamento.
  */
 
@@ -30,25 +36,18 @@ export interface SlaJourneyRow {
   demand_type_nome: string | null;
   setor_nome: string | null;
   sla_onb_corrido_min: number | null;
+  sla_onb_pausado_min: number | null;
   sla_onb_util_min: number | null;
   sla_imp_corrido_min: number | null;
+  sla_imp_pausado_min: number | null;
   sla_imp_util_min: number | null;
   sla_total_corrido_min: number | null;
   sla_total_pausado_min: number | null;
+  sla_total_util_min: number | null;
 }
 
 function pct(n: number, d: number): number {
   return d ? Math.round((n / d) * 1000) / 10 : 0;
-}
-function formatMin(min?: number | null): string {
-  if (min == null || min <= 0) return "0m";
-  if (min < 60) return `${Math.round(min)}m`;
-  const h = Math.floor(min / 60);
-  const m = Math.round(min % 60);
-  if (h < 24) return m ? `${h}h ${m}m` : `${h}h`;
-  const d = Math.floor(h / 24);
-  const rh = h % 24;
-  return rh ? `${d}d ${rh}h` : `${d}d`;
 }
 
 type Tone = "success" | "warning" | "danger" | "info" | "default";
@@ -114,31 +113,29 @@ function ComplianceCard({ name, badge, meta, npC, npE, ct, et }: { name: string;
       <div className="text-[11px] text-muted-foreground mt-1">{meta}</div>
       <div className="h-px bg-border my-3" />
       <div className="flex flex-col gap-2">
-        <ComplianceRow label="No prazo · corrido" v={npC} />
+        <ComplianceRow label="No prazo · bruto" v={npC} />
         <ComplianceRow label="No prazo · efetivo" v={npE} />
       </div>
       <div className="h-px bg-border my-3" />
       <div className="flex items-center justify-between text-[11.5px] text-muted-foreground">
         <span>Ciclo médio</span>
         <span>
-          corrido <b className="text-foreground font-semibold">{ct}</b> · efetivo <b className="text-[hsl(142_71%_45%)] font-semibold">{et}</b>
+          bruto <b className="text-foreground font-semibold">{ct}</b> · efetivo <b className="text-[hsl(142_71%_45%)] font-semibold">{et}</b>
         </span>
       </div>
     </div>
   );
 }
 
-function EtapaCard({ name, pipe, sla, ct, et, cPct, ePct }: { name: string; pipe: string; sla: string; ct: string; et: string; cPct: number; ePct: number }) {
-  const cS = consumo(cPct);
+function EtapaCard({ name, pipe, sla, ct, et, ePct }: { name: string; pipe: string; sla: string; ct: string; et: string; ePct: number }) {
   const eS = consumo(ePct);
   const SC = 1.3; // escala 0..130% do SLA → largura total
   const efeW = Math.min(ePct, 130) / SC;
-  const pauseW = Math.max(0, Math.min(cPct, 130) / SC - Math.min(ePct, 130) / SC);
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="text-sm font-semibold flex items-center gap-2">
-          <span className={`h-2 w-2 rounded-full shrink-0 ${statusBg[cS]}`} />
+          <span className={`h-2 w-2 rounded-full shrink-0 ${statusBg[eS]}`} />
           {name}
         </div>
         <Badge variant="outline" className="text-[10px] shrink-0">SLA {sla}</Badge>
@@ -146,24 +143,18 @@ function EtapaCard({ name, pipe, sla, ct, et, cPct, ePct }: { name: string; pipe
       <div className="text-[11px] text-muted-foreground mt-1">{pipe}</div>
       <div className="relative h-[11px] rounded-md bg-muted overflow-hidden my-2.5">
         <div className={`absolute left-0 top-0 h-full rounded-l-md ${statusBg[eS]}`} style={{ width: `${efeW}%` }} />
-        <div
-          className="absolute top-0 h-full"
-          style={{ left: `${efeW}%`, width: `${pauseW}%`, backgroundColor: "hsl(38 92% 50% / 0.18)", backgroundImage: "repeating-linear-gradient(45deg, hsl(38 92% 50% / 0.85) 0 3px, transparent 3px 6px)" }}
-        />
         <span className="absolute -top-0.5 -bottom-0.5 w-px bg-muted-foreground/50" style={{ left: "53.8%" }} />
         <span className="absolute -top-0.5 -bottom-0.5 w-0.5 bg-destructive" style={{ left: "76.9%" }} />
       </div>
       <div className="flex items-center justify-between text-[11.5px]">
-        <span className="text-muted-foreground">Corrido</span>
-        <span>
-          <b className={`font-semibold ${statusTxt[cS]}`}>{ct}</b> · {cPct}%
-        </span>
-      </div>
-      <div className="flex items-center justify-between text-[11.5px] mt-1">
-        <span className="text-muted-foreground">Efetivo</span>
+        <span className="text-muted-foreground">Expediente</span>
         <span>
           <b className={`font-semibold ${statusTxt[eS]}`}>{et}</b> · {ePct}%
         </span>
+      </div>
+      <div className="flex items-center justify-between text-[11.5px] mt-1">
+        <span className="text-muted-foreground">Calendário</span>
+        <span className="text-muted-foreground">{ct}</span>
       </div>
     </div>
   );
@@ -221,16 +212,20 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
   const stageMap = useMemo(() => new Map((stagesQ.data ?? []).map((s) => [s.id, s])), [stagesQ.data]);
 
   // Fases já iniciadas de uma jornada, com seu SLA alvo (pipeline).
+  // O gate de "fase iniciada" continua sendo o tempo de calendário — uma fase que só
+  // rodou fora do expediente tem 0 min úteis, mas já começou e precisa entrar na conta.
   const journeyPhases = useMemo(() => {
-    return (j: SlaJourneyRow): { pipelineId: string; corrido: number; efetivo: number; target: number }[] => {
-      const out: { pipelineId: string; corrido: number; efetivo: number; target: number }[] = [];
+    return (j: SlaJourneyRow): { pipelineId: string; bruto: number; efetivo: number; target: number }[] => {
+      const out: { pipelineId: string; bruto: number; efetivo: number; target: number }[] = [];
       const onbT = j.pipeline_onboarding_id ? pipeMap.get(j.pipeline_onboarding_id)?.sla_total_minutos : null;
       if (j.pipeline_onboarding_id && (j.sla_onb_corrido_min ?? 0) > 0 && onbT && onbT > 0) {
-        out.push({ pipelineId: j.pipeline_onboarding_id, corrido: j.sla_onb_corrido_min!, efetivo: j.sla_onb_util_min ?? j.sla_onb_corrido_min!, target: onbT });
+        const efetivo = j.sla_onb_util_min ?? 0;
+        out.push({ pipelineId: j.pipeline_onboarding_id, bruto: efetivo + (j.sla_onb_pausado_min ?? 0), efetivo, target: onbT });
       }
       const impT = j.pipeline_implantacao_id ? pipeMap.get(j.pipeline_implantacao_id)?.sla_total_minutos : null;
       if (j.pipeline_implantacao_id && (j.sla_imp_corrido_min ?? 0) > 0 && impT && impT > 0) {
-        out.push({ pipelineId: j.pipeline_implantacao_id, corrido: j.sla_imp_corrido_min!, efetivo: j.sla_imp_util_min ?? j.sla_imp_corrido_min!, target: impT });
+        const efetivo = j.sla_imp_util_min ?? 0;
+        out.push({ pipelineId: j.pipeline_implantacao_id, bruto: efetivo + (j.sla_imp_pausado_min ?? 0), efetivo, target: impT });
       }
       return out;
     };
@@ -238,22 +233,24 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
 
   // KPIs "SLA Total"
   const total = useMemo(() => {
-    let withSla = 0, okC = 0, okE = 0, sumParado = 0, sumCorrido = 0, started = 0, cicloC = 0, cicloE = 0;
+    let withSla = 0, okC = 0, okE = 0, sumParado = 0, sumBruto = 0, sumCal = 0, started = 0, cicloCal = 0, cicloE = 0;
     journeys.forEach((j) => {
       const phases = journeyPhases(j);
       if (phases.length) {
         withSla++;
-        if (phases.every((p) => p.corrido <= p.target)) okC++;
+        if (phases.every((p) => p.bruto <= p.target)) okC++;
         if (phases.every((p) => p.efetivo <= p.target)) okE++;
       }
-      const corr = j.sla_total_corrido_min ?? 0;
+      const cal = j.sla_total_corrido_min ?? 0;
+      const efe = j.sla_total_util_min ?? 0;
       const par = j.sla_total_pausado_min ?? 0;
-      sumCorrido += corr;
+      sumCal += cal;
+      sumBruto += efe + par;
       sumParado += par;
-      if (corr > 0) {
+      if (cal > 0) {
         started++;
-        cicloC += corr;
-        cicloE += Math.max(0, corr - par);
+        cicloCal += cal;
+        cicloE += efe;
       }
     });
     return {
@@ -263,8 +260,8 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
       pctC: pct(okC, withSla),
       pctE: pct(okE, withSla),
       parado: sumParado,
-      paradoPct: pct(sumParado, sumCorrido),
-      cicloC: started ? cicloC / started : 0,
+      paradoPct: pct(sumParado, sumBruto),
+      cicloCal: started ? cicloCal / started : 0,
       cicloE: started ? cicloE / started : 0,
     };
   }, [journeys, journeyPhases]);
@@ -276,9 +273,9 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
       journeyPhases(j).forEach((ph) => {
         const cur = m.get(ph.pipelineId) ?? { count: 0, sumC: 0, sumE: 0, withinC: 0, withinE: 0 };
         cur.count++;
-        cur.sumC += ph.corrido;
+        cur.sumC += ph.bruto;
         cur.sumE += ph.efetivo;
-        if (ph.corrido <= ph.target) cur.withinC++;
+        if (ph.bruto <= ph.target) cur.withinC++;
         if (ph.efetivo <= ph.target) cur.withinE++;
         m.set(ph.pipelineId, cur);
       });
@@ -311,10 +308,12 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
       const key = (areaDim === "demanda" ? j.demand_type_nome : j.setor_nome) || "— sem classificação";
       const cur = m.get(key) ?? { count: 0, okC: 0, okE: 0, sumC: 0, sumE: 0 };
       cur.count++;
-      if (phases.every((p) => p.corrido <= p.target)) cur.okC++;
+      if (phases.every((p) => p.bruto <= p.target)) cur.okC++;
       if (phases.every((p) => p.efetivo <= p.target)) cur.okE++;
-      cur.sumC += j.sla_total_corrido_min ?? 0;
-      cur.sumE += Math.max(0, (j.sla_total_corrido_min ?? 0) - (j.sla_total_pausado_min ?? 0));
+      // mesma base das abas Total e Pipeline (antes esta aba usava corrido − pausado,
+      // uma grandeza diferente para o mesmo conceito de "efetivo")
+      cur.sumE += j.sla_total_util_min ?? 0;
+      cur.sumC += (j.sla_total_util_min ?? 0) + (j.sla_total_pausado_min ?? 0);
       m.set(key, cur);
     });
     return Array.from(m.entries())
@@ -337,8 +336,8 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
       if (!allowed.has(h.journey_id)) return;
       const st = stageMap.get(h.stage_id);
       if (!st || !st.sla_minutos || st.sla_minutos <= 0) return;
-      const c = h.duracao_minutos ?? 0;
-      const e = h.duracao_util_minutos ?? c;
+      const c = h.duracao_minutos ?? 0; // calendário — informativo
+      const e = h.duracao_util_minutos ?? 0; // expediente — é o que se compara com o SLA
       const cur = m.get(h.stage_id) ?? { count: 0, sumC: 0, sumE: 0 };
       cur.count++;
       cur.sumC += c;
@@ -356,9 +355,8 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
           nome: st.nome,
           pipeNome: pipe?.nome ?? "—",
           sla: formatMin(st.sla_minutos),
-          ct: formatMin(avgC),
+          ct: formatMinCal(avgC),
           et: formatMin(avgE),
-          cPct: Math.round((avgC / st.sla_minutos!) * 100),
           ePct: Math.round((avgE / st.sla_minutos!) * 100),
           pipePos: pipe?.position ?? 0,
           stagePos: st.position,
@@ -372,13 +370,13 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
       {/* ===== SLA Total ===== */}
       <section>
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-          SLA Total · {total.withSla} jornadas com SLA
+          SLA Total · {total.withSla} jornadas com SLA · medido em horário útil
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard icon={Clock} label="No prazo · corrido" value={`${total.pctC}%`} sub={`${total.okC} de ${total.withSla} no prazo`} tone={complianceTone(total.pctC)} />
+          <KpiCard icon={Clock} label="No prazo · bruto" value={`${total.pctC}%`} sub={`${total.okC} de ${total.withSla} no prazo`} tone={complianceTone(total.pctC)} />
           <KpiCard icon={CheckCircle2} label="No prazo · efetivo" value={`${total.pctE}%`} sub={`${total.okE} de ${total.withSla} no prazo`} tone={complianceTone(total.pctE)} />
-          <KpiCard icon={Pause} label="Tempo parado" value={formatMin(total.parado)} sub={`${total.paradoPct}% do tempo corrido`} tone="warning" />
-          <KpiCard icon={TrendingUp} label="Ciclo médio · efetivo" value={formatMin(total.cicloE)} sub={`corrido ${formatMin(total.cicloC)}`} tone="success" />
+          <KpiCard icon={Pause} label="Tempo parado" value={formatMin(total.parado)} sub={`${total.paradoPct}% do expediente`} tone="warning" />
+          <KpiCard icon={TrendingUp} label="Ciclo médio · efetivo" value={formatMin(total.cicloE)} sub={`calendário ${formatMinCal(total.cicloCal)}`} tone="success" />
         </div>
       </section>
 
@@ -399,7 +397,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
 
           {/* Pipeline */}
           <TabsContent value="pipeline">
-            <p className="text-[11px] text-muted-foreground mb-2">% no prazo · corrido vs. efetivo, por pipeline</p>
+            <p className="text-[11px] text-muted-foreground mb-2">% no prazo · bruto vs. efetivo (horário útil), por pipeline</p>
             {pipelineAgg.length === 0 ? (
               <EmptyNote>Nenhuma jornada com SLA de pipeline definido.</EmptyNote>
             ) : (
@@ -414,11 +412,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
           {/* Etapa */}
           <TabsContent value="etapa">
             <div className="flex items-center gap-4 flex-wrap text-[11px] text-muted-foreground mb-2">
-              <span className="inline-flex items-center gap-1.5"><span className="w-5 h-2 rounded-sm bg-[hsl(142_71%_45%)]" />Efetivo</span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="w-5 h-2 rounded-sm" style={{ backgroundColor: "hsl(38 92% 50% / 0.18)", backgroundImage: "repeating-linear-gradient(45deg, hsl(38 92% 50% / 0.85) 0 3px, transparent 3px 6px)" }} />
-                Pausa
-              </span>
+              <span className="inline-flex items-center gap-1.5"><span className="w-5 h-2 rounded-sm bg-[hsl(142_71%_45%)]" />Expediente consumido</span>
               <span className="inline-flex items-center gap-1.5"><span className="w-0.5 h-3 bg-destructive" />linha do SLA (100%) · marca fina = 70%</span>
             </div>
             {etapaAgg.length === 0 ? (
@@ -426,7 +420,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {etapaAgg.map((e) => (
-                  <EtapaCard key={e.id} name={e.nome} pipe={e.pipeNome} sla={e.sla} ct={e.ct} et={e.et} cPct={e.cPct} ePct={e.ePct} />
+                  <EtapaCard key={e.id} name={e.nome} pipe={e.pipeNome} sla={e.sla} ct={e.ct} et={e.et} ePct={e.ePct} />
                 ))}
               </div>
             )}
@@ -435,7 +429,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
           {/* Área */}
           <TabsContent value="area">
             <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-              <p className="text-[11px] text-muted-foreground">% no prazo · corrido vs. efetivo</p>
+              <p className="text-[11px] text-muted-foreground">% no prazo · bruto vs. efetivo (horário útil)</p>
               <div className="inline-flex bg-muted rounded-md p-0.5">
                 {(["demanda", "setor"] as const).map((d) => (
                   <button

@@ -17,7 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, GripVertical, Trash2, Loader2, Pencil, Flag, Pause, ChevronRight,
+  Plus, GripVertical, Trash2, Loader2, Pencil, Flag, Pause, ChevronRight, Timer,
 } from "lucide-react";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
@@ -26,6 +26,9 @@ import {
   arrayMove, SortableContext, useSortable, verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { SlaInput } from "./SlaInput";
 import { formatSlaHuman, slugify } from "./utils";
 
@@ -54,6 +57,8 @@ interface Pipeline {
   sla_total_minutos: number | null;
   ativo: boolean;
   position: number;
+  /** Setor cujo expediente mede o SLA. NULL = setor do ticket, depois horário global. */
+  department_id: string | null;
 }
 
 interface Stage {
@@ -69,6 +74,8 @@ interface Stage {
   pausa_sla: boolean;
   ativo: boolean;
   visible_sections: string[] | null;
+  /** Entrar nesta etapa dispara a contagem de SLA. No máximo uma por pipeline. */
+  inicia_sla: boolean;
 }
 
 interface ChecklistGroup {
@@ -89,6 +96,7 @@ interface ChecklistItem {
 }
 
 interface Produto { id: number; nome: string; }
+interface Departamento { id: string; name: string; }
 
 const DEFAULT_COLORS = ["#22C55E", "#0EA5E9", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#6B7280"];
 
@@ -119,7 +127,7 @@ export function PipelinesPanel({ fase }: Props) {
     enabled: !!effectiveTenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_pipelines" as any) as any)
-        .select("id, nome, descricao, fase, produto_id, sla_total_minutos, ativo, position")
+        .select("id, nome, descricao, fase, produto_id, sla_total_minutos, ativo, position, department_id")
         .eq("tenant_id", effectiveTenantId).eq("fase", fase).order("position");
       if (error) throw error;
       return (data ?? []) as Pipeline[];
@@ -137,12 +145,23 @@ export function PipelinesPanel({ fase }: Props) {
     },
   });
 
+  const departamentosQuery = useQuery({
+    queryKey: ["onb-departamentos", effectiveTenantId],
+    enabled: !!effectiveTenantId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("support_departments")
+        .select("id, name").eq("tenant_id", effectiveTenantId!).order("name");
+      if (error) throw error;
+      return (data ?? []) as Departamento[];
+    },
+  });
+
   const stagesQuery = useQuery({
     queryKey: ["onb-stages", effectiveTenantId, selectedPipelineId],
     enabled: !!effectiveTenantId && !!selectedPipelineId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_stages" as any) as any)
-        .select("id, pipeline_id, nome, slug, position, sla_minutos, cor, is_initial, is_final, pausa_sla, ativo, visible_sections")
+        .select("id, pipeline_id, nome, slug, position, sla_minutos, cor, is_initial, is_final, pausa_sla, ativo, visible_sections, inicia_sla")
         .eq("tenant_id", effectiveTenantId).eq("pipeline_id", selectedPipelineId).order("position");
       if (error) throw error;
       return (data ?? []) as Stage[];
@@ -178,6 +197,7 @@ export function PipelinesPanel({ fase }: Props) {
   const groups = groupsQuery.data ?? [];
   const checklist = checklistQuery.data ?? [];
   const produtos = produtosQuery.data ?? [];
+  const departamentos = departamentosQuery.data ?? [];
 
   // ==================== Pipeline ops ====================
   async function savePipeline(p: Partial<Pipeline> & { id?: string }, isNew: boolean) {
@@ -189,6 +209,7 @@ export function PipelinesPanel({ fase }: Props) {
       produto_id: p.produto_id ?? null,
       sla_total_minutos: p.sla_total_minutos ?? 0,
       ativo: p.ativo ?? true,
+      department_id: p.department_id ?? null,
     };
     try {
       if (isNew) {
@@ -242,6 +263,7 @@ export function PipelinesPanel({ fase }: Props) {
       pausa_sla: !!s.pausa_sla,
       ativo: s.ativo ?? true,
       visible_sections: s.visible_sections ?? ALL_SECTION_KEYS,
+      inicia_sla: !!s.inicia_sla,
     };
     try {
       if (isNew) {
@@ -260,7 +282,12 @@ export function PipelinesPanel({ fase }: Props) {
       }
       qc.invalidateQueries({ queryKey: ["onb-stages"] });
     } catch (e: any) {
-      toast.error(e.message || "Erro ao salvar");
+      // índice único parcial uq_onb_stage_inicia_sla_por_pipeline
+      if (e?.code === "23505" && String(e?.message ?? "").includes("inicia_sla")) {
+        toast.error("Outra etapa deste pipeline já inicia a contagem de SLA. Desmarque nela antes.");
+      } else {
+        toast.error(e.message || "Erro ao salvar");
+      }
     }
   }
 
@@ -519,6 +546,7 @@ export function PipelinesPanel({ fase }: Props) {
         open={pipelineNewOpen || !!pipelineEditing}
         initial={pipelineEditing}
         produtos={produtos}
+        departamentos={departamentos}
         onClose={() => { setPipelineNewOpen(false); setPipelineEditing(null); }}
         onSave={(p) => { savePipeline(p, !pipelineEditing); setPipelineNewOpen(false); setPipelineEditing(null); }}
         onDelete={pipelineEditing ? () => { deletePipeline(pipelineEditing.id); setPipelineEditing(null); } : undefined}
@@ -527,6 +555,7 @@ export function PipelinesPanel({ fase }: Props) {
       <StageDialog
         open={stageNewOpen || !!stageEditing}
         initial={stageEditing}
+        gatilhoStage={stages.find((s) => s.inicia_sla) ?? null}
         onClose={() => { setStageNewOpen(false); setStageEditing(null); }}
         onSave={(s) => { saveStage(s, !stageEditing); setStageNewOpen(false); setStageEditing(null); }}
       />
@@ -568,6 +597,7 @@ function SortableStageRow({
           {stage.is_initial && <Flag className="h-3 w-3 text-primary" />}
           {stage.is_final && <Flag className="h-3 w-3 text-destructive" />}
           {stage.pausa_sla && <Pause className="h-3 w-3 text-amber-500" />}
+          {stage.inicia_sla && <Timer className="h-3 w-3 text-[hsl(199_89%_48%)]" />}
         </div>
         <p className="text-[10px] text-muted-foreground">SLA {formatSlaHuman(stage.sla_minutos)}</p>
       </div>
@@ -837,9 +867,9 @@ function SortableChecklistRow({
 // Pipeline dialog
 // ============================================================================
 function PipelineDialog({
-  open, initial, produtos, onClose, onSave, onDelete, onToggleActive,
+  open, initial, produtos, departamentos, onClose, onSave, onDelete, onToggleActive,
 }: {
-  open: boolean; initial: Pipeline | null; produtos: Produto[];
+  open: boolean; initial: Pipeline | null; produtos: Produto[]; departamentos: Departamento[];
   onClose: () => void;
   onSave: (p: Partial<Pipeline> & { id?: string }) => void;
   onDelete?: () => void;
@@ -850,6 +880,7 @@ function PipelineDialog({
   const [produtoId, setProdutoId] = useState<string>("__all__");
   const [slaMin, setSlaMin] = useState(0);
   const [ativo, setAtivo] = useState(true);
+  const [departmentId, setDepartmentId] = useState<string>("__none__");
 
   useEffect(() => {
     if (open) {
@@ -858,6 +889,7 @@ function PipelineDialog({
       setProdutoId(initial?.produto_id != null ? String(initial.produto_id) : "__all__");
       setSlaMin(initial?.sla_total_minutos ?? 0);
       setAtivo(initial?.ativo ?? true);
+      setDepartmentId(initial?.department_id ?? "__none__");
     }
   }, [open, initial]);
 
@@ -876,17 +908,31 @@ function PipelineDialog({
             <Label>Descrição</Label>
             <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} />
           </div>
-          <div className="space-y-1.5">
-            <Label>Produto</Label>
-            <Select value={produtoId} onValueChange={setProdutoId}>
-              <SelectTrigger><SelectValue placeholder="Universal (todos os produtos)" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Universal (todos os produtos)</SelectItem>
-                {produtos.map((p) => (
-                  <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Produto</Label>
+              <Select value={produtoId} onValueChange={setProdutoId}>
+                <SelectTrigger><SelectValue placeholder="Universal" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Universal (todos)</SelectItem>
+                  {produtos.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Setor</Label>
+              <Select value={departmentId} onValueChange={setDepartmentId}>
+                <SelectTrigger><SelectValue placeholder="Horário global" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Horário global</SelectItem>
+                  {departamentos.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <SlaInput label="SLA total" value={slaMin} onChange={setSlaMin} hideMinutes />
           {initial && onToggleActive && (
@@ -912,6 +958,7 @@ function PipelineDialog({
               produto_id: produtoId === "__all__" ? null : Number(produtoId),
               sla_total_minutos: slaMin,
               ativo,
+              department_id: departmentId === "__none__" ? null : departmentId,
             })}>Salvar</Button>
           </div>
         </DialogFooter>
@@ -924,9 +971,11 @@ function PipelineDialog({
 // Stage dialog
 // ============================================================================
 function StageDialog({
-  open, initial, onClose, onSave,
+  open, initial, gatilhoStage, onClose, onSave,
 }: {
   open: boolean; initial: Stage | null;
+  /** Etapa que hoje detém a flag de início de SLA neste pipeline (se houver). */
+  gatilhoStage: Stage | null;
   onClose: () => void;
   onSave: (s: Partial<Stage> & { id?: string }) => void;
 }) {
@@ -938,7 +987,9 @@ function StageDialog({
   const [isFinal, setIsFinal] = useState(false);
   const [pausaSla, setPausaSla] = useState(false);
   const [ativo, setAtivo] = useState(true);
+  const [iniciaSla, setIniciaSla] = useState(false);
   const [visibleSections, setVisibleSections] = useState<string[]>(ALL_SECTION_KEYS);
+  const [secoesOpen, setSecoesOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -950,7 +1001,9 @@ function StageDialog({
       setIsFinal(!!initial?.is_final);
       setPausaSla(!!initial?.pausa_sla);
       setAtivo(initial?.ativo ?? true);
+      setIniciaSla(!!initial?.inicia_sla);
       setVisibleSections(initial?.visible_sections ?? ALL_SECTION_KEYS);
+      setSecoesOpen(false);
     }
   }, [open, initial]);
 
@@ -962,95 +1015,152 @@ function StageDialog({
 
   const autoSlug = useMemo(() => slugify(nome), [nome]);
 
+  // Só uma etapa por pipeline pode iniciar o SLA. Se outra já detém a flag, esta
+  // perde a opção — para trocar, desmarque na etapa que a tem hoje.
+  const gatilhoEmOutra = !!gatilhoStage && gatilhoStage.id !== initial?.id;
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>{initial ? "Editar etapa" : "Nova etapa"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 py-2">
-          <div className="space-y-1.5">
-            <Label>Nome *</Label>
-            <Input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} />
+
+        <div className="max-h-[calc(100vh-16rem)] overflow-y-auto px-2 -mx-2 py-1 -my-1">
+          <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Nome *</Label>
+              <Input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} autoFocus />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Slug</Label>
+              <Input value={slug} onChange={(e) => setSlug(e.target.value)}
+                placeholder={autoSlug || "auto-gerado do nome"} />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Cor</Label>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {DEFAULT_COLORS.map((c) => (
+                  <button
+                    key={c} type="button" onClick={() => setCor(c)}
+                    aria-label={`Cor ${c}`} aria-pressed={cor === c}
+                    className={`h-7 w-7 rounded-full border-2 transition-transform ${cor === c ? "border-foreground scale-110" : "border-transparent"}`}
+                    style={{ background: c }}
+                  />
+                ))}
+                <input type="color" value={cor} onChange={(e) => setCor(e.target.value)}
+                  aria-label="Cor personalizada"
+                  className="h-7 w-9 rounded border border-border bg-transparent cursor-pointer" />
+              </div>
+            </div>
+            <SlaInput label="SLA da etapa" value={slaMin} onChange={setSlaMin} />
           </div>
-          <div className="space-y-1.5">
-            <Label>Slug</Label>
-            <Input value={slug} onChange={(e) => setSlug(e.target.value)}
-              placeholder={autoSlug || "auto-gerado do nome"} />
-          </div>
-          <SlaInput label="SLA da etapa" value={slaMin} onChange={setSlaMin} />
-          <div className="space-y-1.5">
-            <Label>Cor</Label>
-            <div className="flex items-center gap-2 flex-wrap">
-              {DEFAULT_COLORS.map((c) => (
-                <button
-                  key={c} type="button" onClick={() => setCor(c)}
-                  className={`h-7 w-7 rounded-full border-2 transition-transform ${cor === c ? "border-foreground scale-110" : "border-transparent"}`}
-                  style={{ background: c }}
+
+          <div className="space-y-1.5 mt-4">
+            <Label>Comportamento</Label>
+            <div className="rounded-lg border border-border overflow-hidden">
+              <div className="grid grid-cols-1 sm:grid-cols-3">
+                <ToggleRow
+                  icon={<Flag className="h-3.5 w-3.5 text-primary" />}
+                  label="Etapa inicial" checked={isInitial} onChange={setIsInitial}
+                  className="border-b border-border sm:border-r"
                 />
-              ))}
-              <input type="color" value={cor} onChange={(e) => setCor(e.target.value)}
-                className="h-7 w-9 rounded border border-border bg-transparent cursor-pointer" />
+                <ToggleRow
+                  icon={<Flag className="h-3.5 w-3.5 text-destructive" />}
+                  label="Etapa final" checked={isFinal} onChange={setIsFinal}
+                  className="border-b border-border sm:border-r"
+                />
+                <ToggleRow
+                  icon={<Pause className="h-3.5 w-3.5 text-amber-500" />}
+                  label="Pausar SLA" checked={pausaSla} onChange={setPausaSla}
+                  className="border-b border-border"
+                />
+              </div>
+              <ToggleRow
+                icon={<Timer className="h-3.5 w-3.5 text-[hsl(199_89%_48%)]" />}
+                label="Inicia a contagem de SLA"
+                checked={iniciaSla} onChange={setIniciaSla}
+                disabled={gatilhoEmOutra}
+                hint={gatilhoEmOutra
+                  ? `Já definida em «${gatilhoStage!.nome}» — desmarque lá para usar aqui`
+                  : "O cronômetro parte quando a jornada entra nesta etapa"}
+              />
             </div>
           </div>
-          <div className="space-y-2 pt-1 border-t border-border">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm flex items-center gap-1.5">
-                <Flag className="h-3.5 w-3.5 text-primary" /> Etapa inicial
-              </Label>
-              <Switch checked={isInitial} onCheckedChange={setIsInitial} />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label className="text-sm flex items-center gap-1.5">
-                <Flag className="h-3.5 w-3.5 text-destructive" /> Etapa final
-              </Label>
-              <Switch checked={isFinal} onCheckedChange={setIsFinal} />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label className="text-sm flex items-center gap-1.5">
-                <Pause className="h-3.5 w-3.5 text-amber-500" /> Pausar SLA nesta etapa
-              </Label>
-              <Switch checked={pausaSla} onCheckedChange={setPausaSla} />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label className="text-sm">Ativa</Label>
-              <Switch checked={ativo} onCheckedChange={setAtivo} />
-            </div>
-          </div>
-          <div className="space-y-2 pt-2 border-t border-border">
-            <Label className="text-sm">Seções visíveis nesta etapa</Label>
-            <p className="text-[11px] text-muted-foreground">
-              As seções desmarcadas ficam ocultas no detalhe da jornada quando ela está nesta etapa.
-            </p>
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              {SECTION_OPTIONS.map((opt) => {
-                const checked = visibleSections.includes(opt.key);
-                return (
-                  <label
-                    key={opt.key}
-                    className="flex items-start gap-2 text-xs cursor-pointer rounded-md border border-border/50 p-2 hover:bg-muted/40 transition-colors"
-                  >
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={() => toggleSection(opt.key)}
-                      className="mt-0.5"
-                    />
-                    <span className="leading-tight">{opt.label}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
+
+          {/* --- avançado: seções visíveis --- */}
+          <Collapsible open={secoesOpen} onOpenChange={setSecoesOpen} className="mt-5">
+            <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2.5 text-left hover:bg-muted/40 transition-colors">
+              <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${secoesOpen ? "rotate-90" : ""}`} />
+              <span className="text-sm font-medium flex-1">Seções visíveis nesta etapa</span>
+              <Badge variant="outline" className="text-[10px]">
+                {visibleSections.length} de {ALL_SECTION_KEYS.length}
+              </Badge>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="pt-3">
+                <p className="text-[11px] text-muted-foreground mb-2">
+                  As seções desmarcadas ficam ocultas no detalhe da jornada quando ela está nesta etapa.
+                </p>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-1.5">
+                  {SECTION_OPTIONS.map((opt) => {
+                    const checked = visibleSections.includes(opt.key);
+                    return (
+                      <label
+                        key={opt.key}
+                        className="flex items-start gap-2 text-xs cursor-pointer rounded-md border border-border/50 p-2 hover:bg-muted/40 transition-colors"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={() => toggleSection(opt.key)}
+                          className="mt-0.5"
+                        />
+                        <span className="leading-tight">{opt.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
-        <DialogFooter>
+
+        <DialogFooter className="sm:justify-between items-center gap-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Switch checked={ativo} onCheckedChange={setAtivo} />
+            <span className="text-sm">Etapa ativa</span>
+          </label>
+          <div className="flex gap-2">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button disabled={!nome.trim()} onClick={() => onSave({
             id: initial?.id, nome, slug, sla_minutos: slaMin, cor,
             is_initial: isInitial, is_final: isFinal, pausa_sla: pausaSla, ativo,
             visible_sections: visibleSections,
+            inicia_sla: gatilhoEmOutra ? false : iniciaSla,
           })}>Salvar</Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Linha densa de switch dentro do bloco "Comportamento". */
+function ToggleRow({
+  icon, label, hint, checked, onChange, disabled, className,
+}: {
+  icon?: React.ReactNode; label: string; hint?: string;
+  checked: boolean; onChange: (v: boolean) => void; disabled?: boolean; className?: string;
+}) {
+  return (
+    <div className={`flex items-center gap-2 px-3 py-2.5 ${disabled ? "opacity-60" : ""} ${className ?? ""}`}>
+      {icon ? <span className="shrink-0">{icon}</span> : <span className="w-3.5 shrink-0" />}
+      <div className="min-w-0 flex-1">
+        <Label className="text-sm font-normal leading-tight block">{label}</Label>
+        {hint && <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{hint}</p>}
+      </div>
+      <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} className="shrink-0" />
+    </div>
   );
 }

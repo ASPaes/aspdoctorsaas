@@ -31,11 +31,14 @@ interface JourneyRow {
   demand_type_nome: string | null;
   setor_nome: string | null;
   sla_onb_corrido_min: number | null;
+  sla_onb_pausado_min: number | null;
   sla_onb_util_min: number | null;
   sla_imp_corrido_min: number | null;
+  sla_imp_pausado_min: number | null;
   sla_imp_util_min: number | null;
   sla_total_corrido_min: number | null;
   sla_total_pausado_min: number | null;
+  sla_total_util_min: number | null;
 }
 
 interface TrainingRow {
@@ -119,7 +122,7 @@ export default function OnboardingDashboardPage() {
     queryFn: async () => {
       const rows = await fetchAllRows<JourneyRow>(() => {
         let q = (supabase.from("vw_onboarding_journeys" as any) as any)
-          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, concluido_em, pipeline_onboarding_id, pipeline_implantacao_id, demand_type_nome, setor_nome, sla_onb_corrido_min, sla_onb_util_min, sla_imp_corrido_min, sla_imp_util_min, sla_total_corrido_min, sla_total_pausado_min")
+          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, concluido_em, pipeline_onboarding_id, pipeline_implantacao_id, demand_type_nome, setor_nome, sla_onb_corrido_min, sla_onb_pausado_min, sla_onb_util_min, sla_imp_corrido_min, sla_imp_pausado_min, sla_imp_util_min, sla_total_corrido_min, sla_total_pausado_min, sla_total_util_min")
           .eq("tenant_id", effectiveTenantId);
         if (selectedUnidadeIds.length > 0) q = q.in("cliente_unidade_id", selectedUnidadeIds);
         return q;

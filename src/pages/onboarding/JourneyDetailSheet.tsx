@@ -52,6 +52,9 @@ interface Journey {
   etapa_atual_min: number | null;
   etapa_semaforo: string | null;
   go_live_previsto: string | null;
+  /** Data de abertura da jornada (onboarding_journeys.created_at). Somente leitura. */
+  aberta_em: string | null;
+  sla_total_util_min: number | null;
   data_inicio_planejado: string | null;
   pipeline_id?: string | null;
   demand_type_id?: string | null;
@@ -84,6 +87,9 @@ const SEMAFORO_COLOR: Record<string, string> = {
   sem_sla: "hsl(215 16% 47%)",
 };
 
+import { formatMinUtil } from "./slaFormat";
+
+/** Duração de CALENDÁRIO (1 dia = 24h). Para minutos de expediente use formatMinUtil. */
 function formatMin(min: number | null | undefined): string {
   if (min == null) return "—";
   if (min < 60) return `${Math.round(min)}m`;
@@ -339,11 +345,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journeyId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_stage_history" as any) as any)
-        .select("id, stage_id, entrou_em, saiu_em, duracao_minutos")
+        .select("id, stage_id, entrou_em, saiu_em, duracao_minutos, duracao_util_minutos")
         .eq("journey_id", journeyId)
         .order("entrou_em", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; stage_id: string; entrou_em: string; saiu_em: string | null; duracao_minutos: number | null }>;
+      return (data ?? []) as Array<{ id: string; stage_id: string; entrou_em: string; saiu_em: string | null; duracao_minutos: number | null; duracao_util_minutos: number | null }>;
     },
   });
 
@@ -702,7 +708,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   }, [events]);
 
   const historyByStage = useMemo(() => {
-    const m: Record<string, { entrou_em: string; saiu_em: string | null; duracao_minutos: number | null }> = {};
+    const m: Record<string, { entrou_em: string; saiu_em: string | null; duracao_minutos: number | null; duracao_util_minutos: number | null }> = {};
     history.forEach((h) => {
       if (!m[h.stage_id] || new Date(h.entrou_em) > new Date(m[h.stage_id].entrou_em)) {
         m[h.stage_id] = h;
@@ -832,6 +838,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       .sort((a, b) => b.minutos - a.minutos);
   }, [pausesByReasonQ.data]);
 
+  // Acumulado em MINUTOS DE EXPEDIENTE — mesma base de etapa_atual_min e do SLA da etapa.
+  // duracao_util_minutos é o campo certo; duracao_minutos (calendário) só entra como
+  // último recurso em histórico anterior ao backfill.
   const accumulatedByStage = useMemo(() => {
     const m: Record<string, number> = {};
     let acc = 0;
@@ -840,8 +849,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       const h = historyByStage[s.id];
       if (isCurrent) {
         acc += journey?.etapa_atual_min ?? 0;
-      } else if (currentStageIndex >= 0 && idx < currentStageIndex && h?.duracao_minutos != null) {
-        acc += h.duracao_minutos;
+      } else if (currentStageIndex >= 0 && idx < currentStageIndex) {
+        acc += h?.duracao_util_minutos ?? h?.duracao_minutos ?? 0;
       }
       m[s.id] = acc;
     });
@@ -1671,14 +1680,18 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
 
               <div className="flex flex-wrap gap-2 mt-3">
                 <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1.5">
+                  <span className="text-[9px] uppercase text-muted-foreground">Aberta em</span>
+                  <span className="text-[11px] font-mono font-semibold">{formatDate(journey.aberta_em)}</span>
+                </div>
+                <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1.5">
                   <span className="text-[9px] uppercase text-muted-foreground">Onb</span>
-                  <span className="text-[11px] font-mono font-semibold">{formatMin(journey.sla_onb_util_min)}</span>
-                  <span className="text-[10px] text-muted-foreground">· pausa {formatMin(journey.sla_onb_pausado_min)}</span>
+                  <span className="text-[11px] font-mono font-semibold">{formatMinUtil(journey.sla_onb_util_min)}</span>
+                  <span className="text-[10px] text-muted-foreground">· pausa {formatMinUtil(journey.sla_onb_pausado_min)}</span>
                 </div>
                 <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1.5">
                   <span className="text-[9px] uppercase text-muted-foreground">Impl</span>
                   <span className="text-[11px] font-mono font-semibold">
-                    {journey.implantacao_iniciada_em ? formatMin(journey.sla_imp_util_min) : "—"}
+                    {journey.implantacao_iniciada_em ? formatMinUtil(journey.sla_imp_util_min) : "—"}
                   </span>
                 </div>
                 <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1.5">
@@ -1726,7 +1739,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       <Node s={s1} n="1" />
                       <div>
                         <div className={`text-xs font-medium ${s1==="todo"?"text-muted-foreground":""}`}>Onboarding</div>
-                        <div className="text-[10px] text-muted-foreground font-mono">{formatMin(journey.sla_onb_util_min)}</div>
+                        <div className="text-[10px] text-muted-foreground font-mono">{formatMinUtil(journey.sla_onb_util_min)}</div>
                       </div>
                     </div>
                     <Line mode={line1 ? "full" : "none"} />
@@ -1737,7 +1750,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           Implantação{s2==="cur" && journey.stage_nome ? ` · ${journey.stage_nome}` : ""}
                         </div>
                         <div className="text-[10px] text-muted-foreground font-mono">
-                          {s2==="cur" ? `${formatMin(journey.etapa_atual_min)} nesta etapa` : s2==="done" ? formatMin(journey.sla_imp_util_min) : "não iniciada"}
+                          {s2==="cur" ? `${formatMinUtil(journey.etapa_atual_min)} nesta etapa` : s2==="done" ? formatMinUtil(journey.sla_imp_util_min) : "não iniciada"}
                         </div>
                       </div>
                     </div>
@@ -2753,11 +2766,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="text-xs font-medium truncate">{s.nome}</span>
                                   {h?.duracao_minutos != null && !isCurrent && (
-                                    <span className="text-[10px] text-muted-foreground shrink-0">{formatMin(h.duracao_minutos)}</span>
+                                    <span className="text-[10px] text-muted-foreground shrink-0">{formatMinUtil(h.duracao_util_minutos ?? h.duracao_minutos)}</span>
                                   )}
                                   {isCurrent && journey.etapa_atual_min != null && (
                                     <span className="text-[10px] font-medium shrink-0" style={{ color: slaColor }}>
-                                      {formatMin(journey.etapa_atual_min)}
+                                      {formatMinUtil(journey.etapa_atual_min)}
                                     </span>
                                   )}
                                 </div>
@@ -2769,7 +2782,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                 )}
                                 {(isCurrent || isPast) && accumulatedByStage[s.id] > 0 && (
                                   <p className="text-[10px] text-muted-foreground/80 mt-0.5">
-                                    Acumulado até aqui: <span className="font-medium text-foreground/80">{formatMin(accumulatedByStage[s.id])}</span>
+                                    Acumulado até aqui: <span className="font-medium text-foreground/80">{formatMinUtil(accumulatedByStage[s.id])}</span>
                                   </p>
                                 )}
                               </div>
@@ -2858,18 +2871,18 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       <div className="p-3 grid grid-cols-3 gap-3">
                         <div className="rounded-md border border-border bg-card p-2.5">
                           <div className="text-[11px] font-medium mb-1">Onboarding</div>
-                          <div className="text-sm font-semibold">{formatMin(journey.sla_onb_util_min)}</div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5">pausado {formatMin(journey.sla_onb_pausado_min)}</div>
+                          <div className="text-sm font-semibold">{formatMinUtil(journey.sla_onb_util_min)}</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">pausado {formatMinUtil(journey.sla_onb_pausado_min)}</div>
                         </div>
                         <div className="rounded-md border border-border bg-card p-2.5">
                           <div className="text-[11px] font-medium mb-1">Implantação</div>
-                          <div className="text-sm font-semibold">{journey.implantacao_iniciada_em ? formatMin(journey.sla_imp_util_min) : "—"}</div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5">{journey.implantacao_iniciada_em ? `pausado ${formatMin(journey.sla_imp_pausado_min)}` : "não iniciada"}</div>
+                          <div className="text-sm font-semibold">{journey.implantacao_iniciada_em ? formatMinUtil(journey.sla_imp_util_min) : "—"}</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">{journey.implantacao_iniciada_em ? `pausado ${formatMinUtil(journey.sla_imp_pausado_min)}` : "não iniciada"}</div>
                         </div>
                         <div className="rounded-md border border-border bg-card p-2.5">
                           <div className="text-[11px] font-medium mb-1">Total</div>
                           <div className="text-sm font-semibold">{formatMin(journey.sla_total_corrido_min)}</div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5">efetivo {formatMin(Math.max(0,(journey.sla_total_corrido_min ?? 0)-(journey.sla_total_pausado_min ?? 0)))}</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">efetivo {formatMinUtil(journey.sla_total_util_min)}</div>
                         </div>
                       </div>
                     </section>
