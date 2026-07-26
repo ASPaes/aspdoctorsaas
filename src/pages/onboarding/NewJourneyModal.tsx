@@ -32,7 +32,8 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
   const [goLive, setGoLive] = useState<string>("");
   const [goLiveEdited, setGoLiveEdited] = useState(false);
   const [demandTypeId, setDemandTypeId] = useState<string>("");
-  const [implantadorUserId, setImplantadorUserId] = useState<string>("");
+  // "auto" = deixa o motor de distribuição escolher (padrão).
+  const [implantadorUserId, setImplantadorUserId] = useState<string>("auto");
   const [saving, setSaving] = useState(false);
 
   const clienteBuscaDebounced = useDebouncedValue(clienteBusca, 300);
@@ -42,7 +43,7 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
       setClienteId(""); setClienteLabel(""); setClienteBusca("");
       setProdutoId(""); setAssunto(""); setDataInicio(""); setGoLive("");
       setGoLiveEdited(false);
-      setDemandTypeId(""); setImplantadorUserId("");
+      setDemandTypeId(""); setImplantadorUserId("auto");
     }
   }, [open]);
 
@@ -90,9 +91,34 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
     },
   });
 
+  // Pool do rodízio: membros do setor do pipeline daquele produto, com a carga
+  // atual de cada um. Depende do produto porque o pipeline é escolhido por ele.
+  const poolQuery = useQuery({
+    queryKey: ["onb-assignment-pool", tenantId, produtoId, fase],
+    enabled: open && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("fn_onboarding_assignment_pool", {
+        p_tenant_id: tenantId,
+        p_department_id: null,
+        p_produto_id: produtoId ? Number(produtoId) : null,
+        p_fase: "onboarding",
+      });
+      if (error) throw error;
+      return (data ?? null) as {
+        department_id: string | null;
+        department_nome: string | null;
+        membros: Array<{ user_id: string; nome: string; jornadas_ativas: number; no_rodizio: boolean }>;
+      } | null;
+    },
+  });
+
+  const temSetor = !!poolQuery.data?.department_id;
+  const poolMembros = poolQuery.data?.membros ?? [];
+
+  // Fallback de quando o pipeline ainda não tem setor: lista de sempre.
   const membrosQuery = useQuery({
     queryKey: ["onb-membros", tenantId],
-    enabled: open && !!tenantId,
+    enabled: open && !!tenantId && !temSetor,
     queryFn: async () => {
       const { data: profiles, error: pErr } = await supabase
         .from("profiles")
@@ -160,7 +186,8 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
         p_data_inicio_planejado: dataInicio || null,
         p_go_live_previsto: goLive || null,
         p_demand_type_id: demandTypeId || null,
-        p_implantador_user_id: implantadorUserId || null,
+        // "auto" → o motor de distribuição escolhe (fn_onboarding_pick_assignee)
+        p_implantador_user_id: implantadorUserId === "auto" ? null : implantadorUserId || null,
       });
       if (error) throw error;
       const res = data as any;
@@ -257,14 +284,31 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
             <Label>Responsável</Label>
             <Select value={implantadorUserId} onValueChange={setImplantadorUserId}>
               <SelectTrigger>
-                <SelectValue placeholder={membrosQuery.isLoading ? "Carregando..." : "Selecione (opcional)"} />
+                <SelectValue placeholder={poolQuery.isLoading ? "Carregando..." : "Selecione"} />
               </SelectTrigger>
               <SelectContent>
-                {(membrosQuery.data ?? []).map((m) => (
-                  <SelectItem key={m.user_id} value={m.user_id}>{m.nome}</SelectItem>
-                ))}
+                <SelectItem value="auto">Automático (rodízio)</SelectItem>
+                {temSetor
+                  ? poolMembros.map((m) => (
+                      <SelectItem key={m.user_id} value={m.user_id}>
+                        <span className="flex items-center gap-2">
+                          <span>{m.nome}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {m.jornadas_ativas === 1 ? "1 jornada" : `${m.jornadas_ativas} jornadas`}
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))
+                  : (membrosQuery.data ?? []).map((m) => (
+                      <SelectItem key={m.user_id} value={m.user_id}>{m.nome}</SelectItem>
+                    ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              {temSetor
+                ? `Rodízio entre o setor ${poolQuery.data?.department_nome}.`
+                : "Este pipeline não tem setor definido — no automático, você fica como responsável. Configure em Configuração › Distribuição."}
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label>Produto *</Label>

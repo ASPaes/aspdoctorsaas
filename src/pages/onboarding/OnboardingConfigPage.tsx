@@ -12,6 +12,7 @@ import { TrainingTypesPanel } from "./config/TrainingTypesPanel";
 import { VendorReturnReasonsPanel } from "./config/VendorReturnReasonsPanel";
 import { AccountingFieldsPanel } from "./config/AccountingFieldsPanel";
 import { ParticipantRolesPanel } from "./config/ParticipantRolesPanel";
+import { DistribuicaoPanel } from "./config/DistribuicaoPanel";
 import { GenerateOperationAIDialog } from "./config/GenerateOperationAIDialog";
 
 type Fase = "onboarding" | "implantacao";
@@ -20,7 +21,7 @@ export default function OnboardingConfigPage() {
   const { profile, profileLoading } = useAuth();
   const { canAccess, isLoading: accessLoading } = useOnboardingAccess();
   const [fase, setFase] = useState<Fase>("onboarding");
-  const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas" | "treinos" | "retornos" | "contabilidade" | "papeis">("pipelines");
+  const [tab, setTab] = useState<"pipelines" | "distribuicao" | "motivos" | "demandas" | "treinos" | "retornos" | "contabilidade" | "papeis">("pipelines");
   const [aiOpen, setAiOpen] = useState(false);
   const canGenerateAI = profile?.role === "admin" || profile?.is_super_admin === true;
 
@@ -79,6 +80,7 @@ export default function OnboardingConfigPage() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="flex-1 flex flex-col min-h-0">
         <TabsList className="mx-4 mt-3 self-start">
           <TabsTrigger value="pipelines">Pipelines & Etapas</TabsTrigger>
+          <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>
           <TabsTrigger value="motivos">Motivos de Parada</TabsTrigger>
           <TabsTrigger value="demandas">Tipos de demanda</TabsTrigger>
           <TabsTrigger value="treinos">Tipos de treino</TabsTrigger>
@@ -89,6 +91,9 @@ export default function OnboardingConfigPage() {
 
         <TabsContent value="pipelines" className="flex-1 min-h-0 p-4 pt-3">
           <PipelinesPanel fase={fase} />
+        </TabsContent>
+        <TabsContent value="distribuicao" className="flex-1 min-h-0 overflow-y-auto p-4 pt-3">
+          <DistribuicaoPanel />
         </TabsContent>
         <TabsContent value="motivos" className="flex-1 min-h-0 p-4 pt-3">
           <PauseReasonsPanel />
