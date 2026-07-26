@@ -13,10 +13,13 @@ BEGIN
      AND column_name IN ('id','tenant_id','nome','slug','cor','ativo','position','created_at','updated_at');
   IF v_qtd <> 9 THEN RAISE EXCEPTION 'FALHOU 1: onboarding_participant_roles tem % das 9 colunas esperadas', v_qtd; END IF;
 
-  -- 2. RLS ligada com as 4 policies
+  -- 2. RLS ligada com as 4 policies, todas mirando `authenticated` (padrão do módulo).
+  --    Com `TO public`, o role anon estoura "permission denied for function
+  --    can_access_tenant_row" em vez de só não enxergar linha nenhuma.
   SELECT count(*) INTO v_qtd FROM pg_policies
-   WHERE schemaname='public' AND tablename='onboarding_participant_roles';
-  IF v_qtd <> 4 THEN RAISE EXCEPTION 'FALHOU 2: esperava 4 policies, achei %', v_qtd; END IF;
+   WHERE schemaname='public' AND tablename='onboarding_participant_roles'
+     AND roles::text = '{authenticated}';
+  IF v_qtd <> 4 THEN RAISE EXCEPTION 'FALHOU 2: esperava 4 policies TO authenticated, achei %', v_qtd; END IF;
 
   -- 3. todo tenant existente recebeu os 4 papéis-semente
   SELECT count(*) INTO v_qtd

@@ -24,22 +24,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS onboarding_participant_roles_tenant_slug_key
 
 ALTER TABLE public.onboarding_participant_roles ENABLE ROW LEVEL SECURITY;
 
+-- `TO authenticated` segue o padrão das demais tabelas do módulo
+-- (onboarding_pause_reasons, onboarding_demand_types). Sem isso a policy vale
+-- para `public`, e o role anon estoura "permission denied for function
+-- can_access_tenant_row" em vez de simplesmente não enxergar linha nenhuma.
 DROP POLICY IF EXISTS onboarding_participant_roles_sel ON public.onboarding_participant_roles;
 CREATE POLICY onboarding_participant_roles_sel ON public.onboarding_participant_roles
-  FOR SELECT USING (public.can_access_tenant_row(tenant_id));
+  FOR SELECT TO authenticated USING (public.can_access_tenant_row(tenant_id));
 
 DROP POLICY IF EXISTS onboarding_participant_roles_ins ON public.onboarding_participant_roles;
 CREATE POLICY onboarding_participant_roles_ins ON public.onboarding_participant_roles
-  FOR INSERT WITH CHECK (public.can_access_tenant_row(tenant_id));
+  FOR INSERT TO authenticated WITH CHECK (public.can_access_tenant_row(tenant_id));
 
 DROP POLICY IF EXISTS onboarding_participant_roles_upd ON public.onboarding_participant_roles;
 CREATE POLICY onboarding_participant_roles_upd ON public.onboarding_participant_roles
-  FOR UPDATE USING (public.can_access_tenant_row(tenant_id))
-           WITH CHECK (public.can_access_tenant_row(tenant_id));
+  FOR UPDATE TO authenticated USING (public.can_access_tenant_row(tenant_id))
+                          WITH CHECK (public.can_access_tenant_row(tenant_id));
 
 DROP POLICY IF EXISTS onboarding_participant_roles_del ON public.onboarding_participant_roles;
 CREATE POLICY onboarding_participant_roles_del ON public.onboarding_participant_roles
-  FOR DELETE USING (public.can_access_tenant_row(tenant_id));
+  FOR DELETE TO authenticated USING (public.can_access_tenant_row(tenant_id));
 
 -- Guarda dos papéis-semente.
 CREATE OR REPLACE FUNCTION public.fn_guard_onboarding_participant_role()

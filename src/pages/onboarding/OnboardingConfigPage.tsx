@@ -11,6 +11,7 @@ import { DemandTypesPanel } from "./config/DemandTypesPanel";
 import { TrainingTypesPanel } from "./config/TrainingTypesPanel";
 import { VendorReturnReasonsPanel } from "./config/VendorReturnReasonsPanel";
 import { AccountingFieldsPanel } from "./config/AccountingFieldsPanel";
+import { ParticipantRolesPanel } from "./config/ParticipantRolesPanel";
 import { GenerateOperationAIDialog } from "./config/GenerateOperationAIDialog";
 
 type Fase = "onboarding" | "implantacao";
@@ -19,7 +20,7 @@ export default function OnboardingConfigPage() {
   const { profile, profileLoading } = useAuth();
   const { canAccess, isLoading: accessLoading } = useOnboardingAccess();
   const [fase, setFase] = useState<Fase>("onboarding");
-  const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas" | "treinos" | "retornos" | "contabilidade">("pipelines");
+  const [tab, setTab] = useState<"pipelines" | "motivos" | "demandas" | "treinos" | "retornos" | "contabilidade" | "papeis">("pipelines");
   const [aiOpen, setAiOpen] = useState(false);
   const canGenerateAI = profile?.role === "admin" || profile?.is_super_admin === true;
 
@@ -81,6 +82,7 @@ export default function OnboardingConfigPage() {
           <TabsTrigger value="motivos">Motivos de Parada</TabsTrigger>
           <TabsTrigger value="demandas">Tipos de demanda</TabsTrigger>
           <TabsTrigger value="treinos">Tipos de treino</TabsTrigger>
+          <TabsTrigger value="papeis">Papéis</TabsTrigger>
           <TabsTrigger value="retornos">Retorno ao vendedor</TabsTrigger>
           <TabsTrigger value="contabilidade">Dados da contabilidade</TabsTrigger>
         </TabsList>
@@ -96,6 +98,9 @@ export default function OnboardingConfigPage() {
         </TabsContent>
         <TabsContent value="treinos" className="flex-1 min-h-0 p-4 pt-3">
           <TrainingTypesPanel />
+        </TabsContent>
+        <TabsContent value="papeis" className="flex-1 min-h-0 p-4 pt-3">
+          <ParticipantRolesPanel />
         </TabsContent>
         <TabsContent value="retornos" className="flex-1 min-h-0 p-4 pt-3">
           <VendorReturnReasonsPanel />
