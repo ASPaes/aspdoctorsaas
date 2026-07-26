@@ -24,6 +24,8 @@ import {
   Sparkles, Rocket, StickyNote, Undo2, XCircle, Tag,
 } from "lucide-react";
 import { useOnboardingParticipantRoles } from "@/hooks/useOnboardingParticipantRoles";
+import { TransferResponsavelDialog } from "./TransferResponsavelDialog";
+import { ResponsavelHistorico } from "./ResponsavelHistorico";
 
 
 interface Props {
@@ -69,6 +71,8 @@ interface Journey {
   sla_total_pausado_min?: number | null;
   cliente_unidade_id?: number | null;
   cliente_unidade_nome?: string | null;
+  responsavel_user_id?: string | null;
+  responsavel_nome?: string | null;
 }
 
 
@@ -199,6 +203,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelMotivo, setCancelMotivo] = useState("");
   const [addParticipantOpen, setAddParticipantOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
   const [newParticipantUserId, setNewParticipantUserId] = useState<string>("");
   const [newParticipantRoleId, setNewParticipantRoleId] = useState<string>("");
 
@@ -2203,10 +2208,19 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     {/* Participantes */}
                   {secVisible("participantes") && (
                     <section className="rounded-lg border border-border">
-                      <div className="p-3 border-b border-border flex items-center justify-between">
+                      <div className="p-3 border-b border-border flex items-center justify-between gap-2">
                         <h3 className="text-sm font-semibold flex items-center gap-2">
                           <Users className="h-4 w-4" /> Responsável & participantes
                         </h3>
+                        <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => setTransferOpen(true)}
+                        >
+                          <ArrowRight className="h-3.5 w-3.5 mr-1" /> Transferir
+                        </Button>
                         <Popover open={addParticipantOpen} onOpenChange={setAddParticipantOpen}>
                           <PopoverTrigger asChild>
                             <Button size="sm" variant="outline" className="h-7 text-xs">
@@ -2239,8 +2253,17 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                             <Button size="sm" className="w-full" onClick={handleAddParticipant}>Adicionar</Button>
                           </PopoverContent>
                         </Popover>
+                        </div>
                       </div>
                       <div className="p-3 space-y-2">
+                        {!journey?.responsavel_user_id && (
+                          <div className="flex items-center justify-between gap-2 rounded-md border border-dashed border-border px-2.5 py-2">
+                            <span className="text-xs text-muted-foreground">Sem responsável definido.</span>
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setTransferOpen(true)}>
+                              Definir responsável
+                            </Button>
+                          </div>
+                        )}
                         {(participantsQ.data ?? []).length === 0 ? (
                           <p className="text-xs text-muted-foreground py-2 text-center">Nenhum participante cadastrado.</p>
                         ) : (
@@ -2266,7 +2289,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                     key={p.id}
                                     className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-1.5"
                                   >
-                                    {isRespGroup ? (
+                                    {isRespGroup && p.user_id === journey?.responsavel_user_id ? (
                                       <Star className="h-3.5 w-3.5 shrink-0" style={{ color: role.cor }} fill={role.cor} />
                                     ) : (
                                       <User className="h-3.5 w-3.5 shrink-0" style={{ color: role.cor }} />
@@ -2294,6 +2317,13 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                               </div>
                             );
                           })
+                        )}
+                        {journeyId && (
+                          <ResponsavelHistorico
+                            journeyId={journeyId}
+                            tenantId={tenantId}
+                            nomePorUserId={memberNameMap}
+                          />
                         )}
                       </div>
                     </section>
@@ -2883,6 +2913,23 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         </div>
       </DialogContent>
     </Dialog>
+
+    {journeyId && (
+      <TransferResponsavelDialog
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        journeyId={journeyId}
+        responsavelAtualNome={journey?.responsavel_nome ?? null}
+        membros={tenantMembersQ.data ?? []}
+        onTransferido={() => {
+          qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+          qc.invalidateQueries({ queryKey: ["onboarding-participants"] });
+          qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+          qc.invalidateQueries({ queryKey: ["onboarding-responsavel-history"] });
+          qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+        }}
+      />
+    )}
     </>
 
   );
