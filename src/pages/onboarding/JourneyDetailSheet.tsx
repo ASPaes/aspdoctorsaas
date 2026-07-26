@@ -22,6 +22,7 @@ import {
   UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle, Ban, Building2,
   ExternalLink, Link2,
   Sparkles, Rocket, StickyNote, Undo2, XCircle, Tag,
+  Check, ChevronDown,
 } from "lucide-react";
 import { useOnboardingParticipantRoles } from "@/hooks/useOnboardingParticipantRoles";
 import { TransferResponsavelDialog } from "./TransferResponsavelDialog";
@@ -1133,6 +1134,32 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao adicionar participante");
+    }
+  }
+
+  // Quem pode trocar o papel de um participante: o responsavel pela jornada,
+  // admin/head, ou super admin. A regra tambem e aplicada dentro da RPC — isso
+  // aqui e so para nao mostrar um controle que vai falhar.
+  const podeEditarPapel =
+    profile?.is_super_admin === true ||
+    profile?.role === "admin" ||
+    profile?.role === "head" ||
+    (!!user?.id && user.id === journey?.responsavel_user_id);
+
+  async function handleChangeParticipantRole(participantId: string, roleId: string) {
+    try {
+      const { data, error } = await (supabase.rpc as any)("set_onboarding_participant_role", {
+        p_participant_id: participantId,
+        p_role_id: roleId,
+      });
+      if (error) throw error;
+      if (!(data as any)?.inalterado) {
+        toast.success(`Papel alterado para ${(data as any)?.papel_nome ?? "novo papel"}`);
+      }
+      qc.invalidateQueries({ queryKey: ["onboarding-participants"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao alterar o papel");
     }
   }
 
@@ -2319,13 +2346,46 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                         Responsável
                                       </Badge>
                                     )}
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[9px]"
-                                      style={{ borderColor: role.cor, color: role.cor }}
-                                    >
-                                      {role.nome}
-                                    </Badge>
+                                    {podeEditarPapel ? (
+                                      <Popover>
+                                        <PopoverTrigger asChild>
+                                          <button
+                                            type="button"
+                                            title="Alterar papel"
+                                            className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-semibold transition-opacity hover:opacity-70"
+                                            style={{ borderColor: role.cor, color: role.cor }}
+                                          >
+                                            {role.nome}
+                                            <ChevronDown className="h-2.5 w-2.5" />
+                                          </button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-48 p-1" align="end">
+                                          {rolesAtivos.map((r) => (
+                                            <button
+                                              key={r.id}
+                                              type="button"
+                                              onClick={() => handleChangeParticipantRole(p.id, r.id)}
+                                              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted"
+                                            >
+                                              <span
+                                                className="h-2 w-2 shrink-0 rounded-full"
+                                                style={{ background: r.cor }}
+                                              />
+                                              <span className="flex-1 truncate">{r.nome}</span>
+                                              {r.id === role.id && <Check className="h-3.5 w-3.5 shrink-0" />}
+                                            </button>
+                                          ))}
+                                        </PopoverContent>
+                                      </Popover>
+                                    ) : (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[9px]"
+                                        style={{ borderColor: role.cor, color: role.cor }}
+                                      >
+                                        {role.nome}
+                                      </Badge>
+                                    )}
                                     {isResp ? (
                                       // Remover o responsavel deixaria a jornada com um
                                       // responsavel que nao aparece na lista. Transfira antes.
