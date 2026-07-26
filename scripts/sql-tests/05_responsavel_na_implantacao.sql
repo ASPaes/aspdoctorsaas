@@ -116,15 +116,17 @@ BEGIN
     RAISE EXCEPTION 'FALHOU 10: esperava 2 períodos no histórico, achei % (transferência repetida)', v_qtd;
   END IF;
 
-  -- 11. nenhum participante do banco continua como Especialista tendo conduzido treino
+  -- 11. o condutor DESTA jornada entrou como Implantador.
+  --     Escopo é a jornada do teste, de propósito: desde que existe o
+  --     set_onboarding_participant_role, qualquer um com permissão pode mover um
+  --     condutor de volta para Especialista legitimamente. "Nenhum condutor no
+  --     banco inteiro é Especialista" deixou de ser invariante — era só o estado
+  --     logo após o backfill.
   SELECT count(*) INTO v_qtd
     FROM public.onboarding_participants op
     JOIN public.onboarding_participant_roles r ON r.id = op.role_id
-    JOIN public.onboarding_journeys j ON j.ticket_id = op.ticket_id
-   WHERE r.slug = 'especialista'
-     AND EXISTS (SELECT 1 FROM public.onboarding_training_sessions ts
-                  WHERE ts.journey_id = j.id AND ts.conduzido_por = op.user_id);
-  IF v_qtd <> 0 THEN RAISE EXCEPTION 'FALHOU 11: % condutor(es) de treino ainda como Especialista', v_qtd; END IF;
+   WHERE op.ticket_id = v_ticket AND op.user_id = v_tecnico AND r.slug = 'implantador';
+  IF v_qtd <> 1 THEN RAISE EXCEPTION 'FALHOU 11: condutor do treino não está como Implantador nesta jornada'; END IF;
 
   RAISE NOTICE 'OK: 05_responsavel_na_implantacao — 11 asserções passaram';
 END $$;

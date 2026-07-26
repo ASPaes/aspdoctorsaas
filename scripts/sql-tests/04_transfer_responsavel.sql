@@ -124,14 +124,23 @@ BEGIN
    WHERE journey_id = v_jid AND responsavel_user_id = v_novo;
   IF NOT FOUND THEN RAISE EXCEPTION 'FALHOU 10: a view não reflete o novo responsável'; END IF;
 
-  -- 11. segunda transferência mantém a cadeia consistente (1 aberto, 2 fechados)
+  -- 11. segunda transferência mantém a cadeia consistente.
+  --     Conta o DELTA, não o total: a jornada é real e já pode ter histórico de
+  --     transferências anteriores. Contar o absoluto fazia o teste falhar por
+  --     dado acumulado, não por regressão.
+  SELECT count(*) INTO v_antes FROM public.onboarding_responsavel_history
+   WHERE journey_id = v_jid AND ate IS NOT NULL;
   PERFORM public.transfer_onboarding_responsavel(v_jid, v_atual, 'Volta do titular');
+
   SELECT count(*) INTO v_qtd FROM public.onboarding_responsavel_history
    WHERE journey_id = v_jid AND ate IS NULL;
   IF v_qtd <> 1 THEN RAISE EXCEPTION 'FALHOU 11a: esperava 1 período aberto, achei %', v_qtd; END IF;
+
   SELECT count(*) INTO v_qtd FROM public.onboarding_responsavel_history
    WHERE journey_id = v_jid AND ate IS NOT NULL;
-  IF v_qtd <> 2 THEN RAISE EXCEPTION 'FALHOU 11b: esperava 2 períodos fechados, achei %', v_qtd; END IF;
+  IF v_qtd <> v_antes + 1 THEN
+    RAISE EXCEPTION 'FALHOU 11b: a transferência deveria fechar exatamente 1 período (antes %, depois %)', v_antes, v_qtd;
+  END IF;
 
   -- 12. usuário de outro tenant é rejeitado
   SELECT p.user_id INTO v_novo FROM public.profiles p
