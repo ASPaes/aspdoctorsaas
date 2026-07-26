@@ -2142,7 +2142,9 @@ select
 
 Se `hash_view` mudou em relação ao que foi capturado, **recapturar a view e refazer a Task 5 Step 3** antes de prosseguir.
 
-- [ ] **Step 2: Aplicar as 4 migrations, uma por vez, na ordem**
+- [ ] **Step 2: Aplicar as 6 migrations, uma por vez, na ordem**
+
+> Eram 4 quando o plano foi escrito. Viraram **6** com os pedidos de 26/07 (transferência automática na virada para implantação e edição de papel do participante). A ordem é obrigatória: a 094000 usa `fn_onboarding_role_id` da 091000 e o histórico da 092000; a 095000 usa a coluna `responsavel_user_id` da 092000.
 
 Via `mcp__supabase-doctor__apply_migration`, uma chamada por arquivo, **conferindo o resultado antes da próxima**:
 
@@ -2150,8 +2152,14 @@ Via `mcp__supabase-doctor__apply_migration`, uma chamada por arquivo, **conferin
 2. `20260726091000_onboarding_participants_role_id`
 3. `20260726092000_onboarding_responsavel`
 4. `20260726093000_transfer_onboarding_responsavel`
+5. `20260726094000_responsavel_automatico_na_implantacao`
+6. `20260726095000_set_onboarding_participant_role`
+
+As 6 são idempotentes e foram validadas rodando em sequência, do zero, no banco local.
 
 Se a #2 abortar com `Backfill incompleto`, **parar**: existe participante com papel sem correspondência. Diagnosticar, não contornar.
+
+**⚠️ Armadilha para quem for aplicar (vale para qualquer sessão):** as 6 migrations já estão aplicadas no **banco local**, então o local está bem à frente da produção. Se você precisar recriar alguma função com `CREATE OR REPLACE`, **capture a definição de PRODUÇÃO**, nunca do local — senão você carrega mudanças destas migrations para dentro da sua. Já aconteceu o inverso neste repo: o local tinha comentários que a produção não tinha em `create_onboarding_training` e `advance_onboarding_to_implantacao`. Compare sempre o `md5(pg_get_functiondef(...))` dos dois lados antes de editar.
 
 - [ ] **Step 3: Rodar as asserções contra produção, em modo rollback-safe**
 
@@ -2173,6 +2181,29 @@ select
 ```
 
 Esperado: `0, 0, 0, 0, 1`. Qualquer outro valor = investigar antes de liberar a UI.
+
+E a segunda leva (migrations 094000 e 095000):
+
+```sql
+select
+  (select count(*) from public.onboarding_participants op
+    join public.onboarding_participant_roles r on r.id = op.role_id
+    join public.onboarding_journeys j on j.ticket_id = op.ticket_id
+   where r.slug = 'especialista'
+     and exists (select 1 from public.onboarding_training_sessions ts
+                  where ts.journey_id = j.id and ts.conduzido_por = op.user_id)) as condutor_ainda_especialista,
+  (select count(*) from information_schema.columns
+    where table_schema='public' and table_name='onboarding_participants'
+      and column_name='papel' and column_default is not null) as papel_ainda_com_default,
+  (select count(*) from public.onboarding_participants op
+    join public.onboarding_participant_roles r on r.id = op.role_id
+   where op.papel is not null and r.slug is distinct from op.papel::text) as papel_legado_mentindo,
+  (select count(*) from information_schema.routine_privileges
+    where routine_schema='public' and routine_name='set_onboarding_participant_role'
+      and grantee='authenticated') as grant_set_role;
+```
+
+Esperado: `0, 0, 0, 1`.
 
 - [ ] **Step 4: Regenerar os tipos do Supabase**
 
