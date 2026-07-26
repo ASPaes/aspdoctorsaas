@@ -416,7 +416,11 @@ export default function OnboardingPage() {
           );
           return;
         }
-        toast.success("Onboarding concluído — jornada em Implantação.");
+        toast.success(
+          res?.novo_responsavel_nome
+            ? `Onboarding concluído — implantação com ${res.novo_responsavel_nome}.`
+            : "Onboarding concluído — jornada em Implantação."
+        );
         queryClient.invalidateQueries({ queryKey: ["onboarding-journeys"] });
         queryClient.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
         queryClient.invalidateQueries({ queryKey: ["onboarding-stage-history"] });

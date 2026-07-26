@@ -17,12 +17,21 @@ BEGIN
   SELECT count(*) INTO v_qtd FROM public.onboarding_participants WHERE role_id IS NULL;
   IF v_qtd <> 0 THEN RAISE EXCEPTION 'FALHOU 2: % participante(s) sem role_id', v_qtd; END IF;
 
-  -- 3. o backfill mapeou papel -> slug corretamente
+  -- 3. a coluna legada `papel` nunca contradiz o role_id.
+  --    Ela só existe para rollback até ser dropada; se ficar mentindo, o
+  --    rollback restauraria papéis errados. NULL é válido (papel criado pelo
+  --    tenant não tem correspondente no enum).
   SELECT count(*) INTO v_qtd
     FROM public.onboarding_participants op
     JOIN public.onboarding_participant_roles r ON r.id = op.role_id
    WHERE op.papel IS NOT NULL AND r.slug IS DISTINCT FROM op.papel::text;
-  IF v_qtd <> 0 THEN RAISE EXCEPTION 'FALHOU 3: % linha(s) com role_id divergente do papel antigo', v_qtd; END IF;
+  IF v_qtd <> 0 THEN RAISE EXCEPTION 'FALHOU 3: % linha(s) com papel legado contradizendo o role_id', v_qtd; END IF;
+
+  -- 3b. e o DEFAULT precisa ter caído, senão linha nova nasce mentindo
+  PERFORM 1 FROM information_schema.columns
+   WHERE table_schema='public' AND table_name='onboarding_participants'
+     AND column_name='papel' AND column_default IS NOT NULL;
+  IF FOUND THEN RAISE EXCEPTION 'FALHOU 3b: coluna legada papel ainda tem DEFAULT'; END IF;
 
   -- 4. role_id sempre aponta para papel do mesmo tenant
   SELECT count(*) INTO v_qtd

@@ -25,10 +25,26 @@ END $$;
 ALTER TABLE public.onboarding_participants ALTER COLUMN role_id SET NOT NULL;
 ALTER TABLE public.onboarding_participants ALTER COLUMN papel  DROP NOT NULL;
 
+-- O DEFAULT precisa cair junto. Sem isso, toda linha nova (o front não manda
+-- `papel`) nasceria com papel='implantador' mesmo com role_id de outro papel —
+-- a coluna legada ficaria mentindo até ser dropada.
+ALTER TABLE public.onboarding_participants ALTER COLUMN papel DROP DEFAULT;
+
 ALTER TABLE public.onboarding_participants
   DROP CONSTRAINT IF EXISTS onboarding_participants_ticket_id_user_id_papel_key;
-ALTER TABLE public.onboarding_participants
-  ADD CONSTRAINT onboarding_participants_ticket_user_role_key UNIQUE (ticket_id, user_id, role_id);
+
+-- Idempotente de propósito: o arquivo inteiro pode ser reaplicado sem estourar.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conrelid = 'public.onboarding_participants'::regclass
+       AND conname  = 'onboarding_participants_ticket_user_role_key'
+  ) THEN
+    ALTER TABLE public.onboarding_participants
+      ADD CONSTRAINT onboarding_participants_ticket_user_role_key UNIQUE (ticket_id, user_id, role_id);
+  END IF;
+END $$;
 
 -- Resolve o papel padrão de um tenant pelo slug, que é imutável.
 -- Sobrevive ao tenant renomear "Vendedor" para "Consultor Comercial".

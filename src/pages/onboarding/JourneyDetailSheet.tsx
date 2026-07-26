@@ -1224,7 +1224,13 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         toast.error(msg);
         return;
       }
-      toast.success("Onboarding concluído — jornada em Implantação.");
+      toast.success(
+        res?.novo_responsavel_nome
+          ? `Onboarding concluído — implantação com ${res.novo_responsavel_nome}.`
+          : "Onboarding concluído — jornada em Implantação."
+      );
+      qc.invalidateQueries({ queryKey: ["onboarding-responsavel-history"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-participants"] });
       qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
       qc.invalidateQueries({ queryKey: ["onboarding-journey-row", journeyId] });
       qc.invalidateQueries({ queryKey: ["onboarding-detail-stages"] });
