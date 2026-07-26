@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 import type { Profile } from "@/hooks/useProfile";
@@ -16,6 +16,20 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/**
+ * Mantém a mesma referência de profile quando os dados não mudaram — uma
+ * revalidação por foco de aba não deve re-renderizar todo consumidor de useAuth.
+ */
+function sameProfile(a: Profile | null, b: Profile | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -23,8 +37,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(true);
 
+  // Último usuário cujo profile foi efetivamente carregado.
+  const loadedProfileUserId = useRef<string | null>(null);
+
   const loadProfile = useCallback(async (userId: string) => {
-    setProfileLoading(true);
+    // Ao voltar de outra aba, o supabase-js reemite SIGNED_IN com a MESMA sessão
+    // (visibilitychange -> _recoverAndRefresh). Se isso levar profileLoading a
+    // true, todo guard que faz `if (profileLoading) return <spinner/>` desmonta
+    // a página — perdendo modal aberto e rascunho de texto. Nesse caso a
+    // releitura acontece em background, sem estado de carregamento.
+    const isRevalidation = loadedProfileUserId.current === userId;
+    if (!isRevalidation) setProfileLoading(true);
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -33,13 +56,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
       if (error) {
         console.error("Error loading profile:", error);
-        setProfile(null);
+        // Falha numa revalidação em background não derruba o profile em uso.
+        if (!isRevalidation) {
+          loadedProfileUserId.current = null;
+          setProfile(null);
+        }
       } else {
-        setProfile(data as Profile);
+        loadedProfileUserId.current = data ? userId : null;
+        setProfile((prev) => (sameProfile(prev, data as Profile) ? prev : (data as Profile)));
       }
     } catch (err) {
       console.error("Error loading profile:", err);
-      setProfile(null);
+      if (!isRevalidation) {
+        loadedProfileUserId.current = null;
+        setProfile(null);
+      }
     } finally {
       setProfileLoading(false);
     }
@@ -75,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (newUserId) {
           setTimeout(() => loadProfile(newUserId), 0);
         } else {
+          loadedProfileUserId.current = null;
           setProfile(null);
           setProfileLoading(false);
         }
@@ -103,6 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    loadedProfileUserId.current = null;
     setProfile(null);
     try { sessionStorage.removeItem("super-admin-tenant-filter"); } catch {}
     await supabase.auth.signOut();
