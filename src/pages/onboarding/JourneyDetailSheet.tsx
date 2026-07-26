@@ -23,21 +23,8 @@ import {
   ExternalLink, Link2,
   Sparkles, Rocket, StickyNote, Undo2, XCircle, Tag,
 } from "lucide-react";
+import { useOnboardingParticipantRoles } from "@/hooks/useOnboardingParticipantRoles";
 
-
-type Papel = "implantador" | "vendedor" | "especialista" | "outro";
-const PAPEL_OPTIONS: { value: Papel; label: string }[] = [
-  { value: "implantador", label: "Implantador" },
-  { value: "vendedor", label: "Vendedor" },
-  { value: "especialista", label: "Especialista" },
-  { value: "outro", label: "Outro" },
-];
-const PAPEL_COLOR: Record<Papel, string> = {
-  implantador: "hsl(142 71% 45%)",
-  vendedor: "hsl(199 89% 48%)",
-  especialista: "hsl(262 83% 58%)",
-  outro: "hsl(215 16% 47%)",
-};
 
 interface Props {
   open: boolean;
@@ -213,7 +200,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [cancelMotivo, setCancelMotivo] = useState("");
   const [addParticipantOpen, setAddParticipantOpen] = useState(false);
   const [newParticipantUserId, setNewParticipantUserId] = useState<string>("");
-  const [newParticipantPapel, setNewParticipantPapel] = useState<Papel>("especialista");
+  const [newParticipantRoleId, setNewParticipantRoleId] = useState<string>("");
 
   // Trainings
   const [addTrainingOpen, setAddTrainingOpen] = useState(false);
@@ -585,15 +572,27 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     },
   });
 
+  // Papeis vem do cadastro por tenant (onboarding_participant_roles), nao mais do enum.
+  const rolesQ = useOnboardingParticipantRoles(tenantId, { enabled: open });
+  const roles = useMemo(() => rolesQ.data ?? [], [rolesQ.data]);
+  const rolesAtivos = useMemo(() => roles.filter((r) => r.ativo), [roles]);
+  const roleMap = useMemo(() => new Map(roles.map((r) => [r.id, r])), [roles]);
+
+  useEffect(() => {
+    if (!newParticipantRoleId && rolesAtivos.length) {
+      setNewParticipantRoleId(rolesAtivos.find((r) => r.slug === "especialista")?.id ?? rolesAtivos[0].id);
+    }
+  }, [rolesAtivos, newParticipantRoleId]);
+
   const participantsQ = useQuery({
     queryKey: ["onboarding-participants", journey?.ticket_id],
     enabled: !!journey?.ticket_id,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_participants" as any) as any)
-        .select("id, user_id, papel, created_at")
+        .select("id, user_id, role_id, created_at")
         .eq("ticket_id", journey!.ticket_id!);
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; user_id: string; papel: Papel; created_at: string }>;
+      return (data ?? []) as Array<{ id: string; user_id: string; role_id: string; created_at: string }>;
     },
   });
 
@@ -1092,16 +1091,17 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   }
 
   async function handleAddParticipant() {
-    if (!journey?.ticket_id || !tenantId || !newParticipantUserId) {
-      toast.error("Selecione um usuário");
+    if (!journey?.ticket_id || !tenantId || !newParticipantUserId || !newParticipantRoleId) {
+      toast.error("Selecione o usuário e o papel");
       return;
     }
+    const papelNome = roleMap.get(newParticipantRoleId)?.nome ?? "participante";
     try {
       const { error } = await (supabase.from("onboarding_participants" as any) as any).insert({
         tenant_id: tenantId,
         ticket_id: journey.ticket_id,
         user_id: newParticipantUserId,
-        papel: newParticipantPapel,
+        role_id: newParticipantRoleId,
       });
       if (error) {
         if ((error as any).code === "23505") {
@@ -1118,13 +1118,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
           ticket_id: journey.ticket_id,
           user_id: user.id,
           event_type: "onboarding_participante",
-          content: `Adicionado: ${nome} (${newParticipantPapel})`,
+          content: `Adicionado: ${nome} (${papelNome})`,
         });
       }
       toast.success("Participante adicionado");
       setAddParticipantOpen(false);
       setNewParticipantUserId("");
-      setNewParticipantPapel("especialista");
       qc.invalidateQueries({ queryKey: ["onboarding-participants"] });
       qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
     } catch (e: any) {
@@ -1132,7 +1131,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     }
   }
 
-  async function handleRemoveParticipant(id: string, userId: string, papel: Papel) {
+  async function handleRemoveParticipant(id: string, userId: string, papelNome: string) {
     if (!journey?.ticket_id) return;
     try {
       const { error } = await (supabase.from("onboarding_participants" as any) as any)
@@ -1146,7 +1145,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
           ticket_id: journey.ticket_id,
           user_id: user.id,
           event_type: "onboarding_participante",
-          content: `Removido: ${nome} (${papel})`,
+          content: `Removido: ${nome} (${papelNome})`,
         });
       }
       toast.success("Participante removido");
@@ -2228,11 +2227,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                             </div>
                             <div>
                               <label className="text-xs font-medium">Papel</label>
-                              <Select value={newParticipantPapel} onValueChange={(v) => setNewParticipantPapel(v as Papel)}>
-                                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                              <Select value={newParticipantRoleId} onValueChange={setNewParticipantRoleId}>
+                                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                                 <SelectContent>
-                                  {PAPEL_OPTIONS.map((p) => (
-                                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                                  {rolesAtivos.map((r) => (
+                                    <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
@@ -2245,45 +2244,48 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         {(participantsQ.data ?? []).length === 0 ? (
                           <p className="text-xs text-muted-foreground py-2 text-center">Nenhum participante cadastrado.</p>
                         ) : (
-                          (["implantador", "vendedor", "especialista", "outro"] as Papel[]).map((papel) => {
-                            const rows = (participantsQ.data ?? []).filter((p) => p.papel === papel);
+                          roles.map((role) => {
+                            const rows = (participantsQ.data ?? []).filter((p) => p.role_id === role.id);
                             if (!rows.length) return null;
-                            const isImpl = papel === "implantador";
+                            const isRespGroup = role.slug === "implantador";
                             return (
-                              <div key={papel} className="space-y-1.5">
+                              <div key={role.id} className="space-y-1.5">
                                 <div className="flex items-center gap-1.5">
                                   <span
                                     className="text-[10px] uppercase tracking-wide font-semibold"
-                                    style={{ color: PAPEL_COLOR[papel] }}
+                                    style={{ color: role.cor }}
                                   >
-                                    {isImpl ? "Responsável" : PAPEL_OPTIONS.find((o) => o.value === papel)?.label}
+                                    {isRespGroup ? "Responsável" : role.nome}
                                   </span>
+                                  {!role.ativo && (
+                                    <span className="text-[9px] text-muted-foreground">(papel inativo)</span>
+                                  )}
                                 </div>
                                 {rows.map((p) => (
                                   <div
                                     key={p.id}
                                     className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-1.5"
                                   >
-                                    {isImpl ? (
-                                      <Star className="h-3.5 w-3.5 shrink-0" style={{ color: PAPEL_COLOR[papel] }} fill={PAPEL_COLOR[papel]} />
+                                    {isRespGroup ? (
+                                      <Star className="h-3.5 w-3.5 shrink-0" style={{ color: role.cor }} fill={role.cor} />
                                     ) : (
-                                      <User className="h-3.5 w-3.5 shrink-0" style={{ color: PAPEL_COLOR[papel] }} />
+                                      <User className="h-3.5 w-3.5 shrink-0" style={{ color: role.cor }} />
                                     )}
                                     <span className="text-xs flex-1 truncate">
                                       {memberNameMap.get(p.user_id) || "—"}
                                     </span>
                                     <Badge
                                       variant="outline"
-                                      className="text-[9px] capitalize"
-                                      style={{ borderColor: PAPEL_COLOR[papel], color: PAPEL_COLOR[papel] }}
+                                      className="text-[9px]"
+                                      style={{ borderColor: role.cor, color: role.cor }}
                                     >
-                                      {papel}
+                                      {role.nome}
                                     </Badge>
                                     <Button
                                       size="icon"
                                       variant="ghost"
                                       className="h-6 w-6 shrink-0"
-                                      onClick={() => handleRemoveParticipant(p.id, p.user_id, p.papel)}
+                                      onClick={() => handleRemoveParticipant(p.id, p.user_id, role.nome)}
                                     >
                                       <X className="h-3.5 w-3.5" />
                                     </Button>
