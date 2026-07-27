@@ -20,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { ShieldAlert } from "lucide-react";
 import { useAgentPresence } from "@/hooks/useAgentPresence";
+import { hasOpenEscLayer } from "@/lib/escapeLayers";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -201,11 +202,9 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
       // Foco em busca ou qualquer outro campo NÃO bloqueia: ESC deve fechar o chat.
       const el = document.activeElement as HTMLElement | null;
       if (el && el.tagName === 'TEXTAREA' && (el as HTMLTextAreaElement).value.trim() !== '') return;
-      // Overlay realmente aberto → deixa o ESC pra ele (Radix fecha o modal/menu/select)
-      const overlayOpen = document.querySelector(
-        '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"], [role="menu"][data-state="open"], [role="listbox"][data-state="open"]'
-      );
-      if (overlayOpen) return;
+      // Overlay realmente aberto → deixa o ESC pra ele (Radix fecha o modal/menu/select;
+      // overlay custom marcado com data-esc-layer, ex.: lightbox de imagem, fecha o próprio).
+      if (hasOpenEscLayer()) return;
       if (selectionMode) { exitSelectionMode(); return; }
       if (showDetails) { setShowDetails(false); return; }
       onClose?.();

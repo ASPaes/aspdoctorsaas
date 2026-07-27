@@ -25,6 +25,7 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 - ⬆️ **Onboarding** — O cadastro do cliente abre em nova aba direto do detalhe da jornada.
 - 🔧 **Plataforma** — Voltar ao DoctorSaaS depois de usar outra aba do navegador não recarrega mais a página nem fecha o que estava aberto.
 - 🔧 **Chat** — O histórico de tickets abre a tela correta conforme o tipo do ticket.
+- 🔧 **Chat** — Com uma imagem aberta em tela cheia, o ESC fecha apenas a imagem. Antes ele fechava a imagem e a conversa de uma vez, deixando a tela em branco.
 - 🔧 **Tickets** — "Iniciar conversa" não acusa mais telefone inválido quando nenhum contato foi escolhido.
 - 🔧 **Onboarding** — Transferir o responsável não duplica mais quem já estava na equipe da jornada.
 - 🔧 **Clientes** — A importação com a opção "Atualizar" travava na confirmação das duplicatas e nunca concluía. Agora conclui, e ao atualizar um cliente que já existe você escolhe entre **complementar** (grava só as colunas preenchidas na planilha, preservando o resto do cadastro e os contratos) ou **sobrescrever tudo**.

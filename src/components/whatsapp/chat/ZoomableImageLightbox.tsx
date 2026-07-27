@@ -94,6 +94,7 @@ export function ZoomableImageLightbox({
 
   return (
     <div
+      data-esc-layer
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm overscroll-contain"
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
