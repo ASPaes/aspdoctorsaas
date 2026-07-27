@@ -1311,7 +1311,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       {/* Anexos */}
       {ticketId && tid && (
         <div className="space-y-1.5">
-          <TicketAttachments ticketId={ticketId} tenantId={tid} canDelete />
+          <TicketAttachments ticketId={ticketId} tenantId={tid} />
         </div>
       )}
 

@@ -6,6 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const MAX_UPLOAD_MB = 50;
+const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -35,6 +38,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Mesmo teto do bucket (file_size_limit = 50MB) e do front.
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return new Response(JSON.stringify({ error: `"${file.name}" excede ${MAX_UPLOAD_MB}MB` }), {
+        status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data: ticket } = await supabaseAdmin
       .from("support_tickets")
       .select("tenant_id")
@@ -53,10 +63,10 @@ Deno.serve(async (req) => {
       .replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_");
     const path = `${tenantId}/${ticketId}/${Date.now()}_${safeName}`;
 
-    const fileBuffer = await file.arrayBuffer();
+    // Passa o File direto (não arrayBuffer): com 50MB, a cópia extra dobrava o pico de memória da função.
     const { error: uploadError } = await supabaseAdmin.storage
       .from("ticket-attachments")
-      .upload(path, fileBuffer, {
+      .upload(path, file, {
         contentType: file.type || "application/octet-stream",
         upsert: false,
       });

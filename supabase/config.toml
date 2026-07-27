@@ -108,4 +108,10 @@ verify_jwt = false
 [functions.manage-group-participants]
 verify_jwt = false
 
+[functions.upload-ticket-attachment]
+verify_jwt = true
+
+[functions.delete-ticket-attachment]
+verify_jwt = true
+
 

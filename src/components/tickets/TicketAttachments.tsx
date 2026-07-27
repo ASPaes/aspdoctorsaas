@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Paperclip, Upload, Trash2, Download, Loader2, FileText, Image, Film, Music, File, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,7 +11,50 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 interface Props {
   ticketId: string;
   tenantId: string;
-  canDelete?: boolean;
+}
+
+const MAX_UPLOAD_MB = 50;
+const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
+
+type UploadProgress = { name: string; pct: number; index: number; total: number };
+
+// Upload por XHR em vez de functions.invoke por um motivo só: arquivo de 50MB precisa de barra de
+// progresso, e fetch() não reporta progresso de upload.
+function uploadOne(
+  file: File,
+  ticketId: string,
+  token: string,
+  onProgress: (pct: number) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-ticket-attachment`);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.setRequestHeader("apikey", import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable) onProgress(Math.round((ev.loaded / ev.total) * 100));
+    };
+    xhr.onload = () => {
+      let body: any = null;
+      try { body = JSON.parse(xhr.responseText); } catch { /* resposta não-JSON */ }
+      if (xhr.status >= 200 && xhr.status < 300 && !body?.error) return resolve();
+      reject(new Error(body?.error ?? `"${file.name}" falhou (HTTP ${xhr.status})`));
+    };
+    xhr.onerror = () => reject(new Error(`falha de rede ao enviar "${file.name}"`));
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("ticketId", ticketId);
+    xhr.send(fd);
+  });
+}
+
+// functions.invoke troca a mensagem do servidor por "non-2xx status code"; o motivo real vem no context.
+async function efErrorMessage(error: any): Promise<string> {
+  try {
+    const body = await error?.context?.json?.();
+    if (body?.error) return String(body.error);
+  } catch { /* sem corpo JSON */ }
+  return error?.message ?? "erro desconhecido";
 }
 
 function fileIcon(type: string | null) {
@@ -29,12 +73,21 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / 1048576).toFixed(1)}MB`;
 }
 
-function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
+function TicketAttachments({ ticketId, tenantId }: Props) {
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewType, setPreviewType] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState<string>("");
   const queryClient = useQueryClient();
+  const { user, profile } = useAuth();
+
+  // Admin, head e super admin excluem qualquer anexo; os demais, só o que eles mesmos subiram.
+  // A regra é repetida na edge function — aqui é só o que a UI mostra.
+  const canDeleteAny =
+    profile?.is_super_admin === true || profile?.role === "admin" || profile?.role === "head";
+  const canDelete = (att: { uploaded_by: string }) => canDeleteAny || att.uploaded_by === user?.id;
 
   const handlePreview = async (att: any) => {
     try {
@@ -91,35 +144,34 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    const picked = Array.from(files);
     setUploading(true);
     let count = 0;
     try {
-      for (const file of Array.from(files)) {
-        const MAX_SIZE = 10 * 1024 * 1024;
-        if (file.size > MAX_SIZE) {
-          toast.error(`"${file.name}" excede 10MB`);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Sessão expirada, entre novamente");
+
+      for (let i = 0; i < picked.length; i++) {
+        const file = picked[i];
+        if (file.size > MAX_UPLOAD_BYTES) {
+          toast.error(`"${file.name}" excede ${MAX_UPLOAD_MB}MB`);
           continue;
         }
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("ticketId", ticketId);
-        const { data, error } = await supabase.functions.invoke("upload-ticket-attachment", {
-          body: formData,
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
+        setProgress({ name: file.name, pct: 0, index: i + 1, total: picked.length });
+        await uploadOne(file, ticketId, session.access_token, (pct) =>
+          setProgress({ name: file.name, pct, index: i + 1, total: picked.length })
+        );
         count++;
       }
-      if (count > 0) {
-        toast.success(`${count} arquivo(s) anexado(s)`);
-        refetch();
-      }
+      if (count > 0) toast.success(`${count} arquivo(s) anexado(s)`);
     } catch (err: any) {
       toast.error("Erro: " + (err.message ?? ""));
     } finally {
-      setUploading(true);
+      setProgress(null);
       setUploading(false);
       e.target.value = "";
+      // Pode ter subido parte dos arquivos antes de falhar.
+      if (count > 0) refetch();
     }
   };
 
@@ -150,15 +202,23 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
     }
   };
 
+  // Excluir pela edge function, não pela tabela: apagar só a linha deixava o arquivo órfão no Storage
+  // (e a policy do bucket exige a linha existir, então o arquivo ficava indeletável depois).
   const handleDelete = async (att: any) => {
     if (!confirm(`Excluir "${att.file_name}"?`)) return;
+    setDeletingId(att.id);
     try {
-      await (supabase.from("support_ticket_attachments" as any) as any)
-        .delete().eq("id", att.id);
+      const { data, error } = await supabase.functions.invoke("delete-ticket-attachment", {
+        body: { attachmentId: att.id },
+      });
+      if (error) throw new Error(await efErrorMessage(error));
+      if (data?.error) throw new Error(data.error);
       toast.success("Anexo excluído");
       refetch();
     } catch (err: any) {
-      toast.error("Erro: " + (err.message ?? ""));
+      toast.error("Erro ao excluir: " + (err.message ?? ""));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -174,7 +234,8 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
             </Badge>
           )}
         </div>
-        <label className="cursor-pointer">
+        {/* Button asChild vira <span>, que ignora disabled — trava o clique pelo label. */}
+        <label className={`cursor-pointer ${uploading ? "pointer-events-none opacity-60" : ""}`}>
           <input
             type="file"
             className="hidden"
@@ -196,6 +257,30 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
           </Button>
         </label>
       </div>
+
+      {progress && (
+        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-muted-foreground truncate min-w-0 flex-1">
+              Enviando {progress.name}
+              {progress.total > 1 ? ` (${progress.index}/${progress.total})` : ""}
+            </span>
+            <span className="text-[11px] font-medium tabular-nums shrink-0">{progress.pct}%</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-200"
+              style={{ width: `${progress.pct}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {attachments.length === 0 && !progress && (
+        <p className="text-[11px] text-muted-foreground">
+          Nenhum anexo. Até {MAX_UPLOAD_MB}MB por arquivo.
+        </p>
+      )}
 
       {attachments.length > 0 && (
         <div className="space-y-2">
@@ -249,15 +334,20 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
                 >
                   <Download className="h-3.5 w-3.5" />
                 </Button>
-                {canDelete && (
+                {canDelete(att) && (
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 text-destructive hover:text-destructive"
                     onClick={() => handleDelete(att)}
+                    disabled={deletingId === att.id}
                     title="Excluir"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    {deletingId === att.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
                   </Button>
                 )}
               </div>

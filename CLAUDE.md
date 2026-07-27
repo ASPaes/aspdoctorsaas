@@ -283,7 +283,7 @@ Regra do Alexandre: toda mudança avaliada por latência/egress/carga **antes** 
 
 **No ar e estável:** WhatsApp/atendimento (multi-provider, distribuição, CSAT, macros, grupos, URA battle) · Support Tickets (TK-YYYY-NNNN, categorias N:N por produto, closure flow) · Contratos/MRR/cancelamento/reativação · Onboarding & Implantação (kanban, gerador de pipeline por IA via Edge Function `generate-onboarding-blueprint`) · Théo (agente IA) · Painel de Uso · Controles de custo de IA · Quiet hours · SSO DoctorDev.
 
-59 edge functions em `supabase/functions/` (60 diretórios, sendo `_shared` código compartilhado).
+63 edge functions em `supabase/functions/` (64 diretórios, sendo `_shared` código compartilhado). Produção tem **mais** que isso: pelo menos 18 functions (`recon-*`, `omie-*`, `ds-omie-anexo-enviar`, `fetch-zapi-history`, `sync-contact-picture`, `reconnect-whatsapp-instance`) só existem em prod e nunca voltaram pro repo.
 
 **Bugs conhecidos em aberto:**
 - `fn_block_close_without_cliente` bloqueando `csat_completed` / `csat_timeout` / `ura_encerrado`

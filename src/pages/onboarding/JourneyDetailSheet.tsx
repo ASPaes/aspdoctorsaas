@@ -2663,7 +2663,6 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           <TicketAttachments
                             ticketId={journey.ticket_id}
                             tenantId={tenantId!}
-                            canDelete={profile?.is_super_admin === true || profile?.role === "admin"}
                           />
                         </div>
                       )}
