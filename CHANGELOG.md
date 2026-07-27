@@ -27,6 +27,7 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 - 🔧 **Chat** — O histórico de tickets abre a tela correta conforme o tipo do ticket.
 - 🔧 **Tickets** — "Iniciar conversa" não acusa mais telefone inválido quando nenhum contato foi escolhido.
 - 🔧 **Onboarding** — Transferir o responsável não duplica mais quem já estava na equipe da jornada.
+- 🔧 **Clientes** — A importação com a opção "Atualizar" travava na confirmação das duplicatas e nunca concluía. Agora conclui, e ao atualizar um cliente que já existe você escolhe entre **complementar** (grava só as colunas preenchidas na planilha, preservando o resto do cadastro e os contratos) ou **sobrescrever tudo**.
 
 ### 24/07
 

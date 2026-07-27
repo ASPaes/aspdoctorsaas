@@ -73,6 +73,10 @@ import {
   downloadDetailedModulosCsv,
   downloadDetailedContratosCsv,
 } from "./clienteImportTemplate";
+import {
+  buildClienteUpdateRow,
+  type DuplicataUpdateMode,
+} from "./clienteImportUpdate";
 
 // All system field names derived from FRIENDLY_TO_SYSTEM
 const ALL_SYSTEM_FIELDS = [...new Set(Object.values(FRIENDLY_TO_SYSTEM))];
@@ -396,6 +400,9 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const [duplicatas, setDuplicatas] = useState<{ cnpj: string; razao_social: string | null }[]>([]);
 
   const [duplicataOpcao, setDuplicataOpcao] = useState<'pular' | 'atualizar' | 'importar'>('pular');
+  // Como "Atualizar" trata o cadastro que já existe. Padrão: complementar —
+  // só grava o que veio no arquivo e não encosta em contratos/produtos.
+  const [duplicataUpdateMode, setDuplicataUpdateMode] = useState<DuplicataUpdateMode>('complementar');
   const [importPhase, setImportPhase] = useState<'verificando' | 'cidades' | 'importando' | ''>('');
   // cnpjsDuplicadosNoBanco is computed locally inside handleImportWithRows (not state)
 
@@ -446,6 +453,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     setResult(null);
     setDuplicatas([]);
     setDuplicataOpcao('pular');
+    setDuplicataUpdateMode('complementar');
     setImportPhase('');
     setImportMode('selecting');
     setDetailedType(null);
@@ -762,7 +770,10 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   );
 
   /* ---------- Step 4: Import (core logic) ---------- */
-  const handleImportWithRows = useCallback(async (rowsToImportParam: ParsedRow[]) => {
+  const handleImportWithRows = useCallback(async (
+    rowsToImportParam: ParsedRow[],
+    duplicatasConfirmadas = false,
+  ) => {
     const tenantId = effectiveTenantId;
     if (!tenantId) {
       toast.error("Não foi possível identificar o tenant. Faça login novamente.");
@@ -857,11 +868,17 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         setDuplicatas(duplicatasParaModal);
         // Continua o import com os não-duplicados
       } else if (duplicataOpcao === 'atualizar') {
-        // Para 'atualizar': interrompe, mostra modal de confirmação
-        setDuplicatas(duplicatasParaModal);
-        setImporting(false);
-        setImportPhase('');
-        return;
+        // Primeira passada: interrompe e pede confirmação.
+        // Na segunda (já confirmado) segue com `cnpjsDuplicadosNoBanco` populado,
+        // que é o que separa payloadDuplicados (UPDATE) de payloadNovos (INSERT).
+        // Sem essa flag o clique em "Atualizar duplicatas e continuar" recaía aqui
+        // e voltava ao mesmo card — o import nunca concluía.
+        if (!duplicatasConfirmadas) {
+          setDuplicatas(duplicatasParaModal);
+          setImporting(false);
+          setImportPhase('');
+          return;
+        }
       } else if (duplicataOpcao === 'importar') {
         // Não filtra nada — importa todos os registros incluindo duplicados
         // Guarda lista para exibir no resultado final
@@ -1116,11 +1133,15 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         const cnpj = (row.values.cnpj ?? '').trim().replace(/\D/g, '');
         return !cnpjsDuplicadosNoBanco.has(cnpj);
       });
-      const payloadDuplicados = payload.filter((_, idx) => {
-        const row = batches[b][idx];
-        const cnpj = (row.values.cnpj ?? '').trim().replace(/\D/g, '');
-        return cnpjsDuplicadosNoBanco.has(cnpj);
-      });
+      // Guarda a linha de origem junto do payload: o modo "complementar" precisa
+      // saber quais COLUNAS vieram preenchidas no arquivo, não só se o valor
+      // final ficou nulo (`cancelado`, por exemplo, vira `false` sem coluna).
+      const payloadDuplicados = payload
+        .map((record, idx) => ({ record, values: batches[b][idx].values }))
+        .filter(({ values }) => {
+          const cnpj = (values.cnpj ?? '').trim().replace(/\D/g, '');
+          return cnpjsDuplicadosNoBanco.has(cnpj);
+        });
 
       // Helper: monta o objeto `dados` para o RPC import_clientes_produtos_batch,
       // que executa o mesmo fluxo do cadastro manual (create_cliente_produto_with_contract).
@@ -1263,10 +1284,17 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
       // UPDATE dos registros duplicados (apenas quando duplicataOpcao === 'atualizar')
       if (payloadDuplicados.length > 0 && duplicataOpcao === 'atualizar') {
-        for (const record of payloadDuplicados) {
+        for (const { record, values } of payloadDuplicados) {
+          const updateRow = buildClienteUpdateRow(
+            toClienteRow(record),
+            values,
+            duplicataUpdateMode,
+          );
+          // Complementar com o arquivo inteiro vazio não tem o que gravar.
+          if (Object.keys(updateRow).length === 0) continue;
           const { error: upsertErr } = await supabase
             .from('clientes')
-            .update(toClienteRow(record))
+            .update(updateRow as any)
             .eq('cnpj', record.cnpj)
             .eq('tenant_id', tenantId);
           if (upsertErr) {
@@ -1278,6 +1306,10 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
             });
           } else {
             imported += 1;
+            // Relacionados só no modo "sobrescrever": recriar contrato/produto
+            // significa DELETE + recreate, o que perde histórico de contrato e
+            // mexe no MRR. "Complementar" atualiza apenas o cadastro.
+            if (duplicataUpdateMode !== 'sobrescrever') continue;
             // Upsert relacionados: buscar id do cliente, limpar existentes e recriar via RPC
             try {
               const { data: existing } = await supabase
@@ -1339,7 +1371,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     if (imported > 0) {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
     }
-  }, [effectiveTenantId, validRows, errorRows.length, activeFkFields, fkData, fkAutoCreate, fkManualOverrides, fkUniqueValues, queryClient, duplicataOpcao]);
+  }, [effectiveTenantId, validRows, errorRows.length, activeFkFields, fkData, fkAutoCreate, fkManualOverrides, fkUniqueValues, queryClient, duplicataOpcao, duplicataUpdateMode]);
 
   const handleImport = useCallback(async () => {
     await handleImportWithRows(validRows);
@@ -1354,7 +1386,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     }
     // 'atualizar': retomar com TODAS as linhas válidas (o batch insert vai separar novos de duplicados)
     setDuplicatas([]);
-    await handleImportWithRows(validRows);
+    await handleImportWithRows(validRows, true);
   }, [handleImportWithRows, validRows]);
 
   /* ---------- Drag & drop ---------- */
@@ -1566,7 +1598,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                     value: 'atualizar' as const,
                     icon: '♻️',
                     label: 'Atualizar',
-                    desc: 'Sobrescreve os dados do cadastro atual com os dados do arquivo.',
+                    desc: 'Atualiza o cadastro que já existe com os dados do arquivo.',
                   },
                   {
                     value: 'importar' as const,
@@ -1598,6 +1630,54 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                   </label>
                 ))}
               </div>
+
+              {/* Sub-opção do "Atualizar": o que fazer com o cadastro que já existe */}
+              {duplicataOpcao === 'atualizar' && (
+                <div className="ml-6 pl-4 border-l-2 border-primary/30 space-y-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    E o que fazer com os campos que <strong>não</strong> vierem no arquivo?
+                  </p>
+                  {[
+                    {
+                      value: 'complementar' as const,
+                      icon: '🧩',
+                      label: 'Complementar (recomendado)',
+                      desc: 'Grava só os campos preenchidos no arquivo. O resto do cadastro fica intacto, e contratos e produtos não são alterados.',
+                    },
+                    {
+                      value: 'sobrescrever' as const,
+                      icon: '⚠️',
+                      label: 'Sobrescrever tudo',
+                      desc: 'Trata o arquivo como a ficha completa: campo que não vier nele é apagado e o contrato base é recriado. Use só para reimportar o cadastro inteiro.',
+                    },
+                  ].map(opt => (
+                    <label
+                      key={opt.value}
+                      className={cn(
+                        'flex items-start gap-3 rounded-md border p-2.5 cursor-pointer transition-colors',
+                        duplicataUpdateMode === opt.value
+                          ? opt.value === 'sobrescrever'
+                            ? 'border-destructive/50 bg-destructive/5'
+                            : 'border-primary bg-primary/5'
+                          : 'hover:bg-muted/50',
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="duplicata-update-mode"
+                        value={opt.value}
+                        checked={duplicataUpdateMode === opt.value}
+                        onChange={() => setDuplicataUpdateMode(opt.value)}
+                        className="mt-0.5 accent-primary"
+                      />
+                      <div>
+                        <p className="text-xs font-medium">{opt.icon} {opt.label}</p>
+                        <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Card 4 — Regras de formato (collapsible) */}
@@ -2045,6 +2125,18 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                     <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-0.5">
                       Você escolheu <strong>&quot;{duplicataOpcao === 'pular' ? 'Pular' : duplicataOpcao === 'atualizar' ? 'Atualizar' : 'Importar mesmo assim'}&quot;</strong> no Step 1. Confirme para continuar.
                     </p>
+                    {duplicataOpcao === 'atualizar' && (
+                      <p className={cn(
+                        'text-xs mt-1',
+                        duplicataUpdateMode === 'sobrescrever'
+                          ? 'text-destructive font-medium'
+                          : 'text-yellow-700 dark:text-yellow-400',
+                      )}>
+                        {duplicataUpdateMode === 'sobrescrever'
+                          ? '⚠️ Sobrescrever tudo: os campos que não vierem no arquivo serão apagados e o contrato base será recriado.'
+                          : '🧩 Complementar: só os campos preenchidos no arquivo serão gravados. Contratos e produtos não serão alterados.'}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="max-h-28 overflow-y-auto space-y-1">
@@ -2059,9 +2151,12 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                   <Button
                     size="sm"
                     onClick={() => handleConfirmarDuplicatas('atualizar')}
+                    variant={duplicataUpdateMode === 'sobrescrever' ? 'destructive' : 'default'}
                     className="gap-1"
                   >
-                    ♻️ Atualizar duplicatas e continuar
+                    ♻️ {duplicataUpdateMode === 'sobrescrever'
+                      ? 'Sobrescrever duplicatas e continuar'
+                      : 'Complementar duplicatas e continuar'}
                   </Button>
                   <Button
                     size="sm"
