@@ -150,13 +150,107 @@ const TL_META: Record<string, { label: string; Icon: any; tone: TLTone }> = {
   onboarding_retorno_vendedor_resolvido: { label: "Retorno resolvido", Icon: CheckCircle2, tone: "emerald" },
   onboarding_cancelado: { label: "Jornada cancelada", Icon: XCircle, tone: "red" },
   onboarding_concluido: { label: "Jornada concluída", Icon: CheckCircle2, tone: "emerald" },
+  onboarding_fase_revertida: { label: "Fase revertida", Icon: RotateCcw, tone: "amber" },
   nota_agente: { label: "Nota do agente", Icon: StickyNote, tone: "slate" },
+  comment: { label: "Comentário", Icon: MessageSquare, tone: "slate" },
 };
 const tlMeta = (t: string) => TL_META[t] ?? { label: EVENT_LABELS[t] ?? t, Icon: Circle, tone: "slate" as TLTone };
+
+// Coluna esquerda da timeline = o que alguém digitou. Todo o resto é movimentação/log.
+const TL_NOTE_TYPES = new Set(["nota_agente"]);
+
+// old_value/new_value às vezes vêm como UUID cru — não serve para exibir.
+const TL_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const tlCleanValue = (v: any) => (v && !TL_UUID_RE.test(String(v).trim()) ? String(v) : null);
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+// Item da timeline — compartilhado pelas colunas de Notas e de Movimentação.
+function TimelineEventItem({ ev, author }: { ev: any; author: string }) {
+  const meta = tlMeta(ev.event_type);
+  const Icon = meta.Icon;
+  const oldV = tlCleanValue(ev.old_value);
+  const newV = tlCleanValue(ev.new_value);
+  const hasChips = ev.event_type === "onboarding_mudou_etapa" && !!oldV && !!newV;
+  // Na mudança de etapa o content repete "Etapa: X → Y" — escondemos p/ não duplicar os chips.
+  const showContent = ev.content && !hasChips;
+  return (
+    <div className="relative flex items-start gap-3">
+      <div className={`relative z-10 h-6 w-6 rounded-full flex items-center justify-center ring-4 ring-background shrink-0 ${TL_TONES[meta.tone]}`}>
+        <Icon className="h-3.5 w-3.5" />
+      </div>
+      <div className="flex-1 min-w-0 pt-0.5">
+        {/* Quem fez vem primeiro; o que ocorreu logo depois. */}
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-xs font-semibold">{author}</span>
+          <span className="text-[11px] text-muted-foreground">· {meta.label}</span>
+          <span className="text-[10px] text-muted-foreground font-mono ml-auto pl-2">{formatTime(ev.created_at)}</span>
+        </div>
+        {hasChips && (
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{oldV}</span>
+            <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium">{newV}</span>
+          </div>
+        )}
+        {showContent && (
+          <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap break-words">{ev.content}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Lista agrupada por dia com a linha conectora — usada nas duas colunas.
+function TimelineDayGroups({
+  groups,
+  authorOf,
+}: {
+  groups: Array<{ key: string; label: string; items: any[] }>;
+  authorOf: (ev: any) => string;
+}) {
+  return (
+    <div className="space-y-5">
+      {groups.map((day) => (
+        <div key={day.key}>
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{day.label}</span>
+            <div className="h-px bg-border flex-1" />
+            <span className="text-[10px] text-muted-foreground">
+              {day.items.length} {day.items.length === 1 ? "evento" : "eventos"}
+            </span>
+          </div>
+          <div className="relative">
+            <div className="absolute left-[11px] top-3 bottom-3 w-px bg-border" />
+            <div className="space-y-3">
+              {day.items.map((ev: any) => (
+                <TimelineEventItem key={ev.id} ev={ev} author={authorOf(ev)} />
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Agrupa eventos JÁ ordenados desc por dia, preservando a ordem de entrada.
+function groupEventsByDay(list: any[]): Array<{ key: string; label: string; items: any[] }> {
+  const groups: Array<{ key: string; label: string; items: any[] }> = [];
+  let last: { key: string; label: string; items: any[] } | null = null;
+  for (const ev of list) {
+    const d = new Date(ev.created_at);
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    if (!last || last.key !== key) {
+      last = { key, label: formatDayLabel(ev.created_at), items: [] };
+      groups.push(last);
+    }
+    last.items.push(ev);
+  }
+  return groups;
 }
 
 function formatDayLabel(iso: string): string {
@@ -253,6 +347,10 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const toggleChecklistGroup = (k: string) => setChecklistCollapsed((s) => ({ ...s, [k]: !s[k] }));
   const [novoManual, setNovoManual] = useState("");
   const [novoManualReq, setNovoManualReq] = useState(false);
+  // Filtros da aba Timeline — estado local, não persistem entre aberturas.
+  const [tlOnlyMine, setTlOnlyMine] = useState(false);
+  const [tlTypes, setTlTypes] = useState<string[]>([]); // vazio = todos os tipos
+  const [tlTypesOpen, setTlTypesOpen] = useState(false);
 
 
   useEffect(() => {
@@ -276,6 +374,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       setRescheduleDate("");
       setLinkEditId(null);
       setLinkEditValue("");
+      setTlOnlyMine(false);
+      setTlTypes([]);
+      setTlTypesOpen(false);
     }
   }, [open, journeyId]);
 
@@ -450,10 +551,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     queryKey: ["onboarding-event-users", tenantId, eventUserIds.sort().join(",")],
     enabled: !!tenantId && eventUserIds.length > 0,
     queryFn: async () => {
+      // Sem filtro de tenant: o super admin simulando outro tenant tem profile no tenant dele,
+      // e com o filtro o próprio nome dele nunca resolvia (caía em "Usuário"). O RLS de profiles
+      // continua sendo quem limita o que cada um enxerga.
       const { data: profs } = await supabase
         .from("profiles")
         .select("user_id, funcionario_id")
-        .eq("tenant_id", tenantId!)
         .in("user_id", eventUserIds);
       const funcIds = (profs ?? []).map((p: any) => p.funcionario_id).filter(Boolean);
       let funcMap: Record<number, string> = {};
@@ -691,21 +794,31 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const trainings = trainingQ.data ?? [];
   const attendances = attendancesQ.data ?? [];
 
-  // Timeline: eventos (já vêm ordenados desc) agrupados por dia p/ a aba dedicada.
-  const eventsByDay = useMemo(() => {
-    const groups: Array<{ key: string; label: string; items: any[] }> = [];
-    let last: { key: string; label: string; items: any[] } | null = null;
-    for (const ev of events) {
-      const d = new Date(ev.created_at);
-      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-      if (!last || last.key !== key) {
-        last = { key, label: formatDayLabel(ev.created_at), items: [] };
-        groups.push(last);
-      }
-      last.items.push(ev);
-    }
-    return groups;
-  }, [events]);
+  // Timeline (aba dedicada): "Somente as minhas" atinge as duas colunas; o filtro de
+  // tipos só tem efeito na de movimentação, já que a de notas é de um tipo só.
+  const tlBase = useMemo(
+    () => (tlOnlyMine && user?.id ? events.filter((e: any) => e.user_id === user.id) : events),
+    [events, tlOnlyMine, user?.id]
+  );
+  const tlNotes = useMemo(() => tlBase.filter((e: any) => TL_NOTE_TYPES.has(e.event_type)), [tlBase]);
+  const tlLogsAll = useMemo(() => tlBase.filter((e: any) => !TL_NOTE_TYPES.has(e.event_type)), [tlBase]);
+  // Opções do filtro: só os tipos presentes NESTA jornada, com contagem.
+  const tlTypeOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    tlLogsAll.forEach((e: any) => counts.set(e.event_type, (counts.get(e.event_type) ?? 0) + 1));
+    return Array.from(counts.entries())
+      .map(([type, n]) => ({ type, n, label: tlMeta(type).label }))
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  }, [tlLogsAll]);
+  const tlLogs = useMemo(
+    () => (tlTypes.length === 0 ? tlLogsAll : tlLogsAll.filter((e: any) => tlTypes.includes(e.event_type))),
+    [tlLogsAll, tlTypes]
+  );
+  const tlNotesByDay = useMemo(() => groupEventsByDay(tlNotes), [tlNotes]);
+  const tlLogsByDay = useMemo(() => groupEventsByDay(tlLogs), [tlLogs]);
+  const tlFiltersActive = tlOnlyMine || tlTypes.length > 0;
+  const tlAuthorOf = (ev: any) =>
+    !ev.user_id ? "Sistema" : (eventUsersQ.data?.[ev.user_id] ?? "Usuário");
 
   const historyByStage = useMemo(() => {
     const m: Record<string, { entrou_em: string; saiu_em: string | null; duracao_minutos: number | null; duracao_util_minutos: number | null }> = {};
@@ -2627,26 +2740,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
 
               {activeTab === "timeline" && (
                 <div className="p-5">
-                  <div className="max-w-3xl mx-auto space-y-4">
-                    {/* Compositor de nota */}
-                    {!isConcluded && (
-                      <section className="rounded-lg border border-border p-3">
-                        <Textarea
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          placeholder="Adicionar nota do agente à timeline..."
-                          rows={2}
-                          className="text-xs"
-                        />
-                        <div className="flex justify-end mt-2">
-                          <Button size="sm" onClick={handleAddNote} disabled={!note.trim()}>
-                            <StickyNote className="h-3.5 w-3.5 mr-1.5" /> Adicionar nota
-                          </Button>
-                        </div>
-                      </section>
-                    )}
-
-                    {/* Resumo */}
+                  <div className="space-y-4">
+                    {/* Resumo — sempre sobre o total; é metadado da jornada, não muda com filtro */}
                     {events.length > 0 && (
                       <div className="grid grid-cols-3 gap-2">
                         <div className="rounded-lg border border-border p-2.5">
@@ -2664,68 +2759,143 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       </div>
                     )}
 
-                    {/* Timeline agrupada por dia */}
-                    {events.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-border py-12 text-center">
-                        <Clock className="h-8 w-8 mx-auto text-muted-foreground/40" />
-                        <p className="text-xs text-muted-foreground mt-2">Sem eventos registrados ainda.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-5">
-                        {eventsByDay.map((day) => (
-                          <div key={day.key}>
-                            <div className="flex items-center gap-2 mb-2.5">
-                              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{day.label}</span>
-                              <div className="h-px bg-border flex-1" />
-                              <span className="text-[10px] text-muted-foreground">{day.items.length} {day.items.length === 1 ? "evento" : "eventos"}</span>
+                    {/* Filtros da timeline */}
+                    {events.length > 0 && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => setTlOnlyMine((v) => !v)}
+                          className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border text-[11px] transition-colors ${
+                            tlOnlyMine
+                              ? "border-primary/40 bg-primary/10 text-primary font-medium"
+                              : "border-border text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {tlOnlyMine ? <Check className="h-3 w-3" /> : <User className="h-3 w-3" />}
+                          Somente as minhas
+                        </button>
+
+                        <Popover open={tlTypesOpen} onOpenChange={setTlTypesOpen}>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border text-[11px] transition-colors ${
+                                tlTypes.length > 0
+                                  ? "border-primary/40 bg-primary/10 text-primary font-medium"
+                                  : "border-border text-muted-foreground hover:bg-muted"
+                              }`}
+                            >
+                              Tipos{tlTypes.length > 0 ? ` (${tlTypes.length})` : ""}
+                              <ChevronDown className="h-3 w-3" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" className="w-64 p-2">
+                            <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-border">
+                              <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Tipos de movimentação</span>
+                              {tlTypes.length > 0 && (
+                                <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground" onClick={() => setTlTypes([])}>
+                                  limpar
+                                </button>
+                              )}
                             </div>
-                            <div className="relative">
-                              {/* linha conectora do dia */}
-                              <div className="absolute left-[11px] top-3 bottom-3 w-px bg-border" />
-                              <div className="space-y-3">
-                                {day.items.map((ev: any) => {
-                                  const meta = tlMeta(ev.event_type);
-                                  const Icon = meta.Icon;
-                                  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-                                  const cleanVal = (v: any) => (v && !UUID_RE.test(String(v).trim()) ? String(v) : null);
-                                  const oldV = cleanVal(ev.old_value);
-                                  const newV = cleanVal(ev.new_value);
-                                  const isStageChange = ev.event_type === "onboarding_mudou_etapa";
-                                  const hasChips = isStageChange && !!oldV && !!newV;
-                                  const authorName = ev.user_id ? (eventUsersQ.data?.[ev.user_id] ?? "Usuário") : "Sistema";
-                                  // Na mudança de etapa o content repete "Etapa: X → Y" — escondemos p/ não duplicar os chips.
-                                  const showContent = ev.content && !hasChips;
+                            {tlTypeOptions.length === 0 ? (
+                              <p className="text-[11px] text-muted-foreground px-1 py-2">Nada para filtrar nesta jornada.</p>
+                            ) : (
+                              <div className="space-y-0.5 max-h-64 overflow-y-auto">
+                                {tlTypeOptions.map((o) => {
+                                  const checked = tlTypes.includes(o.type);
                                   return (
-                                    <div key={ev.id} className="relative flex items-start gap-3">
-                                      <div className={`relative z-10 h-6 w-6 rounded-full flex items-center justify-center ring-4 ring-background shrink-0 ${TL_TONES[meta.tone]}`}>
-                                        <Icon className="h-3.5 w-3.5" />
-                                      </div>
-                                      <div className="flex-1 min-w-0 pt-0.5">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <span className="text-xs font-semibold">{meta.label}</span>
-                                          <span className="text-[10px] text-muted-foreground font-mono">{formatTime(ev.created_at)}</span>
-                                          <span className="text-[10px] text-muted-foreground">· {authorName}</span>
-                                        </div>
-                                        {hasChips && (
-                                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{oldV}</span>
-                                            <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium">{newV}</span>
-                                          </div>
-                                        )}
-                                        {showContent && (
-                                          <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{ev.content}</p>
-                                        )}
-                                      </div>
-                                    </div>
+                                    <label key={o.type} className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-muted cursor-pointer">
+                                      <Checkbox
+                                        checked={checked}
+                                        onCheckedChange={() =>
+                                          setTlTypes((prev) => (checked ? prev.filter((t) => t !== o.type) : [...prev, o.type]))
+                                        }
+                                      />
+                                      <span className="text-[11px] flex-1 truncate">{o.label}</span>
+                                      <span className="text-[10px] text-muted-foreground tabular-nums">{o.n}</span>
+                                    </label>
                                   );
                                 })}
                               </div>
-                            </div>
-                          </div>
-                        ))}
+                            )}
+                          </PopoverContent>
+                        </Popover>
+
+                        {tlFiltersActive && (
+                          <button
+                            type="button"
+                            onClick={() => { setTlOnlyMine(false); setTlTypes([]); }}
+                            className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] text-muted-foreground hover:text-foreground"
+                          >
+                            <X className="h-3 w-3" /> Limpar filtros
+                          </button>
+                        )}
                       </div>
                     )}
+
+                    {/* Notas (esquerda) x movimentação/log (direita) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                      <section className="rounded-lg border border-border">
+                        <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+                          <div className="flex items-center gap-2">
+                            <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
+                            <h3 className="text-[11px] font-semibold uppercase tracking-wide">Notas</h3>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground tabular-nums">{tlNotes.length}</span>
+                        </div>
+                        <div className="p-3 space-y-4">
+                          {!isConcluded && (
+                            <div>
+                              <Textarea
+                                value={note}
+                                onChange={(e) => setNote(e.target.value)}
+                                placeholder="Adicionar nota do agente à timeline..."
+                                rows={2}
+                                className="text-xs"
+                              />
+                              <div className="flex justify-end mt-2">
+                                <Button size="sm" onClick={handleAddNote} disabled={!note.trim()}>
+                                  <StickyNote className="h-3.5 w-3.5 mr-1.5" /> Adicionar nota
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                          {tlNotes.length === 0 ? (
+                            <div className="py-8 text-center">
+                              <StickyNote className="h-7 w-7 mx-auto text-muted-foreground/30" />
+                              <p className="text-xs text-muted-foreground mt-2">
+                                {tlOnlyMine ? "Nenhuma nota sua nesta jornada." : "Nenhuma nota registrada ainda."}
+                              </p>
+                            </div>
+                          ) : (
+                            <TimelineDayGroups groups={tlNotesByDay} authorOf={tlAuthorOf} />
+                          )}
+                        </div>
+                      </section>
+
+                      <section className="rounded-lg border border-border">
+                        <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                            <h3 className="text-[11px] font-semibold uppercase tracking-wide">Movimentação</h3>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground tabular-nums">{tlLogs.length}</span>
+                        </div>
+                        <div className="p-3">
+                          {tlLogs.length === 0 ? (
+                            <div className="py-8 text-center">
+                              <Clock className="h-7 w-7 mx-auto text-muted-foreground/30" />
+                              <p className="text-xs text-muted-foreground mt-2">
+                                {tlFiltersActive ? "Nenhuma movimentação com os filtros atuais." : "Sem movimentações registradas."}
+                              </p>
+                            </div>
+                          ) : (
+                            <TimelineDayGroups groups={tlLogsByDay} authorOf={tlAuthorOf} />
+                          )}
+                        </div>
+                      </section>
+                    </div>
                   </div>
                 </div>
               )}
