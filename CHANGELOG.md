@@ -14,6 +14,7 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 26/07
 
+- 🆕 **Dashboard de atendimento** — O indicador "Não Atendido" agora abre a lista de quem ficou sem resposta no período, agrupada por contato e mostrando quantas vezes cada um passou por isso. Dá para ler a conversa ali mesmo ou ir direto para o WhatsApp. Atendimentos que viraram ticket não entram na lista.
 - 🆕 **Onboarding** — Transferência do responsável pela jornada, com motivo obrigatório e histórico de quem cuidou de cada período.
 - 🆕 **Onboarding** — Os papéis dos participantes passam a ser cadastrados por empresa, em uma aba própria na configuração, no lugar da lista fixa.
 - 🆕 **Onboarding** — Distribuição automática do responsável inicial da jornada, com aba de Distribuição para acompanhar o rodízio.

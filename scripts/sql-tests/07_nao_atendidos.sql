@@ -44,8 +44,19 @@ BEGIN
   IF v_qtd <> 0 THEN RAISE EXCEPTION 'FALHOU 3: PUBLIC ainda tem grant na funcao'; END IF;
 
   -- ========== 2. contexto: super admin + tenant com mais vácuo ==========
-  SELECT user_id INTO v_uid FROM public.profiles WHERE is_super_admin IS TRUE LIMIT 1;
-  IF v_uid IS NULL THEN RAISE EXCEPTION 'FALHOU 4: nenhum super admin no banco local'; END IF;
+  -- Precisa de um super admin com visão "Todas": para super admin,
+  -- user_effective_unidades() = user_view_unidades(), que lê user_view_state. Um super
+  -- admin com unidade grudada faz a RPC (e o card) devolverem 0 — correto, mas inútil
+  -- como fixture. Em produção isso derrubou a asserção 8 na primeira tentativa.
+  SELECT p.user_id INTO v_uid
+    FROM public.profiles p
+    LEFT JOIN public.user_view_state v ON v.user_id = p.user_id
+   WHERE p.is_super_admin IS TRUE
+     AND COALESCE(v.unidade_ids, '{}') = '{}'
+   LIMIT 1;
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'FALHOU 4: nenhum super admin com visão "Todas" (user_view_state vazio)';
+  END IF;
   PERFORM set_config('request.jwt.claims',
                      json_build_object('sub', v_uid, 'role', 'authenticated')::text, true);
 
