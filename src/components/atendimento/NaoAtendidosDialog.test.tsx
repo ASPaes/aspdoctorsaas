@@ -165,6 +165,14 @@ describe("NaoAtendidosDialog", () => {
     expect(texto()).toContain("4 msg do cliente");
   });
 
+  /** Sem o código do atendimento não dá para rastrear de onde saiu a linha — foi
+   *  exatamente o que faltou quando um item da lista foi contestado (DEM-0153). */
+  it("mostra o código do atendimento em cada chat", () => {
+    renderDialog();
+    clicar(botaoComTexto(/Padaria do Zé/));
+    expect(texto()).toContain("AT-1");
+  });
+
   it("leva para o WhatsApp na conversa certa", () => {
     renderDialog();
     clicar(botaoComTexto(/Padaria do Zé/));

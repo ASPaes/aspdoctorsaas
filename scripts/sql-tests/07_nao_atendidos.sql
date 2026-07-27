@@ -17,6 +17,8 @@ DECLARE
   v_soma     int;
   v_dept     uuid;
   v_json_d   jsonb;
+  v_tenant_tk uuid;
+  v_sem_tk   int;
 BEGIN
   -- ========== 1. estrutura ==========
   SELECT count(*) INTO v_qtd
@@ -72,7 +74,8 @@ BEGIN
      AND sa.opened_at >= v_from AND sa.opened_at <= v_to
      AND sa.status = 'closed'
      AND (sa.msg_customer_count > 0 OR sa.last_customer_message_at IS NOT NULL)
-     AND sa.assumed_at IS NULL AND COALESCE(sa.msg_agent_count, 0) = 0;
+     AND sa.assumed_at IS NULL AND COALESCE(sa.msg_agent_count, 0) = 0
+     AND sa.ticket_id IS NULL AND COALESCE(sa.created_from, '') <> 'ticket';
   IF (v_json->>'total_sem_resposta')::int <> v_qtd THEN
     RAISE EXCEPTION 'FALHOU 8: total_sem_resposta=% mas a contagem direta deu %',
       v_json->>'total_sem_resposta', v_qtd;
@@ -89,7 +92,8 @@ BEGIN
      AND sa.opened_at >= v_from AND sa.opened_at <= v_to
      AND sa.status = 'closed'
      AND (sa.msg_customer_count > 0 OR sa.last_customer_message_at IS NOT NULL)
-     AND sa.assumed_at IS NULL AND COALESCE(sa.msg_agent_count, 0) = 0;
+     AND sa.assumed_at IS NULL AND COALESCE(sa.msg_agent_count, 0) = 0
+     AND sa.ticket_id IS NULL AND COALESCE(sa.created_from, '') <> 'ticket';
   IF (v_json->>'total_contatos')::int <> v_qtd THEN
     RAISE EXCEPTION 'FALHOU 10: total_contatos=% mas os distintos deram %', v_json->>'total_contatos', v_qtd;
   END IF;
@@ -172,7 +176,49 @@ BEGIN
     RAISE EXCEPTION 'FALHOU 21: periodo no futuro deveria vir vazio';
   END IF;
 
-  RAISE NOTICE 'OK: 07_nao_atendidos — 21 asserções passaram (tenant %, % em vacuo de % nao assumidos)',
+  -- ========== 11. quem virou ticket NÃO é vácuo ==========
+  -- Regressão DEM-0153: o atendimento 03058/26 (Digi Office) caiu na lista mesmo tendo
+  -- virado ticket. O cliente escreveu, ninguém respondeu naquela janela, mas o caso foi
+  -- encaminhado — não é abandono. Escolhe de propósito o tenant que TEM esses casos,
+  -- senão a asserção passa sem provar nada.
+  SELECT sa.tenant_id INTO v_tenant_tk
+    FROM public.support_attendances sa
+   WHERE sa.opened_at >= v_from AND sa.opened_at <= v_to
+     AND sa.status = 'closed' AND sa.assumed_at IS NULL
+     AND COALESCE(sa.msg_agent_count, 0) = 0
+     AND (sa.msg_customer_count > 0 OR sa.last_customer_message_at IS NOT NULL)
+     AND sa.ticket_id IS NOT NULL
+   GROUP BY sa.tenant_id ORDER BY count(*) DESC LIMIT 1;
+
+  IF v_tenant_tk IS NULL THEN
+    RAISE NOTICE 'aviso: nenhum atendimento em vacuo com ticket na base — asserções 22/23 não exercitadas';
+  ELSE
+    v_json_d := public.get_atendimento_nao_atendidos(v_tenant_tk, v_from, v_to);
+
+    SELECT count(*) INTO v_qtd
+      FROM jsonb_array_elements(v_json_d->'contatos') c
+      CROSS JOIN LATERAL jsonb_array_elements(c->'chats') ch
+      JOIN public.support_attendances sa ON sa.id = (ch->>'attendance_id')::uuid
+     WHERE sa.ticket_id IS NOT NULL OR COALESCE(sa.created_from, '') = 'ticket';
+    IF v_qtd <> 0 THEN
+      RAISE EXCEPTION 'FALHOU 22: % atendimento(s) que viraram ticket vazaram para a lista de vacuo', v_qtd;
+    END IF;
+
+    -- e o filtro tem que ter efeito real nesse tenant, não ser decorativo
+    SELECT count(*) INTO v_sem_tk
+      FROM public.support_attendances sa
+     WHERE sa.tenant_id = v_tenant_tk
+       AND sa.opened_at >= v_from AND sa.opened_at <= v_to
+       AND sa.status = 'closed'
+       AND (sa.msg_customer_count > 0 OR sa.last_customer_message_at IS NOT NULL)
+       AND sa.assumed_at IS NULL AND COALESCE(sa.msg_agent_count, 0) = 0;
+    IF v_sem_tk <= (v_json_d->>'total_sem_resposta')::int THEN
+      RAISE EXCEPTION 'FALHOU 23: o filtro de ticket nao removeu nada (antes %, depois %)',
+        v_sem_tk, v_json_d->>'total_sem_resposta';
+    END IF;
+  END IF;
+
+  RAISE NOTICE 'OK: 07_nao_atendidos — 23 asserções passaram (tenant %, % em vacuo de % nao assumidos)',
     v_tenant, v_json->>'total_sem_resposta', v_json->>'total_card';
 END $$;
 

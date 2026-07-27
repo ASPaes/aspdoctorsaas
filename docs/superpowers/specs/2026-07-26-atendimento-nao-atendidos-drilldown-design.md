@@ -47,6 +47,7 @@ Duas conclusões que mudam a demanda como foi escrita:
 | Granularidade da lista | **Agrupada por contato** — 1 linha por pessoa, com contador, expande nos chats |
 | Escopo dos chats de cada contato | **Só os não atendidos do período filtrado** — sem histórico completo |
 | Recorte de "vácuo" | **Só os sem nenhuma resposta de agente** (88), não os 175 |
+| Atendimento que virou ticket | **Fora do vácuo** — ver "Correção pós-validação" |
 | Onde o chat abre | **Modal de leitura no próprio dashboard**, com botão "Abrir no WhatsApp" |
 
 A quarta decisão cria um descasamento consciente: o card diz 175 e a lista abre com 88. Mitigação
@@ -86,7 +87,8 @@ Corpo, em CTEs:
   `user_effective_unidades()`, mesmos filtros de período / `status='closed'` / mensagem de cliente /
   departamento / unidade / agente / `is_group`. **Não reescrever de cabeça** — a divergência de uma
   cláusula faz a lista não bater com o card e não há como o usuário saber qual dos dois está certo.
-- **`vacuo`** — `base` + `assumed_at IS NULL AND COALESCE(msg_agent_count, 0) = 0`.
+- **`vacuo`** — `base` + `assumed_at IS NULL AND COALESCE(msg_agent_count, 0) = 0
+  AND ticket_id IS NULL AND COALESCE(created_from,'') <> 'ticket'`.
 - **`chats`** — `vacuo` + `LEFT JOIN support_departments sd ON sd.id = department_id` e
   `LEFT JOIN clientes c ON c.id = cliente_id`; nome do cliente por
   `COALESCE(c.nome_fantasia, c.razao_social, '(sem nome)')` — mesmo padrão de `get_atendimento_clientes`.
@@ -223,6 +225,37 @@ até o Alexandre liberar:
    errado — roda no mesmo banco, então independe de os dados estarem frescos.
 5. Frontend: `npx tsc -p tsconfig.app.json` (o `tsc` da raiz não checa nada) + `bun run build`.
 6. Revisão visual no localhost com o tenant CONSYSA simulado antes de mostrar.
+
+## Correção pós-validação — o caso 03058/26
+
+Na primeira validação com o Alexandre, um item da lista foi contestado: um contato da Digi Office
+que "tinha sido atendido". A investigação no banco mostrou três coisas:
+
+1. **O print era da conversa, a lista trabalha por atendimento.** Aquele contato tem vários
+   atendimentos; as respostas do agente pertenciam a 03057, 03374 e 03414. O que entrou na lista foi
+   o **03058/26**, uma janela diferente.
+2. **`msg_agent_count = 0` estava correto.** Dentro da janela do 03058 só existiram três mensagens:
+   o aviso de abertura, a saudação automática e o aviso de encerramento. Nenhuma humana.
+3. **O que tornava o item um falso positivo era o `ticket_id`.** O caso foi convertido em ticket —
+   encaminhado, não abandonado.
+
+Daí a regra: **atendimento com `ticket_id` (ou `created_from='ticket'`) não é vácuo.** É a mesma
+regra que o fechamento de chat já usa. Efeito medido no banco local, janela de 60 dias:
+
+| Tenant | Antes | Depois |
+|---|---|---|
+| Digi Office Sistemas | 22 | **9** |
+| CONSYSA, ASP, Feax, Liberty, DELVALE, Athuz | — | inalterados (nenhum caso com ticket) |
+
+O filtro corta 59% dos falsos positivos onde o fluxo de ticket é usado e não mexe em nada onde não é
+— não é um filtro que "esconde" o problema.
+
+**O que NÃO é bug, apesar de parecer:** o badge "Sem atendimento" no cabeçalho do chat é o estado
+atual da *conversa*, que perde `assigned_to`/`department_id` no encerramento por regra de negócio
+(reabertura = roteamento fresh). Não tem relação com o `assumed_at` histórico do atendimento.
+
+**Rastreabilidade:** o incidente só foi resolvido consultando o banco porque a lista não mostrava
+qual atendimento era. Cada chat agora exibe o `attendance_code` ao lado da data.
 
 ## Fora de escopo
 

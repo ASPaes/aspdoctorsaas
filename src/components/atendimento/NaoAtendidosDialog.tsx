@@ -118,7 +118,14 @@ export function NaoAtendidosDialog({ open, onOpenChange }: Props) {
                                 className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted/50"
                               >
                                 <div className="min-w-0 flex-1">
-                                  <div className="text-xs font-medium">{fmtData(ch.opened_at)}</div>
+                                  <div className="flex items-center gap-2 text-xs font-medium">
+                                    {fmtData(ch.opened_at)}
+                                    {ch.attendance_code && (
+                                      <span className="font-normal tabular-nums text-muted-foreground">
+                                        {ch.attendance_code}
+                                      </span>
+                                    )}
+                                  </div>
                                   <div className="truncate text-[11px] text-muted-foreground">
                                     {[ch.departamento ?? "Sem setor",
                                       `${ch.msg_customer_count} msg do cliente`].join(" · ")}

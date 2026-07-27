@@ -34,6 +34,7 @@ BEGIN
     SELECT sa.id, sa.attendance_code, sa.conversation_id, sa.contact_id,
            sa.contact_name, sa.contact_phone, sa.cliente_id, sa.department_id,
            sa.opened_at, sa.closed_at, sa.assumed_at,
+           sa.ticket_id, COALESCE(sa.created_from, '') AS created_from,
            COALESCE(sa.msg_agent_count, 0)    AS msg_agent_count,
            COALESCE(sa.msg_customer_count, 0) AS msg_customer_count
     FROM support_attendances sa
@@ -48,7 +49,15 @@ BEGIN
       AND (p_is_group IS NULL OR COALESCE(sa.is_group, false) = p_is_group)
   ),
   vacuo AS (
-    SELECT * FROM base WHERE assumed_at IS NULL AND msg_agent_count = 0
+    -- Vácuo = ninguém assumiu, ninguém respondeu E o caso não foi encaminhado.
+    -- O ticket é o que separa "abandonado" de "tratado por outro caminho": o cliente
+    -- escreveu, só a saudação automática respondeu, mas alguém converteu em ticket.
+    -- Mesma regra que o fechamento já usa (ticket_id / created_from='ticket').
+    SELECT * FROM base
+     WHERE assumed_at IS NULL
+       AND msg_agent_count = 0
+       AND ticket_id IS NULL
+       AND created_from <> 'ticket'
   ),
   chats AS (
     SELECT v.*,
