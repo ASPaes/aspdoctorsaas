@@ -34,6 +34,10 @@ const schema = z.object({
   support_inactivity_enabled: z.boolean(),
   support_inactivity_warning_before_minutes: z.number().min(1).max(60),
   support_inactivity_warning_template: z.string().min(1, "Obrigatório"),
+  // Fim de expediente: prazo que cairia depois do expediente é antecipado
+  support_inactivity_eod_enabled: z.boolean(),
+  support_inactivity_eod_warning_template: z.string().min(1, "Obrigatório"),
+  support_inactivity_eod_close_template: z.string().min(1, "Obrigatório"),
 
   // Ausência do agente (bola com o agente)
   support_agent_alert_enabled: z.boolean(),
@@ -76,6 +80,9 @@ export default function AtendimentoCsatTab() {
       support_inactivity_enabled: true,
       support_inactivity_warning_before_minutes: 5,
       support_inactivity_warning_template: "",
+      support_inactivity_eod_enabled: true,
+      support_inactivity_eod_warning_template: "",
+      support_inactivity_eod_close_template: "",
 
       support_agent_alert_enabled: false,
       support_agent_alert_minutes: 5,
@@ -121,7 +128,7 @@ export default function AtendimentoCsatTab() {
     queryKey: ["configuracoes-atendimento", tid],
     queryFn: async () => {
       let q = supabase.from("configuracoes").select(
-        "id, support_reopen_window_minutes, support_auto_close_inactivity_minutes, support_send_inactivity_warning, support_inactivity_enabled, support_inactivity_warning_before_minutes, support_inactivity_warning_template, support_agent_alert_enabled, support_agent_alert_minutes, support_agent_no_response_close_enabled, support_agent_no_response_close_minutes, support_csat_enabled, support_csat_prompt_template, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template, support_ura_enabled, support_ura_welcome_template, support_ura_invalid_option_template, support_ura_confirmation_template, support_waiting_ack_limit, support_ura_timeout_minutes, support_ura_default_department_id"
+        "id, support_reopen_window_minutes, support_auto_close_inactivity_minutes, support_send_inactivity_warning, support_inactivity_enabled, support_inactivity_warning_before_minutes, support_inactivity_warning_template, support_inactivity_eod_enabled, support_inactivity_eod_warning_template, support_inactivity_eod_close_template, support_agent_alert_enabled, support_agent_alert_minutes, support_agent_no_response_close_enabled, support_agent_no_response_close_minutes, support_csat_enabled, support_csat_prompt_template, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template, support_ura_enabled, support_ura_welcome_template, support_ura_invalid_option_template, support_ura_confirmation_template, support_waiting_ack_limit, support_ura_timeout_minutes, support_ura_default_department_id"
       );
       if (tid) q = q.eq("tenant_id", tid);
       const { data, error } = await q.limit(1).maybeSingle();
@@ -139,6 +146,9 @@ export default function AtendimentoCsatTab() {
         support_inactivity_enabled: config.support_inactivity_enabled ?? true,
         support_inactivity_warning_before_minutes: config.support_inactivity_warning_before_minutes,
         support_inactivity_warning_template: config.support_inactivity_warning_template,
+        support_inactivity_eod_enabled: config.support_inactivity_eod_enabled ?? true,
+        support_inactivity_eod_warning_template: config.support_inactivity_eod_warning_template ?? "",
+        support_inactivity_eod_close_template: config.support_inactivity_eod_close_template ?? "",
 
         support_agent_alert_enabled: config.support_agent_alert_enabled ?? false,
         support_agent_alert_minutes: config.support_agent_alert_minutes ?? 5,
@@ -195,6 +205,7 @@ export default function AtendimentoCsatTab() {
   const csatEnabled = form.watch("support_csat_enabled");
   const warningEnabled = form.watch("support_send_inactivity_warning");
   const inactivityEnabled = form.watch("support_inactivity_enabled");
+  const eodEnabled = form.watch("support_inactivity_eod_enabled");
   const agentAlertEnabled = form.watch("support_agent_alert_enabled");
   const agentCloseEnabled = form.watch("support_agent_no_response_close_enabled");
   const uraEnabled = form.watch("support_ura_enabled");
@@ -289,6 +300,52 @@ export default function AtendimentoCsatTab() {
                           <Textarea {...field} rows={3} placeholder="Use {{minutes}} para inserir o tempo restante" />
                         </FormControl>
                         <FormDescription>Variáveis: {"{{minutes}}"}</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                )}
+
+                <Separator />
+
+                <FormField control={form.control} name="support_inactivity_eod_enabled" render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel>Resolver antes do fim do expediente</FormLabel>
+                      <FormDescription>
+                        Quando o prazo cairia depois do expediente, o aviso e o encerramento são antecipados para o fim do dia. Desligado, o atendimento fica aberto até o próximo dia útil.
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )} />
+
+                {eodEnabled && (
+                  <div className="grid grid-cols-1 gap-4">
+                    {warningEnabled && (
+                      <FormField control={form.control} name="support_inactivity_eod_warning_template" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Aviso de fim de expediente</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} rows={3} placeholder="Use {{end}} para inserir a hora do fim do expediente" />
+                          </FormControl>
+                          <FormDescription>
+                            Enviado no lugar do aviso normal, com a mesma antecedência configurada acima. Variáveis: {"{{end}}"} e {"{{code}}"}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    )}
+
+                    <FormField control={form.control} name="support_inactivity_eod_close_template" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Mensagem de encerramento no fim do expediente</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} rows={3} placeholder="Use {{end}} e {{code}}" />
+                        </FormControl>
+                        <FormDescription>Variáveis: {"{{end}}"} e {"{{code}}"}</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )} />

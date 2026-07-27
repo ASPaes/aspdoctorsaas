@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Julho / 2026
 
+### 27/07
+
+- 🔧 **Atendimento** — Quando o prazo de encerramento por inatividade caía depois do fim do expediente, o atendimento ficava parado: o cliente não recebia o aviso, o chat não era encerrado e o atendimento atravessava a noite (ou o fim de semana) aberto. Agora o aviso e o encerramento são antecipados para o fim do expediente, com mensagem explicando o horário. Dá para desligar o comportamento em Configurações > WhatsApp > Atendimento.
+
 ### 26/07
 
 - 🆕 **Dashboard de atendimento** — O indicador "Não Atendido" agora abre a lista de quem ficou sem resposta no período, agrupada por contato e mostrando quantas vezes cada um passou por isso. Dá para ler a conversa ali mesmo ou ir direto para o WhatsApp. Atendimentos que viraram ticket não entram na lista.

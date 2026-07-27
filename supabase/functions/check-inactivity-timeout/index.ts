@@ -4,7 +4,8 @@ import { getSupportConfig, SupportConfig } from "../_shared/support-config.ts";
 import { sendAndPersistAutoMessage } from "../_shared/message-processor.ts";
 import { getInstanceSecrets } from "../_shared/providers/index.ts";
 import { SendContext } from "../_shared/message-types.ts";
-import { isWithinBusinessHours } from "../_shared/business-hours.ts";
+import { evaluateBusinessHours, BusinessHoursEvaluation, tzTimeStr } from "../_shared/business-hours.ts";
+import { decideInactivityAction } from "../_shared/inactivity-decision.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,6 +44,9 @@ interface AttendanceRow {
   warn_enabled: boolean;
   needs_warn: boolean;
   needs_close: boolean;
+  // fim de expediente:
+  inactivity_eod_close_at: string | null;
+  eod_enabled: boolean;
 }
 
 
@@ -60,6 +64,9 @@ type ProcessResult =
   | "skipped"
   | "warn_skipped_limit"
   | "close_skipped_limit"
+  | "eod_warned"
+  | "eod_closed"
+  | "eod_scheduled"
   | "error";
 
 function getLastActivityIso(att: AttendanceRow): string {
@@ -125,6 +132,43 @@ async function buildSendContext(
   return { ctx, contact };
 }
 
+// Guards que barram QUALQUER ação automática sobre o atendimento.
+// Rodam só quando o motor decidiu agir: a fila agora traz também atendimentos ainda
+// não vencidos (candidatos à antecipação de fim de expediente), e checar todos eles
+// a cada ciclo custaria 2 queries por linha sem nenhuma ação em troca.
+async function passesActionGuards(
+  supabase: any,
+  att: AttendanceRow,
+  log: (msg: string, extra?: any) => void,
+): Promise<boolean> {
+  // Atendimento aguardando avaliação CSAT — não encerrar por inatividade.
+  // O ciclo pós-CSAT (nota e encerramento) é do check-csat-timeout.
+  const { data: pendingCsat } = await supabase
+    .from("support_csat")
+    .select("id")
+    .eq("attendance_id", att.id)
+    .in("status", ["pending", "awaiting_reason"])
+    .limit(1)
+    .maybeSingle();
+  if (pendingCsat) {
+    log("CSAT pendente — skip (csat-timeout cuida)");
+    return false;
+  }
+
+  // "Sem regras do sistema": contato com rules_disabled=true → nada automático.
+  const { data: contactRules } = await supabase
+    .from("whatsapp_contacts")
+    .select("rules_disabled")
+    .eq("id", att.contact_id)
+    .maybeSingle();
+  if (contactRules?.rules_disabled === true) {
+    log("rules_disabled=true no contato — skip");
+    return false;
+  }
+
+  return true;
+}
+
 // canSend(): retorna true se ainda há orçamento de envio no ciclo.
 // Recebe um objeto-contador por referência para que o incremento seja visível
 // ao chamador (o loop principal), garantindo o teto global por execução.
@@ -134,184 +178,175 @@ async function processAttendance(
   correlationId: string,
   budget: { sends: number },
   configCache: Map<string, SupportConfig>,
-  bhCache: Map<string, boolean>,
+  bhCache: Map<string, BusinessHoursEvaluation>,
 ): Promise<ProcessResult> {
   const log = (msg: string, extra?: any) =>
     console.log(`${LOG}[${correlationId}][${att.attendance_code}] ${msg}`, extra ?? "");
 
   try {
-    // Guard: atendimento aguardando avaliação CSAT — não encerrar por inatividade.
-    // O ciclo de vida pós-CSAT (captura da nota e encerramento) é gerido pelo check-csat-timeout.
-    {
-      const { data: pendingCsat } = await supabase
-        .from("support_csat")
-        .select("id")
-        .eq("attendance_id", att.id)
-        .in("status", ["pending", "awaiting_reason"])
-        .limit(1)
-        .maybeSingle();
-      if (pendingCsat) {
-        log("CSAT pendente — skip inactivity close (csat-timeout cuida)");
-        return "skipped";
-      }
-    }
-
     let config = configCache.get(att.tenant_id);
     if (!config) {
       config = await getSupportConfig(supabase, att.tenant_id);
       configCache.set(att.tenant_id, config);
     }
+    const tz = config.business_hours_timezone || "America/Sao_Paulo";
 
-    // Guard "Sem regras do sistema": contato com rules_disabled=true → pula tudo.
-    {
-      const { data: contactRules } = await supabase
-        .from("whatsapp_contacts")
-        .select("rules_disabled")
-        .eq("id", att.contact_id)
-        .maybeSingle();
-      if (contactRules?.rules_disabled === true) {
-        log("rules_disabled=true no contato — skip");
-        return "skipped";
-      }
-    }
-
-    // Guard: estamos dentro do horário comercial AGORA?
-    // Sempre checar — não depende mais da flag opened_out_of_hours.
+    // ─── Horário comercial: dentro/fora AGORA + fim do expediente de hoje ─────
     // Fail-safe: se a checagem falhar, assume "fora" e pula (não pune cliente).
-    {
-      const { data: convOOH } = await supabase
-        .from("whatsapp_conversations")
-        .select("opened_out_of_hours")
-        .eq("id", att.conversation_id)
-        .maybeSingle();
-
-      if (config.business_hours_enabled && att.instance_id) {
-        const minuteBucket = Math.floor(Date.now() / 60000);
-        const bhKey = `${att.tenant_id}:${att.department_id ?? 'none'}:${minuteBucket}`;
-        let insideNow = bhCache.get(bhKey);
-        if (insideNow === undefined) {
-          try {
-            insideNow = await isWithinBusinessHours(
-              supabase,
-              att.conversation_id,
-              att.instance_id,
-              att.tenant_id,
-              config,
-            );
-            bhCache.set(bhKey, insideNow);
-          } catch (err) {
-            console.error(
-              `${LOG}[${correlationId}][${att.attendance_code}] isWithinBusinessHours falhou — fail-safe: skip`,
-              err,
-            );
-            return "skipped";
-          }
-        }
-
-        if (!insideNow) {
-          log("fora do horário comercial agora — skip");
+    let bh: BusinessHoursEvaluation | null = null;
+    if (config.business_hours_enabled && att.instance_id) {
+      const minuteBucket = Math.floor(Date.now() / 60000);
+      const bhKey = `${att.tenant_id}:${att.department_id ?? 'none'}:${minuteBucket}`;
+      bh = bhCache.get(bhKey) ?? null;
+      if (!bh) {
+        try {
+          bh = await evaluateBusinessHours(
+            supabase,
+            att.conversation_id,
+            att.instance_id,
+            att.tenant_id,
+            config,
+          );
+          bhCache.set(bhKey, bh);
+        } catch (err) {
+          console.error(
+            `${LOG}[${correlationId}][${att.attendance_code}] evaluateBusinessHours falhou — fail-safe: skip`,
+            err,
+          );
           return "skipped";
         }
-
-        // Dentro do horário: limpa flag obsoleta se ainda estiver setada
-        if (convOOH?.opened_out_of_hours === true) {
-          await supabase
-            .from("whatsapp_conversations")
-            .update({
-              opened_out_of_hours: false,
-              out_of_hours_cleared_at: new Date().toISOString(),
-            })
-            .eq("id", att.conversation_id);
-        }
       }
     }
 
-    const closeThresholdMin = att.effective_close_min;
-    const warnEnabled = att.warn_enabled;
-    const warnBeforeMin = Math.min(att.effective_warn_before, closeThresholdMin);
-    const warnTemplate = config.support_inactivity_warning_template ||
-      "⚠️ Por falta de interação, este atendimento será encerrado em {{minutes}} minutos. Se ainda precisar de ajuda, responda esta mensagem.";
+    // A regra mora em _shared/inactivity-decision.ts (função pura, coberta por teste).
+    // Aqui só executamos o que ela decidir.
+    const action = decideInactivityAction({
+      now: new Date(),
+      lastActivityAt: new Date(getLastActivityIso(att)),
+      warningSentAt: att.inactivity_warning_sent_at ? new Date(att.inactivity_warning_sent_at) : null,
+      eodCloseAt: att.inactivity_eod_close_at ? new Date(att.inactivity_eod_close_at) : null,
+      closeThresholdMin: att.effective_close_min,
+      warnBeforeMin: att.effective_warn_before,
+      warnEnabled: att.warn_enabled,
+      insideBusinessHours: bh ? bh.inside : null,
+      dayEndAt: bh?.dayEndAt ?? null,
+      eodEnabled: att.eod_enabled && config.support_inactivity_eod_enabled !== false,
+    });
 
-    if (!closeThresholdMin || closeThresholdMin <= 0) {
-      log("close threshold inválido — skip", { closeThresholdMin });
+    if (action.kind === "none") return "skipped";
+
+    // Vamos agir: a flag de "aberto fora do expediente" está obsoleta.
+    if (bh?.inside) {
+      await supabase
+        .from("whatsapp_conversations")
+        .update({
+          opened_out_of_hours: false,
+          out_of_hours_cleared_at: new Date().toISOString(),
+        })
+        .eq("id", att.conversation_id)
+        .eq("opened_out_of_hours", true);
+    }
+
+    // Agendar não manda mensagem: não consome o teto de envios do ciclo.
+    if (action.kind === "eod_schedule") {
+      if (!(await passesActionGuards(supabase, att, log))) return "skipped";
+      await supabase
+        .from("support_attendances")
+        .update({ inactivity_eod_close_at: action.closeAt.toISOString() })
+        .eq("id", att.id)
+        .is("inactivity_eod_close_at", null);
+      log("encerramento agendado para o fim do expediente", {
+        fim: tzTimeStr(action.closeAt, tz),
+      });
+      return "eod_scheduled";
+    }
+
+    // Daqui pra baixo tudo envia mensagem → respeita o teto do ciclo.
+    if (budget.sends >= MAX_SENDS_PER_RUN) {
+      log("teto de envios atingido — adiando pro próximo ciclo", { acao: action.kind });
+      return action.kind === "warn" || action.kind === "eod_warn"
+        ? "warn_skipped_limit"
+        : "close_skipped_limit";
+    }
+    if (!(await passesActionGuards(supabase, att, log))) return "skipped";
+
+    // ─── ENCERRAMENTO AGENDADO PARA O FIM DO EXPEDIENTE ───────────────────────
+    if (action.kind === "eod_close") {
+      const endLabel = tzTimeStr(action.closeAt, tz);
+      const message = (config.support_inactivity_eod_close_template || "")
+        .replace(/\{\{end\}\}/g, endLabel)
+        .replace(/\{\{code\}\}/g, att.attendance_code);
+
+      log("fim de expediente — encerrando (agendado)", { fim: endLabel });
+      const r = await closeAttendance(supabase, att, correlationId, message);
+      if (r !== "closed") return r;
+      budget.sends++;
+      return "eod_closed";
+    }
+
+    // ─── ENCERRAMENTO COMUM ───────────────────────────────────────────────────
+    if (action.kind === "close") {
+      log("prazo de inatividade atingido — encerrando");
+      const r = await closeAttendance(supabase, att, correlationId);
+      if (r === "closed") budget.sends++;
+      return r;
+    }
+
+    // ─── AVISOS (comum e de fim de expediente) ────────────────────────────────
+    const built = await buildSendContext(supabase, att.tenant_id, att.conversation_id);
+    if (!built) {
+      log("não foi possível construir SendContext — skip");
       return "skipped";
     }
 
+    if (action.kind === "eod_warn") {
+      const endLabel = tzTimeStr(action.closeAt, tz);
+      const message = (config.support_inactivity_eod_warning_template || "")
+        .replace(/\{\{end\}\}/g, endLabel)
+        .replace(/\{\{code\}\}/g, att.attendance_code);
 
-    const lastActivityIso = getLastActivityIso(att);
-    const elapsedMin = (Date.now() - new Date(lastActivityIso).getTime()) / 60000;
+      await sendAndPersistAutoMessage(
+        supabase, built.ctx, att.conversation_id, message,
+        { system: true, inactivity_warning: true, inactivity_eod: true, attendance_id: att.id }
+      );
+      budget.sends++;
 
-    // ─── FLUXO COM AVISO ATIVADO ──────────────────────────────────────────────
-    if (warnEnabled) {
-      if (warnBeforeMin <= 0) {
-        log("warnBefore inválido com aviso ativado — skip", { warnBeforeMin });
-        return "skipped";
-      }
+      // Aviso e agendamento gravados juntos: o encerramento já fica garantido para o
+      // fim do expediente, mesmo que o ciclo seguinte caia fora do horário.
+      await supabase
+        .from("support_attendances")
+        .update({
+          inactivity_warning_sent_at: new Date().toISOString(),
+          inactivity_eod_close_at: action.closeAt.toISOString(),
+        })
+        .eq("id", att.id)
+        .is("inactivity_warning_sent_at", null);
 
-      // Caso A: aviso ainda não enviado
-      if (!att.inactivity_warning_sent_at) {
-        const warnAtMin = Math.max(0, closeThresholdMin - warnBeforeMin);
-        if (elapsedMin < warnAtMin) return "skipped"; // ainda não chegou a hora
-
-        // Vai ENVIAR aviso → respeita o teto de envios do ciclo
-        if (budget.sends >= MAX_SENDS_PER_RUN) {
-          log("teto de envios atingido — adiando aviso pro próximo ciclo");
-          return "warn_skipped_limit";
-        }
-
-        const built = await buildSendContext(supabase, att.tenant_id, att.conversation_id);
-        if (!built) {
-          log("não foi possível construir SendContext — skip");
-          return "skipped";
-        }
-
-        const message = warnTemplate.replace(/\{\{minutes\}\}/g, String(warnBeforeMin));
-        await sendAndPersistAutoMessage(
-          supabase, built.ctx, att.conversation_id, message,
-          { system: true, inactivity_warning: true, attendance_id: att.id }
-        );
-        budget.sends++; // contabiliza o envio
-
-        await supabase
-          .from("support_attendances")
-          .update({ inactivity_warning_sent_at: new Date().toISOString() })
-          .eq("id", att.id)
-          .is("inactivity_warning_sent_at", null);
-
-        log("aviso enviado", { elapsedMin, warnAtMin, sendsNoCiclo: budget.sends });
-        return "warned";
-      }
-
-      // Caso B: aviso já enviado — só fecha após warnBeforeMin desde o aviso
-      const warningSentAt = new Date(att.inactivity_warning_sent_at).getTime();
-      const minSinceWarning = (Date.now() - warningSentAt) / 60000;
-      if (minSinceWarning < warnBeforeMin) return "skipped";
-
-      // Vai ENVIAR encerramento → respeita o teto
-      if (budget.sends >= MAX_SENDS_PER_RUN) {
-        log("teto de envios atingido — adiando encerramento pro próximo ciclo");
-        return "close_skipped_limit";
-      }
-
-      log("janela pós-aviso expirada — encerrando", { minSinceWarning, warnBeforeMin });
-      const r = await closeAttendance(supabase, att, correlationId);
-      if (r === "closed") budget.sends++;
-      return r;
+      log("aviso de fim de expediente enviado", { fim: endLabel, sendsNoCiclo: budget.sends });
+      return "eod_warned";
     }
 
-    // ─── FLUXO COM AVISO DESATIVADO ───────────────────────────────────────────
-    if (elapsedMin >= closeThresholdMin) {
-      if (budget.sends >= MAX_SENDS_PER_RUN) {
-        log("teto de envios atingido — adiando encerramento (sem aviso) pro próximo ciclo");
-        return "close_skipped_limit";
-      }
-      log("aviso desativado, threshold atingido — encerrando", { elapsedMin, closeThresholdMin });
-      const r = await closeAttendance(supabase, att, correlationId);
-      if (r === "closed") budget.sends++;
-      return r;
-    }
+    // action.kind === "warn"
+    const warnBeforeMin = Math.min(att.effective_warn_before, att.effective_close_min);
+    const warnTemplate = config.support_inactivity_warning_template ||
+      "⚠️ Por falta de interação, este atendimento será encerrado em {{minutes}} minutos. Se ainda precisar de ajuda, responda esta mensagem.";
+    const message = warnTemplate.replace(/\{\{minutes\}\}/g, String(warnBeforeMin));
 
-    return "skipped";
+    await sendAndPersistAutoMessage(
+      supabase, built.ctx, att.conversation_id, message,
+      { system: true, inactivity_warning: true, attendance_id: att.id }
+    );
+    budget.sends++;
+
+    await supabase
+      .from("support_attendances")
+      .update({ inactivity_warning_sent_at: new Date().toISOString() })
+      .eq("id", att.id)
+      .is("inactivity_warning_sent_at", null);
+
+    log("aviso enviado", { warnBeforeMin, sendsNoCiclo: budget.sends });
+    return "warned";
+
   } catch (err) {
     console.error(`${LOG}[${correlationId}][${att.attendance_code}] erro:`, err);
     return "error";
@@ -321,7 +356,9 @@ async function processAttendance(
 async function closeAttendance(
   supabase: any,
   att: AttendanceRow,
-  correlationId: string
+  correlationId: string,
+  // Mensagem ao cliente. Omitida = encerramento por inatividade comum.
+  customMessage?: string,
 ): Promise<"closed" | "skipped"> {
   const log = (msg: string, extra?: any) =>
     console.log(`${LOG}[${correlationId}][${att.attendance_code}] ${msg}`, extra ?? "");
@@ -345,10 +382,15 @@ async function closeAttendance(
   }
 
   if (built) {
+    const message = customMessage?.trim()
+      ? customMessage
+      : `\u{2705} Atendimento *${att.attendance_code}* encerrado por inatividade.\n\nSe precisar de algo, \u00e9 s\u00f3 nos enviar uma nova mensagem. \u{1F60A}`;
     await sendAndPersistAutoMessage(
-      supabase, built.ctx, att.conversation_id,
-      `\u{2705} Atendimento *${att.attendance_code}* encerrado por inatividade.\n\nSe precisar de algo, \u00e9 s\u00f3 nos enviar uma nova mensagem. \u{1F60A}`,
-      { system: true, attendance_event: "closed", attendance_id: att.id, inactivity_close: true }
+      supabase, built.ctx, att.conversation_id, message,
+      {
+        system: true, attendance_event: "closed", attendance_id: att.id,
+        inactivity_close: true, ...(customMessage ? { inactivity_eod: true } : {}),
+      }
     );
   }
 
@@ -369,10 +411,11 @@ serve(async (req) => {
 
     const budget = { sends: 0 };
     const configCache = new Map<string, SupportConfig>();
-    const bhCache = new Map<string, boolean>();
+    const bhCache = new Map<string, BusinessHoursEvaluation>();
     const summary: Record<ProcessResult, number> = {
       closed: 0, warned: 0, skipped: 0,
-      warn_skipped_limit: 0, close_skipped_limit: 0, error: 0,
+      warn_skipped_limit: 0, close_skipped_limit: 0,
+      eod_warned: 0, eod_closed: 0, eod_scheduled: 0, error: 0,
     };
 
     let scanned = 0;

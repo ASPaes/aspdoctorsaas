@@ -26,6 +26,38 @@ export function tzDayKey(date: Date, tz: string): string {
   return WEEKDAY_KEYS[wd] || "";
 }
 
+/** "HH:MM" do instante, no fuso do tenant. */
+export function tzTimeStr(date: Date, tz: string): string {
+  const tp = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(date);
+  const hh = (tp.find((p) => p.type === "hour")?.value || "00").padStart(2, "0");
+  const mm = (tp.find((p) => p.type === "minute")?.value || "00").padStart(2, "0");
+  // Intl devolve "24" para meia-noite em alguns runtimes com hour12:false
+  return `${hh === "24" ? "00" : hh}:${mm}`;
+}
+
+/** Deslocamento do fuso, em ms, no instante dado. */
+function tzOffsetMs(date: Date, tz: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(date);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  const asUTC = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute"), get("second"));
+  return asUTC - date.getTime();
+}
+
+/**
+ * Converte "YYYY-MM-DD" + "HH:MM" interpretados NO FUSO DO TENANT no instante absoluto.
+ * O Brasil não tem horário de verão desde 2019 (offset fixo), então uma passada basta.
+ */
+export function zonedTimeToInstant(dateStr: string, timeHHMM: string, tz: string): Date {
+  const asIfUtc = new Date(`${dateStr}T${timeHHMM}:00Z`);
+  return new Date(asIfUtc.getTime() - tzOffsetMs(asIfUtc, tz));
+}
+
 // ─── Exceções / feriados ──────────────────────────────────────────────────────
 
 export interface HolidayTemplate {
@@ -222,6 +254,41 @@ export async function isWithinBusinessHours(
   supportConfig: any,
   atDate: Date = new Date(),
 ): Promise<boolean> {
+  const r = await evaluateBusinessHours(
+    supabase, conversationId, instanceId, tenantId, supportConfig, atDate,
+  );
+  return r.inside;
+}
+
+export interface BusinessHoursEvaluation {
+  /** Estamos DENTRO do expediente no instante avaliado? */
+  inside: boolean;
+  /** Instante do fim do ÚLTIMO turno de hoje. null = hoje não tem expediente. */
+  dayEndAt: Date | null;
+  /** "HH:MM" do fim do expediente, para mostrar ao cliente. */
+  dayEndLabel: string | null;
+}
+
+/**
+ * Mesma decisão de `isWithinBusinessHours`, mas devolve também o fim do expediente
+ * de hoje — necessário para antecipar aviso/encerramento de inatividade que cairiam
+ * depois do expediente.
+ *
+ * "Fim do expediente" é o fim do ÚLTIMO turno do dia: num dia com intervalo de almoço
+ * (08:00–12:00 e 13:30–18:00) o fim é 18:00, não 12:00. O intervalo não é fim de
+ * expediente — o motor volta a agir à tarde.
+ *
+ * NÃO captura exceções de propósito: quem chama decide a direção do fail-safe
+ * (na inatividade, falha → "fora", para não fechar e punir o cliente).
+ */
+export async function evaluateBusinessHours(
+  supabase: any,
+  conversationId: string,
+  instanceId: string,
+  tenantId: string,
+  supportConfig: any,
+  atDate: Date = new Date(),
+): Promise<BusinessHoursEvaluation> {
   const tz = supportConfig.business_hours_timezone || "America/Sao_Paulo";
 
   const deptBH = await resolveDepartmentBusinessHours(
@@ -237,12 +304,13 @@ export async function isWithinBusinessHours(
   const exc = await getBusinessHoursExceptions(supabase, tenantId, atDate, tz, 14, deptBH.departmentId);
 
   const dayKey = tzDayKey(atDate, tz);
-  const tp = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false,
-  }).formatToParts(atDate);
-  const currentTime =
-    `${(tp.find((p) => p.type === "hour")?.value || "00").padStart(2, "0")}:` +
-    `${(tp.find((p) => p.type === "minute")?.value || "00").padStart(2, "0")}`;
+  const currentTime = tzTimeStr(atDate, tz);
+  const today = tzDateStr(atDate, tz);
+  const build = (inside: boolean, endHHMM: string | null): BusinessHoursEvaluation => ({
+    inside,
+    dayEndAt: endHHMM ? zonedTimeToInstant(today, endHHMM, tz) : null,
+    dayEndLabel: endHHMM,
+  });
 
   // Feriado com horário reduzido (template): dentro da janela e fora do intervalo?
   if (exc.today?.use_template && exc.template) {
@@ -255,11 +323,11 @@ export async function isWithinBusinessHours(
       currentTime >= t.break_start.slice(0, 5) &&
       currentTime < t.break_end.slice(0, 5)
     );
-    return inTurn && !inBreak;
+    return build(inTurn && !inBreak, close);
   }
 
   // Feriado fechado o dia inteiro
-  if (exc.today?.is_closed && !exc.today?.use_template) return false;
+  if (exc.today?.is_closed && !exc.today?.use_template) return build(false, null);
 
   // Dia normal: dentro de algum slot ativo?
   const dayConfig = businessHours[dayKey];
@@ -267,5 +335,10 @@ export async function isWithinBusinessHours(
   if (dayConfig?.start && dayConfig?.end && slots.length === 0) {
     slots.push({ start: dayConfig.start, end: dayConfig.end });
   }
-  return !!dayConfig?.active && slots.some((s) => currentTime >= s.start && currentTime <= s.end);
+  const active = !!dayConfig?.active && slots.length > 0;
+  if (!active) return build(false, null);
+
+  const inside = slots.some((s) => currentTime >= s.start && currentTime <= s.end);
+  const dayEnd = slots.reduce((max, s) => (s.end > max ? s.end : max), slots[0].end);
+  return build(inside, dayEnd);
 }
