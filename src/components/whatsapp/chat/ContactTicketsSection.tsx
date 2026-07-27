@@ -1,15 +1,26 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ChevronDown, ChevronRight, Ticket, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Ticket, Loader2, Rocket } from "lucide-react";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
+import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
+
+// Pesado (~3k linhas) e só usado quando o ticket é de onboarding — fora do chunk do chat.
+const JourneyDetailSheet = lazy(() => import("@/pages/onboarding/JourneyDetailSheet"));
 
 interface Props {
   clienteId: string | null | undefined;
+}
+
+/** Jornada de onboarding vinculada a um ticket. `tenantId` vem da própria jornada
+ *  (e não do filtro global) para funcionar com super admin em "Todos os tenants". */
+interface JourneyRef {
+  journeyId: string;
+  tenantId: string | null;
 }
 
 interface TicketRow {
@@ -54,6 +65,29 @@ function useClienteTickets(clienteId: string | null | undefined, limit?: number)
   });
 }
 
+/** Mapa ticket_id → jornada, para saber qual modal abrir.
+ *  Não existe flag no ticket (`canal_origem` é 'whatsapp' também nos de onboarding):
+ *  o único discriminador é existir linha em `onboarding_journeys.ticket_id`. */
+function useClienteJourneys(clienteId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["contact-ticket-journeys", clienteId],
+    enabled: !!clienteId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_journeys" as any) as any)
+        .select("id, ticket_id, tenant_id")
+        .eq("cliente_id", clienteId)
+        .not("ticket_id", "is", null);
+      if (error) throw error;
+      const map: Record<string, JourneyRef> = {};
+      for (const r of (data || []) as any[]) {
+        map[r.ticket_id as string] = { journeyId: r.id as string, tenantId: (r.tenant_id as string) ?? null };
+      }
+      return map;
+    },
+    staleTime: 60_000,
+  });
+}
+
 function formatDate(iso: string | null) {
   if (!iso) return "—";
   try {
@@ -66,11 +100,13 @@ function formatDate(iso: string | null) {
 function TicketItem({
   t,
   expanded,
+  isOnboarding,
   onToggle,
   onOpen,
 }: {
   t: TicketRow;
   expanded: boolean;
+  isOnboarding: boolean;
   onToggle: () => void;
   onOpen: () => void;
 }) {
@@ -91,6 +127,15 @@ function TicketItem({
             <span className="font-mono text-[10px] font-semibold text-primary shrink-0">
               {t.ticket_code || "—"}
             </span>
+            {isOnboarding && (
+              <Badge
+                variant="outline"
+                className="text-[9px] h-4 px-1 shrink-0 gap-0.5 border-sky-500/40 text-sky-600 dark:text-sky-400"
+              >
+                <Rocket className="h-2.5 w-2.5" />
+                Onboarding
+              </Badge>
+            )}
             {t.status?.name && (
               <Badge
                 variant="outline"
@@ -145,7 +190,7 @@ function TicketItem({
           )}
           <div className="flex justify-end pt-1">
             <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={onOpen}>
-              Abrir ticket
+              {isOnboarding ? "Abrir onboarding" : "Abrir ticket"}
             </Button>
           </div>
         </div>
@@ -159,9 +204,22 @@ export function ContactTicketsSection({ clienteId }: Props) {
   const [allOpen, setAllOpen] = useState(false);
   const [allExpandedId, setAllExpandedId] = useState<string | null>(null);
   const [openTicketId, setOpenTicketId] = useState<string | null>(null);
+  const [openJourney, setOpenJourney] = useState<JourneyRef | null>(null);
 
   const { data: recent = [], isLoading } = useClienteTickets(clienteId, 3);
   const { data: all = [], isLoading: loadingAll } = useClienteTickets(allOpen ? clienteId : null);
+  const { data: journeyByTicket = {} } = useClienteJourneys(clienteId);
+  const { canAccess: canOnboarding } = useOnboardingAccess();
+
+  // Ticket de onboarding abre a jornada; sem acesso ao módulo, cai no modal de atendimento
+  // (e aí o badge também some, para o rótulo bater com o que realmente abre).
+  const isOnboardingTicket = (ticketId: string) => canOnboarding && !!journeyByTicket[ticketId];
+
+  const openTicket = (ticketId: string) => {
+    const j = journeyByTicket[ticketId];
+    if (j && canOnboarding) setOpenJourney(j);
+    else setOpenTicketId(ticketId);
+  };
 
   if (!clienteId) {
     return (
@@ -190,8 +248,9 @@ export function ContactTicketsSection({ clienteId }: Props) {
           key={t.id}
           t={t}
           expanded={expandedId === t.id}
+          isOnboarding={isOnboardingTicket(t.id)}
           onToggle={() => setExpandedId((cur) => (cur === t.id ? null : t.id))}
-          onOpen={() => setOpenTicketId(t.id)}
+          onOpen={() => openTicket(t.id)}
         />
       ))}
 
@@ -225,9 +284,10 @@ export function ContactTicketsSection({ clienteId }: Props) {
                     key={t.id}
                     t={t}
                     expanded={allExpandedId === t.id}
+                    isOnboarding={isOnboardingTicket(t.id)}
                     onToggle={() => setAllExpandedId((cur) => (cur === t.id ? null : t.id))}
                     onOpen={() => {
-                      setOpenTicketId(t.id);
+                      openTicket(t.id);
                       setAllOpen(false);
                     }}
                   />
@@ -244,6 +304,18 @@ export function ContactTicketsSection({ clienteId }: Props) {
         open={!!openTicketId}
         onOpenChange={(o) => !o && setOpenTicketId(null)}
       />
+
+      {/* Jornada de onboarding — mesmo modal usado na tela de Onboarding */}
+      {openJourney && (
+        <Suspense fallback={null}>
+          <JourneyDetailSheet
+            open
+            onOpenChange={(o) => { if (!o) setOpenJourney(null); }}
+            journeyId={openJourney.journeyId}
+            tenantId={openJourney.tenantId}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
