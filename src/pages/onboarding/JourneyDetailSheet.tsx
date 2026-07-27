@@ -1628,7 +1628,21 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     )}
 
                   </div>
-                  <DialogTitle className="text-base mt-1 truncate">{clienteNome}</DialogTitle>
+                  <DialogTitle className="text-base mt-1 truncate">
+                    {journey.cliente_id ? (
+                      <button
+                        type="button"
+                        onClick={() => window.open(`/clientes/${journey.cliente_id}`, "_blank", "noopener,noreferrer")}
+                        title="Abrir cadastro do cliente em nova aba"
+                        className="group inline-flex items-center gap-1.5 max-w-full text-left rounded-sm transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      >
+                        <span className="truncate group-hover:underline underline-offset-4">{clienteNome}</span>
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                      </button>
+                    ) : (
+                      <span className="block truncate">{clienteNome}</span>
+                    )}
+                  </DialogTitle>
                   {journey.assunto && (
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">{journey.assunto}</p>
                   )}
