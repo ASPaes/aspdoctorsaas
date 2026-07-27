@@ -1632,7 +1632,14 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     {journey.cliente_id ? (
                       <button
                         type="button"
-                        onClick={() => window.open(`/clientes/${journey.cliente_id}`, "_blank", "noopener,noreferrer")}
+                        onClick={() => {
+                          // A aba nova não herda o sessionStorage (noopener), então o tenant
+                          // simulado pelo super admin vai explícito na URL — senão o cadastro
+                          // abre filtrado pelo tenant errado e vem vazio.
+                          const t = (journey as any).tenant_id || tenantId;
+                          const url = `/clientes/${journey.cliente_id}${t ? `?tenant=${encodeURIComponent(t)}` : ""}`;
+                          window.open(url, "_blank", "noopener,noreferrer");
+                        }}
                         title="Abrir cadastro do cliente em nova aba"
                         className="group inline-flex items-center gap-1.5 max-w-full text-left rounded-sm transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       >

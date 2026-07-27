@@ -34,12 +34,24 @@ export function TenantFilterProvider({ children }: { children: React.ReactNode }
       try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
       return null;
     }
+    // Tenant explícito na URL (?tenant=) vence: links abertos em nova aba não herdam
+    // o sessionStorage, então quem abre o link carrega o tenant junto.
+    // Lido aqui no initializer (síncrono) para que a 1ª query já saia com o tenant certo.
+    let fromUrl: string | null = null;
     try {
+      fromUrl = new URLSearchParams(window.location.search).get("tenant");
+    } catch {}
+
+    try {
+      if (fromUrl) {
+        sessionStorage.setItem(STORAGE_KEY, fromUrl);
+        return fromUrl;
+      }
       const stored = sessionStorage.getItem(STORAGE_KEY);
       // Default to admin's own tenant if nothing stored
       return stored || profile?.tenant_id || null;
     } catch {
-      return profile?.tenant_id || null;
+      return fromUrl || profile?.tenant_id || null;
     }
   });
 
