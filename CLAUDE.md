@@ -276,6 +276,7 @@ Regra do Alexandre: toda mudança avaliada por latência/egress/carga **antes** 
 - **Tolerância zero a problema visual óbvio.** Revisar mentalmente o resultado visual antes de entregar. Padrão Spatial UI: tilt 3D, spotlight gradient, pulse dots, mesh gradient bg, `cubic-bezier(0.16,1,0.3,1)`.
 - Se a mudança vier do Lovable, **validar via GitHub API** — false-success é real e recorrente. Arquivos >20KB: comparar SHA + size.
 - **Deploy só quando ele pedir.** Testar no local e mostrar; publicar em `app.doctorsaas.com.br` (Lovable, domínio customizado) é decisão dele.
+- **Publicou? Registra no `CHANGELOG.md`.** Uma linha por entrega, em linguagem de cliente, classificada em 🆕 Novidade / ⬆️ Melhoria / 🔧 Correção, no dia da publicação. Só o que o usuário percebe — refactor, teste e migration ficam no Git. É desse arquivo que sai o relatório mensal que o Alexandre publica no DoctorDev (**não** mexer no `useReleasesNovidade`, que só lê o release de lá).
 
 ---
 
