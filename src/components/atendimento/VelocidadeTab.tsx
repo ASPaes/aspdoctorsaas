@@ -3,6 +3,7 @@ import { Loader2, Gauge, UserX } from "lucide-react";
 import { useAtendimentoVelocidade } from "./useAtendimentoVelocidade";
 import { fmtEspera } from "./TempoRealTab";
 import { VelocidadeTimeline } from "./VelocidadeTimeline";
+import { NaoAtendidosDialog } from "./NaoAtendidosDialog";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ const SLA_OPCOES = [
 
 export function VelocidadeTab() {
   const [slaSeconds, setSlaSeconds] = useState(900);
+  const [verVacuo, setVerVacuo] = useState(false);
   const { data, isLoading, isError, error } = useAtendimentoVelocidade(slaSeconds);
   const dur = (s: number | null | undefined) => (s && s > 0 ? fmtEspera(s) : "—");
 
@@ -111,6 +113,17 @@ export function VelocidadeTab() {
               subtitle={`${data.nao_atendido}/${data.total_encerrados} sem assumir`}
               variant={data.nao_atendido_pct !== null && data.nao_atendido_pct > 5 ? "warning" : "dark"}
               icon={<UserX className="h-4 w-4" />}
+              footer={
+                data.nao_atendido > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setVerVacuo(true)}
+                    className="text-xs font-medium text-primary hover:underline focus:outline-none"
+                  >
+                    Ver clientes →
+                  </button>
+                ) : undefined
+              }
             />
           </div>
 
@@ -153,6 +166,8 @@ export function VelocidadeTab() {
           </div>
         </>
       )}
+
+      <NaoAtendidosDialog open={verVacuo} onOpenChange={setVerVacuo} />
     </div>
   );
 }
