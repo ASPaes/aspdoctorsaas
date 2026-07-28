@@ -1428,8 +1428,20 @@ export async function checkBillingSkipUra(supabase: any, conversationId: string,
 
 export async function ensureAttendanceForBilling(supabase: any, conversationId: string, contactId: string, tenantId: string, departmentId: string, clienteId?: string | null): Promise<void> {
   try {
-    const { data: active } = await supabase.from('support_attendances').select('id, department_id').eq('conversation_id', conversationId).in('status', ['waiting', 'in_progress']).limit(1).maybeSingle();
-    if (active) { if (active.department_id !== departmentId) await supabase.from('support_attendances').update({ department_id: departmentId, updated_at: new Date().toISOString() }).eq('id', active.id); if (clienteId) await supabase.from('support_attendances').update({ cliente_id: clienteId }).eq('id', active.id); return; }
+    const { data: active } = await supabase.from('support_attendances').select('id, department_id, assigned_to').eq('conversation_id', conversationId).in('status', ['waiting', 'in_progress']).limit(1).maybeSingle();
+    if (active) {
+      // Cobranca NUNCA troca o setor de um atendimento ja em andamento.
+      // A RLS de support_attendances so deixa role 'user' ver atendimento do proprio
+      // setor: mover um atendimento vivo para o Financeiro o torna invisivel para quem
+      // esta atendendo — o chat "encerra sozinho", cai no filtro Encerrados e o botao
+      // Reabrir nao resolve (claim_conversation e SECURITY DEFINER e nao mexe no setor).
+      // So define o setor quando nao ha nada a preservar: sem setor E sem dono.
+      if (!active.department_id && !active.assigned_to) {
+        await supabase.from('support_attendances').update({ department_id: departmentId, updated_at: new Date().toISOString() }).eq('id', active.id);
+      }
+      if (clienteId) await supabase.from('support_attendances').update({ cliente_id: clienteId }).eq('id', active.id);
+      return;
+    }
     const supportConfig = await getSupportConfig(supabase, tenantId);
     const { data: lastClosed } = await supabase.from('support_attendances').select('id, closed_at, status, attendance_code').eq('conversation_id', conversationId).in('status', ['closed', 'inactive_closed']).order('closed_at', { ascending: false }).limit(1).maybeSingle();
     const now = new Date(); const nowIso = now.toISOString();
