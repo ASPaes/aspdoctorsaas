@@ -11,7 +11,7 @@ import { NumericInput } from '@/components/ui/numeric-input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
@@ -228,7 +228,9 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); else onOpenChange(o); }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto">
+        {/* dialog-height-ok: 18 campos nao cabem em tela nenhuma. Rola por
+            desenho, com cabecalho e rodape fixos. */}
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle>Novo Ticket CS</DialogTitle>
@@ -425,13 +427,15 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
               </>
             )}
 
-            <div className="flex justify-end gap-2 pt-4">
+            {/* DialogFooter em vez de div: é o que faz o botão Criar ficar fixo
+                na base enquanto o formulário de 18 campos rola. */}
+            <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={handleClose}>Cancelar</Button>
               <Button type="submit" disabled={isSubmitting || createTicket.isPending}>
                 {(isSubmitting || createTicket.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Criar Ticket
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         )}
       </DialogContent>

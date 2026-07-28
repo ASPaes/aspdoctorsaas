@@ -175,7 +175,7 @@ export default function KBEditDialog({ article, areas, onClose }: KBEditDialogPr
 
   return (
     <Dialog open={!!article} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Artigo de KB</DialogTitle>
         </DialogHeader>
@@ -230,29 +230,33 @@ export default function KBEditDialog({ article, areas, onClose }: KBEditDialogPr
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Problema</Label>
-            <p className="text-xs text-muted-foreground">Dúvida ou problema relatado pelo cliente.</p>
-            <Textarea
-              value={editForm.problem}
-              onChange={(e) => setEditForm({ ...editForm, problem: e.target.value })}
-              placeholder="Descreva o problema relatado pelo cliente..."
-              rows={3}
-            />
+          {/* Problema e Solução lado a lado: é o par natural do artigo e
+              empilhados os 3 textarea passavam da altura da tela. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Problema</Label>
+              <p className="text-xs text-muted-foreground">Dúvida ou problema relatado pelo cliente.</p>
+              <Textarea
+                value={editForm.problem}
+                onChange={(e) => setEditForm({ ...editForm, problem: e.target.value })}
+                placeholder="Descreva o problema relatado pelo cliente..."
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Solução</Label>
+              <p className="text-xs text-muted-foreground">Como o técnico orientou/resolveu o problema.</p>
+              <Textarea
+                value={editForm.solution}
+                onChange={(e) => setEditForm({ ...editForm, solution: e.target.value })}
+                placeholder="Descreva a orientação ou solução dada pelo técnico..."
+                rows={3}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Solução</Label>
-            <p className="text-xs text-muted-foreground">Como o técnico orientou/resolveu o problema.</p>
-            <Textarea
-              value={editForm.solution}
-              onChange={(e) => setEditForm({ ...editForm, solution: e.target.value })}
-              placeholder="Descreva a orientação ou solução dada pelo técnico..."
-              rows={3}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Tags (separadas por vírgula)</Label>
               <Input

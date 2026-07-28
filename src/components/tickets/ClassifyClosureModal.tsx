@@ -173,14 +173,15 @@ export function ClassifyClosureModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
         <DialogHeader>
           <DialogTitle className="text-base">Classificar atendimento</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 pt-2">
+        {/* 2 colunas: 5 selects empilhados passavam da altura da tela em 13" */}
+        <div className="grid grid-cols-1 gap-x-4 gap-y-4 pt-2 sm:grid-cols-2">
           {/* Contexto */}
-          <div className="rounded-lg bg-muted/50 p-3 space-y-1.5 text-xs">
+          <div className="rounded-lg bg-muted/50 p-3 space-y-1.5 text-xs sm:col-span-2">
             <div className="flex gap-2">
               <span className="text-muted-foreground shrink-0">Contato:</span>
               <span className="font-medium truncate">{contactName || "—"}</span>
@@ -262,7 +263,7 @@ export function ClassifyClosureModal({
           </div>
 
           {/* Observação */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 sm:col-span-2">
             <Label className="text-sm font-medium">Observação do agente</Label>
             <Textarea
               rows={3}

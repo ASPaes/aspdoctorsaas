@@ -200,6 +200,8 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-3xl">
+        {/* dialog-height-ok: os campos estao em dois ramos exclusivos (prompt x
+            revisao do blueprint) e a lista de revisao ja rola sozinha. */}
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
