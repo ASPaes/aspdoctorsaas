@@ -1576,7 +1576,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
           </div>
         ) : (
           <>
-            <DialogHeader className="px-6 py-4 border-b border-border shrink-0">
+            <DialogHeader className="m-0 px-6 py-4 border-b border-border shrink-0">
               <div className="flex flex-col gap-3">
                 <div className="min-w-0 pr-10">
                   <div className="flex items-center gap-2 flex-wrap">

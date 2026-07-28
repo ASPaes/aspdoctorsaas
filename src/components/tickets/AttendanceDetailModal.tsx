@@ -386,7 +386,7 @@ export function AttendanceDetailModal({ attendanceId, open, onOpenChange }: Prop
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-3xl max-h-[90vh] p-0 gap-0 overflow-hidden">
-          <DialogHeader className="px-6 py-4 border-b shrink-0">
+          <DialogHeader className="m-0 px-6 py-4 border-b shrink-0">
             <DialogTitle>Detalhes do atendimento</DialogTitle>
           </DialogHeader>
           <div className="max-h-[calc(90vh-72px)] overflow-hidden">{content}</div>

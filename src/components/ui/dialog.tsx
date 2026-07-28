@@ -52,12 +52,35 @@ const DialogContent = React.forwardRef<
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)} {...props} />
+  <div
+    className={cn(
+      // Gruda no topo quando o DialogContent rola (ele é overflow-y-auto).
+      // -mx-6/-mt-6 + px-6/pt-6: o fundo cobre o p-6 do DialogContent, senão o
+      //   conteúdo rolando aparece pelas laterais e por cima do título.
+      // -mb-4/pb-4: absorve o gap-4 do grid, senão sobra uma fresta transparente
+      //   de 16px logo abaixo do cabeçalho.
+      // -top-6: compensa o -mt-6. O sticky se posiciona pela margin box, então
+      //   com top-0 o cabeçalho para 25px abaixo do topo e o conteúdo vaza pela
+      //   fresta (medido no Chrome: hdr_topo=25 com top-0, =1 com -top-6).
+      "sticky -top-6 z-20 -mx-6 -mb-4 -mt-6 bg-background px-6 pb-4 pt-6",
+      "flex flex-col space-y-1.5 text-center sm:text-left",
+      className,
+    )}
+    {...props}
+  />
 );
 DialogHeader.displayName = "DialogHeader";
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)} {...props} />
+  <div
+    className={cn(
+      // Espelho do DialogHeader: gruda na base para o botão de ação nunca sumir.
+      "sticky -bottom-6 z-20 -mx-6 -mb-6 -mt-4 bg-background px-6 pb-6 pt-4",
+      "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
+      className,
+    )}
+    {...props}
+  />
 );
 DialogFooter.displayName = "DialogFooter";
 

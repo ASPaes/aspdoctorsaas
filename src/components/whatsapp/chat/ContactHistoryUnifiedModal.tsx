@@ -359,7 +359,7 @@ export function ContactHistoryUnifiedModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[1100px] w-[95vw] max-h-[90vh] flex flex-col p-0 gap-0">
         {/* Header */}
-        <DialogHeader className="px-5 pt-5 pb-3 shrink-0">
+        <DialogHeader className="m-0 px-5 pt-5 pb-3 shrink-0">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <DialogTitle className="text-base">Histórico Unificado</DialogTitle>

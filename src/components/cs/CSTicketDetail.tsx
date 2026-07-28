@@ -70,7 +70,7 @@ export function CSTicketDetail({ ticket, open, onOpenChange, mode }: CSTicketDet
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden">
-        <DialogHeader className="px-6 py-4 border-b shrink-0"><DialogTitle>{mode === 'edit' ? 'Editar Ticket' : 'Detalhes do Ticket'}</DialogTitle></DialogHeader>
+        <DialogHeader className="m-0 px-6 py-4 border-b shrink-0"><DialogTitle>{mode === 'edit' ? 'Editar Ticket' : 'Detalhes do Ticket'}</DialogTitle></DialogHeader>
         <div className="px-6 py-4">{desktopContent}</div>
       </DialogContent>
     </Dialog>

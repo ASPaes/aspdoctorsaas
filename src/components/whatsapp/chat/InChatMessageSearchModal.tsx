@@ -88,7 +88,7 @@ export function InChatMessageSearchModal({ open, onOpenChange, conversationId, c
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg h-[75vh] flex flex-col gap-0 p-0 overflow-hidden">
-        <DialogHeader className="px-4 pt-4 pb-2">
+        <DialogHeader className="m-0 px-4 pt-4 pb-2">
           <DialogTitle className="flex items-center gap-2 text-base">
             <FileSearch className="h-5 w-5 text-primary" />
             Buscar nesta conversa
