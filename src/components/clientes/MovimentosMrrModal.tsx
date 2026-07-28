@@ -585,7 +585,7 @@ export function MovimentosMrrModal({
           {/* Composition Card */}
           <Card className="mb-4 bg-muted/30">
             <CardContent className="py-3 px-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Composição MRR</p>
                   <p className="text-sm">
@@ -659,7 +659,7 @@ export function MovimentosMrrModal({
                 </CardContent>
               ) : (
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Tipo *</Label>
                     <Select value={tipo} onValueChange={(v: any) => { setTipo(v); formIsDirty.current = true; }}>
@@ -712,7 +712,7 @@ export function MovimentosMrrModal({
                 </div>
 
                 {tipo === 'venda_avulsa' ? (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Valor da Venda Avulsa (R$) *</Label>
                       <Input type="number" step="0.01" min="0.01" placeholder="Ex: 500.00" value={valorVendaAvulsa} onChange={(e) => { setValorVendaAvulsa(e.target.value); formIsDirty.current = true; }} />
@@ -724,7 +724,7 @@ export function MovimentosMrrModal({
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label>Valor MRR (R$) *</Label>
                       <Input type="number" step="0.01" min="0.01" placeholder="Ex: 500.00" value={valorDelta} onChange={(e) => { setValorDelta(e.target.value); formIsDirty.current = true; }} />

@@ -637,6 +637,8 @@ function ContratoDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        {/* dialog-height-ok: cadastro de contrato tem 20 campos e nao cabe em
+            tela nenhuma. Rola por desenho, com cabecalho e rodape fixos. */}
         <DialogHeader>
           <div className="flex items-start justify-between gap-3">
             <div>

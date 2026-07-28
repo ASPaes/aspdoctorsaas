@@ -1207,6 +1207,8 @@ function ProdutoDialog({
       onClose();
     }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        {/* dialog-height-ok: cadastro de produto tem 23 campos e nao cabe em
+            tela nenhuma. Rola por desenho, com cabecalho e rodape fixos. */}
         <DialogHeader>
           <DialogTitle>
             {postSaveContrato

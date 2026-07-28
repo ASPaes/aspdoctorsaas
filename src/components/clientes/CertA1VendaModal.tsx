@@ -183,7 +183,7 @@ export default function CertA1VendaModal({ open, onOpenChange, clienteId, funcio
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); else onOpenChange(o); }}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle>Registrar Venda de Certificado A1</DialogTitle>
@@ -213,8 +213,9 @@ export default function CertA1VendaModal({ open, onOpenChange, clienteId, funcio
           </div>
         ) : (
           <>
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
+            {/* 2 colunas: 8 campos empilhados passavam da altura da tela em 13" */}
+            <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+              <div className="flex items-center gap-2 sm:col-span-2">
                 <Checkbox id="perdido" checked={form.perdidoTerceiro} onCheckedChange={(v) => updateField("perdidoTerceiro", v === true)} />
                 <label htmlFor="perdido" className="text-sm">Já renovado com terceiro</label>
               </div>
@@ -258,7 +259,7 @@ export default function CertA1VendaModal({ open, onOpenChange, clienteId, funcio
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 sm:col-span-2">
                     <label className="text-xs font-medium text-muted-foreground">Observação</label>
                     <Textarea value={form.observacao} onChange={(e) => updateField("observacao", e.target.value)} rows={2} />
                   </div>

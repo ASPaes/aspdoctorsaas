@@ -452,12 +452,13 @@ export default function CertificadosA1() {
 
       {/* Modal Registrar Venda */}
       <Dialog open={!!vendaModalCliente} onOpenChange={(o) => { if (!o) { setVendaModalCliente(null); resetVendaModal(); } }}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Registrar Venda — {vendaModalCliente?.razao_social}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
+          {/* 2 colunas: 8 campos empilhados passavam da altura da tela em 13" */}
+          <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+            <div className="flex items-center gap-2 sm:col-span-2">
               <Checkbox id="perdido2" checked={perdidoTerceiro} onCheckedChange={(v) => setPerdidoTerceiro(v === true)} />
               <label htmlFor="perdido2" className="text-sm">Já renovado com terceiro</label>
             </div>
@@ -477,7 +478,7 @@ export default function CertificadosA1() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-medium text-muted-foreground">Motivo / Observação</label>
                   <Textarea value={motivoPerda} onChange={(e) => setMotivoPerda(e.target.value)} rows={2} />
                 </div>
@@ -501,7 +502,7 @@ export default function CertificadosA1() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 sm:col-span-2">
                   <label className="text-xs font-medium text-muted-foreground">Observação</label>
                   <Textarea value={observacao} onChange={(e) => setObservacao(e.target.value)} rows={2} />
                 </div>
