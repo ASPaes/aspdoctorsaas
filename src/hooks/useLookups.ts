@@ -157,7 +157,9 @@ export function useLookups(estadoId?: number | null) {
     queryKey: ["unidades_base", tid],
     staleTime: 30 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await tf(supabase.from("unidades_base").select("id, nome").order("nome"), tid);
+      // Traz inativas também: mapas de id→nome (lista de clientes, exports) e filtros
+      // de histórico precisam delas. Quem oferece unidade para ESCOLHER filtra is_active.
+      const { data, error } = await tf(supabase.from("unidades_base").select("id, nome, is_active").order("nome"), tid);
       if (error) throw error;
       return data;
     },

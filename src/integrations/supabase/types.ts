@@ -11806,6 +11806,7 @@ export type Database = {
         Args: { p_tenant_id: string }
         Returns: {
           id: number
+          is_active: boolean
           is_default_filter: boolean
           is_principal: boolean
           nome: string

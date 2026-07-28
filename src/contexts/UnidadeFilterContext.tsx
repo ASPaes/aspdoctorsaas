@@ -9,6 +9,7 @@ interface Unidade {
   nome: string;
   is_principal: boolean;
   is_default_filter: boolean;
+  is_active: boolean;
 }
 
 interface UnidadeFilterContextType {
@@ -105,7 +106,8 @@ export function UnidadeFilterProvider({ children }: { children: ReactNode }) {
         setViewSynced(true);
         setIsHydrated(true);
       } else {
-        const def = unidades.find((u) => u.is_default_filter);
+        // inativa nunca vira seleção automática — só entra se o usuário marcar
+        const def = unidades.find((u) => u.is_default_filter && u.is_active !== false);
         if (def) {
           setSelectedUnidadeIdsRaw([def.id]);
           await (supabase.rpc as any)("set_view_unidades", { p_ids: [def.id] });

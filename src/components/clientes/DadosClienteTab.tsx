@@ -27,7 +27,7 @@ interface Props {
   cidades: { id: number; nome: string }[];
   areasAtuacao: { id: number; nome: string }[];
   segmentos: { id: number; nome: string }[];
-  unidadesBase: { id: number; nome: string }[];
+  unidadesBase: { id: number; nome: string; is_active?: boolean | null }[];
   clienteId?: string;
   codigoSequencial?: number | null;
   onNavigate?: (to: string) => void;
@@ -324,9 +324,14 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
-                {unidadesBase.map((u) => (
-                  <SelectItem key={u.id} value={u.id.toString()}>{u.nome}</SelectItem>
-                ))}
+                {/* Inativa não é oferecida; a já gravada no cliente continua visível para não sumir o valor */}
+                {unidadesBase
+                  .filter((u) => u.is_active !== false || u.id === field.value)
+                  .map((u) => (
+                    <SelectItem key={u.id} value={u.id.toString()}>
+                      {u.nome}{u.is_active === false ? " (inativa)" : ""}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <FormMessage />
