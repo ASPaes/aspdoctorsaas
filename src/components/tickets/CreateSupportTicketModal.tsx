@@ -1052,7 +1052,7 @@ export function CreateSupportTicketModal({
           {/* Left panel */}
           <div className="p-4 pr-4 border-r space-y-4 overflow-y-auto">
             {/* Setor + Status + Responsável */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Setor <Req /></Label>
                 <Select value={departamentoId} onValueChange={setDepartamentoId}>
@@ -1283,7 +1283,7 @@ export function CreateSupportTicketModal({
             {/* Classificação */}
             <div className="space-y-2">
               <Label className="text-xs font-medium">Classificação</Label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 <Select value={produtoId} onValueChange={setProdutoId}>
                   <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Produto *" /></SelectTrigger>
                   <SelectContent>
@@ -1325,7 +1325,7 @@ export function CreateSupportTicketModal({
                   <Clock className="h-3 w-3" />
                   Horários de Plantão
                 </p>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Início</Label>
                     <Input
@@ -1378,7 +1378,7 @@ export function CreateSupportTicketModal({
             </div>
 
             {/* Previsão + Agendado */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <div className="flex items-center gap-1.5">
                   <Label className="text-xs font-medium">Previsão de encerramento</Label>

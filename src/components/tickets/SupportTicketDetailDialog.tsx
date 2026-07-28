@@ -1710,7 +1710,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             <Label className="text-xs">Nome *</Label>
             <Input value={newContactNome} onChange={(e) => setNewContactNome(e.target.value)} placeholder="Nome do contato" className="h-9" />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label className="text-xs">Telefone</Label>
               <Input value={newContactFone} onChange={(e) => setNewContactFone(e.target.value)} placeholder="(00) 00000-0000" className="h-9" />

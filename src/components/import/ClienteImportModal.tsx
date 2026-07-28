@@ -2098,6 +2098,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           <TooltipProvider>
           <div className="space-y-4">
             {/* Banner resumo */}
+            {/* grid-ok: 3 contadores curtos (importados/atualizados/erros). Empilhar viraria uma torre. */}
             <div className="grid grid-cols-3 gap-2">
               <div className="rounded-md border bg-green-500/5 border-green-200 dark:border-green-800 p-3 text-center">
                 <p className="text-xl font-bold text-green-700 dark:text-green-400">{validRows.length}</p>
@@ -2372,6 +2373,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                   </p>
                 </div>
               </div>
+              {/* grid-ok: 3 contadores curtos do resultado. Empilhar viraria uma torre. */}
               <div className="grid grid-cols-3 gap-2 pt-1">
                 <div className="text-center">
                   <p className="text-xl font-bold text-green-700 dark:text-green-400">{result.imported}</p>

@@ -502,7 +502,7 @@ export function ContactHistoryUnifiedModal({
               )}
 
               {/* Date range */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <label className="text-[10px] font-medium text-muted-foreground">De</label>
                   <Popover>

@@ -307,7 +307,7 @@ export default function CacDespesasTab() {
             <DialogTitle>{editingId ? "Editar Despesa" : "Nova Despesa CAC"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Mês Inicial *</Label>
                 <Input
@@ -361,7 +361,7 @@ export default function CacDespesasTab() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Valor Total (R$) *</Label>
                 <NumericInput

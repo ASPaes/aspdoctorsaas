@@ -177,7 +177,7 @@ export function CreateCSTicketFromChat({ open, onOpenChange, conversation, senti
           {/* Formulário — desabilitado se não tem cliente */}
           <fieldset disabled={!hasCliente} className={!hasCliente ? "opacity-50 pointer-events-none" : ""}>
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium">Tipo</Label>
                   <Select value={tipo} onValueChange={(v) => setTipo(v as CSTicketTipo)}>

@@ -569,7 +569,7 @@ export default function ProdutosModulosTab() {
                 placeholder="Descreva o módulo. Arraste o canto inferior direito para aumentar o campo."
               />
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="modulo-vlr-custo">Valor de Custo (R$)</Label>
                 <NumericInput

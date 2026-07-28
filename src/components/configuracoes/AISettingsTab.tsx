@@ -550,6 +550,7 @@ export default function AISettingsTab() {
           </DialogHeader>
 
           <div className="space-y-3 text-sm">
+            {/* grid-ok: lista rótulo→valor, não campo. 2 colunas É a estrutura. */}
             <div className="grid grid-cols-2 gap-y-2 gap-x-4">
               <span className="text-muted-foreground">Provedor</span>
               <span className="font-medium">{formatProviderLabel(settings?.provider || "")}</span>

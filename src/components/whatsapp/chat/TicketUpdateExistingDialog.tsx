@@ -189,6 +189,7 @@ export function TicketUpdateExistingDialog({
                     <Badge variant="secondary" className="text-[10px]">{ticket.status.name}</Badge>
                   )}
                 </div>
+                {/* grid-ok: lista rótulo→valor de 11px, não campo editável. */}
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
                   <div>
                     <p className="uppercase tracking-wide text-muted-foreground">Categoria</p>
