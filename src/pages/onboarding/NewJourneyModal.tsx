@@ -214,11 +214,13 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Nova jornada de {fase}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 py-2">
+        {/* 2 colunas: em 1 coluna o formulário passava de 730px e não cabia em
+            notebook 13". sm: garante volta a 1 coluna em tela estreita. */}
+        <div className="grid grid-cols-1 gap-x-4 gap-y-3 py-2 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Cliente *</Label>
             <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
@@ -364,18 +366,17 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Início planejado</Label>
-              <Input type="date" value={dataInicio} onChange={(e) => { setDataInicio(e.target.value); setGoLiveEdited(false); }} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Go-live previsto</Label>
-              <Input type="date" value={goLive} onChange={(e) => { setGoLive(e.target.value); setGoLiveEdited(true); }} />
-            </div>
+          {/* sem wrapper: viram células irmãs do grid externo e continuam o par lado a lado */}
+          <div className="space-y-1.5">
+            <Label>Início planejado</Label>
+            <Input type="date" value={dataInicio} onChange={(e) => { setDataInicio(e.target.value); setGoLiveEdited(false); }} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Go-live previsto</Label>
+            <Input type="date" value={goLive} onChange={(e) => { setGoLive(e.target.value); setGoLiveEdited(true); }} />
           </div>
           {demandTypeId && (
-            <div className="text-[11px] -mt-1">
+            <div className="text-[11px] -mt-1 sm:col-span-2">
               {goLiveCalcQuery.isFetching ? (
                 <span className="text-muted-foreground">Calculando go-live…</span>
               ) : selectedDemand && !selectedDemand.sla_total_minutos ? (
