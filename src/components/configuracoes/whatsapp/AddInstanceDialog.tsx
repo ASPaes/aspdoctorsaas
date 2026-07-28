@@ -159,7 +159,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-3xl">
         {!showWebhookInstructions ? (
           <>
             <DialogHeader>
@@ -167,7 +167,13 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
               <DialogDescription>Adicione uma nova instância WhatsApp</DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4">
+              {/* 2 colunas: os campos por provedor são curtos (nome, URL, token) e
+                  empilhados passavam da altura da tela em notebook 13". Os
+                  fragmentos condicionais entregam os campos direto ao grid.
+                  dialog-height-ok: os 13 campos são de provedores mutuamente
+                  exclusivos — no máximo 7 aparecem juntos (meta_cloud), que em
+                  2 colunas dão 4 linhas. A guarda soma todos os ramos. */}
+              <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField control={form.control} name="provider_type" render={({ field }) => (
                   <FormItem>
                     <div className="flex items-center gap-1.5">
@@ -331,7 +337,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
                   </>
                 )}
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 sm:col-span-2">
                   {(providerType === 'self_hosted' || providerType === 'cloud') && (
                     <Button type="button" variant="outline" onClick={handleTestConnection} disabled={isTestingConnection}>
                       {isTestingConnection ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : connectionTested ? <Check className="mr-2 h-4 w-4" /> : null}

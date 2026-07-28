@@ -551,11 +551,13 @@ export default function WhatsAppInstancesTab() {
 
       {/* ── Create/Edit Dialog ── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>{editingId ? "Editar Instância" : "Nova Instância"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          {/* 2 colunas: campos de credencial são curtos e empilhados passavam
+              da altura da tela em notebook 13". */}
+          <div className="grid grid-cols-1 gap-x-4 gap-y-4 py-2 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>Provider *</Label>
               <Select

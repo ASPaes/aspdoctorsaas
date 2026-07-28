@@ -261,7 +261,7 @@ export function AssignmentRuleDialog({ open, onOpenChange, rule, onSave }: Assig
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{rule ? "Editar Regra" : "Nova Regra de Distribuição"}</DialogTitle>
           <DialogDescription>
@@ -270,37 +270,41 @@ export function AssignmentRuleDialog({ open, onOpenChange, rule, onSave }: Assig
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Nome */}
-          <div className="space-y-2">
-            <Label htmlFor="name">Nome da Regra</Label>
-            <Input
-              id="name"
-              placeholder="Ex: Distribuição - Suporte"
-              {...register("name", { required: true })}
-            />
-          </div>
+          {/* Nome + Setor lado a lado: são os dois campos curtos do formulário.
+              Os cartões de estratégia e a seção avançada ficam em largura cheia. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* Nome */}
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome da Regra</Label>
+              <Input
+                id="name"
+                placeholder="Ex: Distribuição - Suporte"
+                {...register("name", { required: true })}
+              />
+            </div>
 
-          {/* Setor */}
-          <div className="space-y-2">
-            <Label>Setor</Label>
-            <Select
-              value={watch("department_id")}
-              onValueChange={(v) => setValue("department_id", v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecionar setor..." />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map((dept) => (
-                  <SelectItem key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Regra aplicada às conversas direcionadas a este setor.
-            </p>
+            {/* Setor */}
+            <div className="space-y-2">
+              <Label>Setor</Label>
+              <Select
+                value={watch("department_id")}
+                onValueChange={(v) => setValue("department_id", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar setor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Regra aplicada às conversas direcionadas a este setor.
+              </p>
+            </div>
           </div>
 
           {/* Estratégia */}

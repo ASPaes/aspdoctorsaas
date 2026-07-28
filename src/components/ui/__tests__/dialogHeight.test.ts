@@ -48,6 +48,13 @@ function medirDialogos(): Diagnostico[] {
       // Esses já têm cabeçalho e rodapé fixos por conta própria.
       if (/overflow-hidden/.test(abertura) && /flex-col/.test(abertura)) continue;
 
+      // Válvula explícita. A contagem de campos não enxerga exclusividade mútua:
+      // um formulário com blocos condicionais por provedor tem 13 campos no
+      // arquivo mas nunca mais que 7 na tela. Quem sabe que é o caso declara e
+      // justifica com `dialog-height-ok: <motivo>` dentro do diálogo — a exceção
+      // fica visível na revisão em vez de virar orçamento frouxo para todos.
+      if (/dialog-height-ok:\s*\S/.test(corpo)) continue;
+
       const conta = (re: RegExp) => (corpo.match(re) || []).length;
       const textareas = conta(/<Textarea[\s>]/g);
       const campos =

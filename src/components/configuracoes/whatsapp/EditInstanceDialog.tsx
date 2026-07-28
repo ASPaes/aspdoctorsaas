@@ -193,14 +193,14 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[560px] max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Editar Instância</DialogTitle>
           <DialogDescription>Atualize as informações da instância</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <ScrollArea className="flex-1 overflow-auto pr-2">
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
             <FormField control={form.control} name="provider_type" render={({ field }) => (
               <FormItem>
@@ -373,7 +373,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
               </>
             )}
 
-            <div className="flex gap-2 justify-end">
+            <div className="flex gap-2 justify-end sm:col-span-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
               <Button type="submit" disabled={updateInstance.isPending}>
                 {updateInstance.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar
