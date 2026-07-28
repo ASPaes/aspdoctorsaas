@@ -352,29 +352,32 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
+          {/* texto livre: linha inteira */}
+          <div className="space-y-1.5 sm:col-span-2">
             <Label>Assunto *</Label>
             <Input value={assunto} onChange={(e) => setAssunto(e.target.value)} maxLength={200} />
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Data de abertura</Label>
-            <Input type="date" value={hojeISO} disabled readOnly />
-            <p className="text-[10px] text-muted-foreground">
-              Registrada automaticamente na criação e não editável. Diferente do início
-              planejado, que é a data combinada com o cliente.
-            </p>
+          {/* as três datas como um grupo. Separadas, o texto de ajuda da data de
+              abertura esticava a linha e abria um buraco na coluna ao lado. */}
+          <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label>Data de abertura</Label>
+              <Input type="date" value={hojeISO} disabled readOnly />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Início planejado</Label>
+              <Input type="date" value={dataInicio} onChange={(e) => { setDataInicio(e.target.value); setGoLiveEdited(false); }} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Go-live previsto</Label>
+              <Input type="date" value={goLive} onChange={(e) => { setGoLive(e.target.value); setGoLiveEdited(true); }} />
+            </div>
           </div>
-
-          {/* sem wrapper: viram células irmãs do grid externo e continuam o par lado a lado */}
-          <div className="space-y-1.5">
-            <Label>Início planejado</Label>
-            <Input type="date" value={dataInicio} onChange={(e) => { setDataInicio(e.target.value); setGoLiveEdited(false); }} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Go-live previsto</Label>
-            <Input type="date" value={goLive} onChange={(e) => { setGoLive(e.target.value); setGoLiveEdited(true); }} />
-          </div>
+          <p className="text-[10px] text-muted-foreground -mt-1 sm:col-span-2">
+            Data de abertura é registrada na criação e não editável. Início planejado é
+            a data combinada com o cliente.
+          </p>
           {demandTypeId && (
             <div className="text-[11px] -mt-1 sm:col-span-2">
               {goLiveCalcQuery.isFetching ? (
