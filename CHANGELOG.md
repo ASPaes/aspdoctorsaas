@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 28/07
 
+- 🔧 **Telas em notebook** — As janelas de cadastro (nova jornada, ticket, contrato, produto, certificado, instância de WhatsApp e outras) não cabiam em tela de notebook 13" ou 14": ficavam cortadas em cima e embaixo, sem barra de rolagem, e só dava para usar reduzindo o zoom do navegador para 60%. Agora os campos ficam lado a lado em duas colunas e a janela cabe inteira. Nas telas realmente longas, o título e os botões de salvar ficam parados enquanto só o meio rola — o botão de confirmar não some mais.
+- ⬆️ **Onboarding** — "Agendar treino" abria num balão preso ao botão, que empurrava os campos Título e Data/hora para fora da tela. Passou a abrir como janela, com todos os campos visíveis de uma vez.
 - 🔧 **Cadastro de clientes** — Unidade base desativada continuava aparecendo na lista do cadastro de cliente e podia ser escolhida. Agora só as ativas são oferecidas. Se um cliente antigo já estiver em uma unidade desativada, ela continua aparecendo no cadastro dele, marcada como "(inativa)", para não perder a informação.
 - ⬆️ **Filtro de unidades** — O filtro do topo passa a listar também as unidades desativadas, para consultar o histórico delas. Com uma delas selecionada, o filtro fica destacado em laranja avisando que os números na tela incluem unidade desativada.
 - 🔧 **WhatsApp** — Ao responder uma mensagem do cliente, a citação aparecia no Doctor mas chegava sem referência no WhatsApp do cliente — a resposta parecia solta, sem indicar a que se referia. Acontecia só em parte das conversas. Corrigido: a citação agora chega marcada corretamente, inclusive quando a mensagem respondida é imagem, áudio ou documento.
