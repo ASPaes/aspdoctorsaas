@@ -138,10 +138,74 @@ class EvolutionAdapter implements ProviderAdapter {
     };
   }
 
+  /**
+   * Monta o `quoted` do envio.
+   *
+   * Mandar só `{ key: { id } }` faz a Evolution buscar a mensagem no store dela e usar a
+   * chave como está gravada. Em conversa 1:1 já migrada para LID, essa chave tem
+   * `remoteJid` = `<lid>@lid`, mas o envio vai para `<telefone>@s.whatsapp.net`. O Baileys
+   * compara os dois (`if (jid !== quoted.key.remoteJid) contextInfo.remoteJid = ...`) e
+   * marca a citação como sendo de OUTRA conversa — o WhatsApp não resolve a referência e o
+   * cliente recebe a mensagem sem a citação, embora o Doctor mostre citada.
+   *
+   * Então buscamos a mensagem no store e reenviamos com a chave normalizada para o
+   * endereçamento por telefone (`remoteJidAlt`, o mapeamento do próprio WhatsApp),
+   * preservando o conteúdo original para o preview continuar rico.
+   *
+   * Qualquer falha volta ao formato antigo: citação errada é melhor que envio perdido.
+   */
+  private async buildQuoted(
+    secrets: InstanceSecrets,
+    instance: InstanceInfo,
+    quotedMessageId: string,
+    to: string,
+  ): Promise<Record<string, unknown>> {
+    const fallback = { key: { id: quotedMessageId } };
+    // Em grupo o JID citado já é o do próprio grupo — bate com o destino, nada a corrigir.
+    if (to.includes('@g.us')) return fallback;
+
+    try {
+      const res = await fetch(
+        `${this.getBaseUrl(secrets)}/chat/findMessages/${this.getIdentifier(secrets, instance)}`,
+        {
+          method: 'POST',
+          headers: { ...this.getHeaders(secrets), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ where: { key: { id: quotedMessageId } } }),
+          signal: AbortSignal.timeout(5000),
+        },
+      );
+      if (!res.ok) return fallback;
+
+      const rec = (await res.json())?.messages?.records?.[0];
+      const key = rec?.key;
+      if (!key?.id || !rec?.message) return fallback;
+
+      const remoteJid = String(key.remoteJid || '').endsWith('@lid')
+        ? (key.remoteJidAlt || key.remoteJid)
+        : key.remoteJid;
+      // Sem o par telefone do LID não há o que corrigir — e chave em LID é justamente o bug.
+      if (!remoteJid || String(remoteJid).endsWith('@lid')) return fallback;
+
+      // `participant` fica de fora de propósito: em 1:1 o Baileys cai no `key.remoteJid`,
+      // que aqui já é o telefone. Repassá-lo reintroduziria o LID.
+      return {
+        key: { id: key.id, fromMe: Boolean(key.fromMe), remoteJid },
+        message: rec.message,
+      };
+    } catch (err) {
+      console.warn(`[evolution] Citação ${quotedMessageId}: store indisponível (${(err as Error)?.message}) — enviando sem normalizar`);
+      return fallback;
+    }
+  }
+
   async send(secrets: InstanceSecrets, instance: InstanceInfo, msg: SendRequest): Promise<SendResult> {
     const base = this.getBaseUrl(secrets);
     const id = this.getIdentifier(secrets, instance);
     const headers = { ...this.getHeaders(secrets), 'Content-Type': 'application/json' };
+
+    const quoted = msg.quotedMessageId
+      ? await this.buildQuoted(secrets, instance, msg.quotedMessageId, msg.to)
+      : null;
 
     let endpoint: string;
     let body: Record<string, unknown>;
@@ -150,7 +214,7 @@ class EvolutionAdapter implements ProviderAdapter {
       case 'text': {
         endpoint = `${base}/message/sendText/${id}`;
         body = { number: msg.to, text: msg.content };
-        if (msg.quotedMessageId) body.quoted = { key: { id: msg.quotedMessageId } };
+        if (quoted) body.quoted = quoted;
         if (Array.isArray(msg.mentioned) && msg.mentioned.length > 0) body.mentioned = msg.mentioned;
         break;
       }
@@ -160,7 +224,7 @@ class EvolutionAdapter implements ProviderAdapter {
           ? msg.mediaBase64.split(',')[1]
           : msg.mediaBase64);
         body = { number: msg.to, audio };
-        if (msg.quotedMessageId) body.quoted = { key: { id: msg.quotedMessageId } };
+        if (quoted) body.quoted = quoted;
         break;
       }
       default: {
@@ -172,7 +236,7 @@ class EvolutionAdapter implements ProviderAdapter {
           caption: msg.content,
           ...(msg.messageType === 'document' && msg.fileName ? { fileName: msg.fileName } : {}),
         };
-        if (msg.quotedMessageId) body.quoted = { key: { id: msg.quotedMessageId } };
+        if (quoted) body.quoted = quoted;
         if (Array.isArray(msg.mentioned) && msg.mentioned.length > 0) body.mentioned = msg.mentioned;
       }
     }

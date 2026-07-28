@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Julho / 2026
 
+### 28/07
+
+- 🔧 **WhatsApp** — Ao responder uma mensagem do cliente, a citação aparecia no Doctor mas chegava sem referência no WhatsApp do cliente — a resposta parecia solta, sem indicar a que se referia. Acontecia só em parte das conversas. Corrigido: a citação agora chega marcada corretamente, inclusive quando a mensagem respondida é imagem, áudio ou documento.
+
 ### 27/07
 
 - 🔧 **Atendimento** — Quando o prazo de encerramento por inatividade caía depois do fim do expediente, o atendimento ficava parado: o cliente não recebia o aviso, o chat não era encerrado e o atendimento atravessava a noite (ou o fim de semana) aberto. Agora o aviso e o encerramento são antecipados para o fim do expediente, com mensagem explicando o horário. Dá para desligar o comportamento em Configurações > WhatsApp > Atendimento.
