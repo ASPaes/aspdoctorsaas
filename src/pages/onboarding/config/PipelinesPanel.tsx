@@ -43,6 +43,7 @@ const SECTION_OPTIONS: { key: string; label: string }[] = [
   { key: "atendimentos", label: "Atendimentos vinculados" },
   { key: "eventos", label: "Timeline de eventos" },
   { key: "anexos", label: "Anexos" },
+  { key: "acompanhamento", label: "Acompanhamento de uso (indicadores)" },
 ];
 const ALL_SECTION_KEYS = SECTION_OPTIONS.map((s) => s.key);
 

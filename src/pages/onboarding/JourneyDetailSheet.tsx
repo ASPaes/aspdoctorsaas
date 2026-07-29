@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOnboardingPhases } from "@/hooks/useOnboardingPhases";
+import AcompanhamentoSection from "./AcompanhamentoSection";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -1192,16 +1193,31 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   async function handleConclude() {
     if (!journey) return;
     try {
-      const { error } = await (supabase.rpc as any)("conclude_onboarding_journey", {
+      // journey_go_live decide pela CONFIGURAÇÃO: sem jornada seguinte ele conclui
+      // (comportamento de sempre); com Acompanhamento ligado, grava o go-live e a
+      // jornada segue viva até o acompanhamento fechar.
+      const { data, error } = await (supabase.rpc as any)("journey_go_live", {
         p_journey_id: journey.journey_id,
         p_go_live_real: goLiveReal || null,
       });
       if (error) throw error;
-      toast.success("Jornada concluída");
+      const res = data as any;
+      if (res && res.ok === false) {
+        toast.error(
+          res.reason === "fase_sem_pipeline" ? `A jornada ${res.fase ?? "seguinte"} ainda não tem pipeline configurado.` :
+          res.reason === "fase_sem_etapa" ? `A jornada ${res.fase ?? "seguinte"} não tem etapas configuradas.` :
+          "Não foi possível registrar o go-live."
+        );
+        return;
+      }
+      toast.success(res?.concluiu === false ? `Go-live registrado — jornada em ${res.fase ?? "acompanhamento"}.` : "Jornada concluída");
       setConcludeOpen(false);
       setGoLiveReal("");
       qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
       qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-phases"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-phases-detail"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-stage-history"] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao concluir");
     }
@@ -1991,6 +2007,27 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   {/* LEFT */}
                   <div className="space-y-5">
                     {/* Checklist */}
+                  {/* Acompanhamento de uso — só quando a etapa pede explicitamente.
+                      Diferente das outras seções, esta NÃO usa o fallback "sem lista = mostra
+                      tudo": ela é opt-in, senão apareceria em toda etapa de visible_sections vazio. */}
+                  {(currentStageSections ?? []).includes("acompanhamento") && (
+                    <section className="rounded-lg border border-border">
+                      <div className="p-3 border-b border-border">
+                        <h3 className="text-sm font-semibold">Acompanhamento de uso</h3>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Os números do cliente ao longo do tempo — é isso que diz se ele destravou.
+                        </p>
+                      </div>
+                      <div className="p-3">
+                        <AcompanhamentoSection
+                          journeyId={journeyId}
+                          tenantId={tenantId}
+                          readOnly={isTerminal}
+                        />
+                      </div>
+                    </section>
+                  )}
+
                   {secVisible("checklist") && (
                     <section className="rounded-lg border border-border">
                       <div className="p-3 border-b border-border">

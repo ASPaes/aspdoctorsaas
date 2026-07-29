@@ -16,6 +16,7 @@ import { AccountingFieldsPanel } from "./config/AccountingFieldsPanel";
 import { ParticipantRolesPanel } from "./config/ParticipantRolesPanel";
 import { DistribuicaoPanel } from "./config/DistribuicaoPanel";
 import { PhasesPanel } from "./config/PhasesPanel";
+import { IndicatorsPanel } from "./config/IndicatorsPanel";
 import { GenerateOperationAIDialog } from "./config/GenerateOperationAIDialog";
 
 export default function OnboardingConfigPage() {
@@ -24,7 +25,7 @@ export default function OnboardingConfigPage() {
   const { canAccess, isLoading: accessLoading } = useOnboardingAccess();
   const phases = useOnboardingPhases(effectiveTenantId, { enabled: canAccess }).data ?? [];
   const [phaseId, setPhaseId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"jornadas" | "pipelines" | "distribuicao" | "motivos" | "demandas" | "treinos" | "retornos" | "contabilidade" | "papeis">("pipelines");
+  const [tab, setTab] = useState<"jornadas" | "pipelines" | "distribuicao" | "motivos" | "demandas" | "treinos" | "retornos" | "contabilidade" | "papeis" | "indicadores">("pipelines");
 
   useEffect(() => {
     if (phases.length === 0) { setPhaseId(null); return; }
@@ -93,6 +94,7 @@ export default function OnboardingConfigPage() {
           <TabsTrigger value="papeis">Papéis</TabsTrigger>
           <TabsTrigger value="retornos">Retorno ao vendedor</TabsTrigger>
           <TabsTrigger value="contabilidade">Dados da contabilidade</TabsTrigger>
+          <TabsTrigger value="indicadores">Indicadores</TabsTrigger>
         </TabsList>
 
         <TabsContent value="jornadas" className="flex-1 min-h-0 overflow-y-auto p-4 pt-3">
@@ -121,6 +123,9 @@ export default function OnboardingConfigPage() {
         </TabsContent>
         <TabsContent value="contabilidade" className="flex-1 min-h-0 p-4 pt-3">
           <AccountingFieldsPanel />
+        </TabsContent>
+        <TabsContent value="indicadores" className="flex-1 min-h-0 overflow-y-auto p-4 pt-3">
+          <IndicatorsPanel />
         </TabsContent>
 
 

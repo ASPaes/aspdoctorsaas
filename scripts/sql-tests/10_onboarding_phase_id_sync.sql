@@ -12,12 +12,16 @@ BEGIN
    GROUP BY j.tenant_id ORDER BY count(*) DESC LIMIT 1;
   IF v_tenant IS NULL THEN RAISE EXCEPTION 'PRE: nenhum tenant com jornada de onboarding'; END IF;
 
-  -- 1. toda pipeline existente tem phase_id preenchido e batendo com o enum
+  -- 1. toda pipeline tem phase_id; e o enum legado espelha a fase SÓ quando ela tem
+  --    equivalente ('onboarding'/'implantacao'). Numa jornada fora do enum — acompanhamento
+  --    ou criada pelo tenant — `fase` fica NULA de propósito.
   SELECT count(*) INTO v_qtd
     FROM public.onboarding_pipelines p
     LEFT JOIN public.onboarding_phases f ON f.id = p.phase_id
-   WHERE p.phase_id IS NULL OR f.slug IS DISTINCT FROM p.fase::text;
-  IF v_qtd <> 0 THEN RAISE EXCEPTION 'FALHOU 1: % pipeline(s) com phase_id ausente ou divergente do enum', v_qtd; END IF;
+   WHERE p.phase_id IS NULL
+      OR (f.slug IN ('onboarding','implantacao') AND p.fase::text IS DISTINCT FROM f.slug)
+      OR (COALESCE(f.slug,'') NOT IN ('onboarding','implantacao') AND p.fase IS NOT NULL);
+  IF v_qtd <> 0 THEN RAISE EXCEPTION 'FALHOU 1: % pipeline(s) com phase_id ausente ou enum legado incoerente', v_qtd; END IF;
 
   -- 2. insert legado (só com `fase`) ganha phase_id pelo trigger
   INSERT INTO public.onboarding_pipelines (tenant_id, nome, fase, ativo, position)
@@ -37,20 +41,26 @@ BEGIN
     RAISE EXCEPTION 'FALHOU 3: fase deveria ser nula numa jornada fora do enum, achei %', v_fase;
   END IF;
 
-  -- 4. onboarding_phase_metrics: toda linha existente tem phase_id coerente com `fase`
+  -- 4. onboarding_phase_metrics: mesma regra do item 1 para o enum legado
   SELECT count(*) INTO v_qtd
     FROM public.onboarding_phase_metrics m
     LEFT JOIN public.onboarding_phases f ON f.id = m.phase_id
-   WHERE m.phase_id IS NULL OR f.slug IS DISTINCT FROM m.fase::text;
-  IF v_qtd <> 0 THEN RAISE EXCEPTION 'FALHOU 4: % linha(s) de phase_metrics com phase_id ausente ou divergente', v_qtd; END IF;
+   WHERE m.phase_id IS NULL
+      OR (f.slug IN ('onboarding','implantacao') AND m.fase::text IS DISTINCT FROM f.slug)
+      OR (COALESCE(f.slug,'') NOT IN ('onboarding','implantacao') AND m.fase IS NOT NULL);
+  IF v_qtd <> 0 THEN RAISE EXCEPTION 'FALHOU 4: % linha(s) de phase_metrics com phase_id ausente ou enum legado incoerente', v_qtd; END IF;
 
-  -- 5. onboarding_journeys: current_phase_id coerente com fase_atual
+  -- 5. onboarding_journeys: current_phase_id coerente com o enum legado.
+  --    Jornada viva numa fase FORA do enum (acompanhamento) mantém o último fase_atual
+  --    válido — o enum não tem como representá-la. O que não pode acontecer é ela
+  --    aparecer como 'concluido' estando viva, nem o contrário.
   SELECT count(*) INTO v_qtd
     FROM public.onboarding_journeys j
     LEFT JOIN public.onboarding_phases f ON f.id = j.current_phase_id
-   WHERE (j.fase_atual::text = 'concluido' AND j.current_phase_id IS NOT NULL)
-      OR (j.fase_atual::text <> 'concluido' AND f.slug IS DISTINCT FROM j.fase_atual::text);
-  IF v_qtd <> 0 THEN RAISE EXCEPTION 'FALHOU 5: % jornada(s) com current_phase_id divergente de fase_atual', v_qtd; END IF;
+   WHERE (j.current_phase_id IS NULL     AND j.fase_atual::text <> 'concluido')
+      OR (j.current_phase_id IS NOT NULL AND j.fase_atual::text =  'concluido')
+      OR (f.slug IN ('onboarding','implantacao') AND j.fase_atual::text IS DISTINCT FROM f.slug);
+  IF v_qtd <> 0 THEN RAISE EXCEPTION 'FALHOU 5: % jornada(s) com current_phase_id incoerente com o enum legado', v_qtd; END IF;
 
   -- 6. UPDATE legado de fase_atual reflete em current_phase_id
   SELECT id INTO v_journey FROM public.onboarding_journeys
