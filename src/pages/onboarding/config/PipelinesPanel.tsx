@@ -52,7 +52,7 @@ interface Pipeline {
   id: string;
   nome: string;
   descricao: string | null;
-  fase: Fase;
+  phase_id: string;
   produto_id: number | null;
   sla_total_minutos: number | null;
   ativo: boolean;
@@ -101,10 +101,11 @@ interface Departamento { id: string; name: string; }
 const DEFAULT_COLORS = ["#22C55E", "#0EA5E9", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#6B7280"];
 
 interface Props {
-  fase: Fase;
+  /** Jornada selecionada (onboarding_phases.id). Null enquanto o cadastro carrega. */
+  phaseId: string | null;
 }
 
-export function PipelinesPanel({ fase }: Props) {
+export function PipelinesPanel({ phaseId }: Props) {
   const { effectiveTenantId } = useTenantFilter();
   const qc = useQueryClient();
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
@@ -116,19 +117,19 @@ export function PipelinesPanel({ fase }: Props) {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  // Reset seleção quando fase muda
+  // Reset seleção quando a jornada muda
   useEffect(() => {
     setSelectedPipelineId(null);
     setSelectedStageId(null);
-  }, [fase]);
+  }, [phaseId]);
 
   const pipelinesQuery = useQuery({
-    queryKey: ["onb-pipelines", effectiveTenantId, fase],
-    enabled: !!effectiveTenantId,
+    queryKey: ["onb-pipelines", effectiveTenantId, phaseId],
+    enabled: !!effectiveTenantId && !!phaseId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_pipelines" as any) as any)
-        .select("id, nome, descricao, fase, produto_id, sla_total_minutos, ativo, position, department_id")
-        .eq("tenant_id", effectiveTenantId).eq("fase", fase).order("position");
+        .select("id, nome, descricao, phase_id, produto_id, sla_total_minutos, ativo, position, department_id")
+        .eq("tenant_id", effectiveTenantId).eq("phase_id", phaseId).order("position");
       if (error) throw error;
       return (data ?? []) as Pipeline[];
     },
@@ -205,7 +206,7 @@ export function PipelinesPanel({ fase }: Props) {
     const payload: any = {
       nome: p.nome.trim(),
       descricao: p.descricao?.trim() || null,
-      fase,
+      phase_id: phaseId,
       produto_id: p.produto_id ?? null,
       sla_total_minutos: p.sla_total_minutos ?? 0,
       ativo: p.ativo ?? true,

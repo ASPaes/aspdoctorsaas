@@ -17,11 +17,10 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   tenantId: string | null;
-  fase: "onboarding" | "implantacao";
   onCreated: () => void;
 }
 
-export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated }: Props) {
+export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Props) {
   const [clienteId, setClienteId] = useState<string>("");
   const [clienteLabel, setClienteLabel] = useState<string>("");
   const [clienteBusca, setClienteBusca] = useState<string>("");
@@ -99,8 +98,13 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
 
   // Pool do rodízio: membros do setor do pipeline daquele produto, com a carga
   // atual de cada um. Depende do produto porque o pipeline é escolhido por ele.
+  //
+  // p_fase é sempre "onboarding" porque create_onboarding_journey abre a jornada na
+  // PRIMEIRA fase — não na fase que estiver selecionada no board. Antes existia uma
+  // prop `fase` aqui que dava a impressão contrária e não era usada; foi removida.
+  // Quando a RPC genérica de fase chegar (Entrega C), isto passa a receber phase_id.
   const poolQuery = useQuery({
-    queryKey: ["onb-assignment-pool", tenantId, produtoId, fase],
+    queryKey: ["onb-assignment-pool", tenantId, produtoId],
     enabled: open && !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("fn_onboarding_assignment_pool", {
@@ -216,7 +220,7 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, fase, onCreated 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Nova jornada de {fase}</DialogTitle>
+          <DialogTitle>Nova jornada</DialogTitle>
         </DialogHeader>
         {/* 2 colunas: em 1 coluna o formulário passava de 730px e não cabia em
             notebook 13". sm: garante volta a 1 coluna em tela estreita. */}

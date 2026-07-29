@@ -5,6 +5,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
+import { useOnboardingPhases } from "@/hooks/useOnboardingPhases";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +34,7 @@ interface StageRow {
 interface PipelineRow {
   id: string;
   nome: string;
-  fase: "onboarding" | "implantacao";
+  phase_id: string;
   position?: number;
 }
 
@@ -69,6 +70,7 @@ interface JourneyRow {
   responsavel_nome?: string | null;
   pipeline_onboarding_id?: string | null;
   pipeline_implantacao_id?: string | null;
+  current_phase_id?: string | null;
   cliente_unidade_id?: number | null;
 }
 
@@ -129,7 +131,9 @@ export default function OnboardingPage() {
   const { selectedUnidadeIds, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const { canAccess, isLoading: accessLoading } = useOnboardingAccess();
   const queryClient = useQueryClient();
-  const [fase, setFase] = useState<"onboarding" | "implantacao">("onboarding");
+  const phasesQuery = useOnboardingPhases(effectiveTenantId, { enabled: canAccess });
+  const phases = phasesQuery.data ?? [];
+  const [phaseId, setPhaseId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
@@ -142,15 +146,29 @@ export default function OnboardingPage() {
   const [filtroTags, setFiltroTags] = useState<string[]>([]);
   const [periodoEntrada, setPeriodoEntrada] = useState<{ from: Date; to: Date } | null>(null);
 
+  // A jornada selecionada e a próxima ativa depois dela (para a coluna de conclusão)
+  const phaseAtual = useMemo(() => phases.find((p) => p.id === phaseId) ?? null, [phases, phaseId]);
+  const proximaPhase = useMemo(() => {
+    if (!phaseAtual) return null;
+    const i = phases.findIndex((p) => p.id === phaseAtual.id);
+    return i >= 0 && i < phases.length - 1 ? phases[i + 1] : null;
+  }, [phases, phaseAtual]);
+
+  // Primeira jornada ativa vira o padrão; com uma jornada só, nenhuma pill é renderizada.
+  useEffect(() => {
+    if (phases.length === 0) { setPhaseId(null); return; }
+    if (!phases.some((p) => p.id === phaseId)) setPhaseId(phases[0].id);
+  }, [phases, phaseId]);
+
   // Pipelines + stages
   const pipelinesQuery = useQuery({
-    queryKey: ["onboarding-pipelines", effectiveTenantId, fase],
-    enabled: canAccess && !!effectiveTenantId,
+    queryKey: ["onboarding-pipelines", effectiveTenantId, phaseId],
+    enabled: canAccess && !!effectiveTenantId && !!phaseId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_pipelines" as any) as any)
-        .select("id, nome, fase, position")
+        .select("id, nome, phase_id, position")
         .eq("tenant_id", effectiveTenantId)
-        .eq("fase", fase)
+        .eq("phase_id", phaseId)
         .eq("ativo", true)
         .order("position");
       if (error) throw error;
@@ -163,15 +181,15 @@ export default function OnboardingPage() {
   useEffect(() => {
     const list = pipelinesQuery.data ?? [];
     if (list.length === 0) { setSelectedPipelineId(null); return; }
-    const key = `onb-board-pipeline-${effectiveTenantId}-${fase}`;
+    const key = `onb-board-pipeline-${effectiveTenantId}-${phaseId}`;
     const saved = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
     const valid = saved && list.some((p) => p.id === saved);
     setSelectedPipelineId(valid ? saved : list[0].id);
-  }, [pipelinesQuery.data, effectiveTenantId, fase]);
+  }, [pipelinesQuery.data, effectiveTenantId, phaseId]);
 
   function selectPipeline(id: string) {
     setSelectedPipelineId(id);
-    try { window.localStorage.setItem(`onb-board-pipeline-${effectiveTenantId}-${fase}`, id); } catch {}
+    try { window.localStorage.setItem(`onb-board-pipeline-${effectiveTenantId}-${phaseId}`, id); } catch {}
   }
 
   const stagesQuery = useQuery({
@@ -190,19 +208,16 @@ export default function OnboardingPage() {
 
   // Journeys from view
   const journeysQuery = useQuery({
-    queryKey: ["onboarding-journeys", effectiveTenantId, fase, viewKey],
+    queryKey: ["onboarding-journeys", effectiveTenantId, viewKey],
     enabled: canAccess && !!effectiveTenantId && unidadeFilterReady,
     queryFn: async () => {
       const rows = await fetchAllRows<JourneyRow>(() => {
+        // Sem filtro de fase no servidor: a jornada a que cada linha pertence vem de
+        // vw_onboarding_journey_phases (journeyPhasesQuery). Isso também derruba o
+        // `.or(stage_fase...)` que anulava o índice.
         let q = (supabase.from("vw_onboarding_journeys" as any) as any)
           .select("*")
           .eq("tenant_id", effectiveTenantId);
-        if (fase === "onboarding") {
-          // ativas no onboarding + jornadas cujo onboarding já foi concluído (visível como coluna final)
-          q = q.or("stage_fase.eq.onboarding,onboarding_concluido.eq.true");
-        } else {
-          q = q.eq("stage_fase", fase);
-        }
         if (selectedUnidadeIds.length > 0) q = q.in("cliente_unidade_id", selectedUnidadeIds);
         return q;
       });
@@ -227,8 +242,8 @@ export default function OnboardingPage() {
 
   // Treinos agendados por jornada — destaque no card da Implantação (data + especialista)
   const trainingsQuery = useQuery({
-    queryKey: ["onboarding-board-trainings", effectiveTenantId, fase],
-    enabled: canAccess && !!effectiveTenantId && fase === "implantacao",
+    queryKey: ["onboarding-board-trainings", effectiveTenantId, phaseAtual?.slug ?? null],
+    enabled: canAccess && !!effectiveTenantId && phaseAtual?.slug === "implantacao",
     queryFn: async () => {
       const rows = await fetchAllRows<any>(() =>
         (supabase.from("onboarding_training_sessions" as any) as any)
@@ -313,6 +328,29 @@ export default function OnboardingPage() {
 
   const ONB_DONE_COL_ID = "__onb_concluido__";
 
+  /** Em que jornada(s) cada journey já esteve, com o pipeline percorrido e se ainda está aberta.
+   *  Substitui os campos pipeline_onboarding_id / pipeline_implantacao_id, que só existiam
+   *  para duas fases. */
+  const journeyPhasesQuery = useQuery({
+    queryKey: ["onboarding-journey-phases", effectiveTenantId],
+    enabled: canAccess && !!effectiveTenantId,
+    queryFn: async () => {
+      const rows = await fetchAllRows<{
+        journey_id: string; phase_id: string; pipeline_id: string | null; aberta: boolean;
+      }>(() =>
+        (supabase.from("vw_onboarding_journey_phases" as any) as any)
+          .select("journey_id, phase_id, pipeline_id, aberta")
+          .eq("tenant_id", effectiveTenantId),
+      );
+      const m: Record<string, Record<string, { pipeline_id: string | null; aberta: boolean }>> = {};
+      rows.forEach((r) => {
+        (m[r.journey_id] ||= {})[r.phase_id] = { pipeline_id: r.pipeline_id, aberta: r.aberta };
+      });
+      return m;
+    },
+  });
+  const phasesByJourney = journeyPhasesQuery.data ?? {};
+
   const opcoesResponsavel = useMemo(() => {
     const seen = new Map<string, string>();
     journeys.forEach((j) => {
@@ -390,22 +428,36 @@ export default function OnboardingPage() {
     m[ONB_DONE_COL_ID] = [];
     journeysFiltradas.forEach((j) => {
       if (filtroSituacao === "todos" && (j.situacao === "concluido" || j.situacao === "cancelado")) return;
-      const jPipe = fase === "onboarding" ? j.pipeline_onboarding_id : j.pipeline_implantacao_id;
-      if (selectedPipelineId && jPipe !== selectedPipelineId) return;
-      // Na aba Onboarding, se o onboarding já foi concluído, vai pra coluna final
-      if (fase === "onboarding" && j.onboarding_concluido) {
+      if (!phaseId) return;
+      // A jornada só aparece neste board se já percorreu (ou está percorrendo) esta fase.
+      const passagem = phasesByJourney[j.journey_id]?.[phaseId];
+      if (!passagem) return;
+      if (selectedPipelineId && passagem.pipeline_id !== selectedPipelineId) return;
+      // Fase já encerrada → coluna de conclusão, para o cartão não sumir do board.
+      if (!passagem.aberta) {
         m[ONB_DONE_COL_ID].push(j);
         return;
       }
       if (j.current_stage_id && m[j.current_stage_id]) m[j.current_stage_id].push(j);
     });
     return m;
-  }, [stages, journeysFiltradas, filtroSituacao, fase, selectedPipelineId]);
+  }, [stages, journeysFiltradas, filtroSituacao, phaseId, selectedPipelineId, phasesByJourney]);
 
   async function handleDrop(journeyId: string, targetStageId: string, fromStageId: string) {
     if (fromStageId === targetStageId) return;
-    // Soltar na coluna "Onboarding concluído" → conclui o onboarding e vai p/ implantação
+    // Soltar na coluna de conclusão → encerra esta fase e entra na próxima ativa.
     if (targetStageId === ONB_DONE_COL_ID) {
+      // A RPC de avanço genérica (advance_onboarding_phase) chega na Entrega C. Enquanto
+      // isso, só o par onboarding → implantação tem RPC própria; qualquer outro par
+      // recusa com mensagem clara em vez de mover a jornada para o lugar errado.
+      if (phaseAtual?.slug !== "onboarding" || proximaPhase?.slug !== "implantacao") {
+        toast.error(
+          proximaPhase
+            ? `Avançar de ${phaseAtual?.nome ?? "esta jornada"} para ${proximaPhase.nome} ainda não está liberado.`
+            : "Esta é a última jornada configurada — não há para onde avançar.",
+        );
+        return;
+      }
       try {
         const { data, error } = await (supabase.rpc as any)("advance_onboarding_to_implantacao", {
           p_journey_id: journeyId,
@@ -427,6 +479,7 @@ export default function OnboardingPage() {
             : "Onboarding concluído — jornada em Implantação."
         );
         queryClient.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+        queryClient.invalidateQueries({ queryKey: ["onboarding-journey-phases"] });
         queryClient.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
         queryClient.invalidateQueries({ queryKey: ["onboarding-stage-history"] });
       } catch (e: any) {
@@ -484,20 +537,19 @@ export default function OnboardingPage() {
       <div className="flex items-center justify-between gap-3 p-4 border-b border-border">
         <div className="flex items-center gap-3">
           <h1 className="text-lg font-semibold">Implantação</h1>
-          <div className="inline-flex rounded-md border border-border p-0.5">
-            <button
-              onClick={() => setFase("onboarding")}
-              className={`px-3 py-1 text-xs rounded ${fase === "onboarding" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-            >
-              Onboarding
-            </button>
-            <button
-              onClick={() => setFase("implantacao")}
-              className={`px-3 py-1 text-xs rounded ${fase === "implantacao" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-            >
-              Implantação
-            </button>
-          </div>
+          {phases.length > 1 && (
+            <div className="inline-flex rounded-md border border-border p-0.5">
+              {phases.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setPhaseId(p.id)}
+                  className={`px-3 py-1 text-xs rounded whitespace-nowrap ${p.id === phaseId ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+                >
+                  {p.nome}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button asChild size="sm" variant="outline">
@@ -643,7 +695,7 @@ export default function OnboardingPage() {
         </div>
       ) : stages.length === 0 ? (
         <div className="p-6 text-sm text-muted-foreground">
-          Nenhum pipeline de {fase} configurado para este tenant.
+          Nenhum pipeline de {phaseAtual?.nome ?? "jornada"} configurado para este tenant.
         </div>
       ) : (
         <div className="flex-1 overflow-x-auto p-4">
@@ -823,7 +875,7 @@ export default function OnboardingPage() {
                 </div>
               );
             })}
-            {fase === "onboarding" && (() => {
+            {!!proximaPhase && (() => {
               const items = journeysByStage[ONB_DONE_COL_ID] ?? [];
               const doneColor = "#22C55E";
               return (
@@ -846,7 +898,7 @@ export default function OnboardingPage() {
                   <div className="flex items-center gap-2 px-3 py-2 border-b border-emerald-500/30 bg-emerald-500/10 rounded-t-lg">
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: doneColor }} />
                     <span className="text-xs font-medium truncate text-emerald-700 dark:text-emerald-400">
-                      Onboarding concluído
+                      {phaseAtual?.nome ?? "Jornada"} concluído
                     </span>
                     <Badge variant="outline" className="ml-auto text-[10px] border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
                       {items.length}
@@ -859,7 +911,7 @@ export default function OnboardingPage() {
                       </div>
                     ) : (
                       items.map((j) => {
-                        const emImplantacao = j.fase_atual === "implantacao";
+                        const seguiuAdiante = !!proximaPhase && phasesByJourney[j.journey_id]?.[proximaPhase.id];
                         const jornadaConcluida = j.fase_atual === "concluido" || j.situacao === "concluido";
                         const slaOnb = j.sla_onb_util_min ?? j.sla_onb_corrido_min ?? null;
                         return (
@@ -880,7 +932,7 @@ export default function OnboardingPage() {
                                 className="ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border-0 text-white"
                                 style={{ background: jornadaConcluida ? doneColor : "#3B82F6" }}
                               >
-                                {jornadaConcluida ? "concluída" : emImplantacao ? "→ em Implantação" : (j.fase_atual ?? "—")}
+                                {jornadaConcluida ? "concluída" : seguiuAdiante ? `→ em ${proximaPhase!.nome}` : (j.fase_atual ?? "—")}
                               </span>
                             </div>
                             <p className="text-xs text-foreground line-clamp-2">
@@ -946,9 +998,9 @@ export default function OnboardingPage() {
         open={newOpen}
         onOpenChange={setNewOpen}
         tenantId={effectiveTenantId}
-        fase={fase}
         onCreated={() => {
           queryClient.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+          queryClient.invalidateQueries({ queryKey: ["onboarding-journey-phases"] });
         }}
       />
 
