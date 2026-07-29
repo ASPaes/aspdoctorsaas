@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Loader2, Sparkles, Pause, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useOnboardingPhases, findPhaseBySlug } from "@/hooks/useOnboardingPhases";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -181,6 +182,14 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
     onOpenChange(v);
   };
 
+  // O gerador cobre as duas jornadas de PROCESSO, que são as que a IA sabe desenhar
+  // (etapas, SLA, checklist). Jornadas criadas pelo tenant e a de Acompanhamento —
+  // que é coleta de indicadores, não processo — ficam de fora e são avisadas na tela.
+  const phases = useOnboardingPhases(effectiveTenantId, { enabled: open }).data ?? [];
+  const phasesForaDoGerador = phases.filter(
+    (f) => f.slug !== "onboarding" && f.slug !== "implantacao",
+  );
+
   const pipelinesByFase = (fase: "onboarding" | "implantacao") =>
     (blueprint?.pipelines ?? [])
       .map((p, pi) => ({ p, pi }))
@@ -251,6 +260,15 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
               <p className="text-xs text-muted-foreground">
                 Desmarque o que não quiser aplicar. Itens de catálogo com nome já existente são ignorados automaticamente.
               </p>
+              {phasesForaDoGerador.length > 0 && (
+                <p className="text-xs text-muted-foreground border border-dashed border-border rounded-md p-2.5">
+                  O gerador desenha só as jornadas de processo.{" "}
+                  <strong>{phasesForaDoGerador.map((f) => f.nome).join(", ")}</strong>{" "}
+                  {phasesForaDoGerador.length === 1 ? "fica" : "ficam"} de fora — monte
+                  as etapas {phasesForaDoGerador.length === 1 ? "dela" : "delas"} em
+                  “Pipelines &amp; Etapas”.
+                </p>
+              )}
 
               {(["onboarding", "implantacao"] as const).map((fase) => {
                 const list = pipelinesByFase(fase);
@@ -258,7 +276,8 @@ export function GenerateOperationAIDialog({ open, onOpenChange }: Props) {
                 return (
                   <section key={fase} className="space-y-2">
                     <h3 className="text-sm font-semibold">
-                      {fase === "onboarding" ? "Onboarding" : "Implantação"}
+                      {findPhaseBySlug(phases, fase)?.nome ??
+                        (fase === "onboarding" ? "Onboarding" : "Implantação")}
                     </h3>
                     {list.map(({ p, pi }) => (
                       <div key={pi} className="rounded-md border border-border p-3 space-y-2">
