@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOnboardingPhases } from "@/hooks/useOnboardingPhases";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,18 @@ interface Props {
   tenantId: string | null;
 }
 
+interface PhaseRow {
+  phase_id: string;
+  phase_nome: string | null;
+  phase_position: number | null;
+  pipeline_id: string | null;
+  aberta: boolean;
+  iniciada_em: string | null;
+  concluida_em: string | null;
+  sla_util_min: number | null;
+  sla_pausado_min: number | null;
+}
+
 interface Journey {
   journey_id: string;
   ticket_id: string | null;
@@ -65,12 +78,6 @@ interface Journey {
   onboarding_concluido?: boolean | null;
   onboarding_concluido_em?: string | null;
   implantacao_iniciada_em?: string | null;
-  sla_onb_corrido_min?: number | null;
-  sla_onb_util_min?: number | null;
-  sla_onb_pausado_min?: number | null;
-  sla_imp_corrido_min?: number | null;
-  sla_imp_util_min?: number | null;
-  sla_imp_pausado_min?: number | null;
   sla_total_corrido_min?: number | null;
   sla_total_pausado_min?: number | null;
   cliente_unidade_id?: number | null;
@@ -415,7 +422,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journeyId && !!tenantId,
     queryFn: async () => {
       const { data } = await (supabase.from("onboarding_journeys" as any) as any)
-        .select("id, fase_atual, pipeline_onboarding_id, pipeline_implantacao_id, current_stage_id, produto_id")
+        .select("id, fase_atual, current_phase_id, current_stage_id, produto_id")
         .eq("id", journeyId)
         .maybeSingle();
       return data as any;
@@ -423,9 +430,40 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   });
 
   const journeyRow = journeyRowQ.data;
-  const pipelineId = journeyRow?.fase_atual === "implantacao"
-    ? journeyRow?.pipeline_implantacao_id
-    : journeyRow?.pipeline_onboarding_id;
+
+  /** Jornadas cadastradas do tenant, na ordem — alimenta o trilho e as regras de fase. */
+  const phases = useOnboardingPhases(tenantId, { enabled: open }).data ?? [];
+
+  /** Passagem desta jornada por cada fase, com o pipeline percorrido e o SLA congelado. */
+  const phaseRowsQ = useQuery({
+    queryKey: ["onboarding-journey-phases-detail", journeyId],
+    enabled: open && !!journeyId && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("vw_onboarding_journey_phases" as any) as any)
+        .select("phase_id, phase_nome, phase_position, pipeline_id, aberta, iniciada_em, concluida_em, sla_util_min, sla_pausado_min")
+        .eq("tenant_id", tenantId)
+        .eq("journey_id", journeyId);
+      if (error) throw error;
+      return (data ?? []) as PhaseRow[];
+    },
+  });
+
+  const phaseRowById = useMemo(() => {
+    const m = new Map<string, PhaseRow>();
+    (phaseRowsQ.data ?? []).forEach((r) => m.set(r.phase_id, r));
+    return m;
+  }, [phaseRowsQ.data]);
+
+  const phaseAtual = useMemo(
+    () => phases.find((p) => p.id === journeyRow?.current_phase_id) ?? null,
+    [phases, journeyRow?.current_phase_id],
+  );
+  /** Slug da fase atual. Null quando a jornada já terminou (sem fase corrente). */
+  const faseSlug = phaseAtual?.slug ?? null;
+
+  const pipelineId = journeyRow?.current_phase_id
+    ? phaseRowById.get(journeyRow.current_phase_id)?.pipeline_id ?? null
+    : null;
 
   const stagesQ = useQuery({
     queryKey: ["onboarding-detail-stages", pipelineId],
@@ -927,13 +965,13 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const canScheduleTraining = useMemo(() => {
     if (!journey) return false;
     if (journey.situacao === "concluido") return false;
-    if (journey.fase_atual === "implantacao") return true;
-    if (journey.fase_atual === "onboarding") {
+    // Na primeira jornada só depois da etapa final; nas seguintes, a qualquer momento.
+    if (faseSlug === "onboarding") {
       const cur = stages.find((s) => s.id === journey.current_stage_id);
       return cur?.is_final === true;
     }
-    return false;
-  }, [journey, stages]);
+    return !!faseSlug;
+  }, [journey, stages, faseSlug]);
 
   const pausesByReason = useMemo(() => {
     const rows = pausesByReasonQ.data ?? [];
@@ -979,10 +1017,10 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const isTerminal = isConcluded || isCancelled;
   const isAdmin = profile?.is_super_admin === true || profile?.role === "admin";
   const etapaFinal = stages.find((s) => s.id === journey?.current_stage_id)?.is_final === true;
-  const canGoLive = (journey?.fase_atual === "implantacao" && etapaFinal) || isAdmin;
+  const canGoLive = (faseSlug === "implantacao" && etapaFinal) || isAdmin;
 
   // Ao agendar na fase de onboarding, o usuário escolhe concluir (→ implantação) ou manter.
-  const isOnbPhase = journey?.fase_atual === "onboarding";
+  const isOnbPhase = faseSlug === "onboarding";
   const scheduleAlert = isOnbPhase ? (
     <Alert className="border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300 [&>svg]:text-sky-500 py-2 text-xs">
       <AlertTriangle className="h-4 w-4" />
@@ -1380,7 +1418,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       toast.error("Informe o título do treino");
       return;
     }
-    const movesToImplantation = journey?.fase_atual === "onboarding" && concluir;
+    const movesToImplantation = faseSlug === "onboarding" && concluir;
     try {
       const { error } = await (supabase.rpc as any)("create_onboarding_training", {
         p_journey_id: journeyId,
@@ -1658,7 +1696,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         {journey.cliente_unidade_nome}
                       </Badge>
                     )}
-                    <Badge variant="outline" className="text-[10px] capitalize">{journey.fase_atual || "—"}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{phaseAtual?.nome ?? "Concluída"}</Badge>
                     <Badge className="text-[10px] capitalize" style={{ background: slaColor, color: "white" }}>
                       {journey.stage_nome || "sem etapa"}
                     </Badge>
@@ -1832,17 +1870,19 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   <span className="text-[9px] uppercase text-muted-foreground">Aberta em</span>
                   <span className="text-[11px] font-mono font-semibold">{formatDate(journey.aberta_em)}</span>
                 </div>
-                <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1.5">
-                  <span className="text-[9px] uppercase text-muted-foreground">Onb</span>
-                  <span className="text-[11px] font-mono font-semibold">{formatMinUtil(journey.sla_onb_util_min)}</span>
-                  <span className="text-[10px] text-muted-foreground">· pausa {formatMinUtil(journey.sla_onb_pausado_min)}</span>
-                </div>
-                <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1.5">
-                  <span className="text-[9px] uppercase text-muted-foreground">Impl</span>
-                  <span className="text-[11px] font-mono font-semibold">
-                    {journey.implantacao_iniciada_em ? formatMinUtil(journey.sla_imp_util_min) : "—"}
-                  </span>
-                </div>
+                {phases.map((f) => {
+                  const r = phaseRowById.get(f.id);
+                  if (!r) return null;
+                  return (
+                    <div key={f.id} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1.5">
+                      <span className="text-[9px] uppercase text-muted-foreground">{f.nome}</span>
+                      <span className="text-[11px] font-mono font-semibold">{formatMinUtil(r.sla_util_min)}</span>
+                      {(r.sla_pausado_min ?? 0) > 0 && (
+                        <span className="text-[10px] text-muted-foreground">· pausa {formatMinUtil(r.sla_pausado_min)}</span>
+                      )}
+                    </div>
+                  );
+                })}
                 <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1.5">
                   <span className="text-[9px] uppercase text-muted-foreground">Total</span>
                   <span className="text-[11px] font-mono font-semibold">{formatMin(journey.sla_total_corrido_min)}</span>
@@ -1854,65 +1894,81 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
               </div>
             </DialogHeader>
 
-            {/* Trilho da jornada */}
-            <div className="px-6 py-3 border-b border-border bg-muted/10 shrink-0">
+            {/* Trilho da jornada — um nó por jornada cadastrada + o nó terminal de go-live */}
+            <div className="px-6 py-3 border-b border-border bg-muted/10 shrink-0 overflow-x-auto">
               {(() => {
-                const fase = journey.fase_atual;
-                const situ = journey.situacao;
-                const isConcl = situ === "concluido";
-                const isCanc = situ === "cancelado";
-                const s1: string = fase === "onboarding" ? "cur" : "done";
-                const s2 = (isConcl || isCanc) ? "done" : (fase === "implantacao" ? "cur" : "todo");
-                const s3 = isConcl ? "done" : (isCanc ? "canc" : "todo");
-                const line1 = s1 === "done";
-                const line2 = isConcl ? "full" : (fase === "implantacao" ? "half" : "none");
-                const nodeCls = (s: string) =>
+                const isConcl = journey.situacao === "concluido";
+                const isCanc = journey.situacao === "cancelado";
+
+                type NodeState = "done" | "cur" | "todo" | "canc";
+                const nodes: Array<{ key: string; titulo: string; sub: string; estado: NodeState }> =
+                  phases.map((f) => {
+                    const r = phaseRowById.get(f.id);
+                    const atual = f.id === journeyRow?.current_phase_id;
+                    const estado: NodeState =
+                      atual && !isConcl && !isCanc ? "cur"
+                      : r && !r.aberta ? "done"
+                      : r ? "done"
+                      : "todo";
+                    const sub =
+                      atual && !isConcl && !isCanc
+                        ? `${formatMinUtil(journey.etapa_atual_min)} nesta etapa`
+                        : r
+                        ? formatMinUtil(r.sla_util_min)
+                        : "não iniciada";
+                    return {
+                      key: f.id,
+                      titulo: atual && journey.stage_nome ? `${f.nome} · ${journey.stage_nome}` : f.nome,
+                      sub,
+                      estado,
+                    };
+                  });
+
+                // Nó terminal: não é uma jornada, é o desfecho.
+                nodes.push({
+                  key: "__golive__",
+                  titulo: "Go-live",
+                  sub: isConcl
+                    ? formatDate(journey.go_live_real || journey.go_live_previsto)
+                    : isCanc
+                    ? "cancelada"
+                    : formatDate(journey.go_live_previsto),
+                  estado: isConcl ? "done" : isCanc ? "canc" : "todo",
+                });
+
+                const nodeCls = (s: NodeState) =>
                   s === "done" ? "bg-[#22C55E] text-[#052012]"
                   : s === "cur" ? "bg-[#0EA5E9] text-[#04202e] ring-4 ring-[#0EA5E9]/20"
                   : s === "canc" ? "bg-destructive text-white"
                   : "bg-muted text-muted-foreground";
-                const Node = ({ s, n }: { s: string; n: string }) => (
-                  <div className={`h-6 w-6 rounded-full grid place-items-center text-[11px] font-mono font-semibold shrink-0 ${nodeCls(s)}`}>
-                    {s === "done" ? "✓" : s === "canc" ? <Ban className="h-3 w-3" /> : n}
-                  </div>
-                );
-                const Line = ({ mode }: { mode: string }) => (
-                  <div className="flex-1 h-0.5 mx-3 rounded bg-muted relative overflow-hidden">
-                    {mode === "full" && <span className="absolute inset-0" style={{ background: "linear-gradient(90deg,#22C55E,#0EA5E9)" }} />}
-                    {mode === "half" && <span className="absolute inset-y-0 left-0 w-1/2 bg-[#0EA5E9]" />}
-                  </div>
-                );
+
                 return (
-                  <div className="flex items-center">
-                    <div className="flex items-center gap-2.5">
-                      <Node s={s1} n="1" />
-                      <div>
-                        <div className={`text-xs font-medium ${s1==="todo"?"text-muted-foreground":""}`}>Onboarding</div>
-                        <div className="text-[10px] text-muted-foreground font-mono">{formatMinUtil(journey.sla_onb_util_min)}</div>
-                      </div>
-                    </div>
-                    <Line mode={line1 ? "full" : "none"} />
-                    <div className="flex items-center gap-2.5">
-                      <Node s={s2} n="2" />
-                      <div>
-                        <div className={`text-xs font-medium ${s2==="todo"?"text-muted-foreground":""}`}>
-                          Implantação{s2==="cur" && journey.stage_nome ? ` · ${journey.stage_nome}` : ""}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground font-mono">
-                          {s2==="cur" ? `${formatMinUtil(journey.etapa_atual_min)} nesta etapa` : s2==="done" ? formatMinUtil(journey.sla_imp_util_min) : "não iniciada"}
-                        </div>
-                      </div>
-                    </div>
-                    <Line mode={line2} />
-                    <div className="flex items-center gap-2.5">
-                      <Node s={s3} n="3" />
-                      <div>
-                        <div className={`text-xs font-medium ${s3==="todo"?"text-muted-foreground":""}`}>Go-live</div>
-                        <div className="text-[10px] text-muted-foreground font-mono">
-                          {s3==="done" ? formatDate(journey.go_live_real || journey.go_live_previsto) : s3==="canc" ? "cancelada" : formatDate(journey.go_live_previsto)}
+                  <div className="flex items-center min-w-max">
+                    {nodes.map((n, i) => (
+                      <div key={n.key} className="flex items-center">
+                        {i > 0 && (
+                          <div className="w-10 sm:w-16 h-0.5 mx-3 rounded bg-muted relative overflow-hidden">
+                            {nodes[i - 1].estado === "done" && n.estado !== "todo" && (
+                              <span className="absolute inset-0" style={{ background: "linear-gradient(90deg,#22C55E,#0EA5E9)" }} />
+                            )}
+                            {nodes[i - 1].estado === "done" && n.estado === "todo" && (
+                              <span className="absolute inset-y-0 left-0 w-1/2 bg-[#22C55E]" />
+                            )}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2.5">
+                          <div className={`h-6 w-6 rounded-full grid place-items-center text-[11px] font-mono font-semibold shrink-0 ${nodeCls(n.estado)}`}>
+                            {n.estado === "done" ? "\u2713" : n.estado === "canc" ? <Ban className="h-3 w-3" /> : String(i + 1)}
+                          </div>
+                          <div>
+                            <div className={`text-xs font-medium whitespace-nowrap ${n.estado === "todo" ? "text-muted-foreground" : ""}`}>
+                              {n.titulo}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground font-mono whitespace-nowrap">{n.sub}</div>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
                 );
               })()}
@@ -3021,17 +3077,19 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   <div className="space-y-5">
                     <section className="rounded-lg border border-border">
                       <div className="p-3 border-b border-border"><h3 className="text-sm font-semibold">SLA por fase</h3></div>
-                      <div className="p-3 grid grid-cols-3 gap-3">
-                        <div className="rounded-md border border-border bg-card p-2.5">
-                          <div className="text-[11px] font-medium mb-1">Onboarding</div>
-                          <div className="text-sm font-semibold">{formatMinUtil(journey.sla_onb_util_min)}</div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5">pausado {formatMinUtil(journey.sla_onb_pausado_min)}</div>
-                        </div>
-                        <div className="rounded-md border border-border bg-card p-2.5">
-                          <div className="text-[11px] font-medium mb-1">Implantação</div>
-                          <div className="text-sm font-semibold">{journey.implantacao_iniciada_em ? formatMinUtil(journey.sla_imp_util_min) : "—"}</div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5">{journey.implantacao_iniciada_em ? `pausado ${formatMinUtil(journey.sla_imp_pausado_min)}` : "não iniciada"}</div>
-                        </div>
+                      <div className="p-3 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(phases.length + 1, 4)}, minmax(0, 1fr))` }}>
+                        {phases.map((f) => {
+                          const r = phaseRowById.get(f.id);
+                          return (
+                            <div key={f.id} className="rounded-md border border-border bg-card p-2.5">
+                              <div className="text-[11px] font-medium mb-1">{f.nome}</div>
+                              <div className="text-sm font-semibold">{r ? formatMinUtil(r.sla_util_min) : "—"}</div>
+                              <div className="text-[10px] text-muted-foreground mt-0.5">
+                                {r ? `pausado ${formatMinUtil(r.sla_pausado_min)}` : "não iniciada"}
+                              </div>
+                            </div>
+                          );
+                        })}
                         <div className="rounded-md border border-border bg-card p-2.5">
                           <div className="text-[11px] font-medium mb-1">Total</div>
                           <div className="text-sm font-semibold">{formatMin(journey.sla_total_corrido_min)}</div>
@@ -3069,7 +3127,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         <p className="text-sm text-muted-foreground">
           Ao concluir, os relógios de SLA serão congelados e a etapa/pausa em aberto será fechada.
         </p>
-        {!(journey?.fase_atual === "implantacao" && etapaFinal) && (
+        {!(faseSlug === "implantacao" && etapaFinal) && (
           <Alert className="border-warning/50 bg-warning/15 text-warning [&>svg]:text-warning py-2">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription className="text-xs">

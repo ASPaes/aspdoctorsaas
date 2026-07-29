@@ -32,8 +32,6 @@ import {
 import { SlaInput } from "./SlaInput";
 import { formatSlaHuman, slugify } from "./utils";
 
-type Fase = "onboarding" | "implantacao";
-
 const SECTION_OPTIONS: { key: string; label: string }[] = [
   { key: "participantes", label: "Responsável & participantes" },
   { key: "timeline", label: "Linha do tempo das etapas" },

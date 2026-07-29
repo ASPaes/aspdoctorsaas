@@ -60,16 +60,12 @@ interface JourneyRow {
   aberta_em: string | null;
   data_inicio_planejado: string | null;
   onboarding_concluido?: boolean | null;
-  sla_onb_util_min?: number | null;
-  sla_onb_corrido_min?: number | null;
   cliente_nome?: string | null;
   demand_type_id?: string | null;
   demand_type_nome?: string | null;
   demand_type_cor?: string | null;
   responsavel_user_id?: string | null;
   responsavel_nome?: string | null;
-  pipeline_onboarding_id?: string | null;
-  pipeline_implantacao_id?: string | null;
   current_phase_id?: string | null;
   cliente_unidade_id?: number | null;
 }
@@ -337,14 +333,17 @@ export default function OnboardingPage() {
     queryFn: async () => {
       const rows = await fetchAllRows<{
         journey_id: string; phase_id: string; pipeline_id: string | null; aberta: boolean;
+        sla_util_min: number | null;
       }>(() =>
         (supabase.from("vw_onboarding_journey_phases" as any) as any)
-          .select("journey_id, phase_id, pipeline_id, aberta")
+          .select("journey_id, phase_id, pipeline_id, aberta, sla_util_min")
           .eq("tenant_id", effectiveTenantId),
       );
-      const m: Record<string, Record<string, { pipeline_id: string | null; aberta: boolean }>> = {};
+      const m: Record<string, Record<string, { pipeline_id: string | null; aberta: boolean; sla_util_min: number | null }>> = {};
       rows.forEach((r) => {
-        (m[r.journey_id] ||= {})[r.phase_id] = { pipeline_id: r.pipeline_id, aberta: r.aberta };
+        (m[r.journey_id] ||= {})[r.phase_id] = {
+          pipeline_id: r.pipeline_id, aberta: r.aberta, sla_util_min: r.sla_util_min,
+        };
       });
       return m;
     },
@@ -913,7 +912,7 @@ export default function OnboardingPage() {
                       items.map((j) => {
                         const seguiuAdiante = !!proximaPhase && phasesByJourney[j.journey_id]?.[proximaPhase.id];
                         const jornadaConcluida = j.fase_atual === "concluido" || j.situacao === "concluido";
-                        const slaOnb = j.sla_onb_util_min ?? j.sla_onb_corrido_min ?? null;
+                        const slaFase = phaseId ? phasesByJourney[j.journey_id]?.[phaseId]?.sla_util_min ?? null : null;
                         return (
                           <div
                             key={j.journey_id}
@@ -965,9 +964,9 @@ export default function OnboardingPage() {
                               </div>
                             )}
                             <div className="flex items-center gap-2 text-[10px] text-muted-foreground/90 mt-1.5 flex-wrap">
-                              <span className="inline-flex items-center gap-1" title="SLA do onboarding (congelado)">
+                              <span className="inline-flex items-center gap-1" title="SLA desta jornada (congelado no encerramento da fase)">
                                 <Clock className="h-3 w-3" />
-                                SLA onb {formatMinUtil(slaOnb)}
+                                SLA {phaseAtual?.nome ?? "da jornada"} {formatMinUtil(slaFase)}
                               </span>
                               {j.aberta_em && (
                                 <span className="inline-flex items-center gap-1" title="Data de abertura da jornada">

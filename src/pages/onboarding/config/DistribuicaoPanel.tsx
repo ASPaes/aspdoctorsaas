@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useOnboardingPhases } from "@/hooks/useOnboardingPhases";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -11,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 interface Pipeline {
   id: string;
-  fase: "onboarding" | "implantacao";
+  phase_id: string;
   nome: string;
   produto_id: number | null;
   department_id: string | null;
@@ -75,7 +76,7 @@ export function DistribuicaoPanel() {
     enabled: !!effectiveTenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_pipelines" as any) as any)
-        .select("id, fase, nome, produto_id, department_id, position")
+        .select("id, phase_id, nome, produto_id, department_id, position")
         .eq("tenant_id", effectiveTenantId)
         .eq("ativo", true)
         .order("position");
@@ -113,15 +114,19 @@ export function DistribuicaoPanel() {
   });
 
   const pipelines = pipelinesQ.data ?? [];
+  const phases = useOnboardingPhases(effectiveTenantId).data ?? [];
+  // A jornada onde a jornada nasce — é ela que alimenta o rodízio.
+  const primeiraPhase = phases[0] ?? null;
 
-  // Só o pipeline de onboarding alimenta o motor: na virada para implantação a
+  // Só o pipeline da primeira jornada alimenta o motor: na virada para a seguinte a
   // responsabilidade vai para quem conduziu o treino, não para o rodízio.
   const setoresDoRodizio = useMemo(() => {
+    if (!primeiraPhase) return [] as string[];
     const ids = pipelines
-      .filter((p) => p.fase === "onboarding" && p.department_id)
+      .filter((p) => p.phase_id === primeiraPhase.id && p.department_id)
       .map((p) => p.department_id as string);
     return Array.from(new Set(ids));
-  }, [pipelines]);
+  }, [pipelines, primeiraPhase]);
 
   const poolsQ = useQuery({
     queryKey: ["onb-dist-pools", effectiveTenantId, setoresDoRodizio.join(",")],
@@ -212,10 +217,10 @@ export function DistribuicaoPanel() {
 
   const departamentos = deptsQ.data ?? [];
   const produtos = produtosQ.data;
-  const porFase = {
-    onboarding: pipelines.filter((p) => p.fase === "onboarding"),
-    implantacao: pipelines.filter((p) => p.fase === "implantacao"),
-  };
+  // Agrupa por jornada cadastrada, na ordem definida na aba Jornadas.
+  const gruposPorPhase = phases
+    .map((f) => ({ phase: f, itens: pipelines.filter((p) => p.phase_id === f.id) }))
+    .filter((g) => g.itens.length > 0);
 
   return (
     <div className="max-w-3xl space-y-8 pb-6">
@@ -234,13 +239,12 @@ export function DistribuicaoPanel() {
           </div>
         ) : (
           <div className="space-y-4">
-            {(["onboarding", "implantacao"] as const).map((fase) =>
-              porFase[fase].length === 0 ? null : (
-                <div key={fase} className="space-y-1.5">
+            {gruposPorPhase.map(({ phase, itens }) => (
+                <div key={phase.id} className="space-y-1.5">
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
-                    {fase === "onboarding" ? "Onboarding" : "Implantação"}
+                    {phase.nome}
                   </p>
-                  {porFase[fase].map((p) => (
+                  {itens.map((p) => (
                     <div
                       key={p.id}
                       className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-card transition-colors hover:border-primary/40"
@@ -270,18 +274,18 @@ export function DistribuicaoPanel() {
                     </div>
                   ))}
                 </div>
-              ),
-            )}
+            ))}
           </div>
         )}
 
-        {porFase.implantacao.length > 0 && (
+        {gruposPorPhase.length > 1 && (
           <p className="text-[11px] text-muted-foreground flex items-start gap-1.5 pt-0.5">
             <AlertTriangle className="h-3.5 w-3.5 mt-px shrink-0" />
             <span>
-              O rodízio só age na <strong>criação</strong> da jornada. Ao concluir o onboarding, a
-              responsabilidade passa para quem conduziu o treino — o setor da implantação serve para o
-              ticket, não para distribuir.
+              O rodízio só age na <strong>criação</strong> da jornada, e só olha o setor de
+              <strong> {primeiraPhase?.nome ?? "primeira jornada"}</strong>. Ao concluir essa etapa, a
+              responsabilidade passa para quem conduziu o treino — o setor das jornadas seguintes serve
+              para o ticket, não para distribuir.
             </span>
           </p>
         )}

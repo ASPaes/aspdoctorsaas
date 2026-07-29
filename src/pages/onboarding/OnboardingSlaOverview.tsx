@@ -17,9 +17,10 @@ import { formatMinUtil as formatMin, formatMinCal } from "./slaFormat";
  * calendário com um alvo em minutos úteis daria "0% no prazo" sempre.
  *
  * Fontes de verdade:
- *  - vw_onboarding_journeys: sla_*_util_min (útil já sem pausas) e sla_*_pausado_min
- *    (pausas, também em minutos úteis). Bruto = util + pausado.
- *    sla_*_corrido_min = calendário, só informativo.
+ *  - vw_onboarding_journey_phases: uma linha por jornada percorrida, com sla_util_min
+ *    (útil já sem pausas), sla_pausado_min e sla_corrido_min (calendário, informativo).
+ *    Bruto = util + pausado. Substituiu os pares sla_onb_* / sla_imp_*, que só sabiam
+ *    falar de duas fases.
  *  - onboarding_pipelines.sla_total_minutos  → SLA alvo da fase/pipeline (minutos úteis)
  *  - onboarding_stages.sla_minutos           → SLA alvo da etapa (minutos úteis)
  *  - onboarding_stage_history: duracao_util_minutos (expediente) vs duracao_minutos (calendário)
@@ -28,19 +29,30 @@ import { formatMinUtil as formatMin, formatMinCal } from "./slaFormat";
  *  Jornada no prazo = todas as fases já iniciadas dentro do orçamento.
  */
 
+interface PipelineLite {
+  id: string;
+  nome: string;
+  phase_id: string;
+  sla_total_minutos: number | null;
+  position: number;
+}
+
+interface PhaseRow {
+  journey_id: string;
+  phase_id: string;
+  phase_nome: string | null;
+  phase_position: number | null;
+  pipeline_id: string | null;
+  sla_corrido_min: number | null;
+  sla_pausado_min: number | null;
+  sla_util_min: number | null;
+}
+
 export interface SlaJourneyRow {
   journey_id: string | null;
   concluido_em: string | null;
-  pipeline_onboarding_id: string | null;
-  pipeline_implantacao_id: string | null;
   demand_type_nome: string | null;
   setor_nome: string | null;
-  sla_onb_corrido_min: number | null;
-  sla_onb_pausado_min: number | null;
-  sla_onb_util_min: number | null;
-  sla_imp_corrido_min: number | null;
-  sla_imp_pausado_min: number | null;
-  sla_imp_util_min: number | null;
   sla_total_corrido_min: number | null;
   sla_total_pausado_min: number | null;
   sla_total_util_min: number | null;
@@ -173,12 +185,12 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
     queryKey: ["onb-sla-pipelines", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("onboarding_pipelines")
-        .select("id, nome, fase, sla_total_minutos, position")
+      // `as any`: phase_id ainda não existe no types.ts, que é gerado da produção.
+      const { data, error } = await (supabase.from("onboarding_pipelines" as any) as any)
+        .select("id, nome, phase_id, sla_total_minutos, position")
         .eq("tenant_id", tenantId!);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as PipelineLite[];
     },
   });
 
@@ -209,27 +221,58 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
   });
 
   const pipeMap = useMemo(() => new Map((pipelinesQ.data ?? []).map((p) => [p.id, p])), [pipelinesQ.data]);
+
   const stageMap = useMemo(() => new Map((stagesQ.data ?? []).map((s) => [s.id, s])), [stagesQ.data]);
+
+  // Uma linha por jornada percorrida — a fonte agora é a view genérica, e não mais
+  // dois blocos copiados (um por fase).
+  const phaseRowsQ = useQuery({
+    queryKey: ["onb-sla-journey-phases", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () =>
+      fetchAllRows<PhaseRow>(() =>
+        (supabase.from("vw_onboarding_journey_phases" as any) as any)
+          .select("journey_id, phase_id, phase_nome, phase_position, pipeline_id, sla_corrido_min, sla_pausado_min, sla_util_min")
+          .eq("tenant_id", tenantId!),
+      ),
+  });
+
+  /** Nome da jornada por id — vem das linhas da view, sem consultar outra tabela. */
+  const phaseNomeById = useMemo(() => {
+    const m = new Map<string, string>();
+    (phaseRowsQ.data ?? []).forEach((r) => { if (r.phase_nome) m.set(r.phase_id, r.phase_nome); });
+    return m;
+  }, [phaseRowsQ.data]);
+
+  const phaseRowsByJourney = useMemo(() => {
+    const m = new Map<string, PhaseRow[]>();
+    (phaseRowsQ.data ?? []).forEach((r) => {
+      const arr = m.get(r.journey_id) ?? [];
+      arr.push(r);
+      m.set(r.journey_id, arr);
+    });
+    m.forEach((arr) => arr.sort((a, b) => (a.phase_position ?? 0) - (b.phase_position ?? 0)));
+    return m;
+  }, [phaseRowsQ.data]);
 
   // Fases já iniciadas de uma jornada, com seu SLA alvo (pipeline).
   // O gate de "fase iniciada" continua sendo o tempo de calendário — uma fase que só
   // rodou fora do expediente tem 0 min úteis, mas já começou e precisa entrar na conta.
   const journeyPhases = useMemo(() => {
     return (j: SlaJourneyRow): { pipelineId: string; bruto: number; efetivo: number; target: number }[] => {
+      const linhas = j.journey_id ? phaseRowsByJourney.get(j.journey_id) ?? [] : [];
       const out: { pipelineId: string; bruto: number; efetivo: number; target: number }[] = [];
-      const onbT = j.pipeline_onboarding_id ? pipeMap.get(j.pipeline_onboarding_id)?.sla_total_minutos : null;
-      if (j.pipeline_onboarding_id && (j.sla_onb_corrido_min ?? 0) > 0 && onbT && onbT > 0) {
-        const efetivo = j.sla_onb_util_min ?? 0;
-        out.push({ pipelineId: j.pipeline_onboarding_id, bruto: efetivo + (j.sla_onb_pausado_min ?? 0), efetivo, target: onbT });
-      }
-      const impT = j.pipeline_implantacao_id ? pipeMap.get(j.pipeline_implantacao_id)?.sla_total_minutos : null;
-      if (j.pipeline_implantacao_id && (j.sla_imp_corrido_min ?? 0) > 0 && impT && impT > 0) {
-        const efetivo = j.sla_imp_util_min ?? 0;
-        out.push({ pipelineId: j.pipeline_implantacao_id, bruto: efetivo + (j.sla_imp_pausado_min ?? 0), efetivo, target: impT });
-      }
+      linhas.forEach((r) => {
+        if (!r.pipeline_id) return;
+        const target = pipeMap.get(r.pipeline_id)?.sla_total_minutos ?? null;
+        if (!target || target <= 0) return;
+        if ((r.sla_corrido_min ?? 0) <= 0) return;
+        const efetivo = r.sla_util_min ?? 0;
+        out.push({ pipelineId: r.pipeline_id, bruto: efetivo + (r.sla_pausado_min ?? 0), efetivo, target });
+      });
       return out;
     };
-  }, [pipeMap]);
+  }, [pipeMap, phaseRowsByJourney]);
 
   // KPIs "SLA Total"
   const total = useMemo(() => {
@@ -287,7 +330,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
         return {
           id: p.id,
           nome: p.nome,
-          fase: p.fase === "implantacao" ? "Implantação" : "Onboarding",
+          fase: phaseNomeById.get(p.phase_id) ?? "—",
           count: v.count,
           npC: pct(v.withinC, v.count),
           npE: pct(v.withinE, v.count),
