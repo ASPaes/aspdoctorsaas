@@ -71,10 +71,24 @@ SELECT j.tenant_id, j.id, j.current_phase_id,
            WHERE p.tenant_id = j.tenant_id AND p.phase_id = j.current_phase_id AND p.ativo
            ORDER BY (p.produto_id = j.produto_id) DESC NULLS LAST, p.position LIMIT 1)
        ),
-       COALESCE(
-         CASE WHEN f.slug = 'implantacao' THEN j.implantacao_iniciada_em END,
-         j.sla_iniciado_em, j.data_inicio_planejado, j.created_at
-       ),
+       -- Início da fase.
+       -- Onboarding: sla_iniciado_em, exatamente como a view antiga calcula. Não mexer.
+       -- Demais fases: o marco (implantacao_iniciada_em) só é gravado por
+       -- advance_onboarding_to_implantacao. Quem arrasta o cartão direto para uma coluna
+       -- de implantação passa por move_onboarding_stage, que muda fase_atual e deixa o
+       -- marco nulo — e o SLA daquela fase fica zerado para sempre na view antiga.
+       -- O histórico de etapas é a fonte confiável nesse caso.
+       CASE WHEN f.slug = 'onboarding'
+            THEN COALESCE(j.sla_iniciado_em, j.data_inicio_planejado, j.created_at)
+            ELSE COALESCE(
+                   CASE WHEN f.slug = 'implantacao' THEN j.implantacao_iniciada_em END,
+                   (SELECT min(sh.entrou_em)
+                      FROM public.onboarding_stage_history sh
+                      JOIN public.onboarding_stages s    ON s.id = sh.stage_id
+                      JOIN public.onboarding_pipelines p ON p.id = s.pipeline_id
+                     WHERE sh.journey_id = j.id AND p.phase_id = j.current_phase_id),
+                   j.sla_iniciado_em, j.data_inicio_planejado, j.created_at)
+       END,
        j.responsavel_user_id
   FROM public.onboarding_journeys j
   JOIN public.onboarding_phases f ON f.id = j.current_phase_id
