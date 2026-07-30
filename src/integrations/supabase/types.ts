@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      _bkp_consysa_owner_fone_20260727: {
+        Row: {
+          id: string | null
+          telefone_contato: string | null
+          telefone_whatsapp: string | null
+          telefone_whatsapp_contato: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          id?: string | null
+          telefone_contato?: string | null
+          telefone_whatsapp?: string | null
+          telefone_whatsapp_contato?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          id?: string | null
+          telefone_contato?: string | null
+          telefone_whatsapp?: string | null
+          telefone_whatsapp_contato?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
       _bkp_obs_cliente_20260716: {
         Row: {
           id: string | null
@@ -1802,6 +1826,9 @@ export type Database = {
           support_csat_thanks_template: string
           support_csat_timeout_minutes: number
           support_inactivity_enabled: boolean
+          support_inactivity_eod_close_template: string
+          support_inactivity_eod_enabled: boolean
+          support_inactivity_eod_warning_template: string
           support_inactivity_warning_before_minutes: number
           support_inactivity_warning_template: string
           support_reopen_window_minutes: number
@@ -1869,6 +1896,9 @@ export type Database = {
           support_csat_thanks_template?: string
           support_csat_timeout_minutes?: number
           support_inactivity_enabled?: boolean
+          support_inactivity_eod_close_template?: string
+          support_inactivity_eod_enabled?: boolean
+          support_inactivity_eod_warning_template?: string
           support_inactivity_warning_before_minutes?: number
           support_inactivity_warning_template?: string
           support_reopen_window_minutes?: number
@@ -1936,6 +1966,9 @@ export type Database = {
           support_csat_thanks_template?: string
           support_csat_timeout_minutes?: number
           support_inactivity_enabled?: boolean
+          support_inactivity_eod_close_template?: string
+          support_inactivity_eod_enabled?: boolean
+          support_inactivity_eod_warning_template?: string
           support_inactivity_warning_before_minutes?: number
           support_inactivity_warning_template?: string
           support_reopen_window_minutes?: number
@@ -4200,6 +4233,7 @@ export type Database = {
       omie_sync_fila: {
         Row: {
           campos_alterados: string[] | null
+          conta_integration_id: string | null
           contrato_id: string
           enfileirado_em: string
           id: string
@@ -4213,6 +4247,7 @@ export type Database = {
         }
         Insert: {
           campos_alterados?: string[] | null
+          conta_integration_id?: string | null
           contrato_id: string
           enfileirado_em?: string
           id?: string
@@ -4226,6 +4261,7 @@ export type Database = {
         }
         Update: {
           campos_alterados?: string[] | null
+          conta_integration_id?: string | null
           contrato_id?: string
           enfileirado_em?: string
           id?: string
@@ -4237,7 +4273,15 @@ export type Database = {
           tentativas?: number
           ultimo_erro?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "omie_sync_fila_conta_integration_id_fkey"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "omie_integration"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       onboarding_accounting_fields: {
         Row: {
@@ -6707,6 +6751,7 @@ export type Database = {
           handle_seconds: number
           handoffs_count: number
           id: string
+          inactivity_eod_close_at: string | null
           inactivity_hold: boolean
           inactivity_warning_sent_at: string | null
           instance_id: string | null
@@ -6787,6 +6832,7 @@ export type Database = {
           handle_seconds?: number
           handoffs_count?: number
           id?: string
+          inactivity_eod_close_at?: string | null
           inactivity_hold?: boolean
           inactivity_warning_sent_at?: string | null
           instance_id?: string | null
@@ -6867,6 +6913,7 @@ export type Database = {
           handle_seconds?: number
           handoffs_count?: number
           id?: string
+          inactivity_eod_close_at?: string | null
           inactivity_hold?: boolean
           inactivity_warning_sent_at?: string | null
           instance_id?: string | null
@@ -11258,6 +11305,19 @@ export type Database = {
         }
         Returns: Json
       }
+      get_atendimento_nao_atendidos: {
+        Args: {
+          p_agent_id?: string
+          p_date_from: string
+          p_date_to: string
+          p_department_id?: string
+          p_is_group?: boolean
+          p_limit?: number
+          p_tenant_id: string
+          p_unidade_base_id?: number
+        }
+        Returns: Json
+      }
       get_atendimento_realtime: {
         Args: {
           p_department_id?: string
@@ -11744,7 +11804,9 @@ export type Database = {
           department_id: string
           effective_close_min: number
           effective_warn_before: number
+          eod_enabled: boolean
           id: string
+          inactivity_eod_close_at: string
           inactivity_warning_sent_at: string
           instance_id: string
           last_customer_message_at: string
@@ -12207,11 +12269,22 @@ export type Database = {
         }
         Returns: Json
       }
-      obter_chave_omie: { Args: { p_tenant_id?: string }; Returns: string }
-      obter_chave_omie_sistema: {
-        Args: { p_tenant_id: string }
+      obter_chave_omie:
+        | { Args: { p_tenant_id?: string }; Returns: string }
+        | {
+            Args: { p_tenant_id: string; p_unidade_base_id: number }
+            Returns: string
+          }
+      obter_chave_omie_por_conta: {
+        Args: { p_integration_id: string }
         Returns: string
       }
+      obter_chave_omie_sistema:
+        | { Args: { p_tenant_id: string }; Returns: string }
+        | {
+            Args: { p_tenant_id: string; p_unidade_base_id: number }
+            Returns: string
+          }
       obter_segredo_cron_espelho: { Args: never; Returns: string }
       omie_fila_reprocessar: { Args: { p_fila_id: string }; Returns: Json }
       omie_fila_status: { Args: { p_tenant_id: string }; Returns: Json }
@@ -12379,7 +12452,7 @@ export type Database = {
         Returns: string
       }
       salvar_integracao_omie: {
-        Args: { p_chave: string; p_tenant_id?: string }
+        Args: { p_ativar?: boolean; p_chave: string; p_tenant_id?: string }
         Returns: Json
       }
       scan_ura_battle_conversations: {
