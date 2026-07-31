@@ -79,6 +79,29 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
   const uePrev = ueData && ueData.series.length >= 2 ? ueData.series[ueData.series.length - 2] : null;
   const series = ueData?.series || [];
 
+  // ─── Uma régua só ────────────────────────────────────────
+  // Esta tela tinha TRÊS motores medindo a mesma coisa: `metrics.mrr` (base da view +
+  // ajustes), `get_mrr_monthly_snapshots` (série) e o Net New de `useDashboardData`
+  // (eventos, regras próprias). Por isso MRR(mês anterior) + Net New nunca dava
+  // MRR(mês) — sobrava R$ 8k a R$ 21k/mês.
+  //
+  // `get_mrr_bridge` calcula estoque e movimento com a mesma definição de valor do
+  // cliente numa data, então mrrInicio + netNew === mrrFim, exato.
+  //
+  // Fallback para `metrics` quando não há período (ex.: "todos os dados"), onde não
+  // existe ponte a fazer.
+  const b = extras?.bridge ?? null;
+  const mrrAtual = b ? b.mrrFim : metrics.mrr;
+  const netNew = b ? b.netNew : metrics.netNewMrr;
+  // O breakdown desenha o sinal por conta própria; passa valor absoluto.
+  const bdNew = b ? b.novo : metrics.newMrr;
+  const bdUpsell = b ? b.upsell : metrics.upsellMrr;
+  const bdCross = b ? b.crossSell : metrics.crossSellMrr;
+  const bdReativ = b ? b.reativacao : metrics.reativacaoMrr;
+  const bdReajuste = b ? b.reajuste : metrics.reajusteMrr;
+  const bdDownsell = b ? Math.abs(b.downsell) : metrics.downsellMrr;
+  const bdChurn = b ? Math.abs(b.churn) : metrics.mrrCancelado;
+
   // ─── Diagnóstico ─────────────────────────────────────────
   const mcPercent = mcData?.mc_percent_ponderada ?? 0;
 
@@ -178,7 +201,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
         <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
           <KPICardEnhanced
             label="MRR ATUAL"
-            value={fmt(metrics.mrr)}
+            value={fmt(mrrAtual)}
             icon={<DollarSign className={`${iconLg} text-primary`} />}
             size={sLg}
             variant="primary"
@@ -189,10 +212,10 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
           />
           <KPICardEnhanced
             label="Net New MRR"
-            value={`${metrics.netNewMrr >= 0 ? '+' : ''}${fmt(metrics.netNewMrr)}`}
+            value={`${netNew >= 0 ? '+' : ''}${fmt(netNew)}`}
             icon={<Calculator className={`${iconLg} text-primary`} />}
             size={sLg}
-            variant={metrics.netNewMrr >= 0 ? 'success' : 'destructive'}
+            variant={netNew >= 0 ? 'success' : 'destructive'}
             subtitle="Variação líquida no período"
             helpKey="net_new_mrr"
           />
@@ -262,14 +285,14 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
 
         {/* Breakdown waterfall (full width) */}
         <NetNewMrrStackedChart
-          newMrr={metrics.newMrr}
-          upsellMrr={metrics.upsellMrr}
-          crossSellMrr={metrics.crossSellMrr}
-          reativacaoMrr={metrics.reativacaoMrr}
-          reajusteMrr={metrics.reajusteMrr}
-          downsellMrr={metrics.downsellMrr}
-          mrrCancelado={metrics.mrrCancelado}
-          netNewMrr={metrics.netNewMrr}
+          newMrr={bdNew}
+          upsellMrr={bdUpsell}
+          crossSellMrr={bdCross}
+          reativacaoMrr={bdReativ}
+          reajusteMrr={bdReajuste}
+          downsellMrr={bdDownsell}
+          mrrCancelado={bdChurn}
+          netNewMrr={netNew}
           historico={extras?.netNewHistorico}
           tvMode={tvMode}
         />

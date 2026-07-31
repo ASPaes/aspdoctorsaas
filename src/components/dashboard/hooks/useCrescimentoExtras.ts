@@ -61,6 +61,31 @@ export interface CrescimentoExtras {
 
   // Série completa (25 pontos)
   mrrSeries24m: Array<{ dataCorte: string; mrr: number; monthLabel: string }>;
+
+  /**
+   * Ponte do período: MRR início → componentes → MRR fim, na MESMA régua do snapshot.
+   * Fecha por construção — mrrInicio + netNew === mrrFim.
+   *
+   * Existe porque o Net New de `useDashboardData` mede com régua diferente do card de
+   * MRR e a conta não fechava (sobrava R$ 8k a R$ 21k/mês). Dois motivos, os dois lá:
+   * `newMrr` soma produtos ativos HOJE (cliente que entrou e depois derrubou produto
+   * encolhe retroativamente no "new"), e churn parcial — cliente que FICA na base e
+   * cancela um produto — não entrava em componente nenhum.
+   *
+   * `downsell` e `churn` vêm NEGATIVOS daqui. Os cards de breakdown esperam positivo.
+   */
+  bridge: {
+    mrrInicio: number;
+    novo: number;
+    upsell: number;
+    crossSell: number;
+    reativacao: number;
+    reajuste: number;
+    downsell: number;
+    churn: number;
+    netNew: number;
+    mrrFim: number;
+  } | null;
 }
 
 const MES_PT_ABBREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -99,13 +124,24 @@ export function useCrescimentoExtras(params: {
   const { filters, metrics, unitEconomics, mcData } = params;
 
   const unidadeBaseId = filters.unidadeBaseId ?? null;
-  const fornecedorId = filters.fornecedorId ?? null;
+  // `filters.fornecedorId` (singular) só é preenchido quando há EXATAMENTE um
+  // fornecedor selecionado (DashboardFilters.tsx: `ids.length === 1 ? ids[0] : null`).
+  // Usar só ele fazia duas coisas erradas: com 2+ selecionados a queryKey ficava
+  // idêntica à de "sem filtro" e o React Query servia o cache não-filtrado, e a RPC
+  // da série recebia NULL e ignorava a seleção múltipla em silêncio.
+  const fornecedorIds = filters.fornecedorIds?.length
+    ? [...filters.fornecedorIds].sort((a, b) => a - b)
+    : null;
+  const fornecedorKey = fornecedorIds ? fornecedorIds.join(',') : '';
   const dataReferencia = filters.periodoFim
     ? new Date(filters.periodoFim).toISOString().slice(0, 10)
     : null;
+  const dataInicio = filters.periodoInicio
+    ? new Date(filters.periodoInicio).toISOString().slice(0, 10)
+    : null;
 
   return useQuery({
-    queryKey: ['crescimento-extras', tid, unidadeBaseId, fornecedorId, dataReferencia],
+    queryKey: ['crescimento-extras', tid, unidadeBaseId, fornecedorKey, dataInicio, dataReferencia],
     enabled: !!tid,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<CrescimentoExtras> => {
@@ -113,12 +149,42 @@ export function useCrescimentoExtras(params: {
         p_tenant_id: tid,
         p_months_back: 24,
         p_unidade_base_id: unidadeBaseId,
-        p_fornecedor_id: fornecedorId,
+        p_fornecedor_ids: fornecedorIds,
         p_data_referencia: dataReferencia,
       });
 
       if (seriesError) {
         console.error('[useCrescimentoExtras] series error:', seriesError);
+      }
+
+      // Ponte do período — mesma régua do snapshot, fecha por construção.
+      // Sem periodoInicio (ex.: "todos os dados") não há período para pontear.
+      let bridge: CrescimentoExtras['bridge'] = null;
+      if (dataInicio && dataReferencia) {
+        const { data: bridgeData, error: bridgeError } = await (supabase.rpc as any)('get_mrr_bridge', {
+          p_tenant_id: tid,
+          p_inicio: dataInicio,
+          p_fim: dataReferencia,
+          p_unidade_base_id: unidadeBaseId,
+          p_fornecedor_ids: fornecedorIds,
+        });
+        if (bridgeError) {
+          console.error('[useCrescimentoExtras] bridge error:', bridgeError);
+        } else if (Array.isArray(bridgeData) && bridgeData.length > 0) {
+          const b = bridgeData[0] as any;
+          bridge = {
+            mrrInicio: Number(b.mrr_inicio) || 0,
+            novo: Number(b.novo) || 0,
+            upsell: Number(b.upsell) || 0,
+            crossSell: Number(b.cross_sell) || 0,
+            reativacao: Number(b.reativacao) || 0,
+            reajuste: Number(b.reajuste) || 0,
+            downsell: Number(b.downsell) || 0,
+            churn: Number(b.churn) || 0,
+            netNew: Number(b.net_new) || 0,
+            mrrFim: Number(b.mrr_fim) || 0,
+          };
+        }
       }
 
       const mrrSeries24m = (seriesData as any[] | null ?? []).map((row: any) => ({
@@ -236,6 +302,7 @@ export function useCrescimentoExtras(params: {
         mrrForecast,
         netNewHistorico,
         mrrSeries24m,
+        bridge,
       };
     },
   });
