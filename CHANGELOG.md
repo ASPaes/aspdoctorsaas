@@ -14,6 +14,7 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 30/07
 
+- 🔧 **WhatsApp** — Áudios, imagens e anexos enviados pelos números da Meta às vezes falhavam com "Falha no upload da mídia — tente reenviar", mesmo com o arquivo perfeito: quem entregava a mensagem era a Meta, e para isso ela precisava buscar o arquivo no nosso servidor — quando essa busca falhava, a mensagem se perdia. Agora o arquivo é entregue direto para a Meta antes do envio, então não há mais essa busca para falhar.
 - 🆕 **Onboarding** — As jornadas deixam de ser fixas e passam a ser cadastradas por empresa, em uma aba própria na configuração: dá para renomear, trocar a cor, reordenar e desativar as que não usa. Quem trabalha com uma jornada só deixa apenas ela ativa, e as abas do quadro somem.
 - 🆕 **Onboarding** — Nova jornada de **Acompanhamento**, para acompanhar o uso do cliente depois que o sistema entra no ar. Os indicadores (nº de vendas, faturamento, usuários ativos, o que a empresa quiser) são cadastrados em Configuração > Indicadores e lançados na jornada em qualquer data, com cartões mostrando o último valor e a variação, e a planilha com todo o histórico. Vem desativada — para usar, ative a jornada e marque a seção "Acompanhamento" nas etapas dela.
 - ⬆️ **Onboarding** — Com o Acompanhamento ligado, o go-live registra a entrada no ar sem encerrar a jornada: ela segue viva até o acompanhamento terminar. Sem ele, nada muda — o go-live continua concluindo.

@@ -495,8 +495,98 @@ class ZApiAdapter implements ProviderAdapter {
 
 // ── Meta Cloud Adapter ────────────────────────────────────────────────────────
 
+/**
+ * Teto para carregar a mídia na memória da Edge Function antes de subir para a
+ * Meta. 16 MB é o limite da própria Meta para áudio, imagem e vídeo — acima
+ * disso só documento, que segue pelo link como antes.
+ */
+const META_UPLOAD_MAX_BYTES = 16 * 1024 * 1024;
+
+/** Extensão só para nomear o arquivo no upload — a Meta valida pelo `type`. */
+const META_EXT_BY_MIME: Record<string, string> = {
+  'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/aac': 'aac', 'audio/amr': 'amr',
+  'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
+  'video/mp4': 'mp4', 'video/3gpp': '3gp',
+  'application/pdf': 'pdf',
+};
+
 class MetaCloudAdapter implements ProviderAdapter {
   private readonly graphBase = 'https://graph.facebook.com/v21.0';
+
+  /**
+   * Sobe os bytes para /{phone_number_id}/media e devolve o media_id.
+   *
+   * Enviar mídia por `{ link }` faz a Meta baixar o arquivo do nosso Storage —
+   * a entrega passa a depender do DNS e do fetcher dela. Em 30/07/2026 isso
+   * derrubou 4 envios em uma hora com "131053 · DNS resolution timed out",
+   * todos com o arquivo íntegro no Storage. Com media_id a rede da Meta sai do
+   * caminho crítico.
+   *
+   * Devolve `null` quando não dá para subir — o chamador volta para o link, que
+   * é o comportamento antigo. Nunca pior do que era.
+   */
+  private async uploadMedia(
+    secrets: InstanceSecrets,
+    phoneId: string,
+    msg: SendRequest,
+  ): Promise<string | null> {
+    try {
+      let bytes: Uint8Array | null = null;
+      let mime = msg.mediaMimetype || '';
+
+      if (msg.mediaBase64) {
+        const raw = msg.mediaBase64.startsWith('data:')
+          ? msg.mediaBase64.split(',')[1] || ''
+          : msg.mediaBase64;
+        bytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
+      } else if (msg.mediaUrl) {
+        const res = await fetch(msg.mediaUrl);
+        if (!res.ok) {
+          console.error(`[meta] download da mídia falhou (${res.status}) — envio segue por link`);
+          return null;
+        }
+        const declaredSize = Number(res.headers?.get('content-length') || 0);
+        if (declaredSize > META_UPLOAD_MAX_BYTES) {
+          // Documento vai até 100 MB na Meta; carregar isso aqui estoura a
+          // memória da função e derrubaria um envio que hoje funciona.
+          await res.body?.cancel?.();
+          console.warn(`[meta] mídia de ${declaredSize} bytes acima do teto de upload — envio segue por link`);
+          return null;
+        }
+        bytes = new Uint8Array(await res.arrayBuffer());
+        if (!mime) mime = res.headers?.get('content-type') || '';
+      }
+
+      if (!bytes || bytes.byteLength === 0) return null;
+      if (!mime) mime = 'application/octet-stream';
+
+      const form = new FormData();
+      form.append('messaging_product', 'whatsapp');
+      form.append('type', mime);
+      form.append(
+        'file',
+        new Blob([bytes], { type: mime }),
+        msg.fileName || `file.${META_EXT_BY_MIME[mime] || 'bin'}`,
+      );
+
+      const res = await fetch(`${this.graphBase}/${phoneId}/media`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${secrets.meta_access_token}` },
+        body: form,
+      });
+
+      if (!res.ok) {
+        console.error(`[meta] upload da mídia recusado: ${await res.text()} — envio segue por link`);
+        return null;
+      }
+
+      const data = await res.json();
+      return data?.id || null;
+    } catch (err) {
+      console.error('[meta] upload da mídia falhou — envio segue por link:', err);
+      return null;
+    }
+  }
 
   async checkStatus(secrets: InstanceSecrets, instance: InstanceInfo): Promise<ConnectionStatus> {
     const phoneId = instance.meta_phone_number_id;
@@ -529,7 +619,10 @@ class MetaCloudAdapter implements ProviderAdapter {
       graphBody = { messaging_product: 'whatsapp', to, type: 'text', text: { body: msg.content } };
     } else {
       const mediaType = msg.messageType;
-      const mediaObj: Record<string, unknown> = msg.mediaUrl
+      const mediaId = await this.uploadMedia(secrets, phoneId, msg);
+      const mediaObj: Record<string, unknown> = mediaId
+        ? { id: mediaId }
+        : msg.mediaUrl
         ? { link: msg.mediaUrl }
         : {};
       if (msg.content && mediaType !== 'audio') mediaObj.caption = msg.content;
