@@ -54,8 +54,16 @@ BEGIN
    WHERE p.is_super_admin IS TRUE
      AND COALESCE(v.unidade_ids, '{}') = '{}'
    LIMIT 1;
+  -- Se todos os super admins estiverem com unidade grudada (acontece depois de recarregar
+  -- o banco local com dados de produção), a visão "Todas" é montada aqui mesmo. O teste
+  -- roda dentro de BEGIN/ROLLBACK, então isso não sobrevive à execução.
   IF v_uid IS NULL THEN
-    RAISE EXCEPTION 'FALHOU 4: nenhum super admin com visão "Todas" (user_view_state vazio)';
+    SELECT p.user_id INTO v_uid
+      FROM public.profiles p WHERE p.is_super_admin IS TRUE LIMIT 1;
+    IF v_uid IS NULL THEN
+      RAISE EXCEPTION 'FALHOU 4: nenhum super admin no banco';
+    END IF;
+    UPDATE public.user_view_state SET unidade_ids = '{}' WHERE user_id = v_uid;
   END IF;
   PERFORM set_config('request.jwt.claims',
                      json_build_object('sub', v_uid, 'role', 'authenticated')::text, true);

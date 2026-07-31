@@ -62,9 +62,17 @@ BEGIN
       OR (f.slug IN ('onboarding','implantacao') AND j.fase_atual::text IS DISTINCT FROM f.slug);
   IF v_qtd <> 0 THEN RAISE EXCEPTION 'FALHOU 5: % jornada(s) com current_phase_id incoerente com o enum legado', v_qtd; END IF;
 
-  -- 6. UPDATE legado de fase_atual reflete em current_phase_id
-  SELECT id INTO v_journey FROM public.onboarding_journeys
-   WHERE tenant_id = v_tenant ORDER BY created_at LIMIT 1;
+  -- 6. UPDATE legado de fase_atual reflete em current_phase_id.
+  --    A jornada precisa estar numa fase COM equivalente no enum: quem está em
+  --    acompanhamento tem fase_atual congelado em 'implantacao', e o UPDATE abaixo
+  --    seria um no-op — o trigger não teria mudança nenhuma para sincronizar.
+  SELECT j.id INTO v_journey FROM public.onboarding_journeys j
+    JOIN public.onboarding_phases f ON f.id = j.current_phase_id
+   WHERE j.tenant_id = v_tenant AND f.slug = 'onboarding'
+   ORDER BY j.created_at LIMIT 1;
+  IF v_journey IS NULL THEN
+    RAISE EXCEPTION 'PRE 6: nenhuma jornada viva em onboarding para testar a sincronização';
+  END IF;
 
   UPDATE public.onboarding_journeys SET fase_atual='implantacao' WHERE id = v_journey;
   PERFORM 1 FROM public.onboarding_journeys j
