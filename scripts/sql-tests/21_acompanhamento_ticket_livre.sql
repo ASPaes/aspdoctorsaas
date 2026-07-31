@@ -177,4 +177,103 @@ BEGIN
   RAISE NOTICE 'TASK 2 OK';
 END $$;
 
+DO $$
+DECLARE
+  v_tenant uuid; v_cli_a uuid; v_cli_b uuid; v_tipo_sim uuid; v_tipo_nao uuid;
+  v_tk_a uuid; v_tk_b uuid; v_j_a uuid; v_j_b uuid; v_stage uuid; v_qtd int; v_desc text;
+BEGIN
+  SELECT t.id INTO v_tenant FROM public.tenants t WHERE t.nome = 'Digi Office Sistemas';
+
+  SELECT id INTO v_tipo_sim FROM public.onboarding_training_types
+   WHERE tenant_id = v_tenant ORDER BY position LIMIT 1;
+  SELECT id INTO v_tipo_nao FROM public.onboarding_training_types
+   WHERE tenant_id = v_tenant AND id <> v_tipo_sim ORDER BY position LIMIT 1;
+  IF v_tipo_nao IS NULL THEN RAISE EXCEPTION 'PRE: precisa de 2 tipos de treino'; END IF;
+  UPDATE public.onboarding_training_types SET pede_acompanhamento = (id = v_tipo_sim)
+   WHERE tenant_id = v_tenant;
+
+  SELECT s.id INTO v_stage FROM public.onboarding_stages s
+    JOIN public.onboarding_pipelines p ON p.id = s.pipeline_id
+    JOIN public.onboarding_phases f ON f.id = p.phase_id AND f.slug = 'implantacao'
+   WHERE p.tenant_id = v_tenant AND s.ativo ORDER BY p.position, s.position LIMIT 1;
+  IF v_stage IS NULL THEN RAISE EXCEPTION 'PRE: implantacao sem etapa ativa'; END IF;
+
+  -- dois clientes SEM acompanhamento aberto
+  SELECT c.id INTO v_cli_a FROM public.clientes c
+   WHERE c.tenant_id = v_tenant
+     AND NOT EXISTS (SELECT 1 FROM public.support_tickets tk
+                      WHERE tk.cliente_id = c.id AND tk.is_acompanhamento AND tk.concluido_em IS NULL)
+   ORDER BY c.id LIMIT 1;
+  SELECT c.id INTO v_cli_b FROM public.clientes c
+   WHERE c.tenant_id = v_tenant AND c.id <> v_cli_a
+     AND NOT EXISTS (SELECT 1 FROM public.support_tickets tk
+                      WHERE tk.cliente_id = c.id AND tk.is_acompanhamento AND tk.concluido_em IS NULL)
+   ORDER BY c.id LIMIT 1;
+  IF v_cli_b IS NULL THEN RAISE EXCEPTION 'PRE: faltam clientes sem acompanhamento'; END IF;
+
+  -- ── A: implantacao com treino que PEDE
+  INSERT INTO public.support_tickets (tenant_id, cliente_id, assunto, contexto, canal_origem)
+  VALUES (v_tenant, v_cli_a, 'impl A', 'onboarding', 'whatsapp') RETURNING id INTO v_tk_a;
+  INSERT INTO public.onboarding_journeys
+    (tenant_id, ticket_id, cliente_id, current_stage_id, fase_atual, situacao)
+  VALUES (v_tenant, v_tk_a, v_cli_a, v_stage, 'implantacao', 'em_andamento') RETURNING id INTO v_j_a;
+  INSERT INTO public.onboarding_training_sessions
+    (tenant_id, journey_id, ticket_id, titulo, training_type_id, status)
+  VALUES (v_tenant, v_j_a, v_tk_a, 'Treino PDV', v_tipo_sim, 'realizado');
+
+  UPDATE public.onboarding_journeys SET situacao = 'concluido' WHERE id = v_j_a;
+
+  SELECT count(*) INTO v_qtd FROM public.support_tickets tk
+   WHERE tk.cliente_id = v_cli_a AND tk.is_acompanhamento AND tk.concluido_em IS NULL;
+  IF v_qtd <> 1 THEN RAISE EXCEPTION '3.1: esperava 1 acompanhamento, achei %', v_qtd; END IF;
+
+  SELECT tk.descricao INTO v_desc FROM public.support_tickets tk
+   WHERE tk.cliente_id = v_cli_a AND tk.is_acompanhamento AND tk.concluido_em IS NULL;
+  IF v_desc IS NULL OR v_desc NOT ILIKE '%Treino PDV%' THEN
+    RAISE EXCEPTION '3.1: origem nao cita o treino: %', v_desc;
+  END IF;
+
+  -- ── B: so treino SEM a flag
+  INSERT INTO public.support_tickets (tenant_id, cliente_id, assunto, contexto, canal_origem)
+  VALUES (v_tenant, v_cli_b, 'impl B', 'onboarding', 'whatsapp') RETURNING id INTO v_tk_b;
+  INSERT INTO public.onboarding_journeys
+    (tenant_id, ticket_id, cliente_id, current_stage_id, fase_atual, situacao)
+  VALUES (v_tenant, v_tk_b, v_cli_b, v_stage, 'implantacao', 'em_andamento') RETURNING id INTO v_j_b;
+  INSERT INTO public.onboarding_training_sessions
+    (tenant_id, journey_id, ticket_id, titulo, training_type_id, status)
+  VALUES (v_tenant, v_j_b, v_tk_b, 'Treino Estoque', v_tipo_nao, 'realizado');
+
+  UPDATE public.onboarding_journeys SET situacao = 'concluido' WHERE id = v_j_b;
+  SELECT count(*) INTO v_qtd FROM public.support_tickets tk
+   WHERE tk.cliente_id = v_cli_b AND tk.is_acompanhamento;
+  IF v_qtd <> 0 THEN RAISE EXCEPTION '3.2: treino sem a flag gerou acompanhamento'; END IF;
+
+  -- ── C: treino apenas PREVISTO nao conta
+  UPDATE public.onboarding_journeys SET situacao = 'em_andamento' WHERE id = v_j_b;
+  UPDATE public.onboarding_training_sessions
+     SET training_type_id = v_tipo_sim, status = 'previsto' WHERE journey_id = v_j_b;
+  UPDATE public.onboarding_journeys SET situacao = 'concluido' WHERE id = v_j_b;
+  SELECT count(*) INTO v_qtd FROM public.support_tickets tk
+   WHERE tk.cliente_id = v_cli_b AND tk.is_acompanhamento;
+  IF v_qtd <> 0 THEN RAISE EXCEPTION '3.3: treino previsto gerou acompanhamento'; END IF;
+
+  -- ── D: cancelamento nao gera
+  UPDATE public.onboarding_journeys SET situacao = 'em_andamento' WHERE id = v_j_b;
+  UPDATE public.onboarding_training_sessions SET status = 'realizado' WHERE journey_id = v_j_b;
+  UPDATE public.onboarding_journeys SET situacao = 'cancelado' WHERE id = v_j_b;
+  SELECT count(*) INTO v_qtd FROM public.support_tickets tk
+   WHERE tk.cliente_id = v_cli_b AND tk.is_acompanhamento;
+  IF v_qtd <> 0 THEN RAISE EXCEPTION '3.4: cancelamento gerou acompanhamento'; END IF;
+
+  -- ── E: conclusao ainda no Onboarding nao gera
+  UPDATE public.onboarding_journeys SET situacao = 'em_andamento', fase_atual = 'onboarding'
+   WHERE id = v_j_b;
+  UPDATE public.onboarding_journeys SET situacao = 'concluido' WHERE id = v_j_b;
+  SELECT count(*) INTO v_qtd FROM public.support_tickets tk
+   WHERE tk.cliente_id = v_cli_b AND tk.is_acompanhamento;
+  IF v_qtd <> 0 THEN RAISE EXCEPTION '3.5: conclusao no onboarding gerou acompanhamento'; END IF;
+
+  RAISE NOTICE 'TASK 3 OK';
+END $$;
+
 ROLLBACK;
