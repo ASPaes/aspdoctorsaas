@@ -985,6 +985,106 @@ async function ensureWaitingAttendanceForOutOfHours(
   }
 }
 
+/** Avisos de fora do horário que ainda saem no texto escrito pelo tenant. */
+export const OFF_HOURS_TEMPLATE_LIMIT = 2;
+
+/**
+ * Decide se o aviso de fora do horário sai do template do tenant ou da IA.
+ *
+ * O template é o padrão — é o texto que o admin escreveu na tela e costuma
+ * carregar informação que a IA não tem (plantão, sábado, telefone alternativo).
+ * A IA só entra quando repetir o mesmo bloco vira ruído: cliente que insiste
+ * depois do 2º aviso recebe uma variação, não a mesma parede de texto.
+ */
+export function decideOffHoursMessageMode(params: {
+  hasTemplate: boolean;
+  hasAI: boolean;
+  isHoliday: boolean;
+  previousNoticeCount: number;
+}): 'template' | 'ai' {
+  const { hasTemplate, hasAI, isHoliday } = params;
+  if (!hasAI) return 'template';
+  // Feriado tem texto próprio: o template do tenant fala de horário comercial e
+  // ficaria errado ("atendemos das 09:00 às 18:00" num dia em que não se atende).
+  if (isHoliday) return 'ai';
+  if (!hasTemplate) return 'ai';
+  const count = Number.isFinite(params.previousNoticeCount) ? params.previousNoticeCount : 0;
+  return count >= OFF_HOURS_TEMPLATE_LIMIT ? 'ai' : 'template';
+}
+
+/** Piso da janela de contagem: um dia. Cobre a noite inteira e zera no dia seguinte. */
+const OFF_HOURS_NOTICE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A partir de quando os avisos anteriores contam.
+ *
+ * Marco natural é a última vez que a conversa voltou para dentro do expediente
+ * (`out_of_hours_cleared_at`); sem isso, quando ela entrou fora do horário.
+ * As duas marcas envelhecem — `opened_out_of_hours_at` só é reescrito quando a
+ * conversa fecha e reabre —, então nada conta além de 24h atrás.
+ */
+export function offHoursNoticeWindowStart(
+  conv: { opened_out_of_hours_at?: string | null; out_of_hours_cleared_at?: string | null },
+  now: Date,
+): Date {
+  const marks = [conv?.out_of_hours_cleared_at, conv?.opened_out_of_hours_at]
+    .filter(Boolean)
+    .map((d) => new Date(d as string).getTime())
+    .filter((t) => Number.isFinite(t));
+  return new Date(Math.max(now.getTime() - OFF_HOURS_NOTICE_WINDOW_MS, ...marks));
+}
+
+/** Texto usado quando o tenant não escreveu nenhuma mensagem. */
+export const OFF_HOURS_DEFAULT_TEMPLATE =
+  'Olá! \u{1F44B} Nosso horário é das {{start}} às {{end}}. Retornamos às {{next_start}}!';
+
+/**
+ * Troca os placeholders do template pelo horário do dia em que a mensagem chegou.
+ *
+ * Atenção: `slot1_*` e `slot2_*` são os turnos de HOJE, não a semana. Num sábado
+ * com janela diferente, um texto que diz "de segunda a sexta, das {{slot1_start}}"
+ * exibe o horário do sábado. Quem quiser falar da semana escreve o horário fixo.
+ */
+export function renderOffHoursTemplate(
+  template: string,
+  vars: { firstStart: string; lastEnd: string; nextStart: string; slots: { start: string; end: string }[] },
+): string {
+  const { firstStart, lastEnd, nextStart, slots } = vars;
+  return template
+    .replace(/\{\{start\}\}/g, firstStart)
+    .replace(/\{\{end\}\}/g, lastEnd)
+    .replace(/\{\{next_start\}\}/g, nextStart)
+    .replace(/\{\{slot1_start\}\}/g, slots[0]?.start || firstStart)
+    .replace(/\{\{slot1_end\}\}/g, slots[0]?.end || '')
+    .replace(/\{\{slot2_start\}\}/g, slots[1]?.start || '')
+    .replace(/\{\{slot2_end\}\}/g, slots[1]?.end || lastEnd);
+}
+
+/** Quantos avisos de fora do horário já saíram na janela atual. */
+async function countOffHoursNotices(supabase: any, conversationId: string, tenantId: string): Promise<number> {
+  try {
+    const { data: conv } = await supabase
+      .from('whatsapp_conversations')
+      .select('opened_out_of_hours_at, out_of_hours_cleared_at')
+      .eq('id', conversationId)
+      .single();
+    const since = offHoursNoticeWindowStart(conv || {}, new Date());
+    const { count } = await supabase
+      .from('whatsapp_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('conversation_id', conversationId)
+      .eq('tenant_id', tenantId)
+      .eq('is_from_me', true)
+      .gte('created_at', since.toISOString())
+      .contains('metadata', { outside_hours: true });
+    return count || 0;
+  } catch (err) {
+    // Falha na contagem não pode calar o aviso: sem número, trata como 1º envio.
+    console.error('[processor] countOffHoursNotices error:', err);
+    return 0;
+  }
+}
+
 async function sendBusinessHoursMessage(
   supabase: any,
   ctx: SendContext,
@@ -997,18 +1097,6 @@ async function sendBusinessHoursMessage(
   closedDates: Set<string>,
   holidayException: { name: string | null; is_closed: boolean } | null,
 ): Promise<void> {
-    // Se o setor tem mensagem customizada, usar direto (sem IA).
-    // A mensagem do setor é intencional — o admin escreveu manualmente.
-    const deptCustomMessage = supportConfig.business_hours_message;
-    if (deptCustomMessage && deptCustomMessage.includes('{{') === false && supportConfig._from_department === true) {
-      await sendAndPersistAutoMessage(supabase, ctx, conversationId, deptCustomMessage, {
-        business_hours: true,
-        outside_hours: true,
-        department_message: true,
-      });
-      return;
-    }
-
   try {
     const isHolidayToday = !!(holidayException && holidayException.is_closed);
     const context = resolveOutsideHoursContext(msgDate, tz, businessHours, closedDates, isHolidayToday);
@@ -1030,8 +1118,24 @@ async function sendBusinessHoursMessage(
     else if (context.period === 'after_close') contextHint = `O cliente escreveu às ${context.currentTime}, após encerramento. Retornamos ${nextWhen}.`;
     else if (context.period === 'weekend') contextHint = `O cliente escreveu num dia sem atendimento. Retornamos ${nextWhen}.`;
 
+    const rawTemplate = typeof supportConfig.business_hours_message === 'string'
+      ? supportConfig.business_hours_message.trim()
+      : '';
+    const hasTemplate = rawTemplate.length > 0;
+    const fromDepartment = supportConfig._from_department === true;
+    const previousNoticeCount = hasTemplate && !isHolidayToday
+      ? await countOffHoursNotices(supabase, conversationId, tenantId)
+      : 0;
+
+    // A IA só é consultada quando pode de fato assumir o texto: a 1ª chamada
+    // pergunta "a IA seria candidata?" e evita um read + decrypt no Vault a cada
+    // aviso que já sairia do template. A regra mora num lugar só.
+    const aiIsCandidate = decideOffHoursMessageMode({
+      hasTemplate, hasAI: true, isHoliday: isHolidayToday, previousNoticeCount,
+    }) === 'ai';
+
     try {
-      const aiCfg = await getAIConfig(tenantId, supabase);
+      const aiCfg = aiIsCandidate ? await getAIConfig(tenantId, supabase) : null;
       if (aiCfg) {
         const basePromptDefault = context.period === 'holiday'
           ? `Você é um atendente virtual. Escreva uma mensagem CURTA (máximo 3 linhas) em português, amigável e variada, informando que hoje é feriado (${holidayName}) e que retornamos ${nextWhen}. Não dê detalhes sobre o feriado.`
@@ -1049,6 +1153,8 @@ async function sendBusinessHoursMessage(
             business_hours: true,
             outside_hours: true,
             ai_generated: true,
+            notice_index: previousNoticeCount + 1,
+            ...(hasTemplate && !isHolidayToday ? { ai_reason: 'repeticao' } : {}),
             ...(isHolidayToday ? { holiday: true, holiday_name: holidayName } : {}),
           });
           return;
@@ -1058,21 +1164,15 @@ async function sendBusinessHoursMessage(
 
     const message = isHolidayToday
       ? `${greeting}! \u{1F4C5} Hoje é feriado (${holidayName}) e nosso atendimento está pausado.\nRetornamos ${nextWhen}. Sua mensagem foi registrada e responderemos assim que voltarmos. \u{1F64F}`
-      : (() => {
-          const template = supportConfig.business_hours_message || 'Olá! \u{1F44B} Nosso horário é das {{start}} às {{end}}. Retornamos às {{next_start}}!';
-          return template
-            .replace(/\{\{start\}\}/g, firstStart)
-            .replace(/\{\{end\}\}/g, lastEnd)
-            .replace(/\{\{next_start\}\}/g, nextStart)
-            .replace(/\{\{slot1_start\}\}/g, slots[0]?.start || firstStart)
-            .replace(/\{\{slot1_end\}\}/g, slots[0]?.end || '')
-            .replace(/\{\{slot2_start\}\}/g, slots[1]?.start || '')
-            .replace(/\{\{slot2_end\}\}/g, slots[1]?.end || lastEnd);
-        })();
+      : renderOffHoursTemplate(hasTemplate ? rawTemplate : OFF_HOURS_DEFAULT_TEMPLATE, {
+          firstStart, lastEnd, nextStart, slots,
+        });
 
     await sendAndPersistAutoMessage(supabase, ctx, conversationId, message, {
       business_hours: true,
       outside_hours: true,
+      notice_index: previousNoticeCount + 1,
+      ...(fromDepartment && hasTemplate ? { department_message: true } : {}),
       ...(isHolidayToday ? { holiday: true, holiday_name: holidayName } : {}),
     });
   } catch (err) { console.error('[processor] Error in sendBusinessHoursMessage:', err); }
