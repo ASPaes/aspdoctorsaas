@@ -25,8 +25,9 @@ import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
   Tag as TagIcon, X, ListChecks, Trash2, ChevronDown, Building2, MessageSquare, UserPlus, Rocket,
-  Check, Lock, RefreshCw,
+  Check, Lock, RefreshCw, TrendingUp,
 } from "lucide-react";
+import AcompanhamentoSection from "@/pages/onboarding/AcompanhamentoSection";
 
 
 const PRIORIDADES_STRIP = [
@@ -1294,6 +1295,24 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           </div>
         );
       })()}
+
+      {/* Acompanhamento de uso — só no ticket que nasceu para isso */}
+      {ticket?.is_acompanhamento && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+            <Label className="text-xs font-medium">Acompanhamento de uso</Label>
+          </div>
+          <p className="text-[10px] text-muted-foreground -mt-1">
+            Os números do cliente ao longo do tempo — é isso que diz se ele destravou.
+          </p>
+          <AcompanhamentoSection
+            ticketId={ticket.id}
+            tenantId={ticket.tenant_id}
+            readOnly={!!ticket.concluido_em}
+          />
+        </div>
+      )}
 
       {/* Checklist */}
       <div className="space-y-2">
