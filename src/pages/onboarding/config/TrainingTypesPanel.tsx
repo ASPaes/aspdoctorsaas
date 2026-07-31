@@ -20,16 +20,19 @@ interface TrainingType {
   id: string;
   nome: string;
   conta_como_pdv: boolean;
+  /** Treino deste tipo, concluído, abre o ticket de acompanhamento no fim da implantação. */
+  pede_acompanhamento: boolean;
   ativo: boolean;
   position: number;
 }
 
 function SortableRow({
-  item, onToggleAtivo, onTogglePdv, onRename, onDelete,
+  item, onToggleAtivo, onTogglePdv, onToggleAcomp, onRename, onDelete,
 }: {
   item: TrainingType;
   onToggleAtivo: (id: string, v: boolean) => void;
   onTogglePdv: (id: string, v: boolean) => void;
+  onToggleAcomp: (id: string, v: boolean) => void;
   onRename: (id: string, nome: string) => void;
   onDelete: (id: string) => void;
 }) {
@@ -65,11 +68,21 @@ function SortableRow({
           {item.conta_como_pdv && (
             <Badge variant="outline" className="ml-2 text-[9px] border-[hsl(142_71%_45%)] text-[hsl(142_71%_45%)]">PDV</Badge>
           )}
+          {item.pede_acompanhamento && (
+            <Badge variant="outline" className="ml-1.5 text-[9px] border-[hsl(199_89%_48%)] text-[hsl(199_89%_48%)]">ACOMP</Badge>
+          )}
         </button>
       )}
       <div className="flex items-center gap-1.5 text-xs">
-        <span className="text-muted-foreground">Conta PDV</span>
+        <span className="text-muted-foreground whitespace-nowrap">Conta PDV</span>
         <Switch checked={item.conta_como_pdv} onCheckedChange={(v) => onTogglePdv(item.id, v)} />
+      </div>
+      <div
+        className="flex items-center gap-1.5 text-xs"
+        title="Ao encerrar a implantação, um treino concluído deste tipo abre o ticket de acompanhamento de uso do cliente."
+      >
+        <span className="text-muted-foreground whitespace-nowrap">Acompanhamento</span>
+        <Switch checked={item.pede_acompanhamento} onCheckedChange={(v) => onToggleAcomp(item.id, v)} />
       </div>
       <div className="flex items-center gap-1.5 text-xs">
         <span className="text-muted-foreground">Ativo</span>
@@ -96,7 +109,7 @@ export function TrainingTypesPanel() {
     enabled: !!effectiveTenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_training_types" as any) as any)
-        .select("id, nome, conta_como_pdv, ativo, position")
+        .select("id, nome, conta_como_pdv, pede_acompanhamento, ativo, position")
         .eq("tenant_id", effectiveTenantId)
         .order("position");
       if (error) throw error;
@@ -113,6 +126,7 @@ export function TrainingTypesPanel() {
         tenant_id: effectiveTenantId,
         nome: novo.trim(),
         conta_como_pdv: novoPdv,
+        pede_acompanhamento: false,
         ativo: true,
         position: maxPos + 1,
       });
@@ -149,6 +163,13 @@ export function TrainingTypesPanel() {
     else qc.invalidateQueries({ queryKey: ["onb-training-types"] });
   }
 
+  async function handleToggleAcomp(id: string, pede_acompanhamento: boolean) {
+    const { error } = await (supabase.from("onboarding_training_types" as any) as any)
+      .update({ pede_acompanhamento }).eq("id", id).eq("tenant_id", effectiveTenantId);
+    if (error) toast.error(error.message);
+    else qc.invalidateQueries({ queryKey: ["onb-training-types"] });
+  }
+
   async function handleDelete(id: string) {
     if (!confirm("Remover este tipo de treino?")) return;
     const { error } = await (supabase.from("onboarding_training_types" as any) as any)
@@ -177,7 +198,7 @@ export function TrainingTypesPanel() {
   }
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="max-w-3xl space-y-4">
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           <Input
@@ -194,7 +215,11 @@ export function TrainingTypesPanel() {
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-1" /> Adicionar</>}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">Digite o nome e clique em Adicionar (ou tecle Enter).</p>
+        <p className="text-xs text-muted-foreground">
+          Digite o nome e clique em Adicionar (ou tecle Enter). <strong>Acompanhamento</strong>: ao
+          encerrar a implantação, um treino concluído deste tipo abre o ticket de acompanhamento de
+          uso do cliente.
+        </p>
       </div>
 
       {isLoading ? (
@@ -213,6 +238,7 @@ export function TrainingTypesPanel() {
                   item={it}
                   onToggleAtivo={handleToggleAtivo}
                   onTogglePdv={handleTogglePdv}
+                  onToggleAcomp={handleToggleAcomp}
                   onRename={handleRename}
                   onDelete={handleDelete}
                 />
