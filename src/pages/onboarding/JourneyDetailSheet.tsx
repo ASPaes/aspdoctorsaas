@@ -24,8 +24,9 @@ import {
   UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle, Ban, Building2,
   ExternalLink, Link2,
   Sparkles, Rocket, StickyNote, Undo2, XCircle, Tag,
-  Check, ChevronDown,
+  Check, ChevronDown, Pencil,
 } from "lucide-react";
+import EditTrainingDialog, { type EditableTraining } from "./EditTrainingDialog";
 import { useOnboardingParticipantRoles } from "@/hooks/useOnboardingParticipantRoles";
 import { TransferResponsavelDialog } from "./TransferResponsavelDialog";
 import { ResponsavelHistorico } from "./ResponsavelHistorico";
@@ -349,6 +350,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [quickTagColor, setQuickTagColor] = useState("#0ea5e9");
   const [creatingTag, setCreatingTag] = useState(false);
   const [secOpen, setSecOpen] = useState<Record<string, boolean>>({ treinos: true, modulos: true, anexos: true, atendimentos: true });
+  const [editTraining, setEditTraining] = useState<EditableTraining | null>(null);
   const toggleSec = (k: string) => setSecOpen((s) => ({ ...s, [k]: !s[k] }));
   // Colapso por grupo do checklist da etapa (default: aberto).
   const [checklistCollapsed, setChecklistCollapsed] = useState<Record<string, boolean>>({});
@@ -622,8 +624,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journeyId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_training_sessions" as any) as any)
-        .select("id, titulo, status, agendado_para, realizado_em, tentativas, no_show, proprietario_presente, is_retreinamento, conduzido_por, ticket_id, link_agendamento")
+        .select("id, titulo, status, agendado_para, realizado_em, tentativas, no_show, proprietario_presente, is_retreinamento, conduzido_por, ticket_id, link_agendamento, training_type_id, ticket:ticket_id(ticket_code, sub_seq)")
         .eq("journey_id", journeyId)
+        .is("deleted_at", null)
         .order("agendado_para", { ascending: true, nullsFirst: false });
       if (error) throw error;
       return (data ?? []) as Array<any>;
@@ -2193,6 +2196,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                               const isCancelled = t.status === "cancelado";
                               return (
                                 <div key={t.id} className="rounded-md border border-border p-2.5">
+                                  {t.ticket?.ticket_code && (
+                                    <div className="font-mono text-[10px] text-primary font-semibold mb-1">
+                                      {t.ticket.ticket_code}
+                                    </div>
+                                  )}
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="text-xs font-medium truncate">{t.titulo}</span>
                                     <Badge
@@ -2238,6 +2246,19 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                   )}
                                   {!isCancelled && (
                                     <div className="flex items-center gap-1 mt-2 flex-wrap">
+                                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
+                                        onClick={() => setEditTraining({
+                                          id: t.id,
+                                          titulo: t.titulo,
+                                          training_type_id: t.training_type_id ?? null,
+                                          conduzido_por: t.conduzido_por ?? null,
+                                          agendado_para: t.agendado_para ?? null,
+                                          link_agendamento: t.link_agendamento ?? null,
+                                          status: t.status,
+                                          ticket_code: t.ticket?.ticket_code ?? null,
+                                        })}>
+                                        <Pencil className="h-3 w-3 mr-1" /> Editar
+                                      </Button>
                                       {!isDone && (
                                         <>
                                           <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
@@ -3283,6 +3304,21 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         }}
       />
     )}
+
+    <EditTrainingDialog
+      open={!!editTraining}
+      onOpenChange={(v) => { if (!v) setEditTraining(null); }}
+      training={editTraining}
+      tipos={trainingTypesQ.data ?? []}
+      membros={(tenantMembersQ.data ?? []).map((u: any) => ({ user_id: u.user_id, nome: u.nome }))}
+      onSaved={() => {
+        qc.invalidateQueries({ queryKey: ["onboarding-training", journeyId] });
+        qc.invalidateQueries({ queryKey: ["onboarding-training-cards"] });
+        qc.invalidateQueries({ queryKey: ["onboarding-board-trainings"] });
+        qc.invalidateQueries({ queryKey: ["onboarding-participants"] });
+        qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+      }}
+    />
     </>
 
   );

@@ -236,6 +236,34 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     },
   });
 
+  /** Sub-tickets de treinamento deste ticket. O pai reflete o andamento dos filhos e
+   *  não pode ser encerrado enquanto algum estiver em aberto. */
+  const { data: trainingChildren = [] } = useQuery({
+    queryKey: ["ticket_training_children", ticketId],
+    enabled: !!ticketId && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("vw_onboarding_training_cards" as any) as any)
+        .select("training_id, ticket_id, ticket_code, sub_seq, titulo, status, agendado_para, realizado_em, conduzido_por_nome, training_type_nome, tentativas")
+        .eq("parent_ticket_id", ticketId)
+        .order("sub_seq");
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
+  const treinoResumo = useMemo(() => {
+    const validos = trainingChildren.filter((t: any) => t.status !== "cancelado");
+    const feitos = validos.filter((t: any) => t.status === "realizado").length;
+    const emAberto = validos.filter((t: any) => t.status !== "realizado");
+    return {
+      total: validos.length,
+      feitos,
+      cancelados: trainingChildren.length - validos.length,
+      emAberto,
+      pct: validos.length > 0 ? Math.round((feitos / validos.length) * 100) : 0,
+    };
+  }, [trainingChildren]);
+
   const { data: ticketTags = [], refetch: refetchTags } = useQuery({
     queryKey: ["ticket_tags_assigned", ticketId],
     enabled: !!ticketId && open,
@@ -1855,23 +1883,39 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                           <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
                           Aberto
                         </div>
-                        {terminalStatus && (
-                          <button
-                            onClick={() => {
-                              const respUid = ticket?.responsavel_user_id ?? null;
-                              if (!isAdminOrHead && respUid && respUid !== currentUserId) {
-                                setCloseTargetStatusId(terminalStatus.id);
-                                setCloseConfirmOpen(true);
-                              } else {
-                                handleFieldUpdate({ status_id: terminalStatus.id });
-                              }
-                            }}
-                            disabled={updating}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
-                          >
-                            <Check className="h-3.5 w-3.5" /> Encerrar
-                          </button>
-                        )}
+                        {terminalStatus && (() => {
+                          // O banco barra de qualquer jeito (trg_block_close_with_open_trainings);
+                          // aqui o operador vê o motivo antes de tentar.
+                          const travado = treinoResumo.emAberto.length > 0;
+                          return (
+                            <button
+                              onClick={() => {
+                                if (travado) {
+                                  toast.error(
+                                    `Encerre antes os treinamentos em aberto: ${treinoResumo.emAberto.map((t: any) => t.ticket_code).join(", ")}`,
+                                  );
+                                  return;
+                                }
+                                const respUid = ticket?.responsavel_user_id ?? null;
+                                if (!isAdminOrHead && respUid && respUid !== currentUserId) {
+                                  setCloseTargetStatusId(terminalStatus.id);
+                                  setCloseConfirmOpen(true);
+                                } else {
+                                  handleFieldUpdate({ status_id: terminalStatus.id });
+                                }
+                              }}
+                              disabled={updating}
+                              title={travado ? `${treinoResumo.emAberto.length} sub-ticket(s) de treinamento em aberto` : undefined}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                                travado
+                                  ? "bg-muted text-muted-foreground border-border cursor-not-allowed"
+                                  : "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
+                              }`}
+                            >
+                              {travado ? <Lock className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />} Encerrar
+                            </button>
+                          );
+                        })()}
                       </>
                     ) : (
                       <>
@@ -2179,7 +2223,72 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                     </div>
                   )}
 
-                  {children.length > 0 && (
+                  {trainingChildren.length > 0 && (
+                    <div className="space-y-1.5 pt-2">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[10px] uppercase text-muted-foreground">Andamento dos treinamentos</p>
+                        <span className="ml-auto text-xs font-semibold">{treinoResumo.feitos} / {treinoResumo.total}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${treinoResumo.pct}%` }} />
+                      </div>
+                      <div className="divide-y divide-border">
+                        {trainingChildren.map((t: any) => {
+                          const feito = t.status === "realizado";
+                          const cancelado = t.status === "cancelado";
+                          return (
+                            <button
+                              key={t.training_id}
+                              onClick={() => {
+                                onOpenChange(false);
+                                setTimeout(() => {
+                                  window.dispatchEvent(new CustomEvent("open-ticket-detail", { detail: { ticketId: t.ticket_id } }));
+                                }, 300);
+                              }}
+                              className={`w-full text-left flex items-center gap-2 py-2 hover:opacity-80 transition-opacity ${cancelado ? "opacity-50" : ""}`}
+                            >
+                              <span
+                                className="h-4 w-4 rounded-full shrink-0 grid place-items-center text-[9px] font-bold text-white"
+                                style={{ background: feito ? "#22C55E" : cancelado ? "#EF4444" : "#0EA5E9" }}
+                              >
+                                {feito ? "✓" : cancelado ? "✕" : "●"}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-mono text-[11px] font-semibold">{t.ticket_code}</div>
+                                <div className={`text-xs truncate ${cancelado ? "line-through" : ""}`}>{t.titulo}</div>
+                                <div className="text-[10px] text-muted-foreground truncate">
+                                  {feito
+                                    ? `Concluído${t.realizado_em ? " · " + new Date(t.realizado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}`
+                                    : cancelado
+                                      ? "Cancelado"
+                                      : t.agendado_para
+                                        ? `Agendado · ${new Date(t.agendado_para).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`
+                                        : "Sem data"}
+                                </div>
+                              </div>
+                              {t.conduzido_por_nome && (
+                                <span className="text-[10px] text-muted-foreground shrink-0">{t.conduzido_por_nome}</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {treinoResumo.emAberto.length > 0 && (
+                        <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5">
+                          <Lock className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-semibold">Conclusão bloqueada</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {treinoResumo.emAberto.length === 1 ? "1 sub-ticket ainda em aberto" : `${treinoResumo.emAberto.length} sub-tickets ainda em aberto`}
+                              : {treinoResumo.emAberto.map((t: any) => t.ticket_code).join(", ")}.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {children.length > 0 && trainingChildren.length === 0 && (
                     <div className="space-y-1 pt-2">
                       <p className="text-[10px] uppercase text-muted-foreground">Tickets filhos ({children.length})</p>
                       <div className="space-y-1">

@@ -220,6 +220,20 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
       ),
   });
 
+  /** Na Implantação quem anda pelas etapas é o sub-ticket de treinamento, não a jornada.
+   *  O histórico dele vive em tabela própria — ver a migration 20260731170000. */
+  const trainingHistoryQ = useQuery({
+    queryKey: ["onb-sla-training-stage-history", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () =>
+      fetchAllRows<{ journey_id: string; stage_id: string; duracao_minutos: number | null; duracao_util_minutos: number | null }>(() =>
+        (supabase.from("onboarding_training_stage_history" as any) as any)
+          .select("journey_id, stage_id, duracao_minutos, duracao_util_minutos")
+          .eq("tenant_id", tenantId!)
+          .not("duracao_minutos", "is", null),
+      ),
+  });
+
   const pipeMap = useMemo(() => new Map((pipelinesQ.data ?? []).map((p) => [p.id, p])), [pipelinesQ.data]);
 
   const stageMap = useMemo(() => new Map((stagesQ.data ?? []).map((s) => [s.id, s])), [stagesQ.data]);
@@ -375,7 +389,9 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
   const etapaAgg = useMemo(() => {
     const allowed = new Set(journeys.map((j) => j.journey_id));
     const m = new Map<string, { count: number; sumC: number; sumE: number }>();
-    (historyQ.data ?? []).forEach((h) => {
+    // Etapa de Implantação só recebe movimento de treino; as demais, só de jornada.
+    // Concatenar não duplica nada.
+    [...(historyQ.data ?? []), ...(trainingHistoryQ.data ?? [])].forEach((h) => {
       if (!allowed.has(h.journey_id)) return;
       const st = stageMap.get(h.stage_id);
       if (!st || !st.sla_minutos || st.sla_minutos <= 0) return;
@@ -406,7 +422,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
         };
       })
       .sort((a, b) => a.pipePos - b.pipePos || a.stagePos - b.stagePos);
-  }, [journeys, historyQ.data, stageMap, pipeMap]);
+  }, [journeys, historyQ.data, trainingHistoryQ.data, stageMap, pipeMap]);
 
   return (
     <>

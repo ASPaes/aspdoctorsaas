@@ -14,11 +14,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
-import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2, Ban, X, Search, GraduationCap, Tag, ChevronDown } from "lucide-react";
+import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2, Ban, X, Search, GraduationCap, Tag, ChevronDown, LayoutList } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { NewJourneyModal } from "./NewJourneyModal";
 import JourneyDetailSheet from "./JourneyDetailSheet";
+import ImplantacaoBoard, { type TrainingCardRow, type JornadaSemTreino } from "./ImplantacaoBoard";
 
 interface StageRow {
   id: string;
@@ -99,7 +100,7 @@ function formatDate(iso: string | null): string {
 }
 
 // cor de texto legível sobre a cor da tag
-function readableOn(hex: string): string {
+export function readableOn(hex: string): string {
   const h = (hex || "").replace("#", "");
   if (h.length < 6) return "#ffffff";
   const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
@@ -107,7 +108,7 @@ function readableOn(hex: string): string {
   return lum > 0.6 ? "#111827" : "#ffffff";
 }
 
-function formatTrainingDateTime(iso: string | null): string {
+export function formatTrainingDateTime(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   const dia = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -116,7 +117,7 @@ function formatTrainingDateTime(iso: string | null): string {
 }
 
 // treino hoje ou atrasado (America/Sao_Paulo, UTC-3 fixo) => sinaliza com pulse
-function isTrainingUrgent(iso: string | null): boolean {
+export function isTrainingUrgent(iso: string | null): boolean {
   if (!iso) return false;
   return new Date(iso).getTime() <= Date.now() + 24 * 60 * 60 * 1000;
 }
@@ -140,6 +141,7 @@ export default function OnboardingPage() {
   const [filtroSemaforo, setFiltroSemaforo] = useState<string>("todos");
   const [filtroSituacao, setFiltroSituacao] = useState<string>("todos");
   const [filtroTags, setFiltroTags] = useState<string[]>([]);
+  const [filtroTipoTreino, setFiltroTipoTreino] = useState<string>("todos");
   const [periodoEntrada, setPeriodoEntrada] = useState<{ from: Date; to: Date } | null>(null);
 
   // A jornada selecionada e a próxima ativa depois dela (para a coluna de conclusão)
@@ -289,6 +291,65 @@ export default function OnboardingPage() {
 
   const trainingByJourney = trainingsQuery.data ?? {};
 
+  /** Na Implantação o cartão é o sub-ticket de treinamento, não a jornada: cada treino
+   *  tem seu responsável e anda pelas etapas no seu ritmo. Um botão devolve a visão
+   *  consolidada por ticket pai. */
+  const isImplantacao = phaseAtual?.slug === "implantacao";
+  const [agrupadoPorTicket, setAgrupadoPorTicket] = useState(false);
+
+  const trainingCardsQuery = useQuery({
+    queryKey: ["onboarding-training-cards", effectiveTenantId, viewKey],
+    enabled: canAccess && !!effectiveTenantId && isImplantacao && unidadeFilterReady,
+    queryFn: async () => {
+      const rows = await fetchAllRows<TrainingCardRow>(() => {
+        let q = (supabase.from("vw_onboarding_training_cards" as any) as any)
+          .select("*")
+          .eq("tenant_id", effectiveTenantId);
+        if (selectedUnidadeIds.length > 0) q = q.in("cliente_unidade_id", selectedUnidadeIds);
+        return q;
+      });
+      return rows;
+    },
+  });
+
+  const trainingCards = trainingCardsQuery.data ?? [];
+
+  const trainingCardsFiltrados = useMemo(() => {
+    if (!isImplantacao) return [] as TrainingCardRow[];
+    const termo = busca.trim().toLowerCase();
+    const stageIds = new Set(stages.map((s) => s.id));
+    return trainingCards.filter((t) => {
+      // Cancelado não ocupa coluna (o quadro descarta quem não tem etapa), mas continua
+      // visível na visão agrupada — é lá que o gestor enxerga o que foi descartado.
+      if (t.status !== "cancelado" && (!t.current_stage_id || !stageIds.has(t.current_stage_id))) return false;
+      if (filtroSituacao === "todos") {
+        if (t.journey_situacao === "concluido" || t.journey_situacao === "cancelado") return false;
+      } else if (filtroSituacao === "em_andamento") {
+        if (t.journey_situacao && t.journey_situacao !== "em_andamento" && t.journey_situacao !== "aberto") return false;
+      } else if (t.journey_situacao !== filtroSituacao) return false;
+
+      if (filtroResponsavel !== "todos" && t.conduzido_por !== filtroResponsavel) return false;
+      if (filtroTipoTreino !== "todos" && t.training_type_id !== filtroTipoTreino) return false;
+      if (termo) {
+        const hay = [t.cliente_nome, t.ticket_code, t.parent_ticket_code, t.titulo, t.conduzido_por_nome]
+          .filter(Boolean).join(" ").toLowerCase();
+        if (!hay.includes(termo)) return false;
+      }
+      return true;
+    });
+  }, [isImplantacao, trainingCards, stages, busca, filtroResponsavel, filtroSituacao, filtroTipoTreino]);
+
+  const opcoesTipoTreino = useMemo(() => {
+    const seen = new Map<string, string>();
+    trainingCards.forEach((t) => {
+      if (t.training_type_id && !seen.has(t.training_type_id)) {
+        seen.set(t.training_type_id, t.training_type_nome || "—");
+      }
+    });
+    return Array.from(seen.entries()).map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [trainingCards]);
+
   // Tags de controle por jornada (exclusivas de onboarding/implantação).
   const journeyTagsQuery = useQuery({
     queryKey: ["onboarding-journeys-tags", effectiveTenantId],
@@ -353,15 +414,27 @@ export default function OnboardingPage() {
   });
   const phasesByJourney = journeyPhasesQuery.data ?? {};
 
+  /** Na Implantação quem importa é quem CONDUZ o treinamento, não o responsável da
+   *  jornada — era exatamente esse o furo: um especialista com seis treinamentos
+   *  marcados não se achava no filtro porque a jornada tinha outro dono. */
   const opcoesResponsavel = useMemo(() => {
     const seen = new Map<string, string>();
+    if (isImplantacao) {
+      trainingCards.forEach((t) => {
+        if (t.conduzido_por && !seen.has(t.conduzido_por)) {
+          seen.set(t.conduzido_por, t.conduzido_por_nome || "—");
+        }
+      });
+    }
     journeys.forEach((j) => {
       if (j.responsavel_user_id && !seen.has(j.responsavel_user_id)) {
         seen.set(j.responsavel_user_id, j.responsavel_nome || "—");
       }
     });
-    return Array.from(seen.entries()).map(([id, nome]) => ({ id, nome }));
-  }, [journeys]);
+    return Array.from(seen.entries())
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [journeys, trainingCards, isImplantacao]);
 
   const opcoesDemanda = useMemo(() => {
     const seen = new Map<string, string>();
@@ -405,6 +478,27 @@ export default function OnboardingPage() {
     });
   }, [journeys, busca, filtroResponsavel, filtroDemanda, filtroSemaforo, filtroSituacao, periodoEntrada, filtroTags, tagsByJourney]);
 
+  /** Jornada que já entrou na Implantação e ainda não tem treinamento nenhum.
+   *  Sem isto ela sumiria do quadro ao trocar cartão de jornada por cartão de treino. */
+  const jornadasSemTreino = useMemo<JornadaSemTreino[]>(() => {
+    if (!isImplantacao) return [];
+    const comTreino = new Set(trainingCards.map((t) => t.journey_id));
+    const stageIds = new Set(stages.map((s) => s.id));
+    return journeysFiltradas
+      .filter((j) => !comTreino.has(j.journey_id))
+      .filter((j) => !!j.current_stage_id && stageIds.has(j.current_stage_id))
+      .filter((j) => (filtroSituacao === "todos" ? j.situacao !== "concluido" && j.situacao !== "cancelado" : true))
+      .map((j) => ({
+        journey_id: j.journey_id,
+        ticket_code: j.ticket_code,
+        cliente_nome: j.cliente_nome ?? null,
+        current_stage_id: j.current_stage_id,
+        responsavel_nome: j.responsavel_nome ?? null,
+        demand_type_nome: j.demand_type_nome ?? null,
+        demand_type_cor: j.demand_type_cor ?? null,
+      }));
+  }, [isImplantacao, trainingCards, journeysFiltradas, stages, filtroSituacao]);
+
   function limparFiltros() {
     setBusca("");
     setFiltroResponsavel("todos");
@@ -412,6 +506,7 @@ export default function OnboardingPage() {
     setFiltroSemaforo("todos");
     setFiltroSituacao("todos");
     setFiltroTags([]);
+    setFiltroTipoTreino("todos");
     setPeriodoEntrada(null);
   }
 
@@ -422,6 +517,7 @@ export default function OnboardingPage() {
     filtroSemaforo !== "todos" ||
     filtroSituacao !== "todos" ||
     filtroTags.length > 0 ||
+    filtroTipoTreino !== "todos" ||
     periodoEntrada !== null;
 
   const journeysByStage = useMemo(() => {
@@ -603,6 +699,17 @@ export default function OnboardingPage() {
             ))}
           </SelectContent>
         </Select>
+        {isImplantacao && opcoesTipoTreino.length > 0 && (
+          <Select value={filtroTipoTreino} onValueChange={setFiltroTipoTreino}>
+            <SelectTrigger className="h-8 text-xs w-[160px]"><SelectValue placeholder="Tipo de treino" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos" className="text-xs">Todos os tipos</SelectItem>
+              {opcoesTipoTreino.map((t) => (
+                <SelectItem key={t.id} value={t.id} className="text-xs">{t.nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={filtroDemanda} onValueChange={setFiltroDemanda}>
           <SelectTrigger className="h-8 text-xs w-[160px]"><SelectValue placeholder="Demanda" /></SelectTrigger>
           <SelectContent>
@@ -687,6 +794,18 @@ export default function OnboardingPage() {
             <X className="h-3.5 w-3.5 mr-1" /> Limpar filtros
           </Button>
         )}
+        {isImplantacao && (
+          <Button
+            size="sm"
+            variant="outline"
+            className={`h-8 text-xs gap-1.5 ml-auto ${agrupadoPorTicket ? "border-primary/50 text-primary" : ""}`}
+            onClick={() => setAgrupadoPorTicket((v) => !v)}
+            title="Um cartão por ticket pai, com o andamento dos treinamentos"
+          >
+            <LayoutList className="h-3.5 w-3.5" />
+            {agrupadoPorTicket ? "Ver por etapa" : "Agrupar por ticket"}
+          </Button>
+        )}
       </div>
 
 
@@ -699,6 +818,14 @@ export default function OnboardingPage() {
         <div className="p-6 text-sm text-muted-foreground">
           Nenhum pipeline de {phaseAtual?.nome ?? "jornada"} configurado para este tenant.
         </div>
+      ) : isImplantacao ? (
+        <ImplantacaoBoard
+          stages={stages}
+          rows={trainingCardsFiltrados}
+          jornadasSemTreino={jornadasSemTreino}
+          agrupado={agrupadoPorTicket}
+          onOpenJourney={(id) => setDetailId(id)}
+        />
       ) : (
         <div className="flex-1 overflow-x-auto p-4">
           <div className="flex flex-row gap-3 min-h-full pb-2">
