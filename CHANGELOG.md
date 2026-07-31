@@ -14,6 +14,7 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 31/07
 
+- 🆕 **Onboarding / Acompanhamento** — Ativar a jornada de **Acompanhamento** passa a montar o quadro sozinho, com quatro colunas prontas: **Primeiras semanas → Uso em ritmo → Sinal de risco → Cliente destravado**. Antes a jornada era ativada e o quadro nascia vazio — sem nenhuma etapa configurada à mão, nenhum cliente conseguia sequer chegar nela. As colunas são cadastro normal: renomeie, reordene ou apague à vontade, que o sistema não desfaz o que você mudou.
 - 🆕 **Onboarding / Implantação** — Cada treinamento vira um sub-ticket com número derivado do ticket original: o **TK-2026-2360** passa a ter **TK-2026-2360-1**, **-2**, **-3**. Antes o filho recebia um número solto da fila e a equipe digitava o código do pai dentro do assunto para não perder o vínculo. Os sub-tickets que já existiam foram renomeados para o formato novo.
 - 🆕 **Onboarding / Implantação** — O quadro deixa de ter um cartão por cliente e passa a ter **um cartão por treinamento, com o responsável que conduz**. Cada um anda pelas colunas no seu ritmo e mostra de qual ticket veio. O botão **Agrupar por ticket** devolve a visão consolidada por cliente, com o andamento de cada treinamento.
 - ⬆️ **Onboarding / Implantação** — O filtro por responsável passa a encontrar **quem conduz o treinamento**, não só o dono da jornada. Um especialista com vários treinamentos marcados agora monta a própria agenda pelo quadro.
