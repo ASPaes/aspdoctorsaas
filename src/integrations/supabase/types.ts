@@ -4428,6 +4428,50 @@ export type Database = {
           },
         ]
       }
+      onboarding_indicators: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          position: number
+          tenant_id: string
+          tipo: string
+          unidade: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          position?: number
+          tenant_id: string
+          tipo?: string
+          unidade?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          position?: number
+          tenant_id?: string
+          tipo?: string
+          unidade?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_indicators_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_journey_accounting: {
         Row: {
           coletado: boolean
@@ -4563,6 +4607,77 @@ export type Database = {
           },
         ]
       }
+      onboarding_journey_indicators: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_ref: string
+          id: string
+          indicator_id: string
+          journey_id: string
+          observacao: string | null
+          origem: string
+          tenant_id: string
+          updated_at: string
+          valor: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_ref: string
+          id?: string
+          indicator_id: string
+          journey_id: string
+          observacao?: string | null
+          origem?: string
+          tenant_id: string
+          updated_at?: string
+          valor: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_ref?: string
+          id?: string
+          indicator_id?: string
+          journey_id?: string
+          observacao?: string | null
+          origem?: string
+          tenant_id?: string
+          updated_at?: string
+          valor?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_journey_indicators_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_indicators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_indicators_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_indicators_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_indicators_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_journey_modules: {
         Row: {
           created_at: string
@@ -4673,6 +4788,7 @@ export type Database = {
           cliente_id: string
           concluido_em: string | null
           created_at: string
+          current_phase_id: string | null
           current_stage_id: string | null
           data_inicio_planejado: string | null
           demand_type_id: string | null
@@ -4697,6 +4813,7 @@ export type Database = {
           cliente_id: string
           concluido_em?: string | null
           created_at?: string
+          current_phase_id?: string | null
           current_stage_id?: string | null
           data_inicio_planejado?: string | null
           demand_type_id?: string | null
@@ -4721,6 +4838,7 @@ export type Database = {
           cliente_id?: string
           concluido_em?: string | null
           created_at?: string
+          current_phase_id?: string | null
           current_stage_id?: string | null
           data_inicio_planejado?: string | null
           demand_type_id?: string | null
@@ -4742,6 +4860,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "onboarding_journeys_current_phase_id_fkey"
+            columns: ["current_phase_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_phases"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "onboarding_journeys_current_stage_id_fkey"
             columns: ["current_stage_id"]
@@ -4790,6 +4915,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "support_tickets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: true
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["parent_ticket_id"]
           },
         ]
       }
@@ -4886,6 +5018,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "support_tickets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_participants_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["parent_ticket_id"]
           },
         ]
       }
@@ -4999,11 +5138,13 @@ export type Database = {
         Row: {
           concluida_em: string | null
           created_at: string
-          fase: Database["public"]["Enums"]["onb_fase"]
+          fase: Database["public"]["Enums"]["onb_fase"] | null
           id: string
           iniciada_em: string | null
           journey_id: string
           pausado_min: number | null
+          phase_id: string
+          pipeline_id: string | null
           responsavel_user_id: string | null
           sla_corrido_min: number | null
           sla_util_min: number | null
@@ -5012,11 +5153,13 @@ export type Database = {
         Insert: {
           concluida_em?: string | null
           created_at?: string
-          fase: Database["public"]["Enums"]["onb_fase"]
+          fase?: Database["public"]["Enums"]["onb_fase"] | null
           id?: string
           iniciada_em?: string | null
           journey_id: string
           pausado_min?: number | null
+          phase_id: string
+          pipeline_id?: string | null
           responsavel_user_id?: string | null
           sla_corrido_min?: number | null
           sla_util_min?: number | null
@@ -5025,11 +5168,13 @@ export type Database = {
         Update: {
           concluida_em?: string | null
           created_at?: string
-          fase?: Database["public"]["Enums"]["onb_fase"]
+          fase?: Database["public"]["Enums"]["onb_fase"] | null
           id?: string
           iniciada_em?: string | null
           journey_id?: string
           pausado_min?: number | null
+          phase_id?: string
+          pipeline_id?: string | null
           responsavel_user_id?: string | null
           sla_corrido_min?: number | null
           sla_util_min?: number | null
@@ -5051,7 +5196,65 @@ export type Database = {
             referencedColumns: ["journey_id"]
           },
           {
+            foreignKeyName: "onboarding_phase_metrics_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_phases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_phase_metrics_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_pipelines"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "onboarding_phase_metrics_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_phases: {
+        Row: {
+          ativo: boolean
+          cor: string | null
+          created_at: string
+          id: string
+          nome: string
+          position: number
+          slug: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cor?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          position?: number
+          slug?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cor?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          position?: number
+          slug?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_phases_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -5065,9 +5268,10 @@ export type Database = {
           created_at: string
           department_id: string | null
           descricao: string | null
-          fase: Database["public"]["Enums"]["onb_fase"]
+          fase: Database["public"]["Enums"]["onb_fase"] | null
           id: string
           nome: string
+          phase_id: string
           position: number
           produto_id: number | null
           sla_total_minutos: number | null
@@ -5079,9 +5283,10 @@ export type Database = {
           created_at?: string
           department_id?: string | null
           descricao?: string | null
-          fase: Database["public"]["Enums"]["onb_fase"]
+          fase?: Database["public"]["Enums"]["onb_fase"] | null
           id?: string
           nome: string
+          phase_id: string
           position?: number
           produto_id?: number | null
           sla_total_minutos?: number | null
@@ -5093,9 +5298,10 @@ export type Database = {
           created_at?: string
           department_id?: string | null
           descricao?: string | null
-          fase?: Database["public"]["Enums"]["onb_fase"]
+          fase?: Database["public"]["Enums"]["onb_fase"] | null
           id?: string
           nome?: string
+          phase_id?: string
           position?: number
           produto_id?: number | null
           sla_total_minutos?: number | null
@@ -5108,6 +5314,13 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_pipelines_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_phases"
             referencedColumns: ["id"]
           },
           {
@@ -5447,8 +5660,13 @@ export type Database = {
       onboarding_training_sessions: {
         Row: {
           agendado_para: string | null
+          cancelado_em: string | null
+          cancelado_por: string | null
           conduzido_por: string | null
           created_at: string
+          current_stage_id: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           id: string
           is_retreinamento: boolean
           journey_id: string
@@ -5468,8 +5686,13 @@ export type Database = {
         }
         Insert: {
           agendado_para?: string | null
+          cancelado_em?: string | null
+          cancelado_por?: string | null
           conduzido_por?: string | null
           created_at?: string
+          current_stage_id?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           is_retreinamento?: boolean
           journey_id: string
@@ -5489,8 +5712,13 @@ export type Database = {
         }
         Update: {
           agendado_para?: string | null
+          cancelado_em?: string | null
+          cancelado_por?: string | null
           conduzido_por?: string | null
           created_at?: string
+          current_stage_id?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           is_retreinamento?: boolean
           journey_id?: string
@@ -5509,6 +5737,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "onboarding_training_sessions_current_stage_id_fkey"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_stages"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "onboarding_training_sessions_journey_id_fkey"
             columns: ["journey_id"]
@@ -5538,11 +5773,100 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "onboarding_training_sessions_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["parent_ticket_id"]
+          },
+          {
             foreignKeyName: "onboarding_training_sessions_training_type_id_fkey"
             columns: ["training_type_id"]
             isOneToOne: false
             referencedRelation: "onboarding_training_types"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_training_stage_history: {
+        Row: {
+          created_at: string
+          duracao_minutos: number | null
+          duracao_util_minutos: number | null
+          entrou_em: string
+          id: string
+          journey_id: string
+          saiu_em: string | null
+          stage_id: string
+          tenant_id: string
+          training_id: string
+        }
+        Insert: {
+          created_at?: string
+          duracao_minutos?: number | null
+          duracao_util_minutos?: number | null
+          entrou_em?: string
+          id?: string
+          journey_id: string
+          saiu_em?: string | null
+          stage_id: string
+          tenant_id: string
+          training_id: string
+        }
+        Update: {
+          created_at?: string
+          duracao_minutos?: number | null
+          duracao_util_minutos?: number | null
+          entrou_em?: string
+          id?: string
+          journey_id?: string
+          saiu_em?: string | null
+          stage_id?: string
+          tenant_id?: string
+          training_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_training_stage_history_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_stage_history_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_stage_history_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_stage_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_stage_history_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_training_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_stage_history_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["training_id"]
           },
         ]
       }
@@ -7039,6 +7363,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "support_attendances_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["parent_ticket_id"]
+          },
+          {
             foreignKeyName: "support_attendances_unidade_base_id_fkey"
             columns: ["unidade_base_id"]
             isOneToOne: false
@@ -7485,6 +7816,13 @@ export type Database = {
             referencedRelation: "support_tickets"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "support_ticket_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["parent_ticket_id"]
+          },
         ]
       }
       support_ticket_events: {
@@ -7495,6 +7833,7 @@ export type Database = {
           id: string
           new_value: string | null
           old_value: string | null
+          origem_sub_ticket_id: string | null
           tenant_id: string
           ticket_id: string
           user_id: string | null
@@ -7506,6 +7845,7 @@ export type Database = {
           id?: string
           new_value?: string | null
           old_value?: string | null
+          origem_sub_ticket_id?: string | null
           tenant_id: string
           ticket_id: string
           user_id?: string | null
@@ -7517,11 +7857,26 @@ export type Database = {
           id?: string
           new_value?: string | null
           old_value?: string | null
+          origem_sub_ticket_id?: string | null
           tenant_id?: string
           ticket_id?: string
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "support_ticket_events_origem_sub_ticket_id_fkey"
+            columns: ["origem_sub_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_ticket_events_origem_sub_ticket_id_fkey"
+            columns: ["origem_sub_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["parent_ticket_id"]
+          },
           {
             foreignKeyName: "support_ticket_events_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -7535,6 +7890,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "support_tickets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_ticket_events_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["parent_ticket_id"]
           },
         ]
       }
@@ -7605,6 +7967,8 @@ export type Database = {
           rotulo: string | null
           service_type_id: string | null
           status_id: string | null
+          sub_seq: number | null
+          sub_seq_last: number
           subcategory_id: string | null
           tempo_agente_minutos: number | null
           tempo_calculado_minutos: number | null
@@ -7654,6 +8018,8 @@ export type Database = {
           rotulo?: string | null
           service_type_id?: string | null
           status_id?: string | null
+          sub_seq?: number | null
+          sub_seq_last?: number
           subcategory_id?: string | null
           tempo_agente_minutos?: number | null
           tempo_calculado_minutos?: number | null
@@ -7703,6 +8069,8 @@ export type Database = {
           rotulo?: string | null
           service_type_id?: string | null
           status_id?: string | null
+          sub_seq?: number | null
+          sub_seq_last?: number
           subcategory_id?: string | null
           tempo_agente_minutos?: number | null
           tempo_calculado_minutos?: number | null
@@ -7782,6 +8150,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "support_tickets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_parent_ticket_id_fkey"
+            columns: ["parent_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["parent_ticket_id"]
           },
           {
             foreignKeyName: "support_tickets_produto_id_fkey"
@@ -8223,6 +8598,13 @@ export type Database = {
             referencedRelation: "support_tickets"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ticket_mentions_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["parent_ticket_id"]
+          },
         ]
       }
       ticket_statuses: {
@@ -8318,6 +8700,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "support_tickets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_tag_assignments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["parent_ticket_id"]
           },
         ]
       }
@@ -10246,6 +10635,62 @@ export type Database = {
           },
         ]
       }
+      vw_onboarding_journey_phases: {
+        Row: {
+          aberta: boolean | null
+          concluida_em: string | null
+          department_id: string | null
+          iniciada_em: string | null
+          journey_id: string | null
+          phase_id: string | null
+          phase_nome: string | null
+          phase_position: number | null
+          phase_slug: string | null
+          pipeline_id: string | null
+          pipeline_nome: string | null
+          sla_corrido_min: number | null
+          sla_pausado_min: number | null
+          sla_util_min: number | null
+          tenant_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_phase_metrics_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_phase_metrics_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_phase_metrics_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_phases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_phase_metrics_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_phase_metrics_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vw_onboarding_journeys: {
         Row: {
           aberta_em: string | null
@@ -10360,6 +10805,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "onboarding_journeys_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: true
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["parent_ticket_id"]
+          },
+          {
             foreignKeyName: "support_tickets_department_id_fkey"
             columns: ["department_id"]
             isOneToOne: false
@@ -10413,6 +10865,108 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vw_onboarding_training_cards: {
+        Row: {
+          agendado_para: string | null
+          cancelado_em: string | null
+          cancelado_na_implantacao: boolean | null
+          cliente_id: string | null
+          cliente_nome: string | null
+          cliente_unidade_id: number | null
+          conduzido_por: string | null
+          conduzido_por_nome: string | null
+          created_at: string | null
+          current_stage_id: string | null
+          demand_type_cor: string | null
+          demand_type_id: string | null
+          demand_type_nome: string | null
+          etapa_entrou_em: string | null
+          implantacao_iniciada_em: string | null
+          is_retreinamento: boolean | null
+          journey_id: string | null
+          journey_situacao: string | null
+          link_agendamento: string | null
+          no_show: boolean | null
+          parent_ticket_code: string | null
+          parent_ticket_id: string | null
+          realizado_em: string | null
+          status: string | null
+          sub_seq: number | null
+          tenant_id: string | null
+          tentativas: number | null
+          ticket_code: string | null
+          ticket_id: string | null
+          titulo: string | null
+          training_id: string | null
+          training_type_id: string | null
+          training_type_nome: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_unidade_base_id_fkey"
+            columns: ["cliente_unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_demand_type_id_fkey"
+            columns: ["demand_type_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_demand_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_sessions_current_stage_id_fkey"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_sessions_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_sessions_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_journeys"
+            referencedColumns: ["journey_id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_sessions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_sessions_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_sessions_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["parent_ticket_id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_sessions_training_type_id_fkey"
+            columns: ["training_type_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_training_types"
             referencedColumns: ["id"]
           },
         ]
@@ -10594,6 +11148,14 @@ export type Database = {
           p_cliente_produto_id: string
           p_novo_fornecedor_id?: number
           p_novo_produto_id: number
+        }
+        Returns: Json
+      }
+      advance_onboarding_phase: {
+        Args: {
+          p_force?: boolean
+          p_journey_id: string
+          p_target_phase_id?: string
         }
         Returns: Json
       }
@@ -10955,6 +11517,10 @@ export type Database = {
         Args: { p_message_ids: string[] }
         Returns: Json
       }
+      delete_onboarding_training: {
+        Args: { p_training_id: string }
+        Returns: Json
+      }
       dismiss_conversation_notifications: {
         Args: { p_conversation_id: string }
         Returns: number
@@ -11146,6 +11712,17 @@ export type Database = {
         }
         Returns: string
       }
+      fn_onb_training_initial_stage: {
+        Args: { p_journey_id: string }
+        Returns: string
+      }
+      fn_onb_treinos_em_aberto: {
+        Args: { p_parent_ticket_id: string }
+        Returns: {
+          codigos: string
+          qtd: number
+        }[]
+      }
       fn_onb_util_min: {
         Args: {
           p_department_id: string
@@ -11164,6 +11741,14 @@ export type Database = {
         }
         Returns: Json
       }
+      fn_onboarding_next_phase: {
+        Args: { p_journey_id: string }
+        Returns: string
+      }
+      fn_onboarding_phase_id: {
+        Args: { p_slug: string; p_tenant_id: string }
+        Returns: string
+      }
       fn_onboarding_pick_assignee: {
         Args: { p_department_id: string; p_tenant_id: string }
         Returns: string
@@ -11176,6 +11761,10 @@ export type Database = {
       fn_retry_waiting_conversations: { Args: never; Returns: Json }
       fn_schedule_group_syncs: { Args: never; Returns: undefined }
       fn_seed_onboarding_participant_roles: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
+      }
+      fn_seed_onboarding_phases: {
         Args: { p_tenant_id: string }
         Returns: undefined
       }
@@ -11835,6 +12424,27 @@ export type Database = {
       }
       get_messages_projection: { Args: never; Returns: Json }
       get_monitor_maintenance_metrics: { Args: never; Returns: Json }
+      get_mrr_bridge: {
+        Args: {
+          p_fim: string
+          p_fornecedor_ids?: number[]
+          p_inicio: string
+          p_tenant_id: string
+          p_unidade_base_id?: number
+        }
+        Returns: {
+          churn: number
+          cross_sell: number
+          downsell: number
+          mrr_fim: number
+          mrr_inicio: number
+          net_new: number
+          novo: number
+          reajuste: number
+          reativacao: number
+          upsell: number
+        }[]
+      }
       get_mrr_monthly_snapshots: {
         Args: {
           p_data_referencia?: string
@@ -12147,6 +12757,10 @@ export type Database = {
         Args: { p_at?: string; p_department_id: string; p_tenant_id: string }
         Returns: boolean
       }
+      journey_go_live: {
+        Args: { p_go_live_real?: string; p_journey_id: string }
+        Returns: Json
+      }
       kpi_cap_seconds: { Args: { p_metric: string }; Returns: number }
       link_cliente_to_attendance: {
         Args: { p_attendance_id: string; p_cliente_id: string }
@@ -12247,9 +12861,20 @@ export type Database = {
         }
         Returns: Json
       }
+      move_onboarding_training_stage: {
+        Args: { p_target_stage_id: string; p_training_id: string }
+        Returns: Json
+      }
       mute_conversation: {
         Args: { p_conversation_id: string; p_duration: string }
         Returns: undefined
+      }
+      next_sub_ticket_code: {
+        Args: { p_parent_ticket_id: string }
+        Returns: {
+          code: string
+          seq: number
+        }[]
       }
       next_support_attendance_seq: {
         Args: { p_tenant: string }
@@ -12289,6 +12914,14 @@ export type Database = {
       omie_fila_reprocessar: { Args: { p_fila_id: string }; Returns: Json }
       omie_fila_status: { Args: { p_tenant_id: string }; Returns: Json }
       onb_slugify: { Args: { p_txt: string }; Returns: string }
+      onboarding_stage_remove: {
+        Args: {
+          p_mode: string
+          p_move_to_stage_id?: string
+          p_stage_id: string
+        }
+        Returns: Json
+      }
       pause_onboarding: {
         Args: {
           p_journey_id: string
@@ -12775,6 +13408,20 @@ export type Database = {
       update_csat_score: {
         Args: { p_csat_id: string; p_new_score: number; p_reason?: string }
         Returns: undefined
+      }
+      update_onboarding_training: {
+        Args: {
+          p_agendado_para?: string
+          p_conduzido_por?: string
+          p_limpar_agendado?: boolean
+          p_limpar_conduzido?: boolean
+          p_limpar_link?: boolean
+          p_link?: string
+          p_titulo?: string
+          p_training_id: string
+          p_training_type_id?: string
+        }
+        Returns: Json
       }
       update_tenant_permission: {
         Args: {
