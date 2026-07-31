@@ -103,4 +103,78 @@ BEGIN
   RAISE NOTICE 'TASK 1 OK';
 END $$;
 
+DO $$
+DECLARE
+  v_tenant uuid; v_cliente uuid; v_res jsonb; v_res2 jsonb; v_tk uuid;
+  v_unidade bigint; v_grants text;
+BEGIN
+  SELECT t.id INTO v_tenant FROM public.tenants t WHERE t.nome = 'Digi Office Sistemas';
+  SELECT c.id INTO v_cliente FROM public.clientes c
+   WHERE c.tenant_id = v_tenant AND c.unidade_base_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM public.support_tickets tk
+                      WHERE tk.cliente_id = c.id AND tk.is_acompanhamento AND tk.concluido_em IS NULL)
+   ORDER BY c.id LIMIT 1;
+  IF v_cliente IS NULL THEN
+    SELECT c.id INTO v_cliente FROM public.clientes c WHERE c.tenant_id = v_tenant ORDER BY c.id LIMIT 1;
+  END IF;
+
+  -- 1. abre o ticket
+  v_res := public.fn_create_acompanhamento_ticket(v_tenant, v_cliente, NULL, 'teste');
+  IF (v_res->>'ok')::boolean IS NOT TRUE THEN RAISE EXCEPTION '2.1: nao criou: %', v_res; END IF;
+  v_tk := (v_res->>'ticket_id')::uuid;
+
+  -- 2. nasce marcado, no contexto certo e com a unidade DO CLIENTE
+  SELECT tk.unidade_base_id INTO v_unidade FROM public.support_tickets tk WHERE tk.id = v_tk;
+  IF NOT EXISTS (SELECT 1 FROM public.support_tickets tk
+                  WHERE tk.id = v_tk AND tk.is_acompanhamento
+                    AND tk.contexto = 'onboarding'
+                    AND tk.origem_criacao = 'acompanhamento_manual'
+                    AND tk.cliente_id = v_cliente) THEN
+    RAISE EXCEPTION '2.2: ticket de acompanhamento com marcacao errada';
+  END IF;
+  IF v_unidade IS DISTINCT FROM (SELECT unidade_base_id FROM public.clientes WHERE id = v_cliente) THEN
+    RAISE EXCEPTION '2.2: unidade nao veio do cliente';
+  END IF;
+
+  -- 3. o motivo virou evento na timeline
+  IF NOT EXISTS (SELECT 1 FROM public.support_ticket_events e
+                  WHERE e.ticket_id = v_tk AND e.event_type = 'acompanhamento_aberto') THEN
+    RAISE EXCEPTION '2.3: faltou o evento de abertura';
+  END IF;
+
+  -- 4. um por cliente: o segundo devolve o primeiro
+  v_res2 := public.fn_create_acompanhamento_ticket(v_tenant, v_cliente, NULL, 'de novo');
+  IF v_res2->>'reason' IS DISTINCT FROM 'ja_existe' THEN
+    RAISE EXCEPTION '2.4: duplicou o acompanhamento: %', v_res2;
+  END IF;
+  IF (v_res2->>'ticket_id')::uuid IS DISTINCT FROM v_tk THEN
+    RAISE EXCEPTION '2.4: ja_existe deveria devolver o ticket aberto';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.support_ticket_events e
+                  WHERE e.ticket_id = v_tk AND e.event_type = 'acompanhamento_reforco') THEN
+    RAISE EXCEPTION '2.4: o segundo pedido nao registrou nada no ticket existente';
+  END IF;
+
+  -- 5. ticket fechado nao conta: abre um novo
+  UPDATE public.support_tickets SET concluido_em = now() WHERE id = v_tk;
+  v_res2 := public.fn_create_acompanhamento_ticket(v_tenant, v_cliente, NULL, 'novo ciclo');
+  IF (v_res2->>'ok')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION '2.5: com o anterior fechado, deveria abrir outro: %', v_res2;
+  END IF;
+
+  -- 6. grants
+  SELECT string_agg(DISTINCT grantee, ',') INTO v_grants FROM information_schema.routine_privileges
+   WHERE routine_schema='public' AND routine_name='create_acompanhamento_ticket';
+  IF COALESCE(v_grants,'') NOT ILIKE '%authenticated%' THEN
+    RAISE EXCEPTION '2.6: RPC publica sem GRANT para authenticated: %', v_grants;
+  END IF;
+  SELECT string_agg(DISTINCT grantee, ',') INTO v_grants FROM information_schema.routine_privileges
+   WHERE routine_schema='public' AND routine_name='fn_create_acompanhamento_ticket';
+  IF COALESCE(v_grants,'') ILIKE '%authenticated%' THEN
+    RAISE EXCEPTION '2.6: funcao interna exposta para authenticated';
+  END IF;
+
+  RAISE NOTICE 'TASK 2 OK';
+END $$;
+
 ROLLBACK;
