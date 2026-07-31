@@ -68,14 +68,19 @@ function Sparkline({ valores }: { valores: number[] }) {
 
 export default function AcompanhamentoSection({
   journeyId,
+  ticketId,
   tenantId,
   readOnly,
 }: {
-  journeyId: string | null;
+  /** Dono do lançamento: jornada OU ticket de acompanhamento, nunca os dois. */
+  journeyId?: string | null;
+  ticketId?: string | null;
   tenantId: string | null;
   readOnly?: boolean;
 }) {
   const qc = useQueryClient();
+  /** Espelha a coluna gerada `dono_id` do banco: COALESCE(journey_id, ticket_id). */
+  const donoId = journeyId ?? ticketId ?? null;
   const [novaOpen, setNovaOpen] = useState(false);
   const [dataRef, setDataRef] = useState(hojeISO());
   const [valores, setValores] = useState<Record<string, string>>({});
@@ -87,14 +92,14 @@ export default function AcompanhamentoSection({
   });
 
   const coletasQ = useQuery({
-    queryKey: [COLETAS_QUERY_KEY, journeyId],
-    enabled: !!journeyId && !!tenantId,
+    queryKey: [COLETAS_QUERY_KEY, donoId],
+    enabled: !!donoId && !!tenantId,
     queryFn: async () =>
       fetchAllRows<Coleta>(() =>
         (supabase.from("onboarding_journey_indicators" as any) as any)
           .select("id, indicator_id, data_ref, valor, observacao, origem")
           .eq("tenant_id", tenantId)
-          .eq("journey_id", journeyId)
+          .eq("dono_id", donoId)
           .order("data_ref", { ascending: false }),
       ),
   });
@@ -134,7 +139,7 @@ export default function AcompanhamentoSection({
   }
 
   async function salvarColeta() {
-    if (!journeyId || !tenantId) return;
+    if (!donoId || !tenantId) return;
     const preenchidos = indicadores
       .map((ind) => ({ ind, valor: (valores[ind.id] ?? "").trim() }))
       .filter((x) => x.valor !== "");
@@ -149,7 +154,8 @@ export default function AcompanhamentoSection({
       const { data: userData } = await supabase.auth.getUser();
       const linhas = preenchidos.map(({ ind, valor }) => ({
         tenant_id: tenantId,
-        journey_id: journeyId,
+        journey_id: journeyId ?? null,
+        ticket_id: journeyId ? null : ticketId,
         indicator_id: ind.id,
         data_ref: dataRef,
         valor,
@@ -158,14 +164,16 @@ export default function AcompanhamentoSection({
         created_by: userData?.user?.id ?? null,
       }));
 
-      // upsert: relançar a mesma data corrige o valor em vez de estourar a unique
+      // upsert: relançar a mesma data corrige o valor em vez de estourar a unique.
+      // O alvo é a coluna gerada dono_id (COALESCE de jornada e ticket): índice único NÃO
+      // parcial, porque o PostgREST não sabe declarar o predicado de um índice parcial aqui.
       const { error } = await (supabase.from("onboarding_journey_indicators" as any) as any)
-        .upsert(linhas, { onConflict: "journey_id,indicator_id,data_ref" });
+        .upsert(linhas, { onConflict: "dono_id,indicator_id,data_ref" });
       if (error) throw error;
 
       toast.success(`Coleta de ${formatDataRef(dataRef)} registrada`);
       setNovaOpen(false);
-      qc.invalidateQueries({ queryKey: [COLETAS_QUERY_KEY, journeyId] });
+      qc.invalidateQueries({ queryKey: [COLETAS_QUERY_KEY, donoId] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao registrar a coleta");
     } finally {
@@ -177,7 +185,7 @@ export default function AcompanhamentoSection({
     if (!confirm(`Remover a coleta de ${formatDataRef(data)}? Todos os indicadores dessa data saem junto.`)) return;
     const { error } = await (supabase.from("onboarding_journey_indicators" as any) as any)
       .delete()
-      .eq("journey_id", journeyId)
+      .eq("dono_id", donoId)
       .eq("tenant_id", tenantId)
       .eq("data_ref", data);
     if (error) {
@@ -185,7 +193,7 @@ export default function AcompanhamentoSection({
       return;
     }
     toast.success("Coleta removida");
-    qc.invalidateQueries({ queryKey: [COLETAS_QUERY_KEY, journeyId] });
+    qc.invalidateQueries({ queryKey: [COLETAS_QUERY_KEY, donoId] });
   }
 
   if (loadingInd || coletasQ.isLoading) {
