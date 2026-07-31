@@ -37,6 +37,11 @@ interface Props {
   onOpenChange: (o: boolean) => void;
   journeyId: string | null;
   tenantId: string | null;
+  /** Aberto a partir de um sub-ticket de treinamento no quadro da Implantação.
+   *  A tela é a do ticket pai, mas o que se faz aqui fica registrado como tendo
+   *  partido deste filho. */
+  subTicketId?: string | null;
+  subTicketCode?: string | null;
 }
 
 interface PhaseRow {
@@ -196,6 +201,15 @@ function TimelineEventItem({ ev, author }: { ev: any; author: string }) {
         <div className="flex items-baseline gap-1.5 flex-wrap">
           <span className="text-xs font-semibold">{author}</span>
           <span className="text-[11px] text-muted-foreground">· {meta.label}</span>
+          {/* De qual sub-ticket a ação partiu — o evento vive no pai, a autoria de contexto é do filho. */}
+          {ev.origem?.ticket_code && (
+            <span
+              className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/25"
+              title="Registrado de dentro deste sub-ticket"
+            >
+              {ev.origem.ticket_code}
+            </span>
+          )}
           <span className="text-[10px] text-muted-foreground font-mono ml-auto pl-2">{formatTime(ev.created_at)}</span>
         </div>
         {hasChips && (
@@ -299,7 +313,7 @@ interface JourneyChecklistRow {
   done_by: string | null;
 }
 
-export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tenantId }: Props) {
+export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tenantId, subTicketId = null, subTicketCode = null }: Props) {
   const { user, profile } = useAuth();
   const qc = useQueryClient();
   const [note, setNote] = useState("");
@@ -545,7 +559,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journey?.ticket_id,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_ticket_events" as any) as any)
-        .select("id, user_id, event_type, content, old_value, new_value, created_at")
+        .select("id, user_id, event_type, content, old_value, new_value, created_at, origem_sub_ticket_id, origem:origem_sub_ticket_id(ticket_code)")
         .eq("ticket_id", journey!.ticket_id!)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -1278,6 +1292,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         user_id: user.id,
         event_type: "nota_agente",
         content: note.trim(),
+        origem_sub_ticket_id: subTicketId,
       });
       if (error) throw error;
       setNote("");
@@ -1372,6 +1387,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
           user_id: user.id,
           event_type: "onboarding_participante",
           content: `Adicionado: ${nome} (${papelNome})`,
+          origem_sub_ticket_id: subTicketId,
         });
       }
       toast.success("Participante adicionado");
@@ -1425,6 +1441,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
           user_id: user.id,
           event_type: "onboarding_participante",
           content: `Removido: ${nome} (${papelNome})`,
+          origem_sub_ticket_id: subTicketId,
         });
       }
       toast.success("Participante removido");
@@ -1703,6 +1720,18 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
           <>
             <DialogHeader className="m-0 px-6 py-4 border-b border-border shrink-0">
               <div className="flex flex-col gap-3">
+                {/* Aberto pelo cartão de um treinamento: a tela é a do ticket pai, mas o
+                    registro do que se faz aqui é do filho. */}
+                {subTicketCode && (
+                  <div className="flex items-center gap-2 rounded-md border border-sky-500/35 bg-sky-500/10 px-3 py-2">
+                    <GraduationCap className="h-4 w-4 text-sky-500 shrink-0" />
+                    <p className="text-[11px] leading-snug min-w-0">
+                      <span className="font-semibold">Você abriu pelo treinamento </span>
+                      <span className="font-mono font-semibold text-sky-600 dark:text-sky-400">{subTicketCode}</span>
+                      <span className="text-muted-foreground"> — a tela é a do ticket pai, e tudo o que fizer aqui fica registrado como partindo deste sub-ticket.</span>
+                    </p>
+                  </div>
+                )}
                 <div className="min-w-0 pr-10">
                   <div className="flex items-center gap-2 flex-wrap">
                     {journey.ticket_code && (

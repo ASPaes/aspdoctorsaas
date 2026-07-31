@@ -135,6 +135,9 @@ export default function OnboardingPage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  /** Quando o detalhe é aberto pelo cartão de um treinamento, a tela continua sendo a do
+   *  ticket pai, mas o que for feito ali é registrado como partindo deste sub-ticket. */
+  const [detailSubTicket, setDetailSubTicket] = useState<{ id: string; code: string | null } | null>(null);
   const [busca, setBusca] = useState("");
   const [filtroResponsavel, setFiltroResponsavel] = useState<string>("todos");
   const [filtroDemanda, setFiltroDemanda] = useState<string>("todos");
@@ -319,8 +322,11 @@ export default function OnboardingPage() {
     const termo = busca.trim().toLowerCase();
     const stageIds = new Set(stages.map((s) => s.id));
     return trainingCards.filter((t) => {
-      // Cancelado não ocupa coluna (o quadro descarta quem não tem etapa), mas continua
-      // visível na visão agrupada — é lá que o gestor enxerga o que foi descartado.
+      // Cancelado ANTES de a jornada chegar na Implantação não existe aqui — nem no
+      // quadro, nem no agrupado. Fica só no histórico da jornada.
+      if (t.status === "cancelado" && !t.cancelado_na_implantacao) return false;
+      // Cancelado dentro da Implantação não ocupa coluna, mas aparece riscado no
+      // agrupado — é lá que o gestor enxerga o que foi descartado.
       if (t.status !== "cancelado" && (!t.current_stage_id || !stageIds.has(t.current_stage_id))) return false;
       if (filtroSituacao === "todos") {
         if (t.journey_situacao === "concluido" || t.journey_situacao === "cancelado") return false;
@@ -824,7 +830,10 @@ export default function OnboardingPage() {
           rows={trainingCardsFiltrados}
           jornadasSemTreino={jornadasSemTreino}
           agrupado={agrupadoPorTicket}
-          onOpenJourney={(id) => setDetailId(id)}
+          onOpenJourney={(id, sub) => {
+            setDetailSubTicket(sub ?? null);
+            setDetailId(id);
+          }}
         />
       ) : (
         <div className="flex-1 overflow-x-auto p-4">
@@ -880,7 +889,7 @@ export default function OnboardingPage() {
                               setDraggingId(j.journey_id);
                             }}
                             onDragEnd={() => setDraggingId(null)}
-                            onClick={() => setDetailId(j.journey_id)}
+                            onClick={() => { setDetailSubTicket(null); setDetailId(j.journey_id); }}
                             className={`bg-card border rounded-md p-2.5 hover:border-primary/40 transition-all cursor-pointer ${
                               draggingId === j.journey_id ? "opacity-40 scale-95" : ""
                             } ${parado ? "opacity-60" : ""} ${concluida ? "opacity-70" : ""} ${cancelada ? "opacity-50" : ""} ${(concluida || cancelada) ? "" : "active:cursor-grabbing"}`}
@@ -1046,7 +1055,7 @@ export default function OnboardingPage() {
                         return (
                           <div
                             key={j.journey_id}
-                            onClick={() => setDetailId(j.journey_id)}
+                            onClick={() => { setDetailSubTicket(null); setDetailId(j.journey_id); }}
                             className="bg-card border rounded-md p-2.5 cursor-pointer hover:border-emerald-500/60 transition-all"
                             style={{ borderColor: `${doneColor}55` }}
                           >
@@ -1135,8 +1144,10 @@ export default function OnboardingPage() {
 
       <JourneyDetailSheet
         open={!!detailId}
-        onOpenChange={(o) => { if (!o) setDetailId(null); }}
+        onOpenChange={(o) => { if (!o) { setDetailId(null); setDetailSubTicket(null); } }}
         journeyId={detailId}
+        subTicketId={detailSubTicket?.id ?? null}
+        subTicketCode={detailSubTicket?.code ?? null}
         tenantId={effectiveTenantId}
       />
     </div>

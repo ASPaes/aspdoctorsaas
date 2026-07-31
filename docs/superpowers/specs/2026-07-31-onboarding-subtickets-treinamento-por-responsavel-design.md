@@ -225,6 +225,38 @@ por fase continua por jornada.
 
 ---
 
+## Regras acrescentadas em 31/07 (depois do mockup aprovado)
+
+### Cancelamento: antes ou depois de chegar na Implantação
+
+Treino **cancelado enquanto a jornada ainda estava no Onboarding não existe para a Implantação** —
+não vira cartão nem aparece na visão agrupada. Fica só no histórico da jornada. Cancelado **já dentro
+da Implantação** continua visível, riscado, e o evento entra na timeline do ticket pai.
+
+Para distinguir os dois casos foi preciso registrar **quando** o cancelamento aconteceu:
+`onboarding_training_sessions.cancelado_em` / `cancelado_por`, carimbados por trigger. Descancelar
+limpa o carimbo. A view expõe `cancelado_na_implantacao`
+(`cancelado_em >= journey.implantacao_iniciada_em`).
+
+**Backfill dos 11 cancelados que já existem usa `created_at` como aproximação** — o momento real
+nunca foi guardado e o `updated_at` foi reescrito pelas migrations desta entrega. Equivale a dizer
+"o treino pertence à fase em que nasceu"; na prática acerta.
+
+### Contexto do sub-ticket
+
+Abrir um cartão do quadro abre **a tela do ticket pai**, mas tudo o que for feito ali fica registrado
+como tendo partido daquele sub-ticket: `support_ticket_events.origem_sub_ticket_id`
+(`ON DELETE SET NULL` — perder o ponteiro é melhor do que travar a exclusão de um ticket).
+
+- Faixa no topo do detalhe dizendo por qual treinamento se entrou.
+- Selo com o código do filho em cada linha da timeline.
+- As quatro RPCs de treino e o trigger de rollup carimbam a origem.
+- Backfill dos eventos antigos pelo par (ticket pai, instante) — a RPC grava o evento na mesma
+  transação em que cria o treino, então os `created_at` coincidem. **0 eventos de treino ficaram sem
+  origem.**
+
+---
+
 ## Riscos conhecidos
 
 | Risco | Mitigação |

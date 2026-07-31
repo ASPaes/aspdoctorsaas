@@ -35,6 +35,11 @@ export interface TrainingCardRow {
   demand_type_nome: string | null;
   demand_type_cor: string | null;
   etapa_entrou_em: string | null;
+  cancelado_em: string | null;
+  implantacao_iniciada_em: string | null;
+  /** Cancelado já dentro da Implantação. Cancelado antes disso nem chega aqui:
+   *  para a Implantação aquele treinamento nunca existiu. */
+  cancelado_na_implantacao: boolean | null;
 }
 
 /** Jornada que já está na Implantação mas ainda não tem nenhum treinamento.
@@ -61,7 +66,7 @@ interface Props {
   rows: TrainingCardRow[];
   jornadasSemTreino: JornadaSemTreino[];
   agrupado: boolean;
-  onOpenJourney: (journeyId: string) => void;
+  onOpenJourney: (journeyId: string, sub?: { id: string; code: string | null }) => void;
 }
 
 const STATUS_COR: Record<string, string> = {
@@ -315,7 +320,7 @@ export default function ImplantacaoBoard({ stages, rows, jornadasSemTreino, agru
                             setDraggingId(t.training_id);
                           }}
                           onDragEnd={() => setDraggingId(null)}
-                          onClick={() => onOpenJourney(t.journey_id)}
+                          onClick={() => onOpenJourney(t.journey_id, { id: t.ticket_id, code: t.ticket_code })}
                           className={`bg-card border rounded-md p-2.5 hover:border-primary/40 transition-all cursor-pointer active:cursor-grabbing ${
                             draggingId === t.training_id ? "opacity-40 scale-95" : ""
                           }`}
