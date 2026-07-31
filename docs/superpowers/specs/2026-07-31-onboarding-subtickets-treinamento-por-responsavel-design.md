@@ -2,7 +2,7 @@
 
 **Data:** 31/07/2026
 **Owner:** Alexandre (ASP)
-**Status:** design aprovado (mockup validado), plano de implementação pendente
+**Status:** implementado e validado no banco local em 31/07/2026 — **não aplicado em produção**
 **Mockup aprovado:** `~/Desktop/DoctorSaaS-Proposta-Subtickets-Implantacao.html`
 
 ---
