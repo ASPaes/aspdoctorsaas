@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Julho / 2026
 
+### 31/07
+
+- 🔧 **Onboarding** — Excluir uma etapa na configuração do pipeline dava erro de banco sempre que a etapa já tinha sido usada alguma vez, e não havia jeito de removê-la. Agora o sistema pergunta o que fazer: **Arquivar** tira a etapa do quadro mas mantém todo o histórico de movimentações nos relatórios (dá para reativar depois), e **Excluir tudo** apaga a etapa e o histórico dela de vez. Antes de qualquer uma das duas, se houver cartão parado na etapa, o sistema mostra quantos são e pede para qual etapa mover.
+
 ### 30/07
 
 - 🔧 **WhatsApp** — Áudios, imagens e anexos enviados pelos números da Meta às vezes falhavam com "Falha no upload da mídia — tente reenviar", mesmo com o arquivo perfeito: quem entregava a mensagem era a Meta, e para isso ela precisava buscar o arquivo no nosso servidor — quando essa busca falhava, a mensagem se perdia. Agora o arquivo é entregue direto para a Meta antes do envio, então não há mais essa busca para falhar.

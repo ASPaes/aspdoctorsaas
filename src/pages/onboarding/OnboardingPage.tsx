@@ -196,6 +196,9 @@ export default function OnboardingPage() {
         .select("id, pipeline_id, nome, slug, position, cor, is_initial, is_final")
         .eq("tenant_id", effectiveTenantId)
         .eq("pipeline_id", selectedPipelineId)
+        // Etapa arquivada sai do quadro. A RPC onboarding_stage_remove exige
+        // esvaziar a etapa antes de arquivar, então nenhum cartão fica escondido.
+        .eq("ativo", true)
         .order("position");
       if (error) throw error;
       return (data ?? []) as StageRow[];

@@ -471,12 +471,15 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!pipelineId && !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_stages" as any) as any)
-        .select("id, nome, position, cor, is_final, visible_sections")
+        // Etapa arquivada (ativo=false) continua vindo: a linha do tempo precisa
+        // dela para mostrar o histórico de quem passou por ali. Quem filtra é o
+        // seletor de destino do "Avançar".
+        .select("id, nome, position, cor, is_final, visible_sections, ativo")
         .eq("tenant_id", tenantId)
         .eq("pipeline_id", pipelineId)
         .order("position");
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; nome: string; position: number; cor: string | null; is_final: boolean | null; visible_sections: string[] | null }>;
+      return (data ?? []) as Array<{ id: string; nome: string; position: number; cor: string | null; is_final: boolean | null; visible_sections: string[] | null; ativo: boolean | null }>;
     },
   });
 
@@ -2114,7 +2117,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                             </SelectTrigger>
                             <SelectContent>
                               {stages
-                                .filter((s) => s.id !== journey.current_stage_id)
+                                .filter((s) => s.id !== journey.current_stage_id && s.ativo !== false)
                                 .map((s) => (
                                   <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
                                 ))}

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, GripVertical, Trash2, Loader2, Pencil, Flag, Pause, ChevronRight, Timer,
+  Archive, AlertTriangle,
 } from "lucide-react";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
@@ -113,6 +114,7 @@ export function PipelinesPanel({ phaseId }: Props) {
   const [pipelineNewOpen, setPipelineNewOpen] = useState(false);
   const [stageEditing, setStageEditing] = useState<Stage | null>(null);
   const [stageNewOpen, setStageNewOpen] = useState(false);
+  const [stageRemoving, setStageRemoving] = useState<Stage | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -291,16 +293,42 @@ export function PipelinesPanel({ phaseId }: Props) {
     }
   }
 
-  async function deleteStage(id: string) {
-    if (!confirm("Remover esta etapa? O checklist também será perdido.")) return;
-    const { error } = await (supabase.from("onboarding_stages" as any) as any)
-      .delete().eq("id", id).eq("tenant_id", effectiveTenantId);
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Etapa removida");
-      if (selectedStageId === id) setSelectedStageId(null);
-      qc.invalidateQueries({ queryKey: ["onb-stages"] });
+  /**
+   * Remover etapa passa pela RPC porque um DELETE seco esbarra nas FKs de
+   * `onboarding_journeys.current_stage_id` e `onboarding_stage_history.stage_id`.
+   * A RPC move os cartões para a etapa escolhida e então arquiva (preserva o
+   * histórico) ou exclui de vez (apaga o histórico da etapa junto).
+   */
+  async function removeStage(
+    stage: Stage,
+    mode: "arquivar" | "excluir",
+    moveToStageId: string | null,
+  ): Promise<boolean> {
+    const { data, error } = await (supabase.rpc as any)("onboarding_stage_remove", {
+      p_stage_id: stage.id,
+      p_mode: mode,
+      p_move_to_stage_id: moveToStageId,
+    });
+    if (error) { toast.error(error.message); return false; }
+
+    const res = (data ?? {}) as { ok?: boolean; reason?: string; jornadas?: number };
+    if (!res.ok) {
+      const motivos: Record<string, string> = {
+        etapa_inicial: "A etapa inicial não pode ser removida. Marque outra etapa como inicial antes.",
+        destino_obrigatorio: `Escolha para onde mover ${res.jornadas ?? 0} cartão(ões) antes de remover.`,
+        destino_invalido: "Destino inválido. Escolha uma etapa ativa deste mesmo pipeline.",
+      };
+      toast.error(motivos[res.reason ?? ""] ?? "Não foi possível remover a etapa.");
+      return false;
     }
+
+    toast.success(mode === "arquivar" ? "Etapa arquivada" : "Etapa excluída");
+    if (selectedStageId === stage.id) setSelectedStageId(null);
+    qc.invalidateQueries({ queryKey: ["onb-stages"] });
+    qc.invalidateQueries({ queryKey: ["onboarding-stages"] });
+    qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+    qc.invalidateQueries({ queryKey: ["onboarding-stage-history"] });
+    return true;
   }
 
   async function reorderStages(reordered: Stage[]) {
@@ -504,7 +532,7 @@ export function PipelinesPanel({ phaseId }: Props) {
                     isSelected={selectedStageId === s.id}
                     onSelect={() => setSelectedStageId(s.id)}
                     onEdit={() => setStageEditing(s)}
-                    onDelete={() => deleteStage(s.id)}
+                    onDelete={() => setStageRemoving(s)}
                   />
                 ))}
               </SortableContext>
@@ -559,6 +587,12 @@ export function PipelinesPanel({ phaseId }: Props) {
         onClose={() => { setStageNewOpen(false); setStageEditing(null); }}
         onSave={(s) => { saveStage(s, !stageEditing); setStageNewOpen(false); setStageEditing(null); }}
       />
+      <StageRemoveDialog
+        stage={stageRemoving}
+        stages={stages}
+        onClose={() => setStageRemoving(null)}
+        onConfirm={removeStage}
+      />
     </div>
   );
 }
@@ -598,6 +632,7 @@ function SortableStageRow({
           {stage.is_final && <Flag className="h-3 w-3 text-destructive" />}
           {stage.pausa_sla && <Pause className="h-3 w-3 text-amber-500" />}
           {stage.inicia_sla && <Timer className="h-3 w-3 text-[hsl(199_89%_48%)]" />}
+          {!stage.ativo && <Badge variant="outline" className="text-[9px] px-1 py-0">arquivada</Badge>}
         </div>
         <p className="text-[10px] text-muted-foreground">SLA {formatSlaHuman(stage.sla_minutos)}</p>
       </div>
@@ -610,6 +645,200 @@ function SortableStageRow({
         <Trash2 className="h-3 w-3 text-destructive" />
       </Button>
     </div>
+  );
+}
+
+// ============================================================================
+// Remover etapa — arquivar (mantém histórico) ou excluir (apaga tudo)
+// ============================================================================
+function StageRemoveDialog({
+  stage, stages, onClose, onConfirm,
+}: {
+  stage: Stage | null;
+  stages: Stage[];
+  onClose: () => void;
+  onConfirm: (stage: Stage, mode: "arquivar" | "excluir", moveToStageId: string | null) => Promise<boolean>;
+}) {
+  const [destino, setDestino] = useState("");
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+  const [busy, setBusy] = useState<"arquivar" | "excluir" | null>(null);
+
+  useEffect(() => {
+    setDestino("");
+    setConfirmandoExclusao(false);
+    setBusy(null);
+  }, [stage?.id]);
+
+  /**
+   * Jornada encerrada (concluída/cancelada) some do quadro mas continua
+   * apontando para a etapa — e é ela que trava a FK. Os dois números precisam
+   * aparecer separados, senão o diálogo acusa cartão numa coluna vazia.
+   */
+  const impacto = useQuery({
+    queryKey: ["onb-stage-impacto", stage?.id],
+    enabled: !!stage,
+    queryFn: async () => {
+      const ENCERRADAS = ["concluido", "cancelado"];
+      const [ativas, encerradas, hist] = await Promise.all([
+        (supabase.from("onboarding_journeys" as any) as any)
+          .select("id", { count: "exact", head: true })
+          .eq("current_stage_id", stage!.id)
+          .not("situacao", "in", `(${ENCERRADAS.join(",")})`),
+        (supabase.from("onboarding_journeys" as any) as any)
+          .select("id", { count: "exact", head: true })
+          .eq("current_stage_id", stage!.id)
+          .in("situacao", ENCERRADAS),
+        (supabase.from("onboarding_stage_history" as any) as any)
+          .select("id", { count: "exact", head: true }).eq("stage_id", stage!.id),
+      ]);
+      return {
+        ativas: ativas.count ?? 0,
+        encerradas: encerradas.count ?? 0,
+        historico: hist.count ?? 0,
+      };
+    },
+  });
+
+  const destinos = useMemo(
+    () => stages.filter((s) => s.id !== stage?.id && s.ativo),
+    [stages, stage?.id],
+  );
+
+  const carregando = impacto.isLoading;
+  const ativas = impacto.data?.ativas ?? 0;
+  const encerradas = impacto.data?.encerradas ?? 0;
+  const historico = impacto.data?.historico ?? 0;
+  const precisaDestino = ativas > 0;
+  const podeAgir = !carregando && (!precisaDestino || !!destino) && !busy;
+
+  async function executar(mode: "arquivar" | "excluir") {
+    if (!stage) return;
+    setBusy(mode);
+    const ok = await onConfirm(stage, mode, precisaDestino ? destino : null);
+    setBusy(null);
+    if (ok) onClose();
+  }
+
+  return (
+    <Dialog open={!!stage} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-base">Remover etapa “{stage?.nome}”</DialogTitle>
+        </DialogHeader>
+
+        {stage?.is_initial ? (
+          <div className="flex gap-2.5 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-xs leading-relaxed">
+              Esta é a <strong>etapa inicial</strong> do pipeline — é por ela que toda jornada nova entra.
+              Marque outra etapa como inicial antes de removê-la.
+            </p>
+          </div>
+        ) : carregando ? (
+          <div className="flex justify-center py-6">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-1.5">
+              <p className="text-xs text-muted-foreground">O que existe hoje nesta etapa</p>
+              <p className="text-sm">
+                <strong>{ativas}</strong> {ativas === 1 ? "cartão no quadro" : "cartões no quadro"}
+                {" · "}
+                <strong>{historico}</strong> {historico === 1 ? "registro de histórico" : "registros de histórico"}
+              </p>
+              {encerradas > 0 && (
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Mais {encerradas === 1
+                    ? "1 jornada já encerrada (concluída ou cancelada) que"
+                    : `${encerradas} jornadas já encerradas (concluídas ou canceladas) que`}{" "}
+                  não {encerradas === 1 ? "aparece" : "aparecem"} no quadro, mas ainda {encerradas === 1 ? "aponta" : "apontam"} para esta etapa.
+                </p>
+              )}
+            </div>
+
+            {precisaDestino && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">
+                  Mover {ativas === 1 ? "o cartão" : `os ${ativas} cartões`} para
+                </Label>
+                {destinos.length === 0 ? (
+                  <p className="text-xs text-destructive">
+                    Não há outra etapa ativa neste pipeline para receber os cartões. Crie uma antes.
+                  </p>
+                ) : (
+                  <Select value={destino} onValueChange={setDestino}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Escolha a etapa de destino" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {destinos.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            )}
+
+            {confirmandoExclusao ? (
+              <div className="flex gap-2.5 rounded-md border border-destructive/40 bg-destructive/10 p-3">
+                <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                <p className="text-xs leading-relaxed">
+                  A etapa e {historico === 1 ? "seu 1 registro" : `seus ${historico} registros`} de histórico
+                  serão apagados <strong>para sempre</strong>. Os cartões que passaram por aqui perdem esse
+                  trecho da linha do tempo e do relatório de SLA.
+                  {encerradas > 0 && ` ${encerradas === 1 ? "A jornada encerrada fica" : `As ${encerradas} jornadas encerradas ficam`} sem etapa de origem.`}
+                  {" "}Não dá para desfazer.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <p className="flex gap-2">
+                  <Archive className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span><strong className="text-foreground">Arquivar:</strong> a etapa sai do quadro, mas todo o histórico de movimentações continua nos relatórios{encerradas > 0 ? ", e as jornadas encerradas seguem registradas nela" : ""}. Dá para reativar depois.</span>
+                </p>
+                <p className="flex gap-2">
+                  <Trash2 className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span><strong className="text-foreground">Excluir tudo:</strong> apaga a etapa e o histórico dela. Definitivo.</span>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 sm:gap-2">
+          {stage?.is_initial ? (
+            <Button variant="outline" onClick={onClose}>Entendi</Button>
+          ) : confirmandoExclusao ? (
+            <>
+              <Button variant="outline" onClick={() => setConfirmandoExclusao(false)} disabled={!!busy}>
+                Voltar
+              </Button>
+              <Button variant="destructive" onClick={() => executar("excluir")} disabled={!podeAgir}>
+                {busy === "excluir" && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                Sim, apagar tudo
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={onClose} disabled={!!busy}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setConfirmandoExclusao(true)} disabled={!podeAgir}
+                className="text-destructive hover:text-destructive">
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                Excluir tudo
+              </Button>
+              <Button onClick={() => executar("arquivar")} disabled={!podeAgir}>
+                {busy === "arquivar"
+                  ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  : <Archive className="h-3.5 w-3.5 mr-1.5" />}
+                Arquivar
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
