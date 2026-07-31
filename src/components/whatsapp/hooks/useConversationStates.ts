@@ -60,7 +60,17 @@ export function useConversationStates(conversationIds: string[]) {
     const debouncedInvalidate = () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["conversation-states"] });
+        // refetchType: 'none' marca o cache como velho SEM disparar request.
+        // Sem isso, invalidateQueries refaz a query ativa na hora e o
+        // staleTime: 30000 acima nunca chega a valer — era o segundo caminho
+        // que mantinha v_whatsapp_conversations_state em ~12 chamadas/s
+        // (50% da CPU do banco, medido em 31/07/2026).
+        // Quem realmente precisa do dado fresco já recebe o patch pelo
+        // useAttendanceStatus; aqui basta expirar e deixar o staleTime governar.
+        queryClient.invalidateQueries({
+          queryKey: ["conversation-states"],
+          refetchType: "none",
+        });
       }, 3000);
     };
 

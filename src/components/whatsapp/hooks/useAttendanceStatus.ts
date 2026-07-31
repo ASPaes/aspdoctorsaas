@@ -2,7 +2,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useCallback } from "react";
 import { subscribeSharedChannel } from "@/lib/realtimeChannelPool";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
+
+// Coalesce de invalidações Realtime por tenant, em escopo de MÓDULO.
+// Precisa ser compartilhado entre instâncias: Sidebar, ChatHeader e QueueIndicator
+// montam este hook ao mesmo tempo e um timer por instância não coalesce nada —
+// N instâncias disparariam N invalidações da mesma chave global.
+const attInvalidateTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export interface AttendanceInfo {
   id: string;
@@ -34,8 +40,10 @@ export function useAttendanceStatus(
   includeClosedFilter = false
 ) {
   const queryClient = useQueryClient();
-  const { profile } = useAuth();
-  const tenantId = profile?.tenant_id;
+  // effectiveTenantId, NÃO profile.tenant_id: quando o super admin simula um tenant,
+  // profile.tenant_id continua sendo o dele e o guard de isolamento abaixo passaria a
+  // descartar os eventos do tenant que ele está olhando.
+  const { effectiveTenantId: tenantId } = useTenantFilter();
 
   const sortedKey =
     conversationIds.length > 0
@@ -120,8 +128,8 @@ export function useAttendanceStatus(
       return map;
     },
     enabled: conversationIds.length > 0,
-    refetchInterval: 10000,
-    staleTime: 2000,
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
 
   // Patch ALL attendance-status caches immediately on realtime event
@@ -166,14 +174,29 @@ export function useAttendanceStatus(
         }
       );
 
-      // Also invalidate to pick up new entries (INSERT) and ensure consistency
-      queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
-      // Invalidate conversations so sidebar picks up status changes
-      queryClient.invalidateQueries({
-        queryKey: ["whatsapp", "conversations"],
-      });
-      queryClient.invalidateQueries({ queryKey: ["conversation-states"] });
-      queryClient.refetchQueries({ queryKey: ["conversation-states"] });
+      // O setQueriesData acima já aplicou o patch instantâneo, sem request.
+      // Aqui só coalescemos as invalidações numa única passada depois que a
+      // rajada parar (1s).
+      //
+      // O que saiu daqui, e por quê:
+      //  - refetchQueries(["conversation-states"]): era o amplificador. invalidateQueries
+      //    só refaz queries ATIVAS; refetchQueries refaz TODAS, inclusive as desmontadas
+      //    em cache. Como a chave é ["conversation-states", sortedKey] e sortedKey muda a
+      //    cada scroll/pill/busca, o cache acumula N variantes e ele refazia todas.
+      //  - invalidateQueries(["whatsapp","conversations"]): redundante. O
+      //    useWhatsAppConversations tem subscription própria em support_attendances
+      //    (useWhatsAppConversations.ts:360-368) com coalescing próprio.
+      const dkey = tenantId ?? "global";
+      const prev = attInvalidateTimers.get(dkey);
+      if (prev) clearTimeout(prev);
+      attInvalidateTimers.set(
+        dkey,
+        setTimeout(() => {
+          attInvalidateTimers.delete(dkey);
+          queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+          queryClient.invalidateQueries({ queryKey: ["conversation-states"] });
+        }, 1000)
+      );
     },
     [queryClient, tenantId]
   );
@@ -187,20 +210,35 @@ export function useAttendanceStatus(
     return subscribeSharedChannel(channelTopic, (channel) => {
       channel.on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "support_attendances" },
+        // Filtro server-side por tenant: corta o fanout de WAL dos outros tenants
+        // antes de chegar no browser. Só é correto porque tenantId acima é o
+        // effectiveTenantId — e o channelTopic usa a MESMA variável, senão dois
+        // tenants dividiriam um canal com filtros diferentes.
+        tenantId
+          ? { event: "*", schema: "public", table: "support_attendances", filter: `tenant_id=eq.${tenantId}` }
+          : { event: "*", schema: "public", table: "support_attendances" },
         (payload) => {
           const row = payload.new as any;
           if (row && row.conversation_id) {
             patchAllCaches(row);
           } else {
-            queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
-            queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+            // DELETE não traz payload.new — sem linha para dar patch, só invalida.
+            const dkey = tenantId ?? "global";
+            const prev = attInvalidateTimers.get(dkey);
+            if (prev) clearTimeout(prev);
+            attInvalidateTimers.set(
+              dkey,
+              setTimeout(() => {
+                attInvalidateTimers.delete(dkey);
+                queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+              }, 1000)
+            );
           }
         }
       );
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelTopic]);
+  }, [channelTopic, tenantId]);
 
   return {
     attendanceMap: data ?? new Map<string, AttendanceInfo>(),
