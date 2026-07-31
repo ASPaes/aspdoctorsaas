@@ -12,6 +12,13 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Julho / 2026
 
+### 30/07
+
+- 🆕 **Onboarding** — As jornadas deixam de ser fixas e passam a ser cadastradas por empresa, em uma aba própria na configuração: dá para renomear, trocar a cor, reordenar e desativar as que não usa. Quem trabalha com uma jornada só deixa apenas ela ativa, e as abas do quadro somem.
+- 🆕 **Onboarding** — Nova jornada de **Acompanhamento**, para acompanhar o uso do cliente depois que o sistema entra no ar. Os indicadores (nº de vendas, faturamento, usuários ativos, o que a empresa quiser) são cadastrados em Configuração > Indicadores e lançados na jornada em qualquer data, com cartões mostrando o último valor e a variação, e a planilha com todo o histórico. Vem desativada — para usar, ative a jornada e marque a seção "Acompanhamento" nas etapas dela.
+- ⬆️ **Onboarding** — Com o Acompanhamento ligado, o go-live registra a entrada no ar sem encerrar a jornada: ela segue viva até o acompanhamento terminar. Sem ele, nada muda — o go-live continua concluindo.
+- 🔧 **Onboarding** — Uma jornada que teve o cartão arrastado direto para uma coluna de implantação ficava com o tempo daquela fase zerado para sempre. O tempo passa a ser reconstruído pelo histórico de etapas.
+
 ### 28/07
 
 - 🔧 **Atendimento** — Quando uma cobrança automática era enviada no meio de uma conversa que já estava em atendimento, o chat sumia da tela do atendente: aparecia como encerrado, caía no filtro "Encerrados" e o botão Reabrir não resolvia — dava a mensagem de que tinha assumido, mas nada mudava. O cliente também não recebia a mensagem de encerramento nem a pesquisa de satisfação. Corrigido: a cobrança automática não muda mais o setor de um atendimento que já está em andamento.
