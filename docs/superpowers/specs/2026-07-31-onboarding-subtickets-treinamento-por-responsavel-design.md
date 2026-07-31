@@ -88,13 +88,33 @@ o código derivado explicitamente é aditivo — **`next_ticket_code` não é to
 | `deleted_at` | `timestamptz NULL` | exclusão lógica |
 | `deleted_by` | `uuid NULL` | quem excluiu |
 
-### 3. `onboarding_stage_history` — SLA por treinamento
+### 3. `onboarding_training_stage_history` (nova) — SLA por treinamento
 
-| coluna | tipo | nota |
-|---|---|---|
-| `training_id` | `uuid NULL` → `onboarding_training_sessions(id)` | `NULL` = movimento da jornada (como hoje) |
+**Correção do desenho inicial.** A primeira versão colocava uma coluna `training_id` em
+`onboarding_stage_history`. Ao implementar, o levantamento mostrou que aquela tabela é lida por
+**11 objetos do banco** (`move_onboarding_stage`, `advance_onboarding_to_implantacao`,
+`conclude/cancel/reopen_onboarding_journey`, `create_onboarding_journey`, `advance_onboarding_phase`,
+`revert_onboarding_to_onboarding`, `onboarding_stage_remove`, `fn_onb_training_cancel_undo` e a view
+`vw_onboarding_journeys`) e por **5 arquivos do front**. Várias procuram "o registro aberto da
+jornada" com `WHERE journey_id = ? AND saiu_em IS NULL` — passariam a encontrar linhas de treino e a
+fechá-las por engano, e todo agregado por etapa passaria a misturar jornada com treino.
 
-`journey_id` continua obrigatório e preenchido nos dois casos. Nada do Onboarding muda, e
+Tabela separada, mesmo formato:
+
+| coluna | tipo |
+|---|---|
+| `id` | `uuid` pk |
+| `tenant_id` | `uuid not null` |
+| `training_id` | `uuid not null` → `onboarding_training_sessions(id) ON DELETE CASCADE` |
+| `journey_id` | `uuid not null` → `onboarding_journeys(id)` |
+| `stage_id` | `uuid not null` → `onboarding_stages(id)` |
+| `entrou_em` / `saiu_em` | `timestamptz` |
+| `duracao_minutos` / `duracao_util_minutos` | `int` |
+
+RLS igual à da tabela irmã: `can_access_tenant_row(tenant_id)` nos quatro comandos. Duração útil pela
+mesma `fn_onb_util_min(entrou_em, saiu_em, tenant, department_id)`.
+
+Assim `onboarding_stage_history` não muda em nada, `move_onboarding_stage` continua intocada, e
 `onboarding_phase_metrics` segue medindo a fase por jornada.
 
 ---
@@ -114,7 +134,7 @@ permanece.
 
 ### `move_onboarding_training_stage(p_training_id, p_target_stage_id, p_force default false)` — nova
 
-Fecha o registro aberto em `onboarding_stage_history` daquele treino, abre o novo, atualiza
+Fecha o registro aberto em `onboarding_training_stage_history` daquele treino, abre o novo, atualiza
 `current_stage_id`. **`move_onboarding_stage` não é tocada** — ela já foi apagada em produção uma vez
 por duas migrations concorrentes (ver `docs/superpowers/specs/2026-07-26-onboarding-sla-*`).
 
@@ -130,8 +150,8 @@ Título, `training_type_id`, `conduzido_por`, `agendado_para`, `link_agendamento
 
 ### `delete_onboarding_training(p_training_id)` — nova
 
-Permitida enquanto o treino não tiver movimento: `realizado_em IS NULL` **e** nenhuma linha em
-`onboarding_stage_history` com aquele `training_id`. Faz soft delete do treino e do sub-ticket, e
+Permitida enquanto o treino não tiver movimento: `realizado_em IS NULL` **e** no máximo uma linha em
+`onboarding_training_stage_history` (a etapa inicial em que nasceu). Faz soft delete do treino e do sub-ticket, e
 registra evento no pai. Fora dessa janela, só cancelar.
 
 ### Trava de conclusão
@@ -221,8 +241,9 @@ por fase continua por jornada.
 
 1. **Banco — numeração.** `sub_seq`/`sub_seq_last`, índices, `next_sub_ticket_code`,
    `create_onboarding_training` alterada, backfill dos 24.
-2. **Banco — cartão e movimento.** `current_stage_id`, `deleted_at`, `training_id` no histórico,
-   `move_onboarding_training_stage`, `update_onboarding_training`, `delete_onboarding_training`.
+2. **Banco — cartão e movimento.** `current_stage_id`, `deleted_at`,
+   `onboarding_training_stage_history`, `move_onboarding_training_stage`,
+   `update_onboarding_training`, `delete_onboarding_training`.
 3. **Banco — rollup e trava.** Trigger de eventos no pai, guarda de conclusão nos dois pontos.
 4. **Front — quadro da Implantação.** Cartões por treino, filtro por `conduzido_por`, agrupar.
 5. **Front — edição no detalhe da jornada.**
