@@ -69,6 +69,8 @@ interface Props {
   goLivePorJornada: Record<string, string>;
   /** Quantas jornadas na tela só apareceram porque há busca — go-live fora dos 30 dias. */
   goLiveForaDaJanela: number;
+  /** Nome da jornada seguinte, quando existe: o cartão concluído mostra para onde foi. */
+  proximaFaseNome: string | null;
   agrupado: boolean;
   onOpenJourney: (journeyId: string, sub?: { id: string; code: string | null }) => void;
 }
@@ -103,8 +105,12 @@ function goLiveCurto(iso: string): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** Coluna virtual — não é etapa de pipeline, então não pode colidir com um uuid. */
+const GOLIVE_COL_ID = "__impl_golive__";
+
 export default function ImplantacaoBoard({
-  stages, rows, jornadasSemTreino, goLivePorJornada, goLiveForaDaJanela, agrupado, onOpenJourney,
+  stages, rows, jornadasSemTreino, goLivePorJornada, goLiveForaDaJanela, proximaFaseNome,
+  agrupado, onOpenJourney,
 }: Props) {
   const queryClient = useQueryClient();
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
@@ -147,6 +153,9 @@ export default function ImplantacaoBoard({
     stages.forEach((s) => (m[s.id] = []));
     rows.forEach((r) => {
       if (r.status === "cancelado") return; // fica só no agrupado e no histórico do pai
+      // Go-live dado: a jornada inteira encerrou, o cartão sai das colunas de etapa e
+      // vai para a coluna de conclusão — mesmo padrão de "Onboarding concluído".
+      if (goLivePorJornada[r.journey_id]) return;
       if (r.current_stage_id && m[r.current_stage_id]) m[r.current_stage_id].push(r);
     });
     Object.values(m).forEach((lista) =>
@@ -157,15 +166,49 @@ export default function ImplantacaoBoard({
       }),
     );
     return m;
-  }, [stages, rows]);
+  }, [stages, rows, goLivePorJornada]);
+
+  /** Coluna de conclusão: um cartão por ticket pai, não por treinamento. Depois do
+   *  go-live o que interessa é "esta implantação acabou", não cada treino de novo. */
+  const concluidas = useMemo(() => {
+    const m = new Map<string, {
+      journeyId: string; code: string | null; cliente: string | null; golive: string;
+      situacao: string | null; treinos: number;
+    }>();
+    rows.forEach((r) => {
+      const golive = goLivePorJornada[r.journey_id];
+      if (!golive) return;
+      const g = m.get(r.journey_id);
+      if (g) { if (r.status !== "cancelado") g.treinos += 1; return; }
+      m.set(r.journey_id, {
+        journeyId: r.journey_id,
+        code: r.parent_ticket_code,
+        cliente: r.cliente_nome,
+        golive,
+        situacao: r.journey_situacao,
+        treinos: r.status === "cancelado" ? 0 : 1,
+      });
+    });
+    // Jornada que encerrou sem nenhum treinamento também precisa aparecer aqui.
+    jornadasSemTreino.forEach((j) => {
+      const golive = goLivePorJornada[j.journey_id];
+      if (!golive || m.has(j.journey_id)) return;
+      m.set(j.journey_id, {
+        journeyId: j.journey_id, code: j.ticket_code, cliente: j.cliente_nome,
+        golive, situacao: null, treinos: 0,
+      });
+    });
+    return Array.from(m.values()).sort((a, b) => b.golive.localeCompare(a.golive));
+  }, [rows, jornadasSemTreino, goLivePorJornada]);
 
   const semTreinoPorEtapa = useMemo(() => {
     const m: Record<string, JornadaSemTreino[]> = {};
     jornadasSemTreino.forEach((j) => {
+      if (goLivePorJornada[j.journey_id]) return; // vai para a coluna de conclusão
       if (j.current_stage_id) (m[j.current_stage_id] ||= []).push(j);
     });
     return m;
-  }, [jornadasSemTreino]);
+  }, [jornadasSemTreino, goLivePorJornada]);
 
   /** Visão do gestor: um cartão por ticket pai.
    *  Não é kanban — um cliente pode ter um treinamento concluído e outro em no-show
@@ -233,7 +276,7 @@ export default function ImplantacaoBoard({
                     className="ml-auto text-[9px] px-1.5 py-0.5 rounded text-white font-medium"
                     style={{ background: golive || g.pronto ? "#22C55E" : "#64748B" }}
                   >
-                    {golive ? `go-live ${goLiveCurto(golive)}` : g.pronto ? "pronto" : `${g.filhos.length} ${g.filhos.length === 1 ? "filho" : "filhos"}`}
+                    {golive ? "concluída" : g.pronto ? "pronto" : `${g.filhos.length} ${g.filhos.length === 1 ? "filho" : "filhos"}`}
                   </span>
                 </div>
                 <p className="text-xs text-foreground mt-1 truncate">{g.cliente ?? "—"}</p>
@@ -250,7 +293,7 @@ export default function ImplantacaoBoard({
                         ? `${g.semDono} sem responsável`
                         : g.responsaveis > 1
                           ? `${g.responsaveis} responsáveis`
-                          : golive ? "implantação encerrada" : g.pronto ? "liberado para concluir" : ""}
+                          : golive ? `go-live ${goLiveCurto(golive)}` : g.pronto ? "liberado para concluir" : ""}
                   </span>
                 </div>
 
@@ -338,13 +381,10 @@ export default function ImplantacaoBoard({
                     {items.map((t) => {
                       const feito = t.status === "realizado";
                       const agendado = !!t.agendado_para && !feito;
-                      // Implantação encerrada: o cartão está aqui como registro do go-live.
-                      // Arrastar reescreveria a etapa arquivada, então ele fica preso.
-                      const golive = goLivePorJornada[t.journey_id];
                       return (
                         <div
                           key={t.training_id}
-                          draggable={!golive}
+                          draggable
                           onDragStart={(e) => {
                             e.dataTransfer.setData("trainingId", t.training_id);
                             e.dataTransfer.setData("fromStageId", t.current_stage_id ?? "");
@@ -352,21 +392,11 @@ export default function ImplantacaoBoard({
                           }}
                           onDragEnd={() => setDraggingId(null)}
                           onClick={() => onOpenJourney(t.journey_id, { id: t.ticket_id, code: t.ticket_code })}
-                          className={`bg-card border rounded-md p-2.5 hover:border-primary/40 transition-all cursor-pointer ${
-                            golive ? "" : "active:cursor-grabbing"
-                          } ${draggingId === t.training_id ? "opacity-40 scale-95" : ""}`}
-                          style={golive ? { borderColor: "#22C55E", background: "hsl(142 71% 45% / 0.04)" } : feito ? { borderColor: "#22C55E" } : undefined}
+                          className={`bg-card border rounded-md p-2.5 hover:border-primary/40 transition-all cursor-pointer active:cursor-grabbing ${
+                            draggingId === t.training_id ? "opacity-40 scale-95" : ""
+                          }`}
+                          style={feito ? { borderColor: "#22C55E" } : undefined}
                         >
-                          {golive && (
-                            <div
-                              className="flex items-center gap-1.5 -mx-2.5 -mt-2.5 mb-2 px-2.5 py-1.5 rounded-t-md text-[10px] font-medium text-white"
-                              style={{ background: "linear-gradient(90deg, #16A34A, #22C55E)" }}
-                              title={`Implantação encerrada em ${goLiveCurto(golive)} — cartão mantido para consulta`}
-                            >
-                              <Rocket className="h-3 w-3 shrink-0" />
-                              <span className="truncate">Go-live {goLiveCurto(golive)}</span>
-                            </div>
-                          )}
                           {agendado && (
                             <div
                               className="flex items-center gap-1.5 -mx-2.5 -mt-2.5 mb-2 px-2.5 py-1.5 rounded-t-md text-[10px] font-medium text-white"
@@ -499,6 +529,78 @@ export default function ImplantacaoBoard({
             </div>
           );
         })}
+
+        {/* Coluna de conclusão, espelhando "Onboarding concluído": a etapa final do
+            pipeline é para o filho encerrado com irmão ainda em andamento; quando TUDO
+            encerra, o go-live traz o ticket inteiro para cá. */}
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOverCol(GOLIVE_COL_ID);
+          }}
+          onDragLeave={() => setDragOverCol(null)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOverCol(null);
+            toast.error("O go-live é dado pelo ticket, e só com todos os treinamentos encerrados.");
+          }}
+          className={`flex flex-col min-w-[280px] w-[280px] rounded-lg border border-emerald-500/40 bg-emerald-500/5 transition-all ${
+            dragOverCol === GOLIVE_COL_ID ? "ring-2 ring-emerald-500/60" : ""
+          }`}
+        >
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-emerald-500/30 bg-emerald-500/10 rounded-t-lg">
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#22C55E" }} />
+            <span className="text-xs font-medium truncate text-emerald-700 dark:text-emerald-400">
+              Implantação concluída
+            </span>
+            <Badge variant="outline" className="ml-auto text-[10px] border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
+              {concluidas.length}
+            </Badge>
+          </div>
+
+          <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[75vh]">
+            {concluidas.length === 0 ? (
+              <div className="text-center text-[11px] text-muted-foreground/50 py-6 px-2">
+                Nenhuma implantação concluída nos últimos 30 dias.
+              </div>
+            ) : (
+              concluidas.map((c) => {
+                const encerrou = c.situacao === "concluido";
+                return (
+                  <div
+                    key={`golive-${c.journeyId}`}
+                    onClick={() => onOpenJourney(c.journeyId)}
+                    className="bg-card border rounded-md p-2.5 cursor-pointer hover:border-emerald-500/60 transition-all"
+                    style={{ borderColor: "#22C55E55" }}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <CheckCircle2 className="h-3 w-3 shrink-0" style={{ color: "#22C55E" }} />
+                      <span className="font-mono text-[11px] text-primary font-semibold">{c.code ?? "—"}</span>
+                      <span
+                        className="ml-auto text-[9px] px-1.5 py-0.5 rounded text-white"
+                        style={{ background: encerrou || !proximaFaseNome ? "#22C55E" : "#3B82F6" }}
+                      >
+                        {encerrou || !proximaFaseNome ? "concluída" : `→ em ${proximaFaseNome}`}
+                      </span>
+                    </div>
+                    <p className="text-xs text-foreground truncate">{c.cliente ?? "—"}</p>
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground/90 mt-1.5 flex-wrap">
+                      <span className="inline-flex items-center gap-1" title="Data do go-live">
+                        <Rocket className="h-3 w-3" /> Go-live {goLiveCurto(c.golive)}
+                      </span>
+                      {c.treinos > 0 && (
+                        <span className="inline-flex items-center gap-1">
+                          <GraduationCap className="h-3 w-3" />
+                          {c.treinos} {c.treinos === 1 ? "treinamento" : "treinamentos"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

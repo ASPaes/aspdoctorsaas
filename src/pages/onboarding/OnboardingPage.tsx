@@ -445,31 +445,19 @@ export default function OnboardingPage() {
     });
   }, [isImplantacao, trainingCards, stages, busca, filtroResponsavel, filtroSituacao, filtroTipoTreino, phasesByJourney, phaseId]);
 
-  /** Data do go-live por jornada, para o selo do cartão. */
+  /** Data do go-live por jornada — é o que manda o cartão para a coluna de conclusão.
+   *  Sai de `journeys`, não dos cartões filtrados, porque uma jornada pode ter encerrado
+   *  sem nenhum treinamento e mesmo assim precisa aparecer lá. É um superconjunto de
+   *  propósito: só é consultado para linha que já passou pelo filtro. */
   const goLivePorJornada = useMemo(() => {
     const m: Record<string, string> = {};
     if (!isImplantacao) return m;
-    trainingCardsFiltrados.forEach((t) => {
-      if (m[t.journey_id]) return;
-      const ts = goLiveEm(t.journey_id, t.journey_situacao);
-      if (ts !== null) m[t.journey_id] = new Date(ts).toISOString();
+    journeys.forEach((j) => {
+      const ts = goLiveEm(j.journey_id, j.situacao ?? null);
+      if (ts !== null) m[j.journey_id] = new Date(ts).toISOString();
     });
     return m;
-  }, [isImplantacao, trainingCardsFiltrados, phasesByJourney, phaseId]);
-
-  /** Cartão de go-live que só está na tela porque há busca — fora da janela padrão. */
-  const goLiveForaDaJanela = useMemo(() => {
-    if (!isImplantacao || !busca.trim() || filtroSituacao !== "todos") return 0;
-    const agora = Date.now();
-    return new Set(
-      trainingCardsFiltrados
-        .filter((t) => {
-          const ts = goLiveEm(t.journey_id, t.journey_situacao);
-          return ts !== null && agora - ts > GOLIVE_JANELA_MS;
-        })
-        .map((t) => t.journey_id),
-    ).size;
-  }, [isImplantacao, trainingCardsFiltrados, busca, filtroSituacao, phasesByJourney, phaseId]);
+  }, [isImplantacao, journeys, phasesByJourney, phaseId]);
 
   /** Na Implantação quem importa é quem CONDUZ o treinamento, não o responsável da
    *  jornada — era exatamente esse o furo: um especialista com seis treinamentos
@@ -543,13 +531,17 @@ export default function OnboardingPage() {
     const stageIds = new Set(stages.map((s) => s.id));
     return journeysFiltradas
       .filter((j) => !comTreino.has(j.journey_id))
-      .filter((j) => !!j.current_stage_id && stageIds.has(j.current_stage_id))
       .filter((j) => {
-        if (filtroSituacao !== "todos") return true;
-        // Mesma regra do cartão de treino: encerrada a Implantação, fica 30 dias na
-        // coluna final; com busca digitada a janela não se aplica.
         const golive = goLiveEm(j.journey_id, j.situacao ?? null);
-        if (golive !== null) return !!busca.trim() || Date.now() - golive <= GOLIVE_JANELA_MS;
+        // Encerrada a Implantação, a jornada vai para a coluna de conclusão — e aí a
+        // etapa atual dela já pode ser de outro pipeline (Acompanhamento). Exigir que
+        // a etapa esteja neste quadro sumiria justamente com quem deu go-live.
+        if (golive !== null) {
+          if (filtroSituacao !== "todos") return true;
+          return !!busca.trim() || Date.now() - golive <= GOLIVE_JANELA_MS;
+        }
+        if (!j.current_stage_id || !stageIds.has(j.current_stage_id)) return false;
+        if (filtroSituacao !== "todos") return true;
         return j.situacao !== "concluido" && j.situacao !== "cancelado";
       })
       .map((j) => ({
@@ -562,6 +554,20 @@ export default function OnboardingPage() {
         demand_type_cor: j.demand_type_cor ?? null,
       }));
   }, [isImplantacao, trainingCards, journeysFiltradas, stages, filtroSituacao, busca, phasesByJourney, phaseId]);
+
+  /** Implantação concluída que só está na tela porque há busca — fora da janela padrão. */
+  const goLiveForaDaJanela = useMemo(() => {
+    if (!isImplantacao || !busca.trim() || filtroSituacao !== "todos") return 0;
+    const agora = Date.now();
+    const ids = new Set<string>();
+    const marcar = (journeyId: string) => {
+      const ts = goLivePorJornada[journeyId];
+      if (ts && agora - new Date(ts).getTime() > GOLIVE_JANELA_MS) ids.add(journeyId);
+    };
+    trainingCardsFiltrados.forEach((t) => marcar(t.journey_id));
+    jornadasSemTreino.forEach((j) => marcar(j.journey_id));
+    return ids.size;
+  }, [isImplantacao, trainingCardsFiltrados, jornadasSemTreino, goLivePorJornada, busca, filtroSituacao]);
 
   function limparFiltros() {
     setBusca("");
@@ -889,6 +895,7 @@ export default function OnboardingPage() {
           jornadasSemTreino={jornadasSemTreino}
           goLivePorJornada={goLivePorJornada}
           goLiveForaDaJanela={goLiveForaDaJanela}
+          proximaFaseNome={proximaPhase?.nome ?? null}
           agrupado={agrupadoPorTicket}
           onOpenJourney={(id, sub) => {
             setDetailSubTicket(sub ?? null);

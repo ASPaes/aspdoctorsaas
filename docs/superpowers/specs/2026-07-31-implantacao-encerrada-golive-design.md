@@ -20,8 +20,15 @@ ou seja, a partir das 17:09 de 31/07 dava para registrar go-live com treinamento
 
 ## Decisões do owner
 
-1. **Não criar etapa nova.** A etapa marcada `is_final` no pipeline de Implantação **é** a
-   "Implantação Encerrada". Na Digi Office ela se chama `Concluído`.
+1. **Coluna de conclusão no fim do quadro**, espelhando a `Onboarding concluído` que já existe
+   na jornada de Onboarding. *(Revisto depois de ver a primeira versão: o owner tinha aceitado
+   reusar a etapa `is_final`, e ao ver na tela pediu a coluna separada, com o selo verde no topo
+   do cartão removido.)* A semântica ficou:
+   - **etapa `is_final` (`Concluído`)** = filho encerrado enquanto **outro filho ainda anda**;
+   - **coluna `Implantação concluída`** = **tudo** encerrado, go-live dado. O cartão sai das
+     colunas de etapa e vira **um cartão por ticket pai**, não por treinamento.
+   Continua não existindo etapa nova em `onboarding_stages`: a coluna é virtual
+   (`__impl_golive__`), como `__onb_concluido__`. Nenhum cadastro de pipeline muda.
 2. **Go-live só finaliza a jornada inteira**: todo sub-ticket de treinamento precisa estar
    encerrado. Caso contrário, bloqueia.
 3. **O cartão precisa existir no banco**, não ser um enfeite calculado na tela — a auditoria
@@ -70,10 +77,17 @@ seria falsificar histórico. O cartão reaparece dizendo a verdade e sai do quad
 
 `ImplantacaoBoard.tsx`:
 
-- Selo `Go-live DD/MM` no cartão (barra verde no topo, mesma geometria da barra azul de treino
-  agendado) e no cartão da visão agrupada.
-- Cartão de go-live **não é arrastável** — arrastar reescreveria a etapa arquivada.
+- Coluna virtual `__impl_golive__` no fim do quadro, com a mesma casca da `Onboarding concluído`
+  (borda e cabeçalho `emerald`, `CheckCircle2`, contador). Um cartão por ticket pai, com data do
+  go-live e quantos treinamentos teve; badge `concluída` ou `→ em <próxima jornada>`.
+- Jornada que encerrou **sem nenhum treinamento** também cai nessa coluna.
+- Soltar cartão nela é recusado com aviso: go-live é pelo ticket, com todos os filhos encerrados.
 - Aviso acima das colunas quando a busca está mostrando go-lives fora dos 30 dias.
+
+Cuidado que custou um bug: em `jornadasSemTreino`, exigir que `current_stage_id` pertença ao
+quadro sumia justamente com quem deu go-live — depois de avançar de fase a etapa da jornada já é
+do pipeline do Acompanhamento. O cartão de treinamento não sofre disso: treino não acompanha a
+jornada de pipeline.
 
 `JourneyDetailSheet.tsx`: mensagem própria para `treinos_em_aberto`, listando os códigos abertos.
 
