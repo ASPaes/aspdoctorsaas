@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Clock, GraduationCap, RotateCcw, Ticket, UserX } from "lucide-react";
+import { CheckCircle2, Clock, GraduationCap, Rocket, RotateCcw, Search, Ticket, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { formatTrainingDateTime, isTrainingUrgent, readableOn } from "./OnboardingPage";
 
@@ -65,6 +65,10 @@ interface Props {
   stages: StageCol[];
   rows: TrainingCardRow[];
   jornadasSemTreino: JornadaSemTreino[];
+  /** journey_id → ISO de quando a Implantação foi encerrada (go-live). Só as encerradas. */
+  goLivePorJornada: Record<string, string>;
+  /** Quantas jornadas na tela só apareceram porque há busca — go-live fora dos 30 dias. */
+  goLiveForaDaJanela: number;
   agrupado: boolean;
   onOpenJourney: (journeyId: string, sub?: { id: string; code: string | null }) => void;
 }
@@ -93,7 +97,15 @@ function corDoAgente(id: string | null): string {
   return paleta[h % paleta.length];
 }
 
-export default function ImplantacaoBoard({ stages, rows, jornadasSemTreino, agrupado, onOpenJourney }: Props) {
+/** "31/07" — data curta do go-live para o selo do cartão. */
+function goLiveCurto(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export default function ImplantacaoBoard({
+  stages, rows, jornadasSemTreino, goLivePorJornada, goLiveForaDaJanela, agrupado, onOpenJourney,
+}: Props) {
   const queryClient = useQueryClient();
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -201,21 +213,27 @@ export default function ImplantacaoBoard({ stages, rows, jornadasSemTreino, agru
         <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))]">
           {grupos.map((g) => {
             const pct = g.total > 0 ? Math.round((g.feitos / g.total) * 100) : 0;
+            // Sem isto um grupo com go-live fica idêntico a um só "liberado para concluir".
+            const golive = goLivePorJornada[g.journeyId];
             return (
               <div
                 key={g.chave}
                 onClick={() => onOpenJourney(g.journeyId)}
                 className="bg-card border rounded-md p-2.5 cursor-pointer transition-all hover:border-primary/40"
-                style={g.pronto ? { borderColor: "#22C55E" } : undefined}
+                style={golive ? { borderColor: "#22C55E", background: "hsl(142 71% 45% / 0.04)" } : g.pronto ? { borderColor: "#22C55E" } : undefined}
               >
                 <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: g.pronto ? "#22C55E" : "#F59E0B" }} />
+                  {golive ? (
+                    <Rocket className="h-3 w-3 shrink-0" style={{ color: "#16A34A" }} />
+                  ) : (
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ background: g.pronto ? "#22C55E" : "#F59E0B" }} />
+                  )}
                   <span className="font-mono text-[11px] text-primary font-semibold">{g.code ?? "—"}</span>
                   <span
                     className="ml-auto text-[9px] px-1.5 py-0.5 rounded text-white font-medium"
-                    style={{ background: g.pronto ? "#22C55E" : "#64748B" }}
+                    style={{ background: golive || g.pronto ? "#22C55E" : "#64748B" }}
                   >
-                    {g.pronto ? "pronto" : `${g.filhos.length} ${g.filhos.length === 1 ? "filho" : "filhos"}`}
+                    {golive ? `go-live ${goLiveCurto(golive)}` : g.pronto ? "pronto" : `${g.filhos.length} ${g.filhos.length === 1 ? "filho" : "filhos"}`}
                   </span>
                 </div>
                 <p className="text-xs text-foreground mt-1 truncate">{g.cliente ?? "—"}</p>
@@ -232,7 +250,7 @@ export default function ImplantacaoBoard({ stages, rows, jornadasSemTreino, agru
                         ? `${g.semDono} sem responsável`
                         : g.responsaveis > 1
                           ? `${g.responsaveis} responsáveis`
-                          : g.pronto ? "liberado para concluir" : ""}
+                          : golive ? "implantação encerrada" : g.pronto ? "liberado para concluir" : ""}
                   </span>
                 </div>
 
@@ -270,6 +288,16 @@ export default function ImplantacaoBoard({ stages, rows, jornadasSemTreino, agru
   // ── Quadro por etapa ──────────────────────────────────────────────────────
   return (
     <div className="flex-1 overflow-x-auto p-4">
+      {goLiveForaDaJanela > 0 && (
+        <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-md border border-[#22C55E]/30 bg-[#22C55E]/[0.06] text-[11px] text-muted-foreground">
+          <Search className="h-3.5 w-3.5 shrink-0 text-[#16A34A]" />
+          <span>
+            A busca está mostrando <span className="font-medium text-foreground">{goLiveForaDaJanela}</span>{" "}
+            {goLiveForaDaJanela === 1 ? "implantação encerrada" : "implantações encerradas"} fora dos últimos 30 dias.
+            Sem busca, o quadro mostra só os go-lives recentes.
+          </span>
+        </div>
+      )}
       <div className="flex flex-row gap-3 min-h-full pb-2">
         {stages.map((col) => {
           const items = porEtapa[col.id] ?? [];
@@ -310,10 +338,13 @@ export default function ImplantacaoBoard({ stages, rows, jornadasSemTreino, agru
                     {items.map((t) => {
                       const feito = t.status === "realizado";
                       const agendado = !!t.agendado_para && !feito;
+                      // Implantação encerrada: o cartão está aqui como registro do go-live.
+                      // Arrastar reescreveria a etapa arquivada, então ele fica preso.
+                      const golive = goLivePorJornada[t.journey_id];
                       return (
                         <div
                           key={t.training_id}
-                          draggable
+                          draggable={!golive}
                           onDragStart={(e) => {
                             e.dataTransfer.setData("trainingId", t.training_id);
                             e.dataTransfer.setData("fromStageId", t.current_stage_id ?? "");
@@ -321,11 +352,21 @@ export default function ImplantacaoBoard({ stages, rows, jornadasSemTreino, agru
                           }}
                           onDragEnd={() => setDraggingId(null)}
                           onClick={() => onOpenJourney(t.journey_id, { id: t.ticket_id, code: t.ticket_code })}
-                          className={`bg-card border rounded-md p-2.5 hover:border-primary/40 transition-all cursor-pointer active:cursor-grabbing ${
-                            draggingId === t.training_id ? "opacity-40 scale-95" : ""
-                          }`}
-                          style={feito ? { borderColor: "#22C55E" } : undefined}
+                          className={`bg-card border rounded-md p-2.5 hover:border-primary/40 transition-all cursor-pointer ${
+                            golive ? "" : "active:cursor-grabbing"
+                          } ${draggingId === t.training_id ? "opacity-40 scale-95" : ""}`}
+                          style={golive ? { borderColor: "#22C55E", background: "hsl(142 71% 45% / 0.04)" } : feito ? { borderColor: "#22C55E" } : undefined}
                         >
+                          {golive && (
+                            <div
+                              className="flex items-center gap-1.5 -mx-2.5 -mt-2.5 mb-2 px-2.5 py-1.5 rounded-t-md text-[10px] font-medium text-white"
+                              style={{ background: "linear-gradient(90deg, #16A34A, #22C55E)" }}
+                              title={`Implantação encerrada em ${goLiveCurto(golive)} — cartão mantido para consulta`}
+                            >
+                              <Rocket className="h-3 w-3 shrink-0" />
+                              <span className="truncate">Go-live {goLiveCurto(golive)}</span>
+                            </div>
+                          )}
                           {agendado && (
                             <div
                               className="flex items-center gap-1.5 -mx-2.5 -mt-2.5 mb-2 px-2.5 py-1.5 rounded-t-md text-[10px] font-medium text-white"

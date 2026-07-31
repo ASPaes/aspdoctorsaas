@@ -317,34 +317,6 @@ export default function OnboardingPage() {
 
   const trainingCards = trainingCardsQuery.data ?? [];
 
-  const trainingCardsFiltrados = useMemo(() => {
-    if (!isImplantacao) return [] as TrainingCardRow[];
-    const termo = busca.trim().toLowerCase();
-    const stageIds = new Set(stages.map((s) => s.id));
-    return trainingCards.filter((t) => {
-      // Cancelado ANTES de a jornada chegar na Implantação não existe aqui — nem no
-      // quadro, nem no agrupado. Fica só no histórico da jornada.
-      if (t.status === "cancelado" && !t.cancelado_na_implantacao) return false;
-      // Cancelado dentro da Implantação não ocupa coluna, mas aparece riscado no
-      // agrupado — é lá que o gestor enxerga o que foi descartado.
-      if (t.status !== "cancelado" && (!t.current_stage_id || !stageIds.has(t.current_stage_id))) return false;
-      if (filtroSituacao === "todos") {
-        if (t.journey_situacao === "concluido" || t.journey_situacao === "cancelado") return false;
-      } else if (filtroSituacao === "em_andamento") {
-        if (t.journey_situacao && t.journey_situacao !== "em_andamento" && t.journey_situacao !== "aberto") return false;
-      } else if (t.journey_situacao !== filtroSituacao) return false;
-
-      if (filtroResponsavel !== "todos" && t.conduzido_por !== filtroResponsavel) return false;
-      if (filtroTipoTreino !== "todos" && t.training_type_id !== filtroTipoTreino) return false;
-      if (termo) {
-        const hay = [t.cliente_nome, t.ticket_code, t.parent_ticket_code, t.titulo, t.conduzido_por_nome]
-          .filter(Boolean).join(" ").toLowerCase();
-        if (!hay.includes(termo)) return false;
-      }
-      return true;
-    });
-  }, [isImplantacao, trainingCards, stages, busca, filtroResponsavel, filtroSituacao, filtroTipoTreino]);
-
   const opcoesTipoTreino = useMemo(() => {
     const seen = new Map<string, string>();
     trainingCards.forEach((t) => {
@@ -403,22 +375,101 @@ export default function OnboardingPage() {
     queryFn: async () => {
       const rows = await fetchAllRows<{
         journey_id: string; phase_id: string; pipeline_id: string | null; aberta: boolean;
-        sla_util_min: number | null;
+        sla_util_min: number | null; concluida_em: string | null;
       }>(() =>
         (supabase.from("vw_onboarding_journey_phases" as any) as any)
-          .select("journey_id, phase_id, pipeline_id, aberta, sla_util_min")
+          .select("journey_id, phase_id, pipeline_id, aberta, sla_util_min, concluida_em")
           .eq("tenant_id", effectiveTenantId),
       );
-      const m: Record<string, Record<string, { pipeline_id: string | null; aberta: boolean; sla_util_min: number | null }>> = {};
+      const m: Record<string, Record<string, { pipeline_id: string | null; aberta: boolean; sla_util_min: number | null; concluida_em: string | null }>> = {};
       rows.forEach((r) => {
         (m[r.journey_id] ||= {})[r.phase_id] = {
           pipeline_id: r.pipeline_id, aberta: r.aberta, sla_util_min: r.sla_util_min,
+          concluida_em: r.concluida_em,
         };
       });
       return m;
     },
   });
   const phasesByJourney = journeyPhasesQuery.data ?? {};
+
+  /** Quando a Implantação daquela jornada foi encerrada (go-live). Nulo = ainda aberta.
+   *  É daqui que sai a janela de 30 dias da coluna final — e não de `situacao`, que
+   *  mente nos dois sentidos: sem jornada seguinte o go-live conclui a jornada e o
+   *  cartão sumia; com Acompanhamento ligado ela segue `em_andamento` e o cartão
+   *  ficaria no quadro da Implantação para sempre. */
+  const GOLIVE_JANELA_MS = 30 * 24 * 60 * 60 * 1000;
+
+  function goLiveEm(journeyId: string, situacao: string | null): number | null {
+    if (!phaseId || situacao === "cancelado") return null;
+    const passagem = phasesByJourney[journeyId]?.[phaseId];
+    if (!passagem || passagem.aberta || !passagem.concluida_em) return null;
+    return new Date(passagem.concluida_em).getTime();
+  }
+
+  const trainingCardsFiltrados = useMemo(() => {
+    if (!isImplantacao) return [] as TrainingCardRow[];
+    const termo = busca.trim().toLowerCase();
+    const stageIds = new Set(stages.map((s) => s.id));
+    const agora = Date.now();
+    return trainingCards.filter((t) => {
+      // Cancelado ANTES de a jornada chegar na Implantação não existe aqui — nem no
+      // quadro, nem no agrupado. Fica só no histórico da jornada.
+      if (t.status === "cancelado" && !t.cancelado_na_implantacao) return false;
+      // Cancelado dentro da Implantação não ocupa coluna, mas aparece riscado no
+      // agrupado — é lá que o gestor enxerga o que foi descartado.
+      if (t.status !== "cancelado" && (!t.current_stage_id || !stageIds.has(t.current_stage_id))) return false;
+
+      const golive = goLiveEm(t.journey_id, t.journey_situacao);
+      if (filtroSituacao !== "todos") {
+        // Situação escolhida à mão continua mandando, inclusive fora da janela.
+        if (filtroSituacao === "em_andamento") {
+          if (t.journey_situacao && t.journey_situacao !== "em_andamento" && t.journey_situacao !== "aberto") return false;
+        } else if (t.journey_situacao !== filtroSituacao) return false;
+      } else if (golive !== null) {
+        // Implantação encerrada: fica na etapa final por 30 dias. Buscar derruba a
+        // janela — é assim que se audita um go-live de dois meses atrás.
+        if (!termo && agora - golive > GOLIVE_JANELA_MS) return false;
+      } else if (t.journey_situacao === "concluido" || t.journey_situacao === "cancelado") {
+        return false;
+      }
+
+      if (filtroResponsavel !== "todos" && t.conduzido_por !== filtroResponsavel) return false;
+      if (filtroTipoTreino !== "todos" && t.training_type_id !== filtroTipoTreino) return false;
+      if (termo) {
+        const hay = [t.cliente_nome, t.ticket_code, t.parent_ticket_code, t.titulo, t.conduzido_por_nome]
+          .filter(Boolean).join(" ").toLowerCase();
+        if (!hay.includes(termo)) return false;
+      }
+      return true;
+    });
+  }, [isImplantacao, trainingCards, stages, busca, filtroResponsavel, filtroSituacao, filtroTipoTreino, phasesByJourney, phaseId]);
+
+  /** Data do go-live por jornada, para o selo do cartão. */
+  const goLivePorJornada = useMemo(() => {
+    const m: Record<string, string> = {};
+    if (!isImplantacao) return m;
+    trainingCardsFiltrados.forEach((t) => {
+      if (m[t.journey_id]) return;
+      const ts = goLiveEm(t.journey_id, t.journey_situacao);
+      if (ts !== null) m[t.journey_id] = new Date(ts).toISOString();
+    });
+    return m;
+  }, [isImplantacao, trainingCardsFiltrados, phasesByJourney, phaseId]);
+
+  /** Cartão de go-live que só está na tela porque há busca — fora da janela padrão. */
+  const goLiveForaDaJanela = useMemo(() => {
+    if (!isImplantacao || !busca.trim() || filtroSituacao !== "todos") return 0;
+    const agora = Date.now();
+    return new Set(
+      trainingCardsFiltrados
+        .filter((t) => {
+          const ts = goLiveEm(t.journey_id, t.journey_situacao);
+          return ts !== null && agora - ts > GOLIVE_JANELA_MS;
+        })
+        .map((t) => t.journey_id),
+    ).size;
+  }, [isImplantacao, trainingCardsFiltrados, busca, filtroSituacao, phasesByJourney, phaseId]);
 
   /** Na Implantação quem importa é quem CONDUZ o treinamento, não o responsável da
    *  jornada — era exatamente esse o furo: um especialista com seis treinamentos
@@ -493,7 +544,14 @@ export default function OnboardingPage() {
     return journeysFiltradas
       .filter((j) => !comTreino.has(j.journey_id))
       .filter((j) => !!j.current_stage_id && stageIds.has(j.current_stage_id))
-      .filter((j) => (filtroSituacao === "todos" ? j.situacao !== "concluido" && j.situacao !== "cancelado" : true))
+      .filter((j) => {
+        if (filtroSituacao !== "todos") return true;
+        // Mesma regra do cartão de treino: encerrada a Implantação, fica 30 dias na
+        // coluna final; com busca digitada a janela não se aplica.
+        const golive = goLiveEm(j.journey_id, j.situacao ?? null);
+        if (golive !== null) return !!busca.trim() || Date.now() - golive <= GOLIVE_JANELA_MS;
+        return j.situacao !== "concluido" && j.situacao !== "cancelado";
+      })
       .map((j) => ({
         journey_id: j.journey_id,
         ticket_code: j.ticket_code,
@@ -503,7 +561,7 @@ export default function OnboardingPage() {
         demand_type_nome: j.demand_type_nome ?? null,
         demand_type_cor: j.demand_type_cor ?? null,
       }));
-  }, [isImplantacao, trainingCards, journeysFiltradas, stages, filtroSituacao]);
+  }, [isImplantacao, trainingCards, journeysFiltradas, stages, filtroSituacao, busca, phasesByJourney, phaseId]);
 
   function limparFiltros() {
     setBusca("");
@@ -829,6 +887,8 @@ export default function OnboardingPage() {
           stages={stages}
           rows={trainingCardsFiltrados}
           jornadasSemTreino={jornadasSemTreino}
+          goLivePorJornada={goLivePorJornada}
+          goLiveForaDaJanela={goLiveForaDaJanela}
           agrupado={agrupadoPorTicket}
           onOpenJourney={(id, sub) => {
             setDetailSubTicket(sub ?? null);

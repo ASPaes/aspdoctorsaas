@@ -1223,6 +1223,16 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       if (error) throw error;
       const res = data as any;
       if (res && res.ok === false) {
+        if (res.reason === "treinos_em_aberto") {
+          // Go-live encerra a jornada inteira: nenhum sub-ticket de treinamento pode
+          // estar em aberto. Mostra QUAIS, senão o operador não sabe o que fechar.
+          toast.error(
+            `Go-live bloqueado: ${res.qtd} treinamento${res.qtd > 1 ? "s" : ""} em aberto (${res.codigos}). ` +
+            "Encerre ou cancele cada um antes de dar o go-live.",
+            { duration: 8000 },
+          );
+          return;
+        }
         toast.error(
           res.reason === "fase_sem_pipeline" ? `A jornada ${res.fase ?? "seguinte"} ainda não tem pipeline configurado.` :
           res.reason === "fase_sem_etapa" ? `A jornada ${res.fase ?? "seguinte"} não tem etapas configuradas.` :
