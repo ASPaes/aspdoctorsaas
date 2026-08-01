@@ -151,16 +151,33 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
     },
   });
 
-  const selectedDemand = (demandTypesQuery.data ?? []).find((d) => d.id === demandTypeId);
-  const slaDays = selectedDemand?.sla_total_minutos
-    ? Math.ceil(selectedDemand.sla_total_minutos / 1440)
-    : 0;
+  // O prazo passou a sair da soma das etapas do trilho do PRODUTO (01/08). Antes vinha do
+  // tipo de demanda, que agora é só referência. A base aqui era 1440 e no diálogo de
+  // edição era 480 — o mesmo cálculo com bases diferentes; agora existe uma só.
+  const trilhoQuery = useQuery({
+    queryKey: ["onb-trilho-sla", tenantId, produtoId],
+    enabled: open && !!tenantId,
+    staleTime: 0,
+    refetchOnMount: "always",
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("fn_onb_trilho_sla_min", {
+        p_tenant_id: tenantId,
+        p_produto_id: produtoId ? Number(produtoId) : null,
+      });
+      if (error) throw error;
+      return (data as number | null) ?? 0;
+    },
+  });
+
+  // base_dia_util_8h: 1 dia útil = 480 minutos, igual a fn_journey_go_live.
+  const trilhoMin = trilhoQuery.data ?? 0;
+  const slaDays = trilhoMin ? Math.ceil(trilhoMin / 480) : 0;
   const slaLabel = `${slaDays} ${slaDays === 1 ? "dia útil" : "dias úteis"}`;
 
-  // Golive previsto = início + SLA do tipo de demanda em dias úteis (fn_journey_go_live).
+  // Golive previsto = início + soma das etapas da janela contada (fn_journey_go_live).
   const goLiveCalcQuery = useQuery({
-    queryKey: ["onb-golive-calc", tenantId, demandTypeId, dataInicio],
-    enabled: open && !!tenantId && !!demandTypeId,
+    queryKey: ["onb-golive-calc", tenantId, produtoId, dataInicio],
+    enabled: open && !!tenantId,
     staleTime: 0,
     refetchOnMount: "always",
     queryFn: async () => {
@@ -168,7 +185,7 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
       const { data, error } = await (supabase.rpc as any)("fn_journey_go_live", {
         p_tenant_id: tenantId,
         p_start: startIso,
-        p_demand_type_id: demandTypeId,
+        p_produto_id: produtoId ? Number(produtoId) : null,
         p_department_id: null,
       });
       if (error) throw error;
@@ -382,12 +399,13 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
             Data de abertura é registrada na criação e não editável. Início planejado é
             a data combinada com o cliente.
           </p>
-          {demandTypeId && (
-            <div className="text-[11px] -mt-1 sm:col-span-2">
-              {goLiveCalcQuery.isFetching ? (
+          <div className="text-[11px] -mt-1 sm:col-span-2">
+            {goLiveCalcQuery.isFetching || trilhoQuery.isFetching ? (
                 <span className="text-muted-foreground">Calculando go-live…</span>
-              ) : selectedDemand && !selectedDemand.sla_total_minutos ? (
-                <span className="text-amber-500">Este tipo de demanda não tem SLA definido — go-live não calculado.</span>
+              ) : !trilhoMin ? (
+                <span className="text-amber-500">
+                  Nenhuma etapa com SLA na janela contada deste produto — go-live não calculado.
+                </span>
               ) : goLiveEdited ? (
                 <button
                   type="button"
@@ -399,8 +417,7 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
               ) : goLiveCalcQuery.data ? (
                 <span className="text-muted-foreground">Calculado: {slaLabel} a partir do início.</span>
               ) : null}
-            </div>
-          )}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>

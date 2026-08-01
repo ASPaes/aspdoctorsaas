@@ -150,4 +150,15 @@ describe("EditJourneyInfoDialog", () => {
     expect(produto).toBeTruthy();
     expect(document.body.textContent).toContain("cancele esta jornada");
   });
+
+  // O go-live passou a derivar da soma das etapas do trilho (01/08). O tipo de demanda
+  // virou referência e não entra mais no cálculo — se voltar a entrar, isto quebra.
+  it("calcula o go-live pelo produto, não pelo tipo de demanda", async () => {
+    render();
+    await act(async () => { await Promise.resolve(); });
+    const chamada = rpc.mock.calls.find((c) => c[0] === "fn_journey_go_live");
+    expect(chamada).toBeDefined();
+    expect(chamada![1]).toHaveProperty("p_produto_id", 7);
+    expect(chamada![1]).not.toHaveProperty("p_demand_type_id");
+  });
 });
