@@ -219,15 +219,15 @@ export function PipelinesPanel({ phaseId }: Props) {
       ativo: p.ativo ?? true,
       department_id: p.department_id ?? null,
     };
-    // sla_total_minutos NÃO entra no UPDATE: desde 01/08 é derivado da soma das etapas
+    // sla_total_minutos não entra no payload: desde 01/08 é derivado da soma das etapas
     // (trg_sync_pipeline_sla_total). Mandá-lo daqui zerava o total a cada edição do
-    // pipeline, até a próxima mexida em etapa. No INSERT vai 0 só para não nascer NULL.
+    // pipeline, até a próxima mexida em etapa. Pipeline novo nasce NULL — "ainda não
+    // tem etapa", que é diferente de "soma zero" (ver sql-test 19, Acompanhamento).
     try {
       if (isNew) {
         const maxPos = pipelines.reduce((m, i) => Math.max(m, i.position ?? 0), 0);
         payload.tenant_id = effectiveTenantId;
         payload.position = maxPos + 1;
-        payload.sla_total_minutos = 0;
         const { error } = await (supabase.from("onboarding_pipelines" as any) as any).insert(payload);
         if (error) throw error;
         toast.success("Pipeline criado");

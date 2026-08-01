@@ -9,9 +9,9 @@ BEGIN
   -- 1. depois da reconciliação inicial, NENHUM pipeline diverge da soma
   SELECT count(*) INTO v_div
     FROM public.onboarding_pipelines p
-   WHERE p.sla_total_minutos IS DISTINCT FROM COALESCE((
+   WHERE p.sla_total_minutos IS DISTINCT FROM (
            SELECT sum(s.sla_minutos) FROM public.onboarding_stages s
-            WHERE s.pipeline_id = p.id AND s.ativo AND NOT COALESCE(s.pausa_sla,false)), 0);
+            WHERE s.pipeline_id = p.id AND s.ativo AND NOT COALESCE(s.pausa_sla,false));
   IF v_div > 0 THEN RAISE EXCEPTION 'FALHA 1: % pipeline(s) divergindo da soma', v_div; END IF;
 
   SELECT p.id INTO v_pipe FROM public.onboarding_pipelines p
@@ -21,28 +21,28 @@ BEGIN
 
   -- 2. mudar o SLA de uma etapa recalcula o total
   UPDATE public.onboarding_stages SET sla_minutos = 777 WHERE id = v_s;
-  SELECT COALESCE(sum(sla_minutos),0) INTO v_esperado FROM public.onboarding_stages
+  SELECT sum(sla_minutos) INTO v_esperado FROM public.onboarding_stages
    WHERE pipeline_id = v_pipe AND ativo AND NOT COALESCE(pausa_sla,false);
   SELECT sla_total_minutos INTO v_lido FROM public.onboarding_pipelines WHERE id = v_pipe;
-  IF v_lido <> v_esperado THEN RAISE EXCEPTION 'FALHA 2: esperava %, li %', v_esperado, v_lido; END IF;
+  IF v_lido IS DISTINCT FROM v_esperado THEN RAISE EXCEPTION 'FALHA 2: esperava %, li %', v_esperado, v_lido; END IF;
 
   -- 3. desativar uma etapa tira ela da soma
   UPDATE public.onboarding_stages SET ativo = false WHERE id = v_s;
-  SELECT COALESCE(sum(sla_minutos),0) INTO v_esperado FROM public.onboarding_stages
+  SELECT sum(sla_minutos) INTO v_esperado FROM public.onboarding_stages
    WHERE pipeline_id = v_pipe AND ativo AND NOT COALESCE(pausa_sla,false);
   SELECT sla_total_minutos INTO v_lido FROM public.onboarding_pipelines WHERE id = v_pipe;
-  IF v_lido <> v_esperado THEN RAISE EXCEPTION 'FALHA 3: esperava %, li %', v_esperado, v_lido; END IF;
+  IF v_lido IS DISTINCT FROM v_esperado THEN RAISE EXCEPTION 'FALHA 3: esperava %, li %', v_esperado, v_lido; END IF;
 
   -- 4. marcar pausa_sla tira da soma
   --    (comparar contra a soma das OUTRAS etapas — o total do pipeline nunca é só esta)
   UPDATE public.onboarding_stages SET ativo = true, sla_minutos = 999, pausa_sla = true WHERE id = v_s;
-  SELECT COALESCE(sum(sla_minutos),0) INTO v_esperado FROM public.onboarding_stages
+  SELECT sum(sla_minutos) INTO v_esperado FROM public.onboarding_stages
    WHERE pipeline_id = v_pipe AND ativo AND NOT COALESCE(pausa_sla,false);
   SELECT sla_total_minutos INTO v_lido FROM public.onboarding_pipelines WHERE id = v_pipe;
-  IF v_lido <> v_esperado THEN
+  IF v_lido IS DISTINCT FROM v_esperado THEN
     RAISE EXCEPTION 'FALHA 4: etapa de pausa entrou na soma — esperava %, li %', v_esperado, v_lido;
   END IF;
-  IF v_esperado = 0 THEN RAISE EXCEPTION 'FALHA 4b: fixture inútil, pipeline só tem a etapa de pausa'; END IF;
+  IF COALESCE(v_esperado,0) = 0 THEN RAISE EXCEPTION 'FALHA 4b: fixture inútil, pipeline só tem a etapa de pausa'; END IF;
 
   -- 5. DELETE recalcula
   UPDATE public.onboarding_stages SET pausa_sla = false WHERE id = v_s;
@@ -52,10 +52,10 @@ BEGIN
   UPDATE public.onboarding_journeys SET current_stage_id = NULL WHERE current_stage_id = v_s;
   UPDATE public.onboarding_journeys SET sla_encerrado_stage_id = NULL WHERE sla_encerrado_stage_id = v_s;
   DELETE FROM public.onboarding_stages WHERE id = v_s;
-  SELECT COALESCE(sum(sla_minutos),0) INTO v_esperado FROM public.onboarding_stages
+  SELECT sum(sla_minutos) INTO v_esperado FROM public.onboarding_stages
    WHERE pipeline_id = v_pipe AND ativo AND NOT COALESCE(pausa_sla,false);
   SELECT sla_total_minutos INTO v_lido FROM public.onboarding_pipelines WHERE id = v_pipe;
-  IF v_lido <> v_esperado THEN RAISE EXCEPTION 'FALHA 5: esperava %, li %', v_esperado, v_lido; END IF;
+  IF v_lido IS DISTINCT FROM v_esperado THEN RAISE EXCEPTION 'FALHA 5: esperava %, li %', v_esperado, v_lido; END IF;
 
   RAISE NOTICE 'OK 23_pipeline_sla_total_trigger';
 END $$;

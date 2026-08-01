@@ -19,13 +19,16 @@ BEGIN
     CASE WHEN TG_OP <> 'DELETE' THEN NEW.pipeline_id END
   ]) AS x WHERE x IS NOT NULL);
 
+  -- Sem COALESCE de propósito: NULL e 0 significam coisas diferentes aqui. O quadro
+  -- padrão de Acompanhamento nasce com etapas de sla_minutos NULL — "o relógio não
+  -- reinicia nesta jornada" — e virar 0 apagaria essa intenção (ver sql-test 19).
   UPDATE public.onboarding_pipelines p
-     SET sla_total_minutos = COALESCE((
+     SET sla_total_minutos = (
            SELECT sum(s.sla_minutos)
              FROM public.onboarding_stages s
             WHERE s.pipeline_id = p.id
               AND s.ativo
-              AND NOT COALESCE(s.pausa_sla, false)), 0)
+              AND NOT COALESCE(s.pausa_sla, false))
    WHERE p.id = ANY(v_ids);
 
   RETURN NULL;
@@ -39,12 +42,12 @@ FOR EACH ROW EXECUTE FUNCTION public.fn_sync_pipeline_sla_total();
 
 -- Reconciliação inicial: alinha todos os pipelines de uma vez.
 UPDATE public.onboarding_pipelines p
-   SET sla_total_minutos = COALESCE((
+   SET sla_total_minutos = (
          SELECT sum(s.sla_minutos) FROM public.onboarding_stages s
-          WHERE s.pipeline_id = p.id AND s.ativo AND NOT COALESCE(s.pausa_sla,false)), 0)
- WHERE p.sla_total_minutos IS DISTINCT FROM COALESCE((
+          WHERE s.pipeline_id = p.id AND s.ativo AND NOT COALESCE(s.pausa_sla,false))
+ WHERE p.sla_total_minutos IS DISTINCT FROM (
          SELECT sum(s.sla_minutos) FROM public.onboarding_stages s
-          WHERE s.pipeline_id = p.id AND s.ativo AND NOT COALESCE(s.pausa_sla,false)), 0);
+          WHERE s.pipeline_id = p.id AND s.ativo AND NOT COALESCE(s.pausa_sla,false));
 
 COMMENT ON COLUMN public.onboarding_pipelines.sla_total_minutos IS
   'DERIVADO por trg_sync_pipeline_sla_total: soma das etapas ativas não-pausa. Não editar à mão.';
