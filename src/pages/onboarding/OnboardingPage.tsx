@@ -21,6 +21,7 @@ import { NewJourneyModal } from "./NewJourneyModal";
 import JourneyDetailSheet from "./JourneyDetailSheet";
 import ImplantacaoBoard, { type TrainingCardRow, type JornadaSemTreino } from "./ImplantacaoBoard";
 import AcompanhamentoBoard from "./AcompanhamentoBoard";
+import { NewAcompanhamentoModal } from "@/components/tickets/NewAcompanhamentoModal";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
 
 interface StageRow {
@@ -138,6 +139,7 @@ export default function OnboardingPage() {
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [acompTicketId, setAcompTicketId] = useState<string | null>(null);
+  const [newAcompOpen, setNewAcompOpen] = useState(false);
   /** Quando o detalhe é aberto pelo cartão de um treinamento, a tela continua sendo a do
    *  ticket pai, mas o que for feito ali é registrado como partindo deste sub-ticket. */
   const [detailSubTicket, setDetailSubTicket] = useState<{ id: string; code: string | null } | null>(null);
@@ -731,10 +733,17 @@ export default function OnboardingPage() {
               Configurar
             </Link>
           </Button>
-          <Button size="sm" onClick={() => setNewOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Nova jornada
-          </Button>
+          {isAcompanhamento ? (
+            <Button size="sm" onClick={() => setNewAcompOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Novo acompanhamento
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => setNewOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Nova jornada
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1218,6 +1227,16 @@ export default function OnboardingPage() {
         onCreated={() => {
           queryClient.invalidateQueries({ queryKey: ["onboarding-journeys"] });
           queryClient.invalidateQueries({ queryKey: ["onboarding-journey-phases"] });
+        }}
+      />
+
+      <NewAcompanhamentoModal
+        open={newAcompOpen}
+        onOpenChange={setNewAcompOpen}
+        tenantId={effectiveTenantId}
+        onCreated={(id) => {
+          queryClient.invalidateQueries({ queryKey: ["onb-acompanhamento-board"] });
+          setAcompTicketId(id);
         }}
       />
 

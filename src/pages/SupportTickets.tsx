@@ -4,7 +4,7 @@ import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove 
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TicketCheck, Plus, TrendingUp, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell, Building2, Download } from "lucide-react";
+import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell, Building2, Download } from "lucide-react";
 import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
 import { subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
@@ -23,7 +23,6 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
 import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
-import { NewAcompanhamentoModal } from "@/components/tickets/NewAcompanhamentoModal";
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
@@ -143,7 +142,6 @@ export default function SupportTickets() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const [newAcompOpen, setNewAcompOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [ticketsView, setTicketsView] = useState<string>("lista");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
@@ -1053,9 +1051,6 @@ export default function SupportTickets() {
               </div>
             </PopoverContent>
           </Popover>
-          <Button size="sm" variant="outline" onClick={() => setNewAcompOpen(true)}>
-            <TrendingUp className="h-4 w-4 mr-1.5" /> Novo acompanhamento
-          </Button>
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-1.5" /> Novo ticket
           </Button>
@@ -1756,15 +1751,6 @@ export default function SupportTickets() {
         const Comp = PendingClosuresTab as any;
         return <Comp embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} />;
       })()}
-
-      <NewAcompanhamentoModal
-        open={newAcompOpen}
-        onOpenChange={setNewAcompOpen}
-        tenantId={tid}
-        onCreated={() => {
-          queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
-        }}
-      />
 
       <CreateSupportTicketModal
         open={createOpen}
