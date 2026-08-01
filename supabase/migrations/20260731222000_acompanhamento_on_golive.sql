@@ -34,11 +34,12 @@ BEGIN
 
   SELECT tk.ticket_code INTO v_codigo FROM public.support_tickets tk WHERE tk.id = NEW.ticket_id;
 
+  -- Histórico mínimo, decisão do owner: no ticket novo entra só de qual implantação ele veio.
+  -- O detalhe (quais treinos pediram) fica no evento da timeline da implantação, abaixo.
   BEGIN
     v_res := public.fn_create_acompanhamento_ticket(
       NEW.tenant_id, NEW.cliente_id, NEW.ticket_id,
-      'Aberto pelo encerramento da implantação ' || COALESCE(v_codigo, '') ||
-      ' · treinos: ' || v_treinos);
+      'Implantação ' || COALESCE(v_codigo, '—'));
   EXCEPTION WHEN OTHERS THEN
     INSERT INTO public.support_ticket_events (tenant_id, ticket_id, user_id, event_type, content)
     VALUES (NEW.tenant_id, NEW.ticket_id, auth.uid(), 'acompanhamento_nao_aberto',
