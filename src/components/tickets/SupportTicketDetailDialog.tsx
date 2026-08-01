@@ -25,7 +25,7 @@ import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
   Tag as TagIcon, X, ListChecks, Trash2, ChevronDown, Building2, MessageSquare, UserPlus, Rocket,
-  Check, Lock, RefreshCw, TrendingUp,
+  Check, Lock, RefreshCw,
 } from "lucide-react";
 import AcompanhamentoSection from "@/pages/onboarding/AcompanhamentoSection";
 
@@ -898,7 +898,34 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   ].filter(Boolean).join(" › ") : "";
   const tipoServico = ticket?.service_types?.nome;
 
-  const detailsContent = !ticket ? null : (
+  /* Ticket de acompanhamento não é ticket de suporte: não tem setor, status, classificação
+     nem contato. O detalhe é só o lançamento dos indicadores. */
+  const acompanhamentoContent = !ticket ? null : (
+    <div className="space-y-3 pr-2 pt-1">
+      <div className="flex items-center gap-2 flex-wrap text-xs">
+        <span className="inline-flex items-center gap-1.5 font-medium">
+          <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+          {ticket.clientes?.nome_fantasia ?? "—"}
+        </span>
+        {ticket.descricao && (
+          <span className="text-muted-foreground">· {ticket.descricao}</span>
+        )}
+        {ticket.concluido_em && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500">
+            encerrado
+          </span>
+        )}
+      </div>
+
+      <AcompanhamentoSection
+        ticketId={ticket.id}
+        tenantId={ticket.tenant_id}
+        readOnly={!!ticket.concluido_em}
+      />
+    </div>
+  );
+
+  const detailsContent = !ticket ? null : ticket.is_acompanhamento ? acompanhamentoContent : (
     <div className="space-y-4 pr-2 pt-1">
       {/* Setor + Status + Responsável */}
       <div className="grid grid-cols-3 gap-3">
@@ -1295,24 +1322,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           </div>
         );
       })()}
-
-      {/* Acompanhamento de uso — só no ticket que nasceu para isso */}
-      {ticket?.is_acompanhamento && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-xs font-medium">Acompanhamento de uso</Label>
-          </div>
-          <p className="text-[10px] text-muted-foreground -mt-1">
-            Os números do cliente ao longo do tempo — é isso que diz se ele destravou.
-          </p>
-          <AcompanhamentoSection
-            ticketId={ticket.id}
-            tenantId={ticket.tenant_id}
-            readOnly={!!ticket.concluido_em}
-          />
-        </div>
-      )}
 
       {/* Checklist */}
       <div className="space-y-2">

@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Building2, CalendarDays } from "lucide-react";
+import { TrendingUp, Building2, CalendarDays, CheckCircle2 } from "lucide-react";
 
 export interface AcompanhamentoStage {
   id: string;
@@ -19,6 +19,7 @@ interface TicketRow {
   descricao: string | null;
   aberto_em: string;
   acompanhamento_stage_id: string | null;
+  concluido_em: string | null;
   cliente_id: string | null;
   clientes?: { nome_fantasia: string | null; razao_social: string | null } | null;
 }
@@ -56,11 +57,13 @@ export default function AcompanhamentoBoard({
     queryFn: async () =>
       fetchAllRows<TicketRow>(() =>
         (supabase.from("support_tickets" as any) as any)
-          .select("id, ticket_code, assunto, descricao, aberto_em, acompanhamento_stage_id, cliente_id, clientes:cliente_id(nome_fantasia, razao_social)")
+          .select("id, ticket_code, assunto, descricao, aberto_em, concluido_em, acompanhamento_stage_id, cliente_id, clientes:cliente_id(nome_fantasia, razao_social)")
           .eq("tenant_id", tenantId)
           .eq("is_acompanhamento", true)
-          .is("concluido_em", null)
           .is("deleted_at", null)
+          // encerrado continua no quadro como histórico, mas só por 90 dias — senão a última
+          // coluna vira depósito e o quadro fica ilegível com o tempo.
+          .or(`concluido_em.is.null,concluido_em.gte.${new Date(Date.now() - 90 * 86_400_000).toISOString()}`)
           .order("aberto_em", { ascending: false }),
       ),
   });
@@ -102,8 +105,12 @@ export default function AcompanhamentoBoard({
     });
     if (error || !data?.ok) {
       toast.error(error?.message ?? "Não foi possível mover o acompanhamento");
-      qc.invalidateQueries({ queryKey: [ACOMP_BOARD_KEY] });
+    } else if (data.encerrou) {
+      toast.success("Acompanhamento encerrado — fica no quadro como histórico");
+    } else if (data.reabriu) {
+      toast.success("Acompanhamento reaberto");
     }
+    qc.invalidateQueries({ queryKey: [ACOMP_BOARD_KEY] });
   }
 
   return (
@@ -147,23 +154,38 @@ export default function AcompanhamentoBoard({
                   items.map((t) => {
                     const cliente = t.clientes?.nome_fantasia || t.clientes?.razao_social || "—";
                     const dias = diasDesde(t.aberto_em);
+                    const encerrado = !!t.concluido_em;
                     return (
                       <div
                         key={t.id}
                         draggable
                         onDragStart={(e) => e.dataTransfer.setData("ticketId", t.id)}
                         onClick={() => onOpenTicket(t.id)}
-                        className="bg-card border border-border rounded-md p-2.5 cursor-pointer hover:border-primary/60 transition-all"
+                        className={`border rounded-md p-2.5 cursor-pointer transition-all ${
+                          encerrado
+                            ? "bg-muted/30 border-emerald-500/40 hover:border-emerald-500/70"
+                            : "bg-card border-border hover:border-primary/60"
+                        }`}
                       >
                         <div className="flex items-center gap-1.5 mb-1">
-                          <TrendingUp className="h-3 w-3 shrink-0 text-[hsl(199_89%_48%)]" />
+                          {encerrado ? (
+                            <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-500" />
+                          ) : (
+                            <TrendingUp className="h-3 w-3 shrink-0 text-[hsl(199_89%_48%)]" />
+                          )}
                           <span className="font-mono text-[11px] text-primary font-semibold">
                             {t.ticket_code ?? "—"}
                           </span>
-                          <span className="ml-auto inline-flex items-center gap-1 text-[9px] text-muted-foreground">
-                            <CalendarDays className="h-2.5 w-2.5" />
-                            {dias === 0 ? "hoje" : `${dias}d`}
-                          </span>
+                          {encerrado ? (
+                            <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500">
+                              encerrado
+                            </span>
+                          ) : (
+                            <span className="ml-auto inline-flex items-center gap-1 text-[9px] text-muted-foreground">
+                              <CalendarDays className="h-2.5 w-2.5" />
+                              {dias === 0 ? "hoje" : `${dias}d`}
+                            </span>
+                          )}
                         </div>
 
                         <p className="text-xs text-foreground truncate flex items-center gap-1">
