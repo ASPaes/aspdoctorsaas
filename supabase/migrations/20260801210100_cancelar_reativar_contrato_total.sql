@@ -15,8 +15,6 @@
 -- 3. reativar_contrato desfaz a baixa pelo encerrado_por_contrato_id e devolve
 --    o MRR pelo mesmo critério com que foi tirado.
 
-BEGIN;
-
 CREATE OR REPLACE FUNCTION public.cancelar_contrato(
   p_contrato_id uuid,
   p_motivo_id bigint DEFAULT NULL::bigint,
@@ -361,4 +359,3 @@ BEGIN
 END;
 $function$;
 
-COMMIT;

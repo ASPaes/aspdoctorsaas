@@ -27,8 +27,6 @@
 -- Cancelamento PARCIAL fica como está: com movimento solto não há como
 -- saber de qual contrato ele é. Assunto separado.
 
-BEGIN;
-
 -- ---------------------------------------------------------------------------
 -- 1. Vigência do movimento recorrente
 -- ---------------------------------------------------------------------------
@@ -82,4 +80,3 @@ COMMENT ON FUNCTION public.fn_mrr_cliente_em(uuid, uuid, date) IS
   'movimentos_mrr.encerrado_em. '
   'NÃO usar vw_clientes_financeiro.mensalidade para data passada — é a foto de hoje.';
 
-COMMIT;
