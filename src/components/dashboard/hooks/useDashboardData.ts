@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { format, startOfMonth, endOfMonth, subMonths, differenceInDays } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, subDays, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { DashboardFilters, KPIMetrics, TimeSeriesData, DistributionData, DistributionDataPoint, CanceladoListItem, NovoClienteListItem, DownsellListItem } from '../types';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { fetchAllRows } from '@/lib/supabasePaginate';
+import { buildMrrRuler, MRR_MOV_TIPOS } from '@/lib/mrrRuler';
 
 const defaultMetrics: KPIMetrics = {
   faturamentoTotal: 0, faturamentoPorUnidade: [], clientesAtivos: 0, mrr: 0, ticketMedio: 0, arr: 0,
@@ -49,18 +50,21 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       const periodoInicioStr = format(periodoInicio, 'yyyy-MM-dd');
       const periodoFimStr = format(periodoFim, 'yyyy-MM-dd');
 
-      // Fornecedor filter via cliente_produtos (deprecated clientes.fornecedor_id)
-      let fornecedorClientIds: Set<string> | null = null;
-      if (filters.fornecedorIds?.length) {
-        const cpByForn = await fetchAllRows<any>(() => {
-          let q = (supabase.from('cliente_produtos' as any) as any)
-            .select('cliente_id')
-            .in('fornecedor_id', filters.fornecedorIds);
-          if (tid) q = q.eq('tenant_id', tid);
-          return q;
-        });
-        fornecedorClientIds = new Set((cpByForn || []).map((r: any) => r.cliente_id));
-      }
+      // Catálogo de produtos do cliente — UMA busca que serve a três coisas: filtro por
+      // fornecedor, distribuição por fornecedor e, principalmente, a BASE TEMPORAL do MRR.
+      //
+      // O MRR vinha de `vw_clientes_financeiro.mensalidade`, que é
+      // `SUM(vlr_mensal) FILTER (ativo = true)` — estado de HOJE, sem história. Quando um
+      // cliente cancelava um produto, ele passava a valer menos em TODOS os meses anteriores
+      // também, e o card de MRR divergia da aba Crescimento (que já lê a régua nova via
+      // `get_mrr_bridge` / `get_mrr_monthly_snapshots`). Medido em 01/08/2026 na Digi Office,
+      // corte 30/04: R$ 369.907 pelo motor antigo contra R$ 417.448 pela régua correta.
+      const cpAllPromise = fetchAllRows<any>(() => {
+        let q = (supabase.from('cliente_produtos' as any) as any)
+          .select('cliente_id, fornecedor_id, vlr_mensal, ativo, data_cancelamento');
+        if (tid) q = q.eq('tenant_id', tid);
+        return q;
+      });
 
       // === FIRE ALL FETCHES IN PARALLEL ===
       const clientesRawPromise = fetchAllRows<any>(() => {
@@ -112,14 +116,6 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
         return q;
       });
-      const movimentosInicioRawPromise = fetchAllRows<any>(() => tf(supabase
-        .from('movimentos_mrr')
-        .select('cliente_id, valor_delta')
-        .in('tipo', ['upsell','cross_sell','downsell','churn','reactivation','reajuste'])
-        .eq('status', 'ativo')
-        .is('estornado_por', null)
-        .is('estorno_de', null)
-        .lt('data_movimento', periodoInicioStr)));
       const cacDataPromise = fetchAllRows<any>(() => tf(supabase
         .from('cac_despesas')
         .select('valor_alocado, unidade_base_id')
@@ -145,7 +141,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       const todosMovimentosAtivosPromise = fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
         .select('cliente_id, valor_delta, data_movimento, tipo')
-        .in('tipo', ['upsell','cross_sell','downsell','churn','reactivation','reajuste'])
+        .in('tipo', [...MRR_MOV_TIPOS])
         .eq('status', 'ativo')
         .is('estornado_por', null)
         .is('estorno_de', null)
@@ -175,18 +171,40 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           .from('vw_clientes_financeiro')
           .select('id, mensalidade, valor_ativacao, data_cadastro, data_venda_efetiva, data_cancelamento, cancelado, unidade_base_id, fornecedor_id, motivo_cancelamento_id'));
       });
-      const cpForDistFornPromise = fetchAllRows<any>(() => {
-        let q = (supabase.from('cliente_produtos' as any) as any)
-          .select('cliente_id, fornecedor_id')
-          .eq('ativo', true);
-        if (tid) q = q.eq('tenant_id', tid);
-        return q;
-      });
-
       // 1. Clientes ativos no fim do período — snapshot temporal
       // Regra canônica: ativo = cancelado !== true OU (cancelado=true E data_cancelamento > periodoFim).
       // Usa paginação para superar o limite de 1000 linhas do PostgREST (db-max-rows).
       const clientesRaw = await clientesRawPromise;
+      const cpAll = await cpAllPromise;
+
+      // Fornecedor filter via cliente_produtos (deprecated clientes.fornecedor_id)
+      let fornecedorClientIds: Set<string> | null = null;
+      if (filters.fornecedorIds?.length) {
+        const fornAlvo = new Set(filters.fornecedorIds);
+        fornecedorClientIds = new Set(
+          (cpAll || []).filter((cp: any) => fornAlvo.has(cp.fornecedor_id)).map((cp: any) => cp.cliente_id),
+        );
+      }
+
+      // ─── RÉGUA CANÔNICA ──────────────────────────────────────────────────────
+      // Toda soma de MRR deste hook passa por `mrrDe(cliente, data)` — a mesma definição
+      // de `get_mrr_bridge` / `get_mrr_monthly_snapshots`, que a aba Crescimento já usa.
+      // É o que faz Visão Geral, Cancelamentos e Vendas pararem de divergir dela.
+      // Ver `src/lib/mrrRuler.ts` para o porquê de não usar `mensalidade`.
+      const todosMovimentosAtivos = await todosMovimentosAtivosPromise;
+      const { mrrDe } = buildMrrRuler(cpAll as any, todosMovimentosAtivos as any);
+
+      // Índices auxiliares do ledger (churn por cliente e ajustes recorrentes da ficha).
+      const ajustesRecorrentesPorCliente: Record<string, number> = {};
+      const churnMrrPorCliente: Record<string, number> = {};
+      todosMovimentosAtivos?.forEach((m: any) => {
+        const delta = Number(m.valor_delta) || 0;
+        if (['upsell','cross_sell','downsell','reajuste'].includes(m.tipo)) {
+          ajustesRecorrentesPorCliente[m.cliente_id] = (ajustesRecorrentesPorCliente[m.cliente_id] || 0) + delta;
+        } else if (m.tipo === 'churn') {
+          churnMrrPorCliente[m.cliente_id] = (churnMrrPorCliente[m.cliente_id] || 0) + Math.abs(delta);
+        }
+      });
 
       // Ativo no fim do período: não-cancelado, OU cancelado com data posterior ao fim (saiu depois).
       const clientesAtivos = (clientesRaw || []).filter(c => {
@@ -196,7 +214,6 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         return new Date(String(c.data_cancelamento)) > new Date(periodoFimStr);
       });
       const clientesCount = clientesAtivos.length;
-      const mrr = clientesAtivos.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
 
       // 2. Novos clientes no período (inclui os que cancelaram dentro do mesmo período — early churn)
       const novosClientes = await novosClientesPromise;
@@ -204,21 +221,11 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         ? (novosClientes || []).filter(c => fornecedorClientIds!.has(c.id))
         : (novosClientes || []);
       const novosCount = novosClientesFilt.length;
-      const newMrr = novosClientesFilt.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
+      const newMrr = novosClientesFilt.reduce((sum, c) => sum + mrrDe(c.id, periodoFimStr), 0);
       const totalImplantacao = novosClientesFilt.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0);
 
       // MRR Atual por cliente = base + Σ movimentos recorrentes (upsell, cross, downsell, reajuste).
       // Exclui churn/reactivation/venda_avulsa — MESMA fórmula da ficha do cliente.
-      const __movAtivosParaChurn = await todosMovimentosAtivosPromise;
-      const ajustesRecorrentesPorCliente: Record<string, number> = {};
-      const churnMrrPorCliente: Record<string, number> = {};
-      __movAtivosParaChurn?.forEach((m: any) => {
-        if (['upsell','cross_sell','downsell','reajuste'].includes(m.tipo)) {
-          ajustesRecorrentesPorCliente[m.cliente_id] = (ajustesRecorrentesPorCliente[m.cliente_id] || 0) + (Number(m.valor_delta) || 0);
-        } else if (m.tipo === 'churn') {
-          churnMrrPorCliente[m.cliente_id] = (churnMrrPorCliente[m.cliente_id] || 0) + Math.abs(Number(m.valor_delta) || 0);
-        }
-      });
       const mrrAtualDe = (c: any) => (Number(c.mensalidade) || 0) + (ajustesRecorrentesPorCliente[c.id] || 0);
 
       // MRR churnado do cliente: usa o ledger de churn (movimentos_mrr), somando TODOS os contratos
@@ -284,17 +291,11 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       });
       const clientesInicioCount = clientesInicioAtivos.length;
 
-      // Movimentos antes do período
-      const movimentosInicioRaw = await movimentosInicioRawPromise;
-
-      const movimentosInicioMap: Record<string, number> = {};
-      movimentosInicioRaw?.forEach(m => {
-        movimentosInicioMap[m.cliente_id] = (movimentosInicioMap[m.cliente_id] || 0) + (Number(m.valor_delta) || 0);
-      });
-
-      const mrrInicio = clientesInicioAtivos.reduce((sum, c) => {
-        return sum + (Number(c.mensalidade) || 0) + (movimentosInicioMap[c.id] || 0);
-      }, 0);
+      // MRR do início = régua canônica no dia ANTERIOR ao início do período — o mesmo
+      // `v_d1 := p_inicio - 1` de `get_mrr_bridge`. Antes isso exigia uma busca extra em
+      // `movimentos_mrr` (< periodoInicio); agora sai do índice que já está em memória.
+      const corteInicioStr = format(subDays(periodoInicio, 1), 'yyyy-MM-dd');
+      const mrrInicio = clientesInicioAtivos.reduce((sum, c) => sum + mrrDe(c.id, corteInicioStr), 0);
 
       // 5. LTV — usar 1 / churn mensal (padrão SaaS), consistente com gráfico
       const now = periodoFim || new Date();
@@ -367,36 +368,9 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         reativacoesQtd += 1;
       });
 
-      // Todos movimentos ativos até fim do período (data_movimento usado para snapshots históricos)
-      const todosMovimentosAtivos = await todosMovimentosAtivosPromise;
-
-      const movimentosPorCliente: Record<string, number> = {};
-      const movimentosPorClienteOrdenados: Record<string, Array<{ date: string; delta: number }>> = {};
-      todosMovimentosAtivos?.forEach(m => {
-        const delta = Number(m.valor_delta) || 0;
-        movimentosPorCliente[m.cliente_id] = (movimentosPorCliente[m.cliente_id] || 0) + delta;
-        if (!movimentosPorClienteOrdenados[m.cliente_id]) movimentosPorClienteOrdenados[m.cliente_id] = [];
-        movimentosPorClienteOrdenados[m.cliente_id].push({ date: String(m.data_movimento), delta });
-      });
-      Object.values(movimentosPorClienteOrdenados).forEach(arr => arr.sort((a, b) => a.date.localeCompare(b.date)));
-      // Helper: retorna o ajuste cumulativo de um cliente até uma data (inclusive).
-      // Usado pelo gráfico mensal para alinhar com o card MRR Atual (que soma todos os movimentos ativos).
-      const ajusteAteData = (clienteId: string, ate: string): number => {
-        const movs = movimentosPorClienteOrdenados[clienteId];
-        if (!movs) return 0;
-        let total = 0;
-        for (const m of movs) {
-          if (m.date > ate) break;
-          total += m.delta;
-        }
-        return total;
-      };
-
       let mrrTotalAtual = 0;
       const clientesComMrrAtual = (clientesAtivos || []).map(c => {
-        const base = Number(c.mensalidade) || 0;
-        const ajuste = movimentosPorCliente[c.id!] || 0;
-        const mrrCliente = base + ajuste;
+        const mrrCliente = mrrDe(c.id!, periodoFimStr);
         mrrTotalAtual += mrrCliente;
         return { ...c, mrrTotalAtual: mrrCliente };
       });
@@ -468,7 +442,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         ? (prevNovos || []).filter(c => fornecedorClientIds!.has(c.id))
         : (prevNovos || []);
       const prevNovosClientes = prevNovosFilt.length;
-      const prevNewMrr = prevNovosFilt.reduce((s, c) => s + (Number(c.mensalidade) || 0), 0);
+      const prevNewMrr = prevNovosFilt.reduce((s, c) => s + mrrDe(c.id, __prevMonthEndParallel), 0);
       const prevTotalImplantacao = prevNovosFilt.reduce((s, c) => s + (Number(c.valor_ativacao) || 0), 0);
 
       // Previous month movimentos for upsell/cross-sell delta
@@ -552,8 +526,9 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
         });
-        // MRR mensal = mensalidade base + ajustes de movimentos ativos até o fim do mês (alinha com card MRR Atual)
-        const mrrMes = activosNoMes.reduce((sum, c) => sum + (Number(c.mensalidade) || 0) + ajusteAteData(c.id, m.end), 0);
+        // MRR do mês pela régua canônica no corte do mês — é o que faz esta série bater,
+        // ponto a ponto, com `get_mrr_monthly_snapshots` (a série da aba Crescimento).
+        const mrrMes = activosNoMes.reduce((sum, c) => sum + mrrDe(c.id, m.end), 0);
         // Per-unit MRR for chart lines
         const mrrPoint: Record<string, string | number | undefined> = {
           month: m.month, monthFull: m.monthFull, value: mrrMes,
@@ -563,7 +538,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         (unidadesBase || []).forEach(u => {
           const mrrU = activosNoMes
             .filter(c => c.unidade_base_id === u.id)
-            .reduce((sum, c) => sum + (Number(c.mensalidade) || 0) + ajusteAteData(c.id, m.end), 0);
+            .reduce((sum, c) => sum + mrrDe(c.id, m.end), 0);
           mrrPoint[`mrr_${u.id}`] = mrrU;
         });
         mrrEvolution.push(mrrPoint as any);
@@ -676,11 +651,11 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       const porCidade = buildDistribution(activeClients, 'cidade_id', cidadeMap);
       const porSegmento = buildDistribution(activeClients, 'segmento_id', segmentoMap);
       const porAreaAtuacao = buildDistribution(activeClients, 'area_atuacao_id', areaMap);
-      // Distribuição por fornecedor: fonte = cliente_produtos (multi-produto)
-      const cpForDistForn = await cpForDistFornPromise;
+      // Distribuição por fornecedor: fonte = cliente_produtos (multi-produto), só os ativos
       const activeIds = new Set((clientesAtivos || []).map((c: any) => c.id));
       const fornCounts: Record<string, number> = {};
-      (cpForDistForn || []).forEach((cp: any) => {
+      (cpAll || []).forEach((cp: any) => {
+        if (cp.ativo !== true) return;
         if (!activeIds.has(cp.cliente_id)) return;
         const fname = fornecedorMap[cp.fornecedor_id];
         if (fname) fornCounts[fname] = (fornCounts[fname] || 0) + 1;
@@ -833,7 +808,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           vendedor: c.funcionario_id ? (funcMap[c.funcionario_id] || '—') : '—',
           origem: c.origem_venda_id ? (origemMap[c.origem_venda_id] || '—') : '—',
           valorAtivacao: Number(c.valor_ativacao) || 0,
-          mensalidade: Number(c.mensalidade) || 0,
+          mensalidade: mrrDe(c.id, periodoFimStr),
         }))
         .sort((a, b) => new Date(b.dataVenda).getTime() - new Date(a.dataVenda).getTime());
       if (seq !== fetchSeqRef.current) return;
