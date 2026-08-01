@@ -27,6 +27,7 @@ import {
   Check, ChevronDown, Pencil,
 } from "lucide-react";
 import EditTrainingDialog, { type EditableTraining } from "./EditTrainingDialog";
+import { EditJourneyInfoDialog } from "./EditJourneyInfoDialog";
 import { useOnboardingParticipantRoles } from "@/hooks/useOnboardingParticipantRoles";
 import { TransferResponsavelDialog } from "./TransferResponsavelDialog";
 import { ResponsavelHistorico } from "./ResponsavelHistorico";
@@ -77,6 +78,8 @@ interface Journey {
   sla_total_util_min: number | null;
   data_inicio_planejado: string | null;
   pipeline_id?: string | null;
+  /** A view expõe produto_id; produto_nome não existe. O nome vem de um lookup. */
+  produto_id?: number | null;
   demand_type_id?: string | null;
   demand_type_nome?: string | null;
   demand_type_cor?: string | null;
@@ -155,6 +158,7 @@ const TL_TONES: Record<TLTone, string> = {
 const TL_META: Record<string, { label: string; Icon: any; tone: TLTone }> = {
   onboarding_criado: { label: "Jornada criada", Icon: Sparkles, tone: "emerald" },
   onboarding_mudou_etapa: { label: "Mudança de etapa", Icon: ArrowRight, tone: "sky" },
+  onboarding_info_editada: { label: "Informações corrigidas", Icon: Pencil, tone: "amber" },
   onboarding_fase_implantacao: { label: "Implantação iniciada", Icon: Rocket, tone: "violet" },
   onboarding_treino_criado: { label: "Treinamento agendado", Icon: GraduationCap, tone: "violet" },
   onboarding_participante: { label: "Participante alterado", Icon: UserPlus, tone: "sky" },
@@ -316,6 +320,7 @@ interface JourneyChecklistRow {
 export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tenantId, subTicketId = null, subTicketCode = null }: Props) {
   const { user, profile } = useAuth();
   const qc = useQueryClient();
+  const [editInfoOpen, setEditInfoOpen] = useState(false);
   const [note, setNote] = useState("");
   const [pauseReasonId, setPauseReasonId] = useState<string>("");
   const [pauseText, setPauseText] = useState("");
@@ -1819,6 +1824,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  {/* Correção de cadastro: só admin, e só enquanto a jornada está aberta. */}
+                  {isAdmin && !isTerminal && (
+                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditInfoOpen(true)}>
+                      <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
+                    </Button>
+                  )}
                   {journey.ticket_id && (
                     <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setStartConvOpen(true)}>
                       <MessageSquare className="h-3.5 w-3.5 mr-1" /> Conversa
@@ -3216,6 +3227,28 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         onCreated={() => {
           qc.invalidateQueries({ queryKey: ["onboarding-attendances", journey.ticket_id] });
           qc.invalidateQueries({ queryKey: ["onboarding-events", journey.ticket_id] });
+        }}
+      />
+    )}
+    {journey && journeyId && (
+      <EditJourneyInfoDialog
+        open={editInfoOpen}
+        onOpenChange={setEditInfoOpen}
+        tenantId={tenantId}
+        journeyId={journeyId}
+        initial={{
+          clienteId: journey.cliente_id ?? "",
+          clienteLabel: clienteNome,
+          produtoId: journey.produto_id ?? null,
+          demandTypeId: journey.demand_type_id ?? null,
+          assunto: journey.assunto ?? "",
+          dataInicio: journey.data_inicio_planejado ? String(journey.data_inicio_planejado).slice(0, 10) : null,
+          goLive: journey.go_live_previsto ? String(journey.go_live_previsto).slice(0, 10) : null,
+        }}
+        onSaved={() => {
+          qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+          qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+          qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
         }}
       />
     )}
