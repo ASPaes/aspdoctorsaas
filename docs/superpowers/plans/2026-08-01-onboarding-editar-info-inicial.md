@@ -19,6 +19,7 @@
 - RPC nova: `SECURITY DEFINER` + `SET search_path = public` + `REVOKE FROM PUBLIC` + `GRANT TO authenticated, service_role`.
 - **Nada é aplicado em produção neste plano.** Toda DDL vai para o Docker local. O push para prod é decisão do Alexandre, depois de ver funcionando.
 - Container do banco local: `supabase_db_vbngjzovjhkmietztffo`.
+- **Em teste SQL: CHAMAR como `authenticated`, LER como `postgres`.** A RLS de `support_tickets` esconde a linha do próprio admin do tenant — a leitura de verificação volta `NULL` e acusa "não gravou" numa escrita que funcionou. Medido no local em 01/08.
 - Timezone `America/Sao_Paulo`. Brand verde `#22C55E`.
 - Nunca `git add -A` — outra sessão mexe no mesmo repo (`ImplantacaoBoard.tsx` está modificado e não é deste trabalho). Sempre `git add <caminho exato>`.
 
@@ -58,11 +59,19 @@ Criar `scripts/sql-tests/22_editar_info_jornada.sql`:
 -- sla_iniciado_em não se move, e evento só nasce para campo que mudou.
 --
 -- Rodar: docker exec -i supabase_db_vbngjzovjhkmietztffo psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < scripts/sql-tests/22_editar_info_jornada.sql
+--
+-- DOIS PADRÕES OBRIGATÓRIOS AQUI:
+--
+-- 1) Caso negativo: a flag v_barrou é setada DENTRO do bloco e o RAISE de falha
+--    fica FORA dele. Com o RAISE dentro, o próprio `WHEN others` o engoliria e o
+--    teste passaria sempre.
+--
+-- 2) CHAMAR como `authenticated`, LER como `postgres`. A RLS de support_tickets
+--    esconde a linha do próprio admin do tenant: lendo autenticado, o SELECT de
+--    verificação volta NULL e o teste acusa "não gravou" numa escrita que funcionou.
+--    Medido no local em 01/08 — a leitura como postgres devolve o valor certo.
 BEGIN;
 
--- Padrão obrigatório dos casos negativos: a flag v_barrou é setada DENTRO do
--- bloco e o RAISE de falha fica FORA dele. Com o RAISE dentro, o próprio
--- handler `WHEN others` o engoliria e o teste passaria sempre.
 DO $$
 DECLARE
   v_journey uuid; v_tenant uuid; v_ticket uuid;
@@ -129,6 +138,8 @@ BEGIN
     RAISE EXCEPTION 'FALHOU 2: admin recusado — %', v_res::text;
   END IF;
 
+  PERFORM set_config('role', 'postgres', true);   -- ver padrão 2 no cabeçalho
+
   SELECT cliente_id, sla_iniciado_em INTO v_cli_dep, v_sla_dep
     FROM public.onboarding_journeys WHERE id = v_journey;
   IF v_cli_dep IS DISTINCT FROM v_cli_novo THEN
@@ -156,8 +167,12 @@ BEGIN
   -- ── 4. reenviar tudo igual não gera evento novo
   SELECT count(*) INTO v_qtd FROM public.support_ticket_events
    WHERE ticket_id = v_ticket AND event_type = 'onboarding_info_editada';
+
+  PERFORM set_config('role', 'authenticated', true);
   PERFORM public.update_onboarding_journey_info(
     v_journey, v_cli_novo, 'ZZ assunto novo', 'motivo do teste');
+  PERFORM set_config('role', 'postgres', true);
+
   SELECT count(*) INTO v_qtd2 FROM public.support_ticket_events
    WHERE ticket_id = v_ticket AND event_type = 'onboarding_info_editada';
   IF v_qtd2 <> v_qtd THEN
@@ -165,6 +180,7 @@ BEGIN
   END IF;
 
   -- ── 5. motivo vazio é recusado (e NÃO por permissão)
+  PERFORM set_config('role', 'authenticated', true);
   v_barrou := false; v_state := '';
   BEGIN
     PERFORM public.update_onboarding_journey_info(
@@ -186,8 +202,8 @@ BEGIN
   IF NOT v_barrou THEN RAISE EXCEPTION 'FALHOU 6: cliente de outro tenant passou'; END IF;
 
   -- ── 7. jornada terminal é barrada.
-  -- Volta a postgres para o UPDATE da fixture: como `authenticated` a RLS de
-  -- onboarding_journeys barraria a escrita e o teste morreria antes de asserir.
+  -- O UPDATE da fixture vai como postgres: autenticado, a RLS de onboarding_journeys
+  -- barraria a escrita e o teste morreria antes de asserir.
   PERFORM set_config('role', 'postgres', true);
   UPDATE public.onboarding_journeys SET situacao = 'cancelado' WHERE id = v_journey;
   PERFORM set_config('role', 'authenticated', true);
