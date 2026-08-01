@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -4824,6 +4844,8 @@ export type Database = {
           produto_id: number | null
           responsavel_user_id: string | null
           situacao: Database["public"]["Enums"]["onb_situacao"]
+          sla_encerrado_em: string | null
+          sla_encerrado_stage_id: string | null
           sla_iniciado_em: string | null
           tenant_id: string
           ticket_id: string
@@ -4849,6 +4871,8 @@ export type Database = {
           produto_id?: number | null
           responsavel_user_id?: string | null
           situacao?: Database["public"]["Enums"]["onb_situacao"]
+          sla_encerrado_em?: string | null
+          sla_encerrado_stage_id?: string | null
           sla_iniciado_em?: string | null
           tenant_id: string
           ticket_id: string
@@ -4874,6 +4898,8 @@ export type Database = {
           produto_id?: number | null
           responsavel_user_id?: string | null
           situacao?: Database["public"]["Enums"]["onb_situacao"]
+          sla_encerrado_em?: string | null
+          sla_encerrado_stage_id?: string | null
           sla_iniciado_em?: string | null
           tenant_id?: string
           ticket_id?: string
@@ -4920,6 +4946,13 @@ export type Database = {
             columns: ["produto_id"]
             isOneToOne: false
             referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journeys_sla_encerrado_stage_id_fkey"
+            columns: ["sla_encerrado_stage_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_stages"
             referencedColumns: ["id"]
           },
           {
@@ -5580,6 +5613,7 @@ export type Database = {
           ativo: boolean
           cor: string
           created_at: string
+          encerra_sla: boolean
           id: string
           inicia_sla: boolean
           is_final: boolean
@@ -5598,6 +5632,7 @@ export type Database = {
           ativo?: boolean
           cor?: string
           created_at?: string
+          encerra_sla?: boolean
           id?: string
           inicia_sla?: boolean
           is_final?: boolean
@@ -5616,6 +5651,7 @@ export type Database = {
           ativo?: boolean
           cor?: string
           created_at?: string
+          encerra_sla?: boolean
           id?: string
           inicia_sla?: boolean
           is_final?: boolean
@@ -11742,6 +11778,10 @@ export type Database = {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: number
       }
+      fn_custo_cliente_em: {
+        Args: { p_cliente: string; p_data: string; p_tenant: string }
+        Returns: number
+      }
       fn_dispatch_next_in_queue: {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: Json
@@ -11768,17 +11808,22 @@ export type Database = {
       fn_is_business_hours: { Args: { p_tenant_id: string }; Returns: boolean }
       fn_journey_go_live: {
         Args: {
-          p_demand_type_id: string
           p_department_id?: string
+          p_produto_id: number
           p_start: string
           p_tenant_id: string
         }
         Returns: string
       }
+      fn_mrr_cliente_em: {
+        Args: { p_cliente: string; p_data: string; p_tenant: string }
+        Returns: number
+      }
       fn_onb_arquivar_treinos_no_golive: {
         Args: { p_journey_id: string }
         Returns: number
       }
+      fn_onb_stage_ordem: { Args: { p_stage_id: string }; Returns: number }
       fn_onb_training_initial_stage: {
         Args: { p_journey_id: string }
         Returns: string
@@ -11789,6 +11834,10 @@ export type Database = {
           codigos: string
           qtd: number
         }[]
+      }
+      fn_onb_trilho_sla_min: {
+        Args: { p_produto_id?: number; p_tenant_id: string }
+        Returns: number
       }
       fn_onb_util_min: {
         Args: {
@@ -12480,6 +12529,7 @@ export type Database = {
         }[]
       }
       get_instance_secrets: { Args: { p_instance_id: string }; Returns: Json }
+      get_journey_ruler: { Args: { p_journey_id: string }; Returns: Json }
       get_message_notification_recipients: {
         Args: { p_conversation_id: string }
         Returns: {
@@ -13484,6 +13534,18 @@ export type Database = {
         Args: { p_csat_id: string; p_new_score: number; p_reason?: string }
         Returns: undefined
       }
+      update_onboarding_journey_info: {
+        Args: {
+          p_assunto: string
+          p_cliente_id: string
+          p_data_inicio_planejado?: string
+          p_demand_type_id?: string
+          p_go_live_previsto?: string
+          p_journey_id: string
+          p_motivo: string
+        }
+        Returns: Json
+      }
       update_onboarding_training: {
         Args: {
           p_agendado_para?: string
@@ -13826,6 +13888,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       contrato_tipo: ["base", "aditivo"],
@@ -13912,3 +13977,4 @@ export const Constants = {
     },
   },
 } as const
+
