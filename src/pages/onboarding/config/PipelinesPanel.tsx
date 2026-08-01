@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, GripVertical, Trash2, Loader2, Pencil, Flag, Pause, ChevronRight, Timer,
-  Archive, AlertTriangle,
+  TimerOff, Archive, AlertTriangle,
 } from "lucide-react";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
@@ -31,7 +31,7 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { SlaInput } from "./SlaInput";
-import { formatSlaHuman, slugify } from "./utils";
+import { foraDaJanelaIds, formatSlaHuman, slugify } from "./utils";
 
 const SECTION_OPTIONS: { key: string; label: string }[] = [
   { key: "participantes", label: "Responsável & participantes" },
@@ -76,6 +76,8 @@ interface Stage {
   visible_sections: string[] | null;
   /** Entrar nesta etapa dispara a contagem de SLA. No máximo uma por pipeline. */
   inicia_sla: boolean;
+  /** Entrar nesta etapa PARA a contagem da jornada inteira. No máximo uma por pipeline. */
+  encerra_sla: boolean;
 }
 
 interface ChecklistGroup {
@@ -163,7 +165,7 @@ export function PipelinesPanel({ phaseId }: Props) {
     enabled: !!effectiveTenantId && !!selectedPipelineId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_stages" as any) as any)
-        .select("id, pipeline_id, nome, slug, position, sla_minutos, cor, is_initial, is_final, pausa_sla, ativo, visible_sections, inicia_sla")
+        .select("id, pipeline_id, nome, slug, position, sla_minutos, cor, is_initial, is_final, pausa_sla, ativo, visible_sections, inicia_sla, encerra_sla")
         .eq("tenant_id", effectiveTenantId).eq("pipeline_id", selectedPipelineId).order("position");
       if (error) throw error;
       return (data ?? []) as Stage[];
@@ -196,6 +198,10 @@ export function PipelinesPanel({ phaseId }: Props) {
 
   const pipelines = pipelinesQuery.data ?? [];
   const stages = stagesQuery.data ?? [];
+
+  // Etapas fora da janela contada (do inicia_sla até o encerra_sla). Mesma regra que
+  // fn_onb_trilho_sla_min aplica no banco — ver utils.ts.
+  const foraJanela = useMemo(() => foraDaJanelaIds(stages), [stages]);
   const groups = groupsQuery.data ?? [];
   const checklist = checklistQuery.data ?? [];
   const produtos = produtosQuery.data ?? [];
@@ -266,6 +272,7 @@ export function PipelinesPanel({ phaseId }: Props) {
       ativo: s.ativo ?? true,
       visible_sections: s.visible_sections ?? ALL_SECTION_KEYS,
       inicia_sla: !!s.inicia_sla,
+      encerra_sla: !!s.encerra_sla,
     };
     try {
       if (isNew) {
@@ -284,8 +291,10 @@ export function PipelinesPanel({ phaseId }: Props) {
       }
       qc.invalidateQueries({ queryKey: ["onb-stages"] });
     } catch (e: any) {
-      // índice único parcial uq_onb_stage_inicia_sla_por_pipeline
-      if (e?.code === "23505" && String(e?.message ?? "").includes("inicia_sla")) {
+      // índices únicos parciais uq_onb_stage_inicia_sla / _encerra_sla_por_pipeline
+      if (e?.code === "23505" && String(e?.message ?? "").includes("encerra_sla")) {
+        toast.error("Outra etapa deste pipeline já encerra a contagem de SLA. Desmarque nela antes.");
+      } else if (e?.code === "23505" && String(e?.message ?? "").includes("inicia_sla")) {
         toast.error("Outra etapa deste pipeline já inicia a contagem de SLA. Desmarque nela antes.");
       } else {
         toast.error(e.message || "Erro ao salvar");
@@ -530,6 +539,7 @@ export function PipelinesPanel({ phaseId }: Props) {
                     key={s.id}
                     stage={s}
                     isSelected={selectedStageId === s.id}
+                    foraJanela={foraJanela.has(s.id)}
                     onSelect={() => setSelectedStageId(s.id)}
                     onEdit={() => setStageEditing(s)}
                     onDelete={() => setStageRemoving(s)}
@@ -584,6 +594,7 @@ export function PipelinesPanel({ phaseId }: Props) {
         open={stageNewOpen || !!stageEditing}
         initial={stageEditing}
         gatilhoStage={stages.find((s) => s.inicia_sla) ?? null}
+        encerraStage={stages.find((s) => s.encerra_sla) ?? null}
         onClose={() => { setStageNewOpen(false); setStageEditing(null); }}
         onSave={(s) => { saveStage(s, !stageEditing); setStageNewOpen(false); setStageEditing(null); }}
       />
@@ -601,9 +612,11 @@ export function PipelinesPanel({ phaseId }: Props) {
 // Sortable stage row
 // ============================================================================
 function SortableStageRow({
-  stage, isSelected, onSelect, onEdit, onDelete,
+  stage, isSelected, foraJanela, onSelect, onEdit, onDelete,
 }: {
   stage: Stage; isSelected: boolean;
+  /** Fora da janela contada: existe no quadro, mas não entra no total nem no go-live. */
+  foraJanela: boolean;
   onSelect: () => void; onEdit: () => void; onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: stage.id });
@@ -616,9 +629,11 @@ function SortableStageRow({
     <div
       ref={setNodeRef} style={style}
       onClick={onSelect}
+      data-stage-id={stage.id}
+      data-fora-janela={foraJanela ? "true" : "false"}
       className={`group flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
         isSelected ? "border-primary/40 bg-primary/5" : "border-border hover:bg-muted/50"
-      } ${!stage.ativo ? "opacity-60" : ""}`}
+      } ${!stage.ativo ? "opacity-60" : ""} ${foraJanela ? "opacity-50" : ""}`}
     >
       <button {...attributes} {...listeners} onClick={(e) => e.stopPropagation()}
         className="cursor-grab active:cursor-grabbing text-muted-foreground p-0.5">
@@ -632,9 +647,15 @@ function SortableStageRow({
           {stage.is_final && <Flag className="h-3 w-3 text-destructive" />}
           {stage.pausa_sla && <Pause className="h-3 w-3 text-amber-500" />}
           {stage.inicia_sla && <Timer className="h-3 w-3 text-[hsl(199_89%_48%)]" />}
+          {stage.encerra_sla && <TimerOff className="h-3 w-3 text-emerald-500" />}
           {!stage.ativo && <Badge variant="outline" className="text-[9px] px-1 py-0">arquivada</Badge>}
         </div>
-        <p className="text-[10px] text-muted-foreground">SLA {formatSlaHuman(stage.sla_minutos)}</p>
+        <p className="text-[10px] text-muted-foreground">
+          SLA {formatSlaHuman(stage.sla_minutos)}
+          {foraJanela && (
+            <span className="ml-1.5 uppercase tracking-wide text-[9px]">· fora da contagem</span>
+          )}
+        </p>
       </div>
       <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100"
         onClick={(e) => { e.stopPropagation(); onEdit(); }}>
@@ -1200,11 +1221,12 @@ function PipelineDialog({
 // Stage dialog
 // ============================================================================
 function StageDialog({
-  open, initial, gatilhoStage, onClose, onSave,
+  open, initial, gatilhoStage, encerraStage, onClose, onSave,
 }: {
   open: boolean; initial: Stage | null;
   /** Etapa que hoje detém a flag de início de SLA neste pipeline (se houver). */
   gatilhoStage: Stage | null;
+  encerraStage: Stage | null;
   onClose: () => void;
   onSave: (s: Partial<Stage> & { id?: string }) => void;
 }) {
@@ -1217,6 +1239,7 @@ function StageDialog({
   const [pausaSla, setPausaSla] = useState(false);
   const [ativo, setAtivo] = useState(true);
   const [iniciaSla, setIniciaSla] = useState(false);
+  const [encerraSla, setEncerraSla] = useState(false);
   const [visibleSections, setVisibleSections] = useState<string[]>(ALL_SECTION_KEYS);
   const [secoesOpen, setSecoesOpen] = useState(false);
 
@@ -1231,6 +1254,7 @@ function StageDialog({
       setPausaSla(!!initial?.pausa_sla);
       setAtivo(initial?.ativo ?? true);
       setIniciaSla(!!initial?.inicia_sla);
+      setEncerraSla(!!initial?.encerra_sla);
       setVisibleSections(initial?.visible_sections ?? ALL_SECTION_KEYS);
       setSecoesOpen(false);
     }
@@ -1247,6 +1271,9 @@ function StageDialog({
   // Só uma etapa por pipeline pode iniciar o SLA. Se outra já detém a flag, esta
   // perde a opção — para trocar, desmarque na etapa que a tem hoje.
   const gatilhoEmOutra = !!gatilhoStage && gatilhoStage.id !== initial?.id;
+
+  // Simétrico do gatilho: só uma etapa por pipeline pode encerrar a contagem.
+  const encerraEmOutra = !!encerraStage && encerraStage.id !== initial?.id;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -1315,6 +1342,16 @@ function StageDialog({
                   ? `Já definida em «${gatilhoStage!.nome}» — desmarque lá para usar aqui`
                   : "O cronômetro parte quando a jornada entra nesta etapa"}
               />
+              <ToggleRow
+                icon={<TimerOff className="h-3.5 w-3.5 text-emerald-500" />}
+                label="Encerra a contagem de SLA"
+                checked={encerraSla} onChange={setEncerraSla}
+                disabled={encerraEmOutra}
+                className="border-t border-border"
+                hint={encerraEmOutra
+                  ? `Já definida em «${encerraStage!.nome}» — desmarque lá para usar aqui`
+                  : "O cronômetro para na jornada inteira ao entrar aqui. Voltar o cartão reabre a contagem"}
+              />
             </div>
           </div>
 
@@ -1367,6 +1404,7 @@ function StageDialog({
             is_initial: isInitial, is_final: isFinal, pausa_sla: pausaSla, ativo,
             visible_sections: visibleSections,
             inicia_sla: gatilhoEmOutra ? false : iniciaSla,
+            encerra_sla: encerraEmOutra ? false : encerraSla,
           })}>Salvar</Button>
           </div>
         </DialogFooter>

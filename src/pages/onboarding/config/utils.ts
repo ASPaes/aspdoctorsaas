@@ -32,6 +32,38 @@ export function formatSlaHuman(total: number | null | undefined): string {
   return parts.join(" ") || "0m";
 }
 
+/**
+ * Etapas que estão FORA da janela contada de SLA.
+ *
+ * A janela vai da etapa que INICIA a contagem até a que ENCERRA (ambas incluídas).
+ * Etapas antes do início ou depois do encerramento continuam existindo no quadro,
+ * mas não entram no total nem no go-live — é a mesma regra que
+ * `fn_onb_trilho_sla_min` aplica no banco. Se as duas divergirem, a tela mente.
+ *
+ * Sem `inicia_sla`, a janela começa na primeira etapa; sem `encerra_sla`, termina na
+ * última. Config incoerente (encerra vindo antes de iniciar) degrada para "nada fora",
+ * em vez de apagar o pipeline inteiro na tela: quem avisa é a faixa do trilho.
+ */
+export function foraDaJanelaIds(
+  stages: Array<{ id: string; position: number; inicia_sla?: boolean | null; encerra_sla?: boolean | null }>,
+): Set<string> {
+  const fora = new Set<string>();
+  if (!stages.length) return fora;
+
+  const ord = [...stages].sort((a, b) => a.position - b.position);
+  const idxIniBruto = ord.findIndex((s) => s.inicia_sla);
+  const idxFimBruto = ord.findIndex((s) => s.encerra_sla);
+  const idxIni = idxIniBruto === -1 ? 0 : idxIniBruto;
+  const idxFim = idxFimBruto === -1 ? ord.length - 1 : idxFimBruto;
+
+  if (idxFim < idxIni) return fora;
+
+  ord.forEach((s, i) => {
+    if (i < idxIni || i > idxFim) fora.add(s.id);
+  });
+  return fora;
+}
+
 export function slugify(s: string): string {
   return s
     .toLowerCase()
