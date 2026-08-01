@@ -392,7 +392,15 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       const ltvReais = ticketMedioAjustado * ltvMeses;
       const ltvCac = cac > 0 ? ltvReais / cac : 0;
       const churnMrrTotal = mrrCancelado;
-      const netNewMrr = newMrr + upsellMrr + crossSellMrr + reativacaoMrr + reajusteMrr - downsellMrr - churnMrrTotal;
+      // Net New = fim − início, pela régua canônica. Fecha por construção, e é o mesmo
+      // número que `get_mrr_bridge` devolve (a ponte também é `mrr_fim − mrr_inicio`).
+      //
+      // Era a soma dos componentes (`newMrr + upsell + cross + reativação + reajuste
+      // − downsell − churn`), que sobrava de R$ 8 mil a R$ 21 mil por mês contra o card
+      // de MRR: `newMrr` media com régua diferente e o churn PARCIAL — cliente que fica
+      // na base e cancela um produto — não entrava em componente nenhum. Os componentes
+      // continuam existindo para os cards de breakdown, que os desenham um a um.
+      const netNewMrr = crescimentoReais;
       const grr = mrrInicio > 0 ? Math.max(0, (mrrInicio - churnMrrTotal - downsellMrr) / mrrInicio) : 1;
       const nrr = mrrInicio > 0 ? (mrrInicio + upsellMrr + crossSellMrr + reativacaoMrr + reajusteMrr - downsellMrr - churnMrrTotal) / mrrInicio : 1;
 

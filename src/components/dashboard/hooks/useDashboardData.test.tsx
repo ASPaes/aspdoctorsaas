@@ -116,6 +116,14 @@ describe('useDashboardData — régua canônica do MRR', () => {
     expect(capturado!.metrics.clientesInicioCount).toBe(2);
   });
 
+  it('fecha a conta: início + net new = fim', async () => {
+    await renderHook(FILTROS);
+    const m = capturado!.metrics;
+    // Invariante da ponte (`get_mrr_bridge`), agora válida também aqui.
+    expect(Number((m.mrrInicio + m.netNewMrr).toFixed(2))).toBe(Number(m.mrr.toFixed(2)));
+    expect(Number(m.netNewMrr.toFixed(2))).toBe(500); // entrou o cliente B, ninguém saiu
+  });
+
   it('valoriza a venda nova pela régua, não pelo estado de hoje', async () => {
     await renderHook(FILTROS);
     expect(capturado!.metrics.novosClientes).toBe(1);
