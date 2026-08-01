@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { JourneyRuler, larguras, semaforo } from "./JourneyRuler";
+import { JourneyRuler, larguras, semaforo, piorEtapa } from "./JourneyRuler";
 
 // Sem @testing-library/react: o peer @testing-library/dom não está instalado no projeto.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -41,6 +41,29 @@ describe("semaforo", () => {
   it("a partir de 70% vira amarelo", () => expect(semaforo(100, 70)).toBe("amarelo"));
   it("abaixo de 70% fica verde", () => expect(semaforo(120, 60)).toBe("verde"));
   it("etapa sem plano não tem semáforo", () => expect(semaforo(0, 999)).toBe("sem_sla"));
+});
+
+describe("piorEtapa", () => {
+  const e = (nome: string, plano: number, real: number) =>
+    ({ stage_id: nome, nome, fase: "Onboarding", ordem: 1, plano_min: plano, real_min: real,
+       passagens: 1, aberta: false, inicia: false, encerra: false, fora_janela: false });
+
+  it("aponta a etapa que mais estourou em minutos absolutos", () => {
+    // 200 acima vence os 50 acima, mesmo o segundo sendo proporcionalmente pior
+    expect(piorEtapa([e("A", 480, 680), e("B", 10, 60)])?.nome).toBe("A");
+  });
+
+  it("ignora etapa dentro do plano", () => {
+    expect(piorEtapa([e("A", 480, 100), e("B", 360, 200)])).toBeNull();
+  });
+
+  it("ignora etapa sem plano, que não tem contra o que estourar", () => {
+    expect(piorEtapa([e("Sem plano", 0, 9999)])).toBeNull();
+  });
+
+  it("lista vazia devolve null", () => {
+    expect(piorEtapa([])).toBeNull();
+  });
 });
 
 describe("larguras", () => {
@@ -95,6 +118,22 @@ describe("JourneyRuler", () => {
     await render();
     expect(document.querySelector("[data-ruler-stage='s4']")?.getAttribute("data-fora-janela")).toBe("true");
     expect(document.body.textContent).toContain("fora da contagem");
+  });
+
+  it("resume o que salta, em vez de deixar o usuário garimpar a barra", async () => {
+    await render();
+    const txt = document.body.textContent ?? "";
+    // Recolhimento Dados: 1680 real contra 480 de plano — o maior estouro do fixture
+    expect(txt).toContain("O que salta");
+    expect(txt).toContain("Recolhimento Dados");
+    expect(txt).toContain("3d 4h"); // formatMinUtil(1680)
+  });
+
+  it("traz a legenda das cores e o que significa o ×N", async () => {
+    await render();
+    const txt = document.body.textContent ?? "";
+    expect(txt).toContain("estourou");
+    expect(txt).toContain("passagens");
   });
 
   it("mostra os totais de plano e real da janela", async () => {

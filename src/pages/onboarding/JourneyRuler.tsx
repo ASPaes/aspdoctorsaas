@@ -32,6 +32,21 @@ export type RulerStage = {
 /** Largura mínima em % para uma etapa curta continuar visível e clicável. */
 const MIN_PCT = 3;
 
+/** Espaço entre segmentos, em px. Precisa bater com o `gap-0.5` do Tailwind. */
+const GAP_PX = 2;
+
+/**
+ * Largura do segmento já descontando o gap.
+ *
+ * As porcentagens somam 100%, e os segmentos são `shrink-0`. Sem descontar, os (n-1)
+ * gaps entram POR CIMA dos 100% e a régua vaza para fora do diálogo — com 9 etapas são
+ * ~16px de estouro, o suficiente para cortar as últimas etapas.
+ */
+function estiloSegmento(pct: number, n: number): { width: string } {
+  const desconto = n > 1 ? (GAP_PX * (n - 1)) / n : 0;
+  return { width: `calc(${pct}% - ${desconto}px)` };
+}
+
 export function semaforo(plano: number, real: number): "verde" | "amarelo" | "vermelho" | "sem_sla" {
   if (!plano) return "sem_sla";
   if (real >= plano) return "vermelho";
@@ -45,6 +60,23 @@ const COR: Record<string, string> = {
   vermelho: "bg-rose-500",
   sem_sla: "bg-muted-foreground/40",
 };
+
+/**
+ * A etapa que mais estourou o plano, em minutos absolutos.
+ *
+ * Absoluto e não proporcional de propósito: uma etapa de 10 min que levou 60 é 6x o
+ * plano, mas custou 50 minutos da jornada — não é ela que explica o atraso. Quem
+ * explica é a que comeu mais tempo a mais do que devia.
+ *
+ * Etapa sem plano fica fora: não há contra o que estourar.
+ */
+export function piorEtapa(etapas: RulerStage[]): RulerStage | null {
+  const estouradas = etapas.filter((e) => e.plano_min > 0 && e.real_min > e.plano_min);
+  if (!estouradas.length) return null;
+  return estouradas.reduce((pior, e) =>
+    e.real_min - e.plano_min > pior.real_min - pior.plano_min ? e : pior,
+  );
+}
 
 /**
  * Distribui 100% entre os segmentos, garantindo MIN_PCT a cada um — sem o piso, uma
@@ -94,6 +126,7 @@ export function JourneyRuler({
   const totalReal = janela.reduce((a, e) => a + e.real_min, 0);
   const wPlano = useMemo(() => larguras(janela.map((e) => e.plano_min)), [janela]);
   const wReal = useMemo(() => larguras(janela.map((e) => e.real_min)), [janela]);
+  const pior = useMemo(() => piorEtapa(janela), [janela]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -127,6 +160,45 @@ export function JourneyRuler({
                 ws={wReal}
                 corFixa={null}
               />
+
+              {/* Leitura: sem isto o usuário tem que garimpar a barra para achar o culpado. */}
+              <div className="space-y-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5">
+                {pior ? (
+                  <p className="text-[11px] leading-relaxed">
+                    <span className="text-muted-foreground">O que salta: </span>
+                    <strong className="font-semibold">{pior.nome}</strong>
+                    <span className="text-muted-foreground">
+                      {" "}levou{" "}
+                    </span>
+                    <span className="font-mono text-rose-400">{formatMinUtil(pior.real_min)}</span>
+                    <span className="text-muted-foreground"> contra </span>
+                    <span className="font-mono">{formatMinUtil(pior.plano_min)}</span>
+                    <span className="text-muted-foreground"> de plano</span>
+                    {pior.passagens > 1 && (
+                      <span className="text-muted-foreground">, em {pior.passagens} passagens</span>
+                    )}
+                    <span className="text-muted-foreground">.</span>
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">
+                    Nenhuma etapa estourou o plano até aqui.
+                  </p>
+                )}
+
+                <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-sm bg-emerald-500" />abaixo de 70% do plano
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-sm bg-amber-500" />a partir de 70%
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-sm bg-rose-500" />estourou
+                  </span>
+                  <span>·</span>
+                  <span>×N = passagens repetidas pela mesma etapa</span>
+                </p>
+              </div>
 
               {fora.length > 0 && (
                 <div className="space-y-1.5 border-t border-border/60 pt-3">
@@ -180,12 +252,21 @@ function Linha({
         <span className="font-mono text-xs font-semibold">{formatMinUtil(total)}</span>
       </div>
 
-      <div className="flex items-center gap-0.5">
+      {/*
+        Os nós ficam FORA do trilho de segmentos. Eles têm largura fixa (12px cada) e,
+        somados às larguras percentuais, estouravam o diálogo pela direita — os dois nós
+        mais os gaps passavam de 100%. O wrapper `flex-1 min-w-0` dá aos segmentos
+        exatamente o espaço que sobra, e os rótulos herdam a mesma caixa, o que também
+        conserta o alinhamento entre rótulo e barra.
+      */}
+      <div className="flex items-start gap-1">
         <span
           className="h-3 w-3 shrink-0 rounded-full bg-foreground"
           aria-label="início da contagem"
         />
-        {etapas.map((e, i) => {
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-0.5">
+            {etapas.map((e, i) => {
           const sem = semaforo(e.plano_min, e.real_min);
           return (
             <Tooltip key={e.stage_id}>
@@ -197,7 +278,7 @@ function Linha({
                   data-passagens={e.passagens}
                   data-semaforo={sem}
                   data-fora-janela="false"
-                  style={{ width: `${ws[i]}%` }}
+                  style={estiloSegmento(ws[i], etapas.length)}
                   className={cn(
                     "relative h-3 shrink-0 rounded-sm transition-all hover:brightness-110",
                     corFixa ?? COR[sem],
@@ -223,24 +304,27 @@ function Linha({
                 {e.aberta && <p className="text-[11px] text-amber-500">em andamento</p>}
               </TooltipContent>
             </Tooltip>
-          );
-        })}
+              );
+            })}
+          </div>
+
+          <div className="mt-1 flex gap-0.5">
+            {etapas.map((e, i) => (
+              <span
+                key={e.stage_id}
+                style={estiloSegmento(ws[i], etapas.length)}
+                className="truncate text-[9px] leading-tight text-muted-foreground"
+                title={e.nome}
+              >
+                {e.nome}
+              </span>
+            ))}
+          </div>
+        </div>
         <span
-          className="h-3 w-3 shrink-0 rounded-full bg-emerald-500"
+          className="h-3 w-3 shrink-0 self-start rounded-full bg-emerald-500"
           aria-label="fim da contagem"
         />
-      </div>
-
-      <div className="mt-1 flex gap-0.5 pl-3.5">
-        {etapas.map((e, i) => (
-          <span
-            key={e.stage_id}
-            style={{ width: `${ws[i]}%` }}
-            className="truncate text-[9px] leading-tight text-muted-foreground"
-          >
-            {e.nome}
-          </span>
-        ))}
       </div>
     </div>
   );
