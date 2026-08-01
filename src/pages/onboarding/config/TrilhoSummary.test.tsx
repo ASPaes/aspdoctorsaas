@@ -7,8 +7,20 @@ import { TrilhoSummary } from "./TrilhoSummary";
 // Sem @testing-library/react: o peer @testing-library/dom não está instalado no projeto.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// trilho = 3720 min (7d 6h úteis); o tipo de demanda promete 2400 (5d) — diverge.
-const trilhoMin = vi.fn(() => 3720);
+// Cenário real do Digi Office no local: o pipeline visível tem 4d 6h, mas o trilho
+// inteiro soma 53d 6h porque o Acompanhamento sozinho vale 45d.
+const resumo = vi.fn(() => ({
+  total_min: 25800,
+  tem_encerra: false,
+  tem_inicia: true,
+  inicia_nome: "Novo Cliente",
+  encerra_nome: "Cliente destravado",
+  segmentos: [
+    { jornada: "Onboarding", min: 2280 },
+    { jornada: "Implantação", min: 1920 },
+    { jornada: "Acompanhamento", min: 21600 },
+  ],
+}));
 const demandTypes = vi.fn(() => [
   { id: "d1", nome: "Onboarding PDV Legal", sla_total_minutos: 2400, ativo: true },
 ]);
@@ -23,8 +35,8 @@ vi.mock("@/integrations/supabase/client", () => {
     supabase: {
       from: () => chain,
       rpc: (fn: string) =>
-        fn === "fn_onb_trilho_sla_min"
-          ? Promise.resolve({ data: trilhoMin(), error: null })
+        fn === "fn_onb_trilho_resumo"
+          ? Promise.resolve({ data: resumo(), error: null })
           : Promise.resolve({ data: null, error: null }),
     },
   };
@@ -41,8 +53,7 @@ async function render() {
       </QueryClientProvider>,
     );
   });
-  // Duas queries independentes (trilho e tipos de demanda) resolvem em rodadas
-  // diferentes de microtask; um flush só deixa o componente no estado de loading.
+  // Duas queries independentes resolvem em rodadas diferentes de microtask.
   for (let i = 0; i < 5; i++) {
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
   }
@@ -51,17 +62,59 @@ async function render() {
 
 beforeEach(() => {
   document.body.innerHTML = "";
-  trilhoMin.mockReturnValue(3720);
+  resumo.mockReturnValue({
+    total_min: 25800, tem_encerra: false, tem_inicia: true,
+    inicia_nome: "Novo Cliente", encerra_nome: "Cliente destravado",
+    segmentos: [
+      { jornada: "Onboarding", min: 2280 },
+      { jornada: "Implantação", min: 1920 },
+      { jornada: "Acompanhamento", min: 21600 },
+    ],
+  });
   demandTypes.mockReturnValue([
     { id: "d1", nome: "Onboarding PDV Legal", sla_total_minutos: 2400, ativo: true },
   ]);
 });
 
 describe("TrilhoSummary", () => {
-  it("mostra o total do trilho na base de 8h", async () => {
+  it("abre a conta por jornada em vez de só mostrar o total", async () => {
     const host = await render();
-    // formatSlaHuman(3720) = 7 dias úteis + 6h
-    expect(host.textContent).toContain("7d 6h");
+    const txt = host.textContent ?? "";
+    // Sem a decomposição, "53d 6h" no cabeçalho de um pipeline de 4d 6h parece erro.
+    expect(txt).toContain("Onboarding");
+    expect(txt).toContain("4d 6h");   // 2280
+    expect(txt).toContain("Implantação");
+    expect(txt).toContain("4d");      // 1920
+    expect(txt).toContain("Acompanhamento");
+    expect(txt).toContain("45d");     // 21600
+    expect(txt).toContain("53d 6h");  // total
+  });
+
+  it("deixa explícito que o número não é só do pipeline aberto", async () => {
+    const host = await render();
+    expect(host.textContent).toContain("não só este pipeline");
+  });
+
+  it("avisa quando falta marcar a etapa que encerra a contagem", async () => {
+    const host = await render();
+    expect(host.textContent).toContain("encerrar a contagem");
+  });
+
+  it("com etapa que encerra marcada, mostra os limites da janela", async () => {
+    resumo.mockReturnValue({
+      total_min: 4200, tem_encerra: true, tem_inicia: true,
+      inicia_nome: "Novo Cliente", encerra_nome: "Sub-tickets Finalizados",
+      segmentos: [
+        { jornada: "Onboarding", min: 2280 },
+        { jornada: "Implantação", min: 1920 },
+      ],
+    });
+    const host = await render();
+    const txt = host.textContent ?? "";
+    expect(txt).toContain("Novo Cliente");
+    expect(txt).toContain("Sub-tickets Finalizados");
+    expect(txt).not.toContain("encerrar a contagem");
+    expect(txt).not.toContain("Acompanhamento");
   });
 
   it("acusa quando o plano estoura o prazo prometido", async () => {
@@ -69,13 +122,11 @@ describe("TrilhoSummary", () => {
     const txt = host.textContent ?? "";
     expect(txt).toContain("Onboarding PDV Legal");
     expect(txt).toContain("acima da promessa");
-    // 3720 - 2400 = 1320 min = 2d 6h
-    expect(txt).toContain("2d 6h");
   });
 
   it("não acusa nada quando o prazo prometido bate com o trilho", async () => {
     demandTypes.mockReturnValue([
-      { id: "d1", nome: "Onboarding PDV Legal", sla_total_minutos: 3720, ativo: true },
+      { id: "d1", nome: "Onboarding PDV Legal", sla_total_minutos: 25800, ativo: true },
     ]);
     const host = await render();
     expect(host.textContent).not.toContain("promessa");
@@ -92,7 +143,10 @@ describe("TrilhoSummary", () => {
   });
 
   it("avisa quando não há etapa nenhuma na janela contada", async () => {
-    trilhoMin.mockReturnValue(0);
+    resumo.mockReturnValue({
+      total_min: 0, tem_encerra: false, tem_inicia: false,
+      inicia_nome: null, encerra_nome: null, segmentos: [],
+    });
     const host = await render();
     expect(host.textContent).toContain("Nenhuma etapa com SLA");
   });
