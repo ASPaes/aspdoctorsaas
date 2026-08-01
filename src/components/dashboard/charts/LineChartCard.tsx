@@ -3,6 +3,13 @@ import { cn } from '@/lib/utils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { ChartDataPoint } from '../types';
 
+interface TooltipRow {
+  /** Campo do ponto */
+  key: string;
+  /** Rótulo da parcela; recebe o ponto inteiro para compor (ex.: "Ativação (38 vendas)") */
+  label: string | ((point: any) => string);
+}
+
 interface LineChartCardProps {
   title: string;
   data: ChartDataPoint[];
@@ -12,9 +19,13 @@ interface LineChartCardProps {
   className?: string;
   color?: string;
   height?: number;
+  /** Nome da série no tooltip. Sem isso, cai no `title` — que costuma ser longo demais. */
+  seriesLabel?: string;
+  /** Abre a composição do valor no tooltip (ex.: recorrente x ativação) */
+  tooltipRows?: TooltipRow[];
 }
 
-export function LineChartCard({ title, data, dataKey = 'value', formatValue = v => v.toLocaleString('pt-BR'), tvMode = false, className, color = 'hsl(var(--primary))', height = 300 }: LineChartCardProps) {
+export function LineChartCard({ title, data, dataKey = 'value', formatValue = v => v.toLocaleString('pt-BR'), tvMode = false, className, color = 'hsl(var(--primary))', height = 300, seriesLabel, tooltipRows }: LineChartCardProps) {
   const chartHeight = tvMode ? height * 1.5 : height;
 
   if (!data || data.length === 0) {
@@ -36,7 +47,34 @@ export function LineChartCard({ title, data, dataKey = 'value', formatValue = v 
               <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
               <XAxis dataKey="monthFull" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
               <YAxis tick={{ fontSize: tvMode ? 14 : 11 }} tickFormatter={formatValue} className="fill-muted-foreground" />
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: tvMode ? 16 : 12, color: 'hsl(var(--foreground))' }} itemStyle={{ color: 'hsl(var(--foreground))', fontSize: '0.8125rem' }} labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }} formatter={(value: number) => [formatValue(value), title]} />
+              {tooltipRows ? (
+                <Tooltip
+                  cursor={{ stroke: 'hsl(var(--border))' }}
+                  content={({ active, payload, label }: any) => {
+                    if (!active || !payload?.length) return null;
+                    const p = payload[0].payload;
+                    return (
+                      <div className="rounded-md border border-border bg-card px-3 py-2 shadow-lg">
+                        <div className={cn('font-semibold text-foreground', tvMode ? 'text-base' : 'text-xs')}>{label}</div>
+                        <div className={cn('mt-1.5 flex items-center justify-between gap-6', tvMode ? 'text-sm' : 'text-xs')}>
+                          <span className="text-muted-foreground">{seriesLabel || title}</span>
+                          <span className="font-semibold tabular-nums" style={{ color }}>{formatValue(Number(p[dataKey]) || 0)}</span>
+                        </div>
+                        <div className={cn('mt-1.5 space-y-1 border-t border-border pt-1.5', tvMode ? 'text-sm' : 'text-xs')}>
+                          {tooltipRows.map(r => (
+                            <div key={r.key} className="flex items-center justify-between gap-6">
+                              <span className="text-muted-foreground">{typeof r.label === 'function' ? r.label(p) : r.label}</span>
+                              <span className="text-foreground tabular-nums">{formatValue(Number(p[r.key]) || 0)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
+              ) : (
+                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: tvMode ? 16 : 12, color: 'hsl(var(--foreground))' }} itemStyle={{ color: 'hsl(var(--foreground))', fontSize: '0.8125rem' }} labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }} formatter={(value: number) => [formatValue(value), seriesLabel || title]} />
+              )}
               <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={tvMode ? 3 : 2} dot={{ fill: color, strokeWidth: 0, r: tvMode ? 5 : 3 }} activeDot={{ r: tvMode ? 8 : 6 }} />
             </LineChart>
           </ResponsiveContainer>

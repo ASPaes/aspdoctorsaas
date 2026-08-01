@@ -126,3 +126,43 @@ describe('buildMrrRuler — ledger', () => {
     expect(aj('y', '2026-03-09')).toBe(0);
   });
 });
+
+describe('buildMrrRuler — MRR sem reajuste', () => {
+  const cp: CpRow[] = [{ cliente_id: 'z', vlr_mensal: 1000, ativo: true, data_cancelamento: null }];
+  const mov: MovRow[] = [
+    { cliente_id: 'z', valor_delta: 300, data_movimento: '2026-02-10', tipo: 'upsell' },
+    { cliente_id: 'z', valor_delta: 100, data_movimento: '2026-03-01', tipo: 'reajuste' },
+    { cliente_id: 'z', valor_delta: -80, data_movimento: '2026-04-05', tipo: 'downsell' },
+    { cliente_id: 'z', valor_delta: 50, data_movimento: '2026-06-01', tipo: 'reajuste' },
+  ];
+  const { mrrDe, mrrSemReajusteDe } = buildMrrRuler(cp, mov);
+
+  it('descarta só o reajuste — venda, upsell e downsell continuam', () => {
+    expect(mrrDe('z', '2026-12-31')).toBe(1370);
+    expect(mrrSemReajusteDe('z', '2026-12-31')).toBe(1220);
+  });
+
+  it('a diferença só aparece a partir do primeiro reajuste', () => {
+    expect(mrrSemReajusteDe('z', '2026-02-28')).toBe(mrrDe('z', '2026-02-28'));
+    expect(mrrDe('z', '2026-03-01') - mrrSemReajusteDe('z', '2026-03-01')).toBe(100);
+  });
+
+  it('estorno de reajuste sai junto e não deixa resíduo', () => {
+    // O estorno é gravado como 'reajuste' com delta negativo (estornar_reajuste).
+    // Se só um dos dois fosse descartado, a série sem reajuste ficaria torta.
+    const { mrrSemReajusteDe: semReaj, mrrDe: com } = buildMrrRuler(cp, [
+      { cliente_id: 'z', valor_delta: 100, data_movimento: '2026-03-01', tipo: 'reajuste' },
+      { cliente_id: 'z', valor_delta: -100, data_movimento: '2026-04-01', tipo: 'reajuste' },
+    ]);
+    expect(com('z', '2026-12-31')).toBe(1000);
+    expect(semReaj('z', '2026-03-15')).toBe(1000);
+    expect(semReaj('z', '2026-12-31')).toBe(1000);
+  });
+
+  it('sem `tipo` na query, nada é descartado — degrada para o MRR cheio', () => {
+    const { mrrDe: com, mrrSemReajusteDe: sem } = buildMrrRuler(cp, [
+      { cliente_id: 'z', valor_delta: 100, data_movimento: '2026-03-01' },
+    ]);
+    expect(sem('z', '2026-12-31')).toBe(com('z', '2026-12-31'));
+  });
+});

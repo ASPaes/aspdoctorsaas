@@ -38,6 +38,8 @@ export interface MovRow {
   cliente_id: string;
   valor_delta: number | string | null;
   data_movimento: string;
+  /** Necessário só para `mrrSemReajusteDe`; sem ele o reajuste não tem como ser isolado. */
+  tipo?: string | null;
 }
 
 /**
@@ -54,6 +56,15 @@ export interface MrrRuler {
   ajusteAteData: (clienteId: string, corte: string) => number;
   /** MRR do cliente na data de corte = base + ajuste. */
   mrrDe: (clienteId: string, corte: string) => number;
+  /**
+   * Mesmo corte, ignorando os movimentos de reajuste — o MRR que existiria sem nenhum
+   * aumento de preço sobre a base. Isola crescimento de operação de crescimento de tabela.
+   *
+   * É exato porque `aplicar_reajuste` NÃO toca em `cliente_produtos.vlr_mensal` nem em
+   * `clientes.mensalidade`: ele só insere a linha no ledger (conferido em prod, 01/08/2026).
+   * O estorno também é `tipo='reajuste'` com delta negativo, então sai junto e não deixa resíduo.
+   */
+  mrrSemReajusteDe: (clienteId: string, corte: string) => number;
   /**
    * Σ `vlr_custo` dos produtos ativos na data de corte — o COGS na mesma régua.
    * Existe pelo mesmo motivo do resto: `vw_clientes_financeiro.custo_operacao` também é
@@ -83,10 +94,14 @@ export function buildMrrRuler(cpRows: CpRow[] | null | undefined, movRows: MovRo
     });
   });
 
-  const movimentos: Record<string, Array<{ date: string; delta: number }>> = {};
+  const movimentos: Record<string, Array<{ date: string; delta: number; reajuste: boolean }>> = {};
   (movRows || []).forEach((m) => {
     if (!movimentos[m.cliente_id]) movimentos[m.cliente_id] = [];
-    movimentos[m.cliente_id].push({ date: String(m.data_movimento).slice(0, 10), delta: Number(m.valor_delta) || 0 });
+    movimentos[m.cliente_id].push({
+      date: String(m.data_movimento).slice(0, 10),
+      delta: Number(m.valor_delta) || 0,
+      reajuste: m.tipo === 'reajuste',
+    });
   });
   Object.values(movimentos).forEach((arr) => arr.sort((a, b) => a.date.localeCompare(b.date)));
 
@@ -110,21 +125,25 @@ export function buildMrrRuler(cpRows: CpRow[] | null | undefined, movRows: MovRo
     return total;
   };
 
-  const ajusteAteData = (clienteId: string, corte: string): number => {
+  const somaAjustes = (clienteId: string, corte: string, semReajuste: boolean): number => {
     const movs = movimentos[clienteId];
     if (!movs) return 0;
     let total = 0;
     for (const m of movs) {
       if (m.date > corte) break; // ordenado por data — pode parar no primeiro que passa
+      if (semReajuste && m.reajuste) continue;
       total += m.delta;
     }
     return total;
   };
+
+  const ajusteAteData = (clienteId: string, corte: string): number => somaAjustes(clienteId, corte, false);
 
   return {
     baseAteData,
     ajusteAteData,
     custoAteData,
     mrrDe: (clienteId, corte) => baseAteData(clienteId, corte) + ajusteAteData(clienteId, corte),
+    mrrSemReajusteDe: (clienteId, corte) => baseAteData(clienteId, corte) + somaAjustes(clienteId, corte, true),
   };
 }

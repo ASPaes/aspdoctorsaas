@@ -214,6 +214,58 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
         <KPICardEnhanced label="Margem % nova" value={`${Math.round(margemPctTotal * 100)}%`} icon={<TrendingUp className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-green-500`} />} size={s} variant="success" helpKey="margem_pct_nova" />
       </div>
 
+      {/* Evolução de vendas — 12 meses */}
+      <Card>
+        <CardHeader className={tvMode ? 'pb-2' : ''}>
+          <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Evolução de vendas — 12 meses</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {serieData.length === 0 ? (
+            <div className="flex items-center justify-center h-[280px] text-muted-foreground">Sem dados disponíveis</div>
+          ) : (
+            <div style={{ height: 280 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={serieData} margin={{ top: 10, right: 20, bottom: 5, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                  <XAxis dataKey="mes" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
+                  <YAxis yAxisId="l" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
+                  <YAxis yAxisId="r" orientation="right" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
+                  <RechartsTooltip
+                    cursor={{ fill: 'hsl(var(--muted) / 0.35)' }}
+                    content={({ active, payload, label }: any) => {
+                      if (!active || !payload?.length) return null;
+                      const row = payload[0].payload;
+                      return (
+                        <div className="rounded-md border border-border bg-card px-3 py-2 shadow-lg">
+                          <div className={cn('font-medium text-foreground mb-1.5', tvMode ? 'text-base' : 'text-xs')}>{label}</div>
+                          <div className={cn('space-y-1', tvMode ? 'text-sm' : 'text-xs')}>
+                            <div className="flex items-center justify-between gap-6">
+                              <span className="text-muted-foreground">Vendas</span>
+                              <span className="font-semibold text-foreground tabular-nums">{row.qtd ?? 0}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-6">
+                              <span className="text-muted-foreground">New MRR</span>
+                              <span className="font-semibold text-primary tabular-nums">{fmt(row.new_mrr || 0)}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-6">
+                              <span className="text-muted-foreground">Ticket médio</span>
+                              <span className="font-semibold tabular-nums" style={{ color: 'hsl(var(--chart-2, 199 89% 48%))' }}>{fmt(row.ticket || 0)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: tvMode ? 14 : 11 }} />
+                  <Bar yAxisId="l" dataKey="new_mrr" name="New MRR" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <Line yAxisId="r" dataKey="ticket" name="Ticket médio" stroke="hsl(var(--chart-2, 199 89% 48%))" strokeWidth={2} dot={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Explorador — métrica × dimensão */}
       {(() => {
         const METRICS: { id: typeof expMetric; label: string }[] = [
@@ -317,37 +369,6 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
                   </div>
                 );
               })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Evolução de vendas — 12 meses */}
-
-      <Card>
-        <CardHeader className={tvMode ? 'pb-2' : ''}>
-          <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Evolução de vendas — 12 meses</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {serieData.length === 0 ? (
-            <div className="flex items-center justify-center h-[280px] text-muted-foreground">Sem dados disponíveis</div>
-          ) : (
-            <div style={{ height: 280 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={serieData} margin={{ top: 10, right: 20, bottom: 5, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-                  <XAxis dataKey="mes" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
-                  <YAxis yAxisId="l" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
-                  <YAxis yAxisId="r" orientation="right" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
-                  <RechartsTooltip
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }}
-                    formatter={(value: number, name: string) => [fmt(Number(value)), name]}
-                  />
-                  <Legend wrapperStyle={{ fontSize: tvMode ? 14 : 11 }} />
-                  <Bar yAxisId="l" dataKey="new_mrr" name="New MRR" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  <Line yAxisId="r" dataKey="ticket" name="Ticket médio" stroke="hsl(var(--chart-2, 199 89% 48%))" strokeWidth={2} dot={false} />
-                </ComposedChart>
-              </ResponsiveContainer>
             </div>
           )}
         </CardContent>

@@ -192,7 +192,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       // É o que faz Visão Geral, Cancelamentos e Vendas pararem de divergir dela.
       // Ver `src/lib/mrrRuler.ts` para o porquê de não usar `mensalidade`.
       const todosMovimentosAtivos = await todosMovimentosAtivosPromise;
-      const { mrrDe } = buildMrrRuler(cpAll as any, todosMovimentosAtivos as any);
+      const { mrrDe, mrrSemReajusteDe } = buildMrrRuler(cpAll as any, todosMovimentosAtivos as any);
 
       // Índices auxiliares do ledger (churn por cliente e ajustes recorrentes da ficha).
       const ajustesRecorrentesPorCliente: Record<string, number> = {};
@@ -534,24 +534,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
         });
-        // MRR do mês pela régua canônica no corte do mês — é o que faz esta série bater,
-        // ponto a ponto, com `get_mrr_monthly_snapshots` (a série da aba Crescimento).
-        const mrrMes = activosNoMes.reduce((sum, c) => sum + mrrDe(c.id, m.end), 0);
-        // Per-unit MRR for chart lines
-        const mrrPoint: Record<string, string | number | undefined> = {
-          month: m.month, monthFull: m.monthFull, value: mrrMes,
-          clientesAtivos: activosNoMes.length,
-          ticketMedio: activosNoMes.length > 0 ? mrrMes / activosNoMes.length : 0,
-        };
-        (unidadesBase || []).forEach(u => {
-          const mrrU = activosNoMes
-            .filter(c => c.unidade_base_id === u.id)
-            .reduce((sum, c) => sum + mrrDe(c.id, m.end), 0);
-          mrrPoint[`mrr_${u.id}`] = mrrU;
-        });
-        mrrEvolution.push(mrrPoint as any);
-
-        // Faturamento = MRR + ativações dos novos clientes cadastrados naquele mês
+        // Clientes vendidos no mês (usado no gráfico de MRR e no faturamento)
         const novosNoMes = (allClientes || []).filter(c => {
           if (!c.data_venda_efetiva) return false;
           const dc = format(new Date(c.data_venda_efetiva), 'yyyy-MM');
@@ -560,8 +543,36 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
         });
+
+        // MRR do mês pela régua canônica no corte do mês — é o que faz esta série bater,
+        // ponto a ponto, com `get_mrr_monthly_snapshots` (a série da aba Crescimento).
+        const mrrMes = activosNoMes.reduce((sum, c) => sum + mrrDe(c.id, m.end), 0);
+        // Mesma régua sem os movimentos de reajuste — série paralela do toggle "sem reajuste"
+        const mrrMesSemReajuste = activosNoMes.reduce((sum, c) => sum + mrrSemReajusteDe(c.id, m.end), 0);
+        // Per-unit MRR for chart lines
+        const mrrPoint: Record<string, string | number | undefined> = {
+          month: m.month, monthFull: m.monthFull, value: mrrMes,
+          valueSemReajuste: mrrMesSemReajuste,
+          vendas: novosNoMes.length,
+          clientesAtivos: activosNoMes.length,
+          ticketMedio: activosNoMes.length > 0 ? mrrMes / activosNoMes.length : 0,
+        };
+        (unidadesBase || []).forEach(u => {
+          const daUnidade = activosNoMes.filter(c => c.unidade_base_id === u.id);
+          mrrPoint[`mrr_${u.id}`] = daUnidade.reduce((sum, c) => sum + mrrDe(c.id, m.end), 0);
+          mrrPoint[`mrr_${u.id}_sr`] = daUnidade.reduce((sum, c) => sum + mrrSemReajusteDe(c.id, m.end), 0);
+          mrrPoint[`vendas_${u.id}`] = novosNoMes.filter(c => c.unidade_base_id === u.id).length;
+        });
+        mrrEvolution.push(mrrPoint as any);
+
+        // Faturamento = MRR + ativações dos novos clientes cadastrados naquele mês
         const ativacoesMes = novosNoMes.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0);
-        faturamentoEvolution.push({ month: m.month, monthFull: m.monthFull, value: mrrMes + ativacoesMes });
+        // Guarda as duas parcelas: o tooltip abre a composição (recorrente x ativação, que é one-time).
+        // Sem isso o mês corrente parece um tombo — ele só ainda não tem ativação nenhuma.
+        faturamentoEvolution.push({
+          month: m.month, monthFull: m.monthFull, value: mrrMes + ativacoesMes,
+          mrr: mrrMes, ativacoes: ativacoesMes, vendas: novosNoMes.length,
+        });
 
         const canceladosNoMes = (allClientes || []).filter(c => {
           if (!c.data_cancelamento) return false;

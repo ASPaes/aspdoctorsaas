@@ -5,6 +5,8 @@ import {
   TrendingUp, Wallet, Scale, CalendarClock,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { LineChartCard } from '../charts/LineChartCard';
 import { MultiLineChartCard } from '../charts/MultiLineChartCard';
@@ -79,6 +81,8 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
   const isAdminOrHead = isAdmin || profile?.role === 'head';
 
   const [diagOpen, setDiagOpen] = useState(false);
+  const [mostrarVendas, setMostrarVendas] = useState(true);
+  const [semReajuste, setSemReajuste] = useState(false);
 
 
   // ── Eficiência & Saúde ──
@@ -132,20 +136,44 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
   // ── Charts ──
   const { mrrLines, mrrChartData } = useMemo(() => {
     const units = metrics.faturamentoPorUnidade;
+    const pontos = (timeSeries.mrrEvolution || []) as any[];
+    const totalKey = semReajuste ? 'valueSemReajuste' : 'value';
+
+    // Fatia média da unidade dentro do total. Unidade que responde por quase todo o MRR
+    // desenha colada na linha Total: o rótulo dela vai ABAIXO da linha, senão cai em cima
+    // da curva de cima e fica ilegível. Unidade pequena corre sozinha lá embaixo → rótulo em cima.
+    const fatiaMedia = (key: string) => {
+      if (!pontos.length) return 0;
+      const soma = pontos.reduce((acc, p) => {
+        const total = Number(p[totalKey]) || 0;
+        return acc + (total > 0 ? (Number(p[key]) || 0) / total : 0);
+      }, 0);
+      return soma / pontos.length;
+    };
+
     const lines: any[] = [
-      { dataKey: 'value', label: 'MRR Total', color: 'hsl(var(--primary))' },
+      {
+        dataKey: totalKey,
+        label: 'MRR Total',
+        color: 'hsl(var(--primary))',
+        qtdKey: 'vendas',
+        labelPosition: 'top',
+      },
     ];
     units.forEach((u, i) => {
       const colors = ['hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+      const dataKey = semReajuste ? `mrr_${u.id}_sr` : `mrr_${u.id}`;
       lines.push({
-        dataKey: `mrr_${u.id}`,
+        dataKey,
         label: `MRR ${u.nome}`,
         color: colors[i % colors.length],
         strokeDasharray: '5 3',
+        qtdKey: `vendas_${u.id}`,
+        labelPosition: fatiaMedia(dataKey) >= 0.5 ? 'bottom' : 'top',
       });
     });
-    return { mrrLines: lines, mrrChartData: timeSeries.mrrEvolution };
-  }, [timeSeries.mrrEvolution, metrics.faturamentoPorUnidade]);
+    return { mrrLines: lines, mrrChartData: pontos };
+  }, [timeSeries.mrrEvolution, metrics.faturamentoPorUnidade, semReajuste]);
 
   const tabLabel = useMemo(() => {
     const now = new Date();
@@ -202,7 +230,50 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
         </div>
       </section>
 
-      {/* BLOCO 2: Eficiência & Saúde */}
+      {/* BLOCO 2: Evolução · 12 meses */}
+      <section className="space-y-3">
+        <div>
+          <h3 className={`font-semibold text-foreground ${tvMode ? 'text-2xl' : 'text-lg'}`}>Evolução · 12 meses</h3>
+          <p className="text-xs text-muted-foreground">série histórica</p>
+        </div>
+        <div className="grid gap-6 grid-cols-1">
+          <MultiLineChartCard
+            title={semReajuste ? 'Evolução do MRR (12 meses) — sem reajuste' : 'Evolução do MRR (12 meses)'}
+            data={mrrChartData}
+            lines={mrrLines}
+            formatValue={fmt}
+            tvMode={tvMode}
+            height={340}
+            showPointLabels={mostrarVendas}
+            headerRight={
+              <div className="flex items-center gap-4 shrink-0">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="mrr-vendas-toggle" className="text-xs text-muted-foreground cursor-pointer whitespace-nowrap">Nº de vendas</Label>
+                  <Switch id="mrr-vendas-toggle" checked={mostrarVendas} onCheckedChange={setMostrarVendas} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="mrr-reajuste-toggle" className="text-xs text-muted-foreground cursor-pointer whitespace-nowrap">Sem reajuste</Label>
+                  <Switch id="mrr-reajuste-toggle" checked={semReajuste} onCheckedChange={setSemReajuste} />
+                </div>
+              </div>
+            }
+          />
+          <LineChartCard
+            title="Faturamento — recorrente + ativação (12 meses)"
+            seriesLabel="Faturamento"
+            data={timeSeries.faturamentoEvolution}
+            formatValue={fmt}
+            tvMode={tvMode}
+            height={340}
+            tooltipRows={[
+              { key: 'mrr', label: 'MRR recorrente' },
+              { key: 'ativacoes', label: (p: any) => `Ativação${p?.vendas ? ` (${p.vendas} vendas)` : ''}` },
+            ]}
+          />
+        </div>
+      </section>
+
+      {/* BLOCO 3: Eficiência & Saúde */}
       <section className="space-y-3">
         <div>
           <div className="flex items-center gap-2">
@@ -257,7 +328,7 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
         </div>
       </section>
 
-      {/* BLOCO 3: Retenção */}
+      {/* BLOCO 4: Retenção */}
       <section className="space-y-3">
         <div>
           <h3 className={`font-semibold text-foreground ${tvMode ? 'text-2xl' : 'text-lg'}`}>Retenção</h3>
@@ -311,25 +382,7 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
         tvMode={tvMode}
       />
 
-      {/* BLOCO 5: Gráficos + Comparativos */}
-      <section className="space-y-3">
-        <div>
-          <h3 className={`font-semibold text-foreground ${tvMode ? 'text-2xl' : 'text-lg'}`}>Evolução · 12 meses</h3>
-          <p className="text-xs text-muted-foreground">série histórica</p>
-        </div>
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-          <MultiLineChartCard
-            title="Evolução do MRR (12 meses)"
-            data={mrrChartData}
-            lines={mrrLines}
-            formatValue={fmt}
-            tvMode={tvMode}
-            height={340}
-          />
-          <LineChartCard title="Evolução do Faturamento (12 meses)" data={timeSeries.faturamentoEvolution} formatValue={fmt} tvMode={tvMode} height={340} />
-        </div>
-      </section>
-
+      {/* BLOCO 5: Comparativos temporais */}
       <section className="space-y-3">
         <div>
           <div className="flex items-center gap-2">
