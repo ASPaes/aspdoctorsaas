@@ -256,3 +256,29 @@ Dois arquivos. `tsc -p tsconfig.app.json` e `bun run build` passaram.
 - `invalidateQueries` → `invalidateQueries({ refetchType: 'none' })`. Marca o cache como velho sem disparar request, devolvendo o governo ao `staleTime: 30000` — que até então nunca chegava a valer.
 
 **Como validar depois de publicar:** `select pg_stat_statements_reset()`, ~10 min de tráfego de pico, reler `mean_exec_time` e `cores_demanda`. Alvo: média da view **abaixo de 60 ms** e demanda **abaixo de 2,0 cores**.
+
+### PUBLICADO em 31/07/2026 — commit `ae0d3107`, deploy Hostinger às 16:05 BRT
+
+Monitoramento por snapshots absolutos com taxa calculada por intervalo (não janela acumulada — a acumulada dilui a mudança no histórico):
+
+| intervalo | req/s | view/s | view ms | em voo | conns |
+|---|---|---|---|---|---|
+| 15:54→16:07 (pré-deploy) | 238,1 | 36,23 | 155,8 | 8,74 | 73 |
+| 16:07→16:28 | 238,6 | 38,61 | 189,7 | 10,77 | 78 |
+| 16:28→16:49 (pico) | 315,6 | 50,80 | 195,2 | 15,55 | 85 |
+| 16:49→17:10 | 218,5 | 33,30 | 150,9 | 7,87 | 72 |
+| **17:10→17:30** | **121,4** | **14,44** | **105,3** | **2,29** | **79** |
+
+Normalizado por conexão (tira o efeito de gente entrando/saindo): req/s por conexão caiu de **3,71 → 1,54**; chamadas da view por conexão, de **0,598 → 0,183**. **−69% de carga por usuário.** `em voo` abaixo do número de cores pela primeira vez no dia.
+
+**⚠️ Truque de medição que vale reusar:** dá para contar quantas sessões ainda rodam o bundle ANTIGO, porque o `useAttendanceStatus` antigo era o único ponto do sistema que assinava `support_attendances` **sem filtro de tenant**:
+
+```sql
+select count(*) from realtime.subscription
+where entity::text like '%support_attendances%'
+  and (filters is null or array_length(filters,1) is null);
+```
+
+Foi de **63 → 43** entre o deploy (16:05) e as 17:30 — só ~1/3 da operação recarregou em 1h25. **SPA não se atualiza sozinha: quem está com o painel aberto segue no código velho até dar F5.** Sem isso, o monitoramento mede o bundle antigo e não conclui nada. Pedir Ctrl+Shift+R faz parte do deploy.
+
+**Ressalva:** parte da melhora das 17:10→17:30 é fim de expediente. A prova limpa é uma janela de pico com ~100% das sessões no bundle novo. **Validar na manhã de 01/08.**
