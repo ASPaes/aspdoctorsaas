@@ -176,7 +176,15 @@ const effectiveTenantId = isSuperAdmin ? selectedTenantId : (profile?.tenant_id 
 ### Fórmula MRR (não negociável)
 `MRR Atual = Base + Upsell + Cross − Downsell − Churn + Reactivation`
 
-**Reajuste fica FORA do estoque e DENTRO do Net New MRR.** As RPCs `preparar/aplicar/estornar_reajuste` atualizam a base direto e criam movimento só para auditoria — nas queries de delta do frontend, excluir com `.neq("tipo","reajuste")`.
+**Saldo × extrato — a distinção que evita descontar duas vezes:**
+
+- **Saldo** (quanto o cliente vale numa data) = `cliente_produtos` vigentes **+** movimentos recorrentes vigentes (`upsell`, `cross_sell`, `downsell`, `reajuste`). É `fn_mrr_cliente_em`.
+- **Extrato** (o que aconteceu) = `movimentos_mrr`. `churn` e `reactivation` são **só** extrato: alimentam Net New / `get_mrr_bridge` e **não entram no saldo**. Somá-los ao saldo descontava a baixa duas vezes — foi o bug de 01/08 que deixou 828 clientes com MRR negativo.
+- Baixa de movimento recorrente é por **`movimentos_mrr.encerrado_em`**, nunca por `status`. `status='inativo'` tiraria o movimento do Net New do mês em que ocorreu.
+
+**Reajuste está DENTRO do saldo e DENTRO do Net New — e isso não é dupla contagem.** `aplicar_reajuste` **não** atualiza a base: mexe só em `data_proximo_reajuste` e grava o movimento. O valor do reajuste existe **exclusivamente** no movimento, então ele precisa ser somado para o cliente valer o que cobra. Medido em 01/08: dos 187 reajustes aplicados, **181 deixaram `clientes.mensalidade` no `vlr_mensal_antes` e nenhum foi para o `vlr_mensal_depois`**. O frontend também soma (`useDashboardData.ts:227`) — não existe `.neq("tipo","reajuste")` em lugar nenhum do repo.
+
+⚠️ Só `estornar_reajuste` e `aplicar_reajuste` criam movimento; `preparar_reajuste` não grava nada.
 
 ---
 
