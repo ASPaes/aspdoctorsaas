@@ -5,6 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import type { DashboardFilters } from '../types';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { fetchAllRows } from '@/lib/supabasePaginate';
+import { buildMrrRuler, MRR_MOV_TIPOS } from '@/lib/mrrRuler';
 
 const LTV_CAP = 120;
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -78,31 +79,45 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
       });
 
       // === QUERY A: All clients ===
-      let fornecedorClientIds: Set<string> | null = null;
-
-      if (filters.fornecedorIds?.length) {
-        const cpByForn = await fetchAllRows<any>(() => {
-          let q = (supabase.from('cliente_produtos' as any) as any)
-            .select('cliente_id')
-            .in('fornecedor_id', filters.fornecedorIds);
+      // `cliente_produtos` + `movimentos_mrr` alimentam a régua canônica (ver
+      // `src/lib/mrrRuler.ts`) e, de quebra, o filtro por fornecedor — que antes era uma
+      // busca própria. Sem isso, ARPA, MC%, LTV e CAC Payback ficavam medindo o passado
+      // com a foto de hoje, e divergiam do card de MRR e da série da aba Crescimento.
+      const [allClientes, cpAll, movimentos, cacDespesas] = await Promise.all([
+        fetchAllRows<any>(() => {
+          let q = supabase
+            .from('vw_clientes_financeiro')
+            .select('id, mensalidade, data_venda_efetiva, data_cancelamento, cancelado, custo_operacao, imposto_percentual, custo_fixo_percentual, unidade_base_id, fornecedor_id, valor_ativacao');
           if (tid) q = q.eq('tenant_id', tid);
           return q;
-        });
-        fornecedorClientIds = new Set((cpByForn || []).map((r: any) => r.cliente_id));
-      }
+        }),
+        fetchAllRows<any>(() => {
+          let q = (supabase.from('cliente_produtos' as any) as any)
+            .select('cliente_id, fornecedor_id, vlr_mensal, vlr_custo, ativo, data_cancelamento');
+          if (tid) q = q.eq('tenant_id', tid);
+          return q;
+        }),
+        fetchAllRows<any>(() => tf(supabase
+          .from('movimentos_mrr')
+          .select('cliente_id, valor_delta, data_movimento')
+          .in('tipo', [...MRR_MOV_TIPOS])
+          .eq('status', 'ativo')
+          .is('estornado_por', null)
+          .is('estorno_de', null))),
+        fetchAllRows<any>(() => tf(supabase
+          .from('cac_despesas')
+          .select('valor_alocado, mes_inicial, mes_final, unidade_base_id'))),
+      ]);
 
-      const allClientes = await fetchAllRows<any>(() => {
-        let q = supabase
-          .from('vw_clientes_financeiro')
-          .select('id, mensalidade, data_venda_efetiva, data_cancelamento, cancelado, custo_operacao, imposto_percentual, custo_fixo_percentual, unidade_base_id, fornecedor_id, valor_ativacao');
-        if (tid) q = q.eq('tenant_id', tid);
-        return q;
-      });
+      const { mrrDe, custoAteData } = buildMrrRuler(cpAll as any, movimentos as any);
 
-      // === QUERY B: CAC despesas ===
-      const cacDespesas = await fetchAllRows<any>(() => tf(supabase
-        .from('cac_despesas')
-        .select('valor_alocado, mes_inicial, mes_final, unidade_base_id')));
+      const fornecedorClientIds: Set<string> | null = filters.fornecedorIds?.length
+        ? new Set(
+            (cpAll || [])
+              .filter((cp: any) => (filters.fornecedorIds as number[]).includes(cp.fornecedor_id))
+              .map((cp: any) => cp.cliente_id),
+          )
+        : null;
 
       const clients = (allClientes || []).filter(c => {
         if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
@@ -177,14 +192,15 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
           return true;
         });
 
-        const mrrSnapshot = ativosFim.reduce((s, c) => s + (Number(c.mensalidade) || 0), 0);
+        // Régua canônica no corte do mês: quem estava ativo NAQUELE dia, valendo o que
+        // valia NAQUELE dia. Antes era `mensalidade` (produtos ativos hoje) e sem o ledger.
+        const mrrSnapshot = ativosFim.reduce((s, c) => s + mrrDe(c.id, endStr), 0);
 
-        // MC total = MRR - COGS only
+        // MC total = MRR - COGS, com o custo no mesmo corte (`custo_operacao` da view
+        // também é FILTER(ativo=true) e encolhia a margem do passado junto com a receita).
         let mcTotal = 0;
         ativosFim.forEach(c => {
-          const mens = Number(c.mensalidade) || 0;
-          const cogs = Number(c.custo_operacao) || 0;
-          mcTotal += mens - cogs;
+          mcTotal += mrrDe(c.id, endStr) - custoAteData(c.id, endStr);
         });
 
         // Ativação dos novos (separada do ARPA)

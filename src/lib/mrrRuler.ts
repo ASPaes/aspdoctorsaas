@@ -29,6 +29,8 @@ export interface CpRow {
   vlr_mensal: number | string | null;
   ativo: boolean | null;
   data_cancelamento: string | null;
+  /** Opcional: só quem calcula margem precisa selecionar esta coluna. */
+  vlr_custo?: number | string | null;
 }
 
 /** Linha de `movimentos_mrr` já filtrada por tipo/status na query. */
@@ -52,6 +54,14 @@ export interface MrrRuler {
   ajusteAteData: (clienteId: string, corte: string) => number;
   /** MRR do cliente na data de corte = base + ajuste. */
   mrrDe: (clienteId: string, corte: string) => number;
+  /**
+   * Σ `vlr_custo` dos produtos ativos na data de corte — o COGS na mesma régua.
+   * Existe pelo mesmo motivo do resto: `vw_clientes_financeiro.custo_operacao` também é
+   * `FILTER (ativo = true)`, então a margem do passado encolhia junto com a receita.
+   * Não há ledger de custo: `movimentos_mrr` só tem receita.
+   * Devolve 0 se `vlr_custo` não foi selecionado na query.
+   */
+  custoAteData: (clienteId: string, corte: string) => number;
 }
 
 const isoDay = (v: unknown): string | null => (v ? String(v).slice(0, 10) : null);
@@ -62,11 +72,12 @@ const isoDay = (v: unknown): string | null => (v ? String(v).slice(0, 10) : null
  * base ativa) e não pode ir ao banco a cada corte.
  */
 export function buildMrrRuler(cpRows: CpRow[] | null | undefined, movRows: MovRow[] | null | undefined): MrrRuler {
-  const produtos: Record<string, Array<{ valor: number; ativo: boolean; canceladoEm: string | null }>> = {};
+  const produtos: Record<string, Array<{ valor: number; custo: number; ativo: boolean; canceladoEm: string | null }>> = {};
   (cpRows || []).forEach((cp) => {
     if (!produtos[cp.cliente_id]) produtos[cp.cliente_id] = [];
     produtos[cp.cliente_id].push({
       valor: Number(cp.vlr_mensal) || 0,
+      custo: Number(cp.vlr_custo) || 0,
       ativo: cp.ativo === true,
       canceladoEm: isoDay(cp.data_cancelamento),
     });
@@ -79,14 +90,23 @@ export function buildMrrRuler(cpRows: CpRow[] | null | undefined, movRows: MovRo
   });
   Object.values(movimentos).forEach((arr) => arr.sort((a, b) => a.date.localeCompare(b.date)));
 
+  // Espelha `cp.ativo = true OR cp.data_cancelamento > <corte>`.
+  const vivoNoCorte = (it: { ativo: boolean; canceladoEm: string | null }, corte: string) =>
+    it.ativo || (it.canceladoEm !== null && it.canceladoEm > corte);
+
   const baseAteData = (clienteId: string, corte: string): number => {
     const itens = produtos[clienteId];
     if (!itens) return 0;
     let total = 0;
-    for (const it of itens) {
-      // Espelha `cp.ativo = true OR cp.data_cancelamento > <corte>`.
-      if (it.ativo || (it.canceladoEm !== null && it.canceladoEm > corte)) total += it.valor;
-    }
+    for (const it of itens) if (vivoNoCorte(it, corte)) total += it.valor;
+    return total;
+  };
+
+  const custoAteData = (clienteId: string, corte: string): number => {
+    const itens = produtos[clienteId];
+    if (!itens) return 0;
+    let total = 0;
+    for (const it of itens) if (vivoNoCorte(it, corte)) total += it.custo;
     return total;
   };
 
@@ -104,6 +124,7 @@ export function buildMrrRuler(cpRows: CpRow[] | null | undefined, movRows: MovRo
   return {
     baseAteData,
     ajusteAteData,
+    custoAteData,
     mrrDe: (clienteId, corte) => baseAteData(clienteId, corte) + ajusteAteData(clienteId, corte),
   };
 }

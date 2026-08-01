@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { DashboardFilters } from '../types';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { fetchAllRows } from '@/lib/supabasePaginate';
+import { buildMrrRuler, MRR_MOV_TIPOS } from '@/lib/mrrRuler';
 
 export interface MargemContribuicaoData {
   receita_mrr: number;
@@ -34,29 +35,47 @@ export function useMargemContribuicaoDashboard(filters: DashboardFilters) {
   return useQuery({
     queryKey: ['margem-contribuicao-dashboard', filters.unidadeBaseId, JSON.stringify(filters.fornecedorIds), periodoFimStr, tid],
     queryFn: async (): Promise<MargemContribuicaoData> => {
-      let fornecedorClientIds: Set<string> | null = null;
-
-      if (filters.fornecedorIds?.length) {
-        const cpByForn = await fetchAllRows<any>(() => {
+      // A população passa a ser a canônica — `data_venda_efetiva <= fim`, a mesma de
+      // `get_mrr_bridge` e do card de MRR. Era `data_cadastro`, que é outra data: cliente
+      // cadastrado antes de vender entrava cedo demais na conta da margem.
+      const [raw, cpAll, movimentos] = await Promise.all([
+        fetchAllRows<any>(() => {
+          let q = supabase
+            .from('vw_clientes_financeiro')
+            .select('id, mensalidade, custo_operacao, data_venda_efetiva, data_cancelamento, cancelado')
+            .lte('data_venda_efetiva', periodoFimStr);
+          if (tid) q = q.eq('tenant_id', tid);
+          if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
+          return q;
+        }),
+        fetchAllRows<any>(() => {
           let q = (supabase.from('cliente_produtos' as any) as any)
-            .select('cliente_id')
-            .in('fornecedor_id', filters.fornecedorIds);
+            .select('cliente_id, fornecedor_id, vlr_mensal, vlr_custo, ativo, data_cancelamento');
           if (tid) q = q.eq('tenant_id', tid);
           return q;
-        });
-        fornecedorClientIds = new Set((cpByForn || []).map((r: any) => r.cliente_id));
-      }
-
-      const raw = await fetchAllRows<any>(() => {
-        let q = supabase
-          .from('vw_clientes_financeiro')
-          .select('id, mensalidade, custo_operacao, data_cadastro, data_cancelamento, cancelado')
-          .lte('data_cadastro', periodoFimStr);
-        if (tid) q = q.eq('tenant_id', tid);
-        if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
-        return q;
-      });
+        }),
+        fetchAllRows<any>(() => {
+          let q = supabase
+            .from('movimentos_mrr')
+            .select('cliente_id, valor_delta, data_movimento')
+            .in('tipo', [...MRR_MOV_TIPOS])
+            .eq('status', 'ativo')
+            .is('estornado_por', null)
+            .is('estorno_de', null);
+          if (tid) q = q.eq('tenant_id', tid);
+          return q;
+        }),
+      ]);
       if (!raw || raw.length === 0) return defaultData;
+
+      const { mrrDe, custoAteData } = buildMrrRuler(cpAll as any, movimentos as any);
+      const fornecedorClientIds: Set<string> | null = filters.fornecedorIds?.length
+        ? new Set(
+            (cpAll || [])
+              .filter((cp: any) => (filters.fornecedorIds as number[]).includes(cp.fornecedor_id))
+              .map((cp: any) => cp.cliente_id),
+          )
+        : null;
 
       // Filtra clientes ativos no fim do período.
       // Regra canônica: ativo = cancelado !== true OU (cancelado=true E data_cancelamento > periodoFim).
@@ -71,11 +90,8 @@ export function useMargemContribuicaoDashboard(filters: DashboardFilters) {
       let cogs_total = 0;
 
       data.forEach(c => {
-        const m = Number(c.mensalidade) || 0;
-        const cogs = Number(c.custo_operacao) || 0;
-
-        receita_mrr += m;
-        cogs_total += cogs;
+        receita_mrr += mrrDe(c.id, periodoFimStr);
+        cogs_total += custoAteData(c.id, periodoFimStr);
       });
 
       const clientes_ativos = data.length;

@@ -74,6 +74,29 @@ describe('buildMrrRuler — churn parcial (o caso que motivou a correção)', ()
   });
 });
 
+describe('buildMrrRuler — custo na mesma régua', () => {
+  const cp: CpRow[] = [
+    { cliente_id: 'x', vlr_mensal: 1000, vlr_custo: 250, ativo: true, data_cancelamento: null },
+    { cliente_id: 'x', vlr_mensal: 400, vlr_custo: 100, ativo: false, data_cancelamento: '2026-05-15' },
+  ];
+  const { custoAteData, baseAteData } = buildMrrRuler(cp, []);
+
+  it('receita e custo entram e saem juntos — a margem do passado não distorce', () => {
+    expect(baseAteData('x', '2026-04-30')).toBe(1400);
+    expect(custoAteData('x', '2026-04-30')).toBe(350);
+    expect(baseAteData('x', '2026-06-30')).toBe(1000);
+    expect(custoAteData('x', '2026-06-30')).toBe(250);
+  });
+
+  it('devolve 0 quando vlr_custo não foi selecionado na query', () => {
+    const { custoAteData: semCusto } = buildMrrRuler(
+      [{ cliente_id: 'x', vlr_mensal: 1000, ativo: true, data_cancelamento: null }],
+      [],
+    );
+    expect(semCusto('x', '2026-04-30')).toBe(0);
+  });
+});
+
 describe('buildMrrRuler — ledger', () => {
   const cp: CpRow[] = [{ cliente_id: 'y', vlr_mensal: 1000, ativo: true, data_cancelamento: null }];
   const mov: MovRow[] = [

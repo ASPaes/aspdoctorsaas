@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { useDashboardData } from './useDashboardData';
+import { makeFakeQuery, type FakeTables } from '@/test/fakeSupabase';
 import type { DashboardFilters, KPIMetrics, TimeSeriesData } from '../types';
 
 /**
@@ -40,7 +41,7 @@ const MOVIMENTOS = [
   { cliente_id: 'A', tenant_id: TID, tipo: 'upsell', valor_delta: 100, data_movimento: '2026-02-01', status: 'ativo', estornado_por: null, estorno_de: null, descricao: null },
 ];
 
-const TABELAS: Record<string, any[]> = {
+const TABELAS: FakeTables = {
   vw_clientes_financeiro: CLIENTES,
   clientes: CLIENTES,
   cliente_produtos: CLIENTE_PRODUTOS,
@@ -49,62 +50,8 @@ const TABELAS: Record<string, any[]> = {
   funcionarios: [],
 };
 
-// ── Mini-PostgREST em memória ──────────────────────────────────────────────────
-// Aplica de verdade os filtros encadeados, para que as ~15 queries do hook devolvam
-// recortes diferentes do mesmo fixture — é isso que torna o teste capaz de pegar uma
-// data de corte trocada.
-type Op = { kind: string; col: string; val: any };
-
-function makeBuilder(table: string) {
-  const ops: Op[] = [];
-  const push = (kind: string, col: string, val: any) => { ops.push({ kind, col, val }); return builder; };
-
-  const apply = () => {
-    let rows = [...(TABELAS[table] ?? [])];
-    for (const o of ops) {
-      rows = rows.filter((r) => {
-        const v = r[o.col];
-        switch (o.kind) {
-          case 'eq': return v === o.val;
-          case 'neq': return v !== o.val;
-          case 'gte': return v != null && v >= o.val;
-          case 'lte': return v != null && v <= o.val;
-          case 'gt': return v != null && v > o.val;
-          case 'lt': return v != null && v < o.val;
-          case 'in': return (o.val as any[]).includes(v);
-          case 'is': return v === o.val || (o.val === null && v == null);
-          case 'notIsNull': return v != null;
-          default: return true;
-        }
-      });
-    }
-    return rows;
-  };
-
-  const builder: any = {
-    select: () => builder,
-    eq: (c: string, v: any) => push('eq', c, v),
-    neq: (c: string, v: any) => push('neq', c, v),
-    gte: (c: string, v: any) => push('gte', c, v),
-    lte: (c: string, v: any) => push('lte', c, v),
-    gt: (c: string, v: any) => push('gt', c, v),
-    lt: (c: string, v: any) => push('lt', c, v),
-    in: (c: string, v: any[]) => push('in', c, v),
-    is: (c: string, v: any) => push('is', c, v),
-    not: (c: string, op: string, v: any) => (op === 'is' && v === null ? push('notIsNull', c, v) : builder),
-    order: () => builder,
-    limit: () => builder,
-    range: (from: number, to: number) => {
-      const rows = apply().slice(from, to + 1);
-      return Promise.resolve({ data: rows, error: null });
-    },
-    then: (res: any, rej: any) => Promise.resolve({ data: apply(), error: null }).then(res, rej),
-  };
-  return builder;
-}
-
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: { from: (table: string) => makeBuilder(table) },
+  supabase: { from: (table: string) => makeFakeQuery(TABELAS, table) },
 }));
 vi.mock('@/contexts/TenantFilterContext', () => ({
   useTenantFilter: () => ({ effectiveTenantId: TID }),
