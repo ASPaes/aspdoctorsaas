@@ -10,6 +10,16 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ---
 
+## Agosto / 2026
+
+### 01/08
+
+- 🆕 **Onboarding / Acompanhamento** — Terminou a implantação, o cliente entra em **acompanhamento sozinho**. Em *Configuração → Tipos de treino*, cada tipo ganha a chave **Acompanhamento**: quando um treinamento desse tipo é concluído e a implantação encerra, abre automaticamente um **ticket de acompanhamento** do cliente, na primeira coluna da jornada de Acompanhamento. É um ticket novo e limpo — traz só o cliente e de qual implantação veio — feito para registrar os números de uso: faturamento, quantidade de vendas ou qualquer indicador que a empresa tenha cadastrado. Cada cliente tem **um** acompanhamento aberto por vez, e quem quiser acompanhar um cliente antigo abre na mão pelo botão **Novo acompanhamento**, no próprio quadro.
+- 🆕 **Onboarding / Acompanhamento** — Os lançamentos de indicadores deixam de depender de uma implantação em andamento. Antes eles só existiam dentro da jornada, que encerra no go-live — ou seja, era impossível registrar o uso justamente depois que o cliente entrou no ar, que é quando isso importa. Arrastar o cartão até a última coluna **encerra** o acompanhamento; ele continua no quadro como histórico e volta a ficar aberto se for arrastado de volta.
+- ⬆️ **Atendimento / Tickets** — A fila de tickets para de misturar **implantação com suporte**. Cartões de jornada, sub-tickets de treinamento e acompanhamentos apareciam no meio da lista de atendimento e entravam nos contadores da página. Eles continuam existindo, no módulo de Implantação, onde são trabalhados.
+
+---
+
 ## Julho / 2026
 
 ### 31/07
