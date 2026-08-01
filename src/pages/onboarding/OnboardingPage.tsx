@@ -20,6 +20,8 @@ import { toast } from "sonner";
 import { NewJourneyModal } from "./NewJourneyModal";
 import JourneyDetailSheet from "./JourneyDetailSheet";
 import ImplantacaoBoard, { type TrainingCardRow, type JornadaSemTreino } from "./ImplantacaoBoard";
+import AcompanhamentoBoard from "./AcompanhamentoBoard";
+import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
 
 interface StageRow {
   id: string;
@@ -135,6 +137,7 @@ export default function OnboardingPage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [acompTicketId, setAcompTicketId] = useState<string | null>(null);
   /** Quando o detalhe é aberto pelo cartão de um treinamento, a tela continua sendo a do
    *  ticket pai, mas o que for feito ali é registrado como partindo deste sub-ticket. */
   const [detailSubTicket, setDetailSubTicket] = useState<{ id: string; code: string | null } | null>(null);
@@ -298,6 +301,8 @@ export default function OnboardingPage() {
    *  tem seu responsável e anda pelas etapas no seu ritmo. Um botão devolve a visão
    *  consolidada por ticket pai. */
   const isImplantacao = phaseAtual?.slug === "implantacao";
+  // A aba de Acompanhamento tem cartão de TICKET, não de jornada — quadro próprio.
+  const isAcompanhamento = phaseAtual?.slug === "acompanhamento";
   const [agrupadoPorTicket, setAgrupadoPorTicket] = useState(false);
 
   const trainingCardsQuery = useQuery({
@@ -888,6 +893,13 @@ export default function OnboardingPage() {
         <div className="p-6 text-sm text-muted-foreground">
           Nenhum pipeline de {phaseAtual?.nome ?? "jornada"} configurado para este tenant.
         </div>
+      ) : isAcompanhamento ? (
+        <AcompanhamentoBoard
+          stages={stages}
+          tenantId={effectiveTenantId}
+          busca={busca}
+          onOpenTicket={setAcompTicketId}
+        />
       ) : isImplantacao ? (
         <ImplantacaoBoard
           stages={stages}
@@ -1207,6 +1219,12 @@ export default function OnboardingPage() {
           queryClient.invalidateQueries({ queryKey: ["onboarding-journeys"] });
           queryClient.invalidateQueries({ queryKey: ["onboarding-journey-phases"] });
         }}
+      />
+
+      <SupportTicketDetailDialog
+        ticketId={acompTicketId}
+        open={!!acompTicketId}
+        onOpenChange={(o) => { if (!o) setAcompTicketId(null); }}
       />
 
       <JourneyDetailSheet
