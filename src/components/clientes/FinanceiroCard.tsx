@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEspelhoFinanceiro } from "@/hooks/useEspelhoFinanceiro";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -37,6 +38,11 @@ const fmtPct = (v: number | null) =>
   v === null || isNaN(v) || !isFinite(v) ? "—" : `${v.toFixed(2)}%`;
 const fmtX = (v: number | null) =>
   v === null || isNaN(v) || !isFinite(v) ? "—" : `${v.toFixed(2)}x`;
+const fmtDataBR = (d: string | null | undefined) => {
+  if (!d) return "";
+  const [y, m, day] = d.split("-");
+  return day && m && y ? `${day}/${m}/${y}` : "";
+};
 
 const STEP_KPI_KEYS: Record<string, string> = {
   "Receita (MRR)": "ef_receita_mrr",
@@ -91,6 +97,8 @@ export default function FinanceiroCard({
   const custo_operacao = form.watch("custo_operacao");
   const imposto_percentual = form.watch("imposto_percentual");
   const custo_fixo_percentual = form.watch("custo_fixo_percentual");
+  const cancelado = form.watch("cancelado") === true;
+  const dataCancelamento = form.watch("data_cancelamento");
 
   const { can } = usePermissions();
   const canVerCustos = can("clientes.custos", "view");
@@ -166,29 +174,42 @@ export default function FinanceiroCard({
   const custoAtual = espelho.custoEfetivo;
   const lucroPositivo = espelho.lucro_real > 0;
 
-  // MRR comparison styles
-  const mrrUp = mrrAtual > mensalidadeBase;
-  const mrrDown = mrrAtual < mensalidadeBase;
-  const mrrAtualBlockClass = mrrUp
-    ? "border-green-500/40 bg-green-500/10"
-    : mrrDown
-      ? "border-orange-500/40 bg-orange-500/10"
-      : "border-primary/30 bg-primary/10";
-  const mrrAtualValueClass = mrrUp
-    ? "text-green-600 dark:text-green-400"
-    : mrrDown
-      ? "text-orange-600 dark:text-orange-400"
-      : "text-primary";
+  // MRR comparison styles.
+  // Cliente cancelado não cresce nem encolhe: os valores ficam visíveis para
+  // histórico e auditoria, mas em tom neutro — verde de "subiu" num cliente que
+  // saiu lê como carteira viva.
+  const mrrUp = !cancelado && mrrAtual > mensalidadeBase;
+  const mrrDown = !cancelado && mrrAtual < mensalidadeBase;
+  const mrrAtualBlockClass = cancelado
+    ? "border-border/60 bg-muted/40"
+    : mrrUp
+      ? "border-green-500/40 bg-green-500/10"
+      : mrrDown
+        ? "border-orange-500/40 bg-orange-500/10"
+        : "border-primary/30 bg-primary/10";
+  const mrrAtualValueClass = cancelado
+    ? "text-muted-foreground"
+    : mrrUp
+      ? "text-green-600 dark:text-green-400"
+      : mrrDown
+        ? "text-orange-600 dark:text-orange-400"
+        : "text-primary";
 
   if (!canVerCustos) return null;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
+        <CardTitle className="flex flex-wrap items-center justify-center gap-2 text-lg">
           <Percent className="h-5 w-5 text-primary" />
           Parâmetros Financeiros
+          {cancelado && <Badge variant="destructive">Cancelado</Badge>}
         </CardTitle>
+        {cancelado && (
+          <p className="text-xs text-muted-foreground text-center">
+            Valores congelados{dataCancelamento ? ` em ${fmtDataBR(dataCancelamento)}` : ""} — mantidos para histórico e auditoria
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Seção 1: Campos editáveis */}
@@ -287,7 +308,7 @@ export default function FinanceiroCard({
               className={`flex-1 border-2 p-3 rounded-md md:rounded-l-none text-right ${mrrAtualBlockClass}`}
             >
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
-                MRR Atual
+                {cancelado ? "MRR no cancelamento" : "MRR Atual"}
               </p>
               <p className={`text-xl font-bold mt-0.5 ${mrrAtualValueClass}`}>
                 {fmt(mrrAtual)}
