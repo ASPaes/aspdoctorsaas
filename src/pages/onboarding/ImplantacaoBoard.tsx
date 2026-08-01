@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type DragEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -108,6 +108,146 @@ function goLiveCurto(iso: string): string {
 /** Coluna virtual — não é etapa de pipeline, então não pode colidir com um uuid. */
 const GOLIVE_COL_ID = "__impl_golive__";
 
+/** Resumo de um ticket pai a partir dos seus sub-tickets. */
+interface GrupoResumo {
+  chave: string;
+  code: string | null;
+  cliente: string | null;
+  journeyId: string;
+  filhos: TrainingCardRow[];
+  feitos: number;
+  total: number;
+  cancelados: number;
+  semDono: number;
+  responsaveis: number;
+  pronto: boolean;
+  /** Realização mais recente do grupo — ordena a coluna final por "acabou agora". */
+  ultimoFeito: string | null;
+}
+
+/** Chave do pai. Sub-ticket sem código de pai cai na jornada, senão grupos distintos
+ *  do mesmo cliente se fundiriam por nome. */
+function chaveDoPai(r: TrainingCardRow): string {
+  return r.parent_ticket_code || r.journey_id;
+}
+
+function resumirGrupo(chave: string, filhos: TrainingCardRow[]): GrupoResumo {
+  const validos = filhos.filter((f) => f.status !== "cancelado");
+  const feitos = validos.filter((f) => f.status === "realizado").length;
+  const responsaveis = new Set(filhos.map((f) => f.conduzido_por).filter(Boolean));
+  return {
+    chave,
+    code: filhos[0]?.parent_ticket_code ?? null,
+    cliente: filhos[0]?.cliente_nome ?? null,
+    journeyId: filhos[0]?.journey_id ?? "",
+    filhos: [...filhos].sort((a, b) => (a.sub_seq ?? 0) - (b.sub_seq ?? 0)),
+    feitos,
+    total: validos.length,
+    cancelados: filhos.length - validos.length,
+    semDono: validos.filter((f) => !f.conduzido_por).length,
+    responsaveis: responsaveis.size,
+    pronto: validos.length > 0 && feitos === validos.length,
+    ultimoFeito: validos.reduce<string | null>(
+      (acc, f) => (f.realizado_em && (!acc || f.realizado_em > acc) ? f.realizado_em : acc),
+      null,
+    ),
+  };
+}
+
+/** Cartão de ticket pai. Um componente só para a visão "Agrupar" e para a etapa final
+ *  do quadro: se divergirem, o gestor vê dois resumos diferentes do mesmo ticket. */
+function GrupoTicketCard({
+  g, golive, etapaFinalId, draggingId, onOpen, onDragStartFilho, onDragEndFilho,
+}: {
+  g: GrupoResumo;
+  golive?: string;
+  /** Só na etapa final: as linhas de filho já finalizadas voltam a ser arrastáveis,
+   *  para devolver um treino à etapa anterior sem abrir a jornada. */
+  etapaFinalId?: string | null;
+  draggingId?: string | null;
+  onOpen: () => void;
+  onDragStartFilho?: (e: DragEvent<HTMLDivElement>, f: TrainingCardRow) => void;
+  onDragEndFilho?: () => void;
+}) {
+  const pct = g.total > 0 ? Math.round((g.feitos / g.total) * 100) : 0;
+  return (
+    <div
+      onClick={onOpen}
+      className="bg-card border rounded-md p-2.5 cursor-pointer transition-all hover:border-primary/40"
+      style={golive ? { borderColor: "#22C55E", background: "hsl(142 71% 45% / 0.04)" } : g.pronto ? { borderColor: "#22C55E" } : undefined}
+    >
+      <div className="flex items-center gap-1.5">
+        {golive ? (
+          <Rocket className="h-3 w-3 shrink-0" style={{ color: "#16A34A" }} />
+        ) : (
+          <span className="h-2 w-2 rounded-full shrink-0" style={{ background: g.pronto ? "#22C55E" : "#F59E0B" }} />
+        )}
+        <span className="font-mono text-[11px] text-primary font-semibold">{g.code ?? "—"}</span>
+        <span
+          className="ml-auto text-[9px] px-1.5 py-0.5 rounded text-white font-medium"
+          style={{ background: golive || g.pronto ? "#22C55E" : "#64748B" }}
+        >
+          {golive ? "concluída" : g.pronto ? "pronto" : `${g.filhos.length} ${g.filhos.length === 1 ? "filho" : "filhos"}`}
+        </span>
+      </div>
+      <p className="text-xs text-foreground mt-1 truncate">{g.cliente ?? "—"}</p>
+
+      <div className="h-1 rounded-full bg-muted overflow-hidden mt-2">
+        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="flex justify-between gap-2 mt-1.5 text-[10px] text-muted-foreground">
+        <span>{g.feitos} de {g.total} {g.total === 1 ? "concluído" : "concluídos"}</span>
+        <span>
+          {g.cancelados > 0
+            ? `${g.cancelados} cancelado${g.cancelados > 1 ? "s" : ""}`
+            : g.semDono > 0
+              ? `${g.semDono} sem responsável`
+              : g.responsaveis > 1
+                ? `${g.responsaveis} responsáveis`
+                : golive ? `go-live ${goLiveCurto(golive)}` : g.pronto ? "liberado para concluir" : ""}
+        </span>
+      </div>
+
+      <div className="grid gap-1 mt-2 pt-2 border-t border-dashed border-border">
+        {g.filhos.map((f) => {
+          // Só o filho que já está na etapa final arrasta: os outros continuam
+          // com cartão próprio na coluna deles, e arrastar daqui duplicaria a origem.
+          const arrastavel = !!etapaFinalId && !!onDragStartFilho && f.current_stage_id === etapaFinalId;
+          return (
+            <div
+              key={f.training_id}
+              draggable={arrastavel}
+              onDragStart={arrastavel ? (e) => { e.stopPropagation(); onDragStartFilho!(e, f); } : undefined}
+              onDragEnd={arrastavel ? onDragEndFilho : undefined}
+              className={`flex items-center gap-1.5 text-[10px] text-muted-foreground ${
+                arrastavel ? "cursor-grab active:cursor-grabbing" : ""
+              } ${draggingId === f.training_id ? "opacity-40" : ""}`}
+            >
+              <span className="font-mono text-foreground font-medium shrink-0">-{f.sub_seq ?? "?"}</span>
+              <span className={`truncate ${f.status === "cancelado" ? "line-through" : ""}`}>
+                {f.titulo}
+                {f.conduzido_por_nome ? ` · ${f.conduzido_por_nome}` : ""}
+              </span>
+              <span
+                className="ml-auto shrink-0 font-medium"
+                style={{ color: STATUS_COR[f.status ?? "previsto"] }}
+              >
+                {f.status === "realizado"
+                  ? "✓"
+                  : f.status === "cancelado"
+                    ? "cancelado"
+                    : f.agendado_para
+                      ? formatTrainingDateTime(f.agendado_para).split(" ")[0]
+                      : "sem data"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function ImplantacaoBoard({
   stages, rows, jornadasSemTreino, goLivePorJornada, goLiveForaDaJanela, proximaFaseNome,
   agrupado, onOpenJourney,
@@ -213,34 +353,45 @@ export default function ImplantacaoBoard({
   /** Visão do gestor: um cartão por ticket pai.
    *  Não é kanban — um cliente pode ter um treinamento concluído e outro em no-show
    *  ao mesmo tempo, então não existe uma coluna só para ele. */
-  const grupos = useMemo(() => {
-    const m = new Map<string, { chave: string; code: string | null; cliente: string | null; journeyId: string; filhos: TrainingCardRow[] }>();
+  /** Todos os sub-tickets indexados pelo ticket pai. O cartão da etapa final precisa
+   *  enxergar os irmãos que ainda estão em outras colunas para dizer "2 de 3". */
+  const filhosPorPai = useMemo(() => {
+    const m = new Map<string, TrainingCardRow[]>();
     rows.forEach((r) => {
-      const chave = r.parent_ticket_code || r.journey_id;
-      if (!m.has(chave)) {
-        m.set(chave, { chave, code: r.parent_ticket_code, cliente: r.cliente_nome, journeyId: r.journey_id, filhos: [] });
-      }
-      m.get(chave)!.filhos.push(r);
+      const chave = chaveDoPai(r);
+      const lista = m.get(chave);
+      if (lista) lista.push(r);
+      else m.set(chave, [r]);
     });
-    return Array.from(m.values())
-      .map((g) => {
-        const validos = g.filhos.filter((f) => f.status !== "cancelado");
-        const feitos = validos.filter((f) => f.status === "realizado").length;
-        const cancelados = g.filhos.length - validos.length;
-        const responsaveis = new Set(g.filhos.map((f) => f.conduzido_por).filter(Boolean));
-        return {
-          ...g,
-          filhos: g.filhos.sort((a, b) => (a.sub_seq ?? 0) - (b.sub_seq ?? 0)),
-          feitos,
-          total: validos.length,
-          cancelados,
-          semDono: g.filhos.filter((f) => f.status !== "cancelado" && !f.conduzido_por).length,
-          responsaveis: responsaveis.size,
-          pronto: validos.length > 0 && feitos === validos.length,
-        };
-      })
-      .sort((a, b) => (a.code || "").localeCompare(b.code || ""));
+    return m;
   }, [rows]);
+
+  const grupos = useMemo(
+    () =>
+      Array.from(filhosPorPai.entries())
+        .map(([chave, filhos]) => resumirGrupo(chave, filhos))
+        .sort((a, b) => (a.code || "").localeCompare(b.code || "")),
+    [filhosPorPai],
+  );
+
+  const etapaFinalId = useMemo(() => stages.find((s) => s.is_final)?.id ?? null, [stages]);
+
+  /** Etapa final: um cartão por ticket pai, não por sub-ticket. Arrastar mais um filho
+   *  para cá só atualiza o contador do pai que já está na coluna. */
+  const gruposFinalizados = useMemo(() => {
+    if (!etapaFinalId) return [];
+    const chaves: string[] = [];
+    const vistos = new Set<string>();
+    (porEtapa[etapaFinalId] ?? []).forEach((r) => {
+      const chave = chaveDoPai(r);
+      if (vistos.has(chave)) return;
+      vistos.add(chave);
+      chaves.push(chave);
+    });
+    return chaves
+      .map((chave) => resumirGrupo(chave, filhosPorPai.get(chave) ?? []))
+      .sort((a, b) => (b.ultimoFeito ?? "").localeCompare(a.ultimoFeito ?? ""));
+  }, [porEtapa, etapaFinalId, filhosPorPai]);
 
   // ── Visão agrupada ────────────────────────────────────────────────────────
   if (agrupado) {
@@ -254,75 +405,15 @@ export default function ImplantacaoBoard({
     return (
       <div className="flex-1 overflow-auto p-4">
         <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))]">
-          {grupos.map((g) => {
-            const pct = g.total > 0 ? Math.round((g.feitos / g.total) * 100) : 0;
-            // Sem isto um grupo com go-live fica idêntico a um só "liberado para concluir".
-            const golive = goLivePorJornada[g.journeyId];
-            return (
-              <div
-                key={g.chave}
-                onClick={() => onOpenJourney(g.journeyId)}
-                className="bg-card border rounded-md p-2.5 cursor-pointer transition-all hover:border-primary/40"
-                style={golive ? { borderColor: "#22C55E", background: "hsl(142 71% 45% / 0.04)" } : g.pronto ? { borderColor: "#22C55E" } : undefined}
-              >
-                <div className="flex items-center gap-1.5">
-                  {golive ? (
-                    <Rocket className="h-3 w-3 shrink-0" style={{ color: "#16A34A" }} />
-                  ) : (
-                    <span className="h-2 w-2 rounded-full shrink-0" style={{ background: g.pronto ? "#22C55E" : "#F59E0B" }} />
-                  )}
-                  <span className="font-mono text-[11px] text-primary font-semibold">{g.code ?? "—"}</span>
-                  <span
-                    className="ml-auto text-[9px] px-1.5 py-0.5 rounded text-white font-medium"
-                    style={{ background: golive || g.pronto ? "#22C55E" : "#64748B" }}
-                  >
-                    {golive ? "concluída" : g.pronto ? "pronto" : `${g.filhos.length} ${g.filhos.length === 1 ? "filho" : "filhos"}`}
-                  </span>
-                </div>
-                <p className="text-xs text-foreground mt-1 truncate">{g.cliente ?? "—"}</p>
-
-                <div className="h-1 rounded-full bg-muted overflow-hidden mt-2">
-                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-                </div>
-                <div className="flex justify-between gap-2 mt-1.5 text-[10px] text-muted-foreground">
-                  <span>{g.feitos} de {g.total} {g.total === 1 ? "concluído" : "concluídos"}</span>
-                  <span>
-                    {g.cancelados > 0
-                      ? `${g.cancelados} cancelado${g.cancelados > 1 ? "s" : ""}`
-                      : g.semDono > 0
-                        ? `${g.semDono} sem responsável`
-                        : g.responsaveis > 1
-                          ? `${g.responsaveis} responsáveis`
-                          : golive ? `go-live ${goLiveCurto(golive)}` : g.pronto ? "liberado para concluir" : ""}
-                  </span>
-                </div>
-
-                <div className="grid gap-1 mt-2 pt-2 border-t border-dashed border-border">
-                  {g.filhos.map((f) => (
-                    <div key={f.training_id} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      <span className="font-mono text-foreground font-medium shrink-0">-{f.sub_seq ?? "?"}</span>
-                      <span className={`truncate ${f.status === "cancelado" ? "line-through" : ""}`}>
-                        {f.titulo}
-                        {f.conduzido_por_nome ? ` · ${f.conduzido_por_nome}` : ""}
-                      </span>
-                      <span
-                        className="ml-auto shrink-0 font-medium"
-                        style={{ color: STATUS_COR[f.status ?? "previsto"] }}
-                      >
-                        {f.status === "realizado"
-                          ? "✓"
-                          : f.status === "cancelado"
-                            ? "cancelado"
-                            : f.agendado_para
-                              ? formatTrainingDateTime(f.agendado_para).split(" ")[0]
-                              : "sem data"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+          {grupos.map((g) => (
+            <GrupoTicketCard
+              key={g.chave}
+              g={g}
+              // Sem isto um grupo com go-live fica idêntico a um só "liberado para concluir".
+              golive={goLivePorJornada[g.journeyId]}
+              onOpen={() => onOpenJourney(g.journeyId)}
+            />
+          ))}
         </div>
       </div>
     );
@@ -343,8 +434,12 @@ export default function ImplantacaoBoard({
       )}
       <div className="flex flex-row gap-3 min-h-full pb-2">
         {stages.map((col) => {
-          const items = porEtapa[col.id] ?? [];
+          // Na etapa final o cartão é o ticket pai; nas outras, o sub-ticket.
+          const isFinal = col.id === etapaFinalId;
+          const items = isFinal ? [] : porEtapa[col.id] ?? [];
+          const gruposDaCol = isFinal ? gruposFinalizados : [];
           const orfas = semTreinoPorEtapa[col.id] ?? [];
+          const cartoes = items.length + gruposDaCol.length + orfas.length;
           const isOver = dragOverCol === col.id;
           const color = col.cor || "#6B7280";
           return (
@@ -368,16 +463,32 @@ export default function ImplantacaoBoard({
               <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
                 <span className="h-2 w-2 rounded-full shrink-0" style={{ background: color }} />
                 <span className="text-xs font-medium truncate">{col.nome}</span>
-                <Badge variant="outline" className="ml-auto text-[10px]">{items.length + orfas.length}</Badge>
+                <Badge variant="outline" className="ml-auto text-[10px]">{cartoes}</Badge>
               </div>
 
               <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[75vh]">
-                {items.length === 0 && orfas.length === 0 ? (
+                {cartoes === 0 ? (
                   <div className="text-center text-[11px] text-muted-foreground/60 py-6 px-2">
                     Nenhum treinamento aqui.
                   </div>
                 ) : (
                   <>
+                    {gruposDaCol.map((g) => (
+                      <GrupoTicketCard
+                        key={g.chave}
+                        g={g}
+                        etapaFinalId={etapaFinalId}
+                        draggingId={draggingId}
+                        onOpen={() => onOpenJourney(g.journeyId)}
+                        onDragStartFilho={(e, f) => {
+                          e.dataTransfer.setData("trainingId", f.training_id);
+                          e.dataTransfer.setData("fromStageId", f.current_stage_id ?? "");
+                          setDraggingId(f.training_id);
+                        }}
+                        onDragEndFilho={() => setDraggingId(null)}
+                      />
+                    ))}
+
                     {items.map((t) => {
                       const feito = t.status === "realizado";
                       const agendado = !!t.agendado_para && !feito;
