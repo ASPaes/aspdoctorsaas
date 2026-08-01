@@ -683,6 +683,7 @@ export default function SupportTickets() {
         `, { count: "exact" })
         .eq("tenant_id", tid)
         .is("deleted_at", null)
+        .neq("contexto", "onboarding")
         .gte("aberto_em", fromISO)
         .lte("aberto_em", toISO);
 
@@ -767,6 +768,10 @@ export default function SupportTickets() {
       const applyFilters = (q: any) => {
         q = q.eq("tenant_id", tid)
           .is("deleted_at", null)
+          // Ticket de onboarding (implantação, sub-ticket de treino, acompanhamento) vive no
+          // módulo de Implantação, não na fila de suporte. `contexto` é NOT NULL, então o neq
+          // não descarta linha nenhuma por engano.
+          .neq("contexto", "onboarding")
           .gte("aberto_em", fromISO)
           .lte("aberto_em", toISO);
         if (!isAdminOrHead) {
@@ -873,6 +878,7 @@ export default function SupportTickets() {
         `)
         .eq("tenant_id", tid)
         .is("deleted_at", null)
+        .neq("contexto", "onboarding")
         .gte("aberto_em", fromISO)
         .lte("aberto_em", toISO);
 
