@@ -71,7 +71,74 @@ BEGIN
     RAISE EXCEPTION 'FALHA 4: encerrou sem etapa marcada';
   END IF;
 
-  RAISE NOTICE 'OK 22_encerra_sla_move';
+  RAISE NOTICE 'OK 22_encerra_sla_move — move';
+END $$;
+
+-- ── avanço de fase: gatilho respeitado e duração útil gravada ─────────────────
+DO $$
+DECLARE
+  v_j uuid; v_tenant uuid; v_uid uuid; v_pipe_onb uuid; v_pipe_imp uuid;
+  v_final_onb uuid; v_first_imp uuid; v_gatilho uuid; v_ini timestamptz;
+  v_hist uuid; v_util int;
+BEGIN
+  -- jornada em onboarding, com pipeline de implantação que tem 2+ etapas
+  SELECT j.id, j.tenant_id, s.pipeline_id, j.pipeline_implantacao_id
+    INTO v_j, v_tenant, v_pipe_onb, v_pipe_imp
+    FROM public.onboarding_journeys j
+    JOIN public.onboarding_stages s ON s.id = j.current_stage_id
+   WHERE j.fase_atual = 'onboarding'
+     AND j.situacao NOT IN ('concluido','cancelado')
+     AND j.pipeline_implantacao_id IS NOT NULL
+     AND (SELECT count(*) FROM public.onboarding_stages x
+           WHERE x.pipeline_id = j.pipeline_implantacao_id AND x.ativo) >= 2
+     AND EXISTS (SELECT 1 FROM public.onboarding_stages x
+                  WHERE x.pipeline_id = s.pipeline_id AND x.ativo AND x.is_final)
+   LIMIT 1;
+  IF v_j IS NULL THEN RAISE EXCEPTION 'PRE 5: nenhuma jornada em onboarding com implantação configurada'; END IF;
+
+  SELECT p.user_id INTO v_uid FROM public.profiles p
+   WHERE p.tenant_id = v_tenant AND p.role IN ('admin','head') LIMIT 1;
+  PERFORM set_config('request.jwt.claims',
+    json_build_object('sub', v_uid::text, 'role', 'authenticated')::text, true);
+
+  SELECT id INTO v_final_onb FROM public.onboarding_stages
+   WHERE pipeline_id = v_pipe_onb AND ativo AND is_final ORDER BY position LIMIT 1;
+
+  -- primeira etapa da implantação, pela MESMA regra da função
+  SELECT id INTO v_first_imp FROM public.onboarding_stages
+   WHERE pipeline_id = v_pipe_imp AND ativo ORDER BY is_initial DESC, position LIMIT 1;
+
+  -- fixture: o gatilho da implantação NÃO é a primeira etapa. É o caso que expõe o bug —
+  -- em produção a 1ª etapa da Implantação PDV é a própria gatilho e mascara o problema.
+  UPDATE public.onboarding_stages SET inicia_sla = false WHERE pipeline_id = v_pipe_imp;
+  SELECT id INTO v_gatilho FROM public.onboarding_stages
+   WHERE pipeline_id = v_pipe_imp AND ativo AND id <> v_first_imp ORDER BY position DESC LIMIT 1;
+  UPDATE public.onboarding_stages SET inicia_sla = true WHERE id = v_gatilho;
+
+  UPDATE public.onboarding_journeys
+     SET sla_iniciado_em = NULL, current_stage_id = v_final_onb
+   WHERE id = v_j;
+
+  -- garante um histórico aberto na etapa final do onboarding, para conferir a duração útil
+  UPDATE public.onboarding_stage_history SET saiu_em = now() WHERE journey_id = v_j AND saiu_em IS NULL;
+  INSERT INTO public.onboarding_stage_history (tenant_id, journey_id, stage_id, entrou_em)
+  VALUES (v_tenant, v_j, v_final_onb, now() - interval '3 days') RETURNING id INTO v_hist;
+
+  PERFORM public.advance_onboarding_to_implantacao(v_j, true);
+
+  -- 5. o relógio NÃO pode ter partido: a etapa de destino não é a gatilho
+  SELECT sla_iniciado_em INTO v_ini FROM public.onboarding_journeys WHERE id = v_j;
+  IF v_ini IS NOT NULL THEN
+    RAISE EXCEPTION 'FALHA 5: avanço de fase ligou o SLA ignorando a etapa gatilho';
+  END IF;
+
+  -- 6. a etapa fechada no avanço precisa sair com duração ÚTIL, não só corrida
+  SELECT duracao_util_minutos INTO v_util FROM public.onboarding_stage_history WHERE id = v_hist;
+  IF v_util IS NULL THEN
+    RAISE EXCEPTION 'FALHA 6: avanço de fase fechou o histórico sem duracao_util_minutos';
+  END IF;
+
+  RAISE NOTICE 'OK 22_encerra_sla_move — avanço de fase';
 END $$;
 
 ROLLBACK;
