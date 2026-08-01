@@ -4612,12 +4612,14 @@ export type Database = {
           created_at: string
           created_by: string | null
           data_ref: string
+          dono_id: string | null
           id: string
           indicator_id: string
-          journey_id: string
+          journey_id: string | null
           observacao: string | null
           origem: string
           tenant_id: string
+          ticket_id: string | null
           updated_at: string
           valor: string
         }
@@ -4625,12 +4627,14 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_ref: string
+          dono_id?: string | null
           id?: string
           indicator_id: string
-          journey_id: string
+          journey_id?: string | null
           observacao?: string | null
           origem?: string
           tenant_id: string
+          ticket_id?: string | null
           updated_at?: string
           valor: string
         }
@@ -4638,12 +4642,14 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_ref?: string
+          dono_id?: string | null
           id?: string
           indicator_id?: string
-          journey_id?: string
+          journey_id?: string | null
           observacao?: string | null
           origem?: string
           tenant_id?: string
+          ticket_id?: string | null
           updated_at?: string
           valor?: string
         }
@@ -4675,6 +4681,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_indicators_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_journey_indicators_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["parent_ticket_id"]
           },
         ]
       }
@@ -5877,6 +5897,7 @@ export type Database = {
           created_at: string
           id: string
           nome: string
+          pede_acompanhamento: boolean
           position: number
           tenant_id: string
           updated_at: string
@@ -5887,6 +5908,7 @@ export type Database = {
           created_at?: string
           id?: string
           nome: string
+          pede_acompanhamento?: boolean
           position?: number
           tenant_id: string
           updated_at?: string
@@ -5897,6 +5919,7 @@ export type Database = {
           created_at?: string
           id?: string
           nome?: string
+          pede_acompanhamento?: boolean
           position?: number
           tenant_id?: string
           updated_at?: string
@@ -7929,6 +7952,7 @@ export type Database = {
       support_tickets: {
         Row: {
           aberto_em: string
+          acompanhamento_stage_id: string | null
           agendado_para: string | null
           assunto: string
           attendance_id: string | null
@@ -7953,6 +7977,7 @@ export type Database = {
           horario_fim: string | null
           horario_inicio: string | null
           id: string
+          is_acompanhamento: boolean
           motivo_cancelamento: string | null
           observacao_agente: string | null
           observacao_ia: string | null
@@ -7980,6 +8005,7 @@ export type Database = {
         }
         Insert: {
           aberto_em?: string
+          acompanhamento_stage_id?: string | null
           agendado_para?: string | null
           assunto: string
           attendance_id?: string | null
@@ -8004,6 +8030,7 @@ export type Database = {
           horario_fim?: string | null
           horario_inicio?: string | null
           id?: string
+          is_acompanhamento?: boolean
           motivo_cancelamento?: string | null
           observacao_agente?: string | null
           observacao_ia?: string | null
@@ -8031,6 +8058,7 @@ export type Database = {
         }
         Update: {
           aberto_em?: string
+          acompanhamento_stage_id?: string | null
           agendado_para?: string | null
           assunto?: string
           attendance_id?: string | null
@@ -8055,6 +8083,7 @@ export type Database = {
           horario_fim?: string | null
           horario_inicio?: string | null
           id?: string
+          is_acompanhamento?: boolean
           motivo_cancelamento?: string | null
           observacao_agente?: string | null
           observacao_ia?: string | null
@@ -8081,6 +8110,13 @@ export type Database = {
           unidade_base_id?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "support_tickets_acompanhamento_stage_id_fkey"
+            columns: ["acompanhamento_stage_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_stages"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "support_tickets_attendance_fkey"
             columns: ["attendance_id"]
@@ -11193,6 +11229,11 @@ export type Database = {
         Args: { p_blueprint: Json; p_tenant_id: string }
         Returns: Json
       }
+      assert_tenant_scope: { Args: { p_tenant_id: string }; Returns: undefined }
+      assert_tenant_scope_strict: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
+      }
       attach_attendance_to_ticket: {
         Args: { p_attendance_id: string; p_nota?: string }
         Returns: string
@@ -11303,6 +11344,15 @@ export type Database = {
           p_tenant_id?: string
         }
         Returns: string
+      }
+      create_acompanhamento_ticket: {
+        Args: {
+          p_cliente_id: string
+          p_motivo?: string
+          p_origem_ticket_id?: string
+          p_tenant_id: string
+        }
+        Returns: Json
       }
       create_additional_ticket_from_attendance: {
         Args: {
@@ -11556,6 +11606,10 @@ export type Database = {
       exec_db_health_query: { Args: { query_text: string }; Returns: Json }
       exec_db_maintenance: { Args: { action: string }; Returns: string }
       fmt_brl: { Args: { n: number }; Returns: string }
+      fn_acompanhamento_first_stage: {
+        Args: { p_tenant_id: string }
+        Returns: string
+      }
       fn_add_business_days: {
         Args: {
           p_days: number
@@ -11675,6 +11729,15 @@ export type Database = {
           retencao_mrr_esp_pct: number
         }[]
       }
+      fn_create_acompanhamento_ticket: {
+        Args: {
+          p_cliente_id: string
+          p_motivo?: string
+          p_origem_ticket_id?: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       fn_current_chat_count: {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: number
@@ -11711,6 +11774,10 @@ export type Database = {
           p_tenant_id: string
         }
         Returns: string
+      }
+      fn_onb_arquivar_treinos_no_golive: {
+        Args: { p_journey_id: string }
+        Returns: number
       }
       fn_onb_training_initial_stage: {
         Args: { p_journey_id: string }
@@ -11760,6 +11827,10 @@ export type Database = {
       fn_process_ura_timeouts: { Args: never; Returns: Json }
       fn_retry_waiting_conversations: { Args: never; Returns: Json }
       fn_schedule_group_syncs: { Args: never; Returns: undefined }
+      fn_seed_onboarding_acompanhamento_pipeline: {
+        Args: { p_tenant_id: string }
+        Returns: string
+      }
       fn_seed_onboarding_participant_roles: {
         Args: { p_tenant_id: string }
         Returns: undefined
@@ -12850,6 +12921,10 @@ export type Database = {
           p_incluir_vigencia?: boolean
           p_tenant_id: string
         }
+        Returns: Json
+      }
+      move_acompanhamento_stage: {
+        Args: { p_stage_id: string; p_ticket_id: string }
         Returns: Json
       }
       move_onboarding_stage: {
