@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/collapsible";
 import { SlaInput } from "./SlaInput";
 import { foraDaJanelaIds, formatSlaHuman, slugify } from "./utils";
+import { TrilhoSummary } from "./TrilhoSummary";
 
 const SECTION_OPTIONS: { key: string; label: string }[] = [
   { key: "participantes", label: "Responsável & participantes" },
@@ -215,15 +216,18 @@ export function PipelinesPanel({ phaseId }: Props) {
       descricao: p.descricao?.trim() || null,
       phase_id: phaseId,
       produto_id: p.produto_id ?? null,
-      sla_total_minutos: p.sla_total_minutos ?? 0,
       ativo: p.ativo ?? true,
       department_id: p.department_id ?? null,
     };
+    // sla_total_minutos NÃO entra no UPDATE: desde 01/08 é derivado da soma das etapas
+    // (trg_sync_pipeline_sla_total). Mandá-lo daqui zerava o total a cada edição do
+    // pipeline, até a próxima mexida em etapa. No INSERT vai 0 só para não nascer NULL.
     try {
       if (isNew) {
         const maxPos = pipelines.reduce((m, i) => Math.max(m, i.position ?? 0), 0);
         payload.tenant_id = effectiveTenantId;
         payload.position = maxPos + 1;
+        payload.sla_total_minutos = 0;
         const { error } = await (supabase.from("onboarding_pipelines" as any) as any).insert(payload);
         if (error) throw error;
         toast.success("Pipeline criado");
@@ -483,7 +487,7 @@ export function PipelinesPanel({ phaseId }: Props) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{p.nome}</p>
                   <p className="text-[10px] text-muted-foreground truncate">
-                    SLA {formatSlaHuman(p.sla_total_minutos)}
+                    SLA {formatSlaHuman(p.sla_total_minutos)} · soma das etapas
                     {p.produto_id != null && ` · ${produtos.find(x => x.id === p.produto_id)?.nome ?? "produto"}`}
                   </p>
                 </div>
@@ -515,6 +519,14 @@ export function PipelinesPanel({ phaseId }: Props) {
             <Plus className="h-3.5 w-3.5 mr-1" />Nova
           </Button>
         </div>
+        {selectedPipelineId && effectiveTenantId && (
+          <div className="px-2 pt-2">
+            <TrilhoSummary
+              tenantId={effectiveTenantId}
+              produtoId={pipelines.find((p) => p.id === selectedPipelineId)?.produto_id ?? null}
+            />
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
           {!selectedPipelineId ? (
             <div className="text-xs text-muted-foreground text-center py-8">Selecione um pipeline</div>
@@ -1184,7 +1196,20 @@ function PipelineDialog({
               </Select>
             </div>
           </div>
-          <SlaInput label="SLA total" value={slaMin} onChange={setSlaMin} hideMinutes />
+          {/*
+            O SLA total deixou de ser digitado em 01/08: o banco recalcula por trigger
+            (trg_sync_pipeline_sla_total) como soma das etapas ativas não-pausa. Antes
+            os dois números divergiam em todos os pipelines de produção.
+          */}
+          <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+            <p className="text-[11px] text-muted-foreground">
+              SLA total:{" "}
+              <span className="font-mono font-semibold text-foreground">
+                {formatSlaHuman(initial?.sla_total_minutos ?? 0)}
+              </span>{" "}
+              — soma automática das etapas ativas. Para mudar, edite o SLA das etapas.
+            </p>
+          </div>
           {initial && onToggleActive && (
             <div className="flex items-center justify-between pt-1 border-t border-border">
               <Label className="text-sm">Ativo</Label>
@@ -1206,7 +1231,7 @@ function PipelineDialog({
               id: initial?.id,
               nome, descricao,
               produto_id: produtoId === "__all__" ? null : Number(produtoId),
-              sla_total_minutos: slaMin,
+              // sla_total_minutos NÃO vai no payload: é mantido por trigger.
               ativo,
               department_id: departmentId === "__none__" ? null : departmentId,
             })}>Salvar</Button>

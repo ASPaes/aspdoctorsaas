@@ -83,14 +83,17 @@ function SlaPopover({ value, onChange }: { value: number; onChange: (v: number) 
         <button
           type="button"
           className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 transition shrink-0"
-          title="SLA total (base do golive)"
+          title="Prazo prometido (referência) — não gera o go-live"
         >
           <Clock className="h-3 w-3" />
           {formatSlaHuman(value)}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-3 space-y-3" align="end">
-        <SlaInput label="SLA total (base do golive)" value={draft} onChange={setDraft} />
+        <SlaInput label="Prazo prometido (referência)" value={draft} onChange={setDraft} />
+        <p className="text-[10px] text-muted-foreground leading-tight">
+          Não gera o go-live. Serve para avisar quando o plano de etapas não cabe na promessa.
+        </p>
         <div className="flex justify-end gap-2">
           <Button size="sm" variant="ghost" className="h-8" onClick={() => setOpen(false)}>Cancelar</Button>
           <Button size="sm" className="h-8" onClick={() => { onChange(draft); setOpen(false); }}>Salvar</Button>
@@ -227,7 +230,7 @@ export function DemandTypesPanel() {
     const { error } = await (supabase.from("onboarding_demand_types" as any) as any)
       .update({ sla_total_minutos }).eq("id", id).eq("tenant_id", effectiveTenantId);
     if (error) toast.error(error.message);
-    else { toast.success("SLA atualizado"); qc.invalidateQueries({ queryKey: ["onb-demand-types"] }); }
+    else { toast.success("Prazo prometido atualizado"); qc.invalidateQueries({ queryKey: ["onb-demand-types"] }); }
   }
 
   async function handleDelete(id: string) {
@@ -273,9 +276,13 @@ export function DemandTypesPanel() {
           </Button>
         </div>
         <div className="rounded-md border border-border bg-card/50 p-3">
-          <SlaInput label="SLA total (base do golive)" value={novoSla} onChange={setNovoSla} />
+          <SlaInput label="Prazo prometido (referência)" value={novoSla} onChange={setNovoSla} />
+          <p className="text-[10px] text-muted-foreground leading-tight mt-1">
+            Desde 01/08 o go-live vem da soma das etapas do trilho. Este prazo é a promessa
+            comercial: o sistema só avisa quando os dois divergem.
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground">Digite o nome, defina o SLA e clique em Adicionar (ou tecle Enter).</p>
+        <p className="text-xs text-muted-foreground">Digite o nome, defina o prazo prometido e clique em Adicionar (ou tecle Enter).</p>
       </div>
 
       {isLoading ? (
