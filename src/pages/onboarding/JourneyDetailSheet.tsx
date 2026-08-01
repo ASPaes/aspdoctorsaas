@@ -24,10 +24,11 @@ import {
   UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle, Ban, Building2,
   ExternalLink, Link2,
   Sparkles, Rocket, StickyNote, Undo2, XCircle, Tag,
-  Check, ChevronDown, Pencil,
+  Check, ChevronDown, Pencil, GitCommitHorizontal,
 } from "lucide-react";
 import EditTrainingDialog, { type EditableTraining } from "./EditTrainingDialog";
 import { EditJourneyInfoDialog } from "./EditJourneyInfoDialog";
+import { JourneyRuler } from "./JourneyRuler";
 import { useOnboardingParticipantRoles } from "@/hooks/useOnboardingParticipantRoles";
 import { TransferResponsavelDialog } from "./TransferResponsavelDialog";
 import { ResponsavelHistorico } from "./ResponsavelHistorico";
@@ -321,6 +322,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const { user, profile } = useAuth();
   const qc = useQueryClient();
   const [editInfoOpen, setEditInfoOpen] = useState(false);
+  const [rulerOpen, setRulerOpen] = useState(false);
   const [note, setNote] = useState("");
   const [pauseReasonId, setPauseReasonId] = useState<string>("");
   const [pauseText, setPauseText] = useState("");
@@ -1963,6 +1965,15 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                   <span className="text-[9px] uppercase text-muted-foreground">Go-live</span>
                   <span className="text-[11px] font-mono font-semibold">{formatDate(journey.go_live_previsto)}</span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setRulerOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1.5 transition-colors hover:border-primary/50 hover:bg-muted/60"
+                  title="Ver o tempo de cada etapa contra o planejado"
+                >
+                  <GitCommitHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-[11px] font-medium">Régua da jornada</span>
+                </button>
               </div>
             </DialogHeader>
 
@@ -3251,6 +3262,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
           qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
         }}
       />
+    )}
+    {journeyId && (
+      <JourneyRuler journeyId={journeyId} open={rulerOpen} onOpenChange={setRulerOpen} />
     )}
     <Dialog open={concludeOpen} onOpenChange={setConcludeOpen}>
       <DialogContent className="max-w-md">
