@@ -109,8 +109,9 @@ BEGIN
   IF NOT COALESCE((v_res->>'ok')::boolean, false) THEN
     RAISE EXCEPTION 'FALHOU 4a: go-live recusado com todos os filhos encerrados → %', v_res::text;
   END IF;
-  IF (v_res->>'concluiu')::boolean THEN
-    RAISE EXCEPTION 'FALHOU 4b: com fase seguinte o go-live deveria avançar, não concluir → %', v_res::text;
+  -- Desde 01/08 o go-live conclui sempre: acompanhamento virou ticket, não fase de destino.
+  IF NOT (v_res->>'concluiu')::boolean THEN
+    RAISE EXCEPTION 'FALHOU 4b: go-live deveria concluir a jornada → %', v_res::text;
   END IF;
   IF COALESCE((v_res->>'treinos_arquivados')::int, 0) < 2 THEN
     RAISE EXCEPTION 'FALHOU 4c: esperava ao menos 2 treinos arquivados, veio %', v_res::text;

@@ -95,26 +95,28 @@ BEGIN
   PERFORM 1 FROM public.onboarding_journeys WHERE id = v_journey AND current_phase_id = v_ph_imp;
   IF NOT FOUND THEN RAISE EXCEPTION 'FALHOU 8b: jornada deveria estar em implantacao'; END IF;
 
-  -- 9. go-live COM jornada seguinte: grava a data, avança e NÃO conclui
+  -- 9. go-live SEMPRE conclui a jornada, mesmo com a jornada de Acompanhamento ativa.
+  --    Mudou em 01/08: acompanhamento deixou de ser fase para onde o cartão avança e virou
+  --    ticket próprio (migration 20260731224000). A fase existir não segura mais a implantação.
   v_res := public.journey_go_live(v_journey, current_date);
-  IF (v_res->>'concluiu')::boolean THEN
-    RAISE EXCEPTION 'FALHOU 9: com Acompanhamento ativo o go-live não pode concluir a jornada';
+  IF NOT (v_res->>'concluiu')::boolean THEN
+    RAISE EXCEPTION 'FALHOU 9: go-live deveria concluir a jornada → %', v_res::text;
   END IF;
   PERFORM 1 FROM public.onboarding_journeys
-   WHERE id = v_journey AND current_phase_id = v_ph_acp
-     AND go_live_real IS NOT NULL AND concluido_em IS NULL AND situacao = 'em_andamento';
-  IF NOT FOUND THEN RAISE EXCEPTION 'FALHOU 9b: jornada deveria estar viva em acompanhamento, com go-live gravado'; END IF;
+   WHERE id = v_journey AND situacao = 'concluido' AND concluido_em IS NOT NULL;
+  IF NOT FOUND THEN RAISE EXCEPTION 'FALHOU 9b: jornada deveria estar concluída'; END IF;
 
-  -- 10. a linha da fase de acompanhamento abriu e a de implantação fechou
-  PERFORM 1 FROM public.onboarding_phase_metrics WHERE journey_id=v_journey AND phase_id=v_ph_acp AND concluida_em IS NULL;
-  IF NOT FOUND THEN RAISE EXCEPTION 'FALHOU 10a: fase de acompanhamento não abriu'; END IF;
+  -- 10. o go-live fecha a implantação e NÃO abre fase nenhuma: desde 01/08 o acompanhamento
+  --     é ticket próprio, então a jornada morre aqui.
   PERFORM 1 FROM public.onboarding_phase_metrics WHERE journey_id=v_journey AND phase_id=v_ph_imp AND concluida_em IS NOT NULL;
-  IF NOT FOUND THEN RAISE EXCEPTION 'FALHOU 10b: fase de implantação não fechou'; END IF;
+  IF NOT FOUND THEN RAISE EXCEPTION 'FALHOU 10a: fase de implantação não fechou'; END IF;
+  PERFORM 1 FROM public.onboarding_phase_metrics WHERE journey_id=v_journey AND concluida_em IS NULL;
+  IF FOUND THEN RAISE EXCEPTION 'FALHOU 10b: jornada concluída não pode ter fase aberta'; END IF;
 
-  -- 11. na última fase não há para onde avançar
+  -- 11. jornada concluída não avança para lugar nenhum
   v_res := public.advance_onboarding_phase(v_journey, NULL, true);
-  IF (v_res->>'reason') IS DISTINCT FROM 'sem_proxima_fase' THEN
-    RAISE EXCEPTION 'FALHOU 11: esperava sem_proxima_fase, veio %', v_res::text;
+  IF (v_res->>'ok')::boolean THEN
+    RAISE EXCEPTION 'FALHOU 11: jornada concluída não deveria avançar → %', v_res::text;
   END IF;
 
   -- ===================== indicadores =====================

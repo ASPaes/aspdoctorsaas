@@ -229,8 +229,14 @@ BEGIN
 
   SELECT tk.descricao INTO v_desc FROM public.support_tickets tk
    WHERE tk.cliente_id = v_cli_a AND tk.is_acompanhamento AND tk.concluido_em IS NULL;
-  IF v_desc IS NULL OR v_desc NOT ILIKE '%Treino PDV%' THEN
-    RAISE EXCEPTION '3.1: origem nao cita o treino: %', v_desc;
+  -- histórico mínimo: só de qual implantação veio (os treinos ficam na timeline do pai)
+  IF v_desc IS NULL OR v_desc NOT ILIKE '%Implanta%' THEN
+    RAISE EXCEPTION '3.1: origem nao cita a implantacao: %', v_desc;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.support_ticket_events e
+                  WHERE e.ticket_id = v_tk_a AND e.event_type = 'acompanhamento_aberto'
+                    AND e.content ILIKE '%Treino PDV%') THEN
+    RAISE EXCEPTION '3.1: a timeline da implantacao nao registrou quais treinos pediram';
   END IF;
 
   -- ── B: so treino SEM a flag

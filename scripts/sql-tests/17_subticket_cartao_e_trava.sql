@@ -94,6 +94,10 @@ BEGIN
   IF v_qtd <> 1 THEN RAISE EXCEPTION 'FALHOU 7b: treino excluído não ficou marcado'; END IF;
 
   -- ── 8. a jornada não conclui com filho em aberto
+  --    Cria o treino em aberto explicitamente: depender de a jornada escolhida já ter um
+  --    torna o teste refém do dado da base — foi o que quebrou em 01/08, quando a jornada
+  --    mais recente em Implantação passou a ser uma com todos os treinos encerrados.
+  v_t2 := public.create_onboarding_training(v_journey, 'ZZ Cartao aberto');
   v_res := public.conclude_onboarding_journey(v_journey);
   IF (v_res->>'ok')::boolean THEN
     RAISE EXCEPTION 'FALHOU 8: jornada concluiu com treino em aberto';
