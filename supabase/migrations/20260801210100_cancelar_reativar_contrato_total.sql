@@ -187,7 +187,10 @@ BEGIN
   ) VALUES (
     v_ct.tenant_id, p_contrato_id, v_ct.cliente_id, 'cancelamento', v_hoje,
     p_motivo_id, p_observacao, v_uid,
-    COALESCE(v_ct.vlr_total_mensal, 0), v_mensalidade_cliente_antes,
+    -- Contrato: o que ESTE contrato valia. Cliente: o que o CLIENTE valia,
+    -- movimentos soltos incluídos. Era clientes.mensalidade, que não os conhece
+    -- — por isso o histórico do BECO mostrava 219,65 nos dois campos.
+    COALESCE(v_ct.vlr_total_mensal, 0), COALESCE(v_mrr_cheio, v_mensalidade_cliente_antes),
     v_afetados, v_mrr_id
   ) RETURNING id INTO v_evt_id;
 
@@ -344,7 +347,7 @@ BEGIN
     v_ct.tenant_id, p_contrato_id, v_ct.cliente_id, 'reativacao', v_hoje,
     p_observacao, v_uid,
     COALESCE(v_ct.vlr_total_mensal, 0),
-    (SELECT mensalidade FROM clientes WHERE id = v_ct.cliente_id),
+    COALESCE(v_mrr_depois, (SELECT mensalidade FROM clientes WHERE id = v_ct.cliente_id)),
     v_reativados, v_mrr_id
   ) RETURNING id INTO v_evt_id;
 

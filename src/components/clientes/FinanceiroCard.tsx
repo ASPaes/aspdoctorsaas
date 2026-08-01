@@ -174,26 +174,25 @@ export default function FinanceiroCard({
   const custoAtual = espelho.custoEfetivo;
   const lucroPositivo = espelho.lucro_real > 0;
 
-  // MRR comparison styles.
-  // Cliente cancelado não cresce nem encolhe: os valores ficam visíveis para
-  // histórico e auditoria, mas em tom neutro — verde de "subiu" num cliente que
-  // saiu lê como carteira viva.
-  const mrrUp = !cancelado && mrrAtual > mensalidadeBase;
-  const mrrDown = !cancelado && mrrAtual < mensalidadeBase;
-  const mrrAtualBlockClass = cancelado
-    ? "border-border/60 bg-muted/40"
-    : mrrUp
-      ? "border-green-500/40 bg-green-500/10"
-      : mrrDown
-        ? "border-orange-500/40 bg-orange-500/10"
-        : "border-primary/30 bg-primary/10";
-  const mrrAtualValueClass = cancelado
-    ? "text-muted-foreground"
-    : mrrUp
-      ? "text-green-600 dark:text-green-400"
-      : mrrDown
-        ? "text-orange-600 dark:text-orange-400"
-        : "text-primary";
+  // MRR comparison styles
+  const mrrUp = mrrAtual > mensalidadeBase;
+  const mrrDown = mrrAtual < mensalidadeBase;
+  const mrrAtualBlockClass = mrrUp
+    ? "border-green-500/40 bg-green-500/10"
+    : mrrDown
+      ? "border-orange-500/40 bg-orange-500/10"
+      : "border-primary/30 bg-primary/10";
+  const mrrAtualValueClass = mrrUp
+    ? "text-green-600 dark:text-green-400"
+    : mrrDown
+      ? "text-orange-600 dark:text-orange-400"
+      : "text-primary";
+
+  // Cliente cancelado: os números continuam todos visíveis para histórico e
+  // auditoria, mas dessaturados. Verde de "lucro" e de "MRR subiu" num cliente
+  // que já saiu lê como carteira viva. Um filtro só, em vez de espalhar
+  // condicional por cada card.
+  const painelClass = cancelado ? "space-y-4 grayscale opacity-90" : "space-y-4";
 
   if (!canVerCustos) return null;
 
@@ -256,6 +255,7 @@ export default function FinanceiroCard({
 
         <Separator />
 
+        <div className={painelClass}>
         {/* Seção 2: Pipeline MRR */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -442,7 +442,9 @@ export default function FinanceiroCard({
                     )}
                   </div>
                 </div>
-                {lucroPositivo ? (
+                {/* Seta de tendência é sinal de carteira viva: cliente que já
+                    saiu não sobe nem desce. O valor fica, a direção sai. */}
+                {cancelado ? null : lucroPositivo ? (
                   <TrendingUp className="h-7 w-7 text-green-500" />
                 ) : (
                   <TrendingDown className="h-7 w-7 text-destructive" />
@@ -451,6 +453,7 @@ export default function FinanceiroCard({
             </div>
           </>
         )}
+        </div>
       </CardContent>
     </Card>
   );

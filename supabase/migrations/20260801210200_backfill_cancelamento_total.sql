@@ -80,6 +80,9 @@ UPDATE movimentos_mrr m
 -- Ajusta o ÚLTIMO churn de cada cliente afetado. Só mexe onde o recorrente
 -- líquido é diferente de zero, e só em cliente que tem churn no extrato.
 
+-- O marcador na descrição também é a trava de reexecução: rodar de novo não
+-- desconta o delta duas vezes.
+CREATE TEMP TABLE _bf_churn ON COMMIT DROP AS
 WITH falta AS (
   SELECT b.cliente_id, SUM(b.valor_delta) AS delta
   FROM _bf_movs b
@@ -92,12 +95,26 @@ alvo AS (
   JOIN falta f ON f.cliente_id = m.cliente_id
   WHERE m.tipo = 'churn' AND m.status = 'ativo'
     AND m.estornado_por IS NULL AND m.estorno_de IS NULL
+    AND COALESCE(m.descricao, '') NOT LIKE '%[ajuste 01/08%'
   ORDER BY m.cliente_id, m.data_movimento DESC, m.criado_em DESC
+),
+upd AS (
+  UPDATE movimentos_mrr m
+     SET valor_delta = ROUND(m.valor_delta - a.delta, 2),
+         descricao = COALESCE(m.descricao, '') || ' [ajuste 01/08: inclui movimento recorrente não baixado]'
+    FROM alvo a
+   WHERE m.id = a.id
+  RETURNING m.id AS mov_id, m.valor_delta
 )
-UPDATE movimentos_mrr m
-   SET valor_delta = ROUND(m.valor_delta - a.delta, 2),
-       descricao = COALESCE(m.descricao, '') || ' [ajuste 01/08: inclui movimento recorrente não baixado]'
-  FROM alvo a
- WHERE m.id = a.id;
+SELECT mov_id, valor_delta FROM upd;
+
+-- O card "Histórico de Eventos" da ficha lê contrato_eventos, não o extrato.
+-- Sem isto ele continuaria mostrando MRR Cliente: R$ 219,65 num cancelamento
+-- de R$ 279,65.
+UPDATE contrato_eventos e
+   SET mensalidade_cliente_snapshot = ABS(c.valor_delta)
+  FROM _bf_churn c
+ WHERE e.movimento_mrr_id = c.mov_id
+   AND e.acao = 'cancelamento';
 
 COMMIT;

@@ -143,7 +143,7 @@ function ContratoEventosHistorico({ clienteId }: { clienteId: string }) {
     queryKey: ["contrato_eventos_historico", tid, clienteId],
     queryFn: async () => {
       let q = (supabase.from("contrato_eventos" as any) as any)
-        .select("id, acao, data_acao, observacao, mensalidade_contrato_snapshot, mensalidade_cliente_snapshot, contrato_id, created_at, motivo_cancelamento_id")
+        .select("id, acao, data_acao, observacao, mensalidade_contrato_snapshot, mensalidade_cliente_snapshot, contrato_id, created_at, motivo_cancelamento_id, movimento_mrr_id")
         .eq("cliente_id", clienteId)
         .order("data_acao", { ascending: false });
 
@@ -173,6 +173,25 @@ function ContratoEventosHistorico({ clienteId }: { clienteId: string }) {
     enabled: contratoIds.length > 0,
   });
 
+  // Total de fato movimentado pelo evento. Sai do extrato, não dos snapshots:
+  // mensalidade_contrato_snapshot é só o contrato, e num cancelamento total o
+  // que saiu inclui os movimentos soltos (upsell sem contrato_id).
+  const movimentoIds = [...new Set((eventosQuery.data ?? []).map((e: any) => e.movimento_mrr_id).filter(Boolean))];
+
+  const movimentosEvtQuery = useQuery({
+    queryKey: ["movimentos_evt", movimentoIds.join(",")],
+    queryFn: async () => {
+      const { data } = await (supabase.from("movimentos_mrr" as any) as any)
+        .select("id, valor_delta")
+        .in("id", movimentoIds);
+
+      const map: Record<string, number> = {};
+      (data ?? []).forEach((m: any) => { map[m.id] = Math.abs(Number(m.valor_delta) || 0); });
+      return map;
+    },
+    enabled: movimentoIds.length > 0,
+  });
+
   const eventos = eventosQuery.data ?? [];
   if (eventos.length === 0) return null;
 
@@ -198,6 +217,10 @@ function ContratoEventosHistorico({ clienteId }: { clienteId: string }) {
       <div className="space-y-2">
         {eventos.map((evt: any) => {
           const isCancelamento = evt.acao === "cancelamento";
+          const totalEvt = evt.movimento_mrr_id
+            ? (movimentosEvtQuery.data ?? {})[evt.movimento_mrr_id]
+            : undefined;
+          const contratoSnap = Number(evt.mensalidade_contrato_snapshot);
           return (
             <div
               key={evt.id}
@@ -238,9 +261,24 @@ function ContratoEventosHistorico({ clienteId }: { clienteId: string }) {
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  MRR Contrato: R$ {fmtBRL(Number(evt.mensalidade_contrato_snapshot))}
-                  {evt.mensalidade_cliente_snapshot != null && (
-                    <span className="ml-3">MRR Cliente: R$ {fmtBRL(Number(evt.mensalidade_cliente_snapshot))}</span>
+                  {totalEvt != null ? (
+                    <>
+                      <span className="text-foreground font-semibold">
+                        {isCancelamento ? "Total cancelado" : "Total reativado"}: R$ {fmtBRL(totalEvt)}
+                      </span>
+                      {/* Só mostra o contrato quando ele difere do total — senão
+                          seriam dois números iguais lado a lado. */}
+                      {Number.isFinite(contratoSnap) && Math.abs(contratoSnap - totalEvt) > 0.005 && (
+                        <span className="ml-3">MRR Contrato: R$ {fmtBRL(contratoSnap)}</span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      MRR Contrato: R$ {fmtBRL(contratoSnap)}
+                      {evt.mensalidade_cliente_snapshot != null && (
+                        <span className="ml-3">MRR Cliente: R$ {fmtBRL(Number(evt.mensalidade_cliente_snapshot))}</span>
+                      )}
+                    </>
                   )}
                 </div>
                 {evt.observacao && (
