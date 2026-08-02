@@ -81,7 +81,7 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
   const isAdminOrHead = isAdmin || profile?.role === 'head';
 
   const [diagOpen, setDiagOpen] = useState(false);
-  const [mostrarVendas, setMostrarVendas] = useState(true);
+  const [mostrarClientes, setMostrarClientes] = useState(true);
   const [semReajuste, setSemReajuste] = useState(false);
 
 
@@ -156,7 +156,7 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
         dataKey: totalKey,
         label: 'MRR Total',
         color: 'hsl(var(--primary))',
-        qtdKey: 'vendas',
+        qtdKey: 'clientesAtivos',
         labelPosition: 'top',
       },
     ];
@@ -168,7 +168,7 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
         label: `MRR ${u.nome}`,
         color: colors[i % colors.length],
         strokeDasharray: '5 3',
-        qtdKey: `vendas_${u.id}`,
+        qtdKey: `clientes_${u.id}`,
         labelPosition: fatiaMedia(dataKey) >= 0.5 ? 'bottom' : 'top',
       });
     });
@@ -244,12 +244,15 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
             formatValue={fmt}
             tvMode={tvMode}
             height={340}
-            showPointLabels={mostrarVendas}
+            showPointLabels={mostrarClientes}
+            /* base ativa passa de 1.000 — sem separador o rótulo vira "1240" no meio do gráfico */
+            labelFormat={v => (v > 0 ? v.toLocaleString('pt-BR') : '')}
+            qtdSuffix="clientes"
             headerRight={
               <div className="flex items-center gap-4 shrink-0">
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="mrr-vendas-toggle" className="text-xs text-muted-foreground cursor-pointer whitespace-nowrap">Nº de vendas</Label>
-                  <Switch id="mrr-vendas-toggle" checked={mostrarVendas} onCheckedChange={setMostrarVendas} />
+                  <Label htmlFor="mrr-clientes-toggle" className="text-xs text-muted-foreground cursor-pointer whitespace-nowrap">Nº de clientes</Label>
+                  <Switch id="mrr-clientes-toggle" checked={mostrarClientes} onCheckedChange={setMostrarClientes} />
                 </div>
                 <div className="flex items-center gap-2">
                   <Label htmlFor="mrr-reajuste-toggle" className="text-xs text-muted-foreground cursor-pointer whitespace-nowrap">Sem reajuste</Label>

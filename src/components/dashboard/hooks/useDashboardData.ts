@@ -534,7 +534,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
         });
-        // Clientes vendidos no mês (usado no gráfico de MRR e no faturamento)
+        // Clientes vendidos no mês (ativação do faturamento e tooltip do gráfico de faturamento)
         const novosNoMes = (allClientes || []).filter(c => {
           if (!c.data_venda_efetiva) return false;
           const dc = format(new Date(c.data_venda_efetiva), 'yyyy-MM');
@@ -553,7 +553,6 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         const mrrPoint: Record<string, string | number | undefined> = {
           month: m.month, monthFull: m.monthFull, value: mrrMes,
           valueSemReajuste: mrrMesSemReajuste,
-          vendas: novosNoMes.length,
           clientesAtivos: activosNoMes.length,
           ticketMedio: activosNoMes.length > 0 ? mrrMes / activosNoMes.length : 0,
         };
@@ -561,7 +560,9 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           const daUnidade = activosNoMes.filter(c => c.unidade_base_id === u.id);
           mrrPoint[`mrr_${u.id}`] = daUnidade.reduce((sum, c) => sum + mrrDe(c.id, m.end), 0);
           mrrPoint[`mrr_${u.id}_sr`] = daUnidade.reduce((sum, c) => sum + mrrSemReajusteDe(c.id, m.end), 0);
-          mrrPoint[`vendas_${u.id}`] = novosNoMes.filter(c => c.unidade_base_id === u.id).length;
+          // Base ativa da unidade no corte do mês — é o que rotula o ponto no gráfico de MRR.
+          // Mesma população que compõe `mrr_${u.id}`, então MRR ÷ clientes = ticket médio da linha.
+          mrrPoint[`clientes_${u.id}`] = daUnidade.length;
         });
         mrrEvolution.push(mrrPoint as any);
 

@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Agosto / 2026
 
+### 02/08
+
+- ⬆️ **Dashboard / Visão Geral** — O controle do gráfico de **Evolução do MRR** passa a ser **Nº de clientes**. O número escrito sobre cada ponto agora é a **base ativa daquele mês** — o mesmo conjunto de clientes que forma o MRR do ponto —, e não mais quantos clientes entraram no mês. Com isso dá para ler o ticket médio de qualquer linha dividindo o valor pela quantidade. Ao passar o mouse, a quantidade aparece ao lado do valor.
+
 ### 01/08
 
 - 🆕 **Onboarding** — Nova **Régua da jornada**, no botão do cartão. Ela desenha a implantação inteira numa linha só — do começo ao go-live, passando por todas as fases — com o **planejado em cima e o que aconteceu de verdade embaixo**, cada etapa com a largura do tempo que levou. A etapa que estourou o prazo aparece vermelha e larga: dá para ver **onde** a jornada travou, não só que o total ficou acima. Etapa por onde o cartão passou mais de uma vez aparece uma vez só, marcada com ×2.

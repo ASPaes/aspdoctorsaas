@@ -9,7 +9,7 @@ interface LineDef {
   color: string;
   strokeDasharray?: string;
   /**
-   * Campo do ponto com a contagem desta série (ex.: nº de vendas do mês).
+   * Campo do ponto com a contagem desta série (ex.: nº de clientes ativos no mês).
    * Sempre aparece no tooltip, ao lado do valor. No gráfico, só com `showPointLabels`.
    */
   qtdKey?: string;
@@ -31,12 +31,14 @@ interface MultiLineChartCardProps {
   showPointLabels?: boolean;
   /** Formata o rótulo no gráfico; retornar '' esconde o ponto */
   labelFormat?: (value: number) => string;
+  /** Unidade da contagem no tooltip (ex.: 'clientes'). Sem isso o número fica solto ao lado do valor. */
+  qtdSuffix?: string;
 }
 
 export function MultiLineChartCard({
   title, data, lines, formatValue = v => v.toLocaleString('pt-BR'),
   tvMode = false, className, height = 300, headerRight, showPointLabels = false,
-  labelFormat = v => (v > 0 ? String(v) : ''),
+  labelFormat = v => (v > 0 ? String(v) : ''), qtdSuffix,
 }: MultiLineChartCardProps) {
   const chartHeight = tvMode ? height * 1.5 : height;
 
@@ -80,7 +82,7 @@ export function MultiLineChartCard({
                   const qtd = line?.qtdKey ? props?.payload?.[line.qtdKey] : undefined;
                   const texto = qtd === undefined || qtd === null
                     ? formatValue(value)
-                    : `${formatValue(value)} (${Number(qtd)})`;
+                    : `${formatValue(value)} (${Number(qtd).toLocaleString('pt-BR')}${qtdSuffix ? ` ${qtdSuffix}` : ''})`;
                   return [texto, line?.label || name];
                 }}
               />
