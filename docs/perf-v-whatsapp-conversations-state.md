@@ -148,6 +148,52 @@ Posição: como o custo medido é majoritariamente **fila**, e não trabalho (4,
 
 ---
 
+## 6.1. Receita de monitoramento (usar cold, sem contexto)
+
+Snapshot absoluto + taxa calculada **por intervalo**. Não usar janela acumulada do `pg_stat_statements`: ela dilui a mudança no histórico e esconde piora recente.
+
+```sql
+select to_char(now() at time zone 'America/Sao_Paulo','DD/MM HH24:MI:SS') as hora_br,
+       extract(epoch from now())::bigint as epoch,
+       (select sum(calls) from pg_stat_statements) as calls_tot,
+       (select round((sum(total_exec_time))::numeric,0) from pg_stat_statements) as exec_ms_tot,
+       (select sum(calls) from pg_stat_statements where query like '%v_whatsapp_conversations_state%') as view_calls,
+       (select round(sum(total_exec_time)::numeric,0) from pg_stat_statements where query like '%v_whatsapp_conversations_state%') as view_ms,
+       (select count(*) from pg_stat_activity where state='active') as ativas,
+       (select count(*) from pg_stat_activity where backend_type='client backend') as conns,
+       (select count(*) from pg_stat_activity where wait_event_type='Lock') as em_lock,
+       (select count(*) from realtime.subscription
+          where entity::text like '%support_attendances%'
+            and (filters is null or array_length(filters,1) is null)) as sessoes_codigo_antigo;
+```
+
+Entre dois snapshots A e B (dt = `epoch_B - epoch_A`):
+
+| métrica | fórmula |
+|---|---|
+| req/s | `(calls_tot_B - calls_tot_A) / dt` |
+| view chamadas/s | `(view_calls_B - view_calls_A) / dt` |
+| view média ms | `(view_ms_B - view_ms_A) / (view_calls_B - view_calls_A)` |
+| **queries em voo** | `(exec_ms_tot_B - exec_ms_tot_A) / 1000 / dt` |
+
+**"Queries em voo" é a métrica-chave.** Não é CPU literal — é `total_exec_time` somado, que conta tempo de parede; várias queries em paralelo somam mais que o relógio. Mede **quantas queries ficaram pendentes em média**. Comparar sempre com o nº de cores (Large = 2).
+
+**Limiares:**
+
+| | saudável | atenção | agir |
+|---|---|---|---|
+| queries em voo | < 2,0 | 2,0 – 4,0 | > 4,0 |
+| view média | < 60 ms | 60 – 120 ms | > 120 ms |
+| locks | 0 | — | qualquer |
+
+⚠️ **Sempre normalizar por conexão** antes de concluir. Carga caindo junto com `conns` caindo pode ser só gente saindo, não melhora. O sinal real é carga caindo com `conns` estável ou subindo.
+
+**Se cruzar "agir":** subir o compute no painel do Supabase (Large → XL). Leva <2 min, não exige código, é reversível. É a alavanca segura para quem não tem contexto do problema.
+
+**Referência medida (31/07, pós-fix, pico):** 1,54 req/s por conexão · 0,183 chamadas da view por conexão · 2,29 em voo com 79 conexões.
+
+---
+
 ## 7. Como retomar
 
 1. Reler os números atuais antes de qualquer coisa — a produção muda por fora (Lovable + outras sessões).
