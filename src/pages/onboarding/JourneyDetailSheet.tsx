@@ -24,8 +24,9 @@ import {
   UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle, Ban, Building2,
   ExternalLink, Link2,
   Sparkles, Rocket, StickyNote, Undo2, XCircle, Tag,
-  Check, ChevronDown, Pencil, GitCommitHorizontal,
+  Check, ChevronDown, Pencil, GitCommitHorizontal, MessageSquareText,
 } from "lucide-react";
+import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 import EditTrainingDialog, { type EditableTraining } from "./EditTrainingDialog";
 import { EditJourneyInfoDialog } from "./EditJourneyInfoDialog";
 import { JourneyRuler } from "./JourneyRuler";
@@ -328,6 +329,14 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [pauseText, setPauseText] = useState("");
   const [pausePopoverOpen, setPausePopoverOpen] = useState(false);
   const [startConvOpen, setStartConvOpen] = useState(false);
+  const [viewChatOpen, setViewChatOpen] = useState(false);
+  const [viewChatMeta, setViewChatMeta] = useState<{
+    code: string;
+    contact: string;
+    openedAt: string | null;
+    closedAt: string | null;
+    conversationId: string | null;
+  }>({ code: "", contact: "", openedAt: null, closedAt: null, conversationId: null });
   const [nextStageId, setNextStageId] = useState<string>("");
   const [concludeOpen, setConcludeOpen] = useState(false);
   const [goLiveReal, setGoLiveReal] = useState<string>("");
@@ -731,7 +740,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journey?.ticket_id,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_attendances" as any) as any)
-        .select("id, attendance_code, status, opened_at, closed_at, participant_label, wait_seconds, handle_seconds, first_response_time_seconds, first_response_business_seconds")
+        .select("id, attendance_code, status, opened_at, closed_at, participant_label, conversation_id, wait_seconds, handle_seconds, first_response_time_seconds, first_response_business_seconds")
         .eq("ticket_id", journey!.ticket_id!)
         .order("opened_at", { ascending: false });
       if (error) throw error;
@@ -2878,15 +2887,43 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                 );
                               })()}
                               <div className="space-y-1.5">
-                                {attendances.map((a) => (
-                                  <div key={a.id} className="rounded-md border border-border p-2 flex items-center gap-2">
-                                    <span className="font-mono text-[11px] text-primary">{a.attendance_code}</span>
-                                    <span className="text-[11px] text-muted-foreground truncate flex-1">
-                                      {a.participant_label || "—"}
-                                    </span>
-                                    <Badge variant="outline" className="text-[9px] capitalize">{a.status}</Badge>
-                                  </div>
-                                ))}
+                                {attendances.map((a) => {
+                                  const statusLabel =
+                                    a.status === "closed" ? "Encerrado"
+                                      : a.status === "in_progress" ? "Em andamento"
+                                      : a.status === "waiting" ? "Aguardando"
+                                      : a.status;
+                                  const hasChat = !!a.conversation_id;
+                                  return (
+                                    <button
+                                      key={a.id}
+                                      type="button"
+                                      disabled={!hasChat}
+                                      title={hasChat ? "Ver histórico da conversa" : "Sem conversa vinculada"}
+                                      onClick={() => {
+                                        if (!hasChat) return;
+                                        setViewChatMeta({
+                                          code: a.attendance_code ?? "",
+                                          contact: a.participant_label || "—",
+                                          openedAt: a.opened_at ?? null,
+                                          closedAt: a.closed_at ?? null,
+                                          conversationId: a.conversation_id ?? null,
+                                        });
+                                        setViewChatOpen(true);
+                                      }}
+                                      className="w-full text-left rounded-md border border-border p-2 flex items-center gap-2 transition-colors enabled:hover:border-primary/40 enabled:hover:bg-muted/40 disabled:opacity-60 disabled:cursor-default"
+                                    >
+                                      <span className="font-mono text-[11px] text-primary">{a.attendance_code}</span>
+                                      <span className="text-[11px] text-muted-foreground truncate flex-1">
+                                        {a.participant_label || "—"}
+                                      </span>
+                                      <Badge variant="outline" className="text-[9px]">{statusLabel}</Badge>
+                                      {hasChat && (
+                                        <MessageSquareText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                      )}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </>
                           )}
@@ -3227,6 +3264,15 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         )}
       </DialogContent>
     </Dialog>
+    <AttendanceChatHistoryModal
+      open={viewChatOpen}
+      onOpenChange={setViewChatOpen}
+      conversationId={viewChatMeta.conversationId}
+      attendanceCode={viewChatMeta.code}
+      contactName={viewChatMeta.contact}
+      openedAt={viewChatMeta.openedAt}
+      closedAt={viewChatMeta.closedAt}
+    />
     {journey && journey.ticket_id && (
       <StartConversationFromTicketDialog
         open={startConvOpen}

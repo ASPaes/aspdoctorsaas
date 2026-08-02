@@ -14,6 +14,7 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 02/08
 
+- ⬆️ **Onboarding** — Os **atendimentos vinculados** à jornada agora abrem. Clicando na linha do atendimento aparece a conversa inteira do WhatsApp daquele período — com áudios, imagens e anexos —, do mesmo jeito que já funcionava nos tickets de suporte. Antes o cartão só mostrava o código e o status, e para ler o que foi conversado era preciso caçar o atendimento na tela do WhatsApp. O status também deixa de aparecer em inglês.
 - 🔧 **Dashboard / Cancelamentos** — Cliente que já tinha cancelado, voltou e cancelou de novo aparecia valendo **o dobro** na lista de cancelados do mês. A conta somava todos os cancelamentos da história do cliente e nunca abatia a reativação: um cliente de R$ 226,20 entrava em julho com R$ 452,40. Agora só entra o que saiu **dentro do período** — e quem cancela dois contratos no mesmo mês continua somando os dois, como sempre foi. Junto se acertam o card **MRR Perdido (bruto)**, o **Early Churn** e o gráfico de **churn dos 12 meses**.
 - ⬆️ **Dashboard / Visão Geral** — O controle do gráfico de **Evolução do MRR** passa a ser **Nº de clientes**. O número escrito sobre cada ponto agora é a **base ativa daquele mês** — o mesmo conjunto de clientes que forma o MRR do ponto —, e não mais quantos clientes entraram no mês. Com isso dá para ler o ticket médio de qualquer linha dividindo o valor pela quantidade. Ao passar o mouse, a quantidade aparece ao lado do valor.
 
