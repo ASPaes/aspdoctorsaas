@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildMrrRuler, type CpRow, type MovRow } from './mrrRuler';
+import { buildChurnRuler, buildMrrRuler, type CpRow, type MovRow } from './mrrRuler';
 
 /**
  * O banco é o oráculo: os casos abaixo saíram de `cliente_produtos` /`movimentos_mrr`
@@ -164,5 +164,54 @@ describe('buildMrrRuler — MRR sem reajuste', () => {
       { cliente_id: 'z', valor_delta: 100, data_movimento: '2026-03-01' },
     ]);
     expect(sem('z', '2026-12-31')).toBe(com('z', '2026-12-31'));
+  });
+});
+
+describe('buildChurnRuler — churn só do período', () => {
+  /**
+   * Caso real (Digi Office, 01/08/2026): COROADO'S BAR MEI cancelou em 30/04,
+   * foi reativado em 25/05 e cancelou de novo em 31/07. A régua antiga somava a
+   * vida inteira do cliente e mostrava 452,40 na lista de julho — o dobro.
+   */
+  const COROADO: MovRow[] = [
+    { cliente_id: 'coroado-mei', valor_delta: -226.2, data_movimento: '2026-04-30', tipo: 'churn' },
+    { cliente_id: 'coroado-mei', valor_delta: 226.2, data_movimento: '2026-05-25', tipo: 'reactivation' },
+    { cliente_id: 'coroado-mei', valor_delta: -226.2, data_movimento: '2026-07-31', tipo: 'churn' },
+  ];
+
+  it('conta só o cancelamento que caiu dentro da janela', () => {
+    const { churnNoPeriodo } = buildChurnRuler(COROADO);
+    expect(churnNoPeriodo('coroado-mei', '2026-07-01', '2026-07-31')).toBe(226.2);
+    expect(churnNoPeriodo('coroado-mei', '2026-04-01', '2026-04-30')).toBe(226.2);
+  });
+
+  it('soma os contratos que caíram na MESMA janela — o motivo de a régua existir', () => {
+    // TECH FOOD AUTOMACAO: dois contratos cancelados em 24/07. Aqui somar é o certo.
+    const { churnNoPeriodo } = buildChurnRuler([
+      { cliente_id: 'techfood', valor_delta: -650, data_movimento: '2026-07-24', tipo: 'churn' },
+      { cliente_id: 'techfood', valor_delta: -21.99, data_movimento: '2026-07-24', tipo: 'churn' },
+    ]);
+    expect(churnNoPeriodo('techfood', '2026-07-01', '2026-07-31')).toBe(671.99);
+  });
+
+  it('devolve null quando não há churn na janela — quem chama decide o fallback', () => {
+    const { churnNoPeriodo } = buildChurnRuler(COROADO);
+    expect(churnNoPeriodo('coroado-mei', '2026-06-01', '2026-06-30')).toBeNull();
+    expect(churnNoPeriodo('nao-existe', '2026-07-01', '2026-07-31')).toBeNull();
+  });
+
+  it('ignora reativação e movimento recorrente — churn é churn', () => {
+    const { churnNoPeriodo } = buildChurnRuler([
+      { cliente_id: 'w', valor_delta: 300, data_movimento: '2026-07-10', tipo: 'reactivation' },
+      { cliente_id: 'w', valor_delta: 120, data_movimento: '2026-07-12', tipo: 'upsell' },
+    ]);
+    expect(churnNoPeriodo('w', '2026-07-01', '2026-07-31')).toBeNull();
+  });
+
+  it('aceita timestamp e devolve valor positivo', () => {
+    const { churnNoPeriodo } = buildChurnRuler([
+      { cliente_id: 'v', valor_delta: '-99.90', data_movimento: '2026-07-31T22:26:19+00:00', tipo: 'churn' },
+    ]);
+    expect(churnNoPeriodo('v', '2026-07-01', '2026-07-31')).toBe(99.9);
   });
 });

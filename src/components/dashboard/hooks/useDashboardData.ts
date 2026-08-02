@@ -5,7 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import type { DashboardFilters, KPIMetrics, TimeSeriesData, DistributionData, DistributionDataPoint, CanceladoListItem, NovoClienteListItem, DownsellListItem } from '../types';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { fetchAllRows } from '@/lib/supabasePaginate';
-import { buildMrrRuler, MRR_MOV_TIPOS } from '@/lib/mrrRuler';
+import { buildChurnRuler, buildMrrRuler, MRR_MOV_TIPOS } from '@/lib/mrrRuler';
 
 const defaultMetrics: KPIMetrics = {
   faturamentoTotal: 0, faturamentoPorUnidade: [], clientesAtivos: 0, mrr: 0, ticketMedio: 0, arr: 0,
@@ -196,15 +196,13 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
 
       // Índices auxiliares do ledger (churn por cliente e ajustes recorrentes da ficha).
       const ajustesRecorrentesPorCliente: Record<string, number> = {};
-      const churnMrrPorCliente: Record<string, number> = {};
       todosMovimentosAtivos?.forEach((m: any) => {
         const delta = Number(m.valor_delta) || 0;
         if (['upsell','cross_sell','downsell','reajuste'].includes(m.tipo)) {
           ajustesRecorrentesPorCliente[m.cliente_id] = (ajustesRecorrentesPorCliente[m.cliente_id] || 0) + delta;
-        } else if (m.tipo === 'churn') {
-          churnMrrPorCliente[m.cliente_id] = (churnMrrPorCliente[m.cliente_id] || 0) + Math.abs(delta);
         }
       });
+      const { churnNoPeriodo } = buildChurnRuler(todosMovimentosAtivos as any);
 
       // Ativo no fim do período: não-cancelado, OU cancelado com data posterior ao fim (saiu depois).
       const clientesAtivos = (clientesRaw || []).filter(c => {
@@ -228,13 +226,15 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       // Exclui churn/reactivation/venda_avulsa — MESMA fórmula da ficha do cliente.
       const mrrAtualDe = (c: any) => (Number(c.mensalidade) || 0) + (ajustesRecorrentesPorCliente[c.id] || 0);
 
-      // MRR churnado do cliente: usa o ledger de churn (movimentos_mrr), somando TODOS os contratos
-      // cancelados. clientes.mensalidade guarda só o último contrato ativo (a regra "nunca zerar"
-      // preserva o remanescente), então contratos cancelados em sequência sumiam do churn — um cliente
-      // com 2 contratos aparecia com o MRR de apenas 1. Fallback p/ mrrAtualDe em cancelamentos
-      // legados sem movimento de churn no ledger.
-      const churnMrrDe = (c: any) =>
-        (c.id in churnMrrPorCliente ? churnMrrPorCliente[c.id] : mrrAtualDe(c));
+      // MRR churnado do cliente NA JANELA: usa o ledger de churn (movimentos_mrr), somando os
+      // contratos cancelados dentro do período. clientes.mensalidade guarda só o último contrato
+      // ativo (a regra "nunca zerar" preserva o remanescente), então contratos cancelados em
+      // sequência sumiam do churn — um cliente com 2 contratos aparecia com o MRR de apenas 1.
+      // A janela é obrigatória: sem ela, quem cancelou → foi reativado → cancelou de novo entrava
+      // com a soma das duas saídas (COROADO'S BAR MEI, 452,40 em julho/2026 valendo 226,20).
+      // Fallback p/ mrrAtualDe em cancelamentos legados sem movimento de churn no ledger.
+      const churnMrrDe = (c: any, inicio: string, fim: string) =>
+        churnNoPeriodo(c.id, inicio, fim) ?? mrrAtualDe(c);
 
       // 3. Cancelamentos no período — requer flag cancelado=true E data_cancelamento na janela
       const cancelamentos = await cancelamentosPromise;
@@ -242,7 +242,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         ? (cancelamentos || []).filter(c => fornecedorClientIds!.has(c.id))
         : (cancelamentos || []);
       const cancelamentosQtd = cancelamentosFilt.length;
-      const mrrCancelado = cancelamentosFilt.reduce((sum, c) => sum + churnMrrDe(c), 0);
+      const mrrCancelado = cancelamentosFilt.reduce((sum, c) => sum + churnMrrDe(c, periodoInicioStr, periodoFimStr), 0);
 
       // Early churn (≤90 dias)
       const earlyChurn = cancelamentosFilt.filter(c => {
@@ -250,7 +250,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         return differenceInDays(new Date(c.data_cancelamento), new Date(c.data_cadastro)) <= 90;
       });
       const cancelamentosEarly = earlyChurn.length;
-      const mrrCanceladoEarly = earlyChurn.reduce((sum, c) => sum + churnMrrDe(c), 0);
+      const mrrCanceladoEarly = earlyChurn.reduce((sum, c) => sum + churnMrrDe(c, periodoInicioStr, periodoFimStr), 0);
 
       // Enriquecer cancelados com dados de contrato/produto via contrato_eventos
       const eventosCancel = await eventosCancelPromise;
@@ -584,7 +584,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           return true;
         });
         churnQtdEvolution.push({ month: m.month, monthFull: m.monthFull, value: canceladosNoMes.length });
-        churnMrrEvolution.push({ month: m.month, monthFull: m.monthFull, value: canceladosNoMes.reduce((s, c) => s + churnMrrDe(c), 0) });
+        churnMrrEvolution.push({ month: m.month, monthFull: m.monthFull, value: canceladosNoMes.reduce((s, c) => s + churnMrrDe(c, m.start, m.end), 0) });
 
         // LTV per month: rolling 3-month churn rate → 1/churnRate
         const churnRateMes = activosInicioMes.length > 0 ? canceladosNoMes.length / activosInicioMes.length : 0;
@@ -808,7 +808,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
             diasAtivo,
             dataCancelamento: c.data_cancelamento!,
             motivo: c.motivo_cancelamento_id ? (motivoMap[c.motivo_cancelamento_id] || '—') : '—',
-            mensalidade: churnMrrDe(c),
+            mensalidade: churnMrrDe(c, periodoInicioStr, periodoFimStr),
             contratoNumero: cancelEnrichMap[c.id]?.contratoNumero || '—',
             produto: cancelEnrichMap[c.id]?.produto || '—',
             earlyChurn: diasAtivo !== null && diasAtivo <= 90,

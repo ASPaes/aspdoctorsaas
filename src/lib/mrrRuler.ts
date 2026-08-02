@@ -147,3 +147,53 @@ export function buildMrrRuler(cpRows: CpRow[] | null | undefined, movRows: MovRo
     mrrSemReajusteDe: (clienteId, corte) => baseAteData(clienteId, corte) + somaAjustes(clienteId, corte, true),
   };
 }
+
+export interface ChurnRuler {
+  /**
+   * Σ dos churns do cliente com `data_movimento` dentro de [inicio, fim], em valor
+   * positivo. Devolve `null` — não 0 — quando não há nenhum churn na janela, para o
+   * chamador poder cair no fallback dos cancelamentos legados (sem ledger) sem
+   * confundir isso com "cancelou valendo zero".
+   */
+  churnNoPeriodo: (clienteId: string, inicio: string, fim: string) => number | null;
+}
+
+/**
+ * Régua do MRR churnado — a janela é obrigatória, e é esse o ponto.
+ *
+ * Somar todos os churns do cliente parece certo enquanto o caso na cabeça é o cliente
+ * com dois contratos cancelados no mesmo dia (TECH FOOD AUTOMACAO, 24/07/2026:
+ * 650,00 + 21,99). Mas o cliente que cancela, é reativado e cancela de novo tem dois
+ * churns em meses diferentes, e a soma da vida inteira o mostra valendo o dobro:
+ * COROADO'S BAR MEI aparecia com 452,40 em julho/2026 valendo 226,20 (o ledger estava
+ * certo; a conta do painel é que somava abril junto e nunca abatia a reativação).
+ *
+ * Recortar pela janela resolve os dois: os contratos do mesmo período continuam
+ * somando, o cancelamento de outro período sai.
+ */
+export function buildChurnRuler(movRows: MovRow[] | null | undefined): ChurnRuler {
+  const churns: Record<string, Array<{ date: string; valor: number }>> = {};
+  (movRows || []).forEach((m) => {
+    if (m.tipo !== 'churn') return;
+    if (!churns[m.cliente_id]) churns[m.cliente_id] = [];
+    churns[m.cliente_id].push({
+      date: String(m.data_movimento).slice(0, 10),
+      valor: Math.abs(Number(m.valor_delta) || 0),
+    });
+  });
+
+  return {
+    churnNoPeriodo: (clienteId, inicio, fim) => {
+      const doCliente = churns[clienteId];
+      if (!doCliente) return null;
+      let total = 0;
+      let achou = false;
+      for (const k of doCliente) {
+        if (k.date < inicio || k.date > fim) continue;
+        total += k.valor;
+        achou = true;
+      }
+      return achou ? total : null;
+    },
+  };
+}
