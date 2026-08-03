@@ -26,7 +26,7 @@ async function checkRateLimit(
   supabase: any,
   tenantId: string,
   functionName: string
-): Promise<{ allowed: boolean; retryAfterSeconds?: number }> {
+): Promise<{ allowed: boolean; retryAfterSeconds?: number; logId?: string }> {
   try {
     const { data: configs } = await supabase
       .from('ai_rate_limit_config')
@@ -52,12 +52,13 @@ async function checkRateLimit(
       return { allowed: false, retryAfterSeconds: windowSeconds };
     }
 
+    const logId = crypto.randomUUID();
     supabase
       .from('ai_usage_log')
-      .insert({ tenant_id: tenantId, function_name: functionName, model: null, provider: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 })
+      .insert({ id: logId, tenant_id: tenantId, function_name: functionName, model: null, provider: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 })
       .then(() => {});
 
-    return { allowed: true };
+    return { allowed: true, logId };
   } catch {
     return { allowed: true };
   }
@@ -275,13 +276,15 @@ Criterios para abertura de Ticket CS (needs_cs_ticket = true):
         }
       }
 
-      await supabase.from('ai_usage_log').update({
-        input_tokens: totalIn,
-        output_tokens: totalOut,
-        estimated_cost_usd: totalCost,
-        model: modelsUsed,
-        provider: aiConfig.provider,
-      }).eq('tenant_id', convData.tenant_id).eq('function_name', 'analyze-whatsapp-sentiment').order('called_at', { ascending: false }).limit(1);
+      if (rateLimit.logId) {
+        await supabase.from('ai_usage_log').update({
+          input_tokens: totalIn,
+          output_tokens: totalOut,
+          estimated_cost_usd: totalCost,
+          model: modelsUsed,
+          provider: aiConfig.provider,
+        }).eq('id', rateLimit.logId);
+      }
     } catch (aiError: any) {
       const msg = aiError.message || "";
       console.error("[analyze-sentiment] AI error:", msg);

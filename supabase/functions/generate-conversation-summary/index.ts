@@ -11,7 +11,7 @@ async function checkRateLimit(
   supabase: any,
   tenantId: string,
   functionName: string
-): Promise<{ allowed: boolean; retryAfterSeconds?: number }> {
+): Promise<{ allowed: boolean; retryAfterSeconds?: number; logId?: string }> {
   try {
     const { data: configs } = await supabase
       .from('ai_rate_limit_config')
@@ -37,12 +37,13 @@ async function checkRateLimit(
       return { allowed: false, retryAfterSeconds: windowSeconds };
     }
 
+    const logId = crypto.randomUUID();
     supabase
       .from('ai_usage_log')
-      .insert({ tenant_id: tenantId, function_name: functionName, model: null, provider: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 })
+      .insert({ id: logId, tenant_id: tenantId, function_name: functionName, model: null, provider: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 })
       .then(() => {});
 
-    return { allowed: true };
+    return { allowed: true, logId };
   } catch {
     return { allowed: true };
   }
@@ -106,11 +107,11 @@ serve(async (req) => {
 
     // --- If attendanceId provided, generate for that specific attendance ---
     if (attendanceId) {
-      return await handleAttendanceSummary(supabase, aiConfig, conversation, attendanceId, conversationId);
+      return await handleAttendanceSummary(supabase, aiConfig, conversation, attendanceId, conversationId, rateLimit.logId);
     }
 
     // --- Otherwise, generate conversation-level summary covering last 5-6 attendances ---
-    return await handleConversationSummary(supabase, aiConfig, conversation, conversationId);
+    return await handleConversationSummary(supabase, aiConfig, conversation, conversationId, rateLimit.logId);
 
   } catch (error) {
     console.error("[generate-summary] Error:", error);
@@ -122,7 +123,7 @@ serve(async (req) => {
 });
 
 async function handleAttendanceSummary(
-  supabase: any, aiConfig: any, conversation: any, attendanceId: string, conversationId: string
+  supabase: any, aiConfig: any, conversation: any, attendanceId: string, conversationId: string, logId?: string
 ) {
   const { data: att } = await supabase
     .from("support_attendances")
@@ -157,7 +158,7 @@ async function handleAttendanceSummary(
   const messagesText = formatMessages(messages);
 
   const prompt = buildSingleAttendancePrompt(contactName, messagesText);
-  const result = await callAndParseAI(aiConfig, prompt, supabase, conversation.tenant_id);
+  const result = await callAndParseAI(aiConfig, prompt, supabase, logId);
   if (result instanceof Response) return result;
 
   // Update attendance AI fields
@@ -182,7 +183,7 @@ async function handleAttendanceSummary(
 }
 
 async function handleConversationSummary(
-  supabase: any, aiConfig: any, conversation: any, conversationId: string
+  supabase: any, aiConfig: any, conversation: any, conversationId: string, logId?: string
 ) {
   // Fetch last 6 attendances for this conversation
   const { data: attendances } = await supabase
@@ -269,7 +270,7 @@ Retorne APENAS um JSON válido sem markdown:
 }`;
   }
 
-  const result = await callAndParseAI(aiConfig, promptContent, supabase, conversation.tenant_id);
+  const result = await callAndParseAI(aiConfig, promptContent, supabase, logId);
   if (result instanceof Response) return result;
 
   const totalMessages = attendances?.reduce((sum: number, a: any) => sum + 1, 0) || 0;
@@ -343,20 +344,20 @@ REGRAS:
 - "tags": palavras-chave únicas e curtas (1-2 palavras).`;
 }
 
-async function callAndParseAI(aiConfig: any, prompt: string, supabase?: any, tenantId?: string): Promise<any> {
+async function callAndParseAI(aiConfig: any, prompt: string, supabase?: any, logId?: string): Promise<any> {
   try {
     const aiResult = await callAI(aiConfig, [
       { role: "system", content: "Você é um assistente de atendimento ao cliente. Gere resumos objetivos e úteis. Sempre responda com JSON válido sem formatação markdown." },
       { role: "user", content: prompt },
     ]);
-    if (supabase && tenantId) {
+    if (supabase && logId) {
       await supabase.from('ai_usage_log').update({
         input_tokens: aiResult.usage.inputTokens,
         output_tokens: aiResult.usage.outputTokens,
         estimated_cost_usd: aiResult.usage.estimatedCostUsd,
         model: aiConfig.model,
         provider: aiConfig.provider,
-      }).eq('tenant_id', tenantId).eq('function_name', 'generate-conversation-summary').order('called_at', { ascending: false }).limit(1);
+      }).eq('id', logId);
     }
     const rawResult = aiResult.content;
     try {

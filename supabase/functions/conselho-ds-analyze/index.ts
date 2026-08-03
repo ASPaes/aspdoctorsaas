@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const FUNCTION_NAME = 'conselho-ds-analyze';
 
-async function checkRateLimit(supabase: any, tenantId: string) {
+async function checkRateLimit(supabase: any, tenantId: string): Promise<{ allowed: boolean; retryAfterSeconds?: number; logId?: string }> {
   try {
     const { data: configs } = await supabase
       .from('ai_rate_limit_config')
@@ -28,11 +28,12 @@ async function checkRateLimit(supabase: any, tenantId: string) {
     if ((count ?? 0) >= config.max_calls) {
       return { allowed: false, retryAfterSeconds: config.window_seconds };
     }
+    const logId = crypto.randomUUID();
     supabase
       .from('ai_usage_log')
-      .insert({ tenant_id: tenantId, function_name: FUNCTION_NAME, model: null, provider: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 })
+      .insert({ id: logId, tenant_id: tenantId, function_name: FUNCTION_NAME, model: null, provider: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 })
       .then(() => {});
-    return { allowed: true };
+    return { allowed: true, logId };
   } catch {
     return { allowed: true };
   }
@@ -191,10 +192,12 @@ Deno.serve(async (req) => {
     const custoUsd = aiResult?.usage?.estimatedCostUsd || 0;
 
     if (status === 'success') {
-      await supabase.from('ai_usage_log').update({
-        input_tokens: tokensIn, output_tokens: tokensOut, estimated_cost_usd: custoUsd,
-        model: aiConfig.model, provider: aiConfig.provider,
-      }).eq('tenant_id', tenantId).eq('function_name', FUNCTION_NAME).order('called_at', { ascending: false }).limit(1);
+      if (rl.logId) {
+        await supabase.from('ai_usage_log').update({
+          input_tokens: tokensIn, output_tokens: tokensOut, estimated_cost_usd: custoUsd,
+          model: aiConfig.model, provider: aiConfig.provider,
+        }).eq('id', rl.logId);
+      }
     }
 
     const personasSnapshot = personas.map((p: any) => ({ id: p.id, slug: p.slug, nome_funcional: p.nome_funcional, bio_curta: p.bio_curta }));

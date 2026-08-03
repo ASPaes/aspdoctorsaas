@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Agosto / 2026
 
+### 03/08
+
+- 🔧 **Painel de Uso / Monitoramento** — O **custo de IA** por empresa estava muito acima do real. A cada análise de conversa, o sistema reescrevia o histórico inteiro daquela empresa com o valor da última chamada — então todo o período passava a valer o preço da conversa mais cara, e o número mudava sozinho a cada minuto. Numa empresa, os últimos 7 dias apareciam como **US$ 40** contra pouco mais de **US$ 1** de consumo real. O registro agora é feito chamada por chamada, e o painel mostra o que foi realmente gasto. O histórico anterior a esta correção não tem como ser recuperado — os valores antigos foram sobrescritos.
+
 ### 02/08
 
 - 🆕 **Onboarding / Treinamentos** — O treinamento passa a registrar **quem participou e quem faltou**. Cada sessão tem sua lista de participantes com **nome, tipo** (colaborador, responsável da empresa ou outro), **fone e e-mail**, e no dia marca-se **presente ou faltou** pessoa por pessoa. Ao adicionar alguém, o campo de nome busca nos **contatos do cliente** e preenche telefone e e-mail sozinho; quem é digitado na hora pode ser salvo no cadastro do cliente com um clique — ou não, se for gente de passagem. O botão **Realizado** só fecha o treinamento com a chamada respondida: sem lista ou com alguém em branco, ele abre a lista em vez de fechar. Fechar arrastando o cartão no quadro continua funcionando, mas o cartão fica marcado como **chamada pendente** até alguém responder.
