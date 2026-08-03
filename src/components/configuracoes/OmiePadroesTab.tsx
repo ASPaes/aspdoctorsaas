@@ -106,6 +106,11 @@ export default function OmiePadroesTab() {
   const [confirmPauseOpen, setConfirmPauseOpen] = useState(false);
   const [savingPausa, setSavingPausa] = useState(false);
 
+  // Seção: números extras que recebem os alertas de WhatsApp do OMIE
+  const [alertNumbers, setAlertNumbers] = useState<string[]>([]);
+  const [novoNumero, setNovoNumero] = useState("");
+  const [savingNumeros, setSavingNumeros] = useState(false);
+
   useEffect(() => {
     void carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -173,7 +178,7 @@ export default function OmiePadroesTab() {
       // Data de corte + lista de modelos (paralelo)
       const [omieRow, modelosRes] = await Promise.all([
         (supabase.from("omie_integration" as any) as any)
-          .select("integrar_a_partir_de, integracao_pausada")
+          .select("integrar_a_partir_de, integracao_pausada, alert_whatsapp_numbers")
           .eq("tenant_id", tid)
           .maybeSingle(),
         (supabase.from("modelos_contrato" as any) as any)
@@ -184,6 +189,8 @@ export default function OmiePadroesTab() {
       const dc = (omieRow?.data as any)?.integrar_a_partir_de ?? null;
       setDataCorte(dc ? String(dc).slice(0, 10) : "");
       setPausada(!!(omieRow?.data as any)?.integracao_pausada);
+      const _nums = (omieRow?.data as any)?.alert_whatsapp_numbers;
+      setAlertNumbers(Array.isArray(_nums) ? _nums.map((n: any) => String(n)) : []);
       setModelos(((modelosRes?.data as any[]) ?? []).map((m) => ({ id: String(m.id), nome: String(m.nome) })));
     } catch (err: any) {
       setErro(err?.message || "Erro ao carregar padrões.");
@@ -305,6 +312,35 @@ export default function OmiePadroesTab() {
       setConfirmPauseOpen(true);
     } else {
       void aplicarPausa(false);
+    }
+  }
+
+  function adicionarNumero() {
+    const n = novoNumero.replace(/\D/g, "");
+    if (n.length < 10 || n.length > 13) {
+      toast({ title: "Número inválido", description: "Use DDD + número (ex: 5531999998888).", variant: "destructive" });
+      return;
+    }
+    setAlertNumbers((prev) => (prev.includes(n) ? prev : [...prev, n]));
+    setNovoNumero("");
+  }
+
+  function removerNumero(n: string) {
+    setAlertNumbers((prev) => prev.filter((x) => x !== n));
+  }
+
+  async function salvarNumeros() {
+    setSavingNumeros(true);
+    try {
+      const { error } = await (supabase.from("omie_integration" as any) as any)
+        .update({ alert_whatsapp_numbers: alertNumbers })
+        .eq("tenant_id", tid);
+      if (error) throw error;
+      toast({ title: "Números salvos" });
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar números", description: err?.message || "Tente novamente.", variant: "destructive" });
+    } finally {
+      setSavingNumeros(false);
     }
   }
 
@@ -548,6 +584,46 @@ export default function OmiePadroesTab() {
             <Button variant="outline" onClick={salvarDataCorte} disabled={savingDataCorte}>
               {savingDataCorte ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Salvar data de ativação
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Números para alertas de WhatsApp (OMIE)</CardTitle>
+          <CardDescription>
+            Quem recebe no WhatsApp os avisos da integração OMIE (cancelamento que não propagou, vínculo ambíguo).
+            Estes números recebem <strong>além</strong> dos usuários já inscritos. O envio sai da instância de alertas do próprio tenant.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Ex: 5531999998888 (DDD + número)"
+              value={novoNumero}
+              inputMode="numeric"
+              onChange={(e) => setNovoNumero(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); adicionarNumero(); } }}
+            />
+            <Button type="button" variant="outline" onClick={adicionarNumero}>Adicionar</Button>
+          </div>
+          {alertNumbers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum número extra. Só os usuários inscritos recebem por WhatsApp.</p>
+          ) : (
+            <div className="space-y-2">
+              {alertNumbers.map((n) => (
+                <div key={n} className="flex items-center justify-between rounded-md border p-2">
+                  <span className="text-sm font-mono">{n}</span>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => removerNumero(n)}>Remover</Button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={salvarNumeros} disabled={savingNumeros}>
+              {savingNumeros ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar números
             </Button>
           </div>
         </CardContent>
