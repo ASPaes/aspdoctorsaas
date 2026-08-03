@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { filterAttachments } from "@/lib/attachmentSearch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useUserNames } from "@/hooks/useUserNames";
+import { AttachmentTitlesDialog } from "./AttachmentTitlesDialog";
 
 interface Props {
   ticketId: string;
@@ -30,7 +31,7 @@ function uploadOne(
   ticketId: string,
   token: string,
   onProgress: (pct: number) => void
-): Promise<void> {
+): Promise<string | undefined> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-ticket-attachment`);
@@ -42,7 +43,7 @@ function uploadOne(
     xhr.onload = () => {
       let body: any = null;
       try { body = JSON.parse(xhr.responseText); } catch { /* resposta não-JSON */ }
-      if (xhr.status >= 200 && xhr.status < 300 && !body?.error) return resolve();
+      if (xhr.status >= 200 && xhr.status < 300 && !body?.error) return resolve(body?.id as string | undefined);
       reject(new Error(body?.error ?? `"${file.name}" falhou (HTTP ${xhr.status})`));
     };
     xhr.onerror = () => reject(new Error(`falha de rede ao enviar "${file.name}"`));
@@ -87,6 +88,7 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
   const [previewType, setPreviewType] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState<string>("");
   const [busca, setBusca] = useState("");
+  const [pendentes, setPendentes] = useState<File[] | null>(null);
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
 
@@ -158,27 +160,39 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
   const visiveis = mostrarBusca ? filterAttachments(attachments, busca) : attachments;
   const filtrando = mostrarBusca && busca.trim().length > 0;
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const picked = Array.from(files);
+  // UPDATE direto: a policy ticket_attachments_all é ALL por tenant, então não precisa de
+  // edge function — e mexer em supabase/functions/** redeploya as 63 do repo.
+  const saveTitle = async (id: string, title: string) => {
+    const { error } = await (supabase.from("support_ticket_attachments" as any) as any)
+      .update({ title: title.trim() || null })
+      .eq("id", id);
+    if (error) throw error;
+  };
+
+  const enviarArquivos = async (itens: Array<{ file: File; title: string }>) => {
     setUploading(true);
     let count = 0;
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("Sessão expirada, entre novamente");
 
-      for (let i = 0; i < picked.length; i++) {
-        const file = picked[i];
+      for (let i = 0; i < itens.length; i++) {
+        const { file, title } = itens[i];
         if (file.size > MAX_UPLOAD_BYTES) {
           toast.error(`"${file.name}" excede ${MAX_UPLOAD_MB}MB`);
           continue;
         }
-        setProgress({ name: file.name, pct: 0, index: i + 1, total: picked.length });
-        await uploadOne(file, ticketId, session.access_token, (pct) =>
-          setProgress({ name: file.name, pct, index: i + 1, total: picked.length })
+        setProgress({ name: file.name, pct: 0, index: i + 1, total: itens.length });
+        const id = await uploadOne(file, ticketId, session.access_token, (pct) =>
+          setProgress({ name: file.name, pct, index: i + 1, total: itens.length })
         );
         count++;
+        // Título é opcional: se este UPDATE falhar, o arquivo já subiu e a pessoa
+        // completa pelo lápis. Não desfaz o upload por causa disso.
+        if (id && title) {
+          try { await saveTitle(id, title); }
+          catch { toast.error(`Anexo "${file.name}" subiu, mas o título não foi salvo`); }
+        }
       }
       if (count > 0) toast.success(`${count} arquivo(s) anexado(s)`);
     } catch (err: any) {
@@ -186,10 +200,19 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
     } finally {
       setProgress(null);
       setUploading(false);
-      e.target.value = "";
       // Pode ter subido parte dos arquivos antes de falhar.
       if (count > 0) refetch();
     }
+  };
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const picked = Array.from(files);
+    e.target.value = "";
+    // No Suporte o fluxo é o de sempre: escolheu, subiu.
+    if (!isOnboarding) return enviarArquivos(picked.map((file) => ({ file, title: "" })));
+    setPendentes(picked);
   };
 
   const handleDownload = async (att: any) => {
@@ -425,6 +448,13 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
           ))}
         </div>
       )}
+
+      <AttachmentTitlesDialog
+        open={!!pendentes}
+        files={pendentes ?? []}
+        onCancel={() => setPendentes(null)}
+        onConfirm={(itens) => { setPendentes(null); enviarArquivos(itens); }}
+      />
 
       <Dialog open={!!previewUrl} onOpenChange={(o) => { if (!o) closePreview(); }}>
         <DialogContent className="max-w-4xl">
