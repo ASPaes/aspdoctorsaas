@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { processInboundMessage } from '../_shared/message-processor.ts';
 import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets } from '../_shared/message-types.ts';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
+import { applyDeliveryStatus } from '../_shared/apply-delivery-status.ts';
 import { normalizeBRPhone } from '../_shared/phone.ts';
 
 const corsHeaders = {
@@ -106,13 +107,15 @@ async function downloadAndUploadMetaMedia(
 async function processStatus(supabase: any, tenantId: string, status: any): Promise<void> {
   const { id: messageId, status: statusValue } = status;
   if (!messageId || !statusValue) return;
-  const statusMap: Record<string, string> = { sent: 'sent', delivered: 'delivered', read: 'read', failed: 'failed' };
-  const mappedStatus = statusMap[statusValue] || statusValue;
+  // Quem decide o status é a escada — o `failed` da Meta entra como `error` e só o
+  // verificador promove a `failed`, depois de confirmar. Ver _shared/delivery-status.ts.
+  const r = await applyDeliveryStatus(supabase, {
+    tenantId, messageId, providerStatus: String(statusValue),
+  });
 
-  const updatePayload: Record<string, any> = { status: mappedStatus };
-
-  // Persistir o motivo da falha reportado pela Meta (errors[]) para diagnóstico
-  if (mappedStatus === 'failed' && Array.isArray(status.errors) && status.errors.length > 0) {
+  // A Meta é a ÚNICA que diz o motivo da falha. Continua sendo gravado, agora só em
+  // metadata — nunca mais junto com o status.
+  if (String(statusValue) === 'failed' && Array.isArray(status.errors) && status.errors.length > 0) {
     const e = status.errors[0];
     const sendError = {
       code: e?.code ?? null,
@@ -127,13 +130,23 @@ async function processStatus(supabase: any, tenantId: string, status: any): Prom
       .select('metadata')
       .eq('tenant_id', tenantId).eq('message_id', messageId)
       .maybeSingle();
-    updatePayload.metadata = { ...(existing?.metadata || {}), send_error: sendError };
+    await supabase.from('whatsapp_messages')
+      .update({ metadata: { ...(existing?.metadata || {}), send_error: sendError } })
+      .eq('tenant_id', tenantId).eq('message_id', messageId);
     console.error(`${LOG} Send FAILED ${messageId}: code=${sendError.code} title=${sendError.title} details=${sendError.details}`);
   }
 
-  await supabase.from('whatsapp_messages')
-    .update(updatePayload)
-    .eq('tenant_id', tenantId).eq('message_id', messageId);
+  if (r.confirmedFailureCandidate) {
+    fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/verify-failed-deliveries`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      },
+      body: JSON.stringify({ tenantId, messageId }),
+    }).catch((e) => console.error(`${LOG} verify dispatch falhou:`, e?.message));
+  }
+
   console.log(`${LOG} Status updated: ${messageId} -> ${statusValue}`);
 }
 

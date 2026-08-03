@@ -549,7 +549,8 @@ Deno.serve(async (req) => {
               content: `\u{2705} Atendimento ${newAtt.attendance_code} aberto com sucesso.`,
               message_type: 'system',
               is_from_me: true,
-              status: 'sent',
+              // nasce 'pending': quem promove a 'sent' é o SERVER_ACK do WhatsApp (ver Task 4)
+              status: 'pending',
               timestamp: openTimestamp,
               tenant_id: tenantId,
               metadata: { system: true, attendance_event: 'opened', attendance_id: newAtt.id },
@@ -610,7 +611,8 @@ Deno.serve(async (req) => {
                   content: openingText,
                   message_type: 'system',
                   is_from_me: true,
-                  status: 'sent',
+                  // nasce 'pending': idem à abertura em 1:1
+                  status: 'pending',
                   timestamp: openTimestamp,
                   tenant_id: tenantId,
                   metadata: { system: true, attendance_event: 'opened', attendance_id: rpcRes.attendance_id },
@@ -751,7 +753,10 @@ Deno.serve(async (req) => {
           media_ext: mediaExt,
           media_size_bytes: mediaSizeBytes,
           media_kind: mediaKind,
-          status: 'sent',
+          // 'pending' = entreguei ao provedor. Quem promove a 'sent' é o SERVER_ACK do
+          // WhatsApp. Antes isto nascia 'sent' e a escada impediria qualquer ERROR de
+          // entrar — a mensagem falhada ficaria eternamente "enviada".
+          status: 'pending',
           is_from_me: persistedIsFromMe,
           timestamp: messageTimestamp,
           quoted_message_id: body.quotedMessageId || null,
