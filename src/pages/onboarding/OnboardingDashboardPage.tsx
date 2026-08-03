@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,10 +17,14 @@ import {
 
 import { startOfMonth, endOfMonth } from "date-fns";
 import OnboardingSlaOverview from "./OnboardingSlaOverview";
+import SituacaoAgoraBand from "./SituacaoAgoraBand";
+import KpiCard from "./KpiCard";
+import { pct, separarJornadas, contarSituacao, agregarTreinos, desfechoTreino } from "./dashMetrics";
 
 interface JourneyRow {
   journey_id: string;
   situacao: string | null;
+  aberta_em: string | null;
   fase_atual: string | null;
   etapa_semaforo: "verde" | "amarelo" | "vermelho" | "sem_sla" | null;
   sla_util_min: number | null;
@@ -51,11 +56,6 @@ interface TrainingRow {
 }
 
 
-function pct(num: number, den: number): number {
-  if (!den) return 0;
-  return Math.round((num / den) * 1000) / 10;
-}
-
 function formatMin(min: number | null | undefined): string {
   if (min == null || min <= 0) return "0m";
   if (min < 60) return `${Math.round(min)}m`;
@@ -65,38 +65,6 @@ function formatMin(min: number | null | undefined): string {
   const d = Math.floor(h / 24);
   const rh = h % 24;
   return rh ? `${d}d ${rh}h` : `${d}d`;
-}
-
-function KpiCard({
-  icon: Icon, label, value, sub, tone = "default", subTone,
-}: {
-  icon: any; label: string; value: string; sub?: string;
-  tone?: "default" | "success" | "warning" | "danger" | "info";
-  subTone?: "success" | "warning" | "danger" | "muted";
-}) {
-  const toneClass: Record<string, string> = {
-    default: "text-foreground",
-    success: "text-[hsl(142_71%_45%)]",
-    warning: "text-[hsl(38_92%_50%)]",
-    danger: "text-destructive",
-    info: "text-[hsl(199_89%_48%)]",
-  };
-  const subToneClass: Record<string, string> = {
-    success: "text-[hsl(142_71%_45%)]",
-    warning: "text-[hsl(38_92%_50%)]",
-    danger: "text-destructive",
-    muted: "text-muted-foreground",
-  };
-  return (
-    <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-1.5">
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">{label}</span>
-        <Icon className={`h-4 w-4 ${toneClass[tone]}`} />
-      </div>
-      <div className={`text-2xl font-semibold ${toneClass[tone]}`}>{value}</div>
-      {sub && <div className={`text-[11px] ${subToneClass[subTone ?? "muted"]}`}>{sub}</div>}
-    </div>
-  );
 }
 
 export default function OnboardingDashboardPage() {
@@ -115,7 +83,7 @@ export default function OnboardingDashboardPage() {
     queryFn: async () => {
       const rows = await fetchAllRows<JourneyRow>(() => {
         let q = (supabase.from("vw_onboarding_journeys" as any) as any)
-          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, concluido_em, demand_type_nome, setor_nome, sla_total_corrido_min, sla_total_pausado_min, sla_total_util_min")
+          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, concluido_em, aberta_em, demand_type_nome, setor_nome, sla_total_corrido_min, sla_total_pausado_min, sla_total_util_min")
           .eq("tenant_id", effectiveTenantId);
         if (selectedUnidadeIds.length > 0) q = q.in("cliente_unidade_id", selectedUnidadeIds);
         return q;
@@ -137,6 +105,25 @@ export default function OnboardingDashboardPage() {
     },
   });
 
+  /** O card de PDV mostra 0 quando NENHUM tipo de treino tem a flag marcada — o que é
+   *  cadastro em branco, não resultado. Esta query distingue os dois casos. */
+  const temTipoPdvQ = useQuery({
+    queryKey: ["onboarding-dash-tem-tipo-pdv", effectiveTenantId],
+    enabled: canAccess && !!effectiveTenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_training_types" as any) as any)
+        .select("id")
+        .eq("tenant_id", effectiveTenantId)
+        .eq("conta_como_pdv", true)
+        .limit(1);
+      if (error) throw error;
+      return ((data ?? []) as unknown[]).length > 0;
+    },
+  });
+
+  /** Só afirma "falta marcar" quando a query confirmou. Enquanto carrega, mostra o número. */
+  const semTipoPdv = temTipoPdvQ.data === false;
+
   const pausesAllQ = useQuery({
     queryKey: ["onboarding-dash-pauses-by-reason", effectiveTenantId],
     enabled: canAccess && !!effectiveTenantId,
@@ -150,9 +137,22 @@ export default function OnboardingDashboardPage() {
     },
   });
 
+  const journeys = useMemo(() => journeysQ.data ?? [], [journeysQ.data]);
+
+  /** Canceladas ficam fora de tudo. Só a faixa "Situação agora" usa `journeys` inteiro. */
+  const { ativas, periodo } = useMemo(
+    () => separarJornadas(journeys, dateRange),
+    [journeys, dateRange],
+  );
+
+  const contagem = useMemo(() => contarSituacao(journeys), [journeys]);
+
+  /** Allowlist de treinos/pausas/retornos: SEM canceladas, mas SEM recorte por
+   *  abertura — esses três já filtram pela data do próprio evento. Usar `periodo`
+   *  aqui sumiria com um treino de agosto numa jornada aberta em junho. */
   const allowedJourneyIds = useMemo(
-    () => new Set((journeysQ.data ?? []).map((j) => j.journey_id)),
-    [journeysQ.data]
+    () => new Set(ativas.map((j) => j.journey_id)),
+    [ativas]
   );
 
   const pausesByReasonAgg = useMemo(() => {
@@ -301,31 +301,10 @@ export default function OnboardingDashboardPage() {
     },
   });
 
-  const journeys = journeysQ.data ?? [];
   const names = namesQ.data ?? {};
 
-  // KPIs jornadas
-  const concluidas = journeys.filter((j) => j.situacao === "concluido").length;
-
-  // KPIs treinos
-  const realizadosOuNoShow = trainings.filter((t) => t.status === "realizado" || t.no_show === true);
-  const noShows = trainings.filter((t) => t.no_show === true);
-  const noShowRate = pct(noShows.length, realizadosOuNoShow.length);
-  const realizados = trainings.filter((t) => t.status === "realizado");
-  const propPresent = realizados.filter((t) => t.proprietario_presente === true);
-  const propRate = pct(propPresent.length, realizados.length);
-  const retreinos = trainings.filter((t) => t.is_retreinamento === true);
-  const retreinosPct = pct(retreinos.length, trainings.length);
-
-  // Previstos/Agendados vs Realizados
-  const previstos = trainings.filter((t) => t.status === "previsto" || t.status === "agendado");
-  const realizadoPct = pct(realizados.length, previstos.length + realizados.length);
-
-  // PDV finalizados: treinos realizados com conta_como_pdv=true
-  const pdvFinalizados = realizados.filter((t) => t.conta_como_pdv === true).length;
-
-  // Primeiro no-show: treinos com no_show=true e tentativas <= 1
-  const primeiroNoShow = trainings.filter((t) => t.no_show === true && (t.tentativas ?? 0) <= 1).length;
+  // KPIs treinos — desfecho vem do status; a flag no_show é pegajosa e vira número à parte.
+  const tr = useMemo(() => agregarTreinos(trainings), [trainings]);
 
   // Tabela por implantador
   const byImplantador = useMemo(() => {
@@ -333,9 +312,11 @@ export default function OnboardingDashboardPage() {
     trainings.forEach((t) => {
       const id = t.conduzido_por || "__sem__";
       if (!m[id]) m[id] = { total: 0, realizado: 0, no_show: 0, retreino: 0 };
+      const d = desfechoTreino(t.status);
+      if (d === "cancelado") return; // cancelado não é performance de ninguém
       m[id].total += 1;
-      if (t.status === "realizado") m[id].realizado += 1;
-      if (t.no_show) m[id].no_show += 1;
+      if (d === "realizado") m[id].realizado += 1;
+      if (d === "no_show") m[id].no_show += 1;
       if (t.is_retreinamento) m[id].retreino += 1;
     });
     return Object.entries(m)
@@ -350,14 +331,17 @@ export default function OnboardingDashboardPage() {
 
   // Tabela por tipo de treino
   const byTipo = useMemo(() => {
-    const m: Record<string, { nome: string; previstos: number; realizados: number; no_show: number }> = {};
+    const m: Record<string, { nome: string; previstos: number; realizados: number; no_show: number; cancelados: number }> = {};
     trainings.forEach((t) => {
       const key = t.training_type_id || "__sem__";
       const nome = t.tipo_nome || "Sem tipo";
-      if (!m[key]) m[key] = { nome, previstos: 0, realizados: 0, no_show: 0 };
-      if (t.status === "previsto" || t.status === "agendado") m[key].previstos += 1;
-      if (t.status === "realizado") m[key].realizados += 1;
-      if (t.no_show) m[key].no_show += 1;
+      if (!m[key]) m[key] = { nome, previstos: 0, realizados: 0, no_show: 0, cancelados: 0 };
+      switch (desfechoTreino(t.status)) {
+        case "em_aberto": m[key].previstos += 1; break;
+        case "realizado": m[key].realizados += 1; break;
+        case "no_show": m[key].no_show += 1; break;
+        case "cancelado": m[key].cancelados += 1; break;
+      }
     });
     return Object.values(m).sort((a, b) => (b.realizados + b.previstos) - (a.realizados + a.previstos));
   }, [trainings]);
@@ -388,8 +372,10 @@ export default function OnboardingDashboardPage() {
         </div>
       ) : (
         <div className="p-4 space-y-5">
+          <SituacaoAgoraBand contagem={contagem} />
+
           {/* SLA — visão corrido vs. efetivo (total, pipeline, etapa, área) */}
-          <OnboardingSlaOverview journeys={journeys} tenantId={effectiveTenantId} />
+          <OnboardingSlaOverview journeys={periodo} tenantId={effectiveTenantId} />
 
           {/* KPI Row 1b: PDV + previsto/realizado */}
           <section>
@@ -398,36 +384,49 @@ export default function OnboardingDashboardPage() {
               <KpiCard
                 icon={CheckCircle2}
                 label="Total PDV finalizados"
-                value={String(pdvFinalizados)}
-                sub={`${concluidas} jornadas concluídas`}
-                tone="success"
-                subTone="muted"
+                value={semTipoPdv ? "—" : String(tr.pdvFinalizados)}
+                sub={
+                  semTipoPdv
+                    ? "nenhum tipo de treino marcado como PDV no cadastro"
+                    : `${tr.realizado} treinos realizados no período`
+                }
+                tone={semTipoPdv ? "default" : "success"}
+                subTone={semTipoPdv ? "warning" : "muted"}
               />
               <KpiCard
                 icon={GraduationCap}
                 label="% Realizado"
-                value={`${realizadoPct}%`}
-                sub={`${realizados.length} realiz. / ${previstos.length} prev.`}
-                tone={realizadoPct >= 80 ? "success" : realizadoPct >= 60 ? "warning" : "danger"}
+                value={`${tr.realizadoPct}%`}
+                sub={`${tr.realizado} realiz. / ${tr.validos} válidos`}
+                tone={tr.realizadoPct >= 80 ? "success" : tr.realizadoPct >= 60 ? "warning" : "danger"}
                 subTone="muted"
               />
               <KpiCard
                 icon={AlertTriangle}
                 label="1º No-show"
-                value={String(primeiroNoShow)}
-                sub={`${noShowRate}% no-show geral`}
-                tone={primeiroNoShow === 0 ? "success" : "warning"}
+                value={String(tr.primeiroNoShow)}
+                sub={`${tr.comFalta} ${tr.comFalta === 1 ? "sessão faltou" : "sessões faltaram"} ao menos 1x`}
+                tone={tr.primeiroNoShow === 0 ? "success" : "warning"}
                 subTone="muted"
               />
               <KpiCard
                 icon={RotateCcw}
                 label="% Retreinamento"
-                value={`${retreinosPct}%`}
-                sub={`${retreinos.length} de ${trainings.length} treinos`}
-                tone={retreinosPct < 15 ? "success" : retreinosPct < 30 ? "warning" : "danger"}
+                value={`${tr.retreinosPct}%`}
+                sub={`${tr.retreinos} de ${tr.validos} treinos`}
+                tone={tr.retreinosPct < 15 ? "success" : tr.retreinosPct < 30 ? "warning" : "danger"}
                 subTone="muted"
               />
             </div>
+            {semTipoPdv && (
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Para este indicador funcionar, marque "conta como PDV" no tipo de treino em{" "}
+                <Link to="/onboarding-implantacao/config" className="underline hover:text-foreground">
+                  Configuração · Implantação
+                </Link>
+                , aba "Tipos de treino".
+              </p>
+            )}
           </section>
 
 
@@ -438,24 +437,28 @@ export default function OnboardingDashboardPage() {
               <KpiCard
                 icon={AlertTriangle}
                 label="Taxa de no-show"
-                value={`${noShowRate}%`}
-                sub={`${noShows.length} de ${realizadosOuNoShow.length} • meta < 20%`}
-                tone={noShowRate < 20 ? "success" : noShowRate < 30 ? "warning" : "danger"}
-                subTone={noShowRate < 20 ? "success" : "danger"}
+                value={`${tr.noShowRate}%`}
+                sub={`${tr.noShow} de ${tr.realizado + tr.noShow} concluídos • meta < 20%`}
+                tone={tr.noShowRate < 20 ? "success" : tr.noShowRate < 30 ? "warning" : "danger"}
+                subTone={tr.noShowRate < 20 ? "success" : "danger"}
               />
               <KpiCard
                 icon={UserCheck}
                 label="Proprietário presente"
-                value={`${propRate}%`}
-                sub={`${propPresent.length} de ${realizados.length} • meta > 90%`}
-                tone={propRate >= 90 ? "success" : propRate >= 75 ? "warning" : "danger"}
-                subTone={propRate >= 90 ? "success" : "danger"}
+                value={tr.propPct == null ? "—" : `${tr.propPct}%`}
+                sub={
+                  tr.propPct == null
+                    ? `não informado em ${tr.realizado} ${tr.realizado === 1 ? "treino realizado" : "treinos realizados"}`
+                    : `${tr.propSim} de ${tr.propInformado} informados · ${tr.propInformado} de ${tr.realizado} preenchidos · meta > 90%`
+                }
+                tone={tr.propPct == null ? "default" : tr.propPct >= 90 ? "success" : tr.propPct >= 75 ? "warning" : "danger"}
+                subTone={tr.propPct == null ? "warning" : tr.propPct >= 90 ? "success" : "danger"}
               />
               <KpiCard
                 icon={GraduationCap}
                 label="Treinos realizados"
-                value={String(realizados.length)}
-                sub={`${trainings.length} agendados no total`}
+                value={String(tr.realizado)}
+                sub={`${tr.validos} válidos · ${tr.cancelado} cancelados`}
                 tone="info"
               />
             </div>
@@ -478,6 +481,7 @@ export default function OnboardingDashboardPage() {
                       <th className="px-3 py-2 font-medium text-right">Previstos</th>
                       <th className="px-3 py-2 font-medium text-right">Realizados</th>
                       <th className="px-3 py-2 font-medium text-right">No-show</th>
+                      <th className="px-3 py-2 font-medium text-right">Cancelados</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -489,6 +493,7 @@ export default function OnboardingDashboardPage() {
                         <td className={`px-3 py-2 text-right ${row.no_show > 0 ? "text-destructive font-medium" : ""}`}>
                           {row.no_show}
                         </td>
+                        <td className="px-3 py-2 text-right text-muted-foreground">{row.cancelados}</td>
                       </tr>
                     ))}
                   </tbody>
