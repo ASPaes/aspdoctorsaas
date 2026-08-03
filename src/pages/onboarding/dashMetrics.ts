@@ -75,3 +75,94 @@ export function contarSituacao(journeys: JourneyLite[]): ContagemSituacao {
     pctCanceladas: pct(canceladas, total),
   };
 }
+
+/* ---------- treinos ---------- */
+
+export type DesfechoTreino = "realizado" | "no_show" | "cancelado" | "em_aberto";
+
+/**
+ * O desfecho vem SÓ do `status`. A coluna `no_show` é uma flag pegajosa gravada por
+ * JourneyDetailSheet.tsx:1593 e nunca limpa — ela diz "faltou em algum momento", não
+ * "terminou em falta". Usá-la como desfecho fazia uma sessão realizada na 3ª tentativa
+ * ser contada como no-show e como realizada ao mesmo tempo.
+ */
+export function desfechoTreino(status: string | null): DesfechoTreino {
+  if (status === "realizado") return "realizado";
+  if (status === "no_show") return "no_show";
+  if (status === "cancelado") return "cancelado";
+  return "em_aberto"; // previsto, agendado, null
+}
+
+export interface TreinoLite {
+  status: string | null;
+  no_show: boolean | null;
+  is_retreinamento: boolean | null;
+  proprietario_presente: boolean | null;
+  conta_como_pdv: boolean | null;
+  tentativas: number | null;
+}
+
+export interface AgregadoTreinos {
+  realizado: number;
+  noShow: number;
+  cancelado: number;
+  emAberto: number;
+  /** tudo menos cancelado — denominador de todo percentual */
+  validos: number;
+  /** flag pegajosa: faltou ao menos uma vez, em qualquer desfecho, cancelado incluído */
+  comFalta: number;
+  primeiroNoShow: number;
+  noShowRate: number;
+  realizadoPct: number;
+  retreinos: number;
+  retreinosPct: number;
+  /** sessões realizadas com proprietario_presente preenchido (true OU false) */
+  propInformado: number;
+  propSim: number;
+  /** null quando ninguém informou — sem cobertura não existe percentual */
+  propPct: number | null;
+  pdvFinalizados: number;
+}
+
+export function agregarTreinos(treinos: TreinoLite[]): AgregadoTreinos {
+  let realizado = 0, noShow = 0, cancelado = 0, emAberto = 0;
+  let comFalta = 0, primeiroNoShow = 0, retreinos = 0;
+  let propInformado = 0, propSim = 0, pdvFinalizados = 0;
+
+  treinos.forEach((t) => {
+    const d = desfechoTreino(t.status);
+    if (d === "realizado") realizado++;
+    else if (d === "no_show") noShow++;
+    else if (d === "cancelado") cancelado++;
+    else emAberto++;
+
+    // A falta é contada mesmo em sessão cancelada: o cliente faltou de verdade.
+    if (t.no_show === true) {
+      comFalta++;
+      if ((t.tentativas ?? 0) <= 1) primeiroNoShow++;
+    }
+
+    if (d === "cancelado") return; // fora de todo o resto
+
+    if (t.is_retreinamento === true) retreinos++;
+    if (d === "realizado") {
+      if (t.proprietario_presente === true || t.proprietario_presente === false) {
+        propInformado++;
+        if (t.proprietario_presente === true) propSim++;
+      }
+      if (t.conta_como_pdv === true) pdvFinalizados++;
+    }
+  });
+
+  const validos = realizado + noShow + emAberto;
+  return {
+    realizado, noShow, cancelado, emAberto, validos, comFalta, primeiroNoShow,
+    noShowRate: pct(noShow, realizado + noShow),
+    realizadoPct: pct(realizado, validos),
+    retreinos,
+    retreinosPct: pct(retreinos, validos),
+    propInformado, propSim,
+    propPct: propInformado > 0 ? pct(propSim, propInformado) : null,
+    pdvFinalizados,
+  };
+}

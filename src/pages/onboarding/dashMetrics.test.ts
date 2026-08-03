@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { pct, separarJornadas, contarSituacao, type JourneyLite } from "./dashMetrics";
+import {
+  pct, separarJornadas, contarSituacao, desfechoTreino, agregarTreinos,
+  type JourneyLite, type TreinoLite,
+} from "./dashMetrics";
 
 /** Espelha a Digi Office em 02/08/2026: 22 em andamento, 15 não iniciadas, 8 canceladas, 4 concluídas. */
 function j(situacao: string, aberta_em: string | null, id = Math.random().toString()): JourneyLite {
@@ -82,5 +85,143 @@ describe("contarSituacao", () => {
     const c = contarSituacao([j("situacao_nova_do_futuro", "2026-07-01T12:00:00Z")]);
     expect(c.total).toBe(1);
     expect(c.emAberto).toBe(0);
+  });
+});
+
+function t(p: Partial<TreinoLite> = {}): TreinoLite {
+  return {
+    status: "realizado",
+    no_show: false,
+    is_retreinamento: false,
+    proprietario_presente: null,
+    conta_como_pdv: false,
+    tentativas: 0,
+    ...p,
+  };
+}
+
+describe("desfechoTreino", () => {
+  it("mapeia previsto e agendado para em_aberto", () => {
+    expect(desfechoTreino("previsto")).toBe("em_aberto");
+    expect(desfechoTreino("agendado")).toBe("em_aberto");
+  });
+
+  it("trata status nulo como em_aberto", () => {
+    expect(desfechoTreino(null)).toBe("em_aberto");
+  });
+
+  it("no_show é desfecho, vindo do status e não da flag", () => {
+    expect(desfechoTreino("no_show")).toBe("no_show");
+    expect(desfechoTreino("cancelado")).toBe("cancelado");
+    expect(desfechoTreino("realizado")).toBe("realizado");
+  });
+});
+
+describe("agregarTreinos", () => {
+  /**
+   * Gabarito medido em produção: Digi Office, julho/2026, já sem jornada cancelada.
+   * 11 sessões — 9 realizadas, 0 com desfecho no-show, 1 cancelada, 1 em aberto.
+   * 2 delas carregam a flag pegajosa (uma realizada na 3ª tentativa, uma reagendada).
+   */
+  const julhoDigiOffice: TreinoLite[] = [
+    ...Array.from({ length: 7 }, () => t()),
+    t({ proprietario_presente: true }),
+    t({ no_show: true, tentativas: 3, proprietario_presente: true }), // realizada na 3ª
+    t({ status: "cancelado" }),
+    t({ status: "agendado", no_show: true, tentativas: 4 }), // reagendada, ainda em pé
+  ];
+
+  it("reproduz os desfechos da Digi Office", () => {
+    const a = agregarTreinos(julhoDigiOffice);
+    expect(a.realizado).toBe(9);
+    expect(a.noShow).toBe(0);
+    expect(a.cancelado).toBe(1);
+    expect(a.emAberto).toBe(1);
+    expect(a.validos).toBe(10);
+  });
+
+  it("a taxa de no-show usa o desfecho, não a flag pegajosa", () => {
+    // Hoje a tela mostra 33,3% somando sessões que seguiram adiante. O real é 0.
+    expect(agregarTreinos(julhoDigiOffice).noShowRate).toBe(0);
+  });
+
+  it("conta separado quem faltou ao menos uma vez", () => {
+    expect(agregarTreinos(julhoDigiOffice).comFalta).toBe(2);
+  });
+
+  it("uma sessão realizada com a flag não conta como falta e como realizada ao mesmo tempo", () => {
+    const a = agregarTreinos([t({ no_show: true, tentativas: 3 })]);
+    expect(a.realizado).toBe(1);
+    expect(a.noShow).toBe(0);
+    expect(a.comFalta).toBe(1);
+    expect(a.noShowRate).toBe(0);
+  });
+
+  it("cancelado fica fora dos percentuais mas continua contado", () => {
+    const a = agregarTreinos([t(), t({ status: "cancelado" }), t({ status: "cancelado" })]);
+    expect(a.cancelado).toBe(2);
+    expect(a.validos).toBe(1);
+    expect(a.realizadoPct).toBe(100);
+  });
+
+  it("treino cancelado que teve falta conta como falta e como cancelado", () => {
+    const a = agregarTreinos([t({ status: "cancelado", no_show: true, tentativas: 2 })]);
+    expect(a.cancelado).toBe(1);
+    expect(a.comFalta).toBe(1);
+    expect(a.validos).toBe(0);
+  });
+
+  it("% realizado da Digi Office é 90, com o cancelado fora", () => {
+    expect(agregarTreinos(julhoDigiOffice).realizadoPct).toBe(90);
+  });
+
+  it("retreinamento divide pelos válidos, não por tudo", () => {
+    const a = agregarTreinos([t({ is_retreinamento: true }), t(), t({ status: "cancelado" })]);
+    expect(a.retreinos).toBe(1);
+    expect(a.retreinosPct).toBe(50);
+  });
+
+  it("proprietário presente divide só pelos informados", () => {
+    const a = agregarTreinos(julhoDigiOffice);
+    expect(a.propInformado).toBe(2);
+    expect(a.propSim).toBe(2);
+    expect(a.propPct).toBe(100);
+  });
+
+  it("proprietário presente devolve null quando ninguém informou", () => {
+    // NULL é "não informado", não "ausente" — sem cobertura não existe percentual.
+    const a = agregarTreinos([t(), t()]);
+    expect(a.propInformado).toBe(0);
+    expect(a.propPct).toBeNull();
+  });
+
+  it("conta o 'não' informado como cobertura, não como ausência de dado", () => {
+    const a = agregarTreinos([t({ proprietario_presente: false }), t({ proprietario_presente: true })]);
+    expect(a.propInformado).toBe(2);
+    expect(a.propPct).toBe(50);
+  });
+
+  it("primeiro no-show é quem faltou já na 1ª tentativa", () => {
+    const a = agregarTreinos([
+      t({ status: "no_show", no_show: true, tentativas: 1 }),
+      t({ no_show: true, tentativas: 3 }),
+    ]);
+    expect(a.primeiroNoShow).toBe(1);
+  });
+
+  it("PDV conta só sessão realizada com o tipo marcado", () => {
+    const a = agregarTreinos([
+      t({ conta_como_pdv: true }),
+      t({ status: "agendado", conta_como_pdv: true }),
+      t({ status: "cancelado", conta_como_pdv: true }),
+    ]);
+    expect(a.pdvFinalizados).toBe(1);
+  });
+
+  it("não quebra com lista vazia", () => {
+    const a = agregarTreinos([]);
+    expect(a.validos).toBe(0);
+    expect(a.noShowRate).toBe(0);
+    expect(a.propPct).toBeNull();
   });
 });
