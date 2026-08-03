@@ -16,10 +16,14 @@ import {
 
 import { startOfMonth, endOfMonth } from "date-fns";
 import OnboardingSlaOverview from "./OnboardingSlaOverview";
+import SituacaoAgoraBand from "./SituacaoAgoraBand";
+import KpiCard from "./KpiCard";
+import { pct, separarJornadas, contarSituacao, agregarTreinos, desfechoTreino } from "./dashMetrics";
 
 interface JourneyRow {
   journey_id: string;
   situacao: string | null;
+  aberta_em: string | null;
   fase_atual: string | null;
   etapa_semaforo: "verde" | "amarelo" | "vermelho" | "sem_sla" | null;
   sla_util_min: number | null;
@@ -51,11 +55,6 @@ interface TrainingRow {
 }
 
 
-function pct(num: number, den: number): number {
-  if (!den) return 0;
-  return Math.round((num / den) * 1000) / 10;
-}
-
 function formatMin(min: number | null | undefined): string {
   if (min == null || min <= 0) return "0m";
   if (min < 60) return `${Math.round(min)}m`;
@@ -65,38 +64,6 @@ function formatMin(min: number | null | undefined): string {
   const d = Math.floor(h / 24);
   const rh = h % 24;
   return rh ? `${d}d ${rh}h` : `${d}d`;
-}
-
-function KpiCard({
-  icon: Icon, label, value, sub, tone = "default", subTone,
-}: {
-  icon: any; label: string; value: string; sub?: string;
-  tone?: "default" | "success" | "warning" | "danger" | "info";
-  subTone?: "success" | "warning" | "danger" | "muted";
-}) {
-  const toneClass: Record<string, string> = {
-    default: "text-foreground",
-    success: "text-[hsl(142_71%_45%)]",
-    warning: "text-[hsl(38_92%_50%)]",
-    danger: "text-destructive",
-    info: "text-[hsl(199_89%_48%)]",
-  };
-  const subToneClass: Record<string, string> = {
-    success: "text-[hsl(142_71%_45%)]",
-    warning: "text-[hsl(38_92%_50%)]",
-    danger: "text-destructive",
-    muted: "text-muted-foreground",
-  };
-  return (
-    <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-1.5">
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">{label}</span>
-        <Icon className={`h-4 w-4 ${toneClass[tone]}`} />
-      </div>
-      <div className={`text-2xl font-semibold ${toneClass[tone]}`}>{value}</div>
-      {sub && <div className={`text-[11px] ${subToneClass[subTone ?? "muted"]}`}>{sub}</div>}
-    </div>
-  );
 }
 
 export default function OnboardingDashboardPage() {
@@ -115,7 +82,7 @@ export default function OnboardingDashboardPage() {
     queryFn: async () => {
       const rows = await fetchAllRows<JourneyRow>(() => {
         let q = (supabase.from("vw_onboarding_journeys" as any) as any)
-          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, concluido_em, demand_type_nome, setor_nome, sla_total_corrido_min, sla_total_pausado_min, sla_total_util_min")
+          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, concluido_em, aberta_em, demand_type_nome, setor_nome, sla_total_corrido_min, sla_total_pausado_min, sla_total_util_min")
           .eq("tenant_id", effectiveTenantId);
         if (selectedUnidadeIds.length > 0) q = q.in("cliente_unidade_id", selectedUnidadeIds);
         return q;
@@ -150,9 +117,22 @@ export default function OnboardingDashboardPage() {
     },
   });
 
+  const journeys = useMemo(() => journeysQ.data ?? [], [journeysQ.data]);
+
+  /** Canceladas ficam fora de tudo. Só a faixa "Situação agora" usa `journeys` inteiro. */
+  const { ativas, periodo } = useMemo(
+    () => separarJornadas(journeys, dateRange),
+    [journeys, dateRange],
+  );
+
+  const contagem = useMemo(() => contarSituacao(journeys), [journeys]);
+
+  /** Allowlist de treinos/pausas/retornos: SEM canceladas, mas SEM recorte por
+   *  abertura — esses três já filtram pela data do próprio evento. Usar `periodo`
+   *  aqui sumiria com um treino de agosto numa jornada aberta em junho. */
   const allowedJourneyIds = useMemo(
-    () => new Set((journeysQ.data ?? []).map((j) => j.journey_id)),
-    [journeysQ.data]
+    () => new Set(ativas.map((j) => j.journey_id)),
+    [ativas]
   );
 
   const pausesByReasonAgg = useMemo(() => {
@@ -301,11 +281,7 @@ export default function OnboardingDashboardPage() {
     },
   });
 
-  const journeys = journeysQ.data ?? [];
   const names = namesQ.data ?? {};
-
-  // KPIs jornadas
-  const concluidas = journeys.filter((j) => j.situacao === "concluido").length;
 
   // KPIs treinos
   const realizadosOuNoShow = trainings.filter((t) => t.status === "realizado" || t.no_show === true);
@@ -388,8 +364,10 @@ export default function OnboardingDashboardPage() {
         </div>
       ) : (
         <div className="p-4 space-y-5">
+          <SituacaoAgoraBand contagem={contagem} />
+
           {/* SLA — visão corrido vs. efetivo (total, pipeline, etapa, área) */}
-          <OnboardingSlaOverview journeys={journeys} tenantId={effectiveTenantId} />
+          <OnboardingSlaOverview journeys={periodo} tenantId={effectiveTenantId} />
 
           {/* KPI Row 1b: PDV + previsto/realizado */}
           <section>
@@ -399,7 +377,7 @@ export default function OnboardingDashboardPage() {
                 icon={CheckCircle2}
                 label="Total PDV finalizados"
                 value={String(pdvFinalizados)}
-                sub={`${concluidas} jornadas concluídas`}
+                sub={`${realizados.length} treinos realizados no período`}
                 tone="success"
                 subTone="muted"
               />
