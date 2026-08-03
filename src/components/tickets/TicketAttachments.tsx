@@ -7,10 +7,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Paperclip, Upload, Trash2, Download, Loader2, FileText, Image, Film, Music, File, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useUserNames } from "@/hooks/useUserNames";
 
 interface Props {
   ticketId: string;
   tenantId: string;
+  /** "onboarding" liga título, busca, autoria e log na Timeline. Suporte usa o padrão. */
+  variant?: "ticket" | "onboarding";
 }
 
 const MAX_UPLOAD_MB = 50;
@@ -73,7 +76,8 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / 1048576).toFixed(1)}MB`;
 }
 
-function TicketAttachments({ ticketId, tenantId }: Props) {
+function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
+  const isOnboarding = variant === "onboarding";
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -129,17 +133,22 @@ function TicketAttachments({ ticketId, tenantId }: Props) {
     enabled: !!ticketId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_ticket_attachments" as any) as any)
-        .select("id, file_name, file_path, file_size, file_type, uploaded_by, created_at")
+        .select("id, file_name, file_path, file_size, file_type, uploaded_by, created_at, title")
         .eq("ticket_id", ticketId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Array<{
         id: string; file_name: string; file_path: string;
         file_size: number | null; file_type: string | null;
-        uploaded_by: string; created_at: string;
+        uploaded_by: string; created_at: string; title: string | null;
       }>;
     },
   });
+
+  // Só o onboarding exibe autoria — no Suporte a consulta nem sai.
+  const autorIds = isOnboarding ? attachments.map((a) => a.uploaded_by) : [];
+  const { data: nomes = {} } = useUserNames(autorIds);
+  const autorDe = (att: { uploaded_by: string }) => nomes[att.uploaded_by] ?? "Usuário";
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -293,25 +302,40 @@ function TicketAttachments({ ticketId, tenantId }: Props) {
                 {fileIcon(att.file_type)}
               </div>
               <div className="flex-1 min-w-0">
-                <button
-                  className="text-sm font-medium truncate text-left hover:text-primary transition-colors w-full"
-                  title={att.file_name}
-                  onClick={() => {
-                    if (isPreviewable(att.file_type)) {
-                      handlePreview(att);
-                    } else {
-                      handleDownload(att);
-                    }
-                  }}
-                >
-                  {att.file_name}
-                </button>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[11px] text-muted-foreground">
-                    {formatSize(att.file_size)}
-                    {att.created_at && ` · ${new Date(att.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`}
-                  </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <button
+                    className="text-sm font-medium truncate text-left hover:text-primary transition-colors min-w-0"
+                    title={att.title || att.file_name}
+                    onClick={() => {
+                      if (isPreviewable(att.file_type)) {
+                        handlePreview(att);
+                      } else {
+                        handleDownload(att);
+                      }
+                    }}
+                  >
+                    {isOnboarding && att.title ? att.title : att.file_name}
+                  </button>
+                  {isOnboarding && !att.title && (
+                    <span className="shrink-0 text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                      sem título
+                    </span>
+                  )}
                 </div>
+                <div className="text-[11px] text-muted-foreground truncate mt-0.5">
+                  {isOnboarding && att.title && <span className="mr-1">{att.file_name} ·</span>}
+                  {formatSize(att.file_size)}
+                  {!isOnboarding && att.created_at &&
+                    ` · ${new Date(att.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`}
+                </div>
+                {isOnboarding && (
+                  <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                    {autorDe(att)} ·{" "}
+                    {new Date(att.created_at).toLocaleString("pt-BR", {
+                      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+                    })}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-0.5 flex-shrink-0">
                 {isPreviewable(att.file_type) && (

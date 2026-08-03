@@ -2834,6 +2834,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           <TicketAttachments
                             ticketId={journey.ticket_id}
                             tenantId={tenantId!}
+                            variant="onboarding"
                           />
                         </div>
                       )}
