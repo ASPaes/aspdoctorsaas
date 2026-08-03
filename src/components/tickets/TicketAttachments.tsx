@@ -176,6 +176,32 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
     if (error) throw error;
   };
 
+  /**
+   * Log na Timeline da jornada. Best-effort de propósito: se o insert falhar, o anexo
+   * já subiu (ou já foi excluído) e nada deve ser desfeito por causa do registro — é a
+   * mesma garantia dos outros eventos de onboarding.
+   */
+  const logTimeline = async (
+    eventType: "onboarding_anexo_adicionado" | "onboarding_anexo_removido",
+    att: { title?: string | null; file_name: string }
+  ) => {
+    if (!isOnboarding || !user?.id) return;
+    const titulo = att.title?.trim();
+    const content = titulo ? `${titulo} (${att.file_name})` : att.file_name;
+    try {
+      await (supabase.from("support_ticket_events" as any) as any).insert({
+        tenant_id: tenantId,
+        ticket_id: ticketId,
+        user_id: user.id,
+        event_type: eventType,
+        content,
+      });
+      queryClient.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+    } catch (err) {
+      console.warn("[anexos] evento não registrado na timeline", err);
+    }
+  };
+
   const enviarArquivos = async (itens: Array<{ file: File; title: string }>) => {
     setUploading(true);
     let count = 0;
@@ -200,6 +226,7 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
           try { await saveTitle(id, title); }
           catch { toast.error(`Anexo "${file.name}" subiu, mas o título não foi salvo`); }
         }
+        await logTimeline("onboarding_anexo_adicionado", { title, file_name: file.name });
       }
       if (count > 0) toast.success(`${count} arquivo(s) anexado(s)`);
     } catch (err: any) {
@@ -275,6 +302,7 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
       if (error) throw new Error(await efErrorMessage(error));
       if (data?.error) throw new Error(data.error);
       toast.success("Anexo excluído");
+      await logTimeline("onboarding_anexo_removido", att);
       refetch();
     } catch (err: any) {
       toast.error("Erro ao excluir: " + (err.message ?? ""));

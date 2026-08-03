@@ -21,15 +21,22 @@ const ANEXOS = [
 
 let umAnexoSo = false;
 
-// Lista de anexos e mapa de nomes: o mock roteia por tabela.
+const eventoInsert = vi.fn();
+const invokeDelete = vi.fn(() => Promise.resolve({ data: { success: true }, error: null }));
+
+// Lista de anexos, mapa de nomes e eventos: o mock roteia por tabela.
 vi.mock("@/integrations/supabase/client", () => {
   const anexosChain: any = {
     select: () => anexosChain,
     eq: () => anexosChain,
     order: () => Promise.resolve({ data: umAnexoSo ? [ANEXOS[0]] : ANEXOS, error: null }),
+    update: () => ({ eq: () => Promise.resolve({ error: null }) }),
   };
   const from = (tabela: string) => {
     if (tabela === "support_ticket_attachments") return anexosChain;
+    if (tabela === "support_ticket_events") {
+      return { insert: (linha: any) => { eventoInsert(linha); return Promise.resolve({ error: null }); } };
+    }
     return {
       select: () => ({
         in: (_c: string, _ids: any[]) =>
@@ -40,7 +47,11 @@ vi.mock("@/integrations/supabase/client", () => {
     };
   };
   return {
-    supabase: { from, auth: { getSession: () => Promise.resolve({ data: { session: null } }) }, functions: { invoke: vi.fn() } },
+    supabase: {
+      from,
+      auth: { getSession: () => Promise.resolve({ data: { session: { access_token: "tk" } } }) },
+      functions: { invoke: (...a: any[]) => invokeDelete(...(a as [])) },
+    },
   };
 });
 
@@ -70,6 +81,8 @@ async function render(variant?: "ticket" | "onboarding") {
 beforeEach(() => {
   auth.profile = { role: "user", is_super_admin: false };
   umAnexoSo = false;
+  eventoInsert.mockReset();
+  invokeDelete.mockClear();
   document.body.innerHTML = "";
 });
 
@@ -176,5 +189,36 @@ describe("TicketAttachments — edição de título", () => {
     auth.profile = { role: "admin", is_super_admin: true };
     await render();
     expect(lapis()).toHaveLength(0);
+  });
+});
+
+describe("TicketAttachments — Timeline", () => {
+  it("registra a exclusão com título e arquivo", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    await render("onboarding");
+    const excluir = [...document.querySelectorAll('button[title="Excluir"]')] as HTMLButtonElement[];
+    await act(async () => { excluir[0].click(); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    expect(eventoInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenant_id: "t1",
+        ticket_id: "tk1",
+        user_id: "u1",
+        event_type: "onboarding_anexo_removido",
+        content: "Contrato assinado (contrato_assinado.pdf)",
+      })
+    );
+  });
+
+  it("no Suporte a exclusão não gera evento", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    auth.profile = { role: "admin", is_super_admin: true };
+    await render();
+    const excluir = [...document.querySelectorAll('button[title="Excluir"]')] as HTMLButtonElement[];
+    await act(async () => { excluir[0].click(); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    expect(eventoInsert).not.toHaveBeenCalled();
   });
 });

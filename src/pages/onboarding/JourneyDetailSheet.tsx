@@ -21,7 +21,7 @@ import { TicketAttachments } from "@/components/tickets/TicketAttachments";
 import {
   Loader2, Clock, Pause, Play, ChevronRight, Calendar, CheckCircle2,
   Circle, AlertCircle, MessageSquare, GraduationCap, User, ArrowRight,
-  UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle, Ban, Building2,
+  UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle, Ban, Building2, Paperclip,
   ExternalLink, Link2,
   Sparkles, Rocket, StickyNote, Undo2, XCircle, Tag,
   Check, ChevronDown, Pencil, GitCommitHorizontal, MessageSquareText,
@@ -164,6 +164,8 @@ const TL_META: Record<string, { label: string; Icon: any; tone: TLTone }> = {
   onboarding_fase_implantacao: { label: "Implantação iniciada", Icon: Rocket, tone: "violet" },
   onboarding_treino_criado: { label: "Treinamento agendado", Icon: GraduationCap, tone: "violet" },
   onboarding_participante: { label: "Participante alterado", Icon: UserPlus, tone: "sky" },
+  onboarding_anexo_adicionado: { label: "Anexo adicionado", Icon: Paperclip, tone: "emerald" },
+  onboarding_anexo_removido: { label: "Anexo excluído", Icon: Paperclip, tone: "red" },
   onboarding_pausado: { label: "Onboarding pausado", Icon: Pause, tone: "amber" },
   onboarding_retomado: { label: "Onboarding retomado", Icon: Play, tone: "emerald" },
   onboarding_retorno_vendedor: { label: "Retorno ao vendedor", Icon: Undo2, tone: "amber" },
