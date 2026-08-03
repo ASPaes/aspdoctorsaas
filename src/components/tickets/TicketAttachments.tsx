@@ -355,7 +355,8 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar por título, arquivo ou extensão (ex: pdf)"
-            className="h-8 pl-8 pr-8 text-xs"
+            // O "x" nativo do type=search apareceria junto com o nosso botão de limpar.
+            className="h-8 pl-8 pr-8 text-xs [&::-webkit-search-cancel-button]:appearance-none"
           />
           {busca && (
             <button
