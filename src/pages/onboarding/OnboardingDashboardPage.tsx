@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -103,6 +104,25 @@ export default function OnboardingDashboardPage() {
       return rows;
     },
   });
+
+  /** O card de PDV mostra 0 quando NENHUM tipo de treino tem a flag marcada — o que é
+   *  cadastro em branco, não resultado. Esta query distingue os dois casos. */
+  const temTipoPdvQ = useQuery({
+    queryKey: ["onboarding-dash-tem-tipo-pdv", effectiveTenantId],
+    enabled: canAccess && !!effectiveTenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_training_types" as any) as any)
+        .select("id")
+        .eq("tenant_id", effectiveTenantId)
+        .eq("conta_como_pdv", true)
+        .limit(1);
+      if (error) throw error;
+      return ((data ?? []) as unknown[]).length > 0;
+    },
+  });
+
+  /** Só afirma "falta marcar" quando a query confirmou. Enquanto carrega, mostra o número. */
+  const semTipoPdv = temTipoPdvQ.data === false;
 
   const pausesAllQ = useQuery({
     queryKey: ["onboarding-dash-pauses-by-reason", effectiveTenantId],
@@ -364,10 +384,14 @@ export default function OnboardingDashboardPage() {
               <KpiCard
                 icon={CheckCircle2}
                 label="Total PDV finalizados"
-                value={String(tr.pdvFinalizados)}
-                sub={`${tr.realizado} treinos realizados no período`}
-                tone="success"
-                subTone="muted"
+                value={semTipoPdv ? "—" : String(tr.pdvFinalizados)}
+                sub={
+                  semTipoPdv
+                    ? "nenhum tipo de treino marcado como PDV no cadastro"
+                    : `${tr.realizado} treinos realizados no período`
+                }
+                tone={semTipoPdv ? "default" : "success"}
+                subTone={semTipoPdv ? "warning" : "muted"}
               />
               <KpiCard
                 icon={GraduationCap}
@@ -394,6 +418,15 @@ export default function OnboardingDashboardPage() {
                 subTone="muted"
               />
             </div>
+            {semTipoPdv && (
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Para este indicador funcionar, marque "conta como PDV" no tipo de treino em{" "}
+                <Link to="/onboarding-implantacao/config" className="underline hover:text-foreground">
+                  Configuração · Implantação
+                </Link>
+                , aba "Tipos de treino".
+              </p>
+            )}
           </section>
 
 
