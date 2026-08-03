@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { processInboundMessage } from '../_shared/message-processor.ts';
 import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets } from '../_shared/message-types.ts';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
+import { applyDeliveryStatus } from '../_shared/apply-delivery-status.ts';
 
 const LOG = '[zapi-webhook]';
 
@@ -160,8 +161,22 @@ async function processZapiWebhook(req: Request): Promise<void> {
     const messageId = payload?.messageId || payload?.id;
     const status = payload?.status;
     if (messageId && status) {
-      const statusMap: Record<string, string> = { SENT: 'sent', DELIVERED: 'delivered', READ: 'read', FAILED: 'failed', sent: 'sent', delivered: 'delivered', read: 'read', failed: 'failed' };
-      await supabase.from('whatsapp_messages').update({ status: statusMap[status] || status.toLowerCase() }).eq('message_id', messageId).eq('tenant_id', instance.tenant_id);
+      // Escada única, igual aos outros dois provedores. Ver _shared/delivery-status.ts.
+      const r = await applyDeliveryStatus(supabase, {
+        tenantId: instance.tenant_id,
+        messageId,
+        providerStatus: String(status),
+      });
+      if (r.confirmedFailureCandidate) {
+        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/verify-failed-deliveries`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({ tenantId: instance.tenant_id, messageId }),
+        }).catch((e) => console.error(`${LOG} verify dispatch falhou:`, e?.message));
+      }
     }
     return;
   }

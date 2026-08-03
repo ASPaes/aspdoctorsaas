@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { processInboundMessage } from '../_shared/message-processor.ts';
 import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets, UNSUPPORTED_MESSAGE_LABEL } from '../_shared/message-types.ts';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
+import { applyDeliveryStatus } from '../_shared/apply-delivery-status.ts';
 import { normalizeBRPhone, phoneSearchVariants } from '../_shared/phone.ts';
 
 const corsHeaders = {
@@ -843,11 +844,6 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
     const resolved = await resolveInstanceTenant(supabase, payload.instance);
     if (!resolved) return;
 
-    const statusMap: Record<string, string> = {
-      ERROR: 'error', PENDING: 'pending', SERVER_ACK: 'sent',
-      DELIVERY_ACK: 'delivered', READ: 'read', PLAYED: 'read',
-    };
-
     for (const update of updates) {
       const messageId = update?.key?.id ?? update?.keyId ?? update?.messageId;
       const statusRaw = update?.update?.status ?? update?.status;
@@ -856,9 +852,28 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
         console.log(`[processMessageUpdate] SKIP — messageId=${messageId} statusRaw=${statusRaw}`);
         continue;
       }
-      const mappedStatus = statusMap[statusRaw] || statusRaw.toLowerCase();
-      await supabase.from('whatsapp_messages').update({ status: mappedStatus })
-        .eq('tenant_id', resolved.tenantId).eq('message_id', messageId);
+
+      // A escada decide o que grava. Antes daqui saía um update cru, e era assim que o
+      // ERROR de UM aparelho (ou de 1 participante de grupo) apagava o DELIVERY_ACK dos
+      // outros. Ver _shared/delivery-status.ts.
+      const r = await applyDeliveryStatus(supabase, {
+        tenantId: resolved.tenantId,
+        messageId,
+        providerStatus: String(statusRaw),
+      });
+
+      if (r.confirmedFailureCandidate) {
+        // Caminho rápido: a verificação de 20s começa agora. Fire-and-forget, mesmo padrão
+        // da chamada a ai-admin-commands mais abaixo — o webhook não pode esperar.
+        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/verify-failed-deliveries`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({ tenantId: resolved.tenantId, messageId }),
+        }).catch((e) => console.error(`${LOG} verify dispatch falhou:`, e?.message));
+      }
     }
   } catch (err) { console.error(`${LOG} Error in processMessageUpdate:`, err); }
 }
