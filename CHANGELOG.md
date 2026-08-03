@@ -12,6 +12,12 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Agosto / 2026
 
+### 03/08
+
+- 🆕 **Integração OMIE** — O sistema passa a **avisar quando um cancelamento não chega ao OMIE**. Quando um contrato é cancelado no DoctorSaaS mas a baixa não é aplicada no OMIE — por vínculo travado ou erro —, chega um aviso na hora, no sino e no WhatsApp, com link direto para o cliente. Antes isso passava despercebido e o contrato ficava ativo no OMIE sem ninguém notar. O aviso **fecha sozinho** quando aquele contrato volta a sincronizar.
+- 🆕 **Integração OMIE** — Aviso de **vínculo ambíguo**. Quando um contrato ativo tem mais de um candidato no OMIE e ninguém escolheu qual é o certo na Conferência, o sistema lembra todo dia útil de manhã — porque é justamente esse vínculo em aberto que faz um cancelamento se perder. O aviso some quando a pendência é resolvida.
+- 🆕 **Configurações / Integração OMIE** — Em **Padrões OMIE**, agora dá para cadastrar os **números de WhatsApp** que recebem os avisos da integração. Cada empresa define os seus, e esses números recebem além dos usuários já inscritos no sistema.
+
 ### 02/08
 
 - 🆕 **Onboarding / Treinamentos** — O treinamento passa a registrar **quem participou e quem faltou**. Cada sessão tem sua lista de participantes com **nome, tipo** (colaborador, responsável da empresa ou outro), **fone e e-mail**, e no dia marca-se **presente ou faltou** pessoa por pessoa. Ao adicionar alguém, o campo de nome busca nos **contatos do cliente** e preenche telefone e e-mail sozinho; quem é digitado na hora pode ser salvo no cadastro do cliente com um clique — ou não, se for gente de passagem. O botão **Realizado** só fecha o treinamento com a chamada respondida: sem lista ou com alguém em branco, ele abre a lista em vez de fechar. Fechar arrastando o cartão no quadro continua funcionando, mas o cartão fica marcado como **chamada pendente** até alguém responder.
