@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import SituacaoAgoraBand from "./SituacaoAgoraBand";
-import { contarSituacao, type JourneyLite } from "./dashMetrics";
+import { contarSituacao } from "./dashMetrics";
+
+/** A faixa só conta situação — não precisa da jornada inteira. */
+type JourneyLite = { journey_id: string; situacao: string };
 
 /**
  * Sem @testing-library/react: o peer @testing-library/dom não está instalado no
@@ -11,7 +14,7 @@ import { contarSituacao, type JourneyLite } from "./dashMetrics";
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 function j(situacao: string, id: string): JourneyLite {
-  return { journey_id: id, situacao, aberta_em: "2026-07-10T12:00:00Z" };
+  return { journey_id: id, situacao };
 }
 
 const digiOffice: JourneyLite[] = [

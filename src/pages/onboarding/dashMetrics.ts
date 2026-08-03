@@ -17,6 +17,7 @@ export interface JourneyLite {
   journey_id: string;
   situacao: string | null;
   aberta_em: string | null;
+  concluido_em: string | null;
 }
 
 export interface ContagemSituacao {
@@ -40,6 +41,19 @@ function fimDoDia(to: Date): number {
   return to.getTime() + 24 * 60 * 60 * 1000 - 1;
 }
 
+/**
+ * `periodo` = jornadas que estavam VIVAS em algum momento do intervalo, não as que
+ * nasceram dentro dele.
+ *
+ * Recortar por data de abertura responde "das que começaram em julho, quantas
+ * cumpriram o prazo" — uma coorte retrospectiva. Não é o que o dashboard precisa:
+ * jornada aberta em julho e ainda rodando tem SLA correndo AGORA e sumia da tela na
+ * virada do mês. Com 37 das 41 jornadas ativas da Digi Office nessa situação, o SLA
+ * abria zerado em agosto.
+ *
+ * A regra é a sobreposição de intervalos: abriu antes do fim da janela E não tinha
+ * sido concluída antes do começo dela.
+ */
 export function separarJornadas<T extends JourneyLite>(
   journeys: T[],
   range: { from: Date; to: Date },
@@ -49,13 +63,15 @@ export function separarJornadas<T extends JourneyLite>(
   const ate = fimDoDia(range.to);
   const periodo = ativas.filter((j) => {
     if (!j.aberta_em) return false;
-    const t = new Date(j.aberta_em).getTime();
-    return t >= de && t <= ate;
+    if (new Date(j.aberta_em).getTime() > ate) return false;
+    if (!j.concluido_em) return true; // ainda aberta: o SLA corre agora
+    return new Date(j.concluido_em).getTime() >= de;
   });
   return { ativas, periodo };
 }
 
-export function contarSituacao(journeys: JourneyLite[]): ContagemSituacao {
+/** Só depende de `situacao` — não exige a jornada inteira. */
+export function contarSituacao(journeys: Array<{ situacao: string | null }>): ContagemSituacao {
   let naoIniciadas = 0, emAndamento = 0, paradas = 0, concluidas = 0, canceladas = 0;
   journeys.forEach((j) => {
     switch (j.situacao) {

@@ -5,8 +5,13 @@ import {
 } from "./dashMetrics";
 
 /** Espelha a Digi Office em 02/08/2026: 22 em andamento, 15 não iniciadas, 8 canceladas, 4 concluídas. */
-function j(situacao: string, aberta_em: string | null, id = Math.random().toString()): JourneyLite {
-  return { journey_id: id, situacao, aberta_em };
+function j(
+  situacao: string,
+  aberta_em: string | null,
+  id = Math.random().toString(),
+  concluido_em: string | null = null,
+): JourneyLite {
+  return { journey_id: id, situacao, aberta_em, concluido_em };
 }
 
 const JULHO = { from: new Date("2026-07-01T00:00:00"), to: new Date("2026-07-31T00:00:00") };
@@ -16,7 +21,7 @@ const digiOffice: JourneyLite[] = [
   ...Array.from({ length: 22 }, (_, i) => j("em_andamento", "2026-07-10T12:00:00Z", `a${i}`)),
   ...Array.from({ length: 15 }, (_, i) => j("nao_iniciado", "2026-07-12T12:00:00Z", `b${i}`)),
   ...Array.from({ length: 8 }, (_, i) => j("cancelado", "2026-07-14T12:00:00Z", `c${i}`)),
-  ...Array.from({ length: 4 }, (_, i) => j("concluido", "2026-07-20T12:00:00Z", `d${i}`)),
+  ...Array.from({ length: 4 }, (_, i) => j("concluido", "2026-07-20T12:00:00Z", `d${i}`, "2026-07-25T12:00:00Z")),
 ];
 
 describe("pct", () => {
@@ -34,20 +39,37 @@ describe("separarJornadas", () => {
     expect(separarJornadas(digiOffice, JULHO).ativas.length).toBe(41);
   });
 
-  it("recorta 'periodo' por data de abertura, já sem as canceladas", () => {
+  it("pega todas as jornadas que estavam vivas no intervalo", () => {
     expect(separarJornadas(digiOffice, JULHO).periodo.length).toBe(41);
   });
 
-  it("devolve periodo vazio quando nenhuma jornada foi aberta no intervalo", () => {
-    // Todas as 49 foram abertas em julho; o dash abre em agosto.
-    expect(separarJornadas(digiOffice, AGOSTO).periodo.length).toBe(0);
-    // ...mas 'ativas' não depende do período e continua inteiro.
-    expect(separarJornadas(digiOffice, AGOSTO).ativas.length).toBe(41);
+  it("jornada aberta antes do intervalo e AINDA rodando continua no período", () => {
+    // O caso que motivou a regra: 37 jornadas abertas em julho seguem em aberto,
+    // com SLA correndo agora. Recortar por data de abertura zerava a tela em agosto.
+    const r = separarJornadas(digiOffice, AGOSTO);
+    expect(r.periodo.length).toBe(37);
+    expect(r.ativas.length).toBe(41);
+  });
+
+  it("jornada concluída antes do início do intervalo fica de fora", () => {
+    // As 4 concluídas em 25/07 não têm mais SLA em disputa em agosto.
+    const ids = separarJornadas(digiOffice, AGOSTO).periodo.map((x) => x.journey_id);
+    expect(ids.some((id) => id.startsWith("d"))).toBe(false);
+  });
+
+  it("jornada aberta depois do fim do intervalo fica de fora", () => {
+    const futura = [j("em_andamento", "2026-09-10T12:00:00Z")];
+    expect(separarJornadas(futura, AGOSTO).periodo.length).toBe(0);
   });
 
   it("inclui o último dia inteiro do intervalo, não só a meia-noite", () => {
     const tarde = [j("em_andamento", "2026-07-31T23:30:00Z")];
     expect(separarJornadas(tarde, JULHO).periodo.length).toBe(1);
+  });
+
+  it("uma jornada que atravessa o intervalo inteiro entra", () => {
+    const atravessa = [j("em_andamento", "2026-05-01T12:00:00Z")];
+    expect(separarJornadas(atravessa, JULHO).periodo.length).toBe(1);
   });
 
   it("descarta jornada sem data de abertura do recorte de período", () => {
