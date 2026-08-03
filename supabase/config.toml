@@ -114,4 +114,12 @@ verify_jwt = true
 [functions.delete-ticket-attachment]
 verify_jwt = true
 
+# Validam o JWT no proprio corpo (auth.getUser); em prod ja estao com verify_jwt=false.
+# Sem estas entradas o deploy-all do workflow assumiria o default true e derrubaria o Conselho DS.
+[functions.conselho-ds-analyze]
+verify_jwt = false
+
+[functions.conselho-ds-suggest-foco]
+verify_jwt = false
+
 
