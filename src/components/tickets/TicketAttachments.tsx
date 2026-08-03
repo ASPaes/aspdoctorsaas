@@ -447,32 +447,34 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
                     </Button>
                   </div>
                 ) : (
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <button
-                    className="text-sm font-medium truncate text-left hover:text-primary transition-colors min-w-0"
-                    title={att.title || att.file_name}
-                    onClick={() => {
-                      if (isPreviewable(att.file_type)) {
-                        handlePreview(att);
-                      } else {
-                        handleDownload(att);
-                      }
-                    }}
-                  >
-                    {isOnboarding && att.title ? att.title : att.file_name}
-                  </button>
+                <button
+                  className="text-sm font-medium truncate text-left hover:text-primary transition-colors w-full"
+                  title={att.title || att.file_name}
+                  onClick={() => {
+                    if (isPreviewable(att.file_type)) {
+                      handlePreview(att);
+                    } else {
+                      handleDownload(att);
+                    }
+                  }}
+                >
+                  {isOnboarding && att.title ? att.title : att.file_name}
+                </button>
+                )}
+                {/* O nome do arquivo nunca some: com título ele vem aqui, sem título ele já é
+                    a linha de cima e o selo desce para não espremer o nome. */}
+                <div className="flex items-center gap-1.5 min-w-0 mt-0.5">
                   {isOnboarding && !att.title && (
                     <span className="shrink-0 text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25">
                       sem título
                     </span>
                   )}
-                </div>
-                )}
-                <div className="text-[11px] text-muted-foreground truncate mt-0.5">
-                  {isOnboarding && att.title && <span className="mr-1">{att.file_name} ·</span>}
-                  {formatSize(att.file_size)}
-                  {!isOnboarding && att.created_at &&
-                    ` · ${new Date(att.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`}
+                  <span className="text-[11px] text-muted-foreground truncate min-w-0">
+                    {isOnboarding && att.title && <>{att.file_name} · </>}
+                    {formatSize(att.file_size)}
+                    {!isOnboarding && att.created_at &&
+                      ` · ${new Date(att.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`}
+                  </span>
                 </div>
                 {isOnboarding && (
                   <div className="text-[11px] text-muted-foreground mt-0.5 truncate">

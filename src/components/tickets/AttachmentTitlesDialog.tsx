@@ -11,7 +11,10 @@ interface Props {
   onConfirm: (itens: Array<{ file: File; title: string }>) => void;
 }
 
-/** Nome sem a extensão — vira sugestão (placeholder), nunca valor preenchido. */
+/**
+ * Nome sem a extensão — vira o título sugerido. O arquivo NUNCA é renomeado: file_name
+ * continua igual no banco e no Storage; título é só um rótulo por cima.
+ */
 function semExtensao(nome: string): string {
   const i = nome.lastIndexOf(".");
   return i > 0 ? nome.slice(0, i) : nome;
@@ -38,8 +41,9 @@ function icone(type: string) {
 export function AttachmentTitlesDialog({ open, files, onCancel, onConfirm }: Props) {
   const [titulos, setTitulos] = useState<string[]>([]);
 
-  // Nova seleção zera os campos — reabrir não pode herdar o que foi digitado antes.
-  useEffect(() => { setTitulos(files.map(() => "")); }, [files]);
+  // Nasce com o nome do arquivo: a pessoa ajusta se quiser, e ninguém fica sem título por
+  // esquecimento. Nova seleção reinicia — reabrir não pode herdar o que foi digitado antes.
+  useEffect(() => { setTitulos(files.map((f) => semExtensao(f.name))); }, [files]);
 
   const confirmar = () =>
     onConfirm(files.map((file, i) => ({ file, title: (titulos[i] ?? "").trim() })));
@@ -71,7 +75,7 @@ export function AttachmentTitlesDialog({ open, files, onCancel, onConfirm }: Pro
                   novos[i] = e.target.value;
                   setTitulos(novos);
                 }}
-                placeholder={semExtensao(f.name)}
+                placeholder="Título do anexo"
                 className="h-8 text-xs"
                 aria-label={`Título de ${f.name}`}
               />
@@ -80,7 +84,7 @@ export function AttachmentTitlesDialog({ open, files, onCancel, onConfirm }: Pro
         </div>
 
         <p className="text-[11px] text-muted-foreground">
-          O título é opcional e pode ser preenchido depois. Ele ajuda a achar o anexo na busca.
+          O título é só um rótulo para achar o anexo na busca — o nome do arquivo não muda.
         </p>
 
         <DialogFooter>

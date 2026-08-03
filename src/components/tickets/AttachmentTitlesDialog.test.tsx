@@ -44,31 +44,28 @@ function camposDeTitulo(): HTMLInputElement[] {
 beforeEach(() => { document.body.innerHTML = ""; });
 
 describe("AttachmentTitlesDialog", () => {
-  it("um campo por arquivo, com o nome sem extensão no placeholder", () => {
+  it("um campo por arquivo, já preenchido com o nome do arquivo sem extensão", () => {
     render();
     const campos = camposDeTitulo();
     expect(campos).toHaveLength(2);
-    expect(campos[0].placeholder).toBe("contrato_assinado");
-    expect(campos[1].placeholder).toBe("print_erro");
+    expect(campos[0].value).toBe("contrato_assinado");
+    expect(campos[1].value).toBe("print_erro");
   });
 
-  it("começa vazio — o título é opcional, não pré-preenchido", () => {
-    render();
-    expect(camposDeTitulo().every((c) => c.value === "")).toBe(true);
-  });
-
-  it("envia os títulos digitados junto dos arquivos", async () => {
+  it("envia o título editado e mantém o sugerido no outro arquivo", async () => {
     const { onConfirm } = render();
     await digitar(camposDeTitulo()[0], "Contrato assinado");
     await act(async () => { botao("Enviar").click(); });
     expect(onConfirm).toHaveBeenCalledWith([
       { file: arquivos[0], title: "Contrato assinado" },
-      { file: arquivos[1], title: "" },
+      { file: arquivos[1], title: "print_erro" },
     ]);
   });
 
-  it("permite enviar tudo sem título", async () => {
+  it("apagar o campo envia sem título — continua opcional", async () => {
     const { onConfirm } = render();
+    await digitar(camposDeTitulo()[0], "");
+    await digitar(camposDeTitulo()[1], "   ");
     await act(async () => { botao("Enviar").click(); });
     expect(onConfirm).toHaveBeenCalledWith([
       { file: arquivos[0], title: "" },
