@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Paperclip, Upload, Trash2, Download, Loader2, FileText, Image, Film, Music, File, Eye, Search, X as XIcon } from "lucide-react";
+import { Paperclip, Upload, Trash2, Download, Loader2, FileText, Image, Film, Music, File, Eye, Search, X as XIcon, Pencil, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { filterAttachments } from "@/lib/attachmentSearch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -89,6 +89,9 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
   const [previewName, setPreviewName] = useState<string>("");
   const [busca, setBusca] = useState("");
   const [pendentes, setPendentes] = useState<File[] | null>(null);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [editandoValor, setEditandoValor] = useState("");
+  const [salvandoTitulo, setSalvandoTitulo] = useState(false);
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
 
@@ -97,6 +100,10 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
   const canDeleteAny =
     profile?.is_super_admin === true || profile?.role === "admin" || profile?.role === "head";
   const canDelete = (att: { uploaded_by: string }) => canDeleteAny || att.uploaded_by === user?.id;
+
+  // Mesma regra do excluir, de propósito: duas permissões diferentes na mesma lista
+  // seriam duas explicações para o operador. É trava de tela — o RLS libera por tenant.
+  const canEditTitle = (att: { uploaded_by: string }) => isOnboarding && canDelete(att);
 
   const handlePreview = async (att: any) => {
     try {
@@ -202,6 +209,20 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
       setUploading(false);
       // Pode ter subido parte dos arquivos antes de falhar.
       if (count > 0) refetch();
+    }
+  };
+
+  const confirmarEdicao = async (att: { id: string; file_name: string }) => {
+    setSalvandoTitulo(true);
+    try {
+      await saveTitle(att.id, editandoValor);
+      setEditandoId(null);
+      setEditandoValor("");
+      refetch();
+    } catch (err: any) {
+      toast.error("Erro ao salvar título: " + (err.message ?? ""));
+    } finally {
+      setSalvandoTitulo(false);
     }
   };
 
@@ -371,6 +392,32 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
                 {fileIcon(att.file_type)}
               </div>
               <div className="flex-1 min-w-0">
+                {editandoId === att.id ? (
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Input
+                      autoFocus
+                      value={editandoValor}
+                      onChange={(e) => setEditandoValor(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") confirmarEdicao(att);
+                        if (e.key === "Escape") { setEditandoId(null); setEditandoValor(""); }
+                      }}
+                      placeholder="Título do anexo"
+                      className="h-7 text-xs"
+                      aria-label={`Título de ${att.file_name}`}
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => confirmarEdicao(att)}
+                      disabled={salvandoTitulo}
+                      title="Salvar título"
+                    >
+                      {salvandoTitulo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                ) : (
                 <div className="flex items-center gap-1.5 min-w-0">
                   <button
                     className="text-sm font-medium truncate text-left hover:text-primary transition-colors min-w-0"
@@ -391,6 +438,7 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
                     </span>
                   )}
                 </div>
+                )}
                 <div className="text-[11px] text-muted-foreground truncate mt-0.5">
                   {isOnboarding && att.title && <span className="mr-1">{att.file_name} ·</span>}
                   {formatSize(att.file_size)}
@@ -407,6 +455,17 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
                 )}
               </div>
               <div className="flex items-center gap-0.5 flex-shrink-0">
+                {canEditTitle(att) && editandoId !== att.id && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => { setEditandoId(att.id); setEditandoValor(att.title ?? ""); }}
+                    title="Editar título"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                )}
                 {isPreviewable(att.file_type) && (
                   <Button
                     variant="ghost"

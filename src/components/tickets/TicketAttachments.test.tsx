@@ -154,3 +154,27 @@ describe("TicketAttachments — busca", () => {
     expect(document.querySelector('input[type="search"]')).toBeNull();
   });
 });
+
+function lapis(): HTMLButtonElement[] {
+  return [...document.querySelectorAll('button[title="Editar título"]')] as HTMLButtonElement[];
+}
+
+describe("TicketAttachments — edição de título", () => {
+  it("operador comum só edita o que ele mesmo subiu", async () => {
+    // auth.user.id = "u1"; a1 é de u1, a2 é de u2.
+    await render("onboarding");
+    expect(lapis()).toHaveLength(1);
+  });
+
+  it("head edita qualquer anexo", async () => {
+    auth.profile = { role: "head", is_super_admin: false };
+    await render("onboarding");
+    expect(lapis()).toHaveLength(2);
+  });
+
+  it("não há lápis no Suporte", async () => {
+    auth.profile = { role: "admin", is_super_admin: true };
+    await render();
+    expect(lapis()).toHaveLength(0);
+  });
+});
