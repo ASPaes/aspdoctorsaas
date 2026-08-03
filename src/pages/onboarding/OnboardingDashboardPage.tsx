@@ -283,25 +283,8 @@ export default function OnboardingDashboardPage() {
 
   const names = namesQ.data ?? {};
 
-  // KPIs treinos
-  const realizadosOuNoShow = trainings.filter((t) => t.status === "realizado" || t.no_show === true);
-  const noShows = trainings.filter((t) => t.no_show === true);
-  const noShowRate = pct(noShows.length, realizadosOuNoShow.length);
-  const realizados = trainings.filter((t) => t.status === "realizado");
-  const propPresent = realizados.filter((t) => t.proprietario_presente === true);
-  const propRate = pct(propPresent.length, realizados.length);
-  const retreinos = trainings.filter((t) => t.is_retreinamento === true);
-  const retreinosPct = pct(retreinos.length, trainings.length);
-
-  // Previstos/Agendados vs Realizados
-  const previstos = trainings.filter((t) => t.status === "previsto" || t.status === "agendado");
-  const realizadoPct = pct(realizados.length, previstos.length + realizados.length);
-
-  // PDV finalizados: treinos realizados com conta_como_pdv=true
-  const pdvFinalizados = realizados.filter((t) => t.conta_como_pdv === true).length;
-
-  // Primeiro no-show: treinos com no_show=true e tentativas <= 1
-  const primeiroNoShow = trainings.filter((t) => t.no_show === true && (t.tentativas ?? 0) <= 1).length;
+  // KPIs treinos — desfecho vem do status; a flag no_show é pegajosa e vira número à parte.
+  const tr = useMemo(() => agregarTreinos(trainings), [trainings]);
 
   // Tabela por implantador
   const byImplantador = useMemo(() => {
@@ -309,9 +292,11 @@ export default function OnboardingDashboardPage() {
     trainings.forEach((t) => {
       const id = t.conduzido_por || "__sem__";
       if (!m[id]) m[id] = { total: 0, realizado: 0, no_show: 0, retreino: 0 };
+      const d = desfechoTreino(t.status);
+      if (d === "cancelado") return; // cancelado não é performance de ninguém
       m[id].total += 1;
-      if (t.status === "realizado") m[id].realizado += 1;
-      if (t.no_show) m[id].no_show += 1;
+      if (d === "realizado") m[id].realizado += 1;
+      if (d === "no_show") m[id].no_show += 1;
       if (t.is_retreinamento) m[id].retreino += 1;
     });
     return Object.entries(m)
@@ -326,14 +311,17 @@ export default function OnboardingDashboardPage() {
 
   // Tabela por tipo de treino
   const byTipo = useMemo(() => {
-    const m: Record<string, { nome: string; previstos: number; realizados: number; no_show: number }> = {};
+    const m: Record<string, { nome: string; previstos: number; realizados: number; no_show: number; cancelados: number }> = {};
     trainings.forEach((t) => {
       const key = t.training_type_id || "__sem__";
       const nome = t.tipo_nome || "Sem tipo";
-      if (!m[key]) m[key] = { nome, previstos: 0, realizados: 0, no_show: 0 };
-      if (t.status === "previsto" || t.status === "agendado") m[key].previstos += 1;
-      if (t.status === "realizado") m[key].realizados += 1;
-      if (t.no_show) m[key].no_show += 1;
+      if (!m[key]) m[key] = { nome, previstos: 0, realizados: 0, no_show: 0, cancelados: 0 };
+      switch (desfechoTreino(t.status)) {
+        case "em_aberto": m[key].previstos += 1; break;
+        case "realizado": m[key].realizados += 1; break;
+        case "no_show": m[key].no_show += 1; break;
+        case "cancelado": m[key].cancelados += 1; break;
+      }
     });
     return Object.values(m).sort((a, b) => (b.realizados + b.previstos) - (a.realizados + a.previstos));
   }, [trainings]);
@@ -376,33 +364,33 @@ export default function OnboardingDashboardPage() {
               <KpiCard
                 icon={CheckCircle2}
                 label="Total PDV finalizados"
-                value={String(pdvFinalizados)}
-                sub={`${realizados.length} treinos realizados no período`}
+                value={String(tr.pdvFinalizados)}
+                sub={`${tr.realizado} treinos realizados no período`}
                 tone="success"
                 subTone="muted"
               />
               <KpiCard
                 icon={GraduationCap}
                 label="% Realizado"
-                value={`${realizadoPct}%`}
-                sub={`${realizados.length} realiz. / ${previstos.length} prev.`}
-                tone={realizadoPct >= 80 ? "success" : realizadoPct >= 60 ? "warning" : "danger"}
+                value={`${tr.realizadoPct}%`}
+                sub={`${tr.realizado} realiz. / ${tr.validos} válidos`}
+                tone={tr.realizadoPct >= 80 ? "success" : tr.realizadoPct >= 60 ? "warning" : "danger"}
                 subTone="muted"
               />
               <KpiCard
                 icon={AlertTriangle}
                 label="1º No-show"
-                value={String(primeiroNoShow)}
-                sub={`${noShowRate}% no-show geral`}
-                tone={primeiroNoShow === 0 ? "success" : "warning"}
+                value={String(tr.primeiroNoShow)}
+                sub={`${tr.comFalta} ${tr.comFalta === 1 ? "sessão faltou" : "sessões faltaram"} ao menos 1x`}
+                tone={tr.primeiroNoShow === 0 ? "success" : "warning"}
                 subTone="muted"
               />
               <KpiCard
                 icon={RotateCcw}
                 label="% Retreinamento"
-                value={`${retreinosPct}%`}
-                sub={`${retreinos.length} de ${trainings.length} treinos`}
-                tone={retreinosPct < 15 ? "success" : retreinosPct < 30 ? "warning" : "danger"}
+                value={`${tr.retreinosPct}%`}
+                sub={`${tr.retreinos} de ${tr.validos} treinos`}
+                tone={tr.retreinosPct < 15 ? "success" : tr.retreinosPct < 30 ? "warning" : "danger"}
                 subTone="muted"
               />
             </div>
@@ -416,24 +404,28 @@ export default function OnboardingDashboardPage() {
               <KpiCard
                 icon={AlertTriangle}
                 label="Taxa de no-show"
-                value={`${noShowRate}%`}
-                sub={`${noShows.length} de ${realizadosOuNoShow.length} • meta < 20%`}
-                tone={noShowRate < 20 ? "success" : noShowRate < 30 ? "warning" : "danger"}
-                subTone={noShowRate < 20 ? "success" : "danger"}
+                value={`${tr.noShowRate}%`}
+                sub={`${tr.noShow} de ${tr.realizado + tr.noShow} concluídos • meta < 20%`}
+                tone={tr.noShowRate < 20 ? "success" : tr.noShowRate < 30 ? "warning" : "danger"}
+                subTone={tr.noShowRate < 20 ? "success" : "danger"}
               />
               <KpiCard
                 icon={UserCheck}
                 label="Proprietário presente"
-                value={`${propRate}%`}
-                sub={`${propPresent.length} de ${realizados.length} • meta > 90%`}
-                tone={propRate >= 90 ? "success" : propRate >= 75 ? "warning" : "danger"}
-                subTone={propRate >= 90 ? "success" : "danger"}
+                value={tr.propPct == null ? "—" : `${tr.propPct}%`}
+                sub={
+                  tr.propPct == null
+                    ? `não informado em ${tr.realizado} ${tr.realizado === 1 ? "treino realizado" : "treinos realizados"}`
+                    : `${tr.propSim} de ${tr.propInformado} informados · ${tr.propInformado} de ${tr.realizado} preenchidos · meta > 90%`
+                }
+                tone={tr.propPct == null ? "default" : tr.propPct >= 90 ? "success" : tr.propPct >= 75 ? "warning" : "danger"}
+                subTone={tr.propPct == null ? "warning" : tr.propPct >= 90 ? "success" : "danger"}
               />
               <KpiCard
                 icon={GraduationCap}
                 label="Treinos realizados"
-                value={String(realizados.length)}
-                sub={`${trainings.length} agendados no total`}
+                value={String(tr.realizado)}
+                sub={`${tr.validos} válidos · ${tr.cancelado} cancelados`}
                 tone="info"
               />
             </div>
@@ -456,6 +448,7 @@ export default function OnboardingDashboardPage() {
                       <th className="px-3 py-2 font-medium text-right">Previstos</th>
                       <th className="px-3 py-2 font-medium text-right">Realizados</th>
                       <th className="px-3 py-2 font-medium text-right">No-show</th>
+                      <th className="px-3 py-2 font-medium text-right">Cancelados</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -467,6 +460,7 @@ export default function OnboardingDashboardPage() {
                         <td className={`px-3 py-2 text-right ${row.no_show > 0 ? "text-destructive font-medium" : ""}`}>
                           {row.no_show}
                         </td>
+                        <td className="px-3 py-2 text-right text-muted-foreground">{row.cancelados}</td>
                       </tr>
                     ))}
                   </tbody>
