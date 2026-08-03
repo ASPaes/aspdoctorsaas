@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Paperclip, Upload, Trash2, Download, Loader2, FileText, Image, Film, Music, File, Eye } from "lucide-react";
+import { Paperclip, Upload, Trash2, Download, Loader2, FileText, Image, Film, Music, File, Eye, Search, X as XIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { filterAttachments } from "@/lib/attachmentSearch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useUserNames } from "@/hooks/useUserNames";
 
@@ -84,6 +86,7 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewType, setPreviewType] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState<string>("");
+  const [busca, setBusca] = useState("");
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
 
@@ -149,6 +152,11 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
   const autorIds = isOnboarding ? attachments.map((a) => a.uploaded_by) : [];
   const { data: nomes = {} } = useUserNames(autorIds);
   const autorDe = (att: { uploaded_by: string }) => nomes[att.uploaded_by] ?? "Usuário";
+
+  // Busca só existe no onboarding, e só aparece quando há o que procurar.
+  const mostrarBusca = isOnboarding && attachments.length >= 2;
+  const visiveis = mostrarBusca ? filterAttachments(attachments, busca) : attachments;
+  const filtrando = mostrarBusca && busca.trim().length > 0;
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -239,7 +247,7 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
           <span className="text-sm font-medium">Anexos</span>
           {attachments.length > 0 && (
             <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
-              {attachments.length}
+              {filtrando ? `${visiveis.length} de ${attachments.length}` : attachments.length}
             </Badge>
           )}
         </div>
@@ -267,6 +275,29 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
         </label>
       </div>
 
+      {mostrarBusca && (
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            type="search"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por título, arquivo ou extensão (ex: pdf)"
+            className="h-8 pl-8 pr-8 text-xs"
+          />
+          {busca && (
+            <button
+              type="button"
+              onClick={() => setBusca("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              title="Limpar busca"
+            >
+              <XIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
       {progress && (
         <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 space-y-1.5">
           <div className="flex items-center justify-between gap-2">
@@ -291,9 +322,24 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
         </p>
       )}
 
-      {attachments.length > 0 && (
+      {filtrando && visiveis.length === 0 && (
+        <div className="rounded-lg border border-dashed border-border/60 px-3 py-4 text-center">
+          <p className="text-[11px] text-muted-foreground">
+            Nenhum anexo corresponde a "{busca.trim()}".
+          </p>
+          <button
+            type="button"
+            onClick={() => setBusca("")}
+            className="text-[11px] text-primary hover:underline mt-1"
+          >
+            Limpar busca
+          </button>
+        </div>
+      )}
+
+      {visiveis.length > 0 && (
         <div className="space-y-2">
-          {attachments.map((att) => (
+          {visiveis.map((att) => (
             <div
               key={att.id}
               className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 group"

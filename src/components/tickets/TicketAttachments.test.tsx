@@ -101,3 +101,56 @@ describe("TicketAttachments — suporte (variant padrão)", () => {
     expect(host.textContent).toContain("contrato_assinado.pdf");
   });
 });
+
+function inputBusca(): HTMLInputElement {
+  const el = document.querySelector('input[type="search"]');
+  if (!el) throw new Error("campo de busca não encontrado");
+  return el as HTMLInputElement;
+}
+
+async function digitar(el: HTMLInputElement, valor: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+  await act(async () => {
+    setter.call(el, valor);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+describe("TicketAttachments — busca", () => {
+  it("filtra pelo título", async () => {
+    const host = await render("onboarding");
+    await digitar(inputBusca(), "contrato");
+    expect(host.textContent).toContain("contrato_assinado.pdf");
+    expect(host.textContent).not.toContain("WhatsApp Image");
+  });
+
+  it("filtra pela extensão", async () => {
+    const host = await render("onboarding");
+    await digitar(inputBusca(), "jpeg");
+    expect(host.textContent).toContain("WhatsApp Image");
+    expect(host.textContent).not.toContain("contrato_assinado.pdf");
+  });
+
+  it("mostra o contador enquanto filtra", async () => {
+    const host = await render("onboarding");
+    await digitar(inputBusca(), "contrato");
+    expect(host.textContent).toContain("1 de 2");
+  });
+
+  it("avisa quando nada corresponde", async () => {
+    const host = await render("onboarding");
+    await digitar(inputBusca(), "boleto");
+    expect(host.textContent).toContain("Nenhum anexo corresponde");
+  });
+
+  it("não mostra busca no Suporte", async () => {
+    await render();
+    expect(document.querySelector('input[type="search"]')).toBeNull();
+  });
+
+  it("não mostra busca com um anexo só", async () => {
+    umAnexoSo = true;
+    await render("onboarding");
+    expect(document.querySelector('input[type="search"]')).toBeNull();
+  });
+});
