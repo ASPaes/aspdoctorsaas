@@ -2,7 +2,7 @@ import { useMemo, useState, type DragEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Clock, GraduationCap, Rocket, RotateCcw, Search, Ticket, UserX } from "lucide-react";
+import { CheckCircle2, CircleAlert, Clock, GraduationCap, Rocket, RotateCcw, Search, Ticket, Users, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { formatTrainingDateTime, isTrainingUrgent, readableOn } from "./OnboardingPage";
 
@@ -40,6 +40,10 @@ export interface TrainingCardRow {
   /** Cancelado já dentro da Implantação. Cancelado antes disso nem chega aqui:
    *  para a Implantação aquele treinamento nunca existiu. */
   cancelado_na_implantacao: boolean | null;
+  participantes_total: number | null;
+  participantes_presentes: number | null;
+  /** Treino sem lista de participantes ou com presença em aberto. */
+  chamada_pendente: boolean | null;
 }
 
 /** Jornada que já está na Implantação mas ainda não tem nenhum treinamento.
@@ -281,7 +285,15 @@ export default function ImplantacaoBoard({
         );
         return;
       }
-      toast.success(res?.realizado ? "Treinamento concluído" : "Etapa atualizada");
+      // Arrastar avisa, mas não impede: o cartão anda e fica com o selo de chamada
+      // pendente até alguém abrir a jornada e marcar quem participou.
+      if (res?.chamada_pendente) {
+        toast.warning("Treinamento fechado sem a chamada", {
+          description: "Abra a jornada e marque quem participou.",
+        });
+      } else {
+        toast.success(res?.realizado ? "Treinamento concluído" : "Etapa atualizada");
+      }
       invalidar();
     } catch (e: any) {
       toast.error(e.message || "Erro ao mover o treinamento");
@@ -606,6 +618,21 @@ export default function ImplantacaoBoard({
                             )}
                             {t.is_retreinamento && (
                               <span className="inline-flex items-center gap-1 text-[hsl(262_83%_58%)]">retreinamento</span>
+                            )}
+                            {(t.participantes_total ?? 0) > 0 && (
+                              <span className="inline-flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {t.participantes_total} · {t.participantes_presentes ?? 0} presente
+                                {(t.participantes_presentes ?? 0) === 1 ? "" : "s"}
+                              </span>
+                            )}
+                            {/* Fechou pelo quadro sem a chamada: o aviso mora no cartão.
+                                Jornada encerrada não recebe o selo — não há o que cobrar. */}
+                            {feito && t.chamada_pendente
+                              && t.journey_situacao !== "concluido" && t.journey_situacao !== "cancelado" && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-medium text-[hsl(38_92%_50%)] bg-[hsl(38_92%_50%)]/10">
+                                <CircleAlert className="h-3 w-3" /> chamada pendente
+                              </span>
                             )}
                           </div>
                         </div>

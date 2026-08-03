@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 import EditTrainingDialog, { type EditableTraining } from "./EditTrainingDialog";
+import TrainingParticipantsDialog, { type TrainingForParticipants } from "./TrainingParticipantsDialog";
 import { EditJourneyInfoDialog } from "./EditJourneyInfoDialog";
 import { JourneyRuler } from "./JourneyRuler";
 import { useOnboardingParticipantRoles } from "@/hooks/useOnboardingParticipantRoles";
@@ -383,6 +384,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [creatingTag, setCreatingTag] = useState(false);
   const [secOpen, setSecOpen] = useState<Record<string, boolean>>({ treinos: true, modulos: true, anexos: true, atendimentos: true });
   const [editTraining, setEditTraining] = useState<EditableTraining | null>(null);
+  const [participantsTraining, setParticipantsTraining] = useState<TrainingForParticipants | null>(null);
+  const [participantsMode, setParticipantsMode] = useState<"lista" | "chamada">("lista");
   const toggleSec = (k: string) => setSecOpen((s) => ({ ...s, [k]: !s[k] }));
   // Colapso por grupo do checklist da etapa (default: aberto).
   const [checklistCollapsed, setChecklistCollapsed] = useState<Record<string, boolean>>({});
@@ -656,7 +659,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journeyId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_training_sessions" as any) as any)
-        .select("id, titulo, status, agendado_para, realizado_em, tentativas, no_show, proprietario_presente, is_retreinamento, conduzido_por, ticket_id, link_agendamento, training_type_id, ticket:ticket_id(ticket_code, sub_seq)")
+        .select("id, titulo, status, agendado_para, realizado_em, tentativas, no_show, proprietario_presente, is_retreinamento, conduzido_por, ticket_id, link_agendamento, training_type_id, ticket:ticket_id(ticket_code, sub_seq), participantes:onboarding_training_participants(id, presente)")
         .eq("journey_id", journeyId)
         .is("deleted_at", null)
         .order("agendado_para", { ascending: true, nullsFirst: false });
@@ -1583,9 +1586,28 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     }
   }
 
-  async function handleMarkRealized(id: string) {
+  /** Não fecha treino sem a chamada respondida: a RPC barra e a gente abre a lista. */
+  async function handleMarkRealized(t: any) {
     try {
-      await updateTraining(id, { status: "realizado", realizado_em: new Date().toISOString() });
+      const { data, error } = await (supabase.rpc as any)("mark_onboarding_training_realized", {
+        p_training_id: t.id,
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res?.ok === false) {
+        if (res.reason === "sem_participantes" || res.reason === "presenca_pendente") {
+          toast.info(res.reason === "sem_participantes"
+            ? "Cadastre quem participou antes de fechar o treino."
+            : `Falta marcar a presença de ${res.pendentes} participante(s).`);
+          abrirParticipantes(t, "chamada");
+          return;
+        }
+        toast.error("Este treinamento não pode ser marcado como realizado.");
+        return;
+      }
+      qc.invalidateQueries({ queryKey: ["onboarding-training", journeyId] });
+      qc.invalidateQueries({ queryKey: ["onboarding-board-trainings"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-training-cards"] });
       toast.success("Treino marcado como realizado");
     } catch (e: any) { toast.error(e.message || "Erro"); }
   }
@@ -1611,10 +1633,15 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     } catch (e: any) { toast.error(e.message || "Erro"); }
   }
 
-  async function handleTogglePresente(id: string, current: boolean) {
-    try {
-      await updateTraining(id, { proprietario_presente: !current });
-    } catch (e: any) { toast.error(e.message || "Erro"); }
+  /** "Proprietário presente" saiu do card: agora é derivado da lista de participantes. */
+  function abrirParticipantes(t: any, modo: "lista" | "chamada") {
+    setParticipantsTraining({
+      id: t.id,
+      titulo: t.titulo,
+      ticket_code: t.ticket?.ticket_code ?? null,
+      status: t.status,
+    });
+    setParticipantsMode(modo);
   }
 
   async function handleCancelTraining(id: string) {
@@ -2266,6 +2293,10 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                               const conductorName = t.conduzido_por ? memberNameMap.get(t.conduzido_por) : null;
                               const isDone = t.status === "realizado";
                               const isCancelled = t.status === "cancelado";
+                              const parts: Array<{ presente: boolean | null }> = t.participantes ?? [];
+                              const partTotal = parts.length;
+                              const partPresentes = parts.filter((p) => p.presente === true).length;
+                              const partPendentes = parts.filter((p) => p.presente === null).length;
                               return (
                                 <div key={t.id} className="rounded-md border border-border p-2.5">
                                   {t.ticket?.ticket_code && (
@@ -2287,6 +2318,17 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                     {t.agendado_para && <span>Agendado: {formatDateTime(t.agendado_para)}</span>}
                                     {t.realizado_em && <span>Realizado: {formatDateTime(t.realizado_em)}</span>}
                                     {conductorName && <span>Por: {conductorName}</span>}
+                                    <button
+                                      type="button"
+                                      className="inline-flex items-center gap-1 hover:text-foreground hover:underline"
+                                      onClick={() => abrirParticipantes(t, "lista")}
+                                      title="Ver e editar os participantes do treino"
+                                    >
+                                      <Users className="h-2.5 w-2.5" />
+                                      {partTotal === 0
+                                        ? "Sem participantes"
+                                        : `${partTotal} ${partTotal === 1 ? "participante" : "participantes"} · ${partPresentes} presente${partPresentes === 1 ? "" : "s"}`}
+                                    </button>
                                   </div>
                                   <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                                     {(t.tentativas ?? 0) > 0 && (
@@ -2302,6 +2344,21 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                       <Badge variant="outline" className="text-[9px] border-[hsl(142_71%_45%)] text-[hsl(142_71%_45%)]">
                                         proprietário presente
                                       </Badge>
+                                    )}
+                                    {/* Treino fechado pelo quadro sem a chamada: o aviso fica no cartão,
+                                        não some junto com o toast. Jornada encerrada não recebe o selo —
+                                        cobrar chamada de treino do passado é só ruído. */}
+                                    {isDone && (partTotal === 0 || partPendentes > 0)
+                                      && journey?.situacao !== "concluido" && journey?.situacao !== "cancelado" && (
+                                      <button
+                                        type="button"
+                                        onClick={() => abrirParticipantes(t, "chamada")}
+                                        title="Marcar quem participou"
+                                      >
+                                        <Badge variant="outline" className="text-[9px] border-[hsl(38_92%_50%)] text-[hsl(38_92%_50%)] hover:bg-[hsl(38_92%_50%)]/10">
+                                          chamada pendente
+                                        </Badge>
+                                      </button>
                                     )}
                                   </div>
                                   {t.link_agendamento && (
@@ -2331,10 +2388,15 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                         })}>
                                         <Pencil className="h-3 w-3 mr-1" /> Editar
                                       </Button>
+                                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
+                                        onClick={() => abrirParticipantes(t, "lista")}>
+                                        <Users className="h-3 w-3 mr-1" /> Participantes
+                                        {partTotal > 0 && <span className="ml-1 opacity-70">({partTotal})</span>}
+                                      </Button>
                                       {!isDone && (
                                         <>
                                           <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
-                                            onClick={() => handleMarkRealized(t.id)}>
+                                            onClick={() => handleMarkRealized(t)}>
                                             <CheckCircle2 className="h-3 w-3 mr-1" /> Realizado
                                           </Button>
                                           <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
@@ -2396,12 +2458,6 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                           </Button>
                                         </PopoverContent>
                                       </Popover>
-                                      {isDone && (
-                                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
-                                          onClick={() => handleTogglePresente(t.id, !!t.proprietario_presente)}>
-                                          {t.proprietario_presente ? "Marcar ausente" : "Proprietário presente"}
-                                        </Button>
-                                      )}
                                       <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-muted-foreground"
                                         onClick={() => handleCancelTraining(t.id)}>
                                         Cancelar
@@ -3452,6 +3508,19 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         qc.invalidateQueries({ queryKey: ["onboarding-board-trainings"] });
         qc.invalidateQueries({ queryKey: ["onboarding-participants"] });
         qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+      }}
+    />
+
+    <TrainingParticipantsDialog
+      open={!!participantsTraining}
+      onOpenChange={(v) => { if (!v) setParticipantsTraining(null); }}
+      training={participantsTraining}
+      clienteId={journey?.cliente_id ?? null}
+      mode={participantsMode}
+      onSaved={() => {
+        qc.invalidateQueries({ queryKey: ["onboarding-training", journeyId] });
+        qc.invalidateQueries({ queryKey: ["onboarding-training-cards"] });
+        qc.invalidateQueries({ queryKey: ["onboarding-board-trainings"] });
       }}
     />
     </>
