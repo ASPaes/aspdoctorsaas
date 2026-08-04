@@ -105,6 +105,35 @@ function extrairMensagemErro(corpo: any): string {
   return msg;
 }
 
+// Extrai o array de candidatos de um cnpj_ambiguo_no_omie, procurando nos
+// mesmos lugares onde extrairMensagemErro busca o detalhe da resposta.
+function extrairCandidatos(corpo: any): any[] {
+  if (corpo == null) return [];
+
+  let detalhe: any = null;
+  if (corpo?.cliente_resultado && typeof corpo.cliente_resultado === "object") {
+    detalhe = corpo.cliente_resultado;
+  } else if (corpo?.contrato?.resultado && typeof corpo.contrato.resultado === "object") {
+    detalhe = corpo.contrato.resultado;
+  } else if (corpo?.detalhe && typeof corpo.detalhe === "object") {
+    detalhe = corpo.detalhe;
+  } else if (
+    corpo?.cliente_resultado?.resultado &&
+    typeof corpo.cliente_resultado.resultado === "object"
+  ) {
+    detalhe = corpo.cliente_resultado.resultado;
+  }
+
+  const candidatos =
+    Array.isArray(corpo?.candidatos) && corpo.candidatos.length > 0
+      ? corpo.candidatos
+      : Array.isArray(detalhe?.candidatos) && detalhe.candidatos.length > 0
+      ? detalhe.candidatos
+      : [];
+
+  return candidatos.filter((c: any) => c && typeof c === "object");
+}
+
 function SincronizadoBadge({ codigo }: { codigo: string | number | null }) {
 
   return (
@@ -124,15 +153,19 @@ function SincronizadoBadge({ codigo }: { codigo: string | number | null }) {
 function EnviarBotao({
   tenantId,
   contrato,
+  clienteId,
 }: {
   tenantId: string;
   contrato: ContratoAtivo;
+  clienteId: string;
 }) {
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [bloqueioOpen, setBloqueioOpen] = useState(false);
   const [bloqueioMsg, setBloqueioMsg] = useState<string>("");
   const [dryRun, setDryRun] = useState<any | null>(null);
+  const [candidatos, setCandidatos] = useState<any[]>([]);
+  const [vinculando, setVinculando] = useState<number | string | null>(null);
 
   if (contrato.sincronizado) {
     return <SincronizadoBadge codigo={contrato.codigo_contrato_omie} />;
@@ -149,6 +182,7 @@ function EnviarBotao({
         return;
       }
       if (data?.ok === false) {
+        setCandidatos(extrairCandidatos(data));
         setBloqueioMsg(extrairMensagemErro(data));
         setBloqueioOpen(true);
         return;
@@ -188,6 +222,7 @@ function EnviarBotao({
           return;
         }
         setConfirmOpen(false);
+        setCandidatos(extrairCandidatos(body));
         setBloqueioMsg(msg);
         setBloqueioOpen(true);
         return;
@@ -210,6 +245,7 @@ function EnviarBotao({
       }
       const msg = extrairMensagemErro(data);
       setConfirmOpen(false);
+      setCandidatos(extrairCandidatos(data));
       setBloqueioMsg(msg);
       setBloqueioOpen(true);
 
@@ -217,6 +253,58 @@ function EnviarBotao({
       toast.error("Falha ao enviar ao Omie. Tente novamente.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVincular = async (candidato: any) => {
+    const codigo = candidato?.codigo_cliente_omie;
+    const razao = candidato?.razao_social ?? "(sem razão social)";
+    const ok = window.confirm(
+      `Vincular este cliente ao cadastro ${razao} (código ${codigo}) no Omie?\n` +
+        "Isso define para onde todas as futuras sincronizações deste cliente vão."
+    );
+    if (!ok) return;
+
+    setVinculando(codigo);
+    try {
+      const { data, error } = await supabase.functions.invoke("omie-integration-call", {
+        body: {
+          acao: "salvar_vinculo",
+          tenant_id: tenantId,
+          dados: {
+            tipo: "cliente",
+            ds_customer_id: clienteId,
+            omie_customer_id: candidato.codigo_cliente_omie,
+            origem: "dialog_envio_omie",
+          },
+        },
+      });
+
+      if (error) {
+        let body: any = {};
+        try {
+          body = (await error?.context?.json?.()) ?? {};
+        } catch {
+          body = {};
+        }
+        const msg = extrairMensagemErro(body);
+        setBloqueioMsg(msg || "Falha ao vincular o cadastro no Omie. Tente novamente.");
+        return;
+      }
+      if (data?.ok === false) {
+        const msg = extrairMensagemErro(data);
+        setBloqueioMsg(msg || "Falha ao vincular o cadastro no Omie. Tente novamente.");
+        return;
+      }
+
+      setBloqueioOpen(false);
+      setCandidatos([]);
+      toast.success(`Cliente vinculado ao cadastro ${codigo}. Enviando...`);
+      handleConfirm();
+    } catch {
+      setBloqueioMsg("Falha ao vincular o cadastro no Omie. Tente novamente.");
+    } finally {
+      setVinculando(null);
     }
   };
 
@@ -236,7 +324,14 @@ function EnviarBotao({
         Enviar ao Omie
       </Button>
 
-      <AlertDialog open={bloqueioOpen} onOpenChange={setBloqueioOpen}>
+      <AlertDialog
+        open={bloqueioOpen}
+        onOpenChange={(v) => {
+          if (vinculando != null) return;
+          setBloqueioOpen(v);
+          if (!v) setCandidatos([]);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -247,8 +342,59 @@ function EnviarBotao({
               {bloqueioMsg}
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {candidatos.length >= 2 && (
+            <div className="space-y-3">
+              <div className="text-sm font-medium">
+                Escolha a qual cadastro do Omie este cliente pertence:
+              </div>
+              <div className="space-y-2">
+                {candidatos.map((c, i) => {
+                  const codigo = c?.codigo_cliente_omie;
+                  const inativo = c?.inativo === "S";
+                  const esteVinculando = vinculando === codigo;
+                  return (
+                    <div
+                      key={`${codigo ?? "sem-codigo"}-${i}`}
+                      className="flex items-center justify-between gap-3 border rounded-md p-3 flex-wrap"
+                    >
+                      <div className="text-sm min-w-0">
+                        <div className="font-medium flex items-center gap-2">
+                          {c?.razao_social ?? "(sem razão social)"}
+                          {inativo && (
+                            <Badge
+                              variant="outline"
+                              className="text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-900"
+                            >
+                              inativo no Omie
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-muted-foreground font-mono text-xs">
+                          código {codigo ?? "—"}
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleVincular(c)}
+                        disabled={vinculando != null}
+                      >
+                        {esteVinculando && (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        )}
+                        Vincular a este
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <AlertDialogFooter>
-            <AlertDialogAction>Entendi</AlertDialogAction>
+            <AlertDialogAction disabled={vinculando != null}>Entendi</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -408,7 +554,7 @@ export default function IntegracaoOmieCard({ clienteId }: Props) {
                   : ""}
               </div>
             </div>
-            <EnviarBotao tenantId={tid} contrato={contratos[0]} />
+            <EnviarBotao tenantId={tid} contrato={contratos[0]} clienteId={clienteId} />
           </div>
         ) : (
           <div className="space-y-2">
@@ -427,7 +573,7 @@ export default function IntegracaoOmieCard({ clienteId }: Props) {
                     {c.modelos_contrato?.nome && <span>{c.modelos_contrato.nome}</span>}
                   </div>
                 </div>
-                <EnviarBotao tenantId={tid} contrato={c} />
+                <EnviarBotao tenantId={tid} contrato={c} clienteId={clienteId} />
               </div>
             ))}
           </div>

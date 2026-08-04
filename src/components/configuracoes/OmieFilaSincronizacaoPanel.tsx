@@ -307,12 +307,24 @@ const STATUS_LABEL: Record<string, string> = {
 /** Status em que o processador NÃO vai mexer mais sozinho. */
 const TERMINAIS = ["invalido", "erro", "ignorado"];
 
+/**
+ * Para onde o botão da Conferência leva. Não é um destino só.
+ *
+ * "escolher_candidato" — contrato que AINDA NÃO tem vínculo. É o tab Escolher Candidato.
+ * "contrato_cancelado" — contrato JÁ vinculado, cujo par no Omie está cancelado. Este NUNCA
+ *   aparece no Escolher Candidato: a recon-candidatos-listar filtra
+ *   `acao_sugerida = 'escolher_candidato'` e descarta `status_usuario in ('resolvido','vinculado')`.
+ *   O balde 'contrato_cancelado' é ALARM_BUCKET, então não filtra status_usuario — é o único
+ *   lugar da tela onde linha já vinculada aparece.
+ */
+type DestinoConferencia = "escolher_candidato" | "contrato_cancelado";
+
 type Diagnostico = {
   titulo: string;
   aconteceu: string;
   passos: string[];
   descartavel?: boolean;
-  irParaConferencia?: boolean;
+  destinoConferencia?: DestinoConferencia;
   podeReprocessar?: boolean;
 };
 
@@ -358,11 +370,11 @@ function diagnosticar(item: FilaItem): Diagnostico {
       aconteceu:
         "O contrato ligado a este cliente já está cancelado (situação 99) no OMIE. Alterar contrato cancelado não é permitido, então nada foi escrito.",
       passos: [
-        "Se é uma reativação: reative o contrato direto no OMIE.",
+        "Se este contrato também foi cancelado no DoctorSaaS, os dois lados já estão iguais e não há o que enviar — confira no balde “Contrato cancelado no Omie”.",
+        "Se é uma reativação: ela acontece sozinha quando o vínculo é único. Este bloqueio significa que o cliente tem mais de um candidato no OMIE — resolva o vínculo na Conferência e clique em Reprocessar.",
         "Se é um contrato novo: remova o vínculo na Conferência para que um novo seja criado no OMIE.",
-        "Feito isso, volte aqui e clique em Reprocessar.",
       ],
-      irParaConferencia: true,
+      destinoConferencia: "contrato_cancelado",
       podeReprocessar: true,
     };
   }
@@ -424,7 +436,7 @@ function diagnosticar(item: FilaItem): Diagnostico {
         "Resolva o vínculo na Conferência.",
         "Depois clique em Reprocessar.",
       ],
-      irParaConferencia: true,
+      destinoConferencia: "escolher_candidato",
       podeReprocessar: true,
     };
   }
@@ -458,10 +470,10 @@ function StatusBadge({ status }: { status?: string | null }) {
 
 export default function OmieFilaSincronizacaoPanel({
   tid,
-  onIrParaEscolherCandidato,
+  onIrParaConferencia,
 }: {
   tid: string | null | undefined;
-  onIrParaEscolherCandidato?: (cnpj: string) => void;
+  onIrParaConferencia?: (cnpj: string, destino: DestinoConferencia) => void;
 }) {
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
   const [okOpen, setOkOpen] = useState(false);
@@ -709,17 +721,22 @@ export default function OmieFilaSincronizacaoPanel({
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                        {/* Antes so aparecia para 'ignorado'. O depara_aponta_cancelado tambem se
-                            resolve na Conferencia e ficava sem saida nenhuma na tela. */}
-                        {dg.irParaConferencia && item.cnpj && onIrParaEscolherCandidato && (
+                        {/* O destino NAO e o mesmo para os dois casos: contrato ja vinculado nunca
+                            aparece no Escolher Candidato (ver DestinoConferencia). Mandar os dois
+                            para la era um beco sem saida -- o usuario chegava numa lista vazia. */}
+                        {dg.destinoConferencia && item.cnpj && onIrParaConferencia && (
                           <Button
                             size="sm"
                             variant="outline"
                             className="gap-1"
-                            onClick={() => onIrParaEscolherCandidato(item.cnpj as string)}
+                            onClick={() =>
+                              onIrParaConferencia(item.cnpj as string, dg.destinoConferencia as DestinoConferencia)
+                            }
                           >
                             <ExternalLink className="h-3 w-3" />
-                            Resolver na Conferência
+                            {dg.destinoConferencia === "contrato_cancelado"
+                              ? "Ver cancelados no Omie"
+                              : "Resolver na Conferência"}
                           </Button>
                         )}
                         {dg.descartavel && item.fila_id && (

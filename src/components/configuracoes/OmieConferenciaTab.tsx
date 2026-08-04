@@ -1007,7 +1007,9 @@ function VisaoGeralPanel({
   onIrParaBalde,
 }: {
   tid: string | null | undefined;
-  onIrParaBalde: (b: Bucket) => void;
+  // `busca` opcional: usada quando o destino é um cliente específico (ex.: vindo da fila),
+  // para o balde já abrir filtrado no CNPJ em vez de despejar a lista inteira.
+  onIrParaBalde: (b: Bucket, busca?: string) => void;
 }) {
   const reconferir = useReconferir(tid);
   const { data, isLoading } = useQuery({
@@ -1185,7 +1187,14 @@ function VisaoGeralPanel({
       {/* Fila de sincronização */}
       <OmieFilaSincronizacaoPanel
         tid={tid}
-        onIrParaEscolherCandidato={(cnpj) => {
+        onIrParaConferencia={(cnpj, destino) => {
+          // Contrato JÁ vinculado não existe no Escolher Candidato (a recon-candidatos-listar
+          // descarta status_usuario 'vinculado'/'resolvido'). O balde 'contrato_cancelado' é
+          // ALARM_BUCKET e não filtra status_usuario — é onde essa linha realmente aparece.
+          if (destino === "contrato_cancelado") {
+            onIrParaBalde("contrato_cancelado", cnpj);
+            return;
+          }
           try {
             sessionStorage.setItem("omie_escolher_cnpj", cnpj);
           } catch {}
@@ -1645,7 +1654,17 @@ export default function OmieConferenciaTab() {
       {bucketAtivo === "visao_geral" ? (
         <VisaoGeralPanel
           tid={tid}
-          onIrParaBalde={(b) => { setPage(0); setNomeFiltro("todos"); setBucketAtivo(b); }}
+          onIrParaBalde={(b, q) => {
+            setPage(0);
+            setNomeFiltro("todos");
+            // Só sobrescreve a busca quando o chamador pediu um alvo; clique normal no card
+            // continua abrindo o balde inteiro.
+            if (q !== undefined) setBusca(q);
+            setBucketAtivo(b);
+            // A VisaoGeralPanel (que contém a fila) desmonta aqui: sem isto o usuário fica
+            // com o scroll parado onde o painel estava e a lista abre fora da tela.
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
         />
       ) : (
       <Card>
