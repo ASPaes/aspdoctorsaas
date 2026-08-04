@@ -58,13 +58,18 @@ export function AttachmentCard({
   const needsMeta = !isTemp && hasMediaUrl && (!mediaFilename || mediaSizeBytes == null);
   const { data: meta } = useMediaMeta(needsMeta ? messageId : null);
 
-  const filename = mediaFilename || meta?.filename || 'Arquivo';
   const ext = mediaExt || meta?.ext || null;
   const sizeBytes = mediaSizeBytes ?? meta?.size_bytes ?? null;
   const kind = mediaKind || meta?.kind || 'other';
 
   const Icon = KIND_ICONS[kind] || File;
   const kindLabel = KIND_LABELS[kind] || 'Arquivo';
+
+  // Vídeo e áudio do WhatsApp normalmente não trazem fileName. Sem nome real, o
+  // título do card vira o próprio tipo ("Vídeo") em vez de um "Arquivo" genérico
+  // — e aí o tipo sai do subtítulo, senão ficaria repetido.
+  const hasRealFilename = Boolean(mediaFilename || meta?.filename);
+  const filename = mediaFilename || meta?.filename || kindLabel;
 
   const handleOpen = async () => {
     if (messageId?.startsWith('temp-')) return;
@@ -121,7 +126,9 @@ export function AttachmentCard({
     }
   };
 
-  const showLargeFileWarning = kind === 'document' && !hasMediaUrl;
+  // Sem media_url/media_path a mídia nunca foi baixada — vale para QUALQUER tipo,
+  // não só document. Vídeo acima de 12 MB cai exatamente aqui.
+  const showLargeFileWarning = !hasMediaUrl;
 
   return (
     <div className="flex items-center gap-3 rounded-lg bg-muted/50 border border-border/50 p-3 min-w-0 max-w-full">
@@ -139,7 +146,7 @@ export function AttachmentCard({
             </Badge>
           )}
           <span className="text-[11px] text-muted-foreground">
-            {formatBytes(sizeBytes)} · {kindLabel}
+            {formatBytes(sizeBytes)}{hasRealFilename ? ` · ${kindLabel}` : ''}
           </span>
         </div>
       </div>
@@ -152,7 +159,14 @@ export function AttachmentCard({
               </div>
             </TooltipTrigger>
             <TooltipContent side="left" className="max-w-[16rem]">
-              <p>Arquivo grande — não carregado automaticamente. Abra pelo WhatsApp.</p>
+              {/* Tamanho conhecido = o webhook recusou por passar do teto. Tamanho
+                  desconhecido = a tentativa de download falhou. Dizer "arquivo
+                  grande" no segundo caso seria chute. */}
+              <p>
+                {sizeBytes != null
+                  ? 'Arquivo grande — não carregado automaticamente. Abra pelo WhatsApp.'
+                  : 'Não foi possível baixar este arquivo. Abra pelo WhatsApp.'}
+              </p>
             </TooltipContent>
           </Tooltip>
         ) : (

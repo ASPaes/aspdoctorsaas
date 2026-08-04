@@ -7,6 +7,7 @@ import { getSendErrorInfo } from "@/lib/metaSendErrors";
 import type { GroupParticipant } from "../hooks/useGroupParticipants";
 import { renderMentions, renderMessageText } from "./mentionUtils";
 import { MediaContent } from "./MediaContent";
+import { hasRenderableMedia } from "@/utils/whatsapp/mediaGate";
 import { ContactCard } from "./ContactCard";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { formatTime as formatTzTime } from "@/lib/formatDateWithTimezone";
@@ -361,8 +362,7 @@ export function MessageBubble({
         />
       )}
 
-      {((msg.media_url && msg.message_type !== "text" && msg.message_type !== "contact" && msg.message_type !== "contacts") ||
-        (msg.message_type === "document" && (msg.media_filename || msg.media_size_bytes))) && (
+      {hasRenderableMedia(msg) && (
         <div className="min-w-0">
           <MediaContent messageId={msg.id} messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} mediaFilename={msg.media_filename} mediaExt={msg.media_ext} mediaSizeBytes={msg.media_size_bytes} mediaKind={msg.media_kind} mediaMimetype={msg.media_mimetype} mediaPath={msg.media_path} />
         </div>

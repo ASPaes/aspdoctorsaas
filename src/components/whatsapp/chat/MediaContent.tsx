@@ -5,6 +5,7 @@ import { Loader2, Play, RotateCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatBytes } from "@/utils/whatsapp/formatBytes";
 import { mediaBlobKey } from "@/lib/mediaBlobRegistry";
+import { hasRetrievableMedia as canRetrieveMedia, kindFromMessageType } from "@/utils/whatsapp/mediaGate";
 import { AttachmentCard } from "./AttachmentCard";
 import { ZoomableImageLightbox } from "./ZoomableImageLightbox";
 
@@ -119,9 +120,13 @@ export function MediaContent({
   const isTemp = messageId?.startsWith("temp-");
   const isInline = INLINE_TYPES.has(messageType);
   const needsClick = CLICK_TO_LOAD_TYPES.has(messageType);
+  // Sem media_url nem media_path não existe o que buscar: o proxy responderia
+  // 404 ("No media path available"). É o caso da mídia acima do teto de 12 MB do
+  // evolution-webhook — tem tamanho e mimetype, mas nunca foi baixada.
+  const hasRetrievableMedia = canRetrieveMedia({ media_url: mediaUrl, media_path: mediaPath });
 
   const hasBeenVisible = useHasBeenVisible(containerRef);
-  const enabled = isInline && hasBeenVisible && (!needsClick || armed);
+  const enabled = isInline && hasRetrievableMedia && hasBeenVisible && (!needsClick || armed);
 
   const { data: blobUrl, isFetching, isError, refetch } = useProxyBlob(messageId, "inline", enabled);
   const resolvedInlineUrl = isTemp ? (mediaUrl || null) : (blobUrl ?? null);
@@ -143,14 +148,17 @@ export function MediaContent({
     }
   }, [isTemp, messageId]);
 
-  if (!isInline) {
+  // Não-inline (document e afins) OU inline sem nada para buscar (mídia grande
+  // que o webhook não baixou) caem no card, que sabe dizer "abra pelo WhatsApp".
+  // Antes esse fallback só existia para document — vídeo grande não renderizava.
+  if (!isInline || !hasRetrievableMedia) {
     return (
       <AttachmentCard
         messageId={messageId}
         mediaFilename={mediaFilename || metadata?.fileName}
         mediaExt={mediaExt}
         mediaSizeBytes={mediaSizeBytes}
-        mediaKind={mediaKind || "document"}
+        mediaKind={mediaKind || kindFromMessageType(messageType)}
         mediaMimetype={mediaMimetype}
         mediaUrl={mediaUrl}
         mediaPath={mediaPath}
