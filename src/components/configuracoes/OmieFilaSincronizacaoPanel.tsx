@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { AlertTriangle, ChevronDown, ChevronRight, RefreshCw, Clock, Pause, TestTube2, ExternalLink, RotateCw, Loader2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, RefreshCw, Clock, Pause, TestTube2, ExternalLink, RotateCw, Loader2, Trash2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
@@ -147,6 +147,42 @@ function ReprocessarButton({
   );
 }
 
+/**
+ * Tira da fila uma linha que não tem o que corrigir: contrato apagado no DoctorSaaS, ou alteração
+ * que envelheceu e não será reenviada. Nada foi escrito no Omie nesses casos — é limpeza.
+ * O gate de quais linhas podem sair mora na RPC, não aqui.
+ */
+function DescartarButton({ filaId, onDone }: { filaId: string; onDone: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const handle = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await (supabase.rpc as any)("omie_fila_descartar", { p_fila_id: filaId });
+      if (error) {
+        toast.error("Não foi possível descartar.", { description: error.message });
+        return;
+      }
+      const r = (data ?? {}) as { ok?: boolean; erro?: string };
+      if (!r.ok) {
+        toast.warning(r.erro ?? "Esta linha não pode ser descartada.");
+        return;
+      }
+      toast.success("Linha removida da fila.");
+      onDone();
+    } catch {
+      toast.error("Não foi possível descartar.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <Button size="sm" variant="ghost" className="gap-1 shrink-0" onClick={handle} disabled={loading}>
+      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+      Descartar
+    </Button>
+  );
+}
+
 type FilaItem = {
   prio?: string | number | null;
   fila_id?: string | null;
@@ -154,6 +190,8 @@ type FilaItem = {
   contrato_id?: string | null;
   cliente?: string | null;
   cnpj?: string | null;
+  // A RPC já devolvia este campo e a tela ignorava.
+  contrato_removido?: boolean | null;
   origem?: string | null;
   status?: string | null;
   tentativas?: number | null;
@@ -247,6 +285,9 @@ function relativeTime(v?: string | null): string {
 
 const STATUS_STYLE: Record<string, string> = {
   erro: "bg-red-100 text-red-800 border-red-300 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900",
+  // 'invalido' nao tinha estilo nem label: caia no fallback e aparecia cru e minusculo na tela,
+  // ao lado de "Ignorado" e "OK". Terminal por bloqueio = vermelho, igual erro.
+  invalido: "bg-red-100 text-red-800 border-red-300 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900",
   ignorado: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
   processando: "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
   pendente: "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
@@ -255,11 +296,155 @@ const STATUS_STYLE: Record<string, string> = {
 
 const STATUS_LABEL: Record<string, string> = {
   erro: "Erro",
-  ignorado: "Ignorado",
-  processando: "Processando",
-  pendente: "Pendente",
+  // "invalido" nao diz nada ao usuario. O que aconteceu foi que o Omie RECUSOU.
+  invalido: "Bloqueado",
+  ignorado: "Não enviado",
+  processando: "Enviando",
+  pendente: "Na fila",
   ok: "OK",
 };
+
+/** Status em que o processador NÃO vai mexer mais sozinho. */
+const TERMINAIS = ["invalido", "erro", "ignorado"];
+
+type Diagnostico = {
+  titulo: string;
+  aconteceu: string;
+  passos: string[];
+  descartavel?: boolean;
+  irParaConferencia?: boolean;
+  podeReprocessar?: boolean;
+};
+
+/**
+ * Traduz a linha da fila em: o que aconteceu + como corrigir + qual botão faz sentido.
+ *
+ * Por que existe: a tela mostrava `ultimo_erro` cru, com o prefixo técnico (`bloqueio:`,
+ * `validacao:`) e um parágrafo corrido que misturava causa e solução. Pior: oferecia
+ * "Reprocessar" em TODA linha, inclusive nas que não têm o que reprocessar (contrato apagado do
+ * DS) e nas que reprocessar não resolve (bloqueio ainda de pé). Quem abria a tela via 7 problemas
+ * e nenhum caminho.
+ */
+function diagnosticar(item: FilaItem): Diagnostico {
+  const erro = item.motivo ?? "";
+  const status = (item.status || "").toLowerCase();
+
+  if (item.contrato_removido) {
+    return {
+      titulo: "Contrato apagado no DoctorSaaS",
+      aconteceu:
+        "O contrato entrou na fila e depois foi excluído. Nada foi escrito no OMIE — não há o que corrigir.",
+      passos: ["Descarte a linha. É só limpeza de fila."],
+      descartavel: true,
+    };
+  }
+
+  if (erro.includes("troca_de_produto")) {
+    return {
+      titulo: "Produto do contrato mudou",
+      aconteceu:
+        "O produto foi trocado no DoctorSaaS e o OMIE ainda está com a categoria do produto anterior.",
+      passos: [
+        "Clique em Reprocessar: a integração agora grava a categoria nova no OMIE sozinha.",
+        "Se voltar a bloquear, o produto atual provavelmente não tem correspondência no OMIE — mapeie em Configurações → Integração OMIE.",
+      ],
+      podeReprocessar: true,
+    };
+  }
+
+  if (erro.includes("depara_aponta_cancelado")) {
+    return {
+      titulo: "O vínculo aponta para um contrato cancelado no OMIE",
+      aconteceu:
+        "O contrato ligado a este cliente já está cancelado (situação 99) no OMIE. Alterar contrato cancelado não é permitido, então nada foi escrito.",
+      passos: [
+        "Se é uma reativação: reative o contrato direto no OMIE.",
+        "Se é um contrato novo: remova o vínculo na Conferência para que um novo seja criado no OMIE.",
+        "Feito isso, volte aqui e clique em Reprocessar.",
+      ],
+      irParaConferencia: true,
+      podeReprocessar: true,
+    };
+  }
+
+  if (erro.includes("produto_sem_mapeamento")) {
+    return {
+      titulo: "Produto sem correspondência no OMIE",
+      aconteceu:
+        "Não existe de/para entre este produto e uma categoria do OMIE, então não dá para confirmar o que gravar. Nada foi escrito.",
+      passos: [
+        "Mapeie o produto em Configurações → Integração OMIE.",
+        "Depois clique em Reprocessar.",
+      ],
+      podeReprocessar: true,
+    };
+  }
+
+  if (erro.startsWith("validacao:") || erro.includes("validacao:")) {
+    // A RPC devolve um array JSON dentro da string. Vira lista, não parágrafo.
+    let itensErro: string[] = [];
+    const m = erro.match(/\[.*\]/s);
+    if (m) {
+      try {
+        itensErro = JSON.parse(m[0]);
+      } catch {
+        /* mantém vazio; cai no texto genérico abaixo */
+      }
+    }
+    return {
+      titulo: "Faltam dados no contrato",
+      aconteceu:
+        "A validação do DoctorSaaS reprovou antes de enviar. Nada foi escrito no OMIE.",
+      passos: itensErro.length
+        ? [...itensErro.map((e) => `Corrija: ${e}`), "Depois clique em Reprocessar."]
+        : ["Abra o contrato, complete os dados que faltam e clique em Reprocessar."],
+      podeReprocessar: true,
+    };
+  }
+
+  if (erro.includes("JA foi vinculado depois deste envio")) {
+    return {
+      titulo: "Alteração perdida — o vínculo veio depois",
+      aconteceu:
+        "Quando esta alteração saiu, o contrato ainda não estava vinculado ao OMIE, então ela não foi enviada. O vínculo existe agora, mas esta alteração específica não é reenviada sozinha.",
+      passos: [
+        "Abra o cliente e edite o campo de novo (basta salvar): isso gera um envio novo, já com o vínculo valendo.",
+        "Depois descarte esta linha — ela não tem mais o que fazer.",
+      ],
+      descartavel: true,
+    };
+  }
+
+  if (status === "ignorado") {
+    return {
+      titulo: "Contrato ainda não vinculado ao OMIE",
+      aconteceu:
+        "A fila automática só altera contrato que já existe no OMIE — ela nunca cria. Nada foi escrito.",
+      passos: [
+        "Resolva o vínculo na Conferência.",
+        "Depois clique em Reprocessar.",
+      ],
+      irParaConferencia: true,
+      podeReprocessar: true,
+    };
+  }
+
+  if (status === "erro") {
+    return {
+      titulo: "Falha ao enviar",
+      aconteceu: erro || "O envio falhou e as tentativas se esgotaram.",
+      passos: ["Se a causa já foi resolvida, clique em Reprocessar."],
+      podeReprocessar: true,
+    };
+  }
+
+  return {
+    titulo: STATUS_LABEL[status] ?? "Em andamento",
+    aconteceu: erro || "—",
+    passos: [],
+    podeReprocessar: TERMINAIS.includes(status),
+  };
+}
 
 function StatusBadge({ status }: { status?: string | null }) {
   const s = (status || "").toLowerCase();
@@ -465,7 +650,10 @@ export default function OmieFilaSincronizacaoPanel({
                 {itensFiltrados.map((item, i) => {
                   const status = (item.status || "").toLowerCase();
                   const isIgnorado = status === "ignorado";
-                  const canReprocess = (status === "ignorado" || status === "invalido" || status === "erro") && !!item.fila_id;
+                  const dg = diagnosticar(item);
+                  const terminal = TERMINAIS.includes(status);
+                  const canReprocess =
+                    terminal && !!item.fila_id && dg.podeReprocessar !== false && !item.contrato_removido;
                   return (
                     <div
                       key={item.fila_id ?? i}
@@ -483,26 +671,47 @@ export default function OmieFilaSincronizacaoPanel({
                           <Badge variant="outline" className="text-[10px]">
                             {labelOrigem(item.origem)}
                           </Badge>
-                          {(item.tentativas ?? 0) > 0 && (
+                          {/* So faz sentido enquanto ainda ha o que tentar. Em linha terminal,
+                              "15 tentativas" lia como esforco em curso -- e ela parou faz dias. */}
+                          {!terminal && (item.tentativas ?? 0) > 0 && (
                             <span className="text-[11px] text-muted-foreground">
                               {item.tentativas} tentativa{(item.tentativas ?? 0) > 1 ? "s" : ""}
                             </span>
                           )}
                         </div>
-                        {item.motivo && (
+                        {/* O que aconteceu — em vez do ultimo_erro cru com prefixo tecnico. */}
+                        <p className="text-xs font-medium text-foreground">{dg.titulo}</p>
+                        {dg.aconteceu && (
                           <p className="text-xs text-muted-foreground whitespace-pre-wrap">
-                            {item.motivo}
+                            {dg.aconteceu}
                           </p>
                         )}
+                        {/* Como corrigir — passos, nao parágrafo. */}
+                        {dg.passos.length > 0 && (
+                          <div className="rounded-md border border-border/60 bg-muted/40 px-2.5 py-2">
+                            <p className="text-[11px] font-medium text-foreground mb-1">Como resolver</p>
+                            <ol className="list-decimal pl-4 space-y-0.5 text-[11px] text-muted-foreground">
+                              {dg.passos.map((p, k) => (
+                                <li key={k}>{p}</li>
+                              ))}
+                            </ol>
+                          </div>
+                        )}
                         <div className="text-[11px] text-muted-foreground">
-                          Enfileirado {relativeTime(item.enfileirado_em)}
-                          {item.proxima_tentativa_em && (
+                          Parado {relativeTime(item.enfileirado_em)}
+                          {/* Em linha terminal nao existe "proxima tentativa": o processador nao
+                              volta nela sozinho. Mostrar uma data no passado ("ha 3d") fazia
+                              parecer que ainda estava tentando. Idem o contador de tentativas. */}
+                          {!terminal && item.proxima_tentativa_em && (
                             <> · Próxima tentativa {relativeTime(item.proxima_tentativa_em)}</>
                           )}
+                          {terminal && <> · Não será reenviado sozinho</>}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                        {isIgnorado && item.cnpj && onIrParaEscolherCandidato && (
+                        {/* Antes so aparecia para 'ignorado'. O depara_aponta_cancelado tambem se
+                            resolve na Conferencia e ficava sem saida nenhuma na tela. */}
+                        {dg.irParaConferencia && item.cnpj && onIrParaEscolherCandidato && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -512,6 +721,9 @@ export default function OmieFilaSincronizacaoPanel({
                             <ExternalLink className="h-3 w-3" />
                             Resolver na Conferência
                           </Button>
+                        )}
+                        {dg.descartavel && item.fila_id && (
+                          <DescartarButton filaId={item.fila_id} onDone={() => query.refetch()} />
                         )}
                         {canReprocess && (
                           <ReprocessarButton
