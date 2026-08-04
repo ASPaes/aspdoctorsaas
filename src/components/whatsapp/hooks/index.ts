@@ -1,5 +1,5 @@
 export { useWhatsAppConversations } from './useWhatsAppConversations';
-export type { ConversationsResult, ConversationWithContact, ConversationsFilters } from './useWhatsAppConversations';
+export type { ConversationWithContact, ConversationsFilters } from './useWhatsAppConversations';
 export { useWhatsAppMessages } from './useWhatsAppMessages';
 export type { Message } from './useWhatsAppMessages';
 export { useWhatsAppSend } from './useWhatsAppSend';

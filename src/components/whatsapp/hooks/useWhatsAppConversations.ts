@@ -1,5 +1,5 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo } from 'react';
 import { subscribeSharedChannel } from '@/lib/realtimeChannelPool';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
@@ -30,6 +30,8 @@ export interface ConversationWithContact {
   opened_out_of_hours_at?: string | null;
   sender_signature_mode?: string;
   sender_ticket_code?: string | null;
+  /** Bucket calculado NO SERVIDOR por wa_conversation_bucket. Não recalcular no cliente. */
+  bucket?: string;
   contact: {
     id: string;
     name: string | null;
@@ -52,207 +54,123 @@ export interface ConversationsFilters {
   instanceIds?: string[];
   departmentId?: string;
   isGroup?: boolean;
-  
+  /**
+   * Pill ativa: 'waiting' | 'in_progress' | 'after_hours' | 'closed'.
+   * undefined = todos os buckets. O filtro é aplicado no SERVIDOR — não refazer
+   * no cliente, senão a página volta a encolher depois de paginada (DEM-0234).
+   */
+  bucket?: string;
   status?: string;
   assignedTo?: string;
   unassigned?: boolean;
   unreadOnly?: boolean;
-  page?: number;
   pageSize?: number;
   includeIds?: string[];
+  /**
+   * Operador comum: restringe encerradas às que foram dele. Passar undefined
+   * para admin/head/super admin. Mesma regra vale na contagem das pills.
+   */
+  closedVisibleTo?: string;
+  autoReplyDisabledOnly?: boolean;
+  rulesDisabledOnly?: boolean;
 }
 
-export interface ConversationsResult {
-  conversations: ConversationWithContact[];
-  totalCount: number;
-  totalPages: number;
-  unreadCount: number;
-  waitingCount: number;
-}
+const DEFAULT_PAGE_SIZE = 50;
 
 // ---------------------------------------------------------------------------
-// Helper: build Supabase filter chains reused by both hooks
+// useWhatsAppConversations — lista paginada, filtrada por bucket no servidor
 // ---------------------------------------------------------------------------
-
-function applyBaseFilter(q: any, tid: string | null, filters?: ConversationsFilters) {
-  if (tid) q = q.eq('tenant_id', tid);
-  if (filters?.departmentId) {
-    q = q.or(`department_id.eq.${filters.departmentId},department_id.is.null`);
-  } else if (filters?.instanceIds && filters.instanceIds.length > 0) {
-    q = q.in('instance_id', filters.instanceIds);
-  } else if (filters?.instanceId) {
-    q = q.eq('instance_id', filters.instanceId);
-  }
-  return q;
-}
-
-function applyFullFilter(q: any, tid: string | null, filters?: ConversationsFilters) {
-  q = applyBaseFilter(q, tid, filters);
-  if (filters?.status) q = q.eq('status', filters.status);
-  if (filters?.assignedTo) {
-    // Filtra conversas atribuídas ao operador OU grupos monitorados por ele.
-    // A fila (assigned_to IS NULL) é visível pela pill "Fila" sem necessidade
-    // de incluir aqui — o hook carrega a fila via query sem filtro de operador.
-    q = q.or(`assigned_to.eq.${filters.assignedTo},monitor_user_id.eq.${filters.assignedTo}`);
-  }
-  if (filters?.unassigned) q = q.is('assigned_to', null);
-  if (filters?.isGroup === true) q = q.eq('is_group', true).eq('group_enabled', true);
-  if (filters?.isGroup === false) q = q.eq('is_group', false);
-  if (filters?.unreadOnly) q = q.gt('unread_count', 0);
-  return q;
-}
-
-// ---------------------------------------------------------------------------
-// useConversationCounts — separate hook with its own cache key & staleTime
-// ---------------------------------------------------------------------------
-
-export function useConversationCounts(filters?: ConversationsFilters) {
-  const { effectiveTenantId: tid } = useTenantFilter();
-
-  return useQuery({
-    queryKey: ['whatsapp', 'conversation-counts', filters, tid],
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: false,
-    queryFn: async () => {
-      const [countResult, unreadResult, waitingResult] = await Promise.all([
-        applyFullFilter(
-          supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true }),
-          tid,
-          filters,
-        ),
-        applyBaseFilter(
-          supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true })
-            .gt('unread_count', 0),
-          tid,
-          filters,
-        ),
-        applyBaseFilter(
-          supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true })
-            .eq('status', 'active')
-            .eq('is_last_message_from_me', false)
-            .not('last_message_at', 'is', null),
-          tid,
-          filters,
-        ),
-      ]);
-
-      return {
-        totalCount: countResult.count || 0,
-        unreadCount: unreadResult.count || 0,
-        waitingCount: waitingResult.count || 0,
-      };
-    },
-  });
-}
-
-// ---------------------------------------------------------------------------
-// useWhatsAppConversations — main hook (conversations list only)
-// ---------------------------------------------------------------------------
-
+//
+// Antes desta versão a lista carregava uma janela fixa das 100 conversas mais
+// recentes e a pill era aplicada no navegador. Conversa encerrada fora dessa
+// janela virava inalcançável — nenhuma ação da UI trazia ela de volta — enquanto
+// a contagem da pill, vinda do servidor sobre o tenant inteiro, seguia mostrando
+// o número cheio. Era o DEM-0234 (WAYRA SURF BAR / ADEGA FG, posições 128 e 166).
+//
+// Agora o bucket e a paginação são do servidor, via whatsapp_list_conversations,
+// que compartilha wa_conversation_bucket com whatsapp_pill_counts. Lista e
+// contagem saem da mesma expressão e não têm como divergir.
 export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
-  const page = filters?.page || 1;
-  const pageSize = filters?.pageSize || (filters?.isGroup ? 100 : 20);
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
+  const pageSize = filters?.pageSize ?? DEFAULT_PAGE_SIZE;
 
-  // Counts from the dedicated hook
-  const { data: countsData } = useConversationCounts(filters);
-  const totalCount = countsData?.totalCount || 0;
-  const unreadCount = countsData?.unreadCount || 0;
-  const waitingCount = countsData?.waitingCount || 0;
-  const totalPages = Math.ceil(totalCount / pageSize);
-
-  const lastActivityRef = useRef<number>(Date.now());
-
-  useEffect(() => {
-    const markActivity = () => { lastActivityRef.current = Date.now(); };
-    window.addEventListener('keydown', markActivity, { passive: true });
-    window.addEventListener('mousedown', markActivity, { passive: true });
-    return () => {
-      window.removeEventListener('keydown', markActivity);
-      window.removeEventListener('mousedown', markActivity);
-    };
-  }, []);
-
-  const { data, isLoading, error } = useQuery({
+  const {
+    data,
+    isLoading,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['whatsapp', 'conversations', filters, tid],
+    initialPageParam: 0,
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: false,
-    queryFn: async () => {
-      let query = supabase
-        .from('whatsapp_conversations')
-        .select(`*, contact:whatsapp_contacts(*)`)
-        .order('last_message_at', { ascending: false, nullsFirst: false })
-        .range(from, to);
-
-      query = applyFullFilter(query, tid, filters);
-
-      // NÃO usar `.or(... id.in ...)` aqui: o OR anula o índice ordenado
-      // idx_wa_conv_tenant_lastmsg_active e força varrer+ordenar TODAS as conversas
-      // da tenant. Grupos mostram tudo; demais só com last_message_at preenchido.
-      if (!filters?.isGroup) {
-        query = query.not('last_message_at', 'is', null);
-      }
-
-      const { data: conversationsData, error } = await query;
-      if (error) throw error;
-
-      // Conversas "forçadas" (ex.: recém-criadas, ainda sem last_message_at) não entram
-      // no filtro acima. Busca-as à parte por PK (lookup barato) e mescla no topo. As
-      // forçadas respeitam os filtros ativos (operador, setor, instância, status) —
-      // sem isso, includeIds reinjetaria conversas de outros operadores. Só dispara
-      // enquanto a conversa não tem mensagem — depois ela entra na query principal.
-      let rawConversations = (conversationsData ?? []) as any[];
-      const includeIds = filters?.includeIds;
-      if (!filters?.isGroup && includeIds && includeIds.length > 0) {
-        const presentIds = new Set(rawConversations.map((c: any) => c.id));
-        const missingIds = includeIds.filter((id) => !presentIds.has(id));
-        if (missingIds.length > 0) {
-          let forcedQuery = (supabase
-            .from('whatsapp_conversations')
-            .select(`*, contact:whatsapp_contacts(*)`)
-            .in('id', missingIds)) as any;
-          forcedQuery = applyFullFilter(forcedQuery, tid, filters);
-          const { data: forcedData } = await forcedQuery;
-
-          if (forcedData && forcedData.length > 0) {
-            rawConversations = [...forcedData, ...rawConversations];
-          }
+    getNextPageParam: (lastPage: ConversationWithContact[], allPages) =>
+      lastPage.length < pageSize
+        ? undefined
+        : allPages.reduce((n, p) => n + p.length, 0),
+    queryFn: async ({ pageParam }): Promise<ConversationWithContact[]> => {
+      const { data: rows, error: rpcError } = await (supabase as any).rpc(
+        'whatsapp_list_conversations',
+        {
+          p_tenant_id: tid,
+          p_bucket: filters?.bucket ?? null,
+          p_department_id: filters?.departmentId ?? null,
+          p_instance_id: filters?.instanceId ?? null,
+          p_instance_ids: filters?.instanceIds?.length ? filters.instanceIds : null,
+          p_status: filters?.status ?? null,
+          p_assigned_to: filters?.assignedTo ?? null,
+          p_unassigned: filters?.unassigned ?? false,
+          p_unread_only: filters?.unreadOnly ?? false,
+          // undefined = grupos e 1:1 juntos (pill "Todos"); false = só 1:1; true = só grupos
+          p_is_group: filters?.isGroup === undefined ? null : filters.isGroup,
+          p_include_ids: filters?.includeIds?.length ? filters.includeIds : null,
+          p_closed_visible_to: filters?.closedVisibleTo ?? null,
+          p_auto_reply_disabled_only: filters?.autoReplyDisabledOnly ?? false,
+          p_rules_disabled_only: filters?.rulesDisabledOnly ?? false,
+          p_limit: pageSize,
+          p_offset: pageParam as number,
         }
-      }
+      );
+      if (rpcError) throw rpcError;
 
-      const result = (rawConversations as unknown as ConversationWithContact[]).map(conv => ({
+      const result = ((rows ?? []) as any[]).map((row) => ({
+        ...row.conversation,
+        contact: row.contact,
+        bucket: row.bucket,
+        unread_count: parseInt(String(row.conversation?.unread_count ?? 0), 10) || 0,
+        last_message_at: row.conversation?.last_message_at || null,
+        isLastMessageFromMe: row.conversation?.is_last_message_from_me ?? false,
+      })) as ConversationWithContact[];
 
-        ...conv,
-        unread_count: parseInt(String((conv as any).unread_count ?? 0), 10) || 0,
-        last_message_at: conv.last_message_at || null,
-        isLastMessageFromMe: (conv as any).is_last_message_from_me ?? false,
-      }));
+      const ids = result.map((c) => c.id);
+      if (ids.length === 0) return result;
 
-      const ids = result.map(c => c.id);
-      let withSentiment = result;
-      if (ids.length > 0) {
-        const { data: sData } = await (supabase.from('whatsapp_sentiment_analysis' as any) as any)
-          .select('conversation_id, needs_cs_ticket, cs_ticket_created_id')
-          .in('conversation_id', ids);
-        const sentimentMap = new Map((sData ?? []).map((s: any) => [s.conversation_id, s]));
-        withSentiment = result.map(c => ({ ...c, sentiment: (sentimentMap.get(c.id) as any) ?? null }));
-      }
-
-      return { conversations: withSentiment };
+      const { data: sData } = await (supabase.from('whatsapp_sentiment_analysis' as any) as any)
+        .select('conversation_id, needs_cs_ticket, cs_ticket_created_id')
+        .in('conversation_id', ids);
+      const sentimentMap = new Map((sData ?? []).map((s: any) => [s.conversation_id, s]));
+      return result.map((c) => ({ ...c, sentiment: (sentimentMap.get(c.id) as any) ?? null }));
     },
+    enabled: !!tid,
   });
 
-  // Realtime: shared channel with ref-count to avoid collision across multiple mounts
+  const conversations = useMemo(
+    () => (data?.pages ?? []).flat() as ConversationWithContact[],
+    [data]
+  );
 
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Realtime: canal compartilhado com ref-count para não colidir entre montagens
   useEffect(() => {
     const channelName = `conversations-rt-${tid ?? 'none'}`;
     return subscribeSharedChannel(channelName, (channel) => {
-      let invalidateThrottle = 0;
       let pillCountsTimer: ReturnType<typeof setTimeout> | null = null;
       const invalidatePillCounts = () => {
         if (pillCountsTimer) clearTimeout(pillCountsTimer);
@@ -261,8 +179,18 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           queryClient.invalidateQueries({ queryKey: ['whatsapp', 'pill-counts'] });
         }, 1000);
       };
-      let insertDebounce: ReturnType<typeof setTimeout> | null = null;
-      let softRefetchTimer: ReturnType<typeof setTimeout> | null = null;
+
+      // Refetch da lista coalescido. Com paginação no servidor um refetch refaz
+      // todas as páginas carregadas, então a janela de coalescing importa mais
+      // do que antes — nada de invalidar por evento.
+      let listRefetchTimer: ReturnType<typeof setTimeout> | null = null;
+      const invalidateList = () => {
+        if (listRefetchTimer) return;
+        listRefetchTimer = setTimeout(() => {
+          listRefetchTimer = null;
+          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+        }, 2000);
+      };
 
       channel.on('postgres_changes', {
         event: 'UPDATE',
@@ -272,57 +200,49 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       }, (payload) => {
         const updated = payload.new as any;
         invalidatePillCounts();
-        // Grupos têm seu próprio badge na pill "Grupos" (query separada).
-        // Invalidar group-counts em tempo real ao receber atualização de grupo
-        // (unread_count, last_message_at, etc.).
         if (updated?.is_group === true) {
           queryClient.invalidateQueries({ queryKey: ['whatsapp', 'group-counts'] });
         }
+
         queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
-          if (!old?.conversations) return old;
-          const existing = old.conversations.find((c: any) => c.id === updated.id);
-          if (!existing) {
-            // Conversation not in current page — coalesce em 1 refetch a cada 2s no máximo
-            if (!softRefetchTimer) {
-              softRefetchTimer = setTimeout(() => {
-                softRefetchTimer = null;
-                queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
-                queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
-              }, 2000);
-            }
+          if (!old?.pages) return old;
+
+          let existing: any = null;
+          for (const page of old.pages) {
+            const hit = page.find((c: any) => c.id === updated.id);
+            if (hit) { existing = hit; break; }
+          }
+
+          // Fora das páginas carregadas: pode ter entrado no bucket ativo agora.
+          if (!existing) { invalidateList(); return old; }
+
+          // assigned_to / department_id / status mudaram → o bucket ou a
+          // elegibilidade podem ter mudado, e isso é decisão do servidor.
+          if (
+            existing.assigned_to !== updated.assigned_to ||
+            existing.department_id !== updated.department_id ||
+            existing.status !== updated.status
+          ) {
+            invalidateList();
             return old;
           }
 
-          // Se assigned_to ou department_id mudou, forçar refetch para recalcular filtros do servidor
-          const assignedChanged = existing.assigned_to !== updated.assigned_to;
-          const deptChanged = existing.department_id !== updated.department_id;
-          if (assignedChanged || deptChanged) {
-            const now = Date.now();
-            if (now - invalidateThrottle > 500) {
-              invalidateThrottle = now;
-              // Invalidação imediata sem delay para atribuições automáticas
-              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
-              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
-            }
-            return old;
-          }
-
-          // Patch normal
-          const idx = old.conversations.findIndex((c: any) => c.id === updated.id);
-          if (idx === -1) return old;
-          const patched = [...old.conversations];
-          patched[idx] = {
-            ...patched[idx],
-            ...updated,
-            unread_count: parseInt(String(updated.unread_count ?? patched[idx].unread_count ?? 0), 10) || 0,
+          // Patch normal. A ordenação final é do consumidor (sortBy da sidebar).
+          return {
+            ...old,
+            pages: old.pages.map((page: any[]) => {
+              const idx = page.findIndex((c: any) => c.id === updated.id);
+              if (idx === -1) return page;
+              const patched = [...page];
+              patched[idx] = {
+                ...patched[idx],
+                ...updated,
+                unread_count:
+                  parseInt(String(updated.unread_count ?? patched[idx].unread_count ?? 0), 10) || 0,
+              };
+              return patched;
+            }),
           };
-          // Re-sort by last_message_at descending
-          patched.sort((a: any, b: any) => {
-            const tA = a.last_message_at || a.created_at || '';
-            const tB = b.last_message_at || b.created_at || '';
-            return tB.localeCompare(tA);
-          });
-          return { ...old, conversations: patched };
         });
       });
 
@@ -337,11 +257,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         if (inserted?.is_group === true) {
           queryClient.invalidateQueries({ queryKey: ['whatsapp', 'group-counts'] });
         }
-        if (insertDebounce) clearTimeout(insertDebounce);
-        insertDebounce = setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
-          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
-        }, 800);
+        invalidateList();
       });
 
       channel.on('postgres_changes', {
@@ -350,11 +266,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         table: 'whatsapp_sentiment_analysis',
         filter: tid ? `tenant_id=eq.${tid}` : undefined,
       } as any, () => {
-        const now = Date.now();
-        if (now - invalidateThrottle > 1000) {
-          invalidateThrottle = now;
-          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
-        }
+        invalidateList();
       });
 
       channel.on('postgres_changes', {
@@ -364,17 +276,20 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         filter: tid ? `tenant_id=eq.${tid}` : undefined,
       } as any, () => {
         invalidatePillCounts();
+        // Abrir/fechar/assumir atendimento move a conversa de bucket, e o bucket
+        // agora é filtro do servidor — sem isto ela ficaria na pill errada até o
+        // refetch de 60s.
+        invalidateList();
       });
     });
   }, [queryClient, tid]);
 
   return {
-    conversations: data?.conversations || [],
-    totalCount,
-    totalPages,
-    unreadCount,
-    waitingCount,
+    conversations,
     isLoading,
     error,
+    loadMore,
+    hasMore: !!hasNextPage,
+    isLoadingMore: isFetchingNextPage,
   };
 };

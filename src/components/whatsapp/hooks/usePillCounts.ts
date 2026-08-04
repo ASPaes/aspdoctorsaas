@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface PillCount {
   total: number;
@@ -23,9 +24,17 @@ type BucketKey = (typeof BUCKET_KEYS)[number];
 export function usePillCounts() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedDepartmentId } = useDepartmentFilter();
+  const { user, profile } = useAuth();
+
+  // Mesma regra que a lista aplica em whatsapp_list_conversations: operador comum
+  // só conta/vê encerrada que foi dele. Sem isto a pill "Encerrados" mostraria o
+  // total do tenant e a lista mostraria só as dele — a divergência do DEM-0234.
+  const isAdmin =
+    profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+  const closedVisibleTo = isAdmin ? null : user?.id ?? null;
 
   return useQuery<PillCountsMap>({
-    queryKey: ["whatsapp", "pill-counts", tid, selectedDepartmentId ?? null],
+    queryKey: ["whatsapp", "pill-counts", tid, selectedDepartmentId ?? null, closedVisibleTo],
     enabled: !!tid,
     staleTime: 15_000,
     refetchInterval: 60_000,
@@ -34,6 +43,7 @@ export function usePillCounts() {
       const { data, error } = await (supabase as any).rpc("whatsapp_pill_counts", {
         p_tenant_id: tid,
         p_department_id: selectedDepartmentId ?? null,
+        p_closed_visible_to: closedVisibleTo,
       });
       if (error) throw error;
 

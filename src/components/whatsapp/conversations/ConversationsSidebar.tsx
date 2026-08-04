@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, MessageSquare, Users, X, FileSearch, ChevronRight, CheckCheck } from "lucide-react";
+import { Search, Plus, MessageSquare, Users, X, FileSearch, ChevronRight, CheckCheck, Loader2 } from "lucide-react";
 import { MessageSearchModal } from "./MessageSearchModal";
 import { toast } from "sonner";
 import {
@@ -34,7 +34,7 @@ import { useActiveAttendanceConvIds } from "../hooks/useActiveAttendanceConvIds"
 import { usePillCounts } from "../hooks/usePillCounts";
 import { useSupportDepartments } from "../hooks/useSupportDepartments";
 import { useContactProdutos } from "../hooks/useContactProdutos";
-import { getConversationBucket, type ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
+import { type ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
 import { ConversationItem } from "./ConversationItem";
 import { ConversationFiltersPopover, type FiltersState } from "./ConversationFiltersPopover";
 import { QuickPills } from "./QuickPills";
@@ -259,6 +259,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     pageSize: 50,
     includeIds,
     closedVisibleTo: isAdmin ? undefined : user?.id,
+    autoReplyDisabledOnly: queueLikePills ? undefined : filters.autoReplyDisabledOnly,
+    rulesDisabledOnly: queueLikePills ? undefined : filters.rulesDisabledOnly,
   });
 
   // Get attendance data for all loaded conversations (still used for ConversationItem display)
@@ -405,31 +407,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       result = result.filter(c => (c as any).is_group === true || c.instance_id === filters.instanceId);
     }
 
-    // Pill filters com visibilidade por papel
-    if (activePill === "in_progress") {
-      result = result.filter(c => getConversationBucket(getStateForConv(c)) === "in_progress");
-    } else if (activePill === "waiting") {
-      result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_in_hours");
-    } else if (activePill === "after_hours") {
-      result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_out_of_hours");
-    } else if (activePill === "closed") {
-      result = result.filter(c => {
-        if (getConversationBucket(getStateForConv(c)) !== "closed") return false;
-        if (!isAdmin && user?.id) {
-          const att = attendanceMap.get(c.id);
-          if (att && att.assigned_to !== user.id) return false;
-        }
-        return true;
-      });
-    }
+    // O filtro de bucket da pill e a visibilidade de encerradas por papel saíram
+    // daqui: são do servidor agora (whatsapp_list_conversations). Filtrar bucket
+    // no cliente encolhia a página DEPOIS de paginada, e era exatamente o que
+    // tornava conversa encerrada antiga inalcançável — DEM-0234. Não reintroduzir.
 
-    if (filters.autoReplyDisabledOnly && !queueLikePills) {
-      result = result.filter((c) => c.auto_reply_disabled === true);
-    }
-
-    if (filters.rulesDisabledOnly && !queueLikePills) {
-      result = result.filter((c) => (c.contact as any)?.rules_disabled === true);
-    }
+    // autoReplyDisabledOnly / rulesDisabledOnly também são do servidor agora —
+    // filtrar aqui encolheria a página paginada (mesmo defeito do DEM-0234).
 
     // Sort
     switch (filters.sortBy) {
@@ -505,7 +489,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     }
 
     return result;
-  }, [conversations, activePill, queueLikePills, filters.sortBy, filters.instanceId, filters.autoReplyDisabledOnly, filters.rulesDisabledOnly, forcedConvId, isAdmin, user?.id, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv, nowMs]);
+  }, [conversations, activePill, queueLikePills, filters.sortBy, filters.instanceId, filters.autoReplyDisabledOnly, filters.rulesDisabledOnly, forcedConvId, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv, nowMs]);
 
   const agentGroups = useMemo(() => {
     if (!isGroupedView) return [];
@@ -893,6 +877,25 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
                   </div>
                 ))
               : (isSearching ? searchResults : filtered).map(renderConversation)}
+
+            {/* Paginação real: sem isto o servidor pagina e o usuário nunca passa
+                da primeira página — era assim que conversa encerrada antiga ficava
+                inalcançável (DEM-0234). */}
+            {!isSearching && hasMore && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full h-8 mt-1 text-xs text-muted-foreground"
+                onClick={loadMore}
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Carregando...</>
+                ) : (
+                  "Carregar mais conversas"
+                )}
+              </Button>
+            )}
           </div>
         )}
       </ScrollArea>
