@@ -1,0 +1,414 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// ds-omie-cliente-upsert
+//
+// v13 (15/07/2026): o LOG passa a dizer a VERDADE sobre o que aconteceu.
+//      Antes, logRow gravava evento:"criar" CRAVADO em toda operacao de cliente. Resultado real:
+//      o Ale alterou um endereco pela tela, a integracao mandou AlterarCliente, o Omie respondeu
+//      "Cliente alterado com sucesso!" -- e a tela exibiu "criacao de cliente". Ele achou que a
+//      alteracao nao tinha sido registrada.
+//      E o terceiro caso do MESMO padrao no mesmo dia: o log registrava O QUE EU CHAMEI, nunca
+//      O QUE RESULTOU (igual ao botao "Enviar" eterno e ao cron com 4.430 "sucessos" em cima de 404).
+//      Agora: criar -> 'criar' | assumir/atualizar -> 'atualizar' | nada a enviar -> status 'ignorado'.
+//      O CHECK da tabela ja aceita (criar, atualizar, cancelar, reativar, testar): sem migration.
+//
+// v12: honra body.campos_alterados (peca final do "C"). Gatilho marca so o que o usuario editou;
+//      aqui manda so isso. Sem a lista (churn/reajuste/envio manual) = manda tudo.
+// v11/v10: assumindo cliente achado por CNPJ, so PREENCHE LACUNA (nunca sobrescreve). Motivo: 99%
+//      dos clientes vem do PLG e o cadastro do DS as vezes e PIOR -- o LAVEI tem "LANVANDERIA"
+//      (typo) e sem telefone; o Omie tem o nome certo e o telefone.
+// v9:  procura por CNPJ (ListarClientes) antes de criar -- fim das duplicatas. A v8 procurava pelo
+//      codigo_cliente_integracao (uuid do DS); cliente que ja existia no Omie com codigo de outro
+//      sistema (DIGI-, PLG-) ou sem codigo NUNCA casava -> CRIAVA DUPLICADO. 2.143 de 2.159
+//      clientes (99,3%) estavam em risco.
+//
+// VALIDADO ISOLADO CONTRA A API REAL (15/07):
+//   - ConsultarCliente NAO aceita cnpj_cpf ("Tag [CNPJ_CPF] nao faz parte da estrutura...").
+//   - ListarClientes + clientesFiltro.cnpj_cpf FUNCIONA, devolve o cadastro completo e NORMALIZA:
+//     '66.741.999/0001-38' == '66741999000138', e ate ignora zeros a esquerda ('00011664679618'
+//     acha o CPF '11664679618').
+//   - AlterarCliente aceita PARAM MINIMO e NAO apaga campo nao enviado (testado na cobaia 7657513510).
+//
+// LIMITE CONHECIDO: campo ESVAZIADO no DS nao propaga (so mandamos valor nao-vazio).
+const OMIE_BASE = "https://app.omie.com.br/api/v1";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS"
+};
+const CAMPOS = [
+  "nome_fantasia",
+  "email",
+  "telefone1_ddd",
+  "telefone1_numero",
+  "endereco",
+  "endereco_numero",
+  "bairro",
+  "complemento",
+  "cep",
+  "cidade",
+  "estado",
+  "contato"
+];
+const CAMPOS_ACEITOS = new Set([
+  "cnpj_cpf",
+  "razao_social",
+  ...CAMPOS
+]);
+const vazio = (v)=>v === undefined || v === null || String(v).trim() === "";
+async function omieCall(endpoint, call, param, creds) {
+  const res = await fetch(`${OMIE_BASE}${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      call,
+      app_key: creds.app_key,
+      app_secret: creds.app_secret,
+      param: [
+        param
+      ]
+    })
+  });
+  const text = await res.text();
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch  {
+    parsed = {
+      raw: text
+    };
+  }
+  if (!res.ok || parsed?.faultstring) {
+    const msg = parsed?.faultstring ?? `Omie ${call} HTTP ${res.status}: ${text.slice(0, 500)}`;
+    throw new Error(msg);
+  }
+  return parsed;
+}
+async function buscarClientesPorCnpj(cnpj, creds) {
+  try {
+    const r = await omieCall("/geral/clientes/", "ListarClientes", {
+      pagina: 1,
+      registros_por_pagina: 50,
+      apenas_importado_api: "N",
+      clientesFiltro: {
+        cnpj_cpf: String(cnpj)
+      }
+    }, creds);
+    return Array.isArray(r?.clientes_cadastro) ? r.clientes_cadastro : [];
+  } catch (e) {
+    const msg = e.message ?? "";
+    if (/n.o existem|n.o encontrad|sem registros/i.test(msg)) return [];
+    throw e;
+  }
+}
+function json(b, status = 200) {
+  return new Response(JSON.stringify(b), {
+    status,
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json"
+    }
+  });
+}
+Deno.serve(async (req)=>{
+  if (req.method === "OPTIONS") return new Response(null, {
+    headers: corsHeaders
+  });
+  if (req.method !== "POST") return json({
+    ok: false,
+    error: "M\u00e9todo n\u00e3o permitido"
+  }, 405);
+  const supa = createClient(Deno.env.get("SUPABASE_URL"), Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
+  // v13: evento agora e PARAMETRO. Nao existe mais "criar" cravado.
+  async function logRow(tenant_id, status, extra, evento = "atualizar") {
+    if (!tenant_id) return;
+    try {
+      const { error } = await supa.from("integrations_log").insert({
+        tenant_id,
+        evento,
+        entidade: "cliente",
+        status,
+        ...extra
+      });
+      if (error) console.error("FALHA_LOG:", JSON.stringify(error));
+    } catch (e) {
+      console.error("EXCECAO_LOG:", e.message);
+    }
+  }
+  let body = null;
+  let tenant_id = null;
+  try {
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const apiKey = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : authHeader.trim();
+    if (!apiKey) return json({
+      ok: false,
+      error: "Chave de API ausente"
+    }, 401);
+    const { data: tenantData, error: validErr } = await supa.rpc("validar_api_key", {
+      p_key: apiKey
+    });
+    if (validErr) {
+      console.error("ERRO_VALIDAR_KEY:", JSON.stringify(validErr));
+      return json({
+        ok: false,
+        error: "Falha ao validar chave"
+      }, 500);
+    }
+    if (!tenantData) return json({
+      ok: false,
+      error: "Chave de API inv\u00e1lida ou revogada"
+    }, 401);
+    tenant_id = tenantData;
+    try {
+      body = await req.json();
+    } catch  {
+      await logRow(tenant_id, "erro", {
+        error_message: "JSON inv\u00e1lido"
+      });
+      return json({
+        ok: false,
+        error: "JSON inv\u00e1lido"
+      }, 400);
+    }
+    const ds_customer_id = body?.ds_customer_id;
+    const cliente = body?.cliente ?? {};
+    if (!ds_customer_id) {
+      await logRow(tenant_id, "erro", {
+        payload: body,
+        error_message: "ds_customer_id obrigat\u00f3rio"
+      });
+      return json({
+        ok: false,
+        error: "ds_customer_id \u00e9 obrigat\u00f3rio"
+      }, 400);
+    }
+    if (!cliente.cnpj_cpf || !cliente.razao_social) {
+      await logRow(tenant_id, "erro", {
+        referencia: String(ds_customer_id),
+        payload: body,
+        error_message: "cnpj_cpf e razao_social s\u00e3o obrigat\u00f3rios"
+      });
+      return json({
+        ok: false,
+        error: "cnpj_cpf e razao_social s\u00e3o obrigat\u00f3rios"
+      }, 400);
+    }
+    const camposAlterados = Array.isArray(body?.campos_alterados) && body.campos_alterados.length > 0 ? body.campos_alterados.map(String).filter((k)=>CAMPOS_ACEITOS.has(k)) : null;
+    const { data: cred } = await supa.from("tenant_credentials").select("omie_app_key, omie_app_secret").eq("tenant_id", tenant_id).maybeSingle();
+    if (!cred?.omie_app_key || !cred?.omie_app_secret) {
+      await logRow(tenant_id, "erro", {
+        referencia: String(ds_customer_id),
+        payload: body,
+        error_message: "Credenciais Omie ausentes"
+      });
+      return json({
+        ok: false,
+        error: "Credenciais Omie ausentes para este tenant"
+      }, 400);
+    }
+    const creds = {
+      app_key: cred.omie_app_key,
+      app_secret: cred.omie_app_secret
+    };
+    // ===== 1) Qual cliente do Omie e o alvo? =====
+    const { data: mapExist } = await supa.from("customers_mapping").select("omie_customer_id").eq("tenant_id", tenant_id).eq("ds_customer_id", String(ds_customer_id)).maybeSingle();
+    let alvoOmieId = mapExist?.omie_customer_id ? Number(mapExist.omie_customer_id) : null;
+    let comoResolveu = alvoOmieId ? "de_para" : "";
+    let cadastroAtual = null;
+    if (!alvoOmieId) {
+      const achados = await buscarClientesPorCnpj(String(cliente.cnpj_cpf), creds);
+      if (achados.length > 1) {
+        const lista = achados.map((c)=>({
+            codigo_cliente_omie: c.codigo_cliente_omie,
+            codigo_cliente_integracao: c.codigo_cliente_integracao ?? null,
+            razao_social: c.razao_social ?? null,
+            inativo: c.inativo ?? null
+          }));
+        await logRow(tenant_id, "erro", {
+          referencia: String(ds_customer_id),
+          payload: body,
+          response: {
+            achados: lista
+          },
+          error_message: `CNPJ com ${achados.length} cadastros no Omie - ambiguo`
+        }, "criar");
+        return json({
+          ok: false,
+          bloqueado: "cnpj_ambiguo_no_omie",
+          error: `Este CNPJ tem ${achados.length} cadastros no Omie. Nao da para escolher automaticamente sem risco de vincular no cadastro errado. Limpe o duplicado no Omie (ou resolva na Conferencia) e tente de novo.`,
+          candidatos: lista
+        }, 409);
+      }
+      if (achados.length === 1) {
+        alvoOmieId = Number(achados[0].codigo_cliente_omie);
+        cadastroAtual = achados[0];
+        comoResolveu = "encontrado_por_cnpj";
+      }
+    }
+    // ===== 2) Monta o que enviar =====
+    let call;
+    let param = {};
+    let camposEnviados = [];
+    let pulouChamada = false;
+    if (alvoOmieId && comoResolveu === "encontrado_por_cnpj") {
+      // ASSUMINDO cliente existente: SO PREENCHE LACUNA. Nunca sobrescreve.
+      call = "AlterarCliente";
+      param = {
+        codigo_cliente_omie: alvoOmieId
+      };
+      for (const k of CAMPOS){
+        if (!vazio(cliente[k]) && vazio(cadastroAtual?.[k])) {
+          param[k] = String(cliente[k]);
+          camposEnviados.push(k);
+        }
+      }
+      if (camposEnviados.length === 0) pulouChamada = true;
+    } else if (alvoOmieId && camposAlterados) {
+      // "C": cliente ja e nosso E sabemos o que o usuario editou -> manda SO isso.
+      call = "AlterarCliente";
+      param = {
+        codigo_cliente_omie: alvoOmieId
+      };
+      for (const k of camposAlterados){
+        if (!vazio(cliente[k])) {
+          param[k] = String(cliente[k]);
+          camposEnviados.push(k);
+        }
+      }
+      if (camposEnviados.length === 0) pulouChamada = true; // ex.: usuario ESVAZIOU o campo
+    } else if (alvoOmieId) {
+      // Cliente ja e nosso, sem lista (churn/reajuste/movimento/envio manual): DS e fonte da
+      // verdade (regra 3). NAO envia codigo_cliente_integracao: o Omie prioriza esse campo como
+      // chave e, nao achando match, CRIARIA duplicata em vez de atualizar.
+      call = "AlterarCliente";
+      param = {
+        codigo_cliente_omie: alvoOmieId,
+        cnpj_cpf: String(cliente.cnpj_cpf),
+        razao_social: String(cliente.razao_social)
+      };
+      for (const k of CAMPOS)if (!vazio(cliente[k])) {
+        param[k] = String(cliente[k]);
+        camposEnviados.push(k);
+      }
+    } else {
+      call = "UpsertCliente";
+      param = {
+        cnpj_cpf: String(cliente.cnpj_cpf),
+        razao_social: String(cliente.razao_social),
+        codigo_cliente_integracao: String(ds_customer_id)
+      };
+      for (const k of CAMPOS)if (!vazio(cliente[k])) {
+        param[k] = String(cliente[k]);
+        camposEnviados.push(k);
+      }
+      comoResolveu = "criado_novo";
+    }
+    // v13: o evento do log sai daqui -- do que a operacao REALMENTE e.
+    const evento = comoResolveu === "criado_novo" ? "criar" : "atualizar";
+    // ===== 3) Executa (ou pula) =====
+    let resp = {
+      pulado: true,
+      motivo: "Nada a enviar ao Omie"
+    };
+    if (!pulouChamada) {
+      console.log(`CHAMANDO_${call}`, JSON.stringify({
+        ds_customer_id,
+        alvoOmieId,
+        comoResolveu,
+        camposEnviados
+      }));
+      resp = await omieCall("/geral/clientes/", call, param, creds);
+    }
+    const omie_customer_id = resp?.codigo_cliente_omie ?? resp?.nCod ?? alvoOmieId;
+    if (!omie_customer_id) {
+      await logRow(tenant_id, "erro", {
+        referencia: String(ds_customer_id),
+        payload: body,
+        response: resp,
+        error_message: "Omie respondeu sem codigo_cliente_omie"
+      }, evento);
+      return json({
+        ok: false,
+        error: "Omie respondeu, mas n\u00e3o veio codigo_cliente_omie. Resposta crua no log.",
+        omie_resposta: resp
+      }, 502);
+    }
+    const nowIso = new Date().toISOString();
+    const { error: mapErr } = await supa.from("customers_mapping").upsert({
+      tenant_id,
+      cpf_cnpj: String(cliente.cnpj_cpf),
+      ds_customer_id: String(ds_customer_id),
+      omie_customer_id: String(omie_customer_id),
+      sync_status: "sincronizado",
+      last_updated: nowIso
+    }, {
+      onConflict: "tenant_id,ds_customer_id"
+    });
+    if (mapErr) console.error("FALHA_DEPARA:", JSON.stringify(mapErr));
+    const espelho = {
+      tenant_id,
+      codigo_cliente_omie: Number(omie_customer_id),
+      cnpj_cpf: String(cliente.cnpj_cpf),
+      razao_social: cadastroAtual?.razao_social ?? String(cliente.razao_social),
+      inativo: false,
+      raw: {
+        enviado: param,
+        omie: resp,
+        metodo: pulouChamada ? "nenhum" : call,
+        como_resolveu: comoResolveu,
+        campos_enviados: camposEnviados
+      },
+      synced_at: nowIso
+    };
+    if (comoResolveu === "criado_novo") espelho.codigo_cliente_integracao = String(ds_customer_id);
+    const { error: espErr } = await supa.from("omie_clientes").upsert(espelho, {
+      onConflict: "tenant_id,codigo_cliente_omie"
+    });
+    if (espErr) console.error("FALHA_ESPELHO:", JSON.stringify(espErr));
+    const depara_ok = !mapErr, espelho_ok = !espErr, tudo_ok = depara_ok && espelho_ok;
+    // v13: nada foi ao Omie -> status 'ignorado'. Antes isto virava "criacao de cliente - Sucesso",
+    // que e mentira duas vezes: nao criou e nao mandou nada.
+    const statusLog = !tudo_ok ? "erro" : pulouChamada ? "ignorado" : "sucesso";
+    await logRow(tenant_id, statusLog, {
+      referencia: String(ds_customer_id),
+      payload: body,
+      response: {
+        ...resp,
+        como_resolveu: comoResolveu,
+        campos_enviados: camposEnviados,
+        metodo: pulouChamada ? "nenhum" : call
+      },
+      error_message: tudo_ok ? pulouChamada ? "Cliente ja existe no Omie e nao havia campo vazio para preencher; nada foi enviado." : null : `de/para_ok=${depara_ok} espelho_ok=${espelho_ok}`
+    }, evento);
+    return json({
+      ok: true,
+      omie_customer_id,
+      ds_customer_id,
+      metodo: pulouChamada ? "nenhum" : call,
+      evento,
+      como_resolveu: comoResolveu,
+      cliente_assumido: comoResolveu === "encontrado_por_cnpj",
+      campos_recebidos: camposAlterados,
+      campos_enviados: camposEnviados,
+      nada_a_enviar: pulouChamada,
+      depara_gravado: depara_ok,
+      espelho_gravado: espelho_ok,
+      ...tudo_ok ? {} : {
+        aviso: "Cliente no Omie OK; verifique de/para e espelho local."
+      }
+    });
+  } catch (e) {
+    const msg = e.message ?? String(e);
+    console.error("ERRO_GERAL:", msg);
+    await logRow(tenant_id, "erro", {
+      referencia: String(body?.ds_customer_id ?? ""),
+      payload: body,
+      error_message: msg
+    });
+    return json({
+      ok: false,
+      error: msg
+    }, 500);
+  }
+});
