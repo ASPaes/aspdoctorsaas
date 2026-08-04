@@ -123,3 +123,9 @@ verify_jwt = false
 verify_jwt = false
 
 
+
+# omie-sync-processar: chamado pelo pg_cron (pg_net) e pelo botao "Enviar para Omie".
+# Producao ESTA com verify_jwt=false (conferido em 04/08/2026 via functions list, version 14).
+# Sem esta entrada o deploy do CI usaria o padrao true e mudaria a auth do processador da fila.
+[functions.omie-sync-processar]
+verify_jwt = false
