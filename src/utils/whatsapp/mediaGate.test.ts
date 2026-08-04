@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { hasRenderableMedia, hasRetrievableMedia, kindFromMessageType } from "./mediaGate";
+import {
+  hasRenderableMedia,
+  hasRetrievableMedia,
+  isMediaPlaceholderContent,
+  kindFromMessageType,
+} from "./mediaGate";
 
 // O bug que estes testes travam: o gate antigo era
 //   msg.media_url && tipo !== text/contact/contacts
@@ -79,6 +84,30 @@ describe("hasRetrievableMedia", () => {
     };
     expect(hasRenderableMedia(grande)).toBe(true);
     expect(hasRetrievableMedia(grande)).toBe(false);
+  });
+});
+
+describe("isMediaPlaceholderContent", () => {
+  it("reconhece os rótulos que o evolution-webhook grava sem legenda", () => {
+    for (const p of ["📷 Imagem", "🎵 Áudio", "🎥 Vídeo", "📄 Documento", "🎨 Sticker"]) {
+      expect(isMediaPlaceholderContent(p)).toBe(true);
+    }
+  });
+
+  it("legenda escrita pelo cliente NÃO é placeholder — não pode sumir da tela", () => {
+    expect(isMediaPlaceholderContent("Vídeo do erro no caixa 3")).toBe(false);
+    expect(isMediaPlaceholderContent("Vídeo")).toBe(false);
+    expect(isMediaPlaceholderContent("🎥")).toBe(false);
+  });
+
+  it("vazio e nulo não contam", () => {
+    expect(isMediaPlaceholderContent("")).toBe(false);
+    expect(isMediaPlaceholderContent(null)).toBe(false);
+    expect(isMediaPlaceholderContent(undefined)).toBe(false);
+  });
+
+  it("tolera espaço em volta", () => {
+    expect(isMediaPlaceholderContent("  🎥 Vídeo  ")).toBe(true);
   });
 });
 

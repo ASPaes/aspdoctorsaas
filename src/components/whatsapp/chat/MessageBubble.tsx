@@ -7,7 +7,7 @@ import { getSendErrorInfo } from "@/lib/metaSendErrors";
 import type { GroupParticipant } from "../hooks/useGroupParticipants";
 import { renderMentions, renderMessageText } from "./mentionUtils";
 import { MediaContent } from "./MediaContent";
-import { hasRenderableMedia } from "@/utils/whatsapp/mediaGate";
+import { hasRenderableMedia, isMediaPlaceholderContent } from "@/utils/whatsapp/mediaGate";
 import { ContactCard } from "./ContactCard";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { formatTime as formatTzTime } from "@/lib/formatDateWithTimezone";
@@ -367,7 +367,14 @@ export function MessageBubble({
           <MediaContent messageId={msg.id} messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} mediaFilename={msg.media_filename} mediaExt={msg.media_ext} mediaSizeBytes={msg.media_size_bytes} mediaKind={msg.media_kind} mediaMimetype={msg.media_mimetype} mediaPath={msg.media_path} />
         </div>
       )}
-      {msg.content && msg.message_type !== 'contact' && msg.message_type !== 'contacts' && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{renderMessageText(msg.content, groupParticipants)}</p>}
+      {/* Com o card de mídia na tela, o placeholder que o webhook grava em
+          `content` ("🎥 Vídeo") vira eco do que o card já diz. Legenda escrita
+          pelo cliente continua aparecendo — só o placeholder some. */}
+      {msg.content
+        && msg.message_type !== 'contact'
+        && msg.message_type !== 'contacts'
+        && !(hasRenderableMedia(msg) && isMediaPlaceholderContent(msg.content))
+        && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{renderMessageText(msg.content, groupParticipants)}</p>}
 
       {isAudio && (
         <div className="mt-1 min-w-0">

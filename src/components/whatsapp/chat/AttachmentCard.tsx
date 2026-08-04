@@ -4,11 +4,6 @@ import { formatBytes } from '@/utils/whatsapp/formatBytes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useMediaMeta } from '@/components/whatsapp/hooks/useMediaMeta';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 
 interface AttachmentCardProps {
   messageId: string;
@@ -131,55 +126,56 @@ export function AttachmentCard({
   const showLargeFileWarning = !hasMediaUrl;
 
   return (
-    <div className="flex items-center gap-3 rounded-lg bg-muted/50 border border-border/50 p-3 min-w-0 max-w-full">
-      <div className="flex-shrink-0 h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-        <Icon className="h-5 w-5 text-primary" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate" title={filename}>
-          {filename}
-        </p>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          {ext && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 uppercase font-mono">
-              {ext}
-            </Badge>
-          )}
-          <span className="text-[11px] text-muted-foreground">
-            {formatBytes(sizeBytes)}{hasRealFilename ? ` · ${kindLabel}` : ''}
-          </span>
+    <div className="rounded-lg bg-muted/50 border border-border/50 p-3 min-w-0 max-w-full">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="flex-shrink-0 h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+          <Icon className="h-5 w-5 text-primary" />
         </div>
-      </div>
-      <div className="flex flex-col gap-1 flex-shrink-0">
-        {showLargeFileWarning ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex items-center justify-center h-7 w-7 text-muted-foreground" title="Abrir pelo WhatsApp">
-                <Smartphone className="h-3.5 w-3.5" />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="left" className="max-w-[16rem]">
-              {/* Tamanho conhecido = o webhook recusou por passar do teto. Tamanho
-                  desconhecido = a tentativa de download falhou. Dizer "arquivo
-                  grande" no segundo caso seria chute. */}
-              <p>
-                {sizeBytes != null
-                  ? 'Arquivo grande — não carregado automaticamente. Abra pelo WhatsApp.'
-                  : 'Não foi possível baixar este arquivo. Abra pelo WhatsApp.'}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          <>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate" title={filename}>
+            {filename}
+          </p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {ext && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 uppercase font-mono">
+                {ext}
+              </Badge>
+            )}
+            <span className="text-[11px] text-muted-foreground">
+              {formatBytes(sizeBytes)}{hasRealFilename ? ` · ${kindLabel}` : ''}
+            </span>
+          </div>
+        </div>
+        {/* Sem arquivo no Storage não há o que abrir nem baixar — o bloco de
+            botões nem existe, em vez de virar um container vazio. */}
+        {!showLargeFileWarning && (
+          <div className="flex flex-col gap-1 flex-shrink-0">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleOpen} title="Abrir">
               <ExternalLink className="h-3.5 w-3.5" />
             </Button>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDownload} title="Baixar" disabled={downloading}>
               {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
             </Button>
-          </>
+          </div>
         )}
       </div>
+
+      {/* Aviso INLINE, não tooltip. Como tooltip só aparecia ao passar o mouse no
+          ícone de celular — o atendente via um card de vídeo sem player e sem
+          explicação nenhuma, e não tinha por que descobrir que havia texto ali.
+          Tamanho conhecido = o webhook recusou por passar do teto de 12 MB.
+          Tamanho desconhecido = a tentativa de download falhou; dizer "arquivo
+          grande" nesse caso seria chute. */}
+      {showLargeFileWarning && (
+        <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-2">
+          <Smartphone className="h-3.5 w-3.5 mt-px shrink-0 text-amber-600 dark:text-amber-400" />
+          <p className="text-[11px] leading-snug text-amber-700 dark:text-amber-300">
+            {sizeBytes != null
+              ? 'Arquivo grande — não foi baixado automaticamente. Abra pelo WhatsApp para ver.'
+              : 'Não foi possível baixar este arquivo. Abra pelo WhatsApp para ver.'}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

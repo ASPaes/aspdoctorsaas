@@ -51,6 +51,29 @@ export function hasRetrievableMedia(msg: Pick<MediaFields, "media_url" | "media_
   return Boolean(msg.media_url || msg.media_path);
 }
 
+/**
+ * Rótulos que o evolution-webhook grava em `content` quando a mídia chega SEM
+ * legenda (ver `descriptions` no getMessageContent). Não são texto do cliente —
+ * são placeholder. Com o card de mídia na tela eles viram eco: o card já diz
+ * "Vídeo" e logo abaixo aparecia "🎥 Vídeo" de novo.
+ */
+const MEDIA_PLACEHOLDER_CONTENT = new Set([
+  "📷 Imagem",
+  "🎵 Áudio",
+  "🎥 Vídeo",
+  "📄 Documento",
+  "🎨 Sticker",
+]);
+
+/**
+ * O `content` é só o placeholder do webhook (e portanto redundante com o card),
+ * ou é legenda de verdade escrita pelo cliente?
+ */
+export function isMediaPlaceholderContent(content: string | null | undefined): boolean {
+  if (!content) return false;
+  return MEDIA_PLACEHOLDER_CONTENT.has(content.trim());
+}
+
 /** message_type → kind do AttachmentCard, para cair o ícone e o rótulo certos. */
 export function kindFromMessageType(messageType: string): string {
   switch (messageType) {
