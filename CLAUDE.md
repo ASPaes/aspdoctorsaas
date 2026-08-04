@@ -8,9 +8,20 @@ Stack: React + Vite + TS + Tailwind + shadcn/ui · Supabase (Postgres + RLS + Ed
 
 ## ⚠️ LEIA ANTES DE QUALQUER COMMIT
 
-### 1. Push na `main` = deploy em PRODUÇÃO
-`.github/workflows/deploy-edge-functions.yml` dispara em qualquer push que toque `supabase/functions/**` e faz **deploy de TODAS as edge functions do repo** (`for dir in supabase/functions/*/`), não só das que mudaram. Se qualquer EF no repo estiver atrás da versão em prod, o push **reverte produção**.
-Historicamente várias EFs foram deployadas direto via Supabase MCP e nunca voltaram pro repo. **Antes do primeiro push que toque `supabase/functions/**`, auditar repo vs prod.**
+### 1. Push na `main` que toca `supabase/functions/**` = deploy em PRODUÇÃO
+`.github/workflows/deploy-edge-functions.yml` dispara nesse caminho e, **desde 03/08/2026, deploya SÓ o que mudou no push** (antes era `for dir in supabase/functions/*/`, o repo inteiro). Três casos ainda deployam tudo:
+- **`_shared` mudou** — as outras o importam em tempo de bundle; deployar só ele deixaria as demais com a cópia antiga embutida.
+- **Sem base confiável para o diff** — primeiro push do branch, force-push ou commit podado. O workflow não adivinha e cai no comportamento antigo.
+- **`workflow_dispatch` com `all=true`** — deploy completo explícito, nunca acidental.
+
+**O repo continua NÃO sendo a fonte de verdade das functions.** Auditoria de 03/08/2026 contra produção (82 functions): 36 no repo e deployadas pelo CI · 28 no repo mas deployadas **a mão** (a cópia do repo pode estar atrás) · 18 só em produção. Era por isso que um push em UMA function revertia as outras — e, como versionar virou risco, ninguém versionou.
+
+Regras que continuam valendo:
+- **Antes de editar qualquer function, baixe a de produção**: `supabase functions download <slug> --project-ref vbngjzovjhkmietztffo` (DoctorOMIE: `vqrytdntynxuqozehals`) e mescle sobre ela. Nunca edite uma cópia baixada antes. Já houve deploy perdido por sobreposição (03/08, `ds-omie-contrato-alterar`).
+- **Ao trazer uma function prod-only para o repo, confira o `verify_jwt` antes**: `supabase functions list --project-ref …`. Sem a entrada correspondente em `supabase/config.toml`, o CI deploya com o padrão `true` e **muda a autenticação da function em silêncio**. Foi o que quase aconteceu com `omie-sync-processar` (prod estava `false`). No projeto, 17 das 82 estão com `true` — as outras 65 quebrariam.
+- **Se `_shared` mudar**, o push deploya todas as 65 do repo: auditar repo vs prod antes.
+
+Em 04/08/2026 o `omie-sync-processar` foi a **primeira das 18 prod-only a voltar** para o repo. Faltam 17.
 
 ### 2. `supabase/migrations/` NÃO é a fonte de verdade do schema
 Não existe CI de migrations. Muita coisa foi aplicada via `apply_migration` / SQL Editor e nunca foi versionada. **O schema real vive no banco.**
@@ -292,7 +303,7 @@ Regra do Alexandre: toda mudança avaliada por latência/egress/carga **antes** 
 
 **No ar e estável:** WhatsApp/atendimento (multi-provider, distribuição, CSAT, macros, grupos, URA battle) · Support Tickets (TK-YYYY-NNNN, categorias N:N por produto, closure flow) · Contratos/MRR/cancelamento/reativação · Onboarding & Implantação (kanban, gerador de pipeline por IA via Edge Function `generate-onboarding-blueprint`) · Théo (agente IA) · Painel de Uso · Controles de custo de IA · Quiet hours · SSO DoctorDev.
 
-63 edge functions em `supabase/functions/` (64 diretórios, sendo `_shared` código compartilhado). Produção tem **mais** que isso: pelo menos 18 functions (`recon-*`, `omie-*`, `ds-omie-anexo-enviar`, `fetch-zapi-history`, `sync-contact-picture`, `reconnect-whatsapp-instance`) só existem em prod e nunca voltaram pro repo.
+65 edge functions em `supabase/functions/` (66 diretórios, sendo `_shared` código compartilhado). Produção tem **82**: as outras **17** (`recon-*`, `omie-*`, `ds-omie-anexo-enviar`, `fetch-zapi-history`, `sync-contact-picture`, `reconnect-whatsapp-instance`) só existem em prod e nunca voltaram pro repo. Trazer as que faltam é seguro desde que o CI deploya só o que mudou — uma de cada vez, conferindo `verify_jwt` antes (ver seção ⚠️ 1).
 
 **Bugs conhecidos em aberto:**
 - `fn_block_close_without_cliente` bloqueando `csat_completed` / `csat_timeout` / `ura_encerrado`
