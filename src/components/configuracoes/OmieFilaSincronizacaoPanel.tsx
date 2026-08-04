@@ -238,6 +238,7 @@ const ORIGEM_LABEL: Record<string, string> = {
   manual: "Envio manual",
   movimento_reajuste: "Reajuste",
   valor: "Alteração de valor",
+  produto: "Troca de produto",
 };
 
 function labelOrigem(o?: string | null) {
