@@ -15,6 +15,7 @@ import { Loader2 } from "lucide-react";
 import RequirePermission from "@/components/auth/RequirePermission";
 import RequireRole from "@/components/auth/RequireRole";
 import LandingRedirect from "@/components/auth/LandingRedirect";
+import { registerMediaBlobRevoker } from "@/lib/mediaBlobRegistry";
 
 // Eager-loaded: pages visited most frequently (no spinner on navigate)
 import Dashboard from "@/pages/Dashboard";
@@ -71,6 +72,11 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Libera os blob URLs de mídia do WhatsApp quando o react-query descarta a
+// entrada de cache. Sem isso a aba do atendente acumula todo áudio/imagem/vídeo
+// aberto no turno até o reload.
+registerMediaBlobRevoker(queryClient);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
