@@ -38,10 +38,13 @@ function WhatsAppContent() {
     if (!selected) return;
 
     const recheckAccess = async () => {
-      // Optimistic: check React Query cache first for immediate update
+      // Optimistic: check React Query cache first for immediate update.
+      // `d.pages`, não `d.conversations`: a lista virou useInfiniteQuery no
+      // DEM-0234 e esta leitura ficou para trás — sempre devolvia undefined, e o
+      // caminho otimista nunca rodava.
       const cachedEntry = queryClient.getQueriesData({ queryKey: ['whatsapp', 'conversations'] })
-        .flatMap(([, d]: any) => d?.conversations ?? [])
-        .find((c: any) => c.id === selected.id);
+        .flatMap(([, d]: any) => (d?.pages ?? []).flat())
+        .find((c: any) => c?.id === selected.id);
 
       if (cachedEntry && (cachedEntry as any).last_message_at !== selected.last_message_at) {
         setSelected(cachedEntry as unknown as ConversationWithContact);

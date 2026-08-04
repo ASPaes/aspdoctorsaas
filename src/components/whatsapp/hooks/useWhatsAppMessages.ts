@@ -278,6 +278,94 @@ export const useWhatsAppMessages = (
     newMessageCallbackRef.current = cb;
   }, []);
 
+  // ── Recuperação: buscar o que o Realtime não entregou ──────────────────────
+  //
+  // `postgres_changes` NÃO tem replay. Se a conexão cai (rede oscilando, máquina
+  // suspensa, aba em segundo plano por muito tempo), tudo que aconteceu no
+  // intervalo some para sempre — o canal reassina e segue como se nada tivesse
+  // faltado. Era o relato do atendente: "às vezes não atualiza a msg, só quando
+  // dá F5 ou entra na conversa".
+  //
+  // E não havia rede de segurança: o fallback do ChatMessages depende do
+  // `lastMessageAt`, que vem do `selected` da página, atualizado SÓ pelo
+  // Realtime. Realtime fora do ar derrubava o plano B junto com o plano A. F5 e
+  // reabrir a conversa funcionavam porque remontam a query.
+  //
+  // Um refetch resolveria, mas a query é infinita: `invalidateQueries` refaz
+  // TODAS as páginas carregadas — quem rolou o histórico pagaria caro e repetido.
+  // Esta busca é incremental e de custo constante: pega só o que é mais novo do
+  // que a mensagem mais recente em cache.
+  const catchUpInFlightRef = useRef(false);
+
+  const catchUpMessages = useCallback(async () => {
+    if (!conversationId || catchUpInFlightRef.current) return;
+
+    const cached = queryClient.getQueryData<MsgPages>(['whatsapp', 'messages', conversationId]);
+    const known = (cached?.pages ?? []).flat();
+    if (known.length === 0) return; // sem carga inicial ainda — a query normal cuida
+
+    let newestIso: string | null = null;
+    let newestMs = -Infinity;
+    for (const m of known) {
+      const ms = new Date(m.timestamp).getTime();
+      if (Number.isFinite(ms) && ms > newestMs) { newestMs = ms; newestIso = m.timestamp; }
+    }
+    if (!newestIso) return;
+
+    catchUpInFlightRef.current = true;
+    try {
+      // `gte` e não `gt`: mensagens no mesmo segundo existem, e `gt` perderia as
+      // irmãs da mais recente. O reprocesso da própria é inofensivo — o
+      // upsertInfinite deduplica por id/message_id.
+      const { data, error } = await (supabase.from('whatsapp_messages' as any) as any)
+        .select(MESSAGE_SELECT)
+        .eq('conversation_id', conversationId)
+        .gte('timestamp', newestIso)
+        .order('timestamp', { ascending: true })
+        .limit(PAGE_SIZE);
+
+      if (error || !data?.length) return;
+
+      const knownIds = new Set(known.map((m) => m.id));
+      for (const raw of data as Array<Partial<Message> & Record<string, any>>) {
+        const msg = normalizeMessage(raw);
+        if (knownIds.has(msg.id)) continue; // já tínhamos: nada a anunciar
+        queryClient.setQueryData<MsgPages>(
+          ['whatsapp', 'messages', conversationId],
+          (old) => upsertInfinite(old, msg)
+        );
+        // Mesmo tratamento do Realtime: rola para o fim se já estava no fim, ou
+        // acende "Novas mensagens" se o atendente estava lendo mais acima.
+        newMessageCallbackRef.current?.(msg);
+        patchConversationPreview(queryClient, conversationId, msg, true);
+      }
+    } finally {
+      catchUpInFlightRef.current = false;
+    }
+  }, [conversationId, queryClient]);
+
+  // Gatilhos independentes do Realtime — é o ponto: se dependessem dele, não
+  // serviriam justamente quando ele falha. Voltar para a aba é o que o atendente
+  // fazia manualmente com F5.
+  useEffect(() => {
+    if (readOnly || !conversationId) return;
+
+    const onBack = () => {
+      if (document.visibilityState === 'visible') void catchUpMessages();
+    };
+    window.addEventListener('focus', onBack);
+    document.addEventListener('visibilitychange', onBack);
+    // Último recurso, e só com a aba à vista: aba em segundo plano não gera
+    // carga nenhuma no banco.
+    const timer = setInterval(onBack, 30_000);
+
+    return () => {
+      window.removeEventListener('focus', onBack);
+      document.removeEventListener('visibilitychange', onBack);
+      clearInterval(timer);
+    };
+  }, [conversationId, readOnly, catchUpMessages]);
+
   useEffect(() => {
     if (readOnly) return;
     if (!conversationId) return;
@@ -321,15 +409,22 @@ export const useWhatsAppMessages = (
         });
       },
       (status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn(`[realtime] channel ${channelName} failed (${status})`);
-          queryClient.invalidateQueries({
-            queryKey: ['whatsapp', 'messages', conversationId],
-          });
+        // SUBSCRIBED cobre a REASSINATURA depois de uma queda, que é o caso
+        // perigoso: o canal volta calado e o intervalo perdido não chega nunca.
+        // Na primeira assinatura o catch-up não faz nada (cache vazio).
+        if (status === 'SUBSCRIBED') {
+          void catchUpMessages();
+          return;
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.warn(`[realtime] channel ${channelName} caiu (${status})`);
+          // Busca incremental em vez de invalidateQueries: a query é infinita e
+          // invalidar refaria TODAS as páginas carregadas.
+          void catchUpMessages();
         }
       }
     );
-  }, [conversationId, queryClient, readOnly]);
+  }, [conversationId, queryClient, readOnly, catchUpMessages]);
 
   return { messages, isLoading, error, onNewMessage, fetchNextPage, hasNextPage, isFetchingNextPage };
 };
