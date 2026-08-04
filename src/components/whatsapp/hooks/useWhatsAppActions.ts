@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
+import { patchConversationInCache, mapConversationsInCache } from './conversationsCache';
 
 /**
  * Helper: optimistically patch a conversation in all sidebar query caches.
@@ -12,14 +13,7 @@ function patchConversation(
   conversationId: string,
   patch: Record<string, any>
 ) {
-  queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
-    if (!old?.conversations) return old;
-    const idx = old.conversations.findIndex((c: any) => c.id === conversationId);
-    if (idx === -1) return old;
-    const patched = [...old.conversations];
-    patched[idx] = { ...patched[idx], ...patch };
-    return { ...old, conversations: patched };
-  });
+  patchConversationInCache(queryClient, conversationId, patch);
 }
 
 export const useWhatsAppActions = () => {
@@ -490,25 +484,19 @@ export const useWhatsAppActions = () => {
       const prevConversations = queryClient.getQueriesData({ queryKey: ['whatsapp', 'conversations'] });
 
       // Patch otimista: atualiza o contato em todas as conversas em cache
-      queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
-        if (!old?.conversations) return old;
-        return {
-          ...old,
-          conversations: old.conversations.map((c: any) =>
-            c?.contact?.id === contactId
-              ? {
-                  ...c,
-                  contact: {
-                    ...c.contact,
-                    rules_disabled: rulesDisabled,
-                    rules_disabled_at: rulesDisabled ? nowIso : null,
-                    rules_disabled_by: rulesDisabled ? (user?.id ?? null) : null,
-                  },
-                }
-              : c
-          ),
-        };
-      });
+      mapConversationsInCache(queryClient, (c: any) =>
+        c?.contact?.id === contactId
+          ? {
+              ...c,
+              contact: {
+                ...c.contact,
+                rules_disabled: rulesDisabled,
+                rules_disabled_at: rulesDisabled ? nowIso : null,
+                rules_disabled_by: rulesDisabled ? (user?.id ?? null) : null,
+              },
+            }
+          : c
+      );
 
       return { prevConversations };
     },

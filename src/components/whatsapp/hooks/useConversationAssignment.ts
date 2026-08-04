@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { createNotificationForUser } from '@/hooks/useNotifications';
+import { patchConversationInCache, removeConversationFromCache } from './conversationsCache';
 
 export const useConversationAssignment = () => {
   const queryClient = useQueryClient();
@@ -77,15 +78,7 @@ export const useConversationAssignment = () => {
     },
     onMutate: async (vars) => {
       // Optimistic: patch sidebar + attendance immediately
-      queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
-        if (!old?.conversations) return old;
-        return {
-          ...old,
-          conversations: old.conversations.map((c: any) =>
-            c.id === vars.conversationId ? { ...c, assigned_to: vars.assignedTo } : c
-          ),
-        };
-      });
+      patchConversationInCache(queryClient, vars.conversationId, { assigned_to: vars.assignedTo });
       queryClient.setQueriesData<Map<string, any>>(
         { queryKey: ["attendance-status"] },
         (oldMap) => {
@@ -151,16 +144,8 @@ export const useConversationAssignment = () => {
       return { conversationId, newAssignee };
     },
     onMutate: async (vars) => {
-      queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
-        if (!old?.conversations) return old;
-        // Remover a conversa da lista do usuário atual (ela foi transferida)
-        return {
-          ...old,
-          conversations: old.conversations.filter(
-            (c: any) => c.id !== vars.conversationId
-          ),
-        };
-      });
+      // Remover a conversa da lista do usuário atual (ela foi transferida)
+      removeConversationFromCache(queryClient, vars.conversationId);
       queryClient.setQueriesData<Map<string, any>>(
         { queryKey: ["attendance-status"] },
         (oldMap) => {

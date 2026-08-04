@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeMessage, upsertInfinite, patchInfinite, type Message, type MsgPages } from './useWhatsAppMessages';
+import { patchConversationInCache, outgoingMediaPreview } from './conversationsCache';
 
 interface SendMessageParams {
   conversationId: string;
@@ -128,25 +129,15 @@ export const useWhatsAppSend = () => {
         );
       }, failTimeoutMs);
 
-      queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
-        if (!old?.conversations) return old;
-        const patched = old.conversations.map((c: any) =>
-          c.id === newMessage.conversationId
-            ? {
-                ...c,
-                last_message_at: new Date().toISOString(),
-                last_message_preview: newMessage.content?.substring(0, 100) || `Sent ${newMessage.messageType}`,
-                is_last_message_from_me: true,
-                isLastMessageFromMe: true,
-              }
-            : c
-        );
-        patched.sort((a: any, b: any) => {
-          const tA = a.last_message_at || a.created_at || '';
-          const tB = b.last_message_at || b.created_at || '';
-          return tB.localeCompare(tA);
-        });
-        return { ...old, conversations: patched };
+      patchConversationInCache(queryClient, newMessage.conversationId, {
+        last_message_at: new Date().toISOString(),
+        // O fallback antigo era `Sent ${messageType}` — em inglês. Nunca apareceu
+        // porque este patch estava morto; agora que volta a valer, tem que sair
+        // em pt-BR e na mesma convenção do evolution-webhook.
+        last_message_preview:
+          newMessage.content?.substring(0, 100) || outgoingMediaPreview(newMessage.messageType),
+        is_last_message_from_me: true,
+        isLastMessageFromMe: true,
       });
 
       return { previousMessages, tempId };

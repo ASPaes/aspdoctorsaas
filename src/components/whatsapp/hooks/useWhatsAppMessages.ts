@@ -2,6 +2,7 @@ import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/r
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { subscribeSharedChannel } from '@/lib/realtimeChannelPool';
+import { patchConversationInCache } from './conversationsCache';
 
 export type MessageUiType = 'text' | 'media' | 'audio' | 'document' | 'image' | 'system' | string;
 
@@ -298,26 +299,13 @@ function patchConversationPreview(
   msg: Message,
   isViewing = false
 ) {
-  queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
-    if (!old?.conversations) return old;
-    const idx = old.conversations.findIndex((c: any) => c.id === conversationId);
-    if (idx === -1) return old;
-    const patched = [...old.conversations];
-    const now = msg.timestamp || new Date().toISOString();
-    patched[idx] = {
-      ...patched[idx],
-      last_message_at: now,
-      last_message_preview: msg.content?.substring(0, 100) || patched[idx].last_message_preview,
-      is_last_message_from_me: msg.is_from_me,
-      isLastMessageFromMe: msg.is_from_me,
-      ...(msg.is_from_me || isViewing ? {} : { unread_count: (patched[idx].unread_count || 0) + 1 }),
-      ...(isViewing ? { unread_count: 0 } : {}),
-    };
-    patched.sort((a: any, b: any) => {
-      const tA = a.last_message_at || a.created_at || '';
-      const tB = b.last_message_at || b.created_at || '';
-      return tB.localeCompare(tA);
-    });
-    return { ...old, conversations: patched };
-  });
+  const now = msg.timestamp || new Date().toISOString();
+  patchConversationInCache(queryClient, conversationId, (prev) => ({
+    last_message_at: now,
+    last_message_preview: msg.content?.substring(0, 100) || prev.last_message_preview,
+    is_last_message_from_me: msg.is_from_me,
+    isLastMessageFromMe: msg.is_from_me,
+    ...(msg.is_from_me || isViewing ? {} : { unread_count: (prev.unread_count || 0) + 1 }),
+    ...(isViewing ? { unread_count: 0 } : {}),
+  }));
 }
