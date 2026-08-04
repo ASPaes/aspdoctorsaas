@@ -46,6 +46,14 @@ export function useConversationStates(conversationIds: string[]) {
     },
     enabled: conversationIds.length > 0,
     staleTime: 30000,
+    // Cadência fixa em vez de reação a evento. Os dois caminhos que invalidavam
+    // esta chave (aqui e no useAttendanceStatus) usam refetchType: "none", então
+    // sem um intervalo a view só seria relida quando a sortedKey mudasse — com o
+    // atendente parado na tela, o estado congelaria. 60s é a mesma cadência do
+    // useWhatsAppConversations e do useAttendanceStatus.
+    refetchInterval: 60_000,
+    // Aba em segundo plano não precisa pagar por isso.
+    refetchIntervalInBackground: false,
     placeholderData: keepPreviousData,
   });
 

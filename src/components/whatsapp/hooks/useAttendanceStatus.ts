@@ -194,7 +194,18 @@ export function useAttendanceStatus(
         setTimeout(() => {
           attInvalidateTimers.delete(dkey);
           queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
-          queryClient.invalidateQueries({ queryKey: ["conversation-states"] });
+          // refetchType: "none" — sem isso este invalidate refazia a query ativa
+          // NA HORA e anulava o staleTime de 30s do useConversationStates, que
+          // foi posto lá em 31/07 exatamente para conter esta view. Metade do fix
+          // ficou pela metade: qualquer mexida em support_attendances (assumir,
+          // encerrar, transferir) forçava uma releitura de
+          // v_whatsapp_conversations_state sobre a lista inteira, a ~126 ms a
+          // chamada — 478 mil chamadas e 16,8 h de tempo de banco, o item mais
+          // caro do pg_stat_statements (medido em 04/08/2026).
+          // Marcar como velho basta: o dado fresco de quem importa já chegou pelo
+          // setQueriesData do attendanceMap logo acima, e o refetchInterval do
+          // useConversationStates governa o resto.
+          queryClient.invalidateQueries({ queryKey: ["conversation-states"], refetchType: "none" });
         }, 1000)
       );
     },
