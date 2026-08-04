@@ -153,6 +153,41 @@ export function mergeMessage(old: Message[], incoming: Message): Message[] {
   return [...old, incoming];
 }
 
+// Zerar o badge é escrita em `whatsapp_conversations`, que está na publication
+// do Realtime: TODO update vira WAL + fanout para todos os browsers do tenant.
+// Medido em 04/08/2026, a decodificação de WAL era o 2º maior custo do banco,
+// com pico de 12,9 s — é o que faz a mensagem demorar a aparecer mesmo tendo
+// entrado no banco em 1,2 s.
+//
+// Duas economias, sem mudar o que o usuário vê:
+//  - `.gt('unread_count', 0)`: se já está zerado, o Postgres não atualiza linha
+//    nenhuma e não gera WAL. É o caso comum — trocar de conversa já lida
+//    disparava um UPDATE inútil a cada clique.
+//  - throttle por conversa: uma rajada de mensagens gerava um UPDATE por
+//    mensagem; agora no máximo um por janela.
+const clearUnreadTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function clearUnreadCount(conversationId: string, throttleMs = 0) {
+  const run = () => {
+    clearUnreadTimers.delete(conversationId);
+    void supabase
+      .from('whatsapp_conversations')
+      .update({ unread_count: 0 })
+      .eq('id', conversationId)
+      .gt('unread_count', 0)
+      .then();
+  };
+
+  if (throttleMs <= 0) {
+    run();
+    return;
+  }
+  // Throttle de borda final: se já existe passada agendada, esta rajada entra
+  // nela. Debounce (reagendar) seria errado — num fluxo contínuo nunca dispararia.
+  if (clearUnreadTimers.has(conversationId)) return;
+  clearUnreadTimers.set(conversationId, setTimeout(run, throttleMs));
+}
+
 export const useWhatsAppMessages = (
   conversationId: string | null,
   options?: { readOnly?: boolean }
@@ -211,17 +246,24 @@ export const useWhatsAppMessages = (
   useEffect(() => {
     if (readOnly) return;
     if (conversationId) {
-      // Zerar unread_count na conversa (badge da sidebar)
-      supabase
-        .from('whatsapp_conversations')
-        .update({ unread_count: 0 })
-        .eq('id', conversationId)
-        .then();
+      // Zerar unread_count na conversa (badge da sidebar). Imediato: o atendente
+      // acabou de abrir e o badge tem que sumir na hora.
+      clearUnreadCount(conversationId);
 
-      // Dispensar todas as notificações dessa conversa (sino)
+      // Dispensar todas as notificações dessa conversa (sino).
+      //
+      // A RPC devolve QUANTAS foram dispensadas — e só invalidamos se houve
+      // alguma. Invalidar incondicionalmente refazia a lista de notificações (50
+      // linhas com join, ~25 ms) a cada conversa aberta, e atendente troca de
+      // conversa o tempo todo: 579 mil chamadas e 4,1 h de tempo de banco, o 3º
+      // maior custo do pg_stat_statements medido em 04/08/2026. Na maioria
+      // esmagadora dos cliques não há nada pendente para dispensar, então o
+      // refetch era puro desperdício. Pular quando nada mudou é estritamente
+      // correto: o cache continua válido.
       supabase
         .rpc('dismiss_conversation_notifications' as any, { p_conversation_id: conversationId })
-        .then(() => {
+        .then(({ data: dismissedCount }) => {
+          if (!dismissedCount) return;
           queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
           queryClient.invalidateQueries({ queryKey: ['notifications-list'] });
         });
@@ -259,11 +301,10 @@ export const useWhatsAppMessages = (
           newMessageCallbackRef.current?.(incoming);
           patchConversationPreview(queryClient, conversationId, incoming, true);
           if (!incoming.is_from_me) {
-            supabase
-              .from('whatsapp_conversations')
-              .update({ unread_count: 0 })
-              .eq('id', conversationId)
-              .then();
+            // Throttle: o cache local já mostra a conversa como lida (patch
+            // acima), então atrasar a escrita 1,5s não muda nada na tela e
+            // colapsa a rajada num único UPDATE.
+            clearUnreadCount(conversationId, 1500);
           }
         });
         channel.on('postgres_changes' as any, {
