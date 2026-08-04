@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
+import { toExternalHref } from "@/lib/externalUrl";
 import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
 import { TicketAttachments } from "@/components/tickets/TicketAttachments";
 import {
@@ -1488,6 +1489,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       toast.error("Informe o título do treino");
       return;
     }
+    const linkHref = toExternalHref(newTrainingLink);
+    if (newTrainingLink.trim() && !linkHref) {
+      toast.error("Link inválido. Cole a URL da sala (ex.: https://meet.google.com/abc-defg-hij).");
+      return;
+    }
     const movesToImplantation = faseSlug === "onboarding" && concluir;
     try {
       const { error } = await (supabase.rpc as any)("create_onboarding_training", {
@@ -1497,7 +1503,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         p_conduzido_por: newTrainingConductor || null,
         p_is_retreinamento: newTrainingRetreat,
         p_training_type_id: newTrainingTypeId || null,
-        p_link: newTrainingLink.trim() || null,
+        p_link: linkHref,
         p_concluir_onboarding: concluir,
       });
       if (error) throw error;
@@ -1576,8 +1582,13 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   }
 
   async function handleSaveLink(id: string) {
+    const href = toExternalHref(linkEditValue);
+    if (linkEditValue.trim() && !href) {
+      toast.error("Link inválido. Cole a URL da sala (ex.: https://meet.google.com/abc-defg-hij).");
+      return;
+    }
     try {
-      await updateTraining(id, { link_agendamento: linkEditValue.trim() || null });
+      await updateTraining(id, { link_agendamento: href });
       setLinkEditId(null);
       setLinkEditValue("");
       toast.success("Link salvo");
@@ -2362,16 +2373,26 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                     )}
                                   </div>
                                   {t.link_agendamento && (
-                                    <a
-                                      href={t.link_agendamento}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-[hsl(199_89%_48%)] hover:underline max-w-full"
-                                      title={t.link_agendamento}
-                                    >
-                                      <ExternalLink className="h-3 w-3 shrink-0" />
-                                      <span className="truncate">Link do agendamento</span>
-                                    </a>
+                                    toExternalHref(t.link_agendamento) ? (
+                                      <a
+                                        href={toExternalHref(t.link_agendamento)!}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-[hsl(199_89%_48%)] hover:underline max-w-full"
+                                        title={t.link_agendamento}
+                                      >
+                                        <ExternalLink className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">Link do agendamento</span>
+                                      </a>
+                                    ) : (
+                                      <span
+                                        className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-muted-foreground max-w-full"
+                                        title={t.link_agendamento}
+                                      >
+                                        <ExternalLink className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">Link inválido — edite o link</span>
+                                      </span>
+                                    )
                                   )}
                                   {!isCancelled && (
                                     <div className="flex items-center gap-1 mt-2 flex-wrap">

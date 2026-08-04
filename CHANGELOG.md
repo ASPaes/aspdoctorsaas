@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Agosto / 2026
 
+### 04/08
+
+- 🔧 **Onboarding / Treinamentos** — O **link do agendamento** do sub-ticket de treino voltou a abrir a sala. Quando o link era colado sem o `https://` na frente — *meet.google.com/abc-defg-hij*, que é como o Meet mostra a sala —, o sistema o entendia como um endereço de dentro do próprio DoctorSaaS e o clique caía na tela de **página não encontrada**, em vez de abrir a reunião. Era o caso de **16 dos 23** links cadastrados. Todos voltam a funcionar sem precisar reeditar nada. Ao salvar, o link agora é completado sozinho, e um endereço que não seja uma sala válida é recusado na hora — antes ele era gravado assim mesmo e só se descobria no dia do treino.
+
 ### 03/08
 
 - 🔧 **Cadastro de Clientes / Integração OMIE** — **Mudar o valor de um produto ou de um módulo agora vai para o OMIE.** Existiam quatro caminhos que disparavam a sincronização — cadastro do cliente, observação, cancelamento e movimentos de MRR (upsell, downsell, reajuste) — e **nenhum** cobria a edição direta do valor do produto ou dos módulos do cliente, que é justamente o que forma a mensalidade. O valor mudava no DoctorSaaS e o OMIE ficava no valor antigo **para sempre**, sem erro, sem log e sem nada aparecer na fila. No caso dos módulos era ainda mais fácil de acontecer: a tela sugeria registrar o movimento de MRR num aviso, e quem fechasse esse aviso deixava a diferença sem nenhum caminho até o OMIE. Só o valor do contrato é enviado — vigência e cadastro do cliente não são tocados.

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Trash2, GraduationCap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { toExternalHref } from "@/lib/externalUrl";
 
 export interface EditableTraining {
   id: string;
@@ -62,6 +63,11 @@ export default function EditTrainingDialog({ open, onOpenChange, training, tipos
       toast.error("O treinamento precisa de um título");
       return;
     }
+    const linkHref = toExternalHref(link);
+    if (link.trim() && !linkHref) {
+      toast.error("Link inválido. Cole a URL da sala (ex.: https://meet.google.com/abc-defg-hij).");
+      return;
+    }
     setSalvando(true);
     try {
       const { data, error } = await (supabase.rpc as any)("update_onboarding_training", {
@@ -70,7 +76,7 @@ export default function EditTrainingDialog({ open, onOpenChange, training, tipos
         p_training_type_id: tipoId || null,
         p_conduzido_por: responsavel || null,
         p_agendado_para: quando ? new Date(quando).toISOString() : null,
-        p_link: link.trim() || null,
+        p_link: linkHref,
         p_limpar_conduzido: !responsavel && !!training.conduzido_por,
         p_limpar_agendado: !quando && !!training.agendado_para,
         p_limpar_link: !link.trim() && !!training.link_agendamento,
