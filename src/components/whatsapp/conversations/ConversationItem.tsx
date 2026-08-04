@@ -22,9 +22,10 @@ interface Props {
   isAgentAlert?: boolean;
   showDepartment?: boolean;
   departmentName?: string | null;
+  produtos?: string[];
 }
 
-export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance, isAgentAlert, showDepartment, departmentName }: Props) {
+export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance, isAgentAlert, showDepartment, departmentName, produtos }: Props) {
   const contact = conv.contact;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
   const sentimentData = conv.sentiment as any;
@@ -160,8 +161,13 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
     <button
       onClick={onClick}
       className={cn(
-        "w-full grid gap-3 p-3 rounded-md text-left transition-colors hover:bg-accent/50",
-        isSelected && "bg-accent",
+        // Seleção precisa ser legível: `bg-accent` é o azul sólido #0EA5E9 e apagava
+        // horário, preview e badges. Tinta leve + trilho na borda dá o mesmo sinal
+        // sem competir com o texto.
+        "w-full grid gap-3 p-3 rounded-md text-left transition-colors border-l-[3px] border-l-transparent",
+        isSelected
+          ? "bg-accent/30 border-l-accent hover:bg-accent/35 dark:bg-accent/[0.35] dark:hover:bg-accent/40"
+          : "hover:bg-muted/60",
         needsCSTicket && "ring-1 ring-destructive/40",
         hasBlock && "ring-1 ring-destructive/60 bg-destructive/5",
         !hasBlock && hasClientAlert && "ring-1 ring-amber-500/50 bg-amber-500/5",
@@ -228,6 +234,18 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+          )}
+          {produtos && produtos.length > 0 && (
+            <Badge
+              variant="outline"
+              title={produtos.join(" · ")}
+              className="shrink-0 max-w-[45%] h-4 px-1 py-0 gap-0.5 text-[9px] font-medium border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+            >
+              <span className="truncate">{produtos[0]}</span>
+              {produtos.length > 1 && (
+                <span className="shrink-0 opacity-70">+{produtos.length - 1}</span>
+              )}
+            </Badge>
           )}
         </div>
         <div className="flex items-center gap-1 mt-0.5">

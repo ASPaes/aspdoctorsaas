@@ -33,6 +33,7 @@ import { useAgentOptions } from "../hooks/useAgentOptions";
 import { useActiveAttendanceConvIds } from "../hooks/useActiveAttendanceConvIds";
 import { usePillCounts } from "../hooks/usePillCounts";
 import { useSupportDepartments } from "../hooks/useSupportDepartments";
+import { useContactProdutos } from "../hooks/useContactProdutos";
 import { getConversationBucket, type ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
 import { ConversationItem } from "./ConversationItem";
 import { ConversationFiltersPopover, type FiltersState } from "./ConversationFiltersPopover";
@@ -239,7 +240,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
   const isGroupsPill = activePill === "groups";
   const queueLikePills = activePill === "waiting" || activePill === "after_hours";
-  const { conversations, isLoading } = useWhatsAppConversations({
+
+  // A pill vira filtro de bucket NO SERVIDOR (DEM-0234). "Todos" e "Grupos" não
+  // restringem bucket. Os nomes das pills são os mesmos buckets de
+  // wa_conversation_bucket, então não há tradução a fazer.
+  const bucketForPill = isGroupsPill || activePill === "all" ? undefined : activePill;
+
+  const { conversations, isLoading, loadMore, hasMore, isLoadingMore } = useWhatsAppConversations({
     instanceId: isGroupsPill ? undefined : filters.instanceId,
     departmentId: isGroupsPill ? undefined : (selectedDepartmentId || undefined),
     instanceIds: isGroupsPill ? undefined : (selectedDepartmentId ? undefined : (filteredInstanceIds ?? undefined)),
@@ -247,9 +254,11 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     assignedTo: queueLikePills ? undefined : resolvedAssignedTo,
     unassigned: isGroupsPill || queueLikePills ? undefined : (resolvedUnassigned || undefined),
     isGroup: isGroupsPill ? true : activePill === "all" ? undefined : false,
+    bucket: bucketForPill,
     unreadOnly,
-    pageSize: 100,
+    pageSize: 50,
     includeIds,
+    closedVisibleTo: isAdmin ? undefined : user?.id,
   });
 
   // Get attendance data for all loaded conversations (still used for ConversationItem display)
@@ -259,6 +268,20 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     return [...new Set([...baseIds, ...searchIds])];
   }, [conversations, searchResults]);
   const { attendanceMap } = useAttendanceStatus(conversationIds, true);
+
+  // Produto (software) do cliente vinculado, para o badge ao lado do nome
+  const contactsForProdutos = useMemo(() => {
+    const byId = new Map<string, { id: string; cliente_id?: string | null }>();
+    [...conversations, ...searchResults].forEach((c) => {
+      const contact = c.contact as any;
+      if (contact?.id && !byId.has(contact.id)) {
+        byId.set(contact.id, { id: contact.id, cliente_id: contact.cliente_id ?? null });
+      }
+    });
+    return [...byId.values()];
+  }, [conversations, searchResults]);
+  const { data: produtosByContact } = useContactProdutos(contactsForProdutos);
+
   const { stateMap, isLoading: isStatesLoading } = useConversationStates(conversationIds);
 
   // Helper: build a ConversationStateRow from stateMap or fallback to conversation fields
@@ -621,6 +644,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       isAgentAlert={(() => { const d = getStateForConv(conv).agent_alert_due_at; return d != null && nowMs >= new Date(d).getTime(); })()}
       showDepartment={!selectedDepartmentId && !isSearching}
       departmentName={conv.department_id ? (departmentNameMap.get(conv.department_id) ?? null) : null}
+      produtos={conv.contact?.id ? produtosByContact?.get(conv.contact.id) : undefined}
     />
   );
 
