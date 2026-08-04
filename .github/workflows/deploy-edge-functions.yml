@@ -1,5 +1,32 @@
 name: Deploy Supabase Edge Functions
 
+# ==============================================================================
+# 03/08/2026 — DEPLOY SO DO QUE MUDOU.
+#
+# Antes: qualquer push que tocasse supabase/functions/** rodava
+#   `for dir in supabase/functions/*/` e deployava TODAS as functions do repo.
+#
+# Por que isso e perigoso aqui: o repo NAO e a fonte de verdade das edge
+# functions. Auditoria de 03/08/2026 contra a producao (82 functions):
+#   36  no repo e deployadas pelo CI            -> em dia
+#   28  no repo mas deployadas A MAO            -> a copia do repo pode estar atras
+#   18  em producao e ausentes do repo
+# Ou seja: um push em UMA function redeployava as outras 63, revertendo em
+# producao qualquer uma das 28 cuja copia no repo estivesse velha. Cinco delas
+# foram deployadas a mao no proprio dia 03/08.
+#
+# Efeito colateral que isso causou: como versionar uma function passou a ser
+# arriscado, ninguem versionou -- e as 18 nunca voltaram. O workflow era o
+# incentivo errado. Deployar so o que mudou remove o risco e torna seguro trazer
+# as que faltam, uma de cada vez.
+#
+# _shared: se ele muda, TODAS vao. Elas importam dele em tempo de bundle, entao
+# deployar so quem mudou deixaria as outras com a copia antiga embutida.
+#
+# workflow_dispatch continua permitindo o deploy completo, agora explicito
+# (all=true) em vez de acidental.
+# ==============================================================================
+
 on:
   push:
     branches:
@@ -7,6 +34,11 @@ on:
     paths:
       - 'supabase/functions/**'
   workflow_dispatch:
+    inputs:
+      all:
+        description: 'Deployar TODAS as functions do repo (cuidado: sobrescreve producao com a copia do repo)'
+        type: boolean
+        default: false
 
 jobs:
   deploy:
@@ -14,22 +46,68 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Precisa do historico para diferenciar o push; sem isso o git diff nao resolve.
+          fetch-depth: 0
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Deploy all functions (with retry)
+      - name: Descobrir o que mudou
+        id: alvo
+        env:
+          ANTES: ${{ github.event.before }}
+          AGORA: ${{ github.sha }}
+          TUDO: ${{ github.event_name == 'workflow_dispatch' && inputs.all }}
+        run: |
+          set -euo pipefail
+          listar_todas() { ls -d supabase/functions/*/ | xargs -n1 basename | grep -v '^_shared$' || true; }
+
+          if [ "$TUDO" = "true" ]; then
+            echo "motivo=workflow_dispatch com all=true" >> "$GITHUB_OUTPUT"
+            listar_todas > /tmp/alvo.txt
+          elif [ -z "${ANTES:-}" ] || [ "$ANTES" = "0000000000000000000000000000000000000000" ] \
+               || ! git cat-file -e "$ANTES^{commit}" 2>/dev/null; then
+            # Primeiro push do branch, force-push ou commit podado: sem base confiavel
+            # para o diff. Nao adivinha -- deploya tudo, que e o comportamento antigo.
+            echo "motivo=sem base para diff; caindo para deploy completo" >> "$GITHUB_OUTPUT"
+            listar_todas > /tmp/alvo.txt
+          else
+            MUDOU="$(git diff --name-only "$ANTES" "$AGORA" -- supabase/functions/ || true)"
+            if echo "$MUDOU" | grep -q '^supabase/functions/_shared/'; then
+              echo "motivo=_shared mudou; todas dependem dele" >> "$GITHUB_OUTPUT"
+              listar_todas > /tmp/alvo.txt
+            else
+              echo "motivo=so o que mudou neste push" >> "$GITHUB_OUTPUT"
+              echo "$MUDOU" \
+                | sed -n 's#^supabase/functions/\([^/]*\)/.*#\1#p' \
+                | grep -v '^_shared$' | sort -u > /tmp/alvo.txt
+              # Pasta apagada no push: nao existe mais para deployar (e remover em
+              # producao e decisao manual, nunca automatica).
+              while read -r fn; do
+                [ -d "supabase/functions/$fn" ] || sed -i "/^${fn}$/d" /tmp/alvo.txt
+              done < /tmp/alvo.txt
+            fi
+          fi
+          echo "Motivo: $(grep '^motivo=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2-)"
+          echo "Functions alvo ($(wc -l < /tmp/alvo.txt)):"
+          cat /tmp/alvo.txt
+
+      - name: Deploy (com retry)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
           set +e
+          if [ ! -s /tmp/alvo.txt ]; then
+            echo "Nenhuma function mudou neste push. Nada a fazer."
+            exit 0
+          fi
           FAILED=""
-          for dir in supabase/functions/*/; do
-            fn=$(basename "$dir")
-            [ "$fn" = "_shared" ] && continue
+          while read -r fn; do
+            [ -z "$fn" ] && continue
             ok=0
             for attempt in 1 2 3; do
               echo "::group::Deploy $fn (tentativa $attempt)"
@@ -42,8 +120,8 @@ jobs:
               sleep $((attempt * 10))
             done
             [ $ok -eq 0 ] && FAILED="$FAILED $fn"
-          done
+          done < /tmp/alvo.txt
           if [ -n "$FAILED" ]; then
-            echo "::error::Functions que falharam após 3 tentativas:$FAILED"
+            echo "::error::Functions que falharam apos 3 tentativas:$FAILED"
             exit 1
           fi
