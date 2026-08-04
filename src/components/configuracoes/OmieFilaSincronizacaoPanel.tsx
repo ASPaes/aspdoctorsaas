@@ -21,11 +21,91 @@ type ReprocessarResp = {
   motivos?: string[];
 };
 
-function ReprocessarButton({ filaId, onDone }: { filaId: string; onDone: () => void }) {
+/**
+ * Pergunta ao Omie, ANTES de reenfileirar, se a causa realmente saiu do caminho.
+ *
+ * Por que isto existe: o omie_fila_reprocessar revalida chamando montar_payload_contrato_omie,
+ * que só enxerga o lado DS. Os três bloqueios que mais matam linha — troca_de_produto,
+ * sem_depara e depara_aponta_cancelado — são decididos no ds-omie-contrato-alterar, no projeto
+ * DoctorOMIE, e passavam batido. Efeito medido na DEM-0237: a linha do LANCHES PEREIRA E SILVA
+ * (bloqueio:troca_de_produto) voltava para 'pendente', tomava o mesmo bloqueio ~2min depois e
+ * voltava para 'invalido'. O botão parecia agir e não agia — loop manual sem fim.
+ *
+ * O dry_run já existia inteiro no omie-integration-call (acao criar_cliente_contrato): ele não
+ * escreve nada no Omie e devolve o `bloqueado` real do momento. Só faltava alguém perguntar.
+ */
+async function conferirBloqueioAtual(
+  contratoId: string,
+  tenantId: string | null | undefined
+): Promise<{ bloqueado: string | null; mensagem: string | null; precisaCriar: boolean }> {
+  const ler = (b: any) => ({
+    bloqueado: (b?.bloqueado as string) ?? null,
+    mensagem:
+      (b?.error as string) ??
+      (Array.isArray(b?.erros) && b.erros.length ? b.erros.join("\n• ") : null),
+    precisaCriar: b?.operacao === "criar",
+  });
+  try {
+    const { data, error } = await supabase.functions.invoke("omie-integration-call", {
+      // tenant_id é obrigatório aqui: a função resolve o tenant pelo PERFIL de quem chama e só
+      // aceita outro se for super admin. Sem ele, o super admin simulando um tenant consultaria
+      // a chave Omie da ASP contra um contrato que não é dela.
+      body: {
+        acao: "criar_cliente_contrato",
+        modo: "dry_run",
+        contrato_id: contratoId,
+        ...(tenantId ? { tenant_id: tenantId } : {}),
+      },
+    });
+    if (error) {
+      // 409 (bloqueado) e 422 (validação) chegam aqui; o motivo real está no corpo.
+      const corpo = await (error as any)?.context?.json?.().catch(() => null);
+      if (corpo) return ler(corpo);
+      // Não deu para saber: não inventa bloqueio, deixa o fluxo normal seguir.
+      return { bloqueado: null, mensagem: null, precisaCriar: false };
+    }
+    return ler(data);
+  } catch {
+    return { bloqueado: null, mensagem: null, precisaCriar: false };
+  }
+}
+
+function ReprocessarButton({
+  filaId,
+  contratoId,
+  tenantId,
+  onDone,
+}: {
+  filaId: string;
+  contratoId?: string | null;
+  tenantId: string | null | undefined;
+  onDone: () => void;
+}) {
   const [loading, setLoading] = useState(false);
   const handle = async () => {
     setLoading(true);
     try {
+      // 1) A causa saiu do caminho? Se não, não reenfileira — e diz o porquê de verdade.
+      if (contratoId) {
+        const chk = await conferirBloqueioAtual(contratoId, tenantId);
+        if (chk.bloqueado) {
+          toast.warning("Reprocessar não vai resolver: a causa continua ativa no Omie.", {
+            description: chk.mensagem ?? "O Omie ainda recusa esta alteração.",
+            duration: 12000,
+          });
+          return;
+        }
+        if (chk.precisaCriar) {
+          toast.warning("Este contrato ainda não existe no Omie.", {
+            description:
+              "A fila automática nunca cria contrato — só altera o que já está vinculado. " +
+              "Vincule na Conferência ou use “Enviar ao Omie” na tela do cliente.",
+            duration: 12000,
+          });
+          return;
+        }
+      }
+
       const { data, error } = await (supabase.rpc as any)("omie_fila_reprocessar", { p_fila_id: filaId });
       if (error) {
         toast.error("Falha ao reprocessar. Tente novamente.");
@@ -56,10 +136,12 @@ function ReprocessarButton({ filaId, onDone }: { filaId: string; onDone: () => v
         <TooltipTrigger asChild>
           <Button size="sm" variant="secondary" className="gap-1 shrink-0" onClick={handle} disabled={loading}>
             {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
-            Reprocessar
+            {loading ? "Conferindo…" : "Reprocessar"}
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Devolve este item para a fila. Use depois de corrigir a causa.</TooltipContent>
+        <TooltipContent>
+          Confere no Omie se a causa saiu do caminho e, só então, devolve o item para a fila.
+        </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
@@ -113,6 +195,11 @@ const ORIGEM_LABEL: Record<string, string> = {
   churn: "Cancelamento",
   reativacao: "Reativação",
   cadastro: "Alteração cadastral",
+  // Origens que já existem em produção e vinham caindo no fallback, aparecendo cruas na tela.
+  observacao: "Observação",
+  manual: "Envio manual",
+  movimento_reajuste: "Reajuste",
+  valor: "Alteração de valor",
 };
 
 function labelOrigem(o?: string | null) {
@@ -427,7 +514,12 @@ export default function OmieFilaSincronizacaoPanel({
                           </Button>
                         )}
                         {canReprocess && (
-                          <ReprocessarButton filaId={item.fila_id as string} onDone={() => query.refetch()} />
+                          <ReprocessarButton
+                            filaId={item.fila_id as string}
+                            contratoId={item.contrato_id}
+                            tenantId={tid}
+                            onDone={() => query.refetch()}
+                          />
                         )}
                       </div>
                     </div>
