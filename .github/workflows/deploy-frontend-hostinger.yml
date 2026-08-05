@@ -22,6 +22,9 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    # O padrão do GitHub é 360 min. Se o FTP travar de novo, o job fica horas
+    # pendurado segurando o `concurrency` — e nenhum deploy seguinte entra.
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,14 +42,26 @@ jobs:
       - name: Build
         run: bun run build
 
+      # v4.3.5 → v4.4.0: a v4.3.5 declara runtime node20, que o runner já força
+      # para node24 desde ago/2026 (o warning "Node.js 20 is deprecated" no log).
+      # A v4.4.0 só oficializa isso — não muda nada do protocolo.
       - name: Deploy via FTPS
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ secrets.HOSTINGER_FTP_SERVER }}
           username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
           protocol: ftps
           port: 21
+          # O padrão é 60000 (60s por operação FTP). Em 04/08/2026 o deploy do
+          # preview de PDF morreu com "Timeout (control socket)" DEPOIS de subir
+          # os arquivos: o site atualizou e o job ficou vermelho. Durante um
+          # upload grande, o socket de controle espera o "226 transfer complete"
+          # parado — e o Hostinger passa dos 60s quando o dist/ vai inteiro.
+          # Isso acontece justamente quando o .ftp-deploy-sync-state.json não foi
+          # gravado na run anterior (falha no fim = estado velho = reenvia tudo),
+          # ou seja: uma falha dessas alimenta a próxima.
+          timeout: 180000
           local-dir: ./dist/
           # Pasta-raiz do subdomínio no Hostinger. Se a conta FTP já abrir dentro
           # do docroot do app, use ./ ; senão o caminho completo (terminar com /).
