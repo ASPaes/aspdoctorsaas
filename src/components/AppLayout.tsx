@@ -22,6 +22,8 @@ import { DepartmentFilterProvider } from "@/contexts/DepartmentFilterContext";
 export default function AppLayout() {
   const location = useLocation();
   const isWhatsApp = location.pathname === "/whatsapp";
+  // Telas que se viram sozinhas com a altura e rolam por dentro: sem padding do layout
+  const isFullBleed = isWhatsApp || location.pathname === "/whatsapp/contatos";
   const { profile } = useAuth();
   const canSeeDuplicates = profile?.role === 'admin' || profile?.role === 'head' || profile?.is_super_admin;
   const [dupOpen, setDupOpen] = useState(false);
@@ -83,7 +85,14 @@ export default function AppLayout() {
                   <ThemeToggle />
                 </div>
               </header>
-              <main className="flex-1 p-4 sm:p-6 overflow-auto min-w-0">
+              {/* Full-bleed ocupa a área inteira: sem padding do layout e sem scroll externo */}
+              <main
+                className={
+                  isFullBleed
+                    ? "flex-1 min-h-0 overflow-hidden min-w-0"
+                    : "flex-1 p-4 sm:p-6 overflow-auto min-w-0"
+                }
+              >
                 <ErrorBoundary>
                   <Suspense fallback={
                     <div className="flex min-h-[50vh] items-center justify-center">

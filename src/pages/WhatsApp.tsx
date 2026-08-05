@@ -241,7 +241,7 @@ function WhatsAppContent() {
   // Bloquear acesso se user não tem setor vinculado
   if (!departmentsLoading && !isAdmin && departments.length === 0) {
     return (
-      <div className="h-[calc(100vh-7rem)] flex items-center justify-center bg-background rounded-lg border border-border">
+      <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center bg-background">
         <div className="text-center max-w-md px-6">
           <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
             <ShieldAlert className="w-8 h-8 text-muted-foreground" />
@@ -259,9 +259,9 @@ function WhatsAppContent() {
   if (isMobile) {
     if (selected) {
       return (
-        <div className="flex flex-col gap-2 h-[calc(100vh-7rem)]">
+        <div className="flex flex-col h-[calc(100vh-3.5rem)]">
           <ScheduleReminderBanner onNavigate={handleNavigateToConversation} />
-          <div className="flex-1 min-h-0 rounded-lg border border-border overflow-hidden bg-background relative">
+          <div className="flex-1 min-h-0 overflow-hidden bg-background relative">
               <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} pendingAction={pendingAction} onPendingActionConsumed={() => setPendingAction(null)} />
             <AgentPresenceOverlay />
           </div>
@@ -269,9 +269,9 @@ function WhatsAppContent() {
       );
     }
     return (
-      <div className="flex flex-col gap-2 h-[calc(100vh-7rem)]">
+      <div className="flex flex-col h-[calc(100vh-3.5rem)]">
         <ScheduleReminderBanner onNavigate={handleNavigateToConversation} />
-        <div className="flex-1 min-h-0 rounded-lg border border-border overflow-hidden bg-background relative">
+        <div className="flex-1 min-h-0 overflow-hidden bg-background relative">
             <div className="w-full h-full">
               <ConversationsSidebar selectedId={null} onSelect={handleSelect} onSelectMessage={handleSelectMessage} />
             </div>
@@ -282,9 +282,9 @@ function WhatsAppContent() {
   }
 
   return (
-    <div className="flex flex-col gap-2 h-[calc(100vh-7rem)]">
+    <div className="flex flex-col h-[calc(100vh-3.5rem)]">
       <ScheduleReminderBanner onNavigate={handleNavigateToConversation} />
-      <div className="flex-1 min-h-0 rounded-lg border border-border overflow-hidden bg-background w-full max-w-full relative">
+      <div className="flex-1 min-h-0 overflow-hidden bg-background w-full max-w-full relative">
           <ResizablePanelGroup direction="horizontal" className="h-full">
             <ResizablePanel defaultSize={25} minSize={24} maxSize={40}>
               <ConversationsSidebar selectedId={selected?.id ?? null} onSelect={handleSelect} onSelectMessage={handleSelectMessage} />

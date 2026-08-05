@@ -53,7 +53,7 @@ export default function WhatsAppContatos() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background">
+    <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden bg-background">
       {/* Contacts List — em telas estreitas some quando um contato está aberto */}
       <div className={`${selectedContactId ? "hidden lg:flex" : "flex"} w-full lg:w-80 shrink-0 border-r border-border flex-col`}>
         <div className="p-3 border-b border-border space-y-2">
