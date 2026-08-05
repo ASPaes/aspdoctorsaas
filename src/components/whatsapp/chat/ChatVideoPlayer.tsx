@@ -10,10 +10,11 @@ const MAX_H = 380;
 
 interface ChatVideoPlayerProps {
   src: string;
-  downloadName: string;
+  onDownload: () => void;
+  onError?: () => void;
 }
 
-export function ChatVideoPlayer({ src, downloadName }: ChatVideoPlayerProps) {
+export function ChatVideoPlayer({ src, onDownload, onError }: ChatVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [ratio, setRatio] = useState<number | null>(null);
@@ -59,13 +60,8 @@ export function ChatVideoPlayer({ src, downloadName }: ChatVideoPlayerProps) {
 
   const handleDownload = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    const a = document.createElement("a");
-    a.href = src;
-    a.download = downloadName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }, [src, downloadName]);
+    onDownload();
+  }, [onDownload]);
 
   return (
     <div
@@ -73,10 +69,15 @@ export function ChatVideoPlayer({ src, downloadName }: ChatVideoPlayerProps) {
       className="relative mb-1 max-w-full overflow-hidden rounded bg-black"
       style={{ width, aspectRatio: ratio ?? 16 / 9 }}
     >
+      {/* Sem `autoPlay`: agora que o vídeo carrega sozinho, ele faria a conversa
+          inteira começar a tocar de uma vez. O `preload="metadata"` traz só o
+          cabeçalho — o browser desenha o primeiro frame e espera o play.
+          `src` direto no elemento, não em <source>: com <source> o browser não
+          dispara `error` no elemento pai, e o fallback nunca aconteceria. */}
       <video
         ref={videoRef}
+        src={src}
         controls
-        autoPlay
         playsInline
         preload="metadata"
         className="h-full w-full object-contain"
@@ -85,9 +86,8 @@ export function ChatVideoPlayer({ src, downloadName }: ChatVideoPlayerProps) {
           if (v.videoWidth && v.videoHeight) setRatio(v.videoWidth / v.videoHeight);
         }}
         onVolumeChange={(e) => setMuted(e.currentTarget.muted)}
-      >
-        <source src={src} />
-      </video>
+        onError={onError}
+      />
 
       <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">
         <ActionButton

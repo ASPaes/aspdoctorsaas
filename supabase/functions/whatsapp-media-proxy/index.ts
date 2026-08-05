@@ -20,6 +20,11 @@ function guessMime(ext: string | null, fallback: string | null): string {
   return fallback || 'application/octet-stream';
 }
 
+// Validade do link assinado do `mode=url`. Enquanto não expira, o link abre o
+// arquivo sem login para quem o tiver — decisão consciente (Alexandre,
+// 04/08/2026). Menos que isso e o vídeo pausado quebra ao ser retomado.
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -136,6 +141,15 @@ Deno.serve(async (req) => {
             status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=600' },
           });
         }
+        // URL externa não tem o que assinar: o cliente usa ela direto.
+        if (mode === 'url') {
+          return new Response(JSON.stringify({
+            url: msg.media_url, expires_in: null,
+            mime: msg.media_mimetype, filename: msg.media_filename,
+          }), {
+            status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+          });
+        }
         // For inline/attachment, redirect to external URL
         return Response.redirect(msg.media_url, 302);
       }
@@ -170,6 +184,41 @@ Deno.serve(async (req) => {
         path: storagePath,
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=600' },
+      });
+    }
+
+    // mode=url — devolve um link assinado do Storage no lugar dos bytes.
+    //
+    // Pelo caminho de baixo o streaming é impossível: `storage.download()`
+    // materializa o arquivo INTEIRO na memória do isolate e a resposta sai sem
+    // `Accept-Ranges`, então o browser não tem como pedir pedaço. Falando direto
+    // com o Storage, o `<video preload="metadata">` busca só o cabeçalho para
+    // desenhar o primeiro frame e o resto conforme o play/seek.
+    if (mode === 'url') {
+      const { data: signed, error: signError } = await supabase.storage
+        .from('whatsapp-media')
+        .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
+
+      if (signError || !signed?.signedUrl) {
+        console.error('[whatsapp-media-proxy] Sign error:', signError);
+        return new Response(JSON.stringify({ error: 'Failed to sign url' }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({
+        url: signed.signedUrl,
+        expires_in: SIGNED_URL_TTL_SECONDS,
+        mime: guessMime(msg.media_ext, msg.media_mimetype),
+        filename: msg.media_filename || storagePath.split('/').pop() || 'file',
+      }), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          // O link expira — resposta cacheada serviria link morto depois.
+          'Cache-Control': 'no-store',
+        },
       });
     }
 

@@ -4,19 +4,13 @@ import { Loader2, Play, RotateCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatBytes } from "@/utils/whatsapp/formatBytes";
 import { useProxyBlob } from "@/components/whatsapp/hooks/useProxyBlob";
+import { useMediaSignedUrl } from "@/components/whatsapp/hooks/useMediaSignedUrl";
 import { hasRetrievableMedia as canRetrieveMedia, kindFromMessageType } from "@/utils/whatsapp/mediaGate";
 import { AttachmentCard } from "./AttachmentCard";
 import { ZoomableImageLightbox } from "./ZoomableImageLightbox";
 import { ChatVideoPlayer } from "./ChatVideoPlayer";
 
 const INLINE_TYPES = new Set(["image", "sticker", "audio", "video"]);
-
-// O whatsapp-media-proxy entrega o arquivo INTEIRO (sem Range, sem streaming) e
-// o cliente ainda o materializa num blob. Vídeo baixando sozinho no mount fazia
-// abrir uma conversa virar N downloads completos em paralelo — e o
-// `preload="none"` do <video> não evitava nada, porque o blob já tinha vindo
-// todo. Vídeo agora só baixa quando o atendente pede.
-const CLICK_TO_LOAD_TYPES = new Set(["video"]);
 
 interface MediaContentProps {
   messageId: string;
@@ -91,17 +85,37 @@ export function MediaContent({
 
   const isTemp = messageId?.startsWith("temp-");
   const isInline = INLINE_TYPES.has(messageType);
-  const needsClick = CLICK_TO_LOAD_TYPES.has(messageType);
+  const isVideo = messageType === "video";
   // Sem media_url nem media_path não existe o que buscar: o proxy responderia
   // 404 ("No media path available"). É o caso da mídia acima do teto de 12 MB do
   // evolution-webhook — tem tamanho e mimetype, mas nunca foi baixada.
   const hasRetrievableMedia = canRetrieveMedia({ media_url: mediaUrl, media_path: mediaPath });
 
+  // Vídeo streama de um link assinado do Storage (Range) em vez de vir inteiro
+  // pelo proxy. No fallback — link recusado, content-type errado no upload, o
+  // que for — volta pro blob de antes, E volta junto o "Carregar vídeo": sem
+  // Range, baixar sozinho é o comportamento caro que motivou o clique.
+  const [videoFallback, setVideoFallback] = useState(false);
+  const useSignedUrl = isVideo && !isTemp && !videoFallback;
+  const needsClick = isVideo && videoFallback;
+
   const hasBeenVisible = useHasBeenVisible(containerRef);
   const enabled = isInline && hasRetrievableMedia && hasBeenVisible && (!needsClick || armed);
 
-  const { data: blobUrl, isFetching, isError, refetch } = useProxyBlob(messageId, "inline", enabled);
-  const resolvedInlineUrl = isTemp ? (mediaUrl || null) : (blobUrl ?? null);
+  const signedQuery = useMediaSignedUrl(messageId, useSignedUrl && enabled);
+  const { data: blobUrl, isFetching, isError, refetch } = useProxyBlob(
+    messageId, "inline", enabled && !useSignedUrl,
+  );
+
+  useEffect(() => {
+    if (useSignedUrl && signedQuery.isError) setVideoFallback(true);
+  }, [useSignedUrl, signedQuery.isError]);
+
+  const resolvedInlineUrl = isTemp
+    ? (mediaUrl || null)
+    : useSignedUrl
+    ? (signedQuery.data?.url ?? null)
+    : (blobUrl ?? null);
 
   const handleOpenNewTab = useCallback(async () => {
     if (isTemp) return;
@@ -118,6 +132,21 @@ export function MediaContent({
         "noopener,noreferrer"
       );
     }
+  }, [isTemp, messageId]);
+
+  // O botão de baixar aponta pro proxy em `mode=attachment`, não pro link
+  // assinado: o atributo `download` do HTML é ignorado em URL cross-origin, e
+  // quem garante o "Salvar como" é o Content-Disposition que a function manda.
+  const handleDownload = useCallback(async () => {
+    if (isTemp) return;
+    const base = import.meta.env.VITE_SUPABASE_URL;
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    const a = document.createElement("a");
+    a.href = `${base}/functions/v1/whatsapp-media-proxy?message_row_id=${messageId}&mode=attachment${token ? `&token=${token}` : ""}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }, [isTemp, messageId]);
 
   // Não-inline (document e afins) OU inline sem nada para buscar (mídia grande
@@ -213,12 +242,14 @@ export function MediaContent({
       </audio>
     );
   } else {
-    const baseName = mediaFilename || metadata?.fileName;
-    const ext = (mediaExt || "mp4").replace(/^\./, "");
     body = (
       <ChatVideoPlayer
+        key={useSignedUrl ? "signed" : "blob"}
         src={resolvedInlineUrl}
-        downloadName={baseName && /\.[a-z0-9]{2,5}$/i.test(baseName) ? baseName : `${baseName || "video"}.${ext}`}
+        onDownload={handleDownload}
+        // Link expirado, content-type que o browser recusa, arquivo corrompido:
+        // em vez de bolha com player quebrado, cai pro caminho antigo.
+        onError={() => { if (useSignedUrl) setVideoFallback(true); }}
       />
     );
   }
