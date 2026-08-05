@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { FileText, Image, Music, Video, File, ExternalLink, Download, Loader2, Smartphone } from 'lucide-react';
+import { FileText, Image, Music, Video, File, ExternalLink, Download, Loader2, Smartphone, Eye } from 'lucide-react';
 import { formatBytes } from '@/utils/whatsapp/formatBytes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useMediaMeta } from '@/components/whatsapp/hooks/useMediaMeta';
+import { isPdfAttachment } from '@/utils/whatsapp/mediaGate';
+import { PdfPreviewLightbox } from './PdfPreviewLightbox';
 
 interface AttachmentCardProps {
   messageId: string;
@@ -66,6 +68,12 @@ export function AttachmentCard({
   const hasRealFilename = Boolean(mediaFilename || meta?.filename);
   const filename = mediaFilename || meta?.filename || kindLabel;
 
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const isPdf = isPdfAttachment({ ext, mime: mediaMimetype || meta?.mime, filename });
+  // Mensagem otimista (temp-) ainda não tem linha no banco para o proxy resolver.
+  const canPreviewPdf = isPdf && hasMediaUrl && !isTemp;
+
   const handleOpen = async () => {
     if (messageId?.startsWith('temp-')) return;
     try {
@@ -125,34 +133,69 @@ export function AttachmentCard({
   // não só document. Vídeo acima de 12 MB cai exatamente aqui.
   const showLargeFileWarning = !hasMediaUrl;
 
+  const info = (
+    <>
+      <div className="flex-shrink-0 h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+        <Icon className="h-5 w-5 text-primary" />
+      </div>
+      <div className="flex-1 min-w-0 text-left">
+        <p className="text-sm font-medium truncate" title={filename}>
+          {filename}
+        </p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {ext && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 uppercase font-mono">
+              {ext}
+            </Badge>
+          )}
+          <span className="text-[11px] text-muted-foreground">
+            {formatBytes(sizeBytes)}{hasRealFilename ? ` · ${kindLabel}` : ''}
+          </span>
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <div className="rounded-lg bg-muted/50 border border-border/50 p-3 min-w-0 max-w-full">
+      {canPreviewPdf && previewOpen && (
+        <PdfPreviewLightbox
+          messageId={messageId}
+          filename={filename}
+          onClose={() => setPreviewOpen(false)}
+          onOpenNewTab={handleOpen}
+        />
+      )}
       <div className="flex items-center gap-3 min-w-0">
-        <div className="flex-shrink-0 h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Icon className="h-5 w-5 text-primary" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate" title={filename}>
-            {filename}
-          </p>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            {ext && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 uppercase font-mono">
-                {ext}
-              </Badge>
-            )}
-            <span className="text-[11px] text-muted-foreground">
-              {formatBytes(sizeBytes)}{hasRealFilename ? ` · ${kindLabel}` : ''}
-            </span>
-          </div>
-        </div>
+        {/* PDF: o card inteiro abre o preview, como a imagem que abre o lightbox
+            ao clique. O botão do olho fica para quem procura o controle explícito. */}
+        {canPreviewPdf ? (
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            title="Visualizar PDF"
+            className="flex flex-1 items-center gap-3 min-w-0 -m-1 p-1 rounded-md cursor-pointer hover:bg-foreground/5 transition-colors"
+          >
+            {info}
+          </button>
+        ) : (
+          <div className="flex flex-1 items-center gap-3 min-w-0">{info}</div>
+        )}
         {/* Sem arquivo no Storage não há o que abrir nem baixar — o bloco de
             botões nem existe, em vez de virar um container vazio. */}
         {!showLargeFileWarning && (
           <div className="flex flex-col gap-1 flex-shrink-0">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleOpen} title="Abrir">
-              <ExternalLink className="h-3.5 w-3.5" />
-            </Button>
+            {canPreviewPdf ? (
+              // "Abrir em nova guia" migra para dentro do preview: três botões
+              // empilhados deixariam a coluna mais alta que o próprio card.
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPreviewOpen(true)} title="Visualizar">
+                <Eye className="h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleOpen} title="Abrir">
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Button>
+            )}
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDownload} title="Baixar" disabled={downloading}>
               {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
             </Button>

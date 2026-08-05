@@ -1,13 +1,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useQuery } from '@tanstack/react-query';
 import { Loader2, Play, RotateCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatBytes } from "@/utils/whatsapp/formatBytes";
-import { mediaBlobKey } from "@/lib/mediaBlobRegistry";
+import { useProxyBlob } from "@/components/whatsapp/hooks/useProxyBlob";
 import { hasRetrievableMedia as canRetrieveMedia, kindFromMessageType } from "@/utils/whatsapp/mediaGate";
 import { AttachmentCard } from "./AttachmentCard";
 import { ZoomableImageLightbox } from "./ZoomableImageLightbox";
+import { ChatVideoPlayer } from "./ChatVideoPlayer";
 
 const INLINE_TYPES = new Set(["image", "sticker", "audio", "video"]);
 
@@ -61,34 +61,6 @@ function useHasBeenVisible(ref: React.RefObject<HTMLElement>): boolean {
   }, [ref, visible]);
 
   return visible;
-}
-
-function useProxyBlob(messageId: string, mode: "inline" | "attachment", enabled: boolean) {
-  const isTemp = messageId?.startsWith("temp-");
-
-  return useQuery<string>({
-    queryKey: mediaBlobKey(messageId, mode),
-    queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error("Sessão expirada");
-      const base = import.meta.env.VITE_SUPABASE_URL;
-      const url = `${base}/functions/v1/whatsapp-media-proxy?message_row_id=${messageId}&mode=${mode}&token=${session.access_token}`;
-      const res = await fetch(url);
-      // Antes o erro virava `null` e o componente devolvia null: a bolha ficava
-      // vazia, sem spinner e sem aviso. Lançar deixa o react-query marcar
-      // isError e a UI mostrar o retry.
-      if (!res.ok) throw new Error(`Falha ao carregar mídia (${res.status})`);
-      return URL.createObjectURL(await res.blob());
-    },
-    enabled: !!messageId && !isTemp && enabled,
-    staleTime: 30 * 60 * 1000,
-    // Menor que o antigo (60 min): o blob é caro em memória e o revoke agora
-    // acompanha o descarte da entrada (ver lib/mediaBlobRegistry).
-    gcTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    retry: 1,
-  });
 }
 
 function MediaFrame({ className, children }: { className?: string; children: React.ReactNode }) {
@@ -166,7 +138,14 @@ export function MediaContent({
     );
   }
 
-  const boxSize = messageType === "audio" ? "h-12 w-64" : "h-40 w-56 max-w-full";
+  // O placeholder do vídeo acompanha o card do player (420px / 16:9) para a
+  // bolha não pular de tamanho quando o arquivo termina de carregar.
+  const boxSize =
+    messageType === "audio"
+      ? "h-12 w-64"
+      : messageType === "video"
+      ? "h-[236px] w-[420px] max-w-full"
+      : "h-40 w-56 max-w-full";
 
   let body: React.ReactNode;
 
@@ -234,10 +213,13 @@ export function MediaContent({
       </audio>
     );
   } else {
+    const baseName = mediaFilename || metadata?.fileName;
+    const ext = (mediaExt || "mp4").replace(/^\./, "");
     body = (
-      <video controls autoPlay className="rounded max-w-full mb-1 max-h-64" preload="metadata">
-        <source src={resolvedInlineUrl} />
-      </video>
+      <ChatVideoPlayer
+        src={resolvedInlineUrl}
+        downloadName={baseName && /\.[a-z0-9]{2,5}$/i.test(baseName) ? baseName : `${baseName || "video"}.${ext}`}
+      />
     );
   }
 

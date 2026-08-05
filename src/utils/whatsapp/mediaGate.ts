@@ -74,6 +74,25 @@ export function isMediaPlaceholderContent(content: string | null | undefined): b
   return MEDIA_PLACEHOLDER_CONTENT.has(content.trim());
 }
 
+/**
+ * É PDF? Decide se o anexo ganha o preview em tela cheia em vez de só "abrir e
+ * baixar".
+ *
+ * Os três campos entram porque nenhum é confiável sozinho: o Evolution manda ora
+ * só o `fileName`, ora só o `mimetype`, e `media_ext` fica NULL quando o nome do
+ * arquivo veio sem extensão. Exigir os três deixaria PDF de fora do preview.
+ */
+export function isPdfAttachment(fields: {
+  ext?: string | null;
+  mime?: string | null;
+  filename?: string | null;
+}): boolean {
+  const ext = fields.ext?.trim().replace(/^\./, "").toLowerCase();
+  if (ext === "pdf") return true;
+  if (fields.mime?.trim().toLowerCase().startsWith("application/pdf")) return true;
+  return /\.pdf$/i.test(fields.filename?.trim() ?? "");
+}
+
 /** message_type → kind do AttachmentCard, para cair o ícone e o rótulo certos. */
 export function kindFromMessageType(messageType: string): string {
   switch (messageType) {

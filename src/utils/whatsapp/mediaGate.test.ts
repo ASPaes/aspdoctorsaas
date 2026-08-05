@@ -3,6 +3,7 @@ import {
   hasRenderableMedia,
   hasRetrievableMedia,
   isMediaPlaceholderContent,
+  isPdfAttachment,
   kindFromMessageType,
 } from "./mediaGate";
 
@@ -121,5 +122,30 @@ describe("kindFromMessageType", () => {
 
   it("tipo desconhecido não vira 'document' por acidente", () => {
     expect(kindFromMessageType("location")).toBe("other");
+  });
+});
+
+describe("isPdfAttachment", () => {
+  it("reconhece por qualquer um dos três campos, isoladamente", () => {
+    expect(isPdfAttachment({ ext: "pdf" })).toBe(true);
+    expect(isPdfAttachment({ mime: "application/pdf" })).toBe(true);
+    expect(isPdfAttachment({ filename: "boleto-08-2026.pdf" })).toBe(true);
+  });
+
+  it("tolera as variações que o Evolution manda", () => {
+    expect(isPdfAttachment({ ext: "PDF" })).toBe(true);
+    expect(isPdfAttachment({ ext: ".pdf" })).toBe(true);
+    expect(isPdfAttachment({ mime: "application/pdf; charset=binary" })).toBe(true);
+    expect(isPdfAttachment({ filename: "NOTA FISCAL.PDF" })).toBe(true);
+  });
+
+  it("não confunde outro anexo com PDF", () => {
+    expect(isPdfAttachment({ ext: "xlsx", mime: "application/vnd.ms-excel", filename: "a.xlsx" })).toBe(false);
+    expect(isPdfAttachment({})).toBe(false);
+    expect(isPdfAttachment({ ext: null, mime: null, filename: null })).toBe(false);
+    // "Documento" é o rótulo genérico do card quando não há nome real.
+    expect(isPdfAttachment({ filename: "Documento" })).toBe(false);
+    // .pdf no meio do nome não é extensão.
+    expect(isPdfAttachment({ filename: "contrato.pdf.zip" })).toBe(false);
   });
 });
