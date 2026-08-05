@@ -8875,6 +8875,8 @@ export type Database = {
           notification_scope: string | null
           prefer_department_overrides: boolean
           push_enabled: boolean | null
+          queue_sound_enabled: boolean
+          queue_sound_volume: number
           signature_name: string | null
           sound_enabled: boolean
           sound_id: string | null
@@ -8901,6 +8903,8 @@ export type Database = {
           notification_scope?: string | null
           prefer_department_overrides?: boolean
           push_enabled?: boolean | null
+          queue_sound_enabled?: boolean
+          queue_sound_volume?: number
           signature_name?: string | null
           sound_enabled?: boolean
           sound_id?: string | null
@@ -8927,6 +8931,8 @@ export type Database = {
           notification_scope?: string | null
           prefer_department_overrides?: boolean
           push_enabled?: boolean | null
+          queue_sound_enabled?: boolean
+          queue_sound_volume?: number
           signature_name?: string | null
           sound_enabled?: boolean
           sound_id?: string | null

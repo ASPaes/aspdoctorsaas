@@ -21,7 +21,21 @@ const EMPTY: PillCount = { total: 0, aguardando: 0, unread: 0, unreadConvs: 0 };
 const BUCKET_KEYS = ["waiting", "in_progress", "after_hours", "closed"] as const;
 type BucketKey = (typeof BUCKET_KEYS)[number];
 
-export function usePillCounts() {
+interface Options {
+  /**
+   * Cadência do poll. O default (60s) é o da tela do Chat. Consumidores que só
+   * precisam do número para alertar (o badge/bip global da fila) passam um
+   * intervalo bem maior: o sinal rápido deles vem do Realtime, não do poll.
+   * Como a queryKey é a mesma, o react-query usa o MENOR intervalo entre os
+   * observadores montados — logo isto nunca deixa o Chat mais lento, e quando o
+   * Chat está fechado o RPC para de rodar de minuto em minuto.
+   */
+  refetchInterval?: number;
+  /** Falso desliga a query — usado por quem não tem acesso ao Chat. */
+  enabled?: boolean;
+}
+
+export function usePillCounts(options?: Options) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedDepartmentId } = useDepartmentFilter();
   const { user, profile } = useAuth();
@@ -35,9 +49,9 @@ export function usePillCounts() {
 
   return useQuery<PillCountsMap>({
     queryKey: ["whatsapp", "pill-counts", tid, selectedDepartmentId ?? null, closedVisibleTo],
-    enabled: !!tid,
+    enabled: !!tid && (options?.enabled ?? true),
     staleTime: 15_000,
-    refetchInterval: 60_000,
+    refetchInterval: options?.refetchInterval ?? 60_000,
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc("whatsapp_pill_counts", {

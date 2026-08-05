@@ -32,6 +32,7 @@ import { useConversationStates } from "../hooks/useConversationStates";
 import { useAgentOptions } from "../hooks/useAgentOptions";
 import { useActiveAttendanceConvIds } from "../hooks/useActiveAttendanceConvIds";
 import { usePillCounts } from "../hooks/usePillCounts";
+import { useQueueAlertState } from "@/contexts/QueueAlertContext";
 import { useSupportDepartments } from "../hooks/useSupportDepartments";
 import { useContactProdutos } from "../hooks/useContactProdutos";
 import { type ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
@@ -339,6 +340,9 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   // Contagens das pills vêm agregadas do servidor (RPC whatsapp_pill_counts).
   // Grupos continuam no hook dedicado (a RPC filtra is_group=false).
   const { data: pillCountsData } = usePillCounts();
+  // Só o destaque visual — o bip e a detecção de borda vivem no AppLayout, um
+  // por aplicação. Ler daqui evita um segundo detector tocando o mesmo bip.
+  const { justArrived: queueJustArrived } = useQueueAlertState();
   const pillCounts = useMemo(() => {
     const EMPTY = { total: 0, aguardando: 0, unread: 0, unreadConvs: 0 };
     const w = pillCountsData?.waiting ?? EMPTY;
@@ -801,6 +805,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
           counts={pillCounts.counts}
           groupsHasUnread={pillCounts.groupsUnread > 0}
           badges={pillCounts.badges}
+          queueJustArrived={queueJustArrived}
         />
       </div>
       )}

@@ -18,6 +18,7 @@ import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateCo
 import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DepartmentFilterProvider } from "@/contexts/DepartmentFilterContext";
+import { QueueAlertProvider } from "@/contexts/QueueAlertContext";
 
 export default function AppLayout() {
   const location = useLocation();
@@ -30,12 +31,16 @@ export default function AppLayout() {
   const [newTicketOpen, setNewTicketOpen] = useState(false);
 
   return (
+    // DepartmentFilterProvider subiu para o layout inteiro (antes só envolvia o
+    // /whatsapp): o alerta de fila roda em qualquer tela e precisa do MESMO setor
+    // que a lista de conversas usa, senão o operador ouviria a fila de outro
+    // setor fora do Chat e a do dele dentro.
     <SidebarProvider>
+      <DepartmentFilterProvider>
+      <QueueAlertProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
-        {(() => {
-          const content = (
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
               <header className="flex h-14 items-center justify-between border-b border-border px-4">
                 <div className="flex items-center gap-2">
                   <SidebarTrigger />
@@ -103,11 +108,10 @@ export default function AppLayout() {
                   </Suspense>
                 </ErrorBoundary>
               </main>
-            </div>
-          );
-          return isWhatsApp ? <DepartmentFilterProvider>{content}</DepartmentFilterProvider> : content;
-        })()}
+        </div>
       </div>
+      </QueueAlertProvider>
+      </DepartmentFilterProvider>
     </SidebarProvider>
   );
 }

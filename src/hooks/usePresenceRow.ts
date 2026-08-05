@@ -32,7 +32,7 @@ const presenceChannels = new Map<
  * - queryFn é SOMENTE LEITURA (não cria linha em support_agent_presence).
  *   A linha é criada pelo RPC agent_presence_set_active ("Iniciar expediente").
  */
-export function usePresenceRow() {
+export function usePresenceRow(options?: { refetchInterval?: number }) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -41,7 +41,12 @@ export function usePresenceRow() {
   const { data: presence, isLoading: presenceLoading } = useQuery({
     queryKey: ["agent_presence", tid, userId],
     enabled: !!tid && !!userId,
-    refetchInterval: 60_000,
+    // 60s é a cadência de quem mostra o cronômetro de pausa na tela. Quem só
+    // precisa saber "estou pausado?" (o alerta de fila, montado no layout
+    // inteiro) passa um intervalo longo — senão este poll passaria a rodar em
+    // TODAS as telas do sistema. O react-query usa o menor intervalo entre os
+    // observadores montados, então o Chat não perde nada.
+    refetchInterval: options?.refetchInterval ?? 60_000,
     queryFn: async (): Promise<AgentPresence | null> => {
       const { data, error } = await supabase
         .from("support_agent_presence")
