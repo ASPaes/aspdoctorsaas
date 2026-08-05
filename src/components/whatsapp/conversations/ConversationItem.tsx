@@ -23,9 +23,15 @@ interface Props {
   showDepartment?: boolean;
   departmentName?: string | null;
   produtos?: string[];
+  /** DEM-0227 — posição na FILA (1 = próximo a ser atendido). Só na pill "Fila". */
+  queuePosition?: number;
+  /** DEM-0227 — chegada na fila, base do tempo de espera exibido. */
+  queueSince?: string | null;
+  /** Relógio da sidebar (tick de 5s). Evita um interval por item. */
+  nowMs?: number;
 }
 
-export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance, isAgentAlert, showDepartment, departmentName, produtos }: Props) {
+export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance, isAgentAlert, showDepartment, departmentName, produtos, queuePosition, queueSince, nowMs }: Props) {
   const contact = conv.contact;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
   const sentimentData = conv.sentiment as any;
@@ -91,6 +97,22 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
 
   const timeStr = formatTime(conv.last_message_at);
 
+  // DEM-0227 — na Fila o que importa não é a hora da última mensagem, é há
+  // quanto tempo o cliente está esperando. É esse número que torna a ordem FIFO
+  // legível: sem ele o operador não tem como conferir que a lista está certa.
+  const isInQueue = queuePosition != null;
+  const waitLabel = (() => {
+    if (!isInQueue || !queueSince) return null;
+    const since = new Date(queueSince).getTime();
+    if (isNaN(since)) return null;
+    const mins = Math.max(0, Math.floor(((nowMs ?? Date.now()) - since) / 60000));
+    if (mins < 1) return "agora";
+    if (mins < 60) return `${mins} min`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h${String(mins % 60).padStart(2, "0")}`;
+    return `${Math.floor(hours / 24)}d`;
+  })();
+
   const formatScheduled = (ts: string) => {
     try {
       const date = new Date(ts);
@@ -129,6 +151,19 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
       return (
         <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-orange-500/50 text-orange-600 dark:text-orange-400">
           Fora do horário
+        </Badge>
+      );
+    }
+    // Na Fila, o badge vira a POSIÇÃO. Escrever "Fila" numa lista que já é a
+    // fila não informa nada; a posição é o que o operador precisa ver.
+    if (isInQueue) {
+      return queuePosition === 1 ? (
+        <Badge className="text-[9px] px-1.5 py-0 h-4 gap-0.5 bg-green-500 hover:bg-green-500 text-white border-transparent">
+          Próximo
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
+          {queuePosition}º na fila
         </Badge>
       );
     }
@@ -279,7 +314,15 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
 
       {/* Col 3 — Meta: time + badge + unread (never hidden) */}
       <div className="flex flex-col items-end gap-1 self-start whitespace-nowrap shrink-0">
-        {timeStr && (
+        {isInQueue && waitLabel ? (
+          <span
+            title={`Na fila desde ${formatScheduled(queueSince!)}`}
+            className="inline-flex items-center gap-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400"
+          >
+            <Clock className="h-3 w-3" />
+            {waitLabel}
+          </span>
+        ) : timeStr && (
           <span className={cn(
             "text-xs",
             hasUnread ? "text-green-500 font-semibold" : "text-muted-foreground"

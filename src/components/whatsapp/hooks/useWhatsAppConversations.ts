@@ -32,6 +32,12 @@ export interface ConversationWithContact {
   sender_ticket_code?: string | null;
   /** Bucket calculado NO SERVIDOR por wa_conversation_bucket. Não recalcular no cliente. */
   bucket?: string;
+  /**
+   * DEM-0227: chegada na fila. Só vem preenchido quando a lista foi pedida com
+   * queueOrder (pill "Fila") — é a chave da ordenação FIFO e o que a UI mostra
+   * como tempo de espera.
+   */
+  queue_since?: string | null;
   contact: {
     id: string;
     name: string | null;
@@ -73,6 +79,13 @@ export interface ConversationsFilters {
   closedVisibleTo?: string;
   autoReplyDisabledOnly?: boolean;
   rulesDisabledOnly?: boolean;
+  /**
+   * DEM-0227: pill "Fila". Troca a listagem por whatsapp_list_queue, que ordena
+   * por chegada (FIFO) NO SERVIDOR. Ordenar só no cliente não resolveria: a
+   * página é cortada por last_message_at DESC, então quem espera há mais tempo
+   * é justamente quem fica fora dela.
+   */
+  queueOrder?: boolean;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -113,7 +126,30 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         ? undefined
         : allPages.reduce((n, p) => n + p.length, 0),
     queryFn: async ({ pageParam }): Promise<ConversationWithContact[]> => {
-      const { data: rows, error: rpcError } = await (supabase as any).rpc(
+      // DEM-0227: a fila tem RPC própria — mesma forma de retorno, ordem FIFO.
+      //
+      // Se ela ainda não existir no banco (frontend publicado antes do SQL), o
+      // PostgREST devolve PGRST202 e a pill PADRÃO do chat ficaria vazia. Cair
+      // para a listagem antiga degrada a ORDEM; não cair degrada o CHAT.
+      let queueRes: any = null;
+      if (filters?.queueOrder) {
+        queueRes = await (supabase as any).rpc('whatsapp_list_queue', {
+          p_tenant_id: tid,
+          p_department_id: filters?.departmentId ?? null,
+          p_instance_id: filters?.instanceId ?? null,
+          p_instance_ids: filters?.instanceIds?.length ? filters.instanceIds : null,
+          p_status: filters?.status ?? null,
+          p_unread_only: filters?.unreadOnly ?? false,
+          p_limit: pageSize,
+          p_offset: pageParam as number,
+        });
+        if (queueRes.error?.code === 'PGRST202') {
+          console.warn('[DEM-0227] whatsapp_list_queue ausente no banco — fila sem ordem FIFO até a migration ser aplicada');
+          queueRes = null;
+        }
+      }
+
+      const { data: rows, error: rpcError } = queueRes ?? await (supabase as any).rpc(
         'whatsapp_list_conversations',
         {
           p_tenant_id: tid,
@@ -141,6 +177,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         ...row.conversation,
         contact: row.contact,
         bucket: row.bucket,
+        queue_since: row.queue_since ?? null,
         unread_count: parseInt(String(row.conversation?.unread_count ?? 0), 10) || 0,
         last_message_at: row.conversation?.last_message_at || null,
         isLastMessageFromMe: row.conversation?.is_last_message_from_me ?? false,

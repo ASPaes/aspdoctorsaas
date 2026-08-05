@@ -241,6 +241,9 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
   const isGroupsPill = activePill === "groups";
   const queueLikePills = activePill === "waiting" || activePill === "after_hours";
+  // DEM-0227: só a FILA propriamente dita é FIFO. "Fora do horário" continua por
+  // recência — lá não existe operador esperando para puxar o próximo.
+  const isQueuePill = activePill === "waiting";
 
   // A pill vira filtro de bucket NO SERVIDOR (DEM-0234). "Todos" e "Grupos" não
   // restringem bucket. Os nomes das pills são os mesmos buckets de
@@ -262,6 +265,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     closedVisibleTo: isAdmin ? undefined : user?.id,
     autoReplyDisabledOnly: queueLikePills ? undefined : filters.autoReplyDisabledOnly,
     rulesDisabledOnly: queueLikePills ? undefined : filters.rulesDisabledOnly,
+    queueOrder: isQueuePill,
   });
 
   // Get attendance data for all loaded conversations (still used for ConversationItem display)
@@ -419,6 +423,17 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     // autoReplyDisabledOnly / rulesDisabledOnly também são do servidor agora —
     // filtrar aqui encolheria a página paginada (mesmo defeito do DEM-0234).
 
+    // DEM-0227 — FILA é FIFO, ponto. Quem chegou primeiro fica em cima.
+    // Sai antes do switch de propósito: o sortBy salvo do usuário, o "pin
+    // waiting" e o alerta de ausência embaralhariam a ordem que o servidor já
+    // devolveu, e aí o operador não teria como saber quem é o próximo.
+    if (isQueuePill) {
+      const arrival = (c: ConversationWithContact) =>
+        new Date(c.queue_since ?? c.last_message_at ?? c.created_at).getTime();
+      result.sort((a, b) => arrival(a) - arrival(b));
+      return result;
+    }
+
     // Sort
     switch (filters.sortBy) {
       case "oldest":
@@ -493,7 +508,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     }
 
     return result;
-  }, [conversations, activePill, queueLikePills, filters.sortBy, filters.instanceId, filters.autoReplyDisabledOnly, filters.rulesDisabledOnly, forcedConvId, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv, nowMs]);
+  }, [conversations, activePill, isQueuePill, queueLikePills, filters.sortBy, filters.instanceId, filters.autoReplyDisabledOnly, filters.rulesDisabledOnly, forcedConvId, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv, nowMs]);
 
   const agentGroups = useMemo(() => {
     if (!isGroupedView) return [];
@@ -588,6 +603,10 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       key: "sort",
       label: SORT_LABELS[filters.sortBy] || filters.sortBy,
       onRemove: () => setFilters(f => ({ ...f, sortBy: "recent" })),
+      // Na Fila a ordem é fixa (chegada/FIFO). Marcar como inativo em vez de
+      // esconder: senão o operador vê a lista ignorar a ordenação que ele
+      // escolheu e acha que quebrou.
+      inactive: isQueuePill,
     });
   }
   if (filters.assignedToMe) {
@@ -621,9 +640,14 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     });
   }
 
-  const renderConversation = (conv: ConversationWithContact) => (
+  // DEM-0227: na Fila o índice É a informação — é a posição na ordem de chegada.
+  // Fora dela (e na busca, que não é FIFO) nada disso aparece.
+  const renderConversation = (conv: ConversationWithContact, index?: number) => (
     <ConversationItem
       key={conv.id}
+      queuePosition={isQueuePill && !isSearching ? (index ?? 0) + 1 : undefined}
+      queueSince={isQueuePill && !isSearching ? conv.queue_since ?? null : undefined}
+      nowMs={nowMs}
       conversation={conv}
       isSelected={selectedId === conv.id}
       onClick={() => handleSelect(conv)}
