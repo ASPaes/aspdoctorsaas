@@ -9,6 +9,13 @@ const corsHeaders = {
 const MAX_UPLOAD_MB = 50;
 const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
+// Ticket de Suporte e ticket de Customer Success moram em tabelas diferentes e cada um tem a sua
+// tabela de anexos. Compartilham o bucket; o segmento "cs" no caminho separa os arquivos.
+const ORIGENS = {
+  support: { ticketTable: "support_tickets", attachTable: "support_ticket_attachments", prefixo: "" },
+  cs: { ticketTable: "cs_tickets", attachTable: "cs_ticket_attachments", prefixo: "cs/" },
+} as const;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -31,9 +38,18 @@ Deno.serve(async (req) => {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const ticketId = formData.get("ticketId") as string | null;
+    // Sem "origem" é Suporte: mantém o contrato de quem já chamava a função.
+    const origemKey = (formData.get("origem") as string | null) ?? "support";
 
     if (!file || !ticketId) {
       return new Response(JSON.stringify({ error: "file e ticketId obrigatórios" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const origem = ORIGENS[origemKey as keyof typeof ORIGENS];
+    if (!origem) {
+      return new Response(JSON.stringify({ error: `origem inválida: "${origemKey}"` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -46,7 +62,7 @@ Deno.serve(async (req) => {
     }
 
     const { data: ticket } = await supabaseAdmin
-      .from("support_tickets")
+      .from(origem.ticketTable)
       .select("tenant_id")
       .eq("id", ticketId)
       .maybeSingle();
@@ -57,11 +73,24 @@ Deno.serve(async (req) => {
       });
     }
 
-    const tenantId = ticket.tenant_id;
+    // cs_tickets.tenant_id é nullable (support_tickets não é) e a tabela de anexos exige o tenant.
+    // Ticket sem tenant herda o de quem está anexando; sem nenhum dos dois não há onde gravar.
+    let tenantId = ticket.tenant_id;
+    if (!tenantId) {
+      const { data: prof } = await supabaseAdmin
+        .from("profiles").select("tenant_id").eq("user_id", user.id).maybeSingle();
+      tenantId = prof?.tenant_id ?? null;
+      if (!tenantId) {
+        return new Response(JSON.stringify({ error: "Ticket sem tenant definido" }), {
+          status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const safeName = file.name
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_");
-    const path = `${tenantId}/${ticketId}/${Date.now()}_${safeName}`;
+    const path = `${tenantId}/${origem.prefixo}${ticketId}/${Date.now()}_${safeName}`;
 
     // Passa o File direto (não arrayBuffer): com 50MB, a cópia extra dobrava o pico de memória da função.
     const { error: uploadError } = await supabaseAdmin.storage
@@ -78,7 +107,7 @@ Deno.serve(async (req) => {
     }
 
     const { data: att, error: insertError } = await supabaseAdmin
-      .from("support_ticket_attachments")
+      .from(origem.attachTable)
       .insert({
         tenant_id: tenantId, ticket_id: ticketId,
         file_name: file.name, file_path: path,

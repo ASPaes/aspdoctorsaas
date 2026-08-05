@@ -6,6 +6,13 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Espelha o ORIGENS da upload-ticket-attachment: Suporte e Customer Success têm tabelas de anexo
+// distintas, no mesmo bucket.
+const TABELAS: Record<string, string> = {
+  support: "support_ticket_attachments",
+  cs: "cs_ticket_attachments",
+};
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -29,13 +36,19 @@ Deno.serve(async (req) => {
       return json({ error: "Não autenticado" }, 401);
     }
 
-    const { attachmentId } = await req.json().catch(() => ({}));
+    // Sem "origem" é Suporte: mantém o contrato de quem já chamava a função.
+    const { attachmentId, origem = "support" } = await req.json().catch(() => ({}));
     if (!attachmentId) {
       return json({ error: "attachmentId obrigatório" }, 400);
     }
 
+    const tabela = TABELAS[origem];
+    if (!tabela) {
+      return json({ error: `origem inválida: "${origem}"` }, 400);
+    }
+
     const { data: att } = await supabaseAdmin
-      .from("support_ticket_attachments")
+      .from(tabela)
       .select("id, tenant_id, file_path, file_name, uploaded_by")
       .eq("id", attachmentId)
       .maybeSingle();
@@ -73,7 +86,7 @@ Deno.serve(async (req) => {
     }
 
     const { error: delError } = await supabaseAdmin
-      .from("support_ticket_attachments")
+      .from(tabela)
       .delete()
       .eq("id", attachmentId);
 
