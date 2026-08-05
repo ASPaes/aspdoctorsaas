@@ -20,7 +20,9 @@ const ANEXOS = [
 ];
 
 let umAnexoSo = false;
+let listaVazia = false;
 
+const tabelasConsultadas: string[] = [];
 const eventoInsert = vi.fn();
 const invokeDelete = vi.fn(() => Promise.resolve({ data: { success: true }, error: null }));
 
@@ -29,11 +31,12 @@ vi.mock("@/integrations/supabase/client", () => {
   const anexosChain: any = {
     select: () => anexosChain,
     eq: () => anexosChain,
-    order: () => Promise.resolve({ data: umAnexoSo ? [ANEXOS[0]] : ANEXOS, error: null }),
+    order: () => Promise.resolve({ data: listaVazia ? [] : umAnexoSo ? [ANEXOS[0]] : ANEXOS, error: null }),
     update: () => ({ eq: () => Promise.resolve({ error: null }) }),
   };
   const from = (tabela: string) => {
-    if (tabela === "support_ticket_attachments") return anexosChain;
+    tabelasConsultadas.push(tabela);
+    if (tabela === "support_ticket_attachments" || tabela === "cs_ticket_attachments") return anexosChain;
     if (tabela === "support_ticket_events") {
       return { insert: (linha: any) => { eventoInsert(linha); return Promise.resolve({ error: null }); } };
     }
@@ -60,14 +63,20 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const auth = { user: { id: "u1" }, profile: { role: "user", is_super_admin: false } };
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => auth }));
 
-async function render(variant?: "ticket" | "onboarding") {
+async function render(variant?: "ticket" | "onboarding", source?: "support" | "cs") {
   const host = document.createElement("div");
   document.body.appendChild(host);
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   await act(async () => {
     createRoot(host).render(
       <QueryClientProvider client={qc}>
-        <TicketAttachments ticketId="tk1" tenantId="t1" variant={variant} />
+        <TicketAttachments
+          ticketId="tk1"
+          tenantId="t1"
+          variant={variant}
+          source={source}
+          enablePaste={source === "cs"}
+        />
       </QueryClientProvider>
     );
   });
@@ -81,8 +90,10 @@ async function render(variant?: "ticket" | "onboarding") {
 beforeEach(() => {
   auth.profile = { role: "user", is_super_admin: false };
   umAnexoSo = false;
+  listaVazia = false;
   eventoInsert.mockReset();
   invokeDelete.mockClear();
+  tabelasConsultadas.length = 0;
   document.body.innerHTML = "";
 });
 
@@ -128,6 +139,58 @@ async function digitar(el: HTMLInputElement, valor: string) {
     el.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
+
+describe("TicketAttachments — Customer Success", () => {
+  it("lê da tabela de anexos do CS, não da do Suporte", async () => {
+    await render("ticket", "cs");
+    expect(tabelasConsultadas).toContain("cs_ticket_attachments");
+    expect(tabelasConsultadas).not.toContain("support_ticket_attachments");
+  });
+
+  it("o Suporte continua lendo da tabela dele", async () => {
+    await render();
+    expect(tabelasConsultadas).toContain("support_ticket_attachments");
+    expect(tabelasConsultadas).not.toContain("cs_ticket_attachments");
+  });
+
+  it("a exclusão diz à edge function que a origem é CS", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    auth.profile = { role: "admin", is_super_admin: false };
+    await render("ticket", "cs");
+    const excluir = [...document.querySelectorAll('button[title="Excluir"]')] as HTMLButtonElement[];
+    await act(async () => { excluir[0].click(); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    expect(invokeDelete).toHaveBeenCalledWith(
+      "delete-ticket-attachment",
+      expect.objectContaining({ body: { attachmentId: "a1", origem: "cs" } })
+    );
+  });
+
+  it("sem origem explícita a exclusão vai como suporte", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    auth.profile = { role: "admin", is_super_admin: false };
+    await render();
+    const excluir = [...document.querySelectorAll('button[title="Excluir"]')] as HTMLButtonElement[];
+    await act(async () => { excluir[0].click(); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    expect(invokeDelete).toHaveBeenCalledWith(
+      "delete-ticket-attachment",
+      expect.objectContaining({ body: { attachmentId: "a1", origem: "support" } })
+    );
+  });
+
+  it("a dica de colar/arrastar só aparece onde o recurso está ligado", async () => {
+    // O texto de ajuda é o do estado vazio.
+    listaVazia = true;
+    const cs = await render("ticket", "cs");
+    expect(cs.textContent).toContain("Ctrl+V");
+
+    const suporte = await render();
+    expect(suporte.textContent).not.toContain("Ctrl+V");
+  });
+});
 
 describe("TicketAttachments — busca", () => {
   it("filtra pelo título", async () => {

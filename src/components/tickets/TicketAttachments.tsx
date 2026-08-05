@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,18 +17,43 @@ interface Props {
   tenantId: string;
   /** "onboarding" liga título, busca, autoria e log na Timeline. Suporte usa o padrão. */
   variant?: "ticket" | "onboarding";
+  /**
+   * De qual módulo é o ticket. Suporte e Onboarding usam support_ticket_attachments;
+   * Customer Success tem tabela própria porque o ticket dele vive em cs_tickets.
+   * As edge functions recebem isso como "origem".
+   */
+  source?: "support" | "cs";
+  /** Liga colar print (Ctrl+V) e arrastar arquivo para a área de anexos. */
+  enablePaste?: boolean;
 }
 
 const MAX_UPLOAD_MB = 50;
 const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
+const TABELA = {
+  support: "support_ticket_attachments",
+  cs: "cs_ticket_attachments",
+} as const;
+
 type UploadProgress = { name: string; pct: number; index: number; total: number };
+
+// Print colado vem do clipboard como "image.png". Renomeia para dar rastro de quando foi colado —
+// o nome é o que a pessoa vê na lista depois.
+function nomeDePrint(file: File): File {
+  const ext = (file.type.split("/")[1] || "png").replace("jpeg", "jpg");
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  const nome = `print-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.${ext}`;
+  // globalThis.File porque `File` neste arquivo é o ícone do lucide-react, não o construtor.
+  return new globalThis.File([file], nome, { type: file.type });
+}
 
 // Upload por XHR em vez de functions.invoke por um motivo só: arquivo de 50MB precisa de barra de
 // progresso, e fetch() não reporta progresso de upload.
 function uploadOne(
   file: File,
   ticketId: string,
+  source: "support" | "cs",
   token: string,
   onProgress: (pct: number) => void
 ): Promise<string | undefined> {
@@ -50,6 +75,7 @@ function uploadOne(
     const fd = new FormData();
     fd.append("file", file);
     fd.append("ticketId", ticketId);
+    fd.append("origem", source);
     xhr.send(fd);
   });
 }
@@ -79,9 +105,16 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / 1048576).toFixed(1)}MB`;
 }
 
-function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
+function TicketAttachments({
+  ticketId,
+  tenantId,
+  variant = "ticket",
+  source = "support",
+  enablePaste = false,
+}: Props) {
   const isOnboarding = variant === "onboarding";
   const [uploading, setUploading] = useState(false);
+  const [arrastando, setArrastando] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -141,11 +174,13 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
     !!type && (type.startsWith("image") || type.startsWith("video") || type.startsWith("audio") || type.includes("pdf"));
 
   const { data: attachments = [], refetch } = useQuery({
-    queryKey: ["ticket_attachments", ticketId],
+    queryKey: ["ticket_attachments", source, ticketId],
     enabled: !!ticketId,
     queryFn: async () => {
-      const { data, error } = await (supabase.from("support_ticket_attachments" as any) as any)
-        .select("id, file_name, file_path, file_size, file_type, uploaded_by, created_at, title")
+      // "title" só existe na tabela do Suporte; pedir a coluna na de CS derruba a query inteira.
+      const colunas = "id, file_name, file_path, file_size, file_type, uploaded_by, created_at";
+      const { data, error } = await (supabase.from(TABELA[source] as any) as any)
+        .select(source === "support" ? `${colunas}, title` : colunas)
         .eq("ticket_id", ticketId)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -216,7 +251,7 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
           continue;
         }
         setProgress({ name: file.name, pct: 0, index: i + 1, total: itens.length });
-        const id = await uploadOne(file, ticketId, session.access_token, (pct) =>
+        const id = await uploadOne(file, ticketId, source, session.access_token, (pct) =>
           setProgress({ name: file.name, pct, index: i + 1, total: itens.length })
         );
         count++;
@@ -237,6 +272,36 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
       // Pode ter subido parte dos arquivos antes de falhar.
       if (count > 0) refetch();
     }
+  };
+
+  // Um upload por vez: o efeito abaixo enxerga o valor do render em que foi montado, então
+  // `uploading` sozinho não serviria de trava.
+  const uploadingRef = useRef(false);
+  uploadingRef.current = uploading;
+
+  // Colar print com Ctrl+V. O listener é no documento (e não num campo) porque a pessoa dá o
+  // Ctrl+V de onde estiver lendo o ticket. Só arquivo de imagem é interceptado — colar texto no
+  // comentário continua colando texto.
+  useEffect(() => {
+    if (!enablePaste) return;
+    const aoColar = (e: ClipboardEvent) => {
+      const imagens = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith("image/"));
+      if (imagens.length === 0 || uploadingRef.current) return;
+      e.preventDefault();
+      enviarArquivos(imagens.map((f) => ({ file: nomeDePrint(f), title: "" })));
+    };
+    document.addEventListener("paste", aoColar);
+    return () => document.removeEventListener("paste", aoColar);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enablePaste, ticketId, source]);
+
+  const aoSoltar = (e: React.DragEvent) => {
+    e.preventDefault();
+    setArrastando(false);
+    const arquivos = Array.from(e.dataTransfer.files ?? []);
+    if (arquivos.length === 0 || uploading) return;
+    // Arrastar não passa pelo diálogo de títulos: quem arrasta quer soltar e seguir.
+    enviarArquivos(arquivos.map((file) => ({ file, title: "" })));
   };
 
   const confirmarEdicao = async (att: { id: string; file_name: string }) => {
@@ -297,7 +362,7 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
     setDeletingId(att.id);
     try {
       const { data, error } = await supabase.functions.invoke("delete-ticket-attachment", {
-        body: { attachmentId: att.id },
+        body: { attachmentId: att.id, origem: source },
       });
       if (error) throw new Error(await efErrorMessage(error));
       if (data?.error) throw new Error(data.error);
@@ -312,7 +377,17 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
   };
 
   return (
-    <div className="space-y-3">
+    <div
+      className={`space-y-3 rounded-lg transition-colors ${
+        arrastando ? "ring-2 ring-primary ring-offset-2 ring-offset-background bg-primary/5" : ""
+      }`}
+      onDragOver={enablePaste ? (e) => { e.preventDefault(); setArrastando(true); } : undefined}
+      // dragleave dispara ao passar por cima dos filhos; sem checar o destino a moldura piscava.
+      onDragLeave={enablePaste ? (e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setArrastando(false);
+      } : undefined}
+      onDrop={enablePaste ? aoSoltar : undefined}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Paperclip className="h-4 w-4 text-muted-foreground" />
@@ -391,7 +466,9 @@ function TicketAttachments({ ticketId, tenantId, variant = "ticket" }: Props) {
 
       {attachments.length === 0 && !progress && (
         <p className="text-[11px] text-muted-foreground">
-          Nenhum anexo. Até {MAX_UPLOAD_MB}MB por arquivo.
+          {enablePaste
+            ? `Nenhum anexo. Arraste um arquivo aqui, cole um print com Ctrl+V ou use o botão Anexar. Até ${MAX_UPLOAD_MB}MB por arquivo.`
+            : `Nenhum anexo. Até ${MAX_UPLOAD_MB}MB por arquivo.`}
         </p>
       )}
 

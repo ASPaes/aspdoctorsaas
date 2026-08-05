@@ -21,6 +21,7 @@ import {
   type CSTicket, type CSTicketStatus, type CSTicketPrioridade, type CSTicketTipo, type CSTicketImpacto, type CSIndicacaoStatus,
 } from './types';
 import { Loader2, Calendar, User, Building2, DollarSign, Clock, Save, AlertTriangle, CheckCircle, ArrowUpDown, Play, Trash2, ExternalLink, MessageCircle } from 'lucide-react';
+import { TicketAttachments } from '@/components/tickets/TicketAttachments';
 import { toast } from 'sonner';
 
 interface CSTicketDetailContentProps {
@@ -271,6 +272,20 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
   if (!currentTicket) return null;
 
   const isOportunidade = currentTicket.tipo === 'oportunidade' || (currentTicket.tipo === 'interno_processo' && !!currentTicket.contato_externo_nome);
+
+  // Vai nos dois modos, mas em posições diferentes: em edição precisa ficar ACIMA de Cancelar/Salvar,
+  // senão sobra botão de ação no meio da tela.
+  const anexos = (
+    <>
+      <Separator />
+      <TicketAttachments
+        ticketId={currentTicket.id}
+        tenantId={(currentTicket as { tenant_id?: string | null }).tenant_id || ''}
+        source="cs"
+        enablePaste
+      />
+    </>
+  );
 
   return (
     <div className="space-y-4">
@@ -537,6 +552,7 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
             <Label>{editData.tipo === 'clube_comunidade' ? 'Ação Agendada/Realizada' : 'Próxima Ação'}</Label>
             <Textarea value={editData.proxima_acao} onChange={(e) => setEditData({ ...editData, proxima_acao: e.target.value })} rows={2} />
           </div>
+          {anexos}
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={onClose}>Cancelar</Button>
             <Button onClick={handleSave} disabled={updateTicket.isPending}>
@@ -589,6 +605,7 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
             {currentTicket.primeira_acao_em && <div className="space-y-1"><Label className="text-muted-foreground text-xs">1ª Ação em</Label><p>{format(new Date(currentTicket.primeira_acao_em), 'dd/MM/yyyy HH:mm', { locale: ptBR })}</p></div>}
           </div>
           <div className="space-y-1"><Label className="text-muted-foreground text-xs">{currentTicket.tipo === 'clube_comunidade' ? 'Ação Agendada/Realizada' : 'Próxima Ação'}</Label><p className="p-2 bg-muted/50 rounded-md text-sm">{currentTicket.proxima_acao}</p></div>
+          {anexos}
         </div>
       )}
 
