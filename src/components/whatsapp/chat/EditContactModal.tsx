@@ -7,11 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useWhatsAppActions } from '../hooks/useWhatsAppActions';
 import { useClienteSearch } from '../hooks/useClienteSearch';
+import { useContactSearch, type ContactSearchResult } from '../hooks/useContactSearch';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { maskPhoneBR } from '@/lib/masks';
-import { normalizeBRPhone, isValidBRPhone, maskBRPhoneLive } from '@/lib/phoneBR';
-import { Link2, Search, Loader2, X, Building2 } from 'lucide-react';
+import { normalizeBRPhone, isValidBRPhone, maskBRPhoneLive, formatBRPhone } from '@/lib/phoneBR';
+import { Link2, Search, Loader2, X, Building2, Users, CheckCircle2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLinkedCliente } from '../hooks/useLinkedCliente';
 
@@ -41,6 +43,17 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
   const [originalClienteId, setOriginalClienteId] = useState<string | null>(null);
   const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen ? searchTerm : '');
 
+  // Preencher a partir de um contato já cadastrado (nome + empresa).
+  // O telefone NÃO vem junto: é único por tenant (whatsapp_contacts_tenant_phone_unique)
+  // e o número desta conversa é o de quem está falando aqui.
+  const [contactTerm, setContactTerm] = useState('');
+  const [contactSearchOpen, setContactSearchOpen] = useState(false);
+  const [filledFrom, setFilledFrom] = useState<string | null>(null);
+  const { results: contactResults, isLoading: isSearchingContacts } = useContactSearch(
+    contactSearchOpen ? contactTerm : '',
+  );
+  const contactOptions = contactResults.filter((c) => c.id !== contactId);
+
   // Busca cliente atualmente vinculado para pré-preencher na edição
   const { data: currentLinked } = useLinkedCliente(
     open && !isNewContact ? contactId || null : null,
@@ -58,8 +71,22 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
       setOriginalClienteId(null);
       setSearchOpen(false);
       setSearchTerm('');
+      setContactTerm('');
+      setContactSearchOpen(false);
+      setFilledFrom(null);
     }
   }, [open, contactName, contactNotes, contactPhone, reset]);
+
+  // Aplica nome e empresa do contato escolhido. Telefone fica como está.
+  const applyContact = (c: ContactSearchResult) => {
+    if (c.name) setValue('name', c.name, { shouldDirty: true });
+    if (c.cliente_id) {
+      setLinkedCliente({ id: c.cliente_id, label: c.cliente_nome || 'Empresa vinculada' });
+    }
+    setFilledFrom(c.name || formatBRPhone(c.phone_number));
+    setContactSearchOpen(false);
+    setContactTerm('');
+  };
 
   // Pré-preenche a empresa vinculada quando a query retorna
   useEffect(() => {
@@ -311,6 +338,73 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Atalho: puxa nome e empresa de um contato do diretório, sem digitar */}
+            {!isGroup && (
+              <div className="space-y-2 rounded-md border border-dashed border-border p-3">
+                <Label className="flex items-center gap-1.5 text-xs">
+                  <Users className="h-3.5 w-3.5" />
+                  Preencher a partir de um contato cadastrado
+                </Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    value={contactTerm}
+                    onChange={(e) => { setContactTerm(e.target.value); setContactSearchOpen(true); }}
+                    onFocus={() => setContactSearchOpen(true)}
+                    placeholder="Buscar contato por nome ou telefone..."
+                    className="text-sm pl-8"
+                  />
+                </div>
+
+                {contactSearchOpen && contactTerm.trim().length >= 2 && (
+                  <div className="border border-border rounded-md max-h-40 overflow-y-auto">
+                    {isSearchingContacts && (
+                      <div className="flex justify-center py-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                    {contactOptions.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="w-full text-left px-2 py-1.5 hover:bg-accent flex items-center gap-2 transition-colors"
+                        onClick={() => applyContact(c)}
+                      >
+                        <Avatar className="h-7 w-7 shrink-0">
+                          {c.profile_picture_url && <AvatarImage src={c.profile_picture_url} />}
+                          <AvatarFallback className="text-[10px]">
+                            {(c.name || c.phone_number).substring(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium truncate">{c.name || formatBRPhone(c.phone_number)}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {formatBRPhone(c.phone_number)}
+                            {c.cliente_nome ? ` · ${c.cliente_nome}` : ''}
+                          </p>
+                        </div>
+                        {c.cliente_id && <Building2 className="h-3 w-3 shrink-0 text-emerald-500" />}
+                      </button>
+                    ))}
+                    {!isSearchingContacts && contactOptions.length === 0 && (
+                      <p className="text-[11px] text-muted-foreground text-center py-2">Nenhum contato encontrado</p>
+                    )}
+                  </div>
+                )}
+
+                {filledFrom ? (
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3 shrink-0" />
+                    Nome e empresa preenchidos a partir de {filledFrom}.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">
+                    Preenche o nome e a empresa. O telefone continua sendo o desta conversa.
+                  </p>
+                )}
+              </div>
+            )}
+
             {!isGroup && (
               <div className="space-y-2">
                 <Label htmlFor="phone">Telefone {!isNewContact && '*'}</Label>
