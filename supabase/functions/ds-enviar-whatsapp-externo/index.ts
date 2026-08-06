@@ -63,14 +63,20 @@ async function assinaturaConfere(
   return diff === 0;
 }
 
-// Preferência pela instância "Financeiro" (mesmo critério do onboarding-send-welcome).
+// Preferência pela instância "Financeiro" (padrão dos módulos administrativos).
+// A coluna é `is_active` — NÃO existe `ativo` em whatsapp_instances. Errar o nome
+// devolve erro do PostgREST; se ele for engolido, o sintoma vira "nenhuma
+// instância ativa" e manda procurar no lugar errado. Por isso o erro sobe.
 async function escolherInstancia(supabase: any, tenantId: string) {
-  const { data: rows } = await supabase
+  const { data: rows, error } = await supabase
     .from('whatsapp_instances')
-    .select('id, instance_name, provider_type, instance_id_external, meta_phone_number_id, ativo')
+    .select('id, instance_name, provider_type, instance_id_external, meta_phone_number_id, status')
     .eq('tenant_id', tenantId)
-    .eq('ativo', true);
+    .eq('is_active', true);
+
+  if (error) throw new Error(`consulta de instancias falhou: ${error.message}`);
   if (!rows || rows.length === 0) return null;
+
   const financeiro = rows.find((r: any) =>
     (r.instance_name || '').toLowerCase().includes('financeiro'),
   );
@@ -137,7 +143,10 @@ Deno.serve(async (req) => {
 
     const tenantId = Deno.env.get('DEVFLOW_WA_TENANT_ID') || TENANT_ASP_PADRAO;
     const instancia = await escolherInstancia(supabase, tenantId);
-    if (!instancia) return json({ ok: false, error: 'nenhuma_instancia_ativa' }, 422);
+    if (!instancia) {
+      // Diz QUAL tenant ficou sem instância — sem isso, o erro manda procurar no escuro
+      return json({ ok: false, error: `nenhuma_instancia_ativa (tenant ${tenantId})` }, 422);
+    }
 
     const secrets = await getInstanceSecrets(supabase, instancia.id);
     const adapter = getAdapter(instancia.provider_type || 'self_hosted');
