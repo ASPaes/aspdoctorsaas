@@ -1845,6 +1845,11 @@ export type Database = {
           support_csat_score_min: number
           support_csat_thanks_template: string
           support_csat_timeout_minutes: number
+          support_group_auto_close_inactivity_minutes: number
+          support_group_inactivity_enabled: boolean
+          support_group_inactivity_warning_before_minutes: number
+          support_group_inactivity_warning_template: string
+          support_group_send_inactivity_warning: boolean
           support_inactivity_enabled: boolean
           support_inactivity_eod_close_template: string
           support_inactivity_eod_enabled: boolean
@@ -1915,6 +1920,11 @@ export type Database = {
           support_csat_score_min?: number
           support_csat_thanks_template?: string
           support_csat_timeout_minutes?: number
+          support_group_auto_close_inactivity_minutes?: number
+          support_group_inactivity_enabled?: boolean
+          support_group_inactivity_warning_before_minutes?: number
+          support_group_inactivity_warning_template?: string
+          support_group_send_inactivity_warning?: boolean
           support_inactivity_enabled?: boolean
           support_inactivity_eod_close_template?: string
           support_inactivity_eod_enabled?: boolean
@@ -1985,6 +1995,11 @@ export type Database = {
           support_csat_score_min?: number
           support_csat_thanks_template?: string
           support_csat_timeout_minutes?: number
+          support_group_auto_close_inactivity_minutes?: number
+          support_group_inactivity_enabled?: boolean
+          support_group_inactivity_warning_before_minutes?: number
+          support_group_inactivity_warning_template?: string
+          support_group_send_inactivity_warning?: boolean
           support_inactivity_enabled?: boolean
           support_inactivity_eod_close_template?: string
           support_inactivity_eod_enabled?: boolean

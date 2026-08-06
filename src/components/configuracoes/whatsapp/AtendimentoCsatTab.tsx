@@ -39,6 +39,13 @@ const schema = z.object({
   support_inactivity_eod_warning_template: z.string().min(1, "Obrigatório"),
   support_inactivity_eod_close_template: z.string().min(1, "Obrigatório"),
 
+  // Grupos: mesma régua do 1:1, com prazos e texto próprios
+  support_group_inactivity_enabled: z.boolean(),
+  support_group_auto_close_inactivity_minutes: z.number().min(1).max(1440),
+  support_group_send_inactivity_warning: z.boolean(),
+  support_group_inactivity_warning_before_minutes: z.number().min(1).max(60),
+  support_group_inactivity_warning_template: z.string().min(1, "Obrigatório"),
+
   // Ausência do agente (bola com o agente)
   support_agent_alert_enabled: z.boolean(),
   support_agent_alert_minutes: z.number().min(1).max(1440),
@@ -84,6 +91,12 @@ export default function AtendimentoCsatTab() {
       support_inactivity_eod_warning_template: "",
       support_inactivity_eod_close_template: "",
 
+      support_group_inactivity_enabled: false,
+      support_group_auto_close_inactivity_minutes: 30,
+      support_group_send_inactivity_warning: true,
+      support_group_inactivity_warning_before_minutes: 5,
+      support_group_inactivity_warning_template: "",
+
       support_agent_alert_enabled: false,
       support_agent_alert_minutes: 5,
       support_agent_no_response_close_enabled: false,
@@ -128,7 +141,7 @@ export default function AtendimentoCsatTab() {
     queryKey: ["configuracoes-atendimento", tid],
     queryFn: async () => {
       let q = supabase.from("configuracoes").select(
-        "id, support_reopen_window_minutes, support_auto_close_inactivity_minutes, support_send_inactivity_warning, support_inactivity_enabled, support_inactivity_warning_before_minutes, support_inactivity_warning_template, support_inactivity_eod_enabled, support_inactivity_eod_warning_template, support_inactivity_eod_close_template, support_agent_alert_enabled, support_agent_alert_minutes, support_agent_no_response_close_enabled, support_agent_no_response_close_minutes, support_csat_enabled, support_csat_prompt_template, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template, support_ura_enabled, support_ura_welcome_template, support_ura_invalid_option_template, support_ura_confirmation_template, support_waiting_ack_limit, support_ura_timeout_minutes, support_ura_default_department_id"
+        "id, support_reopen_window_minutes, support_auto_close_inactivity_minutes, support_send_inactivity_warning, support_inactivity_enabled, support_inactivity_warning_before_minutes, support_inactivity_warning_template, support_inactivity_eod_enabled, support_inactivity_eod_warning_template, support_inactivity_eod_close_template, support_group_inactivity_enabled, support_group_auto_close_inactivity_minutes, support_group_send_inactivity_warning, support_group_inactivity_warning_before_minutes, support_group_inactivity_warning_template, support_agent_alert_enabled, support_agent_alert_minutes, support_agent_no_response_close_enabled, support_agent_no_response_close_minutes, support_csat_enabled, support_csat_prompt_template, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template, support_ura_enabled, support_ura_welcome_template, support_ura_invalid_option_template, support_ura_confirmation_template, support_waiting_ack_limit, support_ura_timeout_minutes, support_ura_default_department_id"
       );
       if (tid) q = q.eq("tenant_id", tid);
       const { data, error } = await q.limit(1).maybeSingle();
@@ -149,6 +162,12 @@ export default function AtendimentoCsatTab() {
         support_inactivity_eod_enabled: config.support_inactivity_eod_enabled ?? true,
         support_inactivity_eod_warning_template: config.support_inactivity_eod_warning_template ?? "",
         support_inactivity_eod_close_template: config.support_inactivity_eod_close_template ?? "",
+
+        support_group_inactivity_enabled: config.support_group_inactivity_enabled ?? false,
+        support_group_auto_close_inactivity_minutes: config.support_group_auto_close_inactivity_minutes ?? 30,
+        support_group_send_inactivity_warning: config.support_group_send_inactivity_warning ?? true,
+        support_group_inactivity_warning_before_minutes: config.support_group_inactivity_warning_before_minutes ?? 5,
+        support_group_inactivity_warning_template: config.support_group_inactivity_warning_template ?? "",
 
         support_agent_alert_enabled: config.support_agent_alert_enabled ?? false,
         support_agent_alert_minutes: config.support_agent_alert_minutes ?? 5,
@@ -206,6 +225,8 @@ export default function AtendimentoCsatTab() {
   const warningEnabled = form.watch("support_send_inactivity_warning");
   const inactivityEnabled = form.watch("support_inactivity_enabled");
   const eodEnabled = form.watch("support_inactivity_eod_enabled");
+  const groupInactivityEnabled = form.watch("support_group_inactivity_enabled");
+  const groupWarningEnabled = form.watch("support_group_send_inactivity_warning");
   const agentAlertEnabled = form.watch("support_agent_alert_enabled");
   const agentCloseEnabled = form.watch("support_agent_no_response_close_enabled");
   const uraEnabled = form.watch("support_ura_enabled");
@@ -362,6 +383,91 @@ export default function AtendimentoCsatTab() {
                   <p className="text-xs text-muted-foreground mt-0.5">Nenhum atendimento é avisado nem encerrado por falta de resposta do cliente. A régua "Agente sem responder" abaixo é independente e continua valendo.</p>
                 </div>
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Grupo sem responder ── */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Grupo sem responder</CardTitle>
+            <CardDescription>
+              Mesma régua acima, aplicada aos atendimentos abertos em GRUPOS de WhatsApp, com prazos próprios. Vale só para grupo habilitado na aba Grupos. Ao encerrar, o atendimento fecha e a mensagem vai para o grupo — o chat do grupo em si nunca é fechado.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FormField control={form.control} name="support_group_inactivity_enabled" render={({ field }) => (
+              <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <FormLabel>Encerrar grupos por inatividade</FormLabel>
+                  <FormDescription>Quando desligado (padrão), nenhum atendimento de grupo é avisado nem encerrado automaticamente.</FormDescription>
+                </div>
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+              </FormItem>
+            )} />
+
+            {groupInactivityEnabled && (
+              <>
+                <FormField control={form.control} name="support_group_auto_close_inactivity_minutes" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Encerrar após (min)</FormLabel>
+                    <FormControl>
+                      <NumericInput value={field.value} onChange={field.onChange} placeholder="30" suffix="min" />
+                    </FormControl>
+                    <FormDescription>Minutos sem ninguém do grupo responder para fechar automaticamente.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <Separator />
+
+                <FormField control={form.control} name="support_group_send_inactivity_warning" render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel>Aviso de inatividade</FormLabel>
+                      <FormDescription>Enviar aviso no grupo antes de encerrar por inatividade.</FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )} />
+
+                {groupWarningEnabled && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="support_group_inactivity_warning_before_minutes" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Aviso X min antes do encerramento</FormLabel>
+                        <FormControl>
+                          <NumericInput value={field.value} onChange={field.onChange} placeholder="5" suffix="min" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="support_group_inactivity_warning_template" render={({ field }) => (
+                      <FormItem className="sm:col-span-2">
+                        <FormLabel>Mensagem de aviso</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} rows={3} placeholder="Use {{minutes}} para inserir o tempo restante" />
+                        </FormControl>
+                        <FormDescription>Variáveis: {"{{minutes}}"}</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                )}
+
+                <div className="flex items-start gap-2 rounded-lg border border-dashed p-4 bg-muted/30">
+                  <BellOff className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Fim de expediente segue o bloco acima</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">A antecipação de aviso/encerramento no fim do expediente usa a mesma chave e os mesmos textos de "Cliente sem responder" — expediente é do workspace, não do canal.</p>
+                  </div>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
