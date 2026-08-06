@@ -601,13 +601,23 @@ export default function OnboardingPage() {
     const m: Record<string, JourneyRow[]> = {};
     stages.forEach((s) => (m[s.id] = []));
     m[ONB_DONE_COL_ID] = [];
+    const termo = busca.trim();
     journeysFiltradas.forEach((j) => {
-      if (filtroSituacao === "todos" && (j.situacao === "concluido" || j.situacao === "cancelado")) return;
       if (!phaseId) return;
       // A jornada só aparece neste board se já percorreu (ou está percorrendo) esta fase.
       const passagem = phasesByJourney[j.journey_id]?.[phaseId];
       if (!passagem) return;
       if (selectedPipelineId && passagem.pipeline_id !== selectedPipelineId) return;
+      if (filtroSituacao === "todos" && (j.situacao === "concluido" || j.situacao === "cancelado")) {
+        // Go-live dado DENTRO desta fase encerra a jornada aqui — sem treino a fazer, a
+        // Implantação nunca começa. O cartão fica na coluna de conclusão pela mesma janela
+        // de 30 dias da Implantação (busca derruba a janela) em vez de sumir do quadro.
+        // Quem seguiu adiante é encerrado no quadro da fase seguinte; cancelada não fica.
+        const golive = goLiveEm(j.journey_id, j.situacao ?? null);
+        const seguiuAdiante = !!proximaPhase && !!phasesByJourney[j.journey_id]?.[proximaPhase.id];
+        if (golive === null || seguiuAdiante) return;
+        if (!termo && Date.now() - golive > GOLIVE_JANELA_MS) return;
+      }
       // Fase já encerrada → coluna de conclusão, para o cartão não sumir do board.
       if (!passagem.aberta) {
         m[ONB_DONE_COL_ID].push(j);
@@ -616,7 +626,7 @@ export default function OnboardingPage() {
       if (j.current_stage_id && m[j.current_stage_id]) m[j.current_stage_id].push(j);
     });
     return m;
-  }, [stages, journeysFiltradas, filtroSituacao, phaseId, selectedPipelineId, phasesByJourney]);
+  }, [stages, journeysFiltradas, filtroSituacao, phaseId, selectedPipelineId, phasesByJourney, proximaPhase, busca]);
 
   async function handleDrop(journeyId: string, targetStageId: string, fromStageId: string) {
     if (fromStageId === targetStageId) return;
