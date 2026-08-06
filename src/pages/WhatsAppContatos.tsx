@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Search, Users, MessageSquare, Clock, TrendingUp, ChevronLeft, ChevronRight, SmilePlus, ThumbsUp, ThumbsDown, Minus, Building2, Mail, ExternalLink, Phone, Send, User, UserPlus, Pencil } from "lucide-react";
+import { ArrowLeft, Search, Users, MessageSquare, Clock, TrendingUp, ChevronLeft, ChevronRight, SmilePlus, ThumbsUp, ThumbsDown, Minus, Building2, Mail, ExternalLink, Phone, Send, User, UserPlus, Pencil, MessageSquarePlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useWhatsAppContacts, type ContactSortOption, type ContactClienteFilter } from "@/components/whatsapp/hooks/useWhatsAppContacts";
 import { useContactDetails } from "@/components/whatsapp/hooks/useContactDetails";
 import { useLinkedCliente } from "@/components/whatsapp/hooks/useLinkedCliente";
 import { ContactDirectoryDialog, type EditableContact } from "@/components/whatsapp/contatos/ContactDirectoryDialog";
+import { NewConversationModal } from "@/components/whatsapp/conversations/NewConversationModal";
 import { ClienteSearchSelect, type SelectedCliente } from "@/components/whatsapp/contatos/ClienteSearchSelect";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ export default function WhatsAppContatos() {
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogContact, setDialogContact] = useState<EditableContact | null>(null);
+  const [newConvOpen, setNewConvOpen] = useState(false);
   const [vinculo, setVinculo] = useState<"all" | "none" | "cliente">("all");
   const [filterCliente, setFilterCliente] = useState<SelectedCliente | null>(null);
   const { instances } = useWhatsAppInstances();
@@ -214,25 +216,39 @@ export default function WhatsAppContatos() {
                     )}
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1.5 shrink-0"
-                  onClick={() => {
-                    if (!details.contact) return;
-                    setDialogContact({
-                      id: details.contact.id,
-                      name: details.contact.name,
-                      phone_number: details.contact.phone_number,
-                      notes: details.contact.notes ?? null,
-                      is_group: details.contact.is_group,
-                    });
-                    setDialogOpen(true);
-                  }}
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                  Editar
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Grupo não tem telefone — o jid não serve para abrir conversa nova */}
+                  {!details.contact?.is_group && (
+                    <Button
+                      size="sm"
+                      className="h-8 gap-1.5"
+                      onClick={() => setNewConvOpen(true)}
+                    >
+                      <MessageSquarePlus className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Iniciar Conversa</span>
+                      <span className="sm:hidden">Conversar</span>
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5"
+                    onClick={() => {
+                      if (!details.contact) return;
+                      setDialogContact({
+                        id: details.contact.id,
+                        name: details.contact.name,
+                        phone_number: details.contact.phone_number,
+                        notes: details.contact.notes ?? null,
+                        is_group: details.contact.is_group,
+                      });
+                      setDialogOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Editar
+                  </Button>
+                </div>
               </div>
 
               {/* Notes */}
@@ -532,6 +548,19 @@ export default function WhatsAppContatos() {
             : null
         }
         onSaved={(contactId) => setSelectedContactId(contactId)}
+      />
+
+      {/* key por contato: o modal guarda a instância escolhida em state e só a
+          preenche quando está vazia — sem remontar, o contato seguinte herdaria
+          a instância do anterior. */}
+      <NewConversationModal
+        key={selectedContactId ?? "none"}
+        open={newConvOpen}
+        onOpenChange={setNewConvOpen}
+        initialPhone={details?.contact?.phone_number}
+        initialName={details?.contact?.name ?? undefined}
+        initialInstanceId={details?.contact?.instance_id ?? undefined}
+        onCreated={(convId) => navigate(`/whatsapp?conversation=${convId}`)}
       />
     </div>
   );
