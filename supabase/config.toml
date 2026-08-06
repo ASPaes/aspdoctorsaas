@@ -129,3 +129,9 @@ verify_jwt = false
 # Sem esta entrada o deploy do CI usaria o padrao true e mudaria a auth do processador da fila.
 [functions.omie-sync-processar]
 verify_jwt = false
+
+# ds-enviar-whatsapp-externo: chamada pelo DoctorDev, que nao tem JWT deste projeto.
+# A auth e HMAC-SHA256 sobre o payload (segredo DEVFLOW_WA_SECRET), igual ao SSO.
+# Com verify_jwt=true o gateway barraria a chamada antes de chegar na function.
+[functions.ds-enviar-whatsapp-externo]
+verify_jwt = false
