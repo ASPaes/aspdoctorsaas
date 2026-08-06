@@ -17,6 +17,9 @@
     /* ─── Brand ─── */
     --primary: 142 71% 45%;          /* #22C55E */
     --primary-foreground: 0 0% 100%;
+    /* Variante usada por `.text-primary` — ver o bloco @layer utilities abaixo.
+       No claro é a própria cor (escura sobre fundo claro já lê bem). */
+    --primary-text: var(--primary);
 
     --secondary: 215 16% 47%;        /* #64748B */
     --secondary-foreground: 0 0% 100%;
@@ -91,6 +94,10 @@
     /* ─── Brand ─── */
     --primary: 142 71% 45%;          /* #22C55E */
     --primary-foreground: 0 0% 100%;
+    /* No escuro a cor vira TEXTO sobre fundo quase preto: se o usuário escolheu
+       um tom escurecido (DEM-0103), `--primary-accessible` traz a versão clara
+       daquele mesmo matiz. Sem override, continua sendo a cor da marca. */
+    --primary-text: var(--primary-accessible, var(--primary));
 
     --secondary: 217 33% 17%;        /* ~Dark 900 for secondary surfaces */
     --secondary-foreground: 210 40% 98%;
@@ -155,5 +162,15 @@
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
     letter-spacing: var(--tracking-normal);
+  }
+}
+
+@layer utilities {
+  /* `bg-primary` quer uma cor ESCURA (o texto em cima é branco) e `text-primary`
+     quer uma cor CLARA no tema escuro — matematicamente o mesmo valor não atende
+     aos dois. Sem override de cor a expressão resolve para `--primary` e nada
+     muda; com override, só o papel de texto ganha a versão clara do matiz. */
+  .text-primary {
+    color: hsl(var(--primary-text));
   }
 }

@@ -19,8 +19,10 @@ import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTick
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DepartmentFilterProvider } from "@/contexts/DepartmentFilterContext";
 import { QueueAlertProvider } from "@/contexts/QueueAlertContext";
+import { useAccentColorSync } from "@/hooks/useAccentColorSync";
 
 export default function AppLayout() {
+  useAccentColorSync();
   const location = useLocation();
   const isWhatsApp = location.pathname === "/whatsapp";
   // Telas que se viram sozinhas com a altura e rolam por dentro: sem padding do layout

@@ -8881,6 +8881,7 @@ export type Database = {
           sound_enabled: boolean
           sound_id: string | null
           tenant_id: string
+          theme_primary_color: string | null
           updated_at: string
           user_id: string
           visual_notifications_enabled: boolean
@@ -8909,6 +8910,7 @@ export type Database = {
           sound_enabled?: boolean
           sound_id?: string | null
           tenant_id: string
+          theme_primary_color?: string | null
           updated_at?: string
           user_id: string
           visual_notifications_enabled?: boolean
@@ -8937,6 +8939,7 @@ export type Database = {
           sound_enabled?: boolean
           sound_id?: string | null
           tenant_id?: string
+          theme_primary_color?: string | null
           updated_at?: string
           user_id?: string
           visual_notifications_enabled?: boolean

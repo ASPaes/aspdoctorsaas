@@ -15,6 +15,14 @@ import { Separator } from "@/components/ui/separator";
 import { Loader2, Save, Volume2 } from "lucide-react";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { playQueueBeep } from "@/lib/queueBeep";
+import { AccentColorPicker } from "@/components/preferences/AccentColorPicker";
+import {
+  MIN_CONTRAST,
+  applyAccentColor,
+  contrastWithWhite,
+  normalizeHex,
+  storeAccent,
+} from "@/lib/accentColor";
 import { toast } from "sonner";
 
 interface Props {
@@ -30,6 +38,7 @@ export function UserPreferencesDialog({ open, onOpenChange }: Props) {
   const [visualEnabled, setVisualEnabled] = useState(true);
   const [queueSoundEnabled, setQueueSoundEnabled] = useState(true);
   const [queueVolume, setQueueVolume] = useState(70);
+  const [accentColor, setAccentColor] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && !isLoading) {
@@ -38,10 +47,32 @@ export function UserPreferencesDialog({ open, onOpenChange }: Props) {
       setVisualEnabled(preferences.visual_notifications_enabled);
       setQueueSoundEnabled(preferences.queue_sound_enabled);
       setQueueVolume(preferences.queue_sound_volume);
+      setAccentColor(preferences.theme_primary_color);
     }
   }, [open, isLoading, preferences]);
 
+  // Prévia ao vivo: a cor entra no app inteiro enquanto o diálogo está aberto.
+  // Fechar sem salvar devolve a cor que está no banco.
+  useEffect(() => {
+    if (!open) return;
+    applyAccentColor(accentColor);
+  }, [open, accentColor]);
+
+  const accentBlocked =
+    accentColor !== null && contrastWithWhite(accentColor) < MIN_CONTRAST;
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next) applyAccentColor(preferences.theme_primary_color);
+    onOpenChange(next);
+  };
+
   const handleSave = async () => {
+    if (accentBlocked) {
+      toast.error("Cor de destaque com contraste abaixo do mínimo. Escolha um tom mais escuro.");
+      return;
+    }
+    // Normaliza antes de gravar: o CHECK da coluna só aceita `#rrggbb` minúsculo.
+    const accentToSave = accentColor ? normalizeHex(accentColor) : null;
     try {
       await upsertAsync({
         signature_name: signatureName.trim() || null,
@@ -49,7 +80,10 @@ export function UserPreferencesDialog({ open, onOpenChange }: Props) {
         visual_notifications_enabled: visualEnabled,
         queue_sound_enabled: queueSoundEnabled,
         queue_sound_volume: queueVolume,
+        theme_primary_color: accentToSave,
       });
+      storeAccent(accentToSave);
+      applyAccentColor(accentToSave);
       toast.success("Preferências salvas!");
       onOpenChange(false);
     } catch (err: any) {
@@ -58,8 +92,8 @@ export function UserPreferencesDialog({ open, onOpenChange }: Props) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Preferências do Usuário</DialogTitle>
         </DialogHeader>
@@ -144,10 +178,14 @@ export function UserPreferencesDialog({ open, onOpenChange }: Props) {
               </div>
             )}
           </div>
+
+          <Separator />
+
+          <AccentColorPicker value={accentColor} onChange={setAccentColor} />
         </div>
 
         <DialogFooter>
-          <Button onClick={handleSave} disabled={isUpdating}>
+          <Button onClick={handleSave} disabled={isUpdating || accentBlocked}>
             {isUpdating ? (
               <Loader2 className="h-4 w-4 animate-spin mr-1" />
             ) : (
