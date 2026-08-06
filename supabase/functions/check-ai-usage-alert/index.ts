@@ -61,93 +61,107 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: false, error: 'config_not_found' }), { status: 200 });
     }
 
-    const { admin_phone, admin_instance_name, warning_threshold, critical_threshold } = alertConfig;
+    // warning_threshold / critical_threshold eram do alerta de % do teto, que saiu de cena.
+    // Continuam na ai_alert_config sem uso — nao removi a coluna para nao mexer no schema.
+    const { admin_phone, admin_instance_name } = alertConfig;
     const alertsSent: string[] = [];
 
     // ============================================================
-    // BLOCO 1 — Teto de CHAMADAS (rate limit) — comportamento existente
+    // BLOCO 1 — ANALISES PERDIDAS (processo interrompido)
+    //
+    // Substituiu o alerta de "% do teto de chamadas". Aquele media a soma de
+    // TODOS os tenants contra um teto que e aplicado POR tenant, entao acusava
+    // 95% com o maior tenant em 20%. E, mesmo corrigido, encostar no teto nao
+    // e incidente: ninguem perde nada. Incidente e analise que nao aconteceu.
+    //
+    // Fonte: attendance_analysis_queue com attempts esgotados. Esses itens nao
+    // voltam pra fila — o atendimento fica sem sentimento, sem resumo e sem KB,
+    // para sempre. processed_at e carimbado na desistencia pelo
+    // process-finalize-queue.
     // ============================================================
-    const { data: limitConfigs } = await supabase
-      .from('ai_rate_limit_config')
-      .select('tenant_id, function_name, max_calls, window_seconds');
+    const LOST_ATTEMPTS = 3;       // igual ao MAX_ATTEMPTS do process-finalize-queue
+    const LOOKBACK_HOURS = 24;     // teto da janela; tambem o fallback do 1o alerta
+    const lookbackIso = new Date(Date.now() - LOOKBACK_HOURS * 60 * 60 * 1000).toISOString();
 
-    for (const config of (limitConfigs || [])) {
-      const windowStart = new Date(Date.now() - config.window_seconds * 1000).toISOString();
+    const { data: lostRows } = await supabase
+      .from('attendance_analysis_queue')
+      .select('tenant_id, processed_at, last_error')
+      .eq('status', 'error')
+      .gte('attempts', LOST_ATTEMPTS)
+      .gte('processed_at', lookbackIso);
 
-      const { count } = await supabase
-        .from('ai_usage_log')
-        .select('id', { count: 'exact', head: true })
-        .eq('function_name', config.function_name)
-        .gte('called_at', windowStart);
-
-      const usage = count ?? 0;
-      const pct = Math.round((usage / config.max_calls) * 100);
-
-      let level: string | null = null;
-      if (usage >= config.max_calls) level = 'blocked';
-      else if (pct >= critical_threshold) level = 'critical';
-      else if (pct >= warning_threshold) level = 'warning';
-
-      if (!level) continue;
-
-      const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-      const { count: recentAlert } = await supabase
+    if ((lostRows || []).length > 0) {
+      // Janela por tenant = desde o ultimo alerta dele. Sem isso, ou o mesmo
+      // item e contado varias vezes (janela fixa maior que o cron) ou some no
+      // vao entre execucoes (janela menor). Se o envio falhou e nao gravou
+      // ai_alert_log, a janela continua aberta e a proxima rodada reavisa.
+      const { data: lastAlerts } = await supabase
         .from('ai_alert_log')
-        .select('id', { count: 'exact', head: true })
-        .eq('function_name', config.function_name)
-        .eq('level', level)
-        .gte('sent_at', fifteenMinAgo)
-        .is('resolved_at', null);
+        .select('tenant_id, sent_at')
+        .eq('function_name', 'analysis_lost')
+        .gte('sent_at', lookbackIso)
+        .order('sent_at', { ascending: false });
 
-      if (level === 'warning' && (recentAlert ?? 0) > 0) continue;
-
-      const funcNames: Record<string, string> = {
-        'suggest-smart-replies': 'Sugestao de Respostas',
-        'compose-whatsapp-message': 'Composicao de Mensagem',
-        'analyze-whatsapp-sentiment': 'Analise de Sentimento',
-        'generate-conversation-summary': 'Resumo de Conversa',
-        'transcribe-whatsapp-audio': 'Transcricao de Audio',
-      };
-      const funcName = funcNames[config.function_name] || config.function_name;
-      const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-      let message = '';
-
-      if (level === 'warning') {
-        message = `🟡 *DoctorSaaS — Aviso de Uso de IA*\n\n` +
-          `▪ Funcao: *${funcName}*\n` +
-          `▪ Uso: ${usage}/${config.max_calls} chamadas (${pct}%)\n` +
-          `▪ Horario: ${now}\n\n` +
-          `💡 *O que fazer agora:*\n` +
-          `Nenhuma acao urgente. Monitore o proximo ciclo de 15 minutos.\n\n` +
-          `_Proximo alerta apenas se piorar._`;
-      } else if (level === 'critical') {
-        message = `🔴 *DoctorSaaS — USO CRITICO DE IA*\n\n` +
-          `▪ Funcao: *${funcName}*\n` +
-          `▪ Uso: ${usage}/${config.max_calls} chamadas (${pct}%)\n` +
-          `▪ Horario: ${now}\n\n` +
-          `⚡ *Acao imediata — aumente o limite respondendo:*\n\n` +
-          `LIMIT UP ${config.function_name}\n\n` +
-          `_Efeito imediato. Proximo alerta em 15 min se nao resolver._`;
-      } else if (level === 'blocked') {
-        message = `⛔ *DoctorSaaS — LIMITE ATINGIDO*\n\n` +
-          `Usuarios estao recebendo ERRO agora!\n\n` +
-          `▪ Funcao: *${funcName}*\n` +
-          `▪ Uso: ${usage}/${config.max_calls} — *BLOQUEADO*\n` +
-          `▪ Horario: ${now}\n\n` +
-          `🔧 *Solucao imediata — responda agora:*\n\n` +
-          `LIMIT UP ${config.function_name}\n\n` +
-          `_Para dobrar o limite de todas as funcoes: responda_ LIMIT UP ALL\n` +
-          `_Proximo alerta em 15 min se nao resolver._`;
+      const windowStart: Record<string, string> = {};
+      for (const a of (lastAlerts || [])) {
+        if (!windowStart[a.tenant_id]) windowStart[a.tenant_id] = a.sent_at; // ordenado desc: 1o = mais recente
       }
 
-      const ok = await sendAdminWhatsApp(supabase, admin_instance_name, admin_phone, message);
-      if (ok) {
-        await supabase.from('ai_alert_log').insert({
-          tenant_id: config.tenant_id,
-          function_name: config.function_name,
-          level,
-        });
-        alertsSent.push(`${config.function_name}:${level}`);
+      // "finalize HTTP 503: {"success":false,"reason":"ai_quota_exceeded"}" -> "ai_quota_exceeded (HTTP 503)"
+      const motivoDe = (err: string | null): string => {
+        if (!err) return 'motivo nao registrado';
+        const reason = err.match(/"reason"\s*:\s*"([^"]+)"/)?.[1];
+        const http = err.match(/HTTP (\d{3})/)?.[1];
+        if (reason && http) return `${reason} (HTTP ${http})`;
+        if (reason) return reason;
+        if (http) return `HTTP ${http}`;
+        return err.substring(0, 40);
+      };
+
+      const porTenant: Record<string, { total: number; motivos: Record<string, number> }> = {};
+      for (const row of lostRows) {
+        const desde = windowStart[row.tenant_id] ?? lookbackIso;
+        if (!row.processed_at || row.processed_at <= desde) continue;
+        const acc = porTenant[row.tenant_id] ??= { total: 0, motivos: {} };
+        acc.total++;
+        const m = motivoDe(row.last_error);
+        acc.motivos[m] = (acc.motivos[m] ?? 0) + 1;
+      }
+
+      const idsPerdas = Object.keys(porTenant);
+      const nomesPerda: Record<string, string> = {};
+      if (idsPerdas.length > 0) {
+        const { data: tn } = await supabase.from('tenants').select('id, nome').in('id', idsPerdas);
+        for (const t of (tn || [])) nomesPerda[t.id] = t.nome;
+      }
+
+      for (const tenantId of idsPerdas) {
+        const { total, motivos } = porTenant[tenantId];
+        const motivoTop = Object.entries(motivos).sort((a, b) => b[1] - a[1])[0][0];
+        const outros = Object.keys(motivos).length - 1;
+        const nome = nomesPerda[tenantId] || tenantId;
+        const desde = new Date(windowStart[tenantId] ?? lookbackIso)
+          .toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+
+        const message = `⛔ *DoctorSaaS — ANALISES PERDIDAS*\n\n` +
+          `▪ Empresa: *${nome}*\n` +
+          `▪ Perdidas: *${total}* analise(s) de atendimento\n` +
+          `▪ Motivo: ${motivoTop}${outros > 0 ? ` (+${outros} outro(s))` : ''}\n` +
+          `▪ Desde: ${desde}\n` +
+          `▪ Horario: ${now}\n\n` +
+          `_Nao serao reprocessadas: a fila esgotou as ${LOST_ATTEMPTS} tentativas._\n` +
+          `_Cada uma e um atendimento sem sentimento, sem resumo e sem KB._`;
+
+        const ok = await sendAdminWhatsApp(supabase, admin_instance_name, admin_phone, message);
+        if (ok) {
+          await supabase.from('ai_alert_log').insert({
+            tenant_id: tenantId,
+            function_name: 'analysis_lost',
+            level: 'blocked', // unicos valores aceitos pelo CHECK: warning | critical | blocked
+          });
+          alertsSent.push(`analysis_lost:${nome}:${total}`);
+        }
       }
     }
 

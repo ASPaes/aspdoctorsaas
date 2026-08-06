@@ -81,14 +81,23 @@ serve(async (req) => {
         .eq("attendance_id", item.attendance_id);
       done++;
     } catch (e) {
+      const attempts = (item.attempts ?? 0) + 1;
+      const desistiu = attempts >= MAX_ATTEMPTS;
       await supabase
         .from("attendance_analysis_queue")
         .update({
           status: "error",
-          attempts: (item.attempts ?? 0) + 1,
+          attempts,
           last_error: String(e instanceof Error ? e.message : e).substring(0, 500),
+          // Só carimba na desistência definitiva. É o único registro de QUANDO a
+          // análise foi perdida — é dele que o check-ai-usage-alert sai para avisar.
+          // Nas tentativas intermediárias fica nulo: o item ainda volta pra fila.
+          ...(desistiu ? { processed_at: new Date().toISOString() } : {}),
         })
         .eq("attendance_id", item.attendance_id);
+      if (desistiu) {
+        console.error(`[${FUNCTION_NAME}][${requestId}] análise PERDIDA (${attempts} tentativas): attendance=${item.attendance_id}`);
+      }
       errors++;
     }
   }
