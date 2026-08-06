@@ -19,9 +19,11 @@ interface MultiSelectFilterProps {
   selected: number[];
   onChange: (ids: number[]) => void;
   className?: string;
+  /** Placeholder da busca. Default: `Buscar {label}...` — útil quando o label é dinâmico ("3 selecionado(s)"). */
+  searchPlaceholder?: string;
 }
 
-export function MultiSelectFilter({ label, options, selected, onChange, className }: MultiSelectFilterProps) {
+export function MultiSelectFilter({ label, options, selected, onChange, className, searchPlaceholder }: MultiSelectFilterProps) {
   const [open, setOpen] = useState(false);
 
   const toggle = (id: number) => {
@@ -52,7 +54,7 @@ export function MultiSelectFilter({ label, options, selected, onChange, classNam
       </PopoverTrigger>
       <PopoverContent className="w-[280px] p-0" align="start">
         <Command>
-          <CommandInput placeholder={`Buscar ${label.toLowerCase()}...`} />
+          <CommandInput placeholder={searchPlaceholder ?? `Buscar ${label.toLowerCase()}...`} />
           <CommandList>
             <CommandEmpty>Nenhum encontrado.</CommandEmpty>
             <CommandGroup>

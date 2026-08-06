@@ -39,9 +39,16 @@ function dateCell(v: any): Date | undefined {
   return new Date(Date.UTC(y, mo - 1, da));
 }
 
+export interface ClienteInfo {
+  razao: string;
+  fantasia: string;
+  /** Já formatado (00.000.000/0000-00). */
+  cnpj: string;
+}
+
 export function exportMovimentosMrrXlsx(params: {
   rows: any[];
-  clientesMap: Record<string, string>;
+  clientesMap: Record<string, ClienteInfo>;
   funcMap: Record<number, string>;
   fornecedorMap: Map<number, string>;
 }): void {
@@ -50,7 +57,9 @@ export function exportMovimentosMrrXlsx(params: {
   const header = [
     "Data",
     "Tipo",
-    "Cliente",
+    "Razão Social",
+    "Nome Fantasia",
+    "CNPJ",
     "Valor (R$)",
     "Custo Delta (R$)",
     "Funcionário",
@@ -63,14 +72,19 @@ export function exportMovimentosMrrXlsx(params: {
 
   for (const m of rows) {
     const valor = m.tipo === "venda_avulsa" ? m.valor_venda_avulsa : m.valor_delta;
+    const cli = clientesMap[m.cliente_id];
     aoa.push([
       dateCell(m.data_movimento) ?? "",
       tipoLabels[m.tipo] || m.tipo || "",
-      clientesMap[m.cliente_id] ?? "",
+      cli?.razao ?? "",
+      cli?.fantasia ?? "",
+      cli?.cnpj ?? "",
       numCellAlways(valor) ?? "",
       numCell(m.custo_delta) ?? "",
       m.funcionario_id ? (funcMap[m.funcionario_id] ?? "") : "",
-      m.fornecedor_id ? (fornecedorMap.get(m.fornecedor_id) ?? "") : "",
+      // fornecedor_efetivo é o que a tela filtra e o que fornecedorMap indexa;
+      // fornecedor_id nem vem no select da view, então saía sempre vazio.
+      m.fornecedor_efetivo ? (fornecedorMap.get(m.fornecedor_efetivo) ?? "") : "",
       m.origem_venda ?? "",
       m.descricao ?? "",
     ]);
@@ -79,15 +93,17 @@ export function exportMovimentosMrrXlsx(params: {
   const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true });
 
   ws["!cols"] = [
-    { wch: 12 },
-    { wch: 14 },
-    { wch: 30 },
-    { wch: 14 },
-    { wch: 14 },
-    { wch: 20 },
-    { wch: 20 },
-    { wch: 18 },
-    { wch: 40 },
+    { wch: 12 },  // Data
+    { wch: 14 },  // Tipo
+    { wch: 34 },  // Razão Social
+    { wch: 28 },  // Nome Fantasia
+    { wch: 20 },  // CNPJ
+    { wch: 14 },  // Valor
+    { wch: 14 },  // Custo Delta
+    { wch: 20 },  // Funcionário
+    { wch: 20 },  // Fornecedor
+    { wch: 18 },  // Origem da Venda
+    { wch: 40 },  // Descrição
   ];
 
   const range = XLSX.utils.decode_range(ws["!ref"]!);

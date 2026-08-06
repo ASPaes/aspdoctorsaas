@@ -16,7 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, ShoppingCart, DollarSign, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, UserMinus, ArrowUpCircle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
-import { exportMovimentosMrrXlsx } from "@/lib/exportMovimentosMrrXlsx";
+import { MultiSelectFilter } from "@/components/atendimento/MultiSelectFilter";
+import { exportMovimentosMrrXlsx, type ClienteInfo } from "@/lib/exportMovimentosMrrXlsx";
 import { toast } from "sonner";
 
 
@@ -46,6 +47,38 @@ const tipoBadgeStyles: Record<string, string> = {
 type SortField = "data_movimento" | "tipo" | "valor_delta" | "cliente_nome" | "funcionario_nome";
 type SortDir = "asc" | "desc";
 
+// Sentinela para "Sem fornecedor" no multi-select (ids reais de fornecedor são > 0).
+const SEM_FORNECEDOR = -1;
+
+// Quantos cliente_ids por request no `.in()` — UUID tem 37 chars na URL e
+// PostgREST/proxy cortam GETs muito longos.
+const CLIENTES_CHUNK = 150;
+
+function formatCNPJ(v?: string | null): string {
+  if (!v) return "";
+  const d = String(v).replace(/\D/g, "");
+  if (d.length === 14) return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+  if (d.length === 11) return d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+  return v;
+}
+
+function ClienteCell({ info }: { info?: ClienteInfo }) {
+  if (!info) return <>—</>;
+  const fantasia = info.fantasia && info.fantasia !== info.razao ? info.fantasia : "";
+  return (
+    <>
+      <div className="truncate">{info.razao || "—"}</div>
+      {(fantasia || info.cnpj) && (
+        <div className="truncate text-[11px] leading-tight text-muted-foreground">
+          {fantasia}
+          {fantasia && info.cnpj ? " · " : ""}
+          {info.cnpj && <span className="font-mono">{info.cnpj}</span>}
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function MovimentosMrrTab() {
   const now = new Date();
   const [periodo, setPeriodo] = useState<DateRange>({
@@ -54,7 +87,7 @@ export default function MovimentosMrrTab() {
   });
   const [tipoFilter, setTipoFilter] = useState("");
   const [funcionarioFilter, setFuncionarioFilter] = useState("");
-  const [fornecedorFilter, setFornecedorFilter] = useState("");
+  const [fornecedorFilter, setFornecedorFilter] = useState<number[]>([]);
   const [sortField, setSortField] = useState<SortField>("data_movimento");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -62,8 +95,14 @@ export default function MovimentosMrrTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
 
+  // Ordenado para a queryKey não invalidar só porque o usuário clicou em outra ordem.
+  const fornecedorSel = useMemo(
+    () => [...fornecedorFilter].sort((a, b) => a - b),
+    [fornecedorFilter]
+  );
+
   const { data: movimentos, isLoading } = useQuery({
-    queryKey: ["movimentos_mrr_list", periodo, tipoFilter, funcionarioFilter, fornecedorFilter, tid],
+    queryKey: ["movimentos_mrr_list", periodo, tipoFilter, funcionarioFilter, fornecedorSel, tid],
     queryFn: async () => {
       const data = await fetchAllRows<any>(() => {
         let q = supabase
@@ -80,10 +119,16 @@ export default function MovimentosMrrTab() {
         if (periodo.to) q = q.lte("data_movimento", format(periodo.to, "yyyy-MM-dd"));
         if (tipoFilter) q = q.eq("tipo", tipoFilter as any);
         if (funcionarioFilter) q = q.eq("funcionario_id", Number(funcionarioFilter));
-        if (fornecedorFilter === "__null__") {
+        // Multi-seleção: "Sem fornecedor" convive com N fornecedores reais.
+        // Só cai no `.or()` (que anula o índice) quando os dois casos são pedidos juntos.
+        const semFornecedor = fornecedorSel.includes(SEM_FORNECEDOR);
+        const idsFornecedor = fornecedorSel.filter((id) => id !== SEM_FORNECEDOR);
+        if (semFornecedor && idsFornecedor.length) {
+          q = q.or(`fornecedor_efetivo.is.null,fornecedor_efetivo.in.(${idsFornecedor.join(",")})`);
+        } else if (semFornecedor) {
           q = q.is("fornecedor_efetivo", null);
-        } else if (fornecedorFilter) {
-          q = q.eq("fornecedor_efetivo", Number(fornecedorFilter));
+        } else if (idsFornecedor.length) {
+          q = q.in("fornecedor_efetivo", idsFornecedor);
         }
 
         return q;
@@ -114,16 +159,44 @@ export default function MovimentosMrrTab() {
     enabled: !!tid,
   });
 
-  // Build cliente name map from flat view columns (no extra query)
-  const clientesMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    (movimentos || []).forEach((m: any) => {
-      if (m.cliente_id) {
-        map[m.cliente_id] = m.cliente_razao_social || m.cliente_nome_fantasia || "—";
+  const clienteIds = useMemo(() => {
+    const s = new Set<string>();
+    (movimentos || []).forEach((m: any) => { if (m.cliente_id) s.add(m.cliente_id); });
+    return [...s].sort();
+  }, [movimentos]);
+
+  // A view vw_movimentos_mrr traz razão social e nome fantasia, mas não o CNPJ —
+  // buscamos só ele em `clientes`, em lotes, sem mexer na view.
+  const { data: cnpjMap } = useQuery({
+    queryKey: ["movimentos_mrr_clientes_cnpj", tid, clienteIds],
+    queryFn: async () => {
+      const out: Record<string, string> = {};
+      for (let i = 0; i < clienteIds.length; i += CLIENTES_CHUNK) {
+        const chunk = clienteIds.slice(i, i + CLIENTES_CHUNK);
+        const { data, error } = await tf(
+          supabase.from("clientes").select("id, cnpj").in("id", chunk)
+        );
+        if (error) throw error;
+        (data || []).forEach((c: any) => { out[c.id] = c.cnpj || ""; });
       }
+      return out;
+    },
+    enabled: clienteIds.length > 0,
+  });
+
+  // Razão social e nome fantasia vêm achatados da view; CNPJ vem da query acima.
+  const clientesMap = useMemo(() => {
+    const map: Record<string, ClienteInfo> = {};
+    (movimentos || []).forEach((m: any) => {
+      if (!m.cliente_id) return;
+      map[m.cliente_id] = {
+        razao: m.cliente_razao_social || m.cliente_nome_fantasia || "—",
+        fantasia: m.cliente_nome_fantasia || "",
+        cnpj: formatCNPJ(cnpjMap?.[m.cliente_id]),
+      };
     });
     return map;
-  }, [movimentos]);
+  }, [movimentos, cnpjMap]);
 
   // Fetch funcionario names
   const funcMap = useMemo(() => {
@@ -135,6 +208,18 @@ export default function MovimentosMrrTab() {
   const fornecedorMap = useMemo(() => {
     return new Map<number, string>((fornecedores ?? []).map((f: any) => [f.id, f.nome]));
   }, [fornecedores]);
+
+  const fornecedorOptions = useMemo(() => [
+    { id: SEM_FORNECEDOR, nome: "Sem fornecedor" },
+    ...(fornecedores ?? []).map((f: any) => ({ id: f.id as number, nome: f.nome as string })),
+  ], [fornecedores]);
+
+  // O MultiSelectFilter já mostra a contagem num badge — o label não repete o número.
+  const fornecedorLabel = fornecedorFilter.length === 0
+    ? "Todos os fornecedores"
+    : fornecedorFilter.length === 1
+      ? (fornecedorOptions.find(o => o.id === fornecedorFilter[0])?.nome ?? "Fornecedores")
+      : "Fornecedores";
 
   const handleExportXlsx = () => {
     try {
@@ -182,7 +267,7 @@ export default function MovimentosMrrTab() {
           cmp = (Number(a.valor_delta) || 0) - (Number(b.valor_delta) || 0);
           break;
         case "cliente_nome":
-          cmp = ((clientesMap?.[a.cliente_id] || "").localeCompare(clientesMap?.[b.cliente_id] || ""));
+          cmp = ((clientesMap?.[a.cliente_id]?.razao || "").localeCompare(clientesMap?.[b.cliente_id]?.razao || ""));
           break;
         case "funcionario_nome":
           cmp = ((a.funcionario_nome || funcMap[a.funcionario_id || 0] || "").localeCompare(b.funcionario_nome || funcMap[b.funcionario_id || 0] || ""));
@@ -242,16 +327,14 @@ export default function MovimentosMrrTab() {
         </div>
         <div className="space-y-1">
           <label className="text-xs font-medium text-muted-foreground">Fornecedor</label>
-          <Select value={fornecedorFilter || "__all__"} onValueChange={(v) => setFornecedorFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="h-9 w-[220px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todos os fornecedores</SelectItem>
-              <SelectItem value="__null__">Sem fornecedor</SelectItem>
-              {fornecedores?.map(f => (
-                <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MultiSelectFilter
+            label={fornecedorLabel}
+            options={fornecedorOptions}
+            selected={fornecedorFilter}
+            onChange={setFornecedorFilter}
+            className="h-9 w-[220px] font-normal"
+            searchPlaceholder="Buscar fornecedor..."
+          />
         </div>
         <div className="ml-auto">
           <ProtectedElement resource="clientes.exportar" action="view" mode="notify">
@@ -416,8 +499,8 @@ export default function MovimentosMrrTab() {
                       {tipoLabels[m.tipo] || m.tipo}
                     </Badge>
                   </TableCell>
-                  <TableCell className="max-w-[200px] truncate text-sm">
-                    {clientesMap?.[m.cliente_id] || "—"}
+                  <TableCell className="max-w-[240px] text-sm">
+                    <ClienteCell info={clientesMap?.[m.cliente_id]} />
                   </TableCell>
                   <TableCell className={cn("font-mono text-sm font-medium",
                     Number(m.valor_delta) > 0 ? "text-green-700 dark:text-green-400" :
