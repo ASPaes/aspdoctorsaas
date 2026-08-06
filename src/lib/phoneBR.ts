@@ -14,7 +14,7 @@
 
 /**
  * Números não-geográficos BR (0800/0300/0500/0900) — NÃO têm DDD.
- * Nacional: 0800 777 8134 · E.164: +55 800 777 8134 (o 0 é prefixo de discagem).
+ * Nacional: 0800 000 0000 · E.164: +55 800 000 0000 (o 0 é prefixo de discagem).
  * Núcleo = código de serviço (3) + 6 ou 7 dígitos.
  *
  * Não há ambiguidade com DDD: 30, 50, 80 e 90 não são DDDs válidos no Brasil,
@@ -23,19 +23,41 @@
 const NON_GEO_FULL = /^(300|500|800|900)\d{6,7}$/;
 
 /**
- * Devolve o núcleo do não-geográfico (ex.: "8007778134") ou null.
+ * Devolve o núcleo do não-geográfico (ex.: "8000000000") ou null.
  * Aceita a forma nacional ainda incompleta ("0800…") para máscara ao vivo;
  * as formas sem o 0 exigem o número completo para não confundir com DDD.
+ *
+ * "550800…" também entra: o campo já vem com "+55" e o usuário digita o 0800
+ * na frente disso. Depois do código de país o 0 nunca é válido, então não há
+ * como confundir com DDD.
  */
 export function nonGeoCoreBR(input: string): string | null {
   const d = input.replace(/\D/g, "");
   if (/^0(300|500|800|900)/.test(d)) return d.replace(/^0+/, "").slice(0, 10);
+  if (/^550(300|500|800|900)/.test(d)) return d.slice(2).replace(/^0+/, "").slice(0, 10);
   if (NON_GEO_FULL.test(d)) return d;
   if (d.startsWith("55") && NON_GEO_FULL.test(d.slice(2))) return d.slice(2);
   return null;
 }
 
-/** Formata o núcleo do não-geográfico no padrão nacional: 0800 777 8134 */
+/**
+ * true quando os dígitos são um número nacional plausível (DDD + 8/9) e portanto
+ * cabe prefixar o 55.
+ *
+ * O teste de comprimento sozinho não basta: apagar um número de 12-13 dígitos
+ * passa por 10-11 e o prefixo voltava a ser colado, então o campo nunca esvaziava
+ * e ia acumulando "55". Celular de 9 dígitos SEMPRE começa com 9; número de 8
+ * dígitos começa em 2-9 (2-5 fixo, 6-9 celular antigo). Fora disso, o que está
+ * ali é um número pela metade — não um nacional sem código de país.
+ */
+function looksNationalBR(digits: string): boolean {
+  const num = digits.slice(2);
+  if (digits.length === 10) return /^[2-9]/.test(num);
+  if (digits.length === 11) return /^9/.test(num);
+  return false;
+}
+
+/** Formata o núcleo do não-geográfico no padrão nacional: 0800 000 0000 */
 function formatNonGeoBR(core: string): string {
   const rest = core.slice(3);
   if (!rest) return `0${core}`;
@@ -58,10 +80,11 @@ export function normalizeBRPhone(input: string): string {
   digits = digits.replace(/^0+/, "");
 
   // 10-11 dígitos = número nacional (DDD + 8/9 dígitos), SEM código de país.
-  // Sempre prefixa 55 — inclusive quando o DDD é 55 (RS: Santa Maria/região central).
-  // Um número COM código de país tem 12-13 dígitos, nunca 10-11, então o comprimento
-  // desambigua: não dá pra confundir o DDD 55 com o código de país aqui.
-  if (digits.length >= 10 && digits.length <= 11) {
+  // Prefixa 55 — inclusive quando o DDD é 55 (RS: Santa Maria/região central):
+  // um número COM código de país tem 12-13 dígitos, nunca 10-11, então o
+  // comprimento desambigua. Ver looksNationalBR para por que o comprimento
+  // sozinho não basta.
+  if (looksNationalBR(digits)) {
     digits = "55" + digits;
   }
 
@@ -140,6 +163,11 @@ export const formatBrazilPhone = formatBRPhone;
 export function maskBRPhoneLive(input: string): string {
   let digits = input.replace(/\D/g, "");
 
+  // O campo já vem preenchido com "+55" e o usuário digita o número na frente
+  // disso. Depois do código de país o 0 nunca é válido — é prefixo de discagem
+  // (0800…, ou o 0 antes do DDD) —, então o 55 sai e sobra a forma nacional.
+  if (/^550/.test(digits)) digits = digits.slice(2);
+
   // 0800/0300/0500/0900: sem DDD — formato nacional, o 0 fica visível.
   const nonGeo = nonGeoCoreBR(digits);
   if (nonGeo) return formatNonGeoBR(nonGeo);
@@ -149,31 +177,31 @@ export function maskBRPhoneLive(input: string): string {
 
   // Remove leading zeros
   digits = digits.replace(/^0+/, "");
-
-  // Auto-prepend 55 quando o usuário digitou um número nacional (10-11 dígitos),
-  // inclusive com DDD 55 — igual a normalizeBRPhone. Com código de país são 12-13.
-  if (digits.length >= 10 && digits.length <= 11) {
-    digits = "55" + digits;
-  }
-
-  // Cap at 13 digits
   digits = digits.slice(0, 13);
 
   if (digits.length === 0) return "";
-  if (digits.length <= 2) return `+${digits}`;
-  if (digits.length <= 4) return `+${digits.slice(0, 2)} (${digits.slice(2)}`;
-  if (digits.length <= 8) {
-    return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4)}`;
-  }
-  if (digits.length <= 12) {
-    // 8-digit number (fixo): XXXX-XXXX
+
+  // COM código de país (12-13 dígitos começando em 55): +55 (DD) NNNNN-NNNN
+  if (digits.length >= 12 && digits.startsWith("55")) {
+    const ddd = digits.slice(2, 4);
     const num = digits.slice(4);
-    if (num.length <= 4) {
-      return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${num}`;
-    }
-    return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${num.slice(0, 4)}-${num.slice(4)}`;
+    return num.length >= 9
+      ? `+55 (${ddd}) ${num.slice(0, 5)}-${num.slice(5)}`
+      : `+55 (${ddd}) ${num.slice(0, 4)}-${num.slice(4)}`;
   }
-  // 13 digits: 9-digit number (celular): XXXXX-XXXX
-  const num = digits.slice(4);
-  return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${num.slice(0, 5)}-${num.slice(5)}`;
+
+  // SEM código de país: formato nacional, (DD) NNNNN-NNNN.
+  //
+  // A máscara NÃO acrescenta o 55 aqui — quem faz isso é normalizeBRPhone, na
+  // saída. Prefixar durante a digitação criava um laço: apagar um número de 13
+  // dígitos passava por 10-11, o 55 era colado de volta e voltava a 12-13, então
+  // o campo nunca esvaziava e ia acumulando "5". Pior com DDD 55, onde 10 dígitos
+  // ("5555987654") são um fixo legítimo e um número pela metade ao mesmo tempo —
+  // não há como decidir durante a edição, então a máscara não decide.
+  if (digits.length <= 2) return digits;
+  const ddd = digits.slice(0, 2);
+  const num = digits.slice(2);
+  if (num.length <= 4) return `(${ddd}) ${num}`;
+  if (num.length <= 8) return `(${ddd}) ${num.slice(0, 4)}-${num.slice(4)}`;
+  return `(${ddd}) ${num.slice(0, 5)}-${num.slice(5)}`;
 }

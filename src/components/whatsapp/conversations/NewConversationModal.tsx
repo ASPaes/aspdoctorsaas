@@ -76,7 +76,11 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const { selectedDepartmentId } = useDepartmentFilter();
   const { user } = useAuth();
   const [instanceId, setInstanceId] = useState("");
-  const [phone, setPhone] = useState(initialPhone || "55");
+  // Vazio, não "55": com o campo pré-preenchido, digitar/colar um número que já
+  // traz o código de país (ou o DDD 55) empilhava um segundo "55" — a máscara não
+  // tem como saber que o 55 da frente foi ela quem pôs. A máscara insere o +55
+  // sozinha quando o número nacional fica completo.
+  const [phone, setPhone] = useState(initialPhone || "");
   const [waCheck, setWaCheck] = useState<'idle' | 'checking' | 'exists' | 'exists_corrected' | 'not_exists' | 'unsupported'>('idle');
   const [name, setName] = useState(initialName || "");
   const [tab, setTab] = useState(initialPhone ? "avulso" : "cliente");
@@ -85,8 +89,8 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const [selectedContactPhone, setSelectedContactPhone] = useState<string | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
 
-  // Sempre E.164 (55 + …). Cobre o 0800, onde o que o usuário digita ("08007778134")
-  // é diferente do que o WhatsApp espera ("558007778134").
+  // Sempre E.164 (55 + …). Cobre o 0800, onde o que o usuário digita ("08000000000")
+  // é diferente do que o WhatsApp espera ("558000000000").
   const normalizedPhone = useMemo(() => normalizePhoneBR(phone), [phone]);
   const phoneReady = isValidBRPhone(normalizedPhone);
 
@@ -308,7 +312,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   };
 
   const resetForm = () => {
-    setPhone("55");
+    setPhone("");
     setWaCheck('idle');
     setName("");
     setSearchTerm("");
@@ -485,7 +489,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
                 <div>
                   <Label className="text-xs font-medium text-muted-foreground">Telefone (cliente sem WhatsApp cadastrado)</Label>
                   <Input
-                    placeholder="+55 (11) 99999-9999"
+                    placeholder="(11) 90000-0000"
                     value={maskPhoneBR(phone)}
                     onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                   />
@@ -497,12 +501,12 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">Telefone</Label>
                 <Input
-                  placeholder="+55 (11) 99999-9999"
+                  placeholder="(11) 90000-0000"
                   value={maskPhoneBR(phone)}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Celular, fixo ou 0800 (ex.: 0800 777 8134)
+                  Celular ou fixo com DDD, ou 0800 (que não tem DDD). O +55 entra sozinho.
                 </p>
                 {waCheck === 'exists_corrected' && (
                   <p className="flex items-center gap-1 text-xs text-green-600 mt-1">

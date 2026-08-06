@@ -14,7 +14,7 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 05/08
 
-- 🔧 **Atendimento / Chat** — **Já dá para iniciar conversa com um 0800.** Em *Nova Conversa → Número Avulso*, o campo de telefone assumia que todo número tem DDD e lia o `08` do 0800 como se fosse um: `0800 777 8134` virava `+55 (08) 00777-8134`, um número que não existe. Na prática só era possível abrir conversa com celular ou fixo — para falar com um 0800 o atendente precisava esperar o cliente chamar primeiro. Agora o campo reconhece os números que não têm DDD (**0800, 0300, 0500 e 0900**), mostra no formato de sempre (`0800 777 8134`) e manda para o WhatsApp o número certo.
+- 🔧 **Atendimento / Chat** — **Já dá para iniciar conversa com um 0800.** Em *Nova Conversa → Número Avulso*, o campo de telefone assumia que todo número tem DDD e lia o `08` do 0800 como se fosse um: `0800 000 0000` virava `+55 (08) 00000-0000`, um número que não existe. Na prática só era possível abrir conversa com celular ou fixo — para falar com um 0800 o atendente precisava esperar o cliente chamar primeiro. Agora o campo reconhece os números que não têm DDD (**0800, 0300, 0500 e 0900**), mostra no formato de sempre (`0800 000 0000`) e manda para o WhatsApp o número certo. Junto, o campo parou de brigar com quem apaga: ele vinha pré-preenchido com `+55` e recolocava esse prefixo a cada tecla apagada, então o número nunca esvaziava e ia enchendo de `5`. Agora o campo começa vazio, você digita o número como digitaria no celular — `(11) 90000-0000` — e o `+55` é acrescentado sozinho na hora de abrir a conversa.
 
 ### 04/08
 
