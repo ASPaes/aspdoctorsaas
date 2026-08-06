@@ -14,6 +14,8 @@ export interface SupportConfig {
   support_inactivity_eod_enabled: boolean;
   support_inactivity_eod_warning_template: string;
   support_inactivity_eod_close_template: string;
+  /** Aviso de inatividade em GRUPO (espelho do 1:1; fim de expediente é compartilhado). */
+  support_group_inactivity_warning_template: string;
   support_waiting_ack_limit: number;
 
   // CSAT
@@ -77,6 +79,8 @@ const DEFAULTS: SupportConfig = {
     '⏰ Nosso expediente encerra às {{end}}. Se ainda precisar de ajuda, é só responder — caso contrário este atendimento será encerrado.',
   support_inactivity_eod_close_template:
     '✅ Atendimento *{{code}}* encerrado — nosso expediente encerrou às {{end}}.\n\nSe precisar, é só enviar uma nova mensagem que retomamos no próximo dia útil. 😊',
+  support_group_inactivity_warning_template:
+    '⚠️ Por falta de interação, este atendimento será encerrado em {{minutes}} minutos. Se ainda precisar de ajuda, responda esta mensagem.',
   support_waiting_ack_limit: 3,
 
   support_csat_enabled: true,
@@ -140,6 +144,7 @@ const SELECT_FIELDS = [
   'support_inactivity_eod_enabled',
   'support_inactivity_eod_warning_template',
   'support_inactivity_eod_close_template',
+  'support_group_inactivity_warning_template',
   'support_waiting_ack_limit',
   'support_csat_enabled',
   'support_csat_prompt_template',

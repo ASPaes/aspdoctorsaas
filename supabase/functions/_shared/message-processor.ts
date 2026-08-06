@@ -1898,6 +1898,11 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   if (isGroup) {
     console.log('[processor] Group message saved, skipping automation for', conversationId);
 
+    // NÃO carimbar contadores de atendimento aqui. Quem faz isso em grupo é a
+    // trigger trg_track_group_attendance_messages (AFTER INSERT em
+    // whatsapp_messages), que já cobre os dois lados e ignora system/CSAT.
+    // Chamar incrementAttendanceCounter aqui dobrava msg_customer_count.
+
     // Captura de CSAT de grupo (silenciosa): apenas mensagens de participantes (não fromMe).
     // Regra: primeira mensagem após envio decide. Nota válida => registra + agradece.
     // Qualquer outra coisa => expira em silêncio (sem nudge).

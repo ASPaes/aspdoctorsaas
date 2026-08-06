@@ -47,6 +47,9 @@ interface AttendanceRow {
   // fim de expediente:
   inactivity_eod_close_at: string | null;
   eod_enabled: boolean;
+  // grupo: o destino do envio é o JID @g.us da conversa, não o telefone do contato
+  is_group: boolean;
+  group_jid: string | null;
 }
 
 
@@ -86,7 +89,7 @@ async function buildSendContext(
 ): Promise<{ ctx: SendContext; contact: ContactRow } | null> {
   const { data: conv } = await supabase
     .from("whatsapp_conversations")
-    .select("id, instance_id, contact_id")
+    .select("id, instance_id, contact_id, is_group, group_jid")
     .eq("id", conversationId)
     .maybeSingle();
   if (!conv) return null;
@@ -109,7 +112,17 @@ async function buildSendContext(
   if (!secrets) return null;
 
   const phone = contact.phone_number;
-  const remoteJid = phone.includes("@") ? phone : `${phone}@s.whatsapp.net`;
+  // Grupo: o destino é o JID @g.us da conversa. O contato do grupo guarda
+  // phone_number só com dígitos, então a regra do 1:1 montaria
+  // "120363...@s.whatsapp.net" e o aviso/encerramento sairia para o vazio.
+  const isGroup = conv.is_group === true;
+  if (isGroup && !conv.group_jid) {
+    console.error(`${LOG} conversa de grupo ${conversationId} sem group_jid — sem destino para enviar`);
+    return null;
+  }
+  const remoteJid = isGroup
+    ? conv.group_jid!
+    : (phone.includes("@") ? phone : `${phone}@s.whatsapp.net`);
 
   const ctx: SendContext = {
     instanceId: instance.id,
@@ -328,7 +341,10 @@ async function processAttendance(
 
     // action.kind === "warn"
     const warnBeforeMin = Math.min(att.effective_warn_before, att.effective_close_min);
-    const warnTemplate = config.support_inactivity_warning_template ||
+    // Grupo tem texto próprio (espelho do 1:1, mesma variável {{minutes}}).
+    const warnTemplate = (att.is_group
+      ? config.support_group_inactivity_warning_template
+      : config.support_inactivity_warning_template) ||
       "⚠️ Por falta de interação, este atendimento será encerrado em {{minutes}} minutos. Se ainda precisar de ajuda, responda esta mensagem.";
     const message = warnTemplate.replace(/\{\{minutes\}\}/g, String(warnBeforeMin));
 

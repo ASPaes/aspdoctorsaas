@@ -816,6 +816,11 @@ Deno.serve(async (req) => {
 
     // Ensure attendance exists + auto-assign + increment agent count
     // Skip attendance logic for system messages (e.g. closure notifications)
+    //
+    // Grupo fica de fora de propósito: em grupo quem carimba
+    // last_operator_message_at / msg_agent_count é a trigger
+    // trg_track_group_attendance_messages (AFTER INSERT em whatsapp_messages).
+    // Incluir grupo aqui dobrava o msg_agent_count.
     if (senderUserId && !body.systemMessage && !isGroupConv) {
       try {
         const now = new Date();
