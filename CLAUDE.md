@@ -16,6 +16,14 @@ Stack: React + Vite + TS + Tailwind + shadcn/ui · Supabase (Postgres + RLS + Ed
 
 **O repo continua NÃO sendo a fonte de verdade das functions.** Auditoria de 03/08/2026 contra produção (82 functions): 36 no repo e deployadas pelo CI · 28 no repo mas deployadas **a mão** (a cópia do repo pode estar atrás) · 18 só em produção. Era por isso que um push em UMA function revertia as outras — e, como versionar virou risco, ninguém versionou.
 
+**Auditoria de 06/08/2026 (79 functions em prod):** 62 vieram do deploy-all de 06/08 00:14 · **4 deployadas a mão 26 min depois** (`evolution-webhook`, `zapi-webhook`, `send-whatsapp-message`, `check-inactivity-timeout` — a entrega de inatividade em grupo, cujo código nunca voltou ao repo; trazido em `1b0f7c6f`) · 17 só em produção. As 66 do repo estão **todas alinhadas com prod** — nenhuma reverteria num deploy-all.
+
+**Receita para refazer essa auditoria** (é ela que destrava o push quando `_shared` muda):
+1. `supabase functions list --project-ref vbngjzovjhkmietztffo -o json` — o `updated_at` que se repete em dezenas é o deploy-all.
+2. **Toda function com `updated_at` maior foi deployada a mão depois** e é a candidata a reverter. Só essas precisam de diff.
+3. Baixar só elas com `functions download` num diretório **isolado** (o comando escreve em `supabase/functions/<slug>` a partir do cwd — rodando no repo, ele sobrescreve seu trabalho).
+4. Diffar **normalizando CRLF**: o download sempre volta com `\r\n` e todo arquivo aparece como diferente. `diff <(sed 's/\r$//' prod) <(sed 's/\r$//' repo)`.
+
 Regras que continuam valendo:
 - **Antes de editar qualquer function, baixe a de produção**: `supabase functions download <slug> --project-ref vbngjzovjhkmietztffo` (DoctorOMIE: `vqrytdntynxuqozehals`) e mescle sobre ela. Nunca edite uma cópia baixada antes. Já houve deploy perdido por sobreposição (03/08, `ds-omie-contrato-alterar`).
 - **Ao trazer uma function prod-only para o repo, confira o `verify_jwt` antes**: `supabase functions list --project-ref …`. Sem a entrada correspondente em `supabase/config.toml`, o CI deploya com o padrão `true` e **muda a autenticação da function em silêncio**. Foi o que quase aconteceu com `omie-sync-processar` (prod estava `false`). No projeto, 17 das 82 estão com `true` — as outras 65 quebrariam.
