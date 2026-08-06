@@ -33,30 +33,8 @@ export function maskCEP(value: string): string {
 }
 
 /**
- * Masks a phone number with Brazilian country code: +55 (XX) XXXXX-XXXX
- * Automatically prepends 55 if not present.
+ * Máscara e normalização de telefone BR são fonte única em `src/lib/phoneBR.ts`.
+ * Estes nomes ficam como alias porque já estão espalhados pelo app — a lógica
+ * (DDD 55, 0800/0300/0500/0900, número com/sem o 9) vive num lugar só.
  */
-export function maskPhoneBR(value: string): string {
-  let digits = value.replace(/\D/g, "").slice(0, 13);
-  // Auto-prepend 55 if user typed 10-11 digits without country code
-  if (digits.length >= 10 && digits.length <= 11 && !digits.startsWith("55")) {
-    digits = "55" + digits;
-  }
-  if (digits.length <= 2) return digits.length ? `+${digits}` : "";
-  if (digits.length <= 4) return `+${digits.slice(0, 2)} (${digits.slice(2)}`;
-  if (digits.length <= 12) {
-    return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4).replace(/^(\d{4})(\d)/, "$1-$2")}`;
-  }
-  return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9, 13)}`;
-}
-
-/**
- * Normalizes a phone to always have the 55 country code prefix (digits only).
- */
-export function normalizePhoneBR(value: string): string {
-  const digits = value.replace(/\D/g, "");
-  if (digits.length >= 10 && digits.length <= 11 && !digits.startsWith("55")) {
-    return "55" + digits;
-  }
-  return digits;
-}
+export { maskBRPhoneLive as maskPhoneBR, normalizeBRPhone as normalizePhoneBR } from "./phoneBR";

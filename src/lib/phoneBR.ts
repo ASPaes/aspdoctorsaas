@@ -13,11 +13,46 @@
  */
 
 /**
+ * Números não-geográficos BR (0800/0300/0500/0900) — NÃO têm DDD.
+ * Nacional: 0800 777 8134 · E.164: +55 800 777 8134 (o 0 é prefixo de discagem).
+ * Núcleo = código de serviço (3) + 6 ou 7 dígitos.
+ *
+ * Não há ambiguidade com DDD: 30, 50, 80 e 90 não são DDDs válidos no Brasil,
+ * então "55800…" só pode ser país 55 + 0800, nunca DDD + número.
+ */
+const NON_GEO_FULL = /^(300|500|800|900)\d{6,7}$/;
+
+/**
+ * Devolve o núcleo do não-geográfico (ex.: "8007778134") ou null.
+ * Aceita a forma nacional ainda incompleta ("0800…") para máscara ao vivo;
+ * as formas sem o 0 exigem o número completo para não confundir com DDD.
+ */
+export function nonGeoCoreBR(input: string): string | null {
+  const d = input.replace(/\D/g, "");
+  if (/^0(300|500|800|900)/.test(d)) return d.replace(/^0+/, "").slice(0, 10);
+  if (NON_GEO_FULL.test(d)) return d;
+  if (d.startsWith("55") && NON_GEO_FULL.test(d.slice(2))) return d.slice(2);
+  return null;
+}
+
+/** Formata o núcleo do não-geográfico no padrão nacional: 0800 777 8134 */
+function formatNonGeoBR(core: string): string {
+  const rest = core.slice(3);
+  if (!rest) return `0${core}`;
+  if (rest.length <= 3) return `0${core.slice(0, 3)} ${rest}`;
+  return `0${core.slice(0, 3)} ${rest.slice(0, 3)} ${rest.slice(3)}`;
+}
+
+/**
  * Normalizes a Brazilian phone input to digits-only with 55 prefix.
  * Returns the normalized string (may be invalid — call isValidBRPhone to check).
  */
 export function normalizeBRPhone(input: string): string {
   let digits = input.replace(/\D/g, "");
+
+  // 0800/0300/0500/0900: sem DDD, o 0 cai e o 55 entra na frente.
+  const nonGeo = nonGeoCoreBR(digits);
+  if (nonGeo) return "55" + nonGeo;
 
   // Remove leading zeros (e.g. 0xx style)
   digits = digits.replace(/^0+/, "");
@@ -40,6 +75,10 @@ export function normalizeBRPhone(input: string): string {
 export function isValidBRPhone(normalized: string): boolean {
   if (!/^\d+$/.test(normalized)) return false;
   if (!normalized.startsWith("55")) return false;
+
+  // 0800/0300/0500/0900: 55 + 3 + (6 ou 7) = 11 ou 12 dígitos, sem DDD.
+  if (NON_GEO_FULL.test(normalized.slice(2))) return true;
+
   if (normalized.length !== 12 && normalized.length !== 13) return false;
 
   const ddd = normalized.slice(2, 4);
@@ -56,6 +95,10 @@ export function formatBRPhone(normalized: string): string {
   if (!normalized) return "";
 
   const clean = normalized.replace(/\D/g, "");
+
+  const nonGeo = nonGeoCoreBR(clean);
+  if (nonGeo) return formatNonGeoBR(nonGeo);
+
   if (clean.length < 4) return clean;
   if (!clean.startsWith("55")) return clean;
 
@@ -96,6 +139,13 @@ export const formatBrazilPhone = formatBRPhone;
  */
 export function maskBRPhoneLive(input: string): string {
   let digits = input.replace(/\D/g, "");
+
+  // 0800/0300/0500/0900: sem DDD — formato nacional, o 0 fica visível.
+  const nonGeo = nonGeoCoreBR(digits);
+  if (nonGeo) return formatNonGeoBR(nonGeo);
+
+  // "0", "08", "080" — ainda pode virar 0800/0300/…; preserva enquanto digita.
+  if (/^0\d{0,2}$/.test(digits)) return digits;
 
   // Remove leading zeros
   digits = digits.replace(/^0+/, "");

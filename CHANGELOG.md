@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Agosto / 2026
 
+### 05/08
+
+- 🔧 **Atendimento / Chat** — **Já dá para iniciar conversa com um 0800.** Em *Nova Conversa → Número Avulso*, o campo de telefone assumia que todo número tem DDD e lia o `08` do 0800 como se fosse um: `0800 777 8134` virava `+55 (08) 00777-8134`, um número que não existe. Na prática só era possível abrir conversa com celular ou fixo — para falar com um 0800 o atendente precisava esperar o cliente chamar primeiro. Agora o campo reconhece os números que não têm DDD (**0800, 0300, 0500 e 0900**), mostra no formato de sempre (`0800 777 8134`) e manda para o WhatsApp o número certo.
+
 ### 04/08
 
 - ⬆️ **Atendimento / Chat** — **A Fila passou a seguir a ordem de chegada, e mostra quem é o próximo.** A aba *Fila* listava as conversas da mais recente para a mais antiga — ou seja, ao contrário: quem estava esperando havia mais tempo aparecia por último, e o atendente que puxasse o primeiro da lista pegava justamente quem tinha acabado de chamar. Em operação com fila grande era pior do que parecia, porque a lista é carregada em blocos: quem esperava mais **não estava nem na primeira tela**, e só aparecia depois de rolar bastante. Agora a Fila é sempre cronológica — o primeiro da lista é o cliente que chama há mais tempo —, o primeiro card traz a marca **Próximo**, os demais mostram a posição (*2º na fila*, *3º na fila*) e, no lugar da hora da última mensagem, cada card exibe **há quanto tempo aquele cliente espera**. Cliente que perde a paciência e manda três mensagens seguidas **não perde a vez**: a conta é feita desde a primeira mensagem sem resposta. A ordem da Fila é fixa e não muda com a ordenação escolhida no filtro, que continua valendo nas outras abas.

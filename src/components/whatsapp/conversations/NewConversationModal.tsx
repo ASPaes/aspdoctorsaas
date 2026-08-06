@@ -13,7 +13,7 @@ import { useClienteSearch, type ClienteSearchResult } from "../hooks/useClienteS
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { maskCNPJ, maskPhoneBR, normalizePhoneBR } from "@/lib/masks";
-import { normalizeBRPhone, formatBRPhone, coreDigits } from "@/lib/phoneBR";
+import { normalizeBRPhone, formatBRPhone, coreDigits, isValidBRPhone } from "@/lib/phoneBR";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
@@ -84,6 +84,11 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const [selectedCliente, setSelectedCliente] = useState<ClienteSearchResult | null>(null);
   const [selectedContactPhone, setSelectedContactPhone] = useState<string | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+
+  // Sempre E.164 (55 + …). Cobre o 0800, onde o que o usuário digita ("08007778134")
+  // é diferente do que o WhatsApp espera ("558007778134").
+  const normalizedPhone = useMemo(() => normalizePhoneBR(phone), [phone]);
+  const phoneReady = isValidBRPhone(normalizedPhone);
 
   const isMetaInstance = useMemo(() => {
     const inst = instances.find((i) => i.id === instanceId);
@@ -219,8 +224,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
     // Meta Cloud: janela 24h exige template aprovado para iniciar contato.
     // O envio do template (via MetaTemplatePicker) cria contato + conversa + atendimento.
     if (isMetaInstance) {
-      const cleanPhone = phone.replace(/\D/g, "");
-      if (cleanPhone.length < 10) {
+      if (!isValidBRPhone(normalizedPhone)) {
         toast.error("Telefone inválido");
         return;
       }
@@ -241,7 +245,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-            body: JSON.stringify({ instanceId, phone: phone.replace(/\D/g, '') }),
+            body: JSON.stringify({ instanceId, phone: normalizedPhone }),
           }
         );
         const data = await res.json();
@@ -284,7 +288,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
     }
 
     // Criação normal (verificado, confirmado pelo usuário, ou Meta)
-    const cleanPhone = normalizePhoneBR(phone);
+    const cleanPhone = normalizedPhone;
     createConversation.mutate(
       { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined, clienteId: selectedCliente?.id },
       {
@@ -313,7 +317,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   };
 
   const handleCheckWhatsApp = async () => {
-    if (!instanceId || phone.replace(/\D/g,'').length < 10) return;
+    if (!instanceId || !isValidBRPhone(normalizedPhone)) return;
     setWaCheck('checking');
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -322,7 +326,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ instanceId, phone: phone.replace(/\D/g,'') }),
+          body: JSON.stringify({ instanceId, phone: normalizedPhone }),
         }
       );
       const data = await res.json();
@@ -497,6 +501,9 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
                   value={maskPhoneBR(phone)}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                 />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Celular, fixo ou 0800 (ex.: 0800 777 8134)
+                </p>
                 {waCheck === 'exists_corrected' && (
                   <p className="flex items-center gap-1 text-xs text-green-600 mt-1">
                     <CheckCircle className="h-3.5 w-3.5" /> 9 adicionado automaticamente 😉
@@ -530,7 +537,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             </TabsContent>
           </Tabs>
 
-          {isCheckingOpen && phone.replace(/\D/g,'').length >= 10 && instanceId && (
+          {isCheckingOpen && phoneReady && instanceId && (
             <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 p-3">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
               <span className="text-xs text-muted-foreground">Verificando atendimentos abertos...</span>
@@ -568,7 +575,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             )
           )}
 
-          {isMetaInstance && phone.replace(/\D/g, "").length >= 10 && !openConv?.exists && !isCheckingOpen && (
+          {isMetaInstance && phoneReady && !openConv?.exists && !isCheckingOpen && (
             <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40 p-3">
               <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
               <div className="space-y-0.5">
@@ -589,12 +596,12 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
           </Button>
         </div>
 
-        {isMetaInstance && instanceId && phone.replace(/\D/g, "").length >= 10 && (
+        {isMetaInstance && instanceId && phoneReady && (
           <MetaTemplatePicker
             open={showTemplatePicker}
             onOpenChange={setShowTemplatePicker}
             instanceId={instanceId}
-            to={phone.replace(/\D/g, "")}
+            to={normalizedPhone}
             onSent={async (result) => {
               if (selectedCliente) {
                 try {
