@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Search, User, Building2, Phone, CheckCircle2, CheckCircle } from "lucide-react";
+import { Loader2, Search, User, Building2, Phone, CheckCircle2, CheckCircle, Users } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useCreateConversation } from "../hooks/useCreateConversation";
 import { useClienteSearch, type ClienteSearchResult } from "../hooks/useClienteSearch";
+import { useContactSearch, type ContactSearchResult } from "../hooks/useContactSearch";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { maskCNPJ, maskPhoneBR, normalizePhoneBR } from "@/lib/masks";
@@ -88,6 +90,9 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const [selectedCliente, setSelectedCliente] = useState<ClienteSearchResult | null>(null);
   const [selectedContactPhone, setSelectedContactPhone] = useState<string | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  // Aba "Buscar Contato": diretório de whatsapp_contacts
+  const [contactTerm, setContactTerm] = useState("");
+  const [selectedContact, setSelectedContact] = useState<ContactSearchResult | null>(null);
 
   // Sempre E.164 (55 + …). Cobre o 0800, onde o que o usuário digita ("08000000000")
   // é diferente do que o WhatsApp espera ("558000000000").
@@ -117,7 +122,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
 
   useEffect(() => {
     if (open && !instanceId) {
-      if (initialInstanceId) {
+      if (initialInstanceId && instances.some((i) => i.id === initialInstanceId)) {
         setInstanceId(initialInstanceId);
       } else if (instances.length === 1) {
         setInstanceId(instances[0].id);
@@ -131,6 +136,19 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   }, [phone, instanceId]);
 
   const { results, isLoading: isSearching } = useClienteSearch(searchTerm);
+  const { results: contactResults, isLoading: isSearchingContacts } = useContactSearch(contactTerm);
+
+  // O contato do diretório já sabe a instância dele e o cliente a que pertence.
+  // Só pré-seleciona a instância se ela ainda estiver na lista — instância
+  // removida/inativa deixaria o Select com um valor que não tem item visível.
+  const handleSelectDirectoryContact = (c: ContactSearchResult) => {
+    setSelectedContact(c);
+    setPhone(c.phone_number);
+    setName(c.name || "");
+    if (c.instance_id && instances.some((i) => i.id === c.instance_id)) {
+      setInstanceId(c.instance_id);
+    }
+  };
 
   // Fetch additional contacts for selected cliente
   const { data: clienteContatos } = useQuery({
@@ -207,6 +225,9 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
     setName(opt.name || selectedCliente?.nome_fantasia || selectedCliente?.razao_social || "");
   };
 
+  // Contato do diretório pode já estar vinculado a um cliente — não perder esse vínculo.
+  const clienteIdForCreate = selectedCliente?.id ?? selectedContact?.cliente_id ?? undefined;
+
   const handleCreate = async () => {
     if (!instanceId || !phone.trim()) {
       toast.error("Preencha instância e telefone");
@@ -262,7 +283,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             await new Promise(r => setTimeout(r, 100));
             const cleanPhone = data.phone;
             createConversation.mutate(
-              { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined, clienteId: selectedCliente?.id },
+              { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined, clienteId: clienteIdForCreate },
               {
                 onSuccess: (d) => {
                   if (d.status === 'blocked') {
@@ -294,7 +315,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
     // Criação normal (verificado, confirmado pelo usuário, ou Meta)
     const cleanPhone = normalizedPhone;
     createConversation.mutate(
-      { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined, clienteId: selectedCliente?.id },
+      { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined, clienteId: clienteIdForCreate },
       {
         onSuccess: (d) => {
           if (d.status === 'blocked') {
@@ -318,6 +339,8 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
     setSearchTerm("");
     setSelectedCliente(null);
     setSelectedContactPhone(null);
+    setContactTerm("");
+    setSelectedContact(null);
   };
 
   const handleCheckWhatsApp = async () => {
@@ -374,13 +397,27 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             </Select>
           </div>
 
-          <Tabs value={tab} onValueChange={(v) => { setTab(v); setSelectedCliente(null); setSelectedContactPhone(null); }}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="cliente" className="gap-1 text-xs">
-                <Building2 className="h-3.5 w-3.5" /> Buscar Cliente
+          <Tabs
+            value={tab}
+            onValueChange={(v) => {
+              setTab(v);
+              setSelectedCliente(null);
+              setSelectedContactPhone(null);
+              setSelectedContact(null);
+            }}
+          >
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="cliente" className="gap-1 text-xs px-2">
+                <Building2 className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden sm:inline">Buscar&nbsp;</span>Cliente
               </TabsTrigger>
-              <TabsTrigger value="avulso" className="gap-1 text-xs">
-                <User className="h-3.5 w-3.5" /> Número Avulso
+              <TabsTrigger value="contato" className="gap-1 text-xs px-2">
+                <Users className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden sm:inline">Buscar&nbsp;</span>Contato
+              </TabsTrigger>
+              <TabsTrigger value="avulso" className="gap-1 text-xs px-2">
+                <User className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden sm:inline">Número&nbsp;</span>Avulso
               </TabsTrigger>
             </TabsList>
 
@@ -497,6 +534,111 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
               )}
             </TabsContent>
 
+            <TabsContent value="contato" className="space-y-3 mt-3">
+              {!selectedContact && (
+                <>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar contato por nome ou telefone..."
+                      value={contactTerm}
+                      onChange={(e) => setContactTerm(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+
+                  {isSearchingContacts && (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+
+                  {contactResults.length > 0 && (
+                    <ScrollArea className="h-[200px] border rounded-md">
+                      <div className="space-y-1 p-1">
+                        {contactResults.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className="w-full flex items-center gap-2 text-left p-2 rounded-md hover:bg-muted transition-colors"
+                            onClick={() => handleSelectDirectoryContact(c)}
+                          >
+                            <Avatar className="h-8 w-8 shrink-0">
+                              {c.profile_picture_url && <AvatarImage src={c.profile_picture_url} />}
+                              <AvatarFallback className="text-[10px]">
+                                {(c.name || c.phone_number).substring(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {c.name || formatBRPhone(c.phone_number)}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {formatBRPhone(c.phone_number)}
+                                {c.cliente_nome ? ` · ${c.cliente_nome}` : ""}
+                              </p>
+                            </div>
+                            {c.cliente_id && (
+                              <Building2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" aria-label="Vinculado a cliente" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+
+                  {contactTerm.trim().length >= 2 && !isSearchingContacts && contactResults.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-2">
+                      Nenhum contato encontrado. Use <strong>Número Avulso</strong> para um número novo.
+                    </p>
+                  )}
+
+                  {contactTerm.trim().length < 2 && (
+                    <p className="text-[11px] text-muted-foreground text-center py-2">
+                      Digite ao menos 2 caracteres. Grupos não aparecem aqui.
+                    </p>
+                  )}
+                </>
+              )}
+
+              {selectedContact && (
+                <div className="bg-muted rounded-md p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-9 w-9 shrink-0">
+                      {selectedContact.profile_picture_url && <AvatarImage src={selectedContact.profile_picture_url} />}
+                      <AvatarFallback className="text-[10px]">
+                        {(selectedContact.name || selectedContact.phone_number).substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">
+                        {selectedContact.name || formatBRPhone(selectedContact.phone_number)}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        <Phone className="h-3 w-3 inline mr-1" />
+                        {formatBRPhone(selectedContact.phone_number)}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-[10px] shrink-0"
+                      onClick={() => { setSelectedContact(null); setPhone(""); setName(""); }}
+                    >
+                      Trocar
+                    </Button>
+                  </div>
+
+                  {selectedContact.cliente_nome && (
+                    <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <Building2 className="h-3 w-3 shrink-0" />
+                      Vinculado a {selectedContact.cliente_nome}
+                    </p>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+
             <TabsContent value="avulso" className="space-y-3 mt-3">
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">Telefone</Label>
@@ -593,7 +735,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             </div>
           )}
 
-          <Button onClick={handleCreate} disabled={createConversation.isPending || isCheckingOpen || waCheck === 'checking' || (tab === "cliente" && !!selectedCliente && !phone) || (!!openConv?.exists && !openConv?.isOwnUser)} className="w-full">
+          <Button onClick={handleCreate} disabled={createConversation.isPending || isCheckingOpen || waCheck === 'checking' || (tab === "cliente" && !!selectedCliente && !phone) || (tab === "contato" && !selectedContact) || (!!openConv?.exists && !openConv?.isOwnUser)} className="w-full">
             {(createConversation.isPending || waCheck === 'checking') ? (
               <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Verificando...</>
             ) : (isMetaInstance && !openConv?.exists ? 'Escolher template' : 'Iniciar Conversa')}
@@ -607,11 +749,11 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             instanceId={instanceId}
             to={normalizedPhone}
             onSent={async (result) => {
-              if (selectedCliente) {
+              if (clienteIdForCreate) {
                 try {
                   await supabase
                     .from("whatsapp_conversations")
-                    .update({ metadata: { cliente_id: selectedCliente.id } as any })
+                    .update({ metadata: { cliente_id: clienteIdForCreate } as any })
                     .eq("id", result.conversation_id);
                 } catch {
                   // ignora — metadata é nice-to-have, conversa já está criada

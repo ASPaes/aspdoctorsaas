@@ -21,6 +21,8 @@ export { useConversationSummaries } from './useConversationSummaries';
 export type { ConversationSummary } from './useConversationSummaries';
 export { useConversationTopics } from './useConversationTopics';
 export { useCategorizeConversation } from './useCategorizeConversation';
+export { useContactSearch } from './useContactSearch';
+export type { ContactSearchResult } from './useContactSearch';
 export { useContactDetails } from './useContactDetails';
 export type { ContactDetails } from './useContactDetails';
 export { useAssignmentRules } from './useAssignmentRules';
