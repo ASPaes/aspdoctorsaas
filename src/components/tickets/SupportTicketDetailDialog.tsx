@@ -1015,6 +1015,24 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         />
       </div>
 
+      {/* Ticket Dev (editável) */}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">Ticket Dev</Label>
+        <Input
+          defaultValue={ticket?.ticket_dev ?? ""}
+          key={`ticket_dev-${ticket?.ticket_dev ?? ""}`}
+          placeholder="Código da demanda no DoctorDev..."
+          className="text-sm"
+          onBlur={(e) => {
+            const val = e.target.value.trim();
+            if (val !== (ticket?.ticket_dev ?? "")) {
+              handleFieldUpdate({ ticket_dev: val });
+            }
+          }}
+          disabled={updating}
+        />
+      </div>
+
       {/* Cliente */}
       <div className="space-y-1.5">
         <Label className="text-xs font-medium">Cliente</Label>

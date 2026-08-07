@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MessageCircle, Phone, User, Mail, Lock } from "lucide-react";
+import { Calendar, MessageCircle, Phone, User, Mail, Lock, Code2 } from "lucide-react";
 
 interface KanbanColumn {
   id: string;
@@ -13,6 +13,7 @@ interface KanbanColumn {
 interface TicketRow {
   id: string;
   ticket_code: string | null;
+  ticket_dev: string | null;
   assunto: string | null;
   status_id: string | null;
   prioridade: string | null;
@@ -219,6 +220,15 @@ function TicketsKanbanView({ tickets, columns, onTicketClick, onStatusChange, ge
                         <User className="h-3 w-3 shrink-0" />
                         <span className="truncate">{getAgentName?.(t.responsavel_user_id) || "Sem responsável"}</span>
                       </div>
+                      {t.ticket_dev?.trim() && (
+                        <div
+                          className="inline-flex items-center gap-1 max-w-full rounded border border-sky-500/30 bg-sky-500/10 px-1.5 py-0.5 mt-1.5"
+                          title={`Ticket Dev: ${t.ticket_dev}`}
+                        >
+                          <Code2 className="h-3 w-3 shrink-0 text-sky-400" />
+                          <span className="font-mono text-[10px] font-semibold text-sky-400 truncate">{t.ticket_dev}</span>
+                        </div>
+                      )}
                       {t.agendado_para && (
                         <div className="inline-flex items-center gap-1 text-[10px] text-yellow-400 mt-1.5">
                           <Calendar className="h-3 w-3" />

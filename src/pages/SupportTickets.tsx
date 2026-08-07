@@ -4,7 +4,7 @@ import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove 
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell, Building2, Download } from "lucide-react";
+import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell, Building2, Download, Code2 } from "lucide-react";
 import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
 import { subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
@@ -70,6 +70,7 @@ function formatDate(iso: string | null): string {
 interface TicketRow {
   id: string;
   ticket_code: string | null;
+  ticket_dev: string | null;
   assunto: string | null;
   rotulo: string | null;
   status_id: string | null;
@@ -669,7 +670,7 @@ export default function SupportTickets() {
 
       let q = (supabase.from("support_tickets" as any) as any)
         .select(`
-          id, ticket_code, assunto, rotulo, status_id, prioridade, canal_origem, tipo_horario,
+          id, ticket_code, ticket_dev, assunto, rotulo, status_id, prioridade, canal_origem, tipo_horario,
           aberto_em, concluido_em, agendado_para, parent_ticket_id,
           horario_inicio, horario_fim, duracao_minutos, responsavel_user_id,
           clientes:cliente_id(nome_fantasia),
@@ -713,7 +714,7 @@ export default function SupportTickets() {
       }
 
       if (s) {
-        const orParts = [...ticketCodePatterns, `assunto.ilike.*${s}*`, `rotulo.ilike.*${s}*`];
+        const orParts = [...ticketCodePatterns, `assunto.ilike.*${s}*`, `rotulo.ilike.*${s}*`, `ticket_dev.ilike.*${s}*`];
         if (clienteIds.length > 0) {
           orParts.push(`cliente_id.in.(${clienteIds.join(",")})`);
         }
@@ -864,7 +865,7 @@ export default function SupportTickets() {
     const builder = () => {
       let q = (supabase.from("support_tickets" as any) as any)
         .select(`
-          id, ticket_code, assunto, rotulo, status_id, prioridade, canal_origem, tipo_horario,
+          id, ticket_code, ticket_dev, assunto, rotulo, status_id, prioridade, canal_origem, tipo_horario,
           aberto_em, concluido_em, agendado_para, parent_ticket_id,
           horario_inicio, horario_fim, duracao_minutos, responsavel_user_id,
           clientes:cliente_id(nome_fantasia),
@@ -903,7 +904,7 @@ export default function SupportTickets() {
       }
 
       if (s) {
-        const orParts = [...ticketCodePatterns, `assunto.ilike.*${s}*`, `rotulo.ilike.*${s}*`];
+        const orParts = [...ticketCodePatterns, `assunto.ilike.*${s}*`, `rotulo.ilike.*${s}*`, `ticket_dev.ilike.*${s}*`];
         if (clienteIds.length > 0) {
           orParts.push(`cliente_id.in.(${clienteIds.join(",")})`);
         }
@@ -946,6 +947,7 @@ export default function SupportTickets() {
     };
     const data: Record<string, any>[] = rows.map(t => ({
       "Código": t.ticket_code ?? "",
+      "Ticket Dev": t.ticket_dev ?? "",
       "Cliente": t.clientes?.nome_fantasia ?? "",
       "Rótulo": t.rotulo ?? "",
       "Assunto": t.assunto ?? "",
@@ -967,7 +969,7 @@ export default function SupportTickets() {
     }));
     const totalMinutos = rows.reduce((sum, t) => sum + (t.duracao_minutos ?? 0), 0);
     data.push({
-      "Código": "", "Cliente": "", "Rótulo": "", "Assunto": "", "Produto": "", "Categoria": "",
+      "Código": "", "Ticket Dev": "", "Cliente": "", "Rótulo": "", "Assunto": "", "Produto": "", "Categoria": "",
       "Subcategoria": "", "Tipo": "", "Canal": "", "Tipo Horário": "", "Status": "",
       "Prioridade": "", "Responsável": `TOTAL (${rows.length} tickets)`,
       "Aberto em": "", "Concluído em": "", "Hr Início Plantão": "", "Hr Fim Plantão": "",
@@ -1713,6 +1715,15 @@ export default function SupportTickets() {
                         <User className="h-3 w-3 shrink-0" />
                         <span className="truncate">{getAgentName(t.responsavel_user_id) || "Sem responsável"}</span>
                       </div>
+                      {t.ticket_dev?.trim() && (
+                        <div
+                          className="flex items-center gap-1 max-w-full rounded border border-sky-500/30 bg-sky-500/10 px-1.5 py-0.5"
+                          title={`Ticket Dev: ${t.ticket_dev}`}
+                        >
+                          <Code2 className="h-3 w-3 shrink-0 text-sky-400" />
+                          <span className="font-mono text-[11px] font-semibold text-sky-400 truncate">{t.ticket_dev}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </button>
