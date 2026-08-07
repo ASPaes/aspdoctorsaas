@@ -241,9 +241,10 @@ function CandidatosLinha({
 }) {
   const queryClient = useQueryClient();
   const [escolhendo, setEscolhendo] = useState<string | number | null>(null);
+  const { conta, contaBody } = useOmieConta();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["omie-conf-candidatos", cnpj],
+    queryKey: ["omie-conf-candidatos", cnpj, conta?.id],
     enabled: !!cnpj && !!conta?.id,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -361,6 +362,7 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
   const [enviarLoading, setEnviarLoading] = useState(false);
   const [dryRun, setDryRun] = useState<any | null>(null);
   const queryClient = useQueryClient();
+  const { contaBody } = useOmieConta();
   const bucket = row.acao_sugerida as Bucket;
   const diffs = row.diffs && typeof row.diffs === "object" ? row.diffs : {};
   const diffKeys = Object.keys(diffs);
@@ -951,6 +953,7 @@ function num(v: any): number {
 function useReconferir(tid: string | null | undefined) {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
+  const { conta, contaBody } = useOmieConta();
 
   async function run() {
     if (!tid) {
@@ -1014,6 +1017,7 @@ function VisaoGeralPanel({
   onIrParaBalde: (b: Bucket, busca?: string) => void;
 }) {
   const reconferir = useReconferir(tid);
+  const { conta } = useOmieConta();
   const { data, isLoading } = useQuery({
     queryKey: ["omie-conf-visao-geral", tid, conta?.id],
     enabled: !!tid && !!conta?.id,
