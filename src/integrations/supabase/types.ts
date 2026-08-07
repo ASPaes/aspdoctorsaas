@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -2732,6 +2712,57 @@ export type Database = {
         }
         Relationships: []
       }
+      cs_ticket_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          tenant_id: string
+          ticket_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          tenant_id: string
+          ticket_id: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          tenant_id?: string
+          ticket_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_ticket_attachments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_ticket_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "cs_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cs_ticket_reassignments: {
         Row: {
           criado_em: string
@@ -3610,6 +3641,8 @@ export type Database = {
           custo_delta: number
           data_movimento: string
           descricao: string | null
+          encerrado_em: string | null
+          encerrado_por_contrato_id: string | null
           estornado_por: string | null
           estorno_de: string | null
           fornecedor_id: number | null
@@ -3632,6 +3665,8 @@ export type Database = {
           custo_delta?: number
           data_movimento: string
           descricao?: string | null
+          encerrado_em?: string | null
+          encerrado_por_contrato_id?: string | null
           estornado_por?: string | null
           estorno_de?: string | null
           fornecedor_id?: number | null
@@ -3654,6 +3689,8 @@ export type Database = {
           custo_delta?: number
           data_movimento?: string
           descricao?: string | null
+          encerrado_em?: string | null
+          encerrado_por_contrato_id?: string | null
           estornado_por?: string | null
           estorno_de?: string | null
           fornecedor_id?: number | null
@@ -3693,6 +3730,13 @@ export type Database = {
           {
             foreignKeyName: "movimentos_mrr_contrato_id_fkey"
             columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_encerrado_por_contrato_id_fkey"
+            columns: ["encerrado_por_contrato_id"]
             isOneToOne: false
             referencedRelation: "contratos"
             referencedColumns: ["id"]
@@ -4155,6 +4199,7 @@ export type Database = {
           codigo_cliente_integracao: string | null
           codigo_cliente_omie: number
           codigo_contrato_omie: number | null
+          conta_integration_id: string | null
           contratos_omie: Json | null
           dia_venc_omie: number | null
           id: string
@@ -4175,6 +4220,7 @@ export type Database = {
           codigo_cliente_integracao?: string | null
           codigo_cliente_omie: number
           codigo_contrato_omie?: number | null
+          conta_integration_id?: string | null
           contratos_omie?: Json | null
           dia_venc_omie?: number | null
           id?: string
@@ -4195,6 +4241,7 @@ export type Database = {
           codigo_cliente_integracao?: string | null
           codigo_cliente_omie?: number
           codigo_contrato_omie?: number | null
+          conta_integration_id?: string | null
           contratos_omie?: Json | null
           dia_venc_omie?: number | null
           id?: string
@@ -4209,10 +4256,19 @@ export type Database = {
           vigencia_final_omie?: string | null
           vigencia_inicial_omie?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "omie_espelho_cadastro_conta_integration_id_fkey"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "omie_integration"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       omie_integration: {
         Row: {
+          alert_whatsapp_numbers: string[]
           ativo: boolean
           id: string
           integracao_pausada: boolean
@@ -4230,6 +4286,7 @@ export type Database = {
           vault_secret_id: string | null
         }
         Insert: {
+          alert_whatsapp_numbers?: string[]
           ativo?: boolean
           id?: string
           integracao_pausada?: boolean
@@ -4247,6 +4304,7 @@ export type Database = {
           vault_secret_id?: string | null
         }
         Update: {
+          alert_whatsapp_numbers?: string[]
           ativo?: boolean
           id?: string
           integracao_pausada?: boolean
@@ -5728,6 +5786,86 @@ export type Database = {
         }
         Relationships: []
       }
+      onboarding_training_participants: {
+        Row: {
+          cliente_contato_id: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          fone: string | null
+          id: string
+          nome: string
+          presenca_em: string | null
+          presenca_por: string | null
+          presente: boolean | null
+          tenant_id: string
+          tipo: string
+          training_id: string
+          updated_at: string
+        }
+        Insert: {
+          cliente_contato_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          fone?: string | null
+          id?: string
+          nome: string
+          presenca_em?: string | null
+          presenca_por?: string | null
+          presente?: boolean | null
+          tenant_id: string
+          tipo?: string
+          training_id: string
+          updated_at?: string
+        }
+        Update: {
+          cliente_contato_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          fone?: string | null
+          id?: string
+          nome?: string
+          presenca_em?: string | null
+          presenca_por?: string | null
+          presente?: boolean | null
+          tenant_id?: string
+          tipo?: string
+          training_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_training_participants_cliente_contato_id_fkey"
+            columns: ["cliente_contato_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_participants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_participants_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_training_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_participants_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_cards"
+            referencedColumns: ["training_id"]
+          },
+        ]
+      }
       onboarding_training_sessions: {
         Row: {
           agendado_para: string | null
@@ -5744,7 +5882,6 @@ export type Database = {
           link_agendamento: string | null
           no_show: boolean
           observacao: string | null
-          participantes: string | null
           proprietario_presente: boolean | null
           realizado_em: string | null
           status: Database["public"]["Enums"]["onb_treino_status"]
@@ -5770,7 +5907,6 @@ export type Database = {
           link_agendamento?: string | null
           no_show?: boolean
           observacao?: string | null
-          participantes?: string | null
           proprietario_presente?: boolean | null
           realizado_em?: string | null
           status?: Database["public"]["Enums"]["onb_treino_status"]
@@ -5796,7 +5932,6 @@ export type Database = {
           link_agendamento?: string | null
           no_show?: boolean
           observacao?: string | null
-          participantes?: string | null
           proprietario_presente?: boolean | null
           realizado_em?: string | null
           status?: Database["public"]["Enums"]["onb_treino_status"]
@@ -6534,6 +6669,7 @@ export type Database = {
           cnpj_norm: string | null
           codigo_cliente_omie: number | null
           codigo_contrato_omie: number | null
+          conta_integration_id: string | null
           dia_venc_ds: number | null
           dia_venc_omie: number | null
           diffs: Json | null
@@ -6573,6 +6709,7 @@ export type Database = {
           cnpj_norm?: string | null
           codigo_cliente_omie?: number | null
           codigo_contrato_omie?: number | null
+          conta_integration_id?: string | null
           dia_venc_ds?: number | null
           dia_venc_omie?: number | null
           diffs?: Json | null
@@ -6612,6 +6749,7 @@ export type Database = {
           cnpj_norm?: string | null
           codigo_cliente_omie?: number | null
           codigo_contrato_omie?: number | null
+          conta_integration_id?: string | null
           dia_venc_ds?: number | null
           dia_venc_omie?: number | null
           diffs?: Json | null
@@ -6645,7 +6783,15 @@ export type Database = {
           vigencia_inicial_ds?: string | null
           vigencia_inicial_omie?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "reconciliacao_cadastro_conta_integration_id_fkey"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "omie_integration"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       resources: {
         Row: {
@@ -7847,6 +7993,7 @@ export type Database = {
           id: string
           tenant_id: string
           ticket_id: string
+          title: string | null
           uploaded_by: string
         }
         Insert: {
@@ -7860,6 +8007,7 @@ export type Database = {
           id?: string
           tenant_id: string
           ticket_id: string
+          title?: string | null
           uploaded_by: string
         }
         Update: {
@@ -7873,6 +8021,7 @@ export type Database = {
           id?: string
           tenant_id?: string
           ticket_id?: string
+          title?: string | null
           uploaded_by?: string
         }
         Relationships: [
@@ -8050,6 +8199,7 @@ export type Database = {
           tempo_calculado_minutos: number | null
           tenant_id: string
           ticket_code: string | null
+          ticket_dev: string | null
           tipo: Database["public"]["Enums"]["support_ticket_tipo"]
           tipo_horario: string | null
           unidade_base_id: number | null
@@ -8103,6 +8253,7 @@ export type Database = {
           tempo_calculado_minutos?: number | null
           tenant_id: string
           ticket_code?: string | null
+          ticket_dev?: string | null
           tipo?: Database["public"]["Enums"]["support_ticket_tipo"]
           tipo_horario?: string | null
           unidade_base_id?: number | null
@@ -8156,6 +8307,7 @@ export type Database = {
           tempo_calculado_minutos?: number | null
           tenant_id?: string
           ticket_code?: string | null
+          ticket_dev?: string | null
           tipo?: Database["public"]["Enums"]["support_ticket_tipo"]
           tipo_horario?: string | null
           unidade_base_id?: number | null
@@ -9373,6 +9525,24 @@ export type Database = {
           },
         ]
       }
+      whatsapp_delivery_config: {
+        Row: {
+          confirm_window_seconds: number
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          confirm_window_seconds?: number
+          id?: number
+          updated_at?: string
+        }
+        Update: {
+          confirm_window_seconds?: number
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       whatsapp_group_participants: {
         Row: {
           first_seen_at: string
@@ -9884,6 +10054,7 @@ export type Database = {
       whatsapp_messages: {
         Row: {
           audio_transcription: string | null
+          auto_retry_count: number
           content: string
           conversation_id: string
           created_at: string
@@ -9892,10 +10063,13 @@ export type Database = {
           delete_status: string
           deleted_at: string | null
           deleted_by: string | null
+          delivery_confirmed_at: string | null
           edited_at: string | null
+          failure_confirmed_at: string | null
           id: string
           instance_id: string | null
           is_from_me: boolean
+          last_error_at: string | null
           media_ext: string | null
           media_filename: string | null
           media_kind: string | null
@@ -9921,6 +10095,7 @@ export type Database = {
         }
         Insert: {
           audio_transcription?: string | null
+          auto_retry_count?: number
           content?: string
           conversation_id: string
           created_at?: string
@@ -9929,10 +10104,13 @@ export type Database = {
           delete_status?: string
           deleted_at?: string | null
           deleted_by?: string | null
+          delivery_confirmed_at?: string | null
           edited_at?: string | null
+          failure_confirmed_at?: string | null
           id?: string
           instance_id?: string | null
           is_from_me?: boolean
+          last_error_at?: string | null
           media_ext?: string | null
           media_filename?: string | null
           media_kind?: string | null
@@ -9958,6 +10136,7 @@ export type Database = {
         }
         Update: {
           audio_transcription?: string | null
+          auto_retry_count?: number
           content?: string
           conversation_id?: string
           created_at?: string
@@ -9966,10 +10145,13 @@ export type Database = {
           delete_status?: string
           deleted_at?: string | null
           deleted_by?: string | null
+          delivery_confirmed_at?: string | null
           edited_at?: string | null
+          failure_confirmed_at?: string | null
           id?: string
           instance_id?: string | null
           is_from_me?: boolean
+          last_error_at?: string | null
           media_ext?: string | null
           media_filename?: string | null
           media_kind?: string | null
@@ -10980,6 +11162,7 @@ export type Database = {
           agendado_para: string | null
           cancelado_em: string | null
           cancelado_na_implantacao: boolean | null
+          chamada_pendente: boolean | null
           cliente_id: string | null
           cliente_nome: string | null
           cliente_unidade_id: number | null
@@ -10999,6 +11182,8 @@ export type Database = {
           no_show: boolean | null
           parent_ticket_code: string | null
           parent_ticket_id: string | null
+          participantes_presentes: number | null
+          participantes_total: number | null
           realizado_em: string | null
           status: string | null
           sub_seq: number | null
@@ -11388,7 +11573,12 @@ export type Database = {
         Args: { p_go_live_real?: string; p_journey_id: string }
         Returns: Json
       }
-      conferencia_saude: { Args: { p_tenant_id: string }; Returns: Json }
+      conferencia_saude:
+        | { Args: { p_tenant_id: string }; Returns: Json }
+        | {
+            Args: { p_conta_integration_id: string; p_tenant_id: string }
+            Returns: Json
+          }
       contrato_anexo_remover: {
         Args: { p_contrato_id: string }
         Returns: string
@@ -11641,6 +11831,10 @@ export type Database = {
         Args: { p_training_id: string }
         Returns: Json
       }
+      delete_onboarding_training_participant: {
+        Args: { p_participant_id: string }
+        Returns: Json
+      }
       dismiss_conversation_notifications: {
         Args: { p_conversation_id: string }
         Returns: number
@@ -11853,6 +12047,21 @@ export type Database = {
         Args: { p_cliente: string; p_data: string; p_tenant: string }
         Returns: number
       }
+      fn_omie_alertar_vinculo_ambiguo: { Args: never; Returns: undefined }
+      fn_omie_notificar_falha: {
+        Args: { p_fila_id: string }
+        Returns: undefined
+      }
+      fn_omie_wpp_extra: {
+        Args: {
+          p_body: string
+          p_event_key: string
+          p_notification_id: string
+          p_tenant_id: string
+          p_title: string
+        }
+        Returns: undefined
+      }
       fn_onb_arquivar_treinos_no_golive: {
         Args: { p_journey_id: string }
         Returns: number
@@ -11862,12 +12071,20 @@ export type Database = {
         Args: { p_journey_id: string }
         Returns: string
       }
+      fn_onb_training_sync_proprietario: {
+        Args: { p_training_id: string }
+        Returns: undefined
+      }
       fn_onb_treinos_em_aberto: {
         Args: { p_parent_ticket_id: string }
         Returns: {
           codigos: string
           qtd: number
         }[]
+      }
+      fn_onb_trilho_resumo: {
+        Args: { p_produto_id?: number; p_tenant_id: string }
+        Returns: Json
       }
       fn_onb_trilho_sla_min: {
         Args: { p_produto_id?: number; p_tenant_id: string }
@@ -12548,10 +12765,12 @@ export type Database = {
           effective_close_min: number
           effective_warn_before: number
           eod_enabled: boolean
+          group_jid: string
           id: string
           inactivity_eod_close_at: string
           inactivity_warning_sent_at: string
           instance_id: string
+          is_group: boolean
           last_customer_message_at: string
           last_operator_message_at: string
           needs_close: boolean
@@ -12989,6 +13208,10 @@ export type Database = {
         Args: { p_recipient_id: string }
         Returns: undefined
       }
+      mark_onboarding_training_realized: {
+        Args: { p_training_id: string }
+        Returns: Json
+      }
       merge_whatsapp_contacts: {
         Args: { p_keep_id: string; p_merge_id: string; p_tenant_id: string }
         Returns: undefined
@@ -13070,8 +13293,14 @@ export type Database = {
             Returns: string
           }
       obter_segredo_cron_espelho: { Args: never; Returns: string }
+      omie_fila_descartar: { Args: { p_fila_id: string }; Returns: Json }
       omie_fila_reprocessar: { Args: { p_fila_id: string }; Returns: Json }
-      omie_fila_status: { Args: { p_tenant_id: string }; Returns: Json }
+      omie_fila_status:
+        | { Args: { p_tenant_id: string }; Returns: Json }
+        | {
+            Args: { p_conta_integration_id: string; p_tenant_id: string }
+            Returns: Json
+          }
       onb_slugify: { Args: { p_txt: string }; Returns: string }
       onboarding_stage_remove: {
         Args: {
@@ -13129,34 +13358,67 @@ export type Database = {
         }
         Returns: Json
       }
-      reconciliacao_fornecedores: {
-        Args: { p_tenant_id: string }
-        Returns: {
-          fornecedor_ds: string
-          fornecedor_id: number
-          qtd: number
-        }[]
-      }
-      reconciliacao_fornecedores_count: {
-        Args: { p_tenant_id: string }
-        Returns: {
-          fornecedor_ds: string
-          fornecedor_id: number
-          qtd: number
-        }[]
-      }
-      reconciliacao_resumo: {
-        Args: { p_fornecedor_ids?: number[]; p_tenant_id: string }
-        Returns: {
-          acao_sugerida: string
-          gerado_em: string
-          qtd: number
-        }[]
-      }
-      reconciliacao_visao_geral: {
-        Args: { p_tenant_id: string }
-        Returns: Json
-      }
+      reconciliacao_fornecedores:
+        | {
+            Args: { p_tenant_id: string }
+            Returns: {
+              fornecedor_ds: string
+              fornecedor_id: number
+              qtd: number
+            }[]
+          }
+        | {
+            Args: { p_conta_integration_id: string; p_tenant_id: string }
+            Returns: {
+              fornecedor_ds: string
+              fornecedor_id: number
+              qtd: number
+            }[]
+          }
+      reconciliacao_fornecedores_count:
+        | {
+            Args: { p_tenant_id: string }
+            Returns: {
+              fornecedor_ds: string
+              fornecedor_id: number
+              qtd: number
+            }[]
+          }
+        | {
+            Args: { p_conta_integration_id: string; p_tenant_id: string }
+            Returns: {
+              fornecedor_ds: string
+              fornecedor_id: number
+              qtd: number
+            }[]
+          }
+      reconciliacao_resumo:
+        | {
+            Args: {
+              p_conta_integration_id: string
+              p_fornecedor_ids?: number[]
+              p_tenant_id: string
+            }
+            Returns: {
+              acao_sugerida: string
+              gerado_em: string
+              qtd: number
+            }[]
+          }
+        | {
+            Args: { p_fornecedor_ids?: number[]; p_tenant_id: string }
+            Returns: {
+              acao_sugerida: string
+              gerado_em: string
+              qtd: number
+            }[]
+          }
+      reconciliacao_visao_geral:
+        | { Args: { p_tenant_id: string }; Returns: Json }
+        | {
+            Args: { p_conta_integration_id: string; p_tenant_id: string }
+            Returns: Json
+          }
       register_conselho_analise: {
         Args: {
           p_alertas_factuais: Json
@@ -13235,16 +13497,24 @@ export type Database = {
         Args: { p_journey_id: string }
         Returns: Json
       }
-      rodar_deteccao_reconciliacao: {
-        Args: { p_tenant_id: string }
-        Returns: number
-      }
+      rodar_deteccao_reconciliacao:
+        | { Args: { p_tenant_id: string }; Returns: number }
+        | {
+            Args: { p_conta_integration_id: string; p_tenant_id: string }
+            Returns: number
+          }
       salvar_data_corte_omie: {
         Args: { p_data: string; p_tenant_id: string }
         Returns: string
       }
       salvar_integracao_omie: {
-        Args: { p_ativar?: boolean; p_chave: string; p_tenant_id?: string }
+        Args: {
+          p_ativar?: boolean
+          p_chave: string
+          p_integration_id?: string
+          p_tenant_id?: string
+          p_unidades_base_ids?: number[]
+        }
         Returns: Json
       }
       scan_ura_battle_conversations: {
@@ -13424,6 +13694,10 @@ export type Database = {
         Args: { p_participant_id: string; p_role_id: string }
         Returns: Json
       }
+      set_onboarding_training_attendance: {
+        Args: { p_presencas: Json; p_training_id: string }
+        Returns: Json
+      }
       set_unidade_default_filter: {
         Args: { p_unidade_id: number }
         Returns: undefined
@@ -13437,28 +13711,51 @@ export type Database = {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: boolean
       }
-      snapshot_reconciliacao_ds: {
-        Args: { p_tenant_id: string }
-        Returns: {
-          cnpj_norm: string
-          dia_vencimento: number
-          ds_contract_id: string
-          ds_customer_id: string
-          modelo: string
-          multi_contrato: boolean
-          numero: string
-          passa_validacao: boolean
-          qtd_contratos_ativos_cliente: number
-          qtd_itens: number
-          razao_social: string
-          sincroniza_omie: boolean
-          tem_datas: boolean
-          tem_modelo: boolean
-          valor_mrr: number
-          vigencia_final: string
-          vigencia_inicial: string
-        }[]
-      }
+      snapshot_reconciliacao_ds:
+        | {
+            Args: { p_tenant_id: string }
+            Returns: {
+              cnpj_norm: string
+              dia_vencimento: number
+              ds_contract_id: string
+              ds_customer_id: string
+              modelo: string
+              multi_contrato: boolean
+              numero: string
+              passa_validacao: boolean
+              qtd_contratos_ativos_cliente: number
+              qtd_itens: number
+              razao_social: string
+              sincroniza_omie: boolean
+              tem_datas: boolean
+              tem_modelo: boolean
+              valor_mrr: number
+              vigencia_final: string
+              vigencia_inicial: string
+            }[]
+          }
+        | {
+            Args: { p_conta_integration_id: string; p_tenant_id: string }
+            Returns: {
+              cnpj_norm: string
+              dia_vencimento: number
+              ds_contract_id: string
+              ds_customer_id: string
+              modelo: string
+              multi_contrato: boolean
+              numero: string
+              passa_validacao: boolean
+              qtd_contratos_ativos_cliente: number
+              qtd_itens: number
+              razao_social: string
+              sincroniza_omie: boolean
+              tem_datas: boolean
+              tem_modelo: boolean
+              valor_mrr: number
+              vigencia_final: string
+              vigencia_inicial: string
+            }[]
+          }
       soft_delete_ticket: { Args: { p_ticket_id: string }; Returns: undefined }
       solicitar_sync_omie: { Args: { p_contrato_id: string }; Returns: Json }
       start_conversation_from_ticket: {
@@ -13646,6 +13943,19 @@ export type Database = {
         }
         Returns: string
       }
+      upsert_onboarding_training_participant: {
+        Args: {
+          p_cliente_contato_id?: string
+          p_email?: string
+          p_fone?: string
+          p_nome: string
+          p_participant_id?: string
+          p_salvar_no_cliente?: boolean
+          p_tipo?: string
+          p_training_id: string
+        }
+        Returns: Json
+      }
       upsert_tenant_conselho_config: {
         Args: {
           p_cache_horas?: number
@@ -13690,6 +14000,14 @@ export type Database = {
         Args: { p_instance_id: string; p_phone: string; p_tenant_id: string }
         Returns: Json
       }
+      wa_conversation_bucket: {
+        Args: {
+          p_attendance_status: string
+          p_conversation_status: string
+          p_opened_out_of_hours: boolean
+        }
+        Returns: string
+      }
       wa_open_or_reuse_conversation: {
         Args: {
           p_cliente_id?: string
@@ -13701,20 +14019,102 @@ export type Database = {
         }
         Returns: Json
       }
+      wa_pill_scope: {
+        Args: {
+          p_assigned_to?: string
+          p_auto_reply_disabled_only?: boolean
+          p_closed_visible_to?: string
+          p_department_id?: string
+          p_instance_id?: string
+          p_instance_ids?: string[]
+          p_rules_disabled_only?: boolean
+          p_status?: string
+          p_tenant_id: string
+          p_unassigned?: boolean
+        }
+        Returns: {
+          awaiting: boolean
+          conversation_id: string
+          pills: string[]
+          unread_count: number
+        }[]
+      }
       whatsapp_group_unread_sum: {
         Args: { p_tenant_id: string }
         Returns: number
       }
+      whatsapp_list_conversations: {
+        Args: {
+          p_assigned_to?: string
+          p_auto_reply_disabled_only?: boolean
+          p_bucket?: string
+          p_closed_visible_to?: string
+          p_department_id?: string
+          p_include_ids?: string[]
+          p_instance_id?: string
+          p_instance_ids?: string[]
+          p_is_group?: boolean
+          p_limit?: number
+          p_offset?: number
+          p_rules_disabled_only?: boolean
+          p_status?: string
+          p_tenant_id: string
+          p_unassigned?: boolean
+          p_unread_only?: boolean
+        }
+        Returns: {
+          bucket: string
+          contact: Json
+          conversation: Json
+        }[]
+      }
+      whatsapp_list_queue: {
+        Args: {
+          p_department_id?: string
+          p_instance_id?: string
+          p_instance_ids?: string[]
+          p_limit?: number
+          p_offset?: number
+          p_status?: string
+          p_tenant_id: string
+          p_unread_only?: boolean
+        }
+        Returns: {
+          bucket: string
+          contact: Json
+          conversation: Json
+          queue_since: string
+        }[]
+      }
       whatsapp_mark_bucket_read: {
         Args: {
+          p_assigned_to?: string
+          p_auto_reply_disabled_only?: boolean
           p_bucket: string
+          p_closed_visible_to?: string
           p_department_id?: string
+          p_instance_id?: string
+          p_instance_ids?: string[]
+          p_rules_disabled_only?: boolean
+          p_status?: string
           p_tenant_id: string
+          p_unassigned?: boolean
         }
         Returns: number
       }
       whatsapp_pill_counts: {
-        Args: { p_department_id?: string; p_tenant_id: string }
+        Args: {
+          p_assigned_to?: string
+          p_auto_reply_disabled_only?: boolean
+          p_closed_visible_to?: string
+          p_department_id?: string
+          p_instance_id?: string
+          p_instance_ids?: string[]
+          p_rules_disabled_only?: boolean
+          p_status?: string
+          p_tenant_id: string
+          p_unassigned?: boolean
+        }
         Returns: {
           aguardando: number
           bucket: string
@@ -13922,9 +14322,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       contrato_tipo: ["base", "aditivo"],
@@ -14011,4 +14408,3 @@ export const Constants = {
     },
   },
 } as const
-
