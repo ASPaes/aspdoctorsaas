@@ -252,8 +252,12 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
   const { conversations, isLoading, loadMore, hasMore, isLoadingMore } = useWhatsAppConversations({
     instanceId: isGroupsPill ? undefined : filters.instanceId,
-    departmentId: isGroupsPill ? undefined : (selectedDepartmentId || undefined),
-    instanceIds: isGroupsPill ? undefined : (selectedDepartmentId ? undefined : (filteredInstanceIds ?? undefined)),
+    // Grupo tem setor (whatsapp_groups.department_id) e a conversa o herda, entao
+    // a pill Grupos deixou de dispensar o setor: o grupo do setor A nao aparece
+    // mais para quem esta no setor B. Grupo sem setor continua visivel a todos —
+    // quem garante isso e o "OR c.department_id IS NULL" da propria RPC.
+    departmentId: selectedDepartmentId || undefined,
+    instanceIds: selectedDepartmentId ? undefined : (filteredInstanceIds ?? undefined),
     status: isGroupsPill ? undefined : filters.status,
     assignedTo: queueLikePills ? undefined : resolvedAssignedTo,
     unassigned: isGroupsPill || queueLikePills ? undefined : (resolvedUnassigned || undefined),
@@ -320,7 +324,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   //
   // Os filtros vão inteiros para o servidor; quais pills respeitam quais é
   // decisão de wa_pill_scope, a mesma que o bloco de parâmetros da lista acima
-  // já faz (Fila ignora operador, Grupos ignoram setor/instância/status).
+  // já faz (Fila ignora operador, Grupos ignoram instância/status — mas SEGUEM
+  // o setor desde que o grupo passou a ter setor próprio).
   const pillCountFilters = useMemo(
     () => ({
       assignedTo: resolvedAssignedTo,
@@ -392,14 +397,25 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     setPillAutoSet(true);
   }, [isLoading, conversations, attendanceMap, pillAutoSet, saved?.activePill]);
 
+  // A busca por contato (search_conversations_by_contact) não recebe setor —
+  // sem este filtro, o operador não veria o grupo de outro setor na lista mas o
+  // acharia digitando o nome. Mesma regra da lista: department_id NULL passa.
+  const visibleSearchResults = useMemo(() => {
+    if (!selectedDepartmentId) return searchResults;
+    return searchResults.filter(
+      (c) => !c.department_id || c.department_id === selectedDepartmentId
+    );
+  }, [searchResults, selectedDepartmentId]);
+
   const filtered = useMemo(() => {
     let result = [...conversations];
 
     // Department filtering (skip for after_hours which is tenant-wide).
-    // Grupos são visíveis para TODOS os agentes do tenant, independente de setor.
+    // Grupo entra aqui como qualquer conversa: o setor vem de whatsapp_groups e a
+    // conversa o herda. Grupo sem setor tem department_id NULL e passa pelo IF de
+    // baixo, continuando visível para todos.
     if (selectedDepartmentId && activePill !== "after_hours") {
       result = result.filter(c => {
-        if ((c as any).is_group === true) return true;
         const state = stateMap.get(c.id);
         if (state?.department_id && state.department_id !== selectedDepartmentId) return false;
         return true;
@@ -883,7 +899,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
               </div>
             ))}
           </div>
-        ) : (isSearching ? searchResults : filtered).length === 0 ? (
+        ) : (isSearching ? visibleSearchResults : filtered).length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <MessageSquare className="h-10 w-10 mb-2 opacity-50" />
             <p className="text-sm">
@@ -911,7 +927,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
                     {!collapsedAgents.has(group.key) && group.convs.map(renderConversation)}
                   </div>
                 ))
-              : (isSearching ? searchResults : filtered).map(renderConversation)}
+              : (isSearching ? visibleSearchResults : filtered).map(renderConversation)}
 
             {/* Paginação real: sem isto o servidor pagina e o usuário nunca passa
                 da primeira página — era assim que conversa encerrada antiga ficava

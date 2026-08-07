@@ -9412,6 +9412,7 @@ export type Database = {
       whatsapp_groups: {
         Row: {
           created_at: string
+          department_id: string | null
           disabled_at: string | null
           disabled_by: string | null
           enabled: boolean
@@ -9431,6 +9432,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          department_id?: string | null
           disabled_at?: string | null
           disabled_by?: string | null
           enabled?: boolean
@@ -9450,6 +9452,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          department_id?: string | null
           disabled_at?: string | null
           disabled_by?: string | null
           enabled?: boolean
@@ -9468,6 +9471,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "whatsapp_groups_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "whatsapp_groups_instance_id_fkey"
             columns: ["instance_id"]

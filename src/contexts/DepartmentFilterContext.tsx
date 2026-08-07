@@ -4,7 +4,15 @@ import { useDepartmentInstances } from "@/components/whatsapp/hooks/useSupportDe
 import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { useAuth } from "@/contexts/AuthContext";
 
-const STORAGE_KEY = "whatsapp-selected-department";
+// Legado: chave GLOBAL em localStorage — não tinha user_id, então em máquina
+// compartilhada um usuário herdava o setor do anterior. Só removemos daqui pra frente.
+const LEGACY_STORAGE_KEY = "whatsapp-selected-department";
+
+// A escolha manual de admin/head vale para a SESSÃO, não para sempre: ao entrar no
+// sistema o setor volta a ser o do cadastro (funcionarios.department_id). Por isso
+// sessionStorage, e por usuário.
+const sessionKeyFor = (userId?: string | null) =>
+  `whatsapp-selected-department:${userId ?? "anon"}`;
 
 interface DepartmentFilterContextValue {
   departments: AllowedDepartment[];
@@ -26,23 +34,22 @@ export function DepartmentFilterProvider({ children }: { children: React.ReactNo
   const { profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
 
-  const [selectedDepartmentId, setSelectedDepartmentIdRaw] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY) || null;
-    } catch {
-      return null;
-    }
-  });
+  const userId = profile?.user_id ?? null;
+  const sessionKey = sessionKeyFor(userId);
+
+  const [selectedDepartmentId, setSelectedDepartmentIdRaw] = useState<string | null>(null);
 
   const [defaultApplied, setDefaultApplied] = useState(false);
 
   const setSelectedDepartmentId = useCallback((id: string | null) => {
     setSelectedDepartmentIdRaw(id);
     try {
-      if (id) localStorage.setItem(STORAGE_KEY, id);
-      else localStorage.removeItem(STORAGE_KEY);
+      // "Todos os setores" precisa ser gravado como escolha explícita ("__all__"),
+      // senão o remove faria o default do cadastro voltar no próximo render.
+      sessionStorage.setItem(sessionKey, id ?? "__all__");
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
     } catch {}
-  }, []);
+  }, [sessionKey]);
 
   const { data: departments = [], isLoading } = useAllowedDepartments();
   const { data: userDepartmentId, isLoading: userDeptLoading } = useUserDepartment();
@@ -62,11 +69,22 @@ export function DepartmentFilterProvider({ children }: { children: React.ReactNo
     }
 
     if (canSeeAllDepartments) {
-      // Admin: use stored value or null (= "Todos")
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored && departments.find((d) => d.id === stored)) {
+      // Admin/head: o padrão ao entrar é o setor do próprio cadastro
+      // (funcionarios.department_id) — o mesmo campo que já trava o operador.
+      // Uma troca feita nesta sessão tem precedência; ao logar de novo, volta ao padrão.
+      let stored: string | null = null;
+      try {
+        stored = sessionStorage.getItem(sessionKey);
+      } catch {}
+
+      if (stored === "__all__") {
+        setSelectedDepartmentIdRaw(null);
+      } else if (stored && departments.find((d) => d.id === stored)) {
         setSelectedDepartmentIdRaw(stored);
+      } else if (userDepartmentId && departments.find((d) => d.id === userDepartmentId)) {
+        setSelectedDepartmentIdRaw(userDepartmentId);
       } else {
+        // Sem setor no cadastro: continua caindo em "Todos", como antes.
         setSelectedDepartmentIdRaw(null);
       }
     } else {
@@ -79,7 +97,13 @@ export function DepartmentFilterProvider({ children }: { children: React.ReactNo
       }
     }
     setDefaultApplied(true);
-  }, [userDepartmentId, userDeptLoading, departments, isLoading, defaultApplied, canSeeAllDepartments]);
+  }, [userDepartmentId, userDeptLoading, departments, isLoading, defaultApplied, canSeeAllDepartments, sessionKey]);
+
+  // Troca de usuário na mesma aba (logout/login) tem que reaplicar o padrão do novo.
+  useEffect(() => {
+    setDefaultApplied(false);
+    setSelectedDepartmentIdRaw(null);
+  }, [userId]);
 
   // Effective selected department id - enforced for non-admins
   const effectiveSelectedId = useMemo(() => {

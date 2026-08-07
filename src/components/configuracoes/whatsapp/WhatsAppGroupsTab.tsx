@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
+import { useSupportDepartments } from "@/components/whatsapp/hooks/useSupportDepartments";
 import { formatDateLabel } from "@/lib/formatDateWithTimezone";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,10 @@ interface WhatsAppGroup {
   last_synced_at?: string | null;
   disabled_by?: string | null;
   disabled_at?: string | null;
+  department_id?: string | null;
 }
+
+const NO_DEPARTMENT = "__none__";
 
 export default function WhatsAppGroupsTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -72,7 +76,7 @@ export default function WhatsAppGroupsTab() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("whatsapp_groups")
-        .select("id, group_jid, group_name, group_picture_url, participant_count, enabled, retention_days, last_synced_at, disabled_by, disabled_at")
+        .select("id, group_jid, group_name, group_picture_url, participant_count, enabled, retention_days, last_synced_at, disabled_by, disabled_at, department_id")
         .eq("tenant_id", tid)
         .eq("instance_id", selectedInstanceId)
         .order("group_name");
@@ -80,6 +84,8 @@ export default function WhatsAppGroupsTab() {
       return (data ?? []) as WhatsAppGroup[];
     },
   });
+
+  const { data: departments, isLoading: departmentsLoading } = useSupportDepartments();
 
   const { data: groupAttendanceConfig } = useQuery({
     queryKey: ["group-attendance-config", tid],
@@ -210,6 +216,27 @@ export default function WhatsAppGroupsTab() {
     },
   });
 
+  // Setor do grupo: define quem enxerga a conversa no chat e quem recebe notificacao.
+  // A conversa herda esse setor no banco (trg_zz_group_department) e a troca propaga
+  // para as conversas existentes (trg_propagate_group_department).
+  const updateDepartmentMutation = useMutation({
+    mutationFn: async ({ groupId, departmentId }: { groupId: string; departmentId: string | null }) => {
+      const { error } = await (supabase as any)
+        .from("whatsapp_groups")
+        .update({ department_id: departmentId, updated_at: new Date().toISOString() })
+        .eq("id", groupId)
+        .eq("tenant_id", tid);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-groups", selectedInstanceId, tid] });
+      toast.success("Setor do grupo atualizado");
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Erro ao atualizar setor do grupo");
+    },
+  });
+
   const updateRetentionMutation = useMutation({
     mutationFn: async ({ groupId, retentionDays }: { groupId: string; retentionDays: number }) => {
       const clamped = Math.min(90, Math.max(1, retentionDays));
@@ -294,7 +321,9 @@ export default function WhatsAppGroupsTab() {
         <CardHeader>
           <CardTitle>Grupos WhatsApp</CardTitle>
           <CardDescription>
-            Sincronize e gerencie quais grupos recebem mensagens nesta instância.
+            Sincronize e gerencie quais grupos recebem mensagens nesta instância. O setor define quem vê
+            o grupo no chat e quem recebe notificação dele — em "Todos os setores", o grupo continua
+            visível e notificando a equipe inteira.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -388,7 +417,41 @@ export default function WhatsAppGroupsTab() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-4">
+                      {isEnabled && (
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-muted-foreground whitespace-nowrap">
+                            Setor
+                          </label>
+                          <Select
+                            value={group.department_id ?? NO_DEPARTMENT}
+                            onValueChange={(v) =>
+                              updateDepartmentMutation.mutate({
+                                groupId: group.id,
+                                departmentId: v === NO_DEPARTMENT ? null : v,
+                              })
+                            }
+                            disabled={
+                              departmentsLoading ||
+                              (updateDepartmentMutation.isPending &&
+                                updateDepartmentMutation.variables?.groupId === group.id)
+                            }
+                          >
+                            <SelectTrigger className="w-44 h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={NO_DEPARTMENT}>Todos os setores</SelectItem>
+                              {departments?.map((d) => (
+                                <SelectItem key={d.id} value={d.id}>
+                                  {d.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
                       {isEnabled && (
                         <div className="flex items-center gap-2">
                           <label htmlFor={`retention-${group.id}`} className="text-xs text-muted-foreground whitespace-nowrap">
