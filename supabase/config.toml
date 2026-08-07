@@ -142,3 +142,46 @@ verify_jwt = false
 # deployaria com o padrao true e mataria o cron do espelho em silencio.
 [functions.recon-espelho-pull-cron]
 verify_jwt = false
+
+# ==============================================================================
+# 07/08/2026 — verify_jwt = TRUE EXPLICITO.
+#
+# Este arquivo so listava as functions com verify_jwt=false, na crenca de que o padrao do CI
+# fosse true. E o contrario: deployar um slug ausente daqui grava verify_jwt=FALSE.
+# Medido no push da F2b -- as 10 functions abaixo entraram no repo com true em producao e
+# sairam do deploy com false. Nenhuma das 73 ja declaradas se mexeu.
+#
+# Todas fazem auth por dentro (auth.getUser, e a recon-omie-escrever tambem checa papel e
+# tenant), entao nao houve acesso a dado -- mas o portao do gateway sumiu sem ninguem decidir.
+# Declarar true e o unico jeito de nao depender do padrao.
+# ==============================================================================
+
+[functions.omie-integration-call]
+verify_jwt = true
+
+[functions.omie-integration-save]
+verify_jwt = true
+
+[functions.recon-atribuir-modelo-lote]
+verify_jwt = true
+
+[functions.recon-atualizar-valor-ds]
+verify_jwt = true
+
+[functions.recon-candidato-confirmar]
+verify_jwt = true
+
+[functions.recon-candidatos-listar]
+verify_jwt = true
+
+[functions.recon-espelho-pull]
+verify_jwt = true
+
+[functions.recon-omie-escrever]
+verify_jwt = true
+
+[functions.recon-vincular-lote]
+verify_jwt = true
+
+[functions.recon-vincular-unitario]
+verify_jwt = true

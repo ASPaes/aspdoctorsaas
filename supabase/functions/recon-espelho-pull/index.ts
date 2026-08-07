@@ -1,3 +1,7 @@
+// verify_jwt = true declarado em supabase/config.toml (07/08/2026). Medido: o CI deploya com
+// verify_jwt=FALSE quando o slug nao esta no config.toml -- nao com true, como se acreditava. Foi
+// assim que esta function perdeu o portao de JWT do gateway ao entrar no repo. A auth interna
+// (auth.getUser + papel) sempre existiu e continua, mas o portao volta a ser explicito aqui.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // recon-espelho-pull v5 (07/08/2026): UMA CONTA OMIE POR UNIDADE BASE.
 //

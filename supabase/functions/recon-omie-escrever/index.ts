@@ -1,3 +1,7 @@
+// verify_jwt = true declarado em supabase/config.toml (07/08/2026). Medido: o CI deploya com
+// verify_jwt=FALSE quando o slug nao esta no config.toml -- nao com true, como se acreditava. Foi
+// assim que esta function perdeu o portao de JWT do gateway ao entrar no repo. A auth interna
+// (auth.getUser + papel) sempre existiu e continua, mas o portao volta a ser explicito aqui.
 // recon-omie-escrever — CONTA OMIE POR UNIDADE BASE (07/08/2026).
 // A conta vem do CONTRATO (cliente -> unidade). Alem da chave, o kill switch
 // (integracao_pausada) e a data de corte (integrar_a_partir_de) passam a ser lidos DA CONTA:
