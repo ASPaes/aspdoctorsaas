@@ -1,4 +1,24 @@
-// omie-sync-processar — PROCESSADOR DA FILA (peca 3 final, Caminho D) — v12
+// omie-sync-processar — PROCESSADOR DA FILA (peca 3 final, Caminho D) — v13
+//
+// v13 (07/08/2026) — UMA CONTA OMIE POR UNIDADE BASE.
+//     O tenant Digi Office passa a ter DUAS contas Omie (Digi Office e Digi Up), cada uma com
+//     chave, de/para e espelho proprios. Esta funcao iterava por LINHA de omie_integration mas
+//     resolvia tudo por tenant_id -- com 2 linhas, cada uma das tres coisas abaixo quebrava ou
+//     misturava:
+//       (a) obter_chave_omie_sistema(tenant) levanta excecao com 2 contas (por desenho, para nao
+//           escolher a chave errada em silencio). As DUAS voltas do loop morriam em
+//           'sem_chave_omie' e a fila da Digi Office -- que ja roda com 698 contratos vinculados
+//           -- parava inteira. Agora a chave vem de obter_chave_omie_por_conta(conta.id).
+//       (b) a fila era selecionada por tenant_id: as duas voltas pegavam os MESMOS itens e
+//           mandavam contrato da Digi Up com a chave da Digi Office (ou o contrario). Agora
+//           filtra por conta_integration_id, que o enfileirar_sync_omie ja carimba desde a
+//           migration de 06/08 (resolve pela clientes.unidade_base_id).
+//       (c) PIOR: o freio de 425 (Omie recusando por excesso de chamadas) gravava
+//           omie_bloqueado_ate com .eq("tenant_id"), ou seja, o Omie da Digi Up estourando o
+//           limite congelava por 35 minutos a integracao da Digi Office. Agora e .eq("id").
+//     Linha de fila sem conta nao e processada -- seria adivinhar a chave. Elas nao existem
+//     (a migration fez o backfill e o enfileirar sempre carimba), mas o resumo devolve a
+//     contagem em `fila_sem_conta` em vez de sumir com elas em silencio.
 //
 // v12 (04/08/2026) — CANCELAMENTO IDEMPOTENTE + primeira versao NO REPO.
 //     (a) Cancelar o que o Omie JA tem em situacao 99 passa a ser SUCESSO, nao bloqueio. Os dois
@@ -139,24 +159,27 @@ Deno.serve(async (req)=>{
   const service = createClient(Deno.env.get("SUPABASE_URL"), Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
   try {
     const agora = new Date().toISOString();
-    const { data: tenants, error: tenantsErr } = await service.from("omie_integration").select("tenant_id, sync_lote_tamanho, sync_max_tentativas, vault_secret_id, omie_bloqueado_ate, sync_contratos_teste").eq("sync_automatica_ativa", true).eq("integracao_pausada", false);
-    if (tenantsErr) {
-      console.error("ERRO_TENANTS:", tenantsErr.message);
+    // v13: a unidade de trabalho e a CONTA (linha de omie_integration), nao o tenant. Um tenant
+    // pode ter varias -- uma por unidade base -- e cada uma tem chave, de/para e freio proprios.
+    const { data: contas, error: contasErr } = await service.from("omie_integration").select("id, tenant_id, unidades_base_ids, sync_lote_tamanho, sync_max_tentativas, vault_secret_id, omie_bloqueado_ate, sync_contratos_teste").eq("sync_automatica_ativa", true).eq("integracao_pausada", false);
+    if (contasErr) {
+      console.error("ERRO_CONTAS:", contasErr.message);
       return json({
         ok: false,
         error: "Falha ao ler configuracao."
       }, 500);
     }
-    if (!tenants || tenants.length === 0) {
+    if (!contas || contas.length === 0) {
       return json({
         ok: true,
-        resultado: "nenhum_tenant_ativo"
+        resultado: "nenhuma_conta_ativa"
       }, 200);
     }
     const resumo = [];
-    for (const t of tenants){
+    for (const t of contas){
       if (t.omie_bloqueado_ate && new Date(t.omie_bloqueado_ate) > new Date()) {
         resumo.push({
+          conta_id: t.id,
           tenant_id: t.tenant_id,
           pulado: "omie_bloqueado",
           ate: t.omie_bloqueado_ate
@@ -165,19 +188,24 @@ Deno.serve(async (req)=>{
       }
       const lote = t.sync_lote_tamanho ?? 5;
       const maxTent = t.sync_max_tentativas ?? 5;
-      const { data: chaveData, error: chaveErr } = await service.rpc("obter_chave_omie_sistema", {
-        p_tenant_id: t.tenant_id
+      // v13: chave DA CONTA. obter_chave_omie_sistema(tenant) levantaria excecao com 2 contas.
+      const { data: chaveData, error: chaveErr } = await service.rpc("obter_chave_omie_por_conta", {
+        p_integration_id: t.id
       });
       const chave = typeof chaveData === "string" && chaveData ? chaveData : null;
       if (chaveErr || !chave) {
+        console.error("SEM_CHAVE_OMIE conta=" + t.id, chaveErr?.message ?? "vault vazio");
         resumo.push({
+          conta_id: t.id,
           tenant_id: t.tenant_id,
           erro: "sem_chave_omie"
         });
         continue;
       }
       const listaTeste = Array.isArray(t.sync_contratos_teste) && t.sync_contratos_teste.length > 0 ? t.sync_contratos_teste : null;
-      let q = service.from("omie_sync_fila").select("id, contrato_id, tentativas, origem, campos_alterados").eq("tenant_id", t.tenant_id).in("status", [
+      // v13: por CONTA. Filtrar por tenant faria as duas voltas do loop pegarem os mesmos itens
+      // e mandarem contrato de uma unidade com a chave da outra.
+      let q = service.from("omie_sync_fila").select("id, contrato_id, tentativas, origem, campos_alterados").eq("tenant_id", t.tenant_id).eq("conta_integration_id", t.id).in("status", [
         "pendente",
         "erro"
       ]).lte("proxima_tentativa_em", agora);
@@ -190,6 +218,7 @@ Deno.serve(async (req)=>{
       if (itensErr) {
         console.error("ERRO_ITENS:", itensErr.message);
         resumo.push({
+          conta_id: t.id,
           tenant_id: t.tenant_id,
           erro: "falha_ao_selecionar"
         });
@@ -197,6 +226,7 @@ Deno.serve(async (req)=>{
       }
       if (!itens || itens.length === 0) {
         resumo.push({
+          conta_id: t.id,
           tenant_id: t.tenant_id,
           pegou: 0,
           modo: listaTeste ? "teste" : "producao"
@@ -220,6 +250,7 @@ Deno.serve(async (req)=>{
       if (claimErr) {
         console.error("ERRO_CLAIM:", claimErr.message);
         resumo.push({
+          conta_id: t.id,
           tenant_id: t.tenant_id,
           erro: "falha_no_claim"
         });
@@ -227,6 +258,7 @@ Deno.serve(async (req)=>{
       }
       if (!claimed || claimed.length === 0) {
         resumo.push({
+          conta_id: t.id,
           tenant_id: t.tenant_id,
           pegou: 0,
           motivo: "claim_vazio"
@@ -311,9 +343,11 @@ Deno.serve(async (req)=>{
             await service.from("omie_sync_fila").update({
               status: "pendente"
             }).eq("id", item.id);
+            // v13: freia SO esta conta. Com .eq("tenant_id"), o Omie de uma unidade estourando o
+            // limite congelava a integracao da outra por 35 minutos.
             await service.from("omie_integration").update({
               omie_bloqueado_ate: new Date(Date.now() + BLOQUEIO_425_MIN * 60_000).toISOString()
-            }).eq("tenant_id", t.tenant_id);
+            }).eq("id", t.id);
             parou425 = true;
             break;
           }
@@ -401,9 +435,10 @@ Deno.serve(async (req)=>{
               await service.from("omie_sync_fila").update({
                 status: "pendente"
               }).eq("id", item.id);
+              // v13: idem -- freio por conta, nao por tenant.
               await service.from("omie_integration").update({
                 omie_bloqueado_ate: new Date(Date.now() + BLOQUEIO_425_MIN * 60_000).toISOString()
-              }).eq("tenant_id", t.tenant_id);
+              }).eq("id", t.id);
               parou425 = true;
               break;
             }
@@ -459,6 +494,7 @@ Deno.serve(async (req)=>{
         }).in("id", claimedIds).eq("status", "processando");
       }
       resumo.push({
+        conta_id: t.id,
         tenant_id: t.tenant_id,
         pegou: claimed.length,
         modo: listaTeste ? "teste" : "producao",
@@ -479,10 +515,23 @@ Deno.serve(async (req)=>{
         } : {}
       });
     }
+    // v13: linha de fila sem conta nao e processada -- nao da para adivinhar com qual chave o
+    // contrato deveria ir. Nao deveria existir nenhuma (migration + enfileirar_sync_omie
+    // carimbam), mas se aparecer, aparece AQUI e nao em silencio.
+    const { count: semConta } = await service.from("omie_sync_fila").select("id", {
+      count: "exact",
+      head: true
+    }).is("conta_integration_id", null).in("status", [
+      "pendente",
+      "erro"
+    ]);
     return json({
       ok: true,
       resultado: "processado",
-      resumo
+      resumo,
+      ...semConta ? {
+        fila_sem_conta: semConta
+      } : {}
     }, 200);
   } catch (e) {
     const msg = e?.message ?? String(e);
