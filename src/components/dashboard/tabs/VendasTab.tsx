@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import {
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, ComposedChart, Line,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, ComposedChart, Line, LabelList,
 } from 'recharts';
 import type { KPIMetrics, DistributionData, DistributionDataPoint, NovoClienteListItem, DashboardFilters } from '../types';
 import { NovosClientesTable } from '../tables/NovosClientesTable';
@@ -218,6 +218,7 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
       <Card>
         <CardHeader className={tvMode ? 'pb-2' : ''}>
           <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Evolução de vendas — 12 meses</CardTitle>
+          <p className={cn('text-muted-foreground', tvMode ? 'text-sm' : 'text-xs')}>O número acima de cada barra é a quantidade de vendas do mês.</p>
         </CardHeader>
         <CardContent>
           {serieData.length === 0 ? (
@@ -225,7 +226,7 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
           ) : (
             <div style={{ height: 280 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={serieData} margin={{ top: 10, right: 20, bottom: 5, left: 0 }}>
+                <ComposedChart data={serieData} margin={{ top: 22, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
                   <XAxis dataKey="mes" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
                   <YAxis yAxisId="l" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
@@ -257,7 +258,16 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
                     }}
                   />
                   <Legend wrapperStyle={{ fontSize: tvMode ? 14 : 11 }} />
-                  <Bar yAxisId="l" dataKey="new_mrr" name="New MRR" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <Bar yAxisId="l" dataKey="new_mrr" name="New MRR" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]}>
+                    <LabelList
+                      dataKey="qtd"
+                      position="top"
+                      offset={6}
+                      fill="hsl(var(--muted-foreground))"
+                      fontSize={tvMode ? 14 : 11}
+                      formatter={(v: number) => (v > 0 ? String(v) : '')}
+                    />
+                  </Bar>
                   <Line yAxisId="r" dataKey="ticket" name="Ticket médio" stroke="hsl(var(--chart-2, 199 89% 48%))" strokeWidth={2} dot={false} />
                 </ComposedChart>
               </ResponsiveContainer>
