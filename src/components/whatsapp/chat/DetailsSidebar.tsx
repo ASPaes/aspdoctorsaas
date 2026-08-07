@@ -630,10 +630,14 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
 
           {/* ─── 14. Não encerrar por inatividade ─── */}
           {/* Vale igual em grupo: a fila do motor (get_inactive_attendances_to_process)
-              filtra inactivity_hold para 1:1 e grupo na mesma clausula. */}
-          {relevantAttendanceId && !isRelevantClosed && (
-            <InactivityHoldSection attendanceId={relevantAttendanceId} />
-          )}
+              filtra inactivity_hold para 1:1 e grupo na mesma clausula.
+              O card aparece SEMPRE (1:1 e grupo). inactivity_hold e coluna do
+              atendimento, entao sem atendimento aberto nao ha onde gravar: o switch
+              fica desligado e explica. Antes a secao inteira sumia, e em grupo — que
+              passa a maior parte do tempo sem atendimento aberto — parecia nao existir. */}
+          <InactivityHoldSection
+            attendanceId={relevantAttendanceId && !isRelevantClosed ? relevantAttendanceId : null}
+          />
 
           {/* ─── 15. Regras do sistema ─── */}
           {/* Grupo tem contato proprio (phone_number = JID em digitos), entao a flag
@@ -883,14 +887,21 @@ function GroupAttendancesSection({
 }
 
 /* ─── Inactivity hold toggle for the current open attendance ─── */
-function InactivityHoldSection({ attendanceId }: { attendanceId: string }) {
+function InactivityHoldSection({ attendanceId }: { attendanceId: string | null }) {
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [localValue, setLocalValue] = useState<boolean | null>(null);
 
+  // Troca de conversa/atendimento zera o otimista — senão o card herdava o estado
+  // do atendimento anterior enquanto a query nova não voltava.
+  useEffect(() => {
+    setLocalValue(null);
+  }, [attendanceId]);
+
   const { data: att } = useQuery({
     queryKey: ["attendance-inactivity-hold", attendanceId],
     staleTime: 30_000,
+    enabled: !!attendanceId,
     queryFn: async () => {
       const { data } = await (supabase.from("support_attendances" as any) as any)
         .select("inactivity_hold")
@@ -900,9 +911,10 @@ function InactivityHoldSection({ attendanceId }: { attendanceId: string }) {
     },
   });
 
-  const effective = localValue ?? (att?.inactivity_hold === true);
+  const effective = !!attendanceId && (localValue ?? (att?.inactivity_hold === true));
 
   const handleToggle = async (v: boolean) => {
+    if (!attendanceId) return;
     setSaving(true);
     setLocalValue(v);
     try {
@@ -927,13 +939,18 @@ function InactivityHoldSection({ attendanceId }: { attendanceId: string }) {
           <TimerOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <span className="text-xs font-medium">Não encerrar por inatividade</span>
         </div>
-        <Switch checked={effective} disabled={saving} onCheckedChange={handleToggle} />
+        <Switch checked={effective} disabled={saving || !attendanceId} onCheckedChange={handleToggle} />
       </div>
       <p className="text-[10px] text-muted-foreground leading-relaxed">
         Vale só para este atendimento: ele não será encerrado automaticamente por falta de
         interação, nem por falta de resposta do agente. As demais regras continuam ativas.
         Ao encerrar o atendimento, a opção volta ao normal sozinha.
       </p>
+      {!attendanceId && (
+        <p className="text-[10px] text-muted-foreground leading-relaxed">
+          Disponível quando houver um atendimento em andamento nesta conversa.
+        </p>
+      )}
     </div>
   );
 }
