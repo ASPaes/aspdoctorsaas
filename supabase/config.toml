@@ -135,3 +135,10 @@ verify_jwt = false
 # Com verify_jwt=true o gateway barraria a chamada antes de chegar na function.
 [functions.ds-enviar-whatsapp-externo]
 verify_jwt = false
+
+# recon-espelho-pull-cron: chamada pelo pg_cron (via pg_net), que nao tem JWT de usuario.
+# A auth mora dentro da function: segredo dedicado no vault (obter_segredo_cron_espelho),
+# comparado com o Bearer recebido. Producao ja estava com false -- sem esta entrada o CI
+# deployaria com o padrao true e mataria o cron do espelho em silencio.
+[functions.recon-espelho-pull-cron]
+verify_jwt = false
