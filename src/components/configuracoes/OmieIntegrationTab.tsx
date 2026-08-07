@@ -34,6 +34,21 @@ import { OmieContaProvider, type OmieConta } from "./OmieContaContext";
 
 const NOVA = "nova:";
 
+/**
+ * O supabase-js joga o corpo da resposta fora quando a Edge Function devolve não-2xx: sobra
+ * "Edge Function returned a non-2xx status code" e o motivo real — que a função escreveu em
+ * português — some. O corpo continua acessível em `error.context`.
+ */
+async function motivoReal(error: any, resp: any, padrao: string) {
+  try {
+    const corpo = await error?.context?.json?.();
+    if (corpo?.error) return corpo.error as string;
+  } catch {
+    /* corpo não era JSON; cai no padrão */
+  }
+  return resp?.error || error?.message || padrao;
+}
+
 export default function OmieIntegrationTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -134,12 +149,15 @@ export default function OmieIntegrationTab() {
       const { data: resp, error } = await supabase.functions.invoke("omie-integration-save", {
         body: {
           chave: chave.trim(),
+          // Obrigatório: a RPC resolve o tenant pelo PERFIL de quem chama. Super admin simulando
+          // outro tenant salvaria contra o tenant dele. A RPC só aceita outro se for super admin.
+          ...(tid ? { tenant_id: tid } : {}),
           // Conta nova nasce presa à unidade escolhida; conta existente troca a própria chave.
           // Sem um dos dois, o backend só aceita enquanto o tenant tiver uma conta só.
           ...(criandoNova ? { unidade_base_id: unidadeNova } : conta ? { integration_id: conta.id } : {}),
         },
       });
-      if (error) throw error;
+      if (error) throw new Error(await motivoReal(error, resp, "Não foi possível conectar."));
       if (!resp?.ok) throw new Error(resp?.error || "Não foi possível conectar.");
       setChave("");
       setTrocando(false);
@@ -166,7 +184,7 @@ export default function OmieIntegrationTab() {
       const { data: resp, error } = await supabase.functions.invoke("omie-integration-call", {
         body: { acao: "testar", tenant_id: tid, conta_integration_id: conta.id },
       });
-      if (error) throw error;
+      if (error) throw new Error(await motivoReal(error, resp, "Falha ao testar conexão."));
       if (!resp?.ok) throw new Error(resp?.error || "Falha ao testar conexão.");
       if (resp?.resultado?.omie_configurado) {
         toast({ title: "Conexão OK" });

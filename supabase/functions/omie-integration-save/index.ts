@@ -72,6 +72,12 @@ Deno.serve(async (req)=>{
       }, 400);
     }
     const integrationId = typeof body?.integration_id === "string" && body.integration_id ? body.integration_id : null;
+    // v6 (07/08/2026): TENANT DO BODY. Super admin simulando outro tenant salvava contra o
+    // tenant do PROPRIO perfil (ASP), e a validacao nova de unidade estourava com "Unidade base
+    // N nao pertence a este tenant" -- que era verdade, so que do tenant errado.
+    // Quem decide se pode e a RPC: ela so aceita p_tenant_id diferente do proprio se
+    // is_super_admin. Repassar aqui nao afrouxa nada.
+    const tenantAlvo = typeof body?.tenant_id === "string" && body.tenant_id ? body.tenant_id : null;
     // 2) Cliente Supabase COM O TOKEN DO USU\u00c1RIO (pra a RPC enxergar auth.uid() e validar admin)
     const userClient = createClient(Deno.env.get("SUPABASE_URL"), Deno.env.get("SUPABASE_ANON_KEY"), {
       global: {
@@ -116,6 +122,9 @@ Deno.serve(async (req)=>{
     // 4) Chave v\u00e1lida -> chama a RPC (que valida admin, guarda no Vault e grava o ponteiro)
     const { data: rpcData, error: rpcErr } = await userClient.rpc("salvar_integracao_omie", {
       p_chave: chave,
+      ...tenantAlvo ? {
+        p_tenant_id: tenantAlvo
+      } : {},
       ...unidades ? {
         p_unidades_base_ids: unidades
       } : {},
