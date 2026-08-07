@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -313,37 +313,36 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     };
   }, [stateMap, isStatesLoading, attendanceMap]);
 
-  const { data: groupCountData } = useQuery({
-    queryKey: ["whatsapp", "group-counts", tid],
-    staleTime: 60_000,
-    refetchInterval: 60_000,
-    queryFn: async () => {
-      const [{ count: totalGroups }, { count: unreadConvs }, unreadSumResp] = await Promise.all([
-        (supabase.from("whatsapp_conversations" as any) as any)
-          .select("*", { count: "exact", head: true })
-          .eq("tenant_id", tid)
-          .eq("is_group", true)
-          .eq("group_enabled", true),
-        (supabase.from("whatsapp_conversations" as any) as any)
-          .select("*", { count: "exact", head: true })
-          .eq("tenant_id", tid)
-          .eq("is_group", true)
-          .eq("group_enabled", true)
-          .gt("unread_count", 0),
-        (supabase as any).rpc("whatsapp_group_unread_sum", { p_tenant_id: tid }),
-      ]);
-      return {
-        totalGroups: totalGroups || 0,
-        groupsUnreadConvs: unreadConvs || 0,
-        groupsUnreadMsgs: Number(unreadSumResp?.data) || 0,
-      };
-    },
-    enabled: !!tid,
-  });
-
-  // Contagens das pills vêm agregadas do servidor (RPC whatsapp_pill_counts).
-  // Grupos continuam no hook dedicado (a RPC filtra is_group=false).
-  const { data: pillCountsData } = usePillCounts();
+  // Contagens das pills vêm agregadas do servidor (RPC whatsapp_pill_counts),
+  // GRUPOS INCLUSIVE. Antes a pill "Grupos" tinha 3 queries próprias contando só
+  // tenant_id + is_group + group_enabled: ignoravam o filtro de operador que a
+  // lista aplicava, e a pill dizia 40 com 7 grupos na tela (DEM-0258).
+  //
+  // Os filtros vão inteiros para o servidor; quais pills respeitam quais é
+  // decisão de wa_pill_scope, a mesma que o bloco de parâmetros da lista acima
+  // já faz (Fila ignora operador, Grupos ignoram setor/instância/status).
+  const pillCountFilters = useMemo(
+    () => ({
+      assignedTo: resolvedAssignedTo,
+      unassigned: resolvedUnassigned,
+      instanceId: filters.instanceId,
+      instanceIds: selectedDepartmentId ? undefined : (filteredInstanceIds ?? undefined),
+      status: filters.status,
+      autoReplyDisabledOnly: filters.autoReplyDisabledOnly,
+      rulesDisabledOnly: filters.rulesDisabledOnly,
+    }),
+    [
+      resolvedAssignedTo,
+      resolvedUnassigned,
+      filters.instanceId,
+      filters.status,
+      filters.autoReplyDisabledOnly,
+      filters.rulesDisabledOnly,
+      selectedDepartmentId,
+      filteredInstanceIds,
+    ]
+  );
+  const { data: pillCountsData } = usePillCounts(pillCountFilters);
   // Só o destaque visual — o bip e a detecção de borda vivem no AppLayout, um
   // por aplicação. Ler daqui evita um segundo detector tocando o mesmo bip.
   const { justArrived: queueJustArrived } = useQueueAlertState();
@@ -353,10 +352,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     const ip = pillCountsData?.in_progress ?? EMPTY;
     const ah = pillCountsData?.after_hours ?? EMPTY;
     const cl = pillCountsData?.closed ?? EMPTY;
+    const gr = pillCountsData?.groups ?? EMPTY;
     const all = pillCountsData?.all ?? EMPTY;
-    const groupsUnreadMsgs = groupCountData?.groupsUnreadMsgs ?? 0;
-    const groupsUnreadConvs = groupCountData?.groupsUnreadConvs ?? 0;
-    const totalGroups = groupCountData?.totalGroups ?? 0;
     return {
       counts: {
         waiting: { total: w.total, unreadConvs: w.unreadConvs },
@@ -364,20 +361,20 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         after_hours: { total: ah.total, unreadConvs: ah.unreadConvs },
         closed: { total: cl.total, unreadConvs: cl.unreadConvs },
         all: { total: all.total, unreadConvs: all.unreadConvs },
-        groups: { total: totalGroups, unreadConvs: groupsUnreadConvs },
+        groups: { total: gr.total, unreadConvs: gr.unreadConvs },
       },
-      groups: totalGroups,
-      groupsUnread: groupsUnreadMsgs,
+      groups: gr.total,
+      groupsUnread: gr.unread,
       badges: {
         waiting: { unread: w.unread },
         in_progress: { unread: ip.unread },
         after_hours: { unread: ah.unread },
         closed: { unread: cl.unread },
         all: { unread: all.unread },
-        groups: { unread: groupsUnreadMsgs },
+        groups: { unread: gr.unread },
       },
     };
-  }, [pillCountsData, groupCountData]);
+  }, [pillCountsData]);
 
   // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
   useEffect(() => {
@@ -792,10 +789,20 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
                 if (!tid) return;
                 setMarkAllLoading(true);
                 try {
+                  // Mesmos filtros da pill: o diálogo promete marcar as N que a
+                  // pill contou. Sem isto ele zerava o tenant inteiro (DEM-0258).
                   const { data, error } = await (supabase as any).rpc("whatsapp_mark_bucket_read", {
                     p_tenant_id: tid,
                     p_bucket: activePill,
                     p_department_id: selectedDepartmentId ?? null,
+                    p_closed_visible_to: isAdmin ? null : user?.id ?? null,
+                    p_assigned_to: pillCountFilters.assignedTo ?? null,
+                    p_unassigned: pillCountFilters.unassigned ?? false,
+                    p_instance_id: pillCountFilters.instanceId ?? null,
+                    p_instance_ids: pillCountFilters.instanceIds ?? null,
+                    p_status: pillCountFilters.status ?? null,
+                    p_auto_reply_disabled_only: pillCountFilters.autoReplyDisabledOnly ?? false,
+                    p_rules_disabled_only: pillCountFilters.rulesDisabledOnly ?? false,
                   });
                   if (error) throw error;
                   const affected = Number(data) || 0;
@@ -803,7 +810,6 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
                   queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
                   queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversation-counts"] });
                   queryClient.invalidateQueries({ queryKey: ["whatsapp", "pill-counts"] });
-                  queryClient.invalidateQueries({ queryKey: ["whatsapp", "group-counts"] });
                   setMarkAllOpen(false);
                 } catch (err: any) {
                   toast.error(err?.message ?? "Falha ao marcar como lidas");

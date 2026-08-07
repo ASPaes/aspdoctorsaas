@@ -236,10 +236,9 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         filter: tid ? `tenant_id=eq.${tid}` : undefined,
       }, (payload) => {
         const updated = payload.new as any;
+        // DEM-0258: grupo também é uma linha de whatsapp_pill_counts agora —
+        // invalidatePillCounts() cobre os dois casos, sem query separada.
         invalidatePillCounts();
-        if (updated?.is_group === true) {
-          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'group-counts'] });
-        }
 
         queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
           if (!old?.pages) return old;
@@ -289,11 +288,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         table: 'whatsapp_conversations',
         filter: tid ? `tenant_id=eq.${tid}` : undefined,
       }, (payload) => {
-        const inserted = payload.new as any;
         invalidatePillCounts();
-        if (inserted?.is_group === true) {
-          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'group-counts'] });
-        }
         invalidateList();
       });
 

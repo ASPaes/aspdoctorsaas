@@ -970,7 +970,9 @@ function GroupEnabledSection({
       toast.success("Grupo desativado. Para reativar: Configurações › Atendimento › Operação › Grupos.");
       qc.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
       qc.invalidateQueries({ queryKey: ["whatsapp", "conversation-counts"] });
-      qc.invalidateQueries({ queryKey: ["whatsapp", "group-counts"] });
+      // DEM-0258: a pill "Grupos" saiu de group-counts e virou uma linha de
+      // whatsapp_pill_counts.
+      qc.invalidateQueries({ queryKey: ["whatsapp", "pill-counts"] });
       qc.invalidateQueries({ queryKey: ["whatsapp-groups"] });
       setConfirmOpen(false);
       onDisabled?.();
