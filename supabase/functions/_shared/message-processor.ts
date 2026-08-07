@@ -1903,6 +1903,23 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
     // whatsapp_messages), que já cobre os dois lados e ignora system/CSAT.
     // Chamar incrementAttendanceCounter aqui dobrava msg_customer_count.
 
+    // "Sem regras do sistema" também vale em grupo: o contato do grupo carrega a mesma
+    // flag (phone_number = JID só com dígitos) e o trigger de propagação cross-instância
+    // é o mesmo. Aqui ela barra o que ainda roda em grupo — captura silenciosa de CSAT
+    // e alerta de churn —, igual ao early-return do 1:1 logo abaixo.
+    // Só consulta em mensagem de participante: no fromMe nada automático depende disso.
+    if (!fromMe) {
+      const { data: groupRules } = await supabase
+        .from('whatsapp_contacts')
+        .select('rules_disabled')
+        .eq('id', contactId)
+        .maybeSingle();
+      if (groupRules?.rules_disabled === true) {
+        console.log(`[processor] rules_disabled=true on group contact ${contactId} — skipping group automation for conversation ${conversationId}`);
+        return;
+      }
+    }
+
     // Captura de CSAT de grupo (silenciosa): apenas mensagens de participantes (não fromMe).
     // Regra: primeira mensagem após envio decide. Nota válida => registra + agradece.
     // Qualquer outra coisa => expira em silêncio (sem nudge).
