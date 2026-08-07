@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useOmieConta } from "./OmieContaContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -138,6 +139,8 @@ type ErrorState =
 export default function OmieEscolherCandidatoTab() {
   const qc = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
+  // Conta Omie escolhida no seletor do topo. Ver OmieContaContext.
+  const { conta, contaBody } = useOmieConta();
   const [filtro, setFiltro] = useState<Pista | "todos">("todos");
   const [confirmarTodosLimpos, setConfirmarTodosLimpos] = useState(false);
   const [busy, setBusy] = useState<string | null>(null); // key do grupo/ação em processamento
@@ -148,11 +151,11 @@ export default function OmieEscolherCandidatoTab() {
   const [escolhas, setEscolhas] = useState<Record<string, number>>({});
 
   const { data, isLoading, isFetching, refetch } = useQuery<ListaResp>({
-    queryKey: ["recon-escolher-candidato", "listar", tid],
+    queryKey: ["recon-escolher-candidato", "listar", tid, conta?.id],
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("recon-candidatos-listar", {
-        body: { tenant_id: tid },
+        body: { ...contaBody, tenant_id: tid },
       });
       if (error) throw error;
       return data as ListaResp;
@@ -240,14 +243,14 @@ export default function OmieEscolherCandidatoTab() {
     setErros((p) => ({ ...p, [cnpj]: null }));
     try {
       const { data, error } = await supabase.functions.invoke("recon-candidato-confirmar", {
-        body: { tenant_id: tid, confirmacoes },
+        body: { ...contaBody, tenant_id: tid, confirmacoes },
       });
       if (error) throw error;
       const res = data as any;
       if (res?.ok) {
         const resolvidos: { ds_contract_id: string }[] = res.resolvidos ?? [];
         removeResolvidos(resolvidos.map((r) => r.ds_contract_id));
-        await qc.invalidateQueries({ queryKey: ["recon-escolher-candidato", "listar", tid] });
+        await qc.invalidateQueries({ queryKey: ["recon-escolher-candidato", "listar", tid, conta?.id] });
         toast.success(`${res.vinculados ?? resolvidos.length} vínculo(s) criados`);
       } else {
         // interpretar erros 409
@@ -284,14 +287,14 @@ export default function OmieEscolherCandidatoTab() {
     setBusy("__todos_limpos__");
     try {
       const { data, error } = await supabase.functions.invoke("recon-candidato-confirmar", {
-        body: { tenant_id: tid, confirmacoes: confs },
+        body: { ...contaBody, tenant_id: tid, confirmacoes: confs },
       });
       if (error) throw error;
       const res = data as any;
       if (res?.ok) {
         const resolvidos: { ds_contract_id: string }[] = res.resolvidos ?? [];
         removeResolvidos(resolvidos.map((r) => r.ds_contract_id));
-        await qc.invalidateQueries({ queryKey: ["recon-escolher-candidato", "listar", tid] });
+        await qc.invalidateQueries({ queryKey: ["recon-escolher-candidato", "listar", tid, conta?.id] });
         toast.success(`${res.vinculados ?? resolvidos.length} contratos vinculados`);
       } else {
         toast.error(res?.error || "Falha ao vincular em lote");

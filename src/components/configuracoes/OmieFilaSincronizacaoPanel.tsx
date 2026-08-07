@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useOmieConta } from "./OmieContaContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -476,14 +477,16 @@ export default function OmieFilaSincronizacaoPanel({
   tid: string | null | undefined;
   onIrParaConferencia?: (cnpj: string, destino: DestinoConferencia) => void;
 }) {
+  // Conta Omie escolhida no seletor de Integracoes -> Omie. Ver OmieContaContext.
+  const { conta } = useOmieConta();
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
   const [okOpen, setOkOpen] = useState(false);
 
   const query = useQuery({
-    queryKey: ["omie-fila-status", tid],
+    queryKey: ["omie-fila-status", tid, conta?.id],
     enabled: !!tid,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("omie_fila_status" as any, { p_tenant_id: tid });
+      const { data, error } = await supabase.rpc("omie_fila_status" as any, { p_tenant_id: tid, p_conta_integration_id: conta?.id });
       if (error) throw error;
       return (data ?? {}) as FilaStatus;
     },

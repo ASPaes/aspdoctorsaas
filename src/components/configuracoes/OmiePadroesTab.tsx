@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useOmieConta } from "./OmieContaContext";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,8 @@ type LerResp = {
 export default function OmiePadroesTab() {
   const { toast } = useToast();
   const { effectiveTenantId: tid } = useTenantFilter();
+  // Conta Omie escolhida no seletor do topo. Ver OmieContaContext.
+  const { conta, contaBody } = useOmieConta();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -121,7 +124,7 @@ export default function OmiePadroesTab() {
     setErro(null);
     try {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: { acao: "ler_padroes", tenant_id: tid, dados: { operacao: "ler" } },
+        body: { ...contaBody, acao: "ler_padroes", tenant_id: tid, dados: { operacao: "ler" } },
       });
       if (error) throw error;
       const res = (data?.resultado ?? data) as LerResp;
@@ -179,7 +182,7 @@ export default function OmiePadroesTab() {
       const [omieRow, modelosRes] = await Promise.all([
         (supabase.from("omie_integration" as any) as any)
           .select("integrar_a_partir_de, integracao_pausada, alert_whatsapp_numbers")
-          .eq("tenant_id", tid)
+          .eq("id", conta?.id ?? "")
           .maybeSingle(),
         (supabase.from("modelos_contrato" as any) as any)
           .select("id, nome")
@@ -251,7 +254,7 @@ export default function OmiePadroesTab() {
       };
 
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: { acao: "salvar_padroes", tenant_id: tid, dados: { operacao: "salvar", padroes } },
+        body: { ...contaBody, acao: "salvar_padroes", tenant_id: tid, dados: { operacao: "salvar", padroes } },
       });
       if (error) throw error;
       const res = (data?.resultado ?? data) as { ok: boolean; error?: string };
@@ -294,7 +297,7 @@ export default function OmiePadroesTab() {
     try {
       const { error } = await (supabase.from("omie_integration" as any) as any)
         .update({ integracao_pausada: novaPausa })
-        .eq("tenant_id", tid);
+        .eq("id", conta?.id ?? "");
       if (error) throw error;
       setPausada(novaPausa);
       toast({ title: novaPausa ? "Integração pausada" : "Integração reativada" });
@@ -334,7 +337,7 @@ export default function OmiePadroesTab() {
     try {
       const { error } = await (supabase.from("omie_integration" as any) as any)
         .update({ alert_whatsapp_numbers: alertNumbers })
-        .eq("tenant_id", tid);
+        .eq("id", conta?.id ?? "");
       if (error) throw error;
       toast({ title: "Números salvos" });
     } catch (err: any) {

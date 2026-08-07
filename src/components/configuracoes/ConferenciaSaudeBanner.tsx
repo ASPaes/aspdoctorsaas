@@ -19,16 +19,19 @@ interface ConferenciaSaude {
 }
 
 interface Props {
+  /** Conta Omie (unidade) que o banner esta olhando. Ver OmieContaContext. */
+  contaId?: string | null;
   tenantId: string | null | undefined;
 }
 
-export function ConferenciaSaudeBanner({ tenantId }: Props) {
+export function ConferenciaSaudeBanner({ tenantId, contaId }: Props) {
   const { data, isLoading } = useQuery({
-    queryKey: ["conferencia_saude", tenantId],
+    queryKey: ["conferencia_saude", tenantId, contaId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("conferencia_saude", {
+      const { data, error } = await (supabase.rpc as any)("conferencia_saude", {
         p_tenant_id: tenantId as string,
+        p_conta_integration_id: contaId ?? undefined,
       });
       if (error) {
         console.warn("[ConferenciaSaudeBanner] RPC falhou:", error.message);

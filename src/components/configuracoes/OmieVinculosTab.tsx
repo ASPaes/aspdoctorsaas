@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useOmieConta } from "./OmieContaContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,8 @@ function normalizar(s: string): string {
 export default function OmieVinculosTab() {
   const { toast } = useToast();
   const { effectiveTenantId: tid } = useTenantFilter();
+  // Conta Omie escolhida no seletor do topo. Ver OmieContaContext.
+  const { conta, contaBody } = useOmieConta();
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [selecoes, setSelecoes] = useState<Record<string, string>>({});
   const [vinculados, setVinculados] = useState<Record<string, boolean>>({});
@@ -44,10 +47,10 @@ export default function OmieVinculosTab() {
   const [mostrarTodosProdutos, setMostrarTodosProdutos] = useState(false);
 
   const { data: remote, isLoading: loadingRemote, error: errRemote, refetch: refetchRemote } = useQuery({
-    queryKey: ["omie_listar_vinculos", tid],
+    queryKey: ["omie_listar_vinculos", tid, conta?.id],
     queryFn: async (): Promise<ListarVinculosResp> => {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: { acao: "listar_vinculos", tenant_id: tid },
+        body: { ...contaBody, acao: "listar_vinculos", tenant_id: tid },
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error || "Falha ao carregar vínculos.");
@@ -56,7 +59,7 @@ export default function OmieVinculosTab() {
   });
 
   const { data: funcionarios, isLoading: loadingFunc } = useQuery({
-    queryKey: ["omie_vinculos_funcionarios", tid],
+    queryKey: ["omie_vinculos_funcionarios", tid, conta?.id],
     enabled: !!tid,
     queryFn: async (): Promise<Funcionario[]> => {
       const { data, error } = await supabase
@@ -71,7 +74,7 @@ export default function OmieVinculosTab() {
   });
 
   const { data: produtos, isLoading: loadingProd } = useQuery({
-    queryKey: ["omie_vinculos_produtos", tid],
+    queryKey: ["omie_vinculos_produtos", tid, conta?.id],
     enabled: !!tid,
     queryFn: async (): Promise<Produto[]> => {
       const { data, error } = await supabase
@@ -181,7 +184,7 @@ export default function OmieVinculosTab() {
     setSavingKey(key);
     try {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: {
+        body: { ...contaBody,
           acao: "salvar_vinculo",
           tenant_id: tid,
           dados: {
@@ -213,7 +216,7 @@ export default function OmieVinculosTab() {
     setSavingKey(key);
     try {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: {
+        body: { ...contaBody,
           acao: "salvar_vinculo",
           tenant_id: tid,
           dados: {
@@ -243,7 +246,7 @@ export default function OmieVinculosTab() {
     setSavingKey(key);
     try {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: {
+        body: { ...contaBody,
           acao: "salvar_vinculo",
           tenant_id: tid,
           dados: { tipo: "ignorar_vendedor", ds_funcionario_id: String(func.id), nome_ds: func.nome },
@@ -266,7 +269,7 @@ export default function OmieVinculosTab() {
     setSavingKey(key);
     try {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: {
+        body: { ...contaBody,
           acao: "salvar_vinculo",
           tenant_id: tid,
           dados: { tipo: "ignorar_produto", ds_produto_id: String(prod.id), nome_ds: prod.nome },
@@ -289,7 +292,7 @@ export default function OmieVinculosTab() {
     setSavingKey(key);
     try {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: {
+        body: { ...contaBody,
           acao: "salvar_vinculo",
           tenant_id: tid,
           dados: { tipo: "remover_vinculo", alvo: "vendedor", ds_funcionario_id: String(func.id) },
@@ -318,7 +321,7 @@ export default function OmieVinculosTab() {
     setSavingKey(key);
     try {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: {
+        body: { ...contaBody,
           acao: "salvar_vinculo",
           tenant_id: tid,
           dados: { tipo: "remover_vinculo", alvo: "produto", ds_produto_id: String(prod.id) },

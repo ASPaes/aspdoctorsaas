@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useOmieConta } from "./OmieContaContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -243,12 +244,13 @@ function CandidatosLinha({
 
   const { data, isLoading } = useQuery({
     queryKey: ["omie-conf-candidatos", cnpj],
-    enabled: !!cnpj,
+    enabled: !!cnpj && !!conta?.id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("omie_espelho_cadastro")
         .select("codigo_cliente_omie, codigo_contrato_omie, razao_social_omie, valor_omie, situacao_contrato, omie_inativo, origem_codigo")
         .eq("cnpj_norm", cnpj)
+        .eq("conta_integration_id", conta?.id ?? "")
         .limit(20);
       if (error) throw error;
       return data ?? [];
@@ -268,7 +270,7 @@ function CandidatosLinha({
     setEscolhendo(codigoContrato);
     try {
       const { data: resp, error } = await supabase.functions.invoke("recon-candidato-confirmar", {
-        body: {
+        body: { ...contaBody,
           tenant_id: tid,
           confirmacoes: [
             { ds_contract_id: dsContractId, codigo_contrato_omie: codigoContrato },
@@ -382,7 +384,7 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
     setVincLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("recon-vincular-unitario", {
-        body: { tenant_id: tid, ds_contract_id: row.ds_contract_id },
+        body: { ...contaBody, tenant_id: tid, ds_contract_id: row.ds_contract_id },
       });
       if (error) throw error;
       const res = data as { ok?: boolean; error?: string } | null;
@@ -446,7 +448,7 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
     setAjusteLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("recon-atualizar-valor-ds", {
-        body: { tenant_id: tid, ds_contract_id: row.ds_contract_id },
+        body: { ...contaBody, tenant_id: tid, ds_contract_id: row.ds_contract_id },
       });
       if (error) throw error;
       const res = data as { ok?: boolean; error?: string; tipo?: string; valor_delta?: number } | null;
@@ -486,7 +488,7 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
     setEnviarLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("recon-omie-escrever", {
-        body: { tenant_id: tid, ds_contract_id: row.ds_contract_id, modo: "dry_run" },
+        body: { ...contaBody, tenant_id: tid, ds_contract_id: row.ds_contract_id, modo: "dry_run" },
       });
       if (error) throw error;
       const res = data as any;
@@ -512,7 +514,7 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
     setEnviarLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("recon-omie-escrever", {
-        body: { tenant_id: tid, ds_contract_id: row.ds_contract_id, modo: "criar" },
+        body: { ...contaBody, tenant_id: tid, ds_contract_id: row.ds_contract_id, modo: "criar" },
       });
       if (error) throw error;
       const res = data as any;
@@ -960,7 +962,7 @@ function useReconferir(tid: string | null | undefined) {
       // 1) Puxa o espelho do Omie (leitura)
       const { data: pullData, error: pullErr } = await supabase.functions.invoke(
         "recon-espelho-pull",
-        { body: { tenant_id: tid } }
+        { body: { ...contaBody, tenant_id: tid } }
       );
       if (pullErr) throw pullErr;
       if (pullData && (pullData as any).ok === false) {
@@ -988,7 +990,7 @@ function useReconferir(tid: string | null | undefined) {
         queryClient.invalidateQueries({ queryKey: ["omie-conf-nome-diverge-count"] }),
         queryClient.invalidateQueries({ queryKey: ["omie-conf-visao-geral"] }),
         queryClient.invalidateQueries({ queryKey: ["omie-conf-fornecedores"] }),
-        queryClient.invalidateQueries({ queryKey: ["recon-escolher-candidato", "listar", tid] }),
+        queryClient.invalidateQueries({ queryKey: ["recon-escolher-candidato", "listar", tid, conta?.id] }),
       ]);
 
       toast.success("Reconferência concluída");
@@ -1013,12 +1015,12 @@ function VisaoGeralPanel({
 }) {
   const reconferir = useReconferir(tid);
   const { data, isLoading } = useQuery({
-    queryKey: ["omie-conf-visao-geral", tid],
-    enabled: !!tid,
+    queryKey: ["omie-conf-visao-geral", tid, conta?.id],
+    enabled: !!tid && !!conta?.id,
     queryFn: async () => {
       const { data, error } = await supabase.rpc(
         "reconciliacao_visao_geral" as any,
-        { p_tenant_id: tid }
+        { p_tenant_id: tid, p_conta_integration_id: conta?.id }
       );
       if (error) throw error;
       return (data ?? {}) as VisaoGeralData;
@@ -1307,6 +1309,8 @@ function VisaoGeralPanel({
 
 export default function OmieConferenciaTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
+  // Conta Omie escolhida no seletor do topo. Ver OmieContaContext.
+  const { conta, contaBody } = useOmieConta();
   const [bucketAtivo, setBucketAtivo] = useState<View>("visao_geral");
   const [busca, setBusca] = useState("");
   const [page, setPage] = useState(0);
@@ -1339,8 +1343,8 @@ export default function OmieConferenciaTab() {
   const [modeloSelecionadoId, setModeloSelecionadoId] = useState<string>("");
 
   const { data: modelosContrato = [] } = useQuery({
-    queryKey: ["modelos_contrato", tid],
-    enabled: !!tid,
+    queryKey: ["modelos_contrato", tid, conta?.id],
+    enabled: !!tid && !!conta?.id,
     staleTime: 10 * 60 * 1000,
     queryFn: async () => {
       let q = supabase.from("modelos_contrato").select("id, nome").order("nome") as any;
@@ -1354,11 +1358,12 @@ export default function OmieConferenciaTab() {
   // Contagens dos cards via RPC (a lógica fila×alarme vive dentro da RPC).
   // Não replicar aqui — dois caminhos calculando o mesmo número foi o que quebrou antes.
   const { data: resumoRows, isLoading: loadingResumo } = useQuery({
-    queryKey: ["omie-conf-resumo", tid, fornecedorParam],
-    enabled: !!tid,
+    queryKey: ["omie-conf-resumo", tid, fornecedorParam, conta?.id],
+    enabled: !!tid && !!conta?.id,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("reconciliacao_resumo" as any, {
         p_tenant_id: tid,
+        p_conta_integration_id: conta?.id,
         p_fornecedor_ids: fornecedorParam,
       });
       if (error) throw error;
@@ -1377,12 +1382,13 @@ export default function OmieConferenciaTab() {
   // Contagem de linhas de escolher_candidato já resolvidas (para o toggle "Ver resolvidos").
   // A RPC só devolve o que é fila (status_usuario='novo'), então buscamos o "resto" via HEAD count.
   const { data: escolherCandidatoResolvidos = 0 } = useQuery({
-    queryKey: ["omie-conf-escolher-resolvidos", tid, fornecedorParam],
-    enabled: !!tid,
+    queryKey: ["omie-conf-escolher-resolvidos", tid, fornecedorParam, conta?.id],
+    enabled: !!tid && !!conta?.id,
     queryFn: async () => {
       let q = supabase
         .from("reconciliacao_cadastro")
         .select("ds_contract_id", { count: "exact", head: true })
+        .eq("conta_integration_id", conta?.id ?? "")
         .eq("acao_sugerida", "escolher_candidato")
         .neq("status_usuario", "novo");
       if (fornecedorParam != null && fornecedorParam.length > 0) {
@@ -1413,12 +1419,13 @@ export default function OmieConferenciaTab() {
 
 
   const { data: nomeDivergeCount, isLoading: loadingNomeDivergeCount } = useQuery({
-    queryKey: ["omie-conf-nome-diverge-count", tid, fornecedorParam],
-    enabled: !!tid,
+    queryKey: ["omie-conf-nome-diverge-count", tid, fornecedorParam, conta?.id],
+    enabled: !!tid && !!conta?.id,
     queryFn: async () => {
       let q = supabase
         .from("reconciliacao_cadastro")
         .select("*", { count: "exact", head: true })
+        .eq("conta_integration_id", conta?.id ?? "")
         .eq("acao_sugerida", "vinculo_auto_ok")
         .eq("nome_diverge", true)
         .neq("status_usuario", "vinculado");
@@ -1441,12 +1448,12 @@ export default function OmieConferenciaTab() {
   });
 
   const { data: fornecedores, isLoading: loadingFornecedores } = useQuery({
-    queryKey: ["omie-conf-fornecedores", tid],
-    enabled: !!tid,
+    queryKey: ["omie-conf-fornecedores", tid, conta?.id],
+    enabled: !!tid && !!conta?.id,
     queryFn: async () => {
       const { data, error } = await supabase.rpc(
         "reconciliacao_fornecedores" as any,
-        { p_tenant_id: tid }
+        { p_tenant_id: tid, p_conta_integration_id: conta?.id }
       );
       if (error) throw error;
       return (data ?? []) as { fornecedor_id: number | null; fornecedor_ds: string | null; qtd: number }[];
@@ -1459,8 +1466,8 @@ export default function OmieConferenciaTab() {
   const to = from + PAGE_SIZE - 1;
 
   const { data: lista, isLoading: loadingLista } = useQuery({
-    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro, fornecedorParam, verResolvidosCandidato],
-    enabled: !!tid && bucketAtivo !== "visao_geral",
+    queryKey: ["omie-conf-lista", tid, bucketAtivo, buscaTrim, page, nomeFiltro, fornecedorParam, verResolvidosCandidato, conta?.id],
+    enabled: !!tid && !!conta?.id && bucketAtivo !== "visao_geral",
     queryFn: async () => {
       let q = supabase
         .from("reconciliacao_cadastro")
@@ -1468,6 +1475,7 @@ export default function OmieConferenciaTab() {
           "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, vigencia_final_omie, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id, situacao_contrato, tem_cancelado_omie, status_usuario, candidato_escolhido",
           { count: "exact" }
         );
+      q = q.eq("conta_integration_id", conta?.id ?? "");
 
       // Filtro fila × alarme: alarme NÃO filtra por status_usuario (some sozinho
       // quando o Omie muda). Fila filtra 'novo' — igual ao card.
@@ -1513,7 +1521,7 @@ export default function OmieConferenciaTab() {
 
   return (
     <div className="space-y-4">
-      <ConferenciaSaudeBanner tenantId={tid} />
+      <ConferenciaSaudeBanner tenantId={tid} contaId={conta?.id ?? null} />
       {/* Topo */}
       <div className="flex items-center justify-between flex-wrap gap-2">
 
@@ -1884,7 +1892,7 @@ export default function OmieConferenciaTab() {
                 try {
                   const { data, error } = await supabase.functions.invoke(
                     "recon-atribuir-modelo-lote",
-                    { body: { tenant_id: tid, modelo_contrato_id: modeloSelecionadoId } }
+                    { body: { ...contaBody, tenant_id: tid, modelo_contrato_id: modeloSelecionadoId } }
                   );
                   if (error) throw error;
                   const res = data as { ok?: boolean; atualizados?: number; sem_produto_ignorados?: number; error?: string } | null;
