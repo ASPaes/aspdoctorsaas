@@ -1824,7 +1824,10 @@ export default function OmieConferenciaTab() {
                 if (!tid) return;
                 setVinculandoLote(true);
                 try {
-                  const body: Record<string, unknown> = { tenant_id: tid };
+                  // O ...contaBody aqui é obrigatório: sem a unidade, a função cai na versão de
+                  // 1 argumento de obter_chave_omie, que levanta 22023 quando o tenant tem mais
+                  // de uma conta Omie — de propósito, para não escolher a chave errada.
+                  const body: Record<string, unknown> = { ...contaBody, tenant_id: tid };
                   if (fornecedorParam && fornecedorParam.length > 0) {
                     body.fornecedor_ids = fornecedorParam;
                   }
@@ -1848,7 +1851,17 @@ export default function OmieConferenciaTab() {
                     toast.error(res?.error ?? "Falha ao vincular em lote.");
                   }
                 } catch (err) {
-                  toast.error(err instanceof Error ? err.message : "Falha ao vincular em lote.");
+                  // O supabase-js descarta o corpo da resposta em não-2xx e sobra
+                  // "Edge Function returned a non-2xx status code". O motivo real vem no corpo,
+                  // que continua acessível em error.context.
+                  let msg = err instanceof Error ? err.message : "Falha ao vincular em lote.";
+                  try {
+                    const corpo = await (err as any)?.context?.json?.();
+                    if (corpo?.error) msg = corpo.error;
+                  } catch {
+                    /* corpo não era JSON */
+                  }
+                  toast.error(msg);
                 } finally {
                   setVinculandoLote(false);
                 }
