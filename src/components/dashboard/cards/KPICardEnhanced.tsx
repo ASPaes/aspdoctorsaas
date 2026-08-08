@@ -45,10 +45,15 @@ export function KPICardEnhanced({
   useTilt3D(cardRef, { enabled: enableTilt !== false });
 
   /** O label é um botão (popover de ajuda) e o footer pode ter links — o clique
-   *  deles não pode virar drill-down. */
+   *  deles não pode virar drill-down. O `!== e.currentTarget` é o que salva: o
+   *  próprio card é role="button", e sem isso o closest() achava ele mesmo e
+   *  engolia TODO clique. */
   const handleCardClick = (e: MouseEvent<HTMLDivElement>) => {
     if (!onClick) return;
-    if ((e.target as HTMLElement).closest('button, a, [role="button"], input, select')) return;
+    const interativo = (e.target as HTMLElement).closest(
+      'button, a, [role="button"], input, select',
+    );
+    if (interativo && interativo !== e.currentTarget) return;
     onClick();
   };
 
