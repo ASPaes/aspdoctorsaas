@@ -975,14 +975,14 @@ function useReconferir(tid: string | null | undefined) {
       // 2) Snapshot do lado DS
       const { error: snapErr } = await supabase.rpc(
         "snapshot_reconciliacao_ds" as any,
-        { p_tenant_id: tid }
+        { p_tenant_id: tid, p_conta_integration_id: conta?.id }
       );
       if (snapErr) throw snapErr;
 
       // 3) Rodar detecção
       const { error: detErr } = await supabase.rpc(
         "rodar_deteccao_reconciliacao" as any,
-        { p_tenant_id: tid }
+        { p_tenant_id: tid, p_conta_integration_id: conta?.id }
       );
       if (detErr) throw detErr;
 
