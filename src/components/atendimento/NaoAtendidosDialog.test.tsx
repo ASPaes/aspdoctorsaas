@@ -38,29 +38,37 @@ vi.mock("@/components/tickets/AttendanceChatHistoryModal", () => ({
 }));
 
 const payload = (over: Partial<AtendimentoNaoAtendidos> = {}): AtendimentoNaoAtendidos => ({
-  total_sem_resposta: 88,
   total_card: 175,
+  total_sem_resposta: 88,
+  total_respondido: 80,
+  total_ticket: 7,
   total_contatos: 2,
   truncado: false,
   contatos: [
     {
       contato: "Padaria do Zé", telefone: "5511999990000",
-      cliente_id: null, cliente_nome: null, qtd: 3,
+      cliente_id: null, cliente_nome: null, qtd: 3, qtd_sem_resposta: 1,
       ultimo_at: "2026-06-30T12:00:00.000Z",
       chats: [
         { attendance_id: "a1", attendance_code: "AT-1", conversation_id: "c1",
           opened_at: "2026-06-30T12:00:00.000Z", closed_at: "2026-06-30T13:00:00.000Z",
-          departamento: "Suporte", msg_customer_count: 4, aberto_seg: 3600 },
+          departamento: "Suporte", msg_customer_count: 4, msg_agent_count: 0,
+          motivo: "sem_resposta", aberto_seg: 3600 },
+        { attendance_id: "a3", attendance_code: "AT-3", conversation_id: "c3",
+          opened_at: "2026-06-28T09:00:00.000Z", closed_at: "2026-06-28T09:20:00.000Z",
+          departamento: "Suporte", msg_customer_count: 2, msg_agent_count: 1,
+          motivo: "respondido", aberto_seg: 1200 },
       ],
     },
     {
       contato: "Mercado Central", telefone: "5511888880000",
-      cliente_id: "cli-1", cliente_nome: "MERCADO CENTRAL LTDA", qtd: 1,
+      cliente_id: "cli-1", cliente_nome: "MERCADO CENTRAL LTDA", qtd: 1, qtd_sem_resposta: 0,
       ultimo_at: "2026-06-29T10:00:00.000Z",
       chats: [
         { attendance_id: "a2", attendance_code: "AT-2", conversation_id: "c2",
           opened_at: "2026-06-29T10:00:00.000Z", closed_at: "2026-06-29T10:30:00.000Z",
-          departamento: null, msg_customer_count: 1, aberto_seg: 1800 },
+          departamento: null, msg_customer_count: 1, msg_agent_count: 2,
+          motivo: "ticket", aberto_seg: 1800 },
       ],
     },
   ],
@@ -111,18 +119,37 @@ afterEach(() => {
 });
 
 describe("NaoAtendidosDialog", () => {
-  it("explica a diferença entre a lista e o número do card", () => {
+  /** O card e a lista têm que falar o mesmo número — foi o que motivou a 2ª volta
+   *  do DEM-0153. O total no título é o total_card, sem recorte. */
+  it("mostra no título o mesmo total que o card", () => {
     renderDialog();
-    const linha = document.body.querySelector('[data-testid="reconciliacao"]')?.textContent ?? "";
-    expect(linha).toContain("88");
-    expect(linha).toContain("87"); // 175 - 88
-    expect(linha).toContain("175");
+    expect(texto()).toContain("175 atendimentos");
   });
 
-  it("omite a linha de reconciliação quando não há diferença", () => {
-    hookState = { isLoading: false, isError: false, data: payload({ total_card: 88 }) };
+  it("quebra o total nos motivos de não ter sido assumido", () => {
     renderDialog();
-    expect(document.body.querySelector('[data-testid="reconciliacao"]')).toBeNull();
+    const linha = document.body.querySelector('[data-testid="resumo"]')?.textContent ?? "";
+    expect(linha).toContain("88 sem nenhuma resposta");
+    expect(linha).toContain("80 responderam mas ninguém assumiu");
+    expect(linha).toContain("7 viraram ticket");
+  });
+
+  it("omite o resumo quando todos caem no mesmo motivo", () => {
+    hookState = {
+      isLoading: false, isError: false,
+      data: payload({ total_card: 88, total_sem_resposta: 88, total_respondido: 0, total_ticket: 0 }),
+    };
+    renderDialog();
+    expect(document.body.querySelector('[data-testid="resumo"]')).toBeNull();
+  });
+
+  it("marca cada chat com o motivo — o que separa o vácuo do resto", () => {
+    renderDialog();
+    clicar(botaoComTexto(/Padaria do Zé/));
+    expect(texto()).toContain("sem resposta");
+    expect(texto()).toContain("respondido, sem assumir");
+    clicar(botaoComTexto(/Mercado Central/));
+    expect(texto()).toContain("virou ticket");
   });
 
   it("lista um item por contato, com o contador de reincidência", () => {
@@ -143,7 +170,10 @@ describe("NaoAtendidosDialog", () => {
     agentId = "algum-agente";
     hookState = {
       isLoading: false, isError: false,
-      data: payload({ total_sem_resposta: 0, total_contatos: 0, total_card: 0, contatos: [] }),
+      data: payload({
+        total_card: 0, total_sem_resposta: 0, total_respondido: 0, total_ticket: 0,
+        total_contatos: 0, contatos: [],
+      }),
     };
     renderDialog();
     expect(texto()).toMatch(/filtro de agente/i);

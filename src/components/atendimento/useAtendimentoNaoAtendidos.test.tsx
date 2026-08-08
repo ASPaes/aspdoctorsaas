@@ -88,22 +88,26 @@ beforeEach(() => {
   capturado = { isSuccess: false };
   rpc.mockResolvedValue({
     data: {
-      total_sem_resposta: 3,
       total_card: 7,
+      total_sem_resposta: 3,
+      total_respondido: 3,
+      total_ticket: 1,
       total_contatos: 2,
       truncado: false,
       contatos: [
         {
           contato: "Padaria do Zé", telefone: "5511999990000",
-          cliente_id: null, cliente_nome: null, qtd: 2,
+          cliente_id: null, cliente_nome: null, qtd: 2, qtd_sem_resposta: 1,
           ultimo_at: "2026-06-30T12:00:00.000Z",
           chats: [
             { attendance_id: "a1", attendance_code: "AT-1", conversation_id: "c1",
               opened_at: "2026-06-30T12:00:00.000Z", closed_at: "2026-06-30T13:00:00.000Z",
-              departamento: "Suporte", msg_customer_count: 4, aberto_seg: 3600 },
+              departamento: "Suporte", msg_customer_count: 4, msg_agent_count: 0,
+              motivo: "sem_resposta", aberto_seg: 3600 },
             { attendance_id: "a2", attendance_code: null, conversation_id: "c2",
               opened_at: "2026-06-20T09:00:00.000Z", closed_at: null,
-              departamento: null, msg_customer_count: 1, aberto_seg: 60 },
+              departamento: null, msg_customer_count: 1, msg_agent_count: 2,
+              motivo: "respondido", aberto_seg: 60 },
           ],
         },
       ],
@@ -151,13 +155,40 @@ describe("useAtendimentoNaoAtendidos", () => {
     await render(true);
     await esperarSucesso();
     const d = capturado.data!;
-    expect(d.total_sem_resposta).toBe(3);
     expect(d.total_card).toBe(7);
+    expect(d.total_sem_resposta).toBe(3);
+    expect(d.total_respondido).toBe(3);
+    expect(d.total_ticket).toBe(1);
     expect(d.truncado).toBe(false);
     expect(d.contatos).toHaveLength(1);
     expect(d.contatos[0].chats).toHaveLength(2);
+    expect(d.contatos[0].chats[0].motivo).toBe("sem_resposta");
+    expect(d.contatos[0].chats[1].motivo).toBe("respondido");
     expect(d.contatos[0].chats[1].departamento).toBeNull();
     expect(d.contatos[0].cliente_nome).toBeNull();
+  });
+
+  /** Se a RPC em produção estiver atrás do repo, o campo chega undefined — cair em
+   *  'sem_resposta' pinta um chat como vácuo sem ele ser. Melhor um default explícito
+   *  e testado do que um crash no MOTIVO_BADGE. */
+  it("cai em 'sem_resposta' quando a RPC não manda o motivo", async () => {
+    rpc.mockResolvedValue({
+      data: {
+        total_card: 1, total_contatos: 1, truncado: false,
+        contatos: [{
+          contato: "Sem motivo", telefone: null, cliente_id: null, cliente_nome: null,
+          qtd: 1, ultimo_at: "2026-06-30T12:00:00.000Z",
+          chats: [{ attendance_id: "a9", attendance_code: null, conversation_id: "c9",
+            opened_at: "2026-06-30T12:00:00.000Z", closed_at: null,
+            departamento: null, msg_customer_count: 1, aberto_seg: 10 }],
+        }],
+      },
+      error: null,
+    });
+    await render(true);
+    await esperarSucesso();
+    expect(capturado.data!.contatos[0].chats[0].motivo).toBe("sem_resposta");
+    expect(capturado.data!.contatos[0].qtd_sem_resposta).toBe(0);
   });
 
   it("aguenta a RPC devolver payload vazio sem quebrar", async () => {

@@ -113,15 +113,13 @@ export function VelocidadeTab() {
               subtitle={`${data.nao_atendido}/${data.total_encerrados} sem assumir`}
               variant={data.nao_atendido_pct !== null && data.nao_atendido_pct > 5 ? "warning" : "dark"}
               icon={<UserX className="h-4 w-4" />}
+              onClick={data.nao_atendido > 0 ? () => setVerVacuo(true) : undefined}
+              onClickLabel={`Ver os ${data.nao_atendido} atendimentos não atendidos`}
               footer={
                 data.nao_atendido > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => setVerVacuo(true)}
-                    className="text-xs font-medium text-primary hover:underline focus:outline-none"
-                  >
-                    Ver clientes →
-                  </button>
+                  <span className="text-xs font-medium text-primary">
+                    Ver os {data.nao_atendido.toLocaleString("pt-BR")} atendimentos →
+                  </span>
                 ) : undefined
               }
             />

@@ -5,9 +5,14 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2, ChevronDown, ChevronRight, ExternalLink, UserX } from "lucide-react";
 import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
-import { useAtendimentoNaoAtendidos, type NaoAtendidoChat } from "./useAtendimentoNaoAtendidos";
+import {
+  useAtendimentoNaoAtendidos,
+  type NaoAtendidoChat,
+  type NaoAtendidoMotivo,
+} from "./useAtendimentoNaoAtendidos";
 import { fmtEspera } from "./TempoRealTab";
 import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
+import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -21,6 +26,14 @@ const fmtData = (iso: string) =>
     day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit",
   });
 
+const n = (v: number) => v.toLocaleString("pt-BR");
+
+const MOTIVO_BADGE: Record<NaoAtendidoMotivo, { texto: string; classe: string }> = {
+  sem_resposta: { texto: "sem resposta", classe: "bg-destructive/15 text-destructive" },
+  respondido: { texto: "respondido, sem assumir", classe: "bg-amber-500/15 text-amber-600 dark:text-amber-400" },
+  ticket: { texto: "virou ticket", classe: "bg-primary/15 text-primary" },
+};
+
 export function NaoAtendidosDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const { agentId } = useAtendimentoFilter();
@@ -33,8 +46,14 @@ export function NaoAtendidosDialog({ open, onOpenChange }: Props) {
     navigate(`/whatsapp?conversation=${conversationId}`);
   };
 
-  const semResposta = data?.total_sem_resposta ?? 0;
-  const respondidosSemAssumir = Math.max((data?.total_card ?? 0) - semResposta, 0);
+  /** Recortes do mesmo total — a soma dos três é o número do card. */
+  const recortes = data
+    ? ([
+        [data.total_sem_resposta, "sem nenhuma resposta"],
+        [data.total_respondido, "responderam mas ninguém assumiu"],
+        [data.total_ticket, "viraram ticket"],
+      ] as const).filter(([qtd]) => qtd > 0)
+    : [];
   const restantes = (data?.total_contatos ?? 0) - (data?.contatos.length ?? 0);
 
   return (
@@ -44,17 +63,19 @@ export function NaoAtendidosDialog({ open, onOpenChange }: Props) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserX className="h-4 w-4 text-muted-foreground" />
-              Clientes no vácuo
+              Não atendido
+              {data && (
+                <span className="text-sm font-normal tabular-nums text-muted-foreground">
+                  · {n(data.total_card)} atendimento{data.total_card === 1 ? "" : "s"}
+                </span>
+              )}
             </DialogTitle>
             <DialogDescription className="text-xs">
-              {data && respondidosSemAssumir > 0 ? (
-                <span data-testid="reconciliacao">
-                  {semResposta.toLocaleString("pt-BR")} chats sem nenhuma resposta ·{" "}
-                  outros {respondidosSemAssumir.toLocaleString("pt-BR")} tiveram resposta mas
-                  ninguém assumiu (o card conta os {data.total_card.toLocaleString("pt-BR")}).
+              Encerrados sem ninguém assumir, nos filtros do período.
+              {recortes.length > 1 && (
+                <span data-testid="resumo" className="mt-1 block">
+                  {recortes.map(([qtd, rotulo]) => `${n(qtd)} ${rotulo}`).join(" · ")}
                 </span>
-              ) : (
-                "Atendimentos em que o cliente escreveu e ninguém respondeu."
               )}
             </DialogDescription>
           </DialogHeader>
@@ -74,7 +95,7 @@ export function NaoAtendidosDialog({ open, onOpenChange }: Props) {
             <div className="rounded-md border border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
               {agentId
                 ? "Nenhum resultado: o filtro de agente exclui atendimentos não atendidos, que por definição não têm agente."
-                : "Nenhum cliente ficou sem resposta no período."}
+                : "Todos os atendimentos do período foram assumidos."}
             </div>
           ) : (
             <>
@@ -102,7 +123,14 @@ export function NaoAtendidosDialog({ open, onOpenChange }: Props) {
                           </div>
                         </div>
                         {c.qtd > 1 && (
-                          <span className="shrink-0 rounded-md bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-destructive">
+                          <span
+                            className={cn(
+                              "shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium",
+                              c.qtd_sem_resposta > 0
+                                ? "bg-destructive/15 text-destructive"
+                                : "bg-muted text-muted-foreground",
+                            )}
+                          >
                             {c.qtd} chats
                           </span>
                         )}
@@ -126,9 +154,19 @@ export function NaoAtendidosDialog({ open, onOpenChange }: Props) {
                                       </span>
                                     )}
                                   </div>
-                                  <div className="truncate text-[11px] text-muted-foreground">
-                                    {[ch.departamento ?? "Sem setor",
-                                      `${ch.msg_customer_count} msg do cliente`].join(" · ")}
+                                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                    <span
+                                      className={cn(
+                                        "shrink-0 rounded px-1.5 py-0.5 font-medium",
+                                        MOTIVO_BADGE[ch.motivo].classe,
+                                      )}
+                                    >
+                                      {MOTIVO_BADGE[ch.motivo].texto}
+                                    </span>
+                                    <span className="truncate">
+                                      {[ch.departamento ?? "Sem setor",
+                                        `${ch.msg_customer_count} msg do cliente`].join(" · ")}
+                                    </span>
                                   </div>
                                 </div>
                                 <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">

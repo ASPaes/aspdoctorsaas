@@ -1,4 +1,4 @@
-import { ReactNode, useRef } from 'react';
+import { ReactNode, useRef, type KeyboardEvent, type MouseEvent } from 'react';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { KpiHelpPopover } from '../KpiHelpPopover';
@@ -29,15 +29,36 @@ interface KPICardEnhancedProps {
   currentValue?: number;
   /** Conteúdo opcional no rodapé do card (ex: botão "Ver chats"). */
   footer?: ReactNode;
+  /** Torna o card inteiro clicável (drill-down). Cliques no help/em botões internos não disparam. */
+  onClick?: () => void;
+  /** Texto do aria-label quando clicável. Default: "Ver detalhes de {label}". */
+  onClickLabel?: string;
 }
 
 export function KPICardEnhanced({
   label, value, trend, trendValue, icon, variant = 'dark',
   size = 'md', className, formula, helpKey, subtitle,
   enableTilt = true, showBenchmark = true, currentValue, footer,
+  onClick, onClickLabel,
 }: KPICardEnhancedProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   useTilt3D(cardRef, { enabled: enableTilt !== false });
+
+  /** O label é um botão (popover de ajuda) e o footer pode ter links — o clique
+   *  deles não pode virar drill-down. */
+  const handleCardClick = (e: MouseEvent<HTMLDivElement>) => {
+    if (!onClick) return;
+    if ((e.target as HTMLElement).closest('button, a, [role="button"], input, select')) return;
+    onClick();
+  };
+
+  const handleCardKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!onClick) return;
+    if (e.target !== e.currentTarget) return;
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    onClick();
+  };
 
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
   const trendColor = trend === 'up' ? 'text-green-600 dark:text-green-400' : trend === 'down' ? 'text-destructive' : 'text-muted-foreground';
@@ -69,12 +90,19 @@ export function KPICardEnhanced({
   return (
     <div
       ref={cardRef}
+      onClick={onClick ? handleCardClick : undefined}
+      onKeyDown={onClick ? handleCardKeyDown : undefined}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? (onClickLabel ?? `Ver detalhes de ${label}`) : undefined}
       className={cn(
         'rounded-xl transition-all duration-200',
         'kpi-spatial',
         `kpi-spatial-${variant}`,
         variantStyles[variant],
         sizeStyles[size],
+        onClick &&
+          'cursor-pointer hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         className,
       )}
     >
