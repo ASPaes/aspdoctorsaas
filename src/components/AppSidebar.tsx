@@ -251,7 +251,9 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-3">
+      {/* h-14 = mesma altura do <header> em AppLayout: as duas border-b têm que
+          cair no mesmo Y, senão a linha da sidebar fica 8px abaixo da do header. */}
+      <div className="flex h-14 items-center justify-center border-b border-sidebar-border px-3">
         {collapsed ? (
           <button
             type="button"
