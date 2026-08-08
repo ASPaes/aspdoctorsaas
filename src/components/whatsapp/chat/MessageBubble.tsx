@@ -527,7 +527,9 @@ export function MessageBubble({
         {msg.edited_at && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="text-[10px] italic text-muted-foreground cursor-help">(editada)</span>
+              {/* Herda a cor do balão (como o horário). Fixar text-muted-foreground
+                  deixava o selo azulado e ilegível sobre o verde do enviado. */}
+              <span className="text-[10px] italic opacity-75 cursor-help">(editada)</span>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-[260px] text-xs">
               <p>Esta mensagem foi editada após o envio. O painel mostra a última versão que recebeu — se for crítico, confira no WhatsApp.</p>
