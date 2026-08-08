@@ -78,13 +78,13 @@ export function ZoomableImageLightbox({
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (e.target !== e.currentTarget) {
-      downPos.current = null;
-      return;
-    }
     const start = downPos.current;
     downPos.current = null;
     if (!start) return;
+    // Fecha ao clicar em qualquer área vazia. O wrapper do react-zoom-pan-pinch
+    // ocupa a tela inteira, então a lateral do overlay nunca é o currentTarget —
+    // o que valia era a imagem e os controles, marcados com data-lightbox-keep.
+    if ((e.target as HTMLElement | null)?.closest("[data-lightbox-keep]")) return;
     const dx = e.clientX - start.x;
     const dy = e.clientY - start.y;
     if (Math.hypot(dx, dy) < 8) {
@@ -112,6 +112,7 @@ export function ZoomableImageLightbox({
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
             <div
+              data-lightbox-keep
               className="absolute top-2 right-2 z-10 flex gap-2"
               onClick={(e) => e.stopPropagation()}
             >
@@ -162,6 +163,7 @@ export function ZoomableImageLightbox({
               contentStyle={{ touchAction: "none" }}
             >
               <img
+                data-lightbox-keep
                 src={src}
                 alt={alt ?? "Visualização"}
                 draggable={false}
@@ -170,6 +172,7 @@ export function ZoomableImageLightbox({
             </TransformComponent>
 
             <div
+              data-lightbox-keep
               className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-3 bg-black/60 rounded-full px-3 py-1.5"
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}

@@ -60,3 +60,60 @@ describe("ZoomableImageLightbox — ESC", () => {
     expect(hasOpenEscLayer()).toBe(false);
   });
 });
+
+// jsdom não tem PointerEvent; React só olha o type do evento, então MouseEvent serve.
+const click = (el: Element, x = 10, y = 10) =>
+  act(() => {
+    el.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, clientX: x, clientY: y }));
+    el.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, clientX: x, clientY: y }));
+  });
+
+describe("ZoomableImageLightbox — clique fora", () => {
+  // Regressão: só o X fechava. O wrapper do react-zoom-pan-pinch cobre a tela
+  // inteira, então o clique na lateral nunca chegava ao overlay como currentTarget.
+  it("fecha ao clicar na área vazia ao lado da imagem", () => {
+    const onClose = vi.fn();
+    act(() => root.render(<ZoomableImageLightbox src="blob:fake" onClose={onClose} />));
+
+    const wrapper = container.querySelector(".react-transform-wrapper")!;
+    expect(wrapper).toBeTruthy();
+    click(wrapper);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("não fecha ao clicar na própria imagem", () => {
+    const onClose = vi.fn();
+    act(() => root.render(<ZoomableImageLightbox src="blob:fake" onClose={onClose} />));
+
+    click(container.querySelector("img")!);
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("não fecha ao usar os controles de zoom", () => {
+    const onClose = vi.fn();
+    act(() => root.render(<ZoomableImageLightbox src="blob:fake" onClose={onClose} />));
+
+    click(container.querySelector('[title="Aumentar zoom"]')!);
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("não fecha quando o clique é um arrasto", () => {
+    const onClose = vi.fn();
+    act(() => root.render(<ZoomableImageLightbox src="blob:fake" onClose={onClose} />));
+
+    const wrapper = container.querySelector(".react-transform-wrapper")!;
+    act(() => {
+      wrapper.dispatchEvent(
+        new MouseEvent("pointerdown", { bubbles: true, clientX: 10, clientY: 10 })
+      );
+      wrapper.dispatchEvent(
+        new MouseEvent("pointerup", { bubbles: true, clientX: 200, clientY: 120 })
+      );
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});

@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 08/08
 
+- 🔧 **Atendimento / Chat** — **A imagem ampliada fecha clicando fora dela.** Ao abrir uma imagem do chat em tela cheia, a única saída era o **X** no canto: clicar na área escura ao lado da imagem — o gesto natural, e o mesmo que funciona no WhatsApp Web — não fazia nada. Agora clicar em qualquer parte vazia da tela fecha a visualização. Os botões de copiar, baixar, abrir em nova guia e os controles de zoom continuam respondendo normalmente, e arrastar a imagem ampliada para navegar não fecha mais por engano. O **X** e a tecla **Esc** seguem funcionando.
+
 - 🆕 **Atendimento / Chat** — **Dá para corrigir uma mensagem já enviada ao cliente.** Errou uma palavra, trocou um valor ou mandou o nome errado e só percebeu depois do envio: até agora a única saída era apagar a mensagem para todos e mandar de novo — o cliente via o "apagada" no aparelho dele e recebia tudo outra vez. Agora o menu do balão tem **Editar**: o texto vira um campo ali mesmo, você corrige e salva (**Enter** salva, **Esc** cancela). A correção vai para o WhatsApp do cliente, que passa a ver o texto novo com a marca **(editada)** — a mesma que ele veria se tivesse editado uma mensagem dele. No painel, o histórico do que foi trocado fica guardado. Duas limitações vêm do próprio WhatsApp, não do sistema: só dá para editar **até 15 minutos** depois do envio, e só **mensagem de texto sua** — áudio, imagem, documento e mensagem do cliente não são editáveis. Fora dessas condições o **Editar** simplesmente não aparece no menu, para você não esbarrar num botão que ia falhar; nesses casos continua valendo o *Apagar para todos*. Disponível nas instâncias de WhatsApp conectadas por QR Code.
 
 ### 07/08
