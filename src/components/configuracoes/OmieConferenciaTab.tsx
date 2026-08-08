@@ -249,12 +249,39 @@ function CandidatosLinha({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("omie_espelho_cadastro")
-        .select("codigo_cliente_omie, codigo_contrato_omie, razao_social_omie, valor_omie, situacao_contrato, omie_inativo, origem_codigo")
+        .select(
+          "codigo_cliente_omie, codigo_contrato_omie, razao_social_omie, valor_omie, situacao_contrato, omie_inativo, origem_codigo, contratos_omie",
+        )
         .eq("cnpj_norm", cnpj)
         .eq("conta_integration_id", conta?.id ?? "")
         .limit(20);
       if (error) throw error;
-      return data ?? [];
+
+      // O espelho tem UMA linha por cliente do Omie, com o "melhor" contrato nas colunas soltas.
+      // Cliente com 2+ contratos tinha os demais invisíveis aqui — e o "Escolher este" oferecia o
+      // contrato errado, criando de/para cruzado (foi o caso JMBM, e reapareceu na ELIANE BATISTA
+      // LIMA: R$ 440 no DS x R$ 187,50 oferecido). A coluna contratos_omie guarda todos desde a v4
+      // do recon-espelho-pull; a aba Escolher Candidato já a usava, esta ficou para trás.
+      // Mesma regra do contratosDoCliente da recon-candidatos-listar: se há ativos ('10'), são
+      // eles; senão, o menos ruim.
+      const prio = (s: any) => (String(s) === "10" ? 0 : String(s) === "90" ? 1 : 2);
+      return (data ?? []).flatMap((e: any) => {
+        const todos = Array.isArray(e.contratos_omie) ? e.contratos_omie : [];
+        const ativos = todos.filter((c: any) => String(c.situacao_contrato) === "10");
+        const escolhidos =
+          ativos.length > 0
+            ? ativos
+            : todos.slice().sort((a: any, b: any) => prio(a.situacao_contrato) - prio(b.situacao_contrato)).slice(0, 1);
+        // Sem contratos_omie, mantém a linha do espelho como antes (o botão já se desabilita
+        // sozinho quando não há código de contrato).
+        if (escolhidos.length === 0) return [e];
+        return escolhidos.map((c: any) => ({
+          ...e,
+          codigo_contrato_omie: c.codigo_contrato_omie,
+          valor_omie: c.valor_omie,
+          situacao_contrato: c.situacao_contrato,
+        }));
+      });
     },
   });
 
