@@ -79,6 +79,8 @@ export function ChatMessages({
   const { notes, deleteNote } = useConversationNotes(conversationId);
   const { timezone } = useAppTimezone();
   const { instances } = useWhatsAppInstances();
+  // Apagar-para-todos e editar dependem de endpoints da Evolution; nos demais
+  // provedores (meta_cloud, z-api) a ação não existe e não deve ser oferecida.
   const revokeUnsupportedInstanceIds = useMemo(
     () => new Set(instances.filter((i) => !["self_hosted", "cloud"].includes(i.provider_type)).map((i) => i.id)),
     [instances]
@@ -417,6 +419,7 @@ export function ChatMessages({
                         onContactSave={onContactSave}
                         groupParticipants={isGroup ? groupParticipants : undefined}
                         deleteEveryoneDisabled={!!item.msg.instance_id && revokeUnsupportedInstanceIds.has(item.msg.instance_id)}
+                        editDisabled={!!item.msg.instance_id && revokeUnsupportedInstanceIds.has(item.msg.instance_id)}
                       />
                     </div>
                   );

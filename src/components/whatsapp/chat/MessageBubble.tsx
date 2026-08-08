@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare, EyeOff, Loader2, AlertCircle, RotateCcw, MoreVertical, Reply, FileText } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare, EyeOff, Loader2, AlertCircle, RotateCcw, MoreVertical, Reply, FileText, Pencil } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Message } from "../hooks/useWhatsAppMessages";
@@ -13,6 +13,7 @@ import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { formatTime as formatTzTime } from "@/lib/formatDateWithTimezone";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { useEditMessage } from "../hooks/useEditMessage";
 import {
   Tooltip,
   TooltipContent,
@@ -37,6 +38,7 @@ interface Props {
   onDeleteEveryone?: (msgId: string) => void;
   onRetryDelete?: (msgId: string) => void;
   deleteEveryoneDisabled?: boolean;
+  editDisabled?: boolean;
   onForward?: (msgId: string) => void;
   onResendFailed?: (msgId: string) => void;
   onEnterSelectionMode?: (msgId: string) => void;
@@ -46,6 +48,10 @@ interface Props {
   quotedMessage?: Message | null;
   groupParticipants?: GroupParticipant[];
 }
+
+// Limite do próprio WhatsApp: editar só vale nos 15 min seguintes ao envio.
+// A Edge Function reaplica essa checagem — aqui é só para não oferecer o que vai falhar.
+const EDIT_WINDOW_MS = 15 * 60 * 1000;
 
 function canDeletePanelOnly(msg: Message): boolean {
   if (msg.id.startsWith('temp-')) return false;
@@ -64,6 +70,7 @@ export function MessageBubble({
   onDeleteEveryone,
   onRetryDelete,
   deleteEveryoneDisabled,
+  editDisabled,
   onForward,
   onResendFailed,
   onEnterSelectionMode,
@@ -95,6 +102,47 @@ export function MessageBubble({
   const isPending = deleteStatus === 'pending';
   const isFailed = deleteStatus === 'failed';
   const sendError = isFromMe && msg.status === 'failed' ? getSendErrorInfo(msg.metadata) : null;
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState('');
+  const editMessage = useEditMessage();
+
+  const canEdit =
+    isFromMe &&
+    !editDisabled &&
+    !isDeleted &&
+    !isPending &&
+    msg.status !== 'failed' &&
+    msg.message_type === 'text' &&
+    !!msg.message_id &&
+    !msg.id.startsWith('temp-') &&
+    Date.now() - new Date(msg.timestamp).getTime() <= EDIT_WINDOW_MS;
+
+  const startEditing = () => {
+    setEditText(msg.content ?? '');
+    setIsEditing(true);
+  };
+
+  const saveEdit = () => {
+    const novo = editText.trim();
+    if (!novo) {
+      toast.error('A mensagem não pode ficar vazia.');
+      return;
+    }
+    if (novo === (msg.content ?? '').trim()) {
+      setIsEditing(false);
+      return;
+    }
+    if (Date.now() - new Date(msg.timestamp).getTime() > EDIT_WINDOW_MS) {
+      toast.error('Mensagens só podem ser editadas em até 15 minutos após o envio.');
+      setIsEditing(false);
+      return;
+    }
+    editMessage.mutate(
+      { messageId: msg.message_id, conversationId: msg.conversation_id, newContent: novo },
+      { onSuccess: (data: any) => { if (data?.success) setIsEditing(false); } }
+    );
+  };
 
   const isAudio = msg.message_type === 'audio' || msg.message_type === 'ptt' || (msg.media_mimetype?.startsWith('audio/') ?? false);
   const hasTranscription = isAudio && !!msg.audio_transcription;
@@ -370,11 +418,63 @@ export function MessageBubble({
       {/* Com o card de mídia na tela, o placeholder que o webhook grava em
           `content` ("🎥 Vídeo") vira eco do que o card já diz. Legenda escrita
           pelo cliente continua aparecendo — só o placeholder some. */}
-      {msg.content
-        && msg.message_type !== 'contact'
-        && msg.message_type !== 'contacts'
-        && !(hasRenderableMedia(msg) && isMediaPlaceholderContent(msg.content))
-        && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{renderMessageText(msg.content, groupParticipants)}</p>}
+      {isEditing ? (
+        <div className="min-w-[240px]">
+          <textarea
+            value={editText}
+            autoFocus
+            rows={Math.min(6, (editText.match(/\n/g)?.length ?? 0) + 1)}
+            disabled={editMessage.isPending}
+            onChange={(e) => setEditText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                saveEdit();
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                setIsEditing(false);
+              }
+            }}
+            className="w-full resize-none rounded-md bg-background text-foreground text-sm px-2 py-1.5 outline-none ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary/60 disabled:opacity-60"
+          />
+          <div className="flex items-center gap-2 mt-1">
+            <span className={cn("text-[10px] mr-auto", isFromMe ? "text-primary-foreground/70" : "text-muted-foreground")}>
+              Enter salva · Esc cancela
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              disabled={editMessage.isPending}
+              className={cn(
+                "text-[11px] px-2 py-0.5 rounded transition-opacity hover:opacity-100 disabled:opacity-50",
+                isFromMe ? "text-primary-foreground/80" : "text-muted-foreground"
+              )}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={saveEdit}
+              disabled={editMessage.isPending}
+              className={cn(
+                "flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded transition-colors disabled:opacity-50",
+                isFromMe
+                  ? "bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30"
+                  : "bg-primary/10 text-primary hover:bg-primary/20"
+              )}
+            >
+              {editMessage.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
+              Salvar
+            </button>
+          </div>
+        </div>
+      ) : (
+        msg.content
+          && msg.message_type !== 'contact'
+          && msg.message_type !== 'contacts'
+          && !(hasRenderableMedia(msg) && isMediaPlaceholderContent(msg.content))
+          && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{renderMessageText(msg.content, groupParticipants)}</p>
+      )}
 
       {isAudio && (
         <div className="mt-1 min-w-0">
@@ -428,7 +528,7 @@ export function MessageBubble({
               <span className="text-[10px] italic text-muted-foreground cursor-help">(editada)</span>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-[260px] text-xs">
-              <p>Esta mensagem foi editada pelo cliente após o envio. O conteúdo exibido pode ser a versão original — verifique no WhatsApp se for crítico.</p>
+              <p>Esta mensagem foi editada após o envio. O painel mostra a última versão que recebeu — se for crítico, confira no WhatsApp.</p>
             </TooltipContent>
           </Tooltip>
         )}
@@ -510,6 +610,12 @@ export function MessageBubble({
           <Reply className="h-4 w-4 mr-2" />
           Responder
         </DropdownMenuItem>
+        {canEdit && (
+          <DropdownMenuItem onClick={startEditing}>
+            <Pencil className="h-4 w-4 mr-2" />
+            Editar
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         {isFromMe && canDeletePanelOnly(msg) && !deleteEveryoneDisabled && (
           <DropdownMenuItem onClick={handleDeleteEveryone} className="text-destructive focus:text-destructive">
