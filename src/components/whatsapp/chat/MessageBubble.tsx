@@ -437,8 +437,8 @@ export function MessageBubble({
             }}
             className="w-full resize-none rounded-md bg-background text-foreground text-sm px-2 py-1.5 outline-none ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary/60 disabled:opacity-60"
           />
-          <div className="flex items-center gap-2 mt-1">
-            <span className={cn("text-[10px] mr-auto", isFromMe ? "text-primary-foreground/70" : "text-muted-foreground")}>
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className={cn("text-[10px] mr-auto", isFromMe ? "text-primary-foreground/75" : "text-muted-foreground")}>
               Enter salva · Esc cancela
             </span>
             <button
@@ -446,8 +446,10 @@ export function MessageBubble({
               onClick={() => setIsEditing(false)}
               disabled={editMessage.isPending}
               className={cn(
-                "text-[11px] px-2 py-0.5 rounded transition-opacity hover:opacity-100 disabled:opacity-50",
-                isFromMe ? "text-primary-foreground/80" : "text-muted-foreground"
+                "text-[11px] font-semibold px-2.5 py-1 rounded transition-colors disabled:opacity-50",
+                isFromMe
+                  ? "text-primary-foreground hover:bg-primary-foreground/20"
+                  : "text-foreground hover:bg-foreground/10"
               )}
             >
               Cancelar
@@ -457,10 +459,10 @@ export function MessageBubble({
               onClick={saveEdit}
               disabled={editMessage.isPending}
               className={cn(
-                "flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded transition-colors disabled:opacity-50",
+                "flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded shadow-sm transition-colors disabled:opacity-50",
                 isFromMe
-                  ? "bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30"
-                  : "bg-primary/10 text-primary hover:bg-primary/20"
+                  ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90"
               )}
             >
               {editMessage.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
