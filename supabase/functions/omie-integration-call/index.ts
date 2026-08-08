@@ -97,7 +97,15 @@ async function chamarDoctorOmie(url, chave, corpo) {
 }
 // v15. Resolve QUAL conta Omie do tenant atende esta chamada. Ver cabecalho.
 // Devolve { conta } ou { erro } -- nunca chuta.
-async function resolverConta(service, tenantId, contratoId, contaId) {
+// v16 (07/08/2026): resolve tambem por CLIENTE e por UNIDADE.
+// A v15 so entendia contrato_id e conta_integration_id, e isso quebrou tres telas de uma vez:
+// Vinculos e Padroes Omie mandam a unidade (mesma convencao das recon-*), e as telas do detalhe
+// do cliente (log, vinculo, padroes) nao mandam nada alem do cliente. Todas caiam em
+// 'conta_nao_informada' assim que existiu a segunda conta.
+// A ordem vai do mais especifico para o menos: contrato prova a conta pelo dado; cliente idem;
+// unidade e escolha de tela; conta_integration_id e ultimo porque e o unico que a tela poderia
+// mandar errado.
+async function resolverConta(service, tenantId, contratoId, contaId, clienteId, unidadeBase) {
   const { data: contas, error } = await service.from("omie_integration").select("id, unidades_base_ids").eq("tenant_id", tenantId);
   if (error) return {
     erro: "falha_ao_ler_contas",
@@ -126,6 +134,31 @@ async function resolverConta(service, tenantId, contratoId, contaId) {
     } : {
       erro: "unidade_sem_conta",
       detalhe: String(unidade)
+    };
+  }
+  if (clienteId) {
+    const { data: cl } = await service.from("clientes").select("unidade_base_id").eq("id", clienteId).eq("tenant_id", tenantId).maybeSingle();
+    const unidade = cl?.unidade_base_id ?? null;
+    if (unidade === null) return {
+      erro: "cliente_sem_unidade"
+    };
+    const c = contas.find((x)=>cobre(x, unidade));
+    return c ? {
+      conta: c,
+      unidade
+    } : {
+      erro: "unidade_sem_conta",
+      detalhe: String(unidade)
+    };
+  }
+  if (unidadeBase !== null && unidadeBase !== undefined) {
+    const c = contas.find((x)=>cobre(x, unidadeBase));
+    return c ? {
+      conta: c,
+      unidade: unidadeBase
+    } : {
+      erro: "unidade_sem_conta",
+      detalhe: String(unidadeBase)
     };
   }
   if (contaId) {
@@ -231,7 +264,9 @@ Deno.serve(async (req)=>{
     // v15: resolve a CONTA antes da chave. Ver cabecalho.
     const contratoIdBody = typeof body?.contrato_id === "string" ? body.contrato_id : null;
     const contaIdBody = typeof body?.conta_integration_id === "string" && body.conta_integration_id ? body.conta_integration_id : null;
-    const alvo = await resolverConta(serviceClient, tenantEfetivo, contratoIdBody, contaIdBody);
+    const clienteIdBody = typeof body?.cliente_id === "string" && body.cliente_id ? body.cliente_id : null;
+    const unidadeBody = body?.unidade_base_id != null && body.unidade_base_id !== "" && Number.isFinite(Number(body.unidade_base_id)) ? Number(body.unidade_base_id) : null;
+    const alvo = await resolverConta(serviceClient, tenantEfetivo, contratoIdBody, contaIdBody, clienteIdBody, unidadeBody);
     if (alvo.erro) {
       console.error("ERRO_RESOLVER_CONTA:", alvo.erro, alvo.detalhe ?? "");
       return json({

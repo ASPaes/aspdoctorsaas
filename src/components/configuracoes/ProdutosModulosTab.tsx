@@ -115,28 +115,51 @@ export default function ProdutosModulosTab() {
   });
 
   // Omie integration active check — usa o mesmo effectiveTenantId que as demais telas (super admin pode simular tenant).
-  const omieAtivoQ = useQuery({
-    queryKey: ["omie_integration_ativo", tid],
+  //
+  // 07/08/2026: era um .maybeSingle() sobre omie_integration filtrado por tenant. Com a segunda
+  // conta Omie (uma por unidade base) isso passou a ERRAR — "multiple rows returned" — e a tela
+  // de produtos perdia os campos do Omie por inteiro.
+  //
+  // Produto é do TENANT, mas categoria/serviço do Omie é de cada CONTA. Enquanto não existir
+  // mapeamento de produto por unidade, esta tela usa a conta da **unidade principal**: é o padrão
+  // visível na interface (a principal é marcada como tal) e mantém o comportamento de antes, já
+  // que quem tinha uma conta só continua com ela. O mapeamento por conta, esse sim definitivo,
+  // vive em Integrações → Omie → Vínculos, que já é por conta.
+  const omieContaQ = useQuery({
+    queryKey: ["omie_conta_para_produtos", tid],
     enabled: !!tid,
     queryFn: async () => {
-      const { data, error } = await (supabase.from("omie_integration" as any) as any)
-        .select("tenant_id")
+      const { data: contas, error } = await (supabase.from("omie_integration" as any) as any)
+        .select("id, unidades_base_ids")
         .eq("tenant_id", tid as string)
-        .eq("ativo", true)
-        .maybeSingle();
+        .eq("ativo", true);
       if (error) throw error;
-      return !!data;
+      const lista = (contas ?? []) as Array<{ id: string; unidades_base_ids: number[] | null }>;
+      if (lista.length === 0) return null;
+      if (lista.length === 1) return lista[0].id;
+      const { data: principal } = await (supabase.from("unidades_base" as any) as any)
+        .select("id")
+        .eq("tenant_id", tid as string)
+        .eq("is_principal", true)
+        .maybeSingle();
+      const pid = (principal as any)?.id ?? null;
+      const escolhida =
+        lista.find(
+          (c) => !c.unidades_base_ids?.length || (pid != null && c.unidades_base_ids.includes(pid)),
+        ) ?? lista[0];
+      return escolhida.id;
     },
   });
-  const omieAtivo = omieAtivoQ.data === true;
+  const omieContaId = omieContaQ.data ?? null;
+  const omieAtivo = !!omieContaId;
 
   // Omie lists (only when integration is active and dialog is open)
   const omiePadroesQ = useQuery({
-    queryKey: ["omie_padroes_lists", tid],
+    queryKey: ["omie_padroes_lists", tid, omieContaId],
     enabled: !!tid && omieAtivo && produtoDialogOpen,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: { acao: "ler_padroes", tenant_id: tid, dados: { operacao: "ler" } },
+        body: { acao: "ler_padroes", tenant_id: tid, conta_integration_id: omieContaId, dados: { operacao: "ler" } },
       });
       if (error) throw error;
       const payload = (data as any)?.dados ?? data ?? {};

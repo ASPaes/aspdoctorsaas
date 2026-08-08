@@ -271,6 +271,8 @@ function EnviarBotao({
         body: {
           acao: "salvar_vinculo",
           tenant_id: tenantId,
+          // Conta Omie sai do cliente (cliente -> unidade -> conta). Ver resolverConta v16.
+          cliente_id: clienteId,
           dados: {
             tipo: "cliente",
             ds_customer_id: clienteId,

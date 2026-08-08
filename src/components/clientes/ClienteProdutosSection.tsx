@@ -885,7 +885,7 @@ function ProdutoDialog({
     enabled: open && omieAtivo && !!resolvedTenantId,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
-        body: { acao: "ler_padroes", tenant_id: resolvedTenantId, dados: { operacao: "ler" } },
+        body: { acao: "ler_padroes", tenant_id: resolvedTenantId, cliente_id: clienteId, dados: { operacao: "ler" } },
       });
       if (error) throw error;
       const resultado = (data as any)?.resultado ?? (data as any)?.dados ?? data ?? {};

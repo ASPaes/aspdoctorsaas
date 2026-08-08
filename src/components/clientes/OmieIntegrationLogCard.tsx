@@ -297,6 +297,8 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
         body: {
           acao: "listar_log",
           tenant_id: tid,
+          // Conta Omie sai do cliente (cliente -> unidade -> conta). Ver resolverConta v16.
+          cliente_id: clienteId,
           dados: {
             ds_customer_id: clienteId,
             ds_contract_ids: dadosQuery.data?.contratoIds ?? [],
