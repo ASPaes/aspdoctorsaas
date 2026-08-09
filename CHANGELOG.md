@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Agosto / 2026
 
+### 09/08
+
+- 🔧 **Atendimento / Contatos** — **O contato selecionado voltou a mostrar os dados.** Na tela de *Contatos*, o item escolhido na lista da esquerda ficava pintado de azul sólido, e esse azul cobria justamente o que interessa: o **telefone**, o **número de conversas** e o ícone de **cliente vinculado** sumiam dentro do preenchimento. Na prática, o contato aberto era o único da lista que você não conseguia ler. Agora a seleção usa um azul bem mais leve, com uma faixa na lateral esquerda marcando qual está aberto — continua óbvio onde você está, e todas as informações seguem legíveis.
+
 ### 08/08
 
 - 🔧 **Atendimento / Chat** — **A imagem ampliada fecha clicando fora dela.** Ao abrir uma imagem do chat em tela cheia, a única saída era o **X** no canto: clicar na área escura ao lado da imagem — o gesto natural, e o mesmo que funciona no WhatsApp Web — não fazia nada. Agora clicar em qualquer parte vazia da tela fecha a visualização. Os botões de copiar, baixar, abrir em nova guia e os controles de zoom continuam respondendo normalmente, e arrastar a imagem ampliada para navegar não fecha mais por engano. O **X** e a tecla **Esc** seguem funcionando.

@@ -136,11 +136,18 @@ export default function WhatsAppContatos() {
             </div>
           ) : (
             <div className="p-1 space-y-px">
+              {/* Seleção precisa ser legível: `bg-accent` é o azul sólido #0EA5E9 e
+                  apagava telefone e badges. Tinta leve + trilho na borda dá o mesmo
+                  sinal sem competir com o texto (mesmo padrão do ConversationItem). */}
               {contacts.map((c: any) => (
                 <button
                   key={c.id}
                   onClick={() => setSelectedContactId(c.id)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-md text-left hover:bg-accent/50 transition-colors ${selectedContactId === c.id ? "bg-accent" : ""}`}
+                  className={`w-full flex items-center gap-3 p-3 rounded-md text-left transition-colors border-l-[3px] ${
+                    selectedContactId === c.id
+                      ? "bg-accent/30 border-l-accent hover:bg-accent/35 dark:bg-accent/[0.35] dark:hover:bg-accent/40"
+                      : "border-l-transparent hover:bg-muted/60"
+                  }`}
                 >
                   <Avatar className="h-10 w-10">
                     {c.profile_picture_url && <AvatarImage src={c.profile_picture_url} />}
