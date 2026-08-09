@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 09/08
 
+- 🔧 **Geral** — **O aviso do canto não cobre mais o campo de digitar.** Os avisos de confirmação — "Atendimento 05038/26 iniciado", "mensagem enviada", e todos os outros — apareciam colados no rodapé da tela, exatamente em cima da **caixa de escrever a mensagem** do chat. Quem estava digitando quando um deles surgia perdia de vista o próprio texto por alguns segundos e tinha que esperar o aviso sumir para conferir o que já tinha escrito. Agora eles aparecem um pouco mais acima, sobre a conversa, e o campo de digitação fica sempre livre. O conteúdo, a duração e o lugar do aviso — canto inferior direito — continuam os mesmos.
+
 - 🔧 **Atendimento / Contatos** — **O contato selecionado voltou a mostrar os dados.** Na tela de *Contatos*, o item escolhido na lista da esquerda ficava pintado de azul sólido, e esse azul cobria justamente o que interessa: o **telefone**, o **número de conversas** e o ícone de **cliente vinculado** sumiam dentro do preenchimento. Na prática, o contato aberto era o único da lista que você não conseguia ler. Agora a seleção usa um azul bem mais leve, com uma faixa na lateral esquerda marcando qual está aberto — continua óbvio onde você está, e todas as informações seguem legíveis.
 
 ### 08/08

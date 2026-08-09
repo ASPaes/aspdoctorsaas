@@ -83,7 +83,9 @@ const App = () => (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
     <TooltipProvider>
       <Toaster />
-      <Sonner position="bottom-right" />
+      {/* offset sobe o toast acima do composer do chat (~130px): sem isso a
+          notificação cai em cima do campo de digitar a mensagem. */}
+      <Sonner position="bottom-right" offset={{ bottom: "9rem" }} />
       <BrowserRouter>
           <Routes>
             {/* Public routes */}
