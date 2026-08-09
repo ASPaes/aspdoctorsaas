@@ -19,7 +19,7 @@ import { SmartReplySuggestions } from "./input/SmartReplySuggestions";
 import { ReplyPreview } from "./input/ReplyPreview";
 import { AttachmentChip } from "./input/AttachmentChip";
 import { MediaSendPreviewDialog } from "./input/MediaSendPreviewDialog";
-import { useWhatsAppMacros } from "../hooks/useWhatsAppMacros";
+import { useWhatsAppMacros, macroAnexos, type MacroAnexo } from "../hooks/useWhatsAppMacros";
 import { useMacroTags } from "../hooks/useMacroTags";
 import { useSmartReply } from "../hooks/useSmartReply";
 import { useWhatsAppSend } from "../hooks/useWhatsAppSend";
@@ -98,7 +98,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const [macroSelectedIndex, setMacroSelectedIndex] = useState(0);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [activeMacro, setActiveMacro] = useState<{ id: string; content: string; permite_edicao_livre: boolean; media_type?: string | null; media_path?: string | null } | null>(null);
+  const [activeMacro, setActiveMacro] = useState<{ id: string; content: string; permite_edicao_livre: boolean; anexos: MacroAnexo[] } | null>(null);
+  const [macroSending, setMacroSending] = useState(false);
   const isInternalNote = mode === "note";
   const isDraftMode = mode === "draft";
   const { createNote, isCreating: isCreatingNote } = useConversationNotes(conversationId);
@@ -756,17 +757,16 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     setShowMacroSuggestions(false);
 
     const hasTags = /\{\{[^}]+\}\}/.test(macro.content || "");
-    const hasMedia = !!macro.media_path;
+    const anexos = macroAnexos(macro);
 
-    if (hasTags || hasMedia) {
+    if (hasTags || anexos.length > 0) {
       const cleaned = message.replace(/(\/(macro:\s*\S*|[^\s/]*))$/i, "").trimEnd();
       setMessage(cleaned);
       setActiveMacro({
         id: macro.id,
         content: macro.content,
         permite_edicao_livre: macro.permite_edicao_livre ?? false,
-        media_type: macro.media_type,
-        media_path: macro.media_path,
+        anexos,
       });
       return;
     }
@@ -789,22 +789,35 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
       return;
     }
-    if (activeMacro?.media_path) {
+    const anexos = activeMacro?.anexos ?? [];
+    if (anexos.length > 0) {
+      // Sequencial de propósito: a ordem definida no cadastro é o requisito.
+      // `sendAttachedFilesAll` dispara em paralelo e não garante a chegada em ordem.
+      setMacroSending(true);
       try {
-        const { data: blob, error } = await supabase.storage
-          .from('macro-media')
-          .download(activeMacro.media_path);
-        if (error || !blob) {
-          toast.error("Erro ao baixar mídia da macro");
-          return;
+        for (let i = 0; i < anexos.length; i++) {
+          const anexo = anexos[i];
+          const { data: blob, error } = await supabase.storage
+            .from('macro-media')
+            .download(anexo.media_path);
+          if (error || !blob) {
+            toast.error(`Erro ao baixar o anexo ${i + 1} de ${anexos.length} da macro`);
+            return;
+          }
+          const fileName = anexo.file_name || anexo.media_path.split('/').pop() || 'file';
+          const file = new File([blob], fileName, { type: anexo.mime_type || blob.type });
+          // Texto da macro vai como legenda do 1º anexo; os demais seguem sem legenda.
+          await sendOneFile(file, i === 0 ? (finalText || undefined) : undefined);
         }
-        const fileName = activeMacro.media_path.split('/').pop() || 'file';
-        const file = new File([blob], fileName, { type: blob.type });
-        await sendAttachedFile(file, finalText || undefined);
         setActiveMacro(null);
+        setAttachedFiles([]);
+        setMessage("");
         onCancelReply?.();
+        setTimeout(() => textareaRef.current?.focus(), 50);
       } catch (err: any) {
         toast.error("Erro ao enviar mídia: " + (err.message || ""));
+      } finally {
+        setMacroSending(false);
       }
       return;
     }
@@ -981,12 +994,12 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           <MacroFillCard
             template={activeMacro.content}
             permiteEdicaoLivre={activeMacro.permite_edicao_livre}
-            mediaType={activeMacro.media_type}
+            anexos={activeMacro.anexos}
             prefillValues={macroPrefillValues}
             onCancel={handleMacroCardCancel}
             onEditFreely={handleMacroEditFreely}
             onSend={handleMacroCardSend}
-            isSending={sendMutation.isPending}
+            isSending={sendMutation.isPending || macroSending}
           />
         )}
 

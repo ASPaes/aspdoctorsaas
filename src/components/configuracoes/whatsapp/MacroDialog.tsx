@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useMacroTags } from "@/components/whatsapp/hooks/useMacroTags";
-import { AlertTriangle, Paperclip, X } from "lucide-react";
+import {
+  AlertTriangle, FileAudio, FileText, FileVideo, GripVertical, Image as ImageIcon, Paperclip, X,
+} from "lucide-react";
+import {
+  DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -16,12 +25,65 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { useWhatsAppMacros, type WhatsAppMacro } from "@/components/whatsapp/hooks/useWhatsAppMacros";
+import { useWhatsAppMacros, macroAnexos, type WhatsAppMacro } from "@/components/whatsapp/hooks/useWhatsAppMacros";
+import {
+  useMacroAnexos, pendingFromAnexo, pendingFromFile, MAX_MACRO_ANEXOS, type PendingAnexo,
+} from "@/components/whatsapp/hooks/useMacroAnexos";
 import { Switch } from "@/components/ui/switch";
 import { Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { formatBytes } from "@/utils/whatsapp/formatBytes";
 import { toast } from "sonner";
+
+function AnexoIcon({ mediaType }: { mediaType: string }) {
+  const Icon = mediaType === "image" ? ImageIcon
+    : mediaType === "audio" ? FileAudio
+    : mediaType === "video" ? FileVideo
+    : FileText;
+  return <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />;
+}
+
+function SortableAnexoRow({
+  anexo, ordem, onRemove,
+}: {
+  anexo: PendingAnexo;
+  ordem: number;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: anexo.key });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+      className="flex items-center gap-2 rounded-md border bg-card p-2"
+    >
+      <button
+        type="button"
+        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+        {...attributes}
+        {...listeners}
+        aria-label={`Reordenar ${anexo.file_name}`}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <span className="w-5 shrink-0 text-center text-xs font-medium text-muted-foreground">{ordem + 1}</span>
+      <AnexoIcon mediaType={anexo.media_type} />
+      <span className="min-w-0 flex-1 truncate text-sm" title={anexo.file_name}>{anexo.file_name}</span>
+      {anexo.size_bytes != null && (
+        <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(anexo.size_bytes)}</span>
+      )}
+      <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onRemove} aria-label={`Remover ${anexo.file_name}`}>
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
 
 
 const formSchema = z.object({
@@ -43,15 +105,46 @@ interface MacroDialogProps {
 }
 
 export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
-  const { createMacro, updateMacro, isCreating, isUpdating } = useWhatsAppMacros();
+  const { createMacroAsync, updateMacroAsync, isCreating, isUpdating } = useWhatsAppMacros();
+  const { saveAnexos, isSavingAnexos } = useMacroAnexos();
   const { tags: allTags, detectTags, isKnownTag } = useMacroTags();
   const { effectiveTenantId: tid } = useTenantFilter();
   const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [mediaType, setMediaType] = useState<string | null>(null);
-  const [existingMediaPath, setExistingMediaPath] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [anexos, setAnexos] = useState<PendingAnexo[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setAnexos((prev) => {
+      const oldIndex = prev.findIndex((a) => a.key === active.id);
+      const newIndex = prev.findIndex((a) => a.key === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  };
+
+  const handleAddFiles = (files: FileList | null) => {
+    if (!files?.length) return;
+    const incoming = Array.from(files);
+    setAnexos((prev) => {
+      const livre = MAX_MACRO_ANEXOS - prev.length;
+      if (livre <= 0) {
+        toast.warning(`Limite de ${MAX_MACRO_ANEXOS} anexos por macro.`);
+        return prev;
+      }
+      if (incoming.length > livre) {
+        toast.warning(`Só cabem mais ${livre} anexo${livre > 1 ? "s" : ""} nesta macro.`);
+      }
+      return [...prev, ...incoming.slice(0, livre).map(pendingFromFile)];
+    });
+  };
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -90,57 +183,42 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
         category: macro?.category || "",
         permite_edicao_livre: macro?.permite_edicao_livre ?? false,
       });
-      setMediaFile(null);
-      setMediaType(macro?.media_type ?? null);
-      setExistingMediaPath(macro?.media_path ?? null);
+      setAnexos(macro ? macroAnexos(macro).map(pendingFromAnexo) : []);
     }
   }, [open, macro, form]);
 
   const onSubmit = async (values: FormValues) => {
-    let finalMediaPath = existingMediaPath;
-    let finalMediaType = mediaType;
-
-    if (mediaFile && tid) {
-      setUploading(true);
-      const ext = mediaFile.name.split('.').pop() || 'bin';
-      const filePath = `${tid}/macros/${crypto.randomUUID()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('macro-media').upload(filePath, mediaFile, { upsert: false });
-      setUploading(false);
-      if (upErr) {
-        toast.error('Erro no upload: ' + upErr.message);
-        return;
-      }
-      finalMediaPath = filePath;
-      finalMediaType = mediaFile.type.startsWith('image/') ? 'image'
-        : mediaFile.type.startsWith('audio/') ? 'audio'
-        : mediaFile.type.startsWith('video/') ? 'video'
-        : 'document';
-    }
-
-    if (!mediaFile && !existingMediaPath) {
-      finalMediaPath = null;
-      finalMediaType = null;
-    }
-
+    // `media_path`/`media_type` não vão no payload: quem grava esse espelho do
+    // 1º anexo é o saveAnexos, logo depois de subir os arquivos.
     const payload = {
       title: values.title,
       content: values.content,
       shortcut: values.shortcut || null,
       category: values.category || null,
       permite_edicao_livre: values.permite_edicao_livre,
-      media_type: finalMediaType,
-      media_path: finalMediaPath,
     };
 
-    if (macro) {
-      updateMacro({ id: macro.id, updates: payload });
-    } else {
-      createMacro(payload);
+    setSaving(true);
+    try {
+      const saved = macro
+        ? await updateMacroAsync({ id: macro.id, updates: payload })
+        : await createMacroAsync(payload);
+
+      // O tenant vem da linha gravada: o trigger set_tenant_id_on_insert pode
+      // ter resolvido um tenant diferente do `tid` do filtro (super admin).
+      const tenantId = saved?.tenant_id || macro?.tenant_id || tid;
+      if (!tenantId) throw new Error("Tenant não identificado.");
+
+      await saveAnexos({ macroId: saved.id, tenantId, items: anexos });
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error("Erro ao salvar anexos: " + (err?.message || ""));
+    } finally {
+      setSaving(false);
     }
-    onOpenChange(false);
   };
 
-  const isPending = isCreating || isUpdating;
+  const isPending = isCreating || isUpdating || isSavingAnexos || saving;
 
 
   return (
@@ -203,51 +281,60 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
             )} />
 
             <div className="space-y-2">
-              <FormLabel>Mídia (opcional)</FormLabel>
-              {existingMediaPath && !mediaFile && (
-                <div className="flex items-center gap-2 rounded-md border p-2 bg-muted/30">
-                  <Paperclip className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm flex-1 truncate">{existingMediaPath.split('/').pop()}</span>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => { setExistingMediaPath(null); setMediaType(null); }}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
+              <div className="flex items-center justify-between">
+                <FormLabel>Anexos (opcional)</FormLabel>
+                {anexos.length > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {anexos.length}/{MAX_MACRO_ANEXOS} · enviados nesta ordem
+                  </span>
+                )}
+              </div>
+
+              {anexos.length > 0 && (
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={anexos.map((a) => a.key)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2">
+                      {anexos.map((anexo, ordem) => (
+                        <SortableAnexoRow
+                          key={anexo.key}
+                          anexo={anexo}
+                          ordem={ordem}
+                          onRemove={() => setAnexos((prev) => prev.filter((a) => a.key !== anexo.key))}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               )}
-              {mediaFile && (
-                <div className="flex items-center gap-2 rounded-md border p-2 bg-muted/30">
-                  <Paperclip className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm flex-1 truncate">{mediaFile.name}</span>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setMediaFile(null)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-              {!existingMediaPath && !mediaFile && (
-                <div>
-                  <input
-                    id="macro-dialog-media-input"
-                    type="file"
-                    className="hidden"
-                    accept="image/*,audio/*,video/*,application/pdf"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        setMediaFile(file);
-                        setMediaType(
-                          file.type.startsWith('image/') ? 'image'
-                          : file.type.startsWith('audio/') ? 'audio'
-                          : file.type.startsWith('video/') ? 'video'
-                          : 'document'
-                        );
-                      }
-                      e.target.value = "";
-                    }}
-                  />
-                  <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('macro-dialog-media-input')?.click()}>
-                    <Paperclip className="h-4 w-4 mr-2" /> Anexar mídia
-                  </Button>
-                </div>
-              )}
+
+              <div>
+                <input
+                  id="macro-dialog-media-input"
+                  type="file"
+                  multiple
+                  className="hidden"
+                  accept="image/*,audio/*,video/*,application/pdf"
+                  onChange={(e) => {
+                    handleAddFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={anexos.length >= MAX_MACRO_ANEXOS}
+                  onClick={() => document.getElementById('macro-dialog-media-input')?.click()}
+                >
+                  <Paperclip className="h-4 w-4 mr-2" />
+                  {anexos.length ? "Adicionar anexo" : "Anexar arquivos"}
+                </Button>
+                {anexos.length > 1 && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Arraste pela alça para mudar a ordem de envio. O texto da macro vai como legenda do 1º anexo.
+                  </p>
+                )}
+              </div>
             </div>
 
             {allTags.length > 0 && (
@@ -297,7 +384,7 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isPending || uploading}>
+              <Button type="submit" disabled={isPending}>
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {macro ? "Salvar Alterações" : "Criar Macro"}
               </Button>

@@ -3,6 +3,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
+export interface MacroAnexo {
+  id: string;
+  macro_id: string;
+  media_path: string;
+  media_type: string;
+  file_name: string | null;
+  mime_type: string | null;
+  size_bytes: number | null;
+  ordem: number;
+}
+
 export interface WhatsAppMacro {
   id: string;
   tenant_id: string;
@@ -18,8 +29,33 @@ export interface WhatsAppMacro {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** DEPRECATED — espelha o 1º anexo (`anexos[0]`). Mantido para compatibilidade. */
   media_type: string | null;
+  /** DEPRECATED — espelha o 1º anexo (`anexos[0]`). Mantido para compatibilidade. */
   media_path: string | null;
+  anexos: MacroAnexo[];
+}
+
+const ANEXOS_EMBED =
+  "anexos:whatsapp_macro_anexos(id, macro_id, media_path, media_type, file_name, mime_type, size_bytes, ordem)";
+
+/**
+ * Anexos da macro já ordenados. Cai no `media_path` legado quando a macro ainda
+ * não tem linha em `whatsapp_macro_anexos` (macro criada antes do backfill).
+ */
+export function macroAnexos(macro: Pick<WhatsAppMacro, "id" | "anexos" | "media_path" | "media_type">): MacroAnexo[] {
+  if (macro.anexos?.length) return macro.anexos;
+  if (!macro.media_path) return [];
+  return [{
+    id: `legacy-${macro.id}`,
+    macro_id: macro.id,
+    media_path: macro.media_path,
+    media_type: macro.media_type || "document",
+    file_name: macro.media_path.split("/").pop() || null,
+    mime_type: null,
+    size_bytes: null,
+    ordem: 0,
+  }];
 }
 
 export const useWhatsAppMacros = (instanceId?: string) => {
@@ -30,7 +66,7 @@ export const useWhatsAppMacros = (instanceId?: string) => {
     queryKey: ['whatsapp-macros', instanceId, effectiveTenantId],
     queryFn: async () => {
       let query = (supabase.from('whatsapp_macros') as any)
-        .select('*')
+        .select(`*, ${ANEXOS_EMBED}`)
         .eq('is_active', true)
         .order('title', { ascending: true });
 
@@ -46,7 +82,11 @@ export const useWhatsAppMacros = (instanceId?: string) => {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as WhatsAppMacro[];
+      // PostgREST não garante a ordem do embed — ordenar por `ordem` aqui.
+      return ((data ?? []) as any[]).map((m) => ({
+        ...m,
+        anexos: [...(m.anexos ?? [])].sort((a: MacroAnexo, b: MacroAnexo) => a.ordem - b.ordem),
+      })) as WhatsAppMacro[];
     },
   });
 
@@ -97,6 +137,8 @@ export const useWhatsAppMacros = (instanceId?: string) => {
   return {
     macros, isLoading,
     createMacro: createMacro.mutate, updateMacro: updateMacro.mutate,
+    // Variantes async: o dialog precisa do id da macro criada para gravar os anexos.
+    createMacroAsync: createMacro.mutateAsync, updateMacroAsync: updateMacro.mutateAsync,
     deleteMacro: deleteMacro.mutate, incrementUsage: incrementUsage.mutate,
     isCreating: createMacro.isPending, isUpdating: updateMacro.isPending, isDeleting: deleteMacro.isPending,
   };

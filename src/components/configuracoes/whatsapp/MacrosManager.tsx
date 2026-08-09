@@ -4,7 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWhatsAppMacros } from "@/components/whatsapp/hooks/useWhatsAppMacros";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Paperclip } from "lucide-react";
+import { macroAnexos } from "@/components/whatsapp/hooks/useWhatsAppMacros";
 import { MacroDialog } from "./MacroDialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -76,12 +77,15 @@ function MacrosList() {
                 <TableHead>Atalho</TableHead>
                 <TableHead className="hidden md:table-cell">Conteúdo</TableHead>
                 <TableHead>Categoria</TableHead>
+                <TableHead className="text-center">Anexos</TableHead>
                 <TableHead className="text-right">Usos</TableHead>
                 <TableHead className="w-[100px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {macros.map((macro) => (
+              {macros.map((macro) => {
+                const totalAnexos = macroAnexos(macro).length;
+                return (
                 <TableRow key={macro.id}>
                   <TableCell className="font-medium">{macro.title}</TableCell>
                   <TableCell>
@@ -95,6 +99,20 @@ function MacrosList() {
                   <TableCell>
                     {macro.category ? <Badge variant="secondary">{macro.category}</Badge> : <span className="text-muted-foreground">—</span>}
                   </TableCell>
+                  <TableCell className="text-center">
+                    {totalAnexos > 0 ? (
+                      <Badge
+                        variant="outline"
+                        className="gap-1 font-mono tabular-nums"
+                        title={`${totalAnexos} anexo${totalAnexos > 1 ? "s" : ""}`}
+                      >
+                        <Paperclip className="h-3 w-3" />
+                        {totalAnexos}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">{macro.usage_count}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
@@ -107,7 +125,8 @@ function MacrosList() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </div>

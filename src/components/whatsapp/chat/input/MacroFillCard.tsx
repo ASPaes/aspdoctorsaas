@@ -4,6 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Send, Edit3, AlertTriangle, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { MacroAnexo } from "../../hooks/useWhatsAppMacros";
+
+const ANEXO_LABEL: Record<string, string> = {
+  image: "Imagem",
+  audio: "Áudio",
+  video: "Vídeo",
+  document: "Documento",
+};
 
 interface Fragment {
   type: "text" | "tag";
@@ -13,7 +21,7 @@ interface Fragment {
 interface Props {
   template: string;
   permiteEdicaoLivre: boolean;
-  mediaType?: string | null;
+  anexos?: MacroAnexo[];
   prefillValues?: Record<string, string>;
   onCancel: () => void;
   onEditFreely: () => void;
@@ -63,7 +71,7 @@ function computeInitialValues(template: string, prefillValues?: Record<string, s
   return { values, prefilled };
 }
 
-export function MacroFillCard({ template, permiteEdicaoLivre, mediaType, prefillValues, onCancel, onEditFreely, onSend, isSending }: Props) {
+export function MacroFillCard({ template, permiteEdicaoLivre, anexos = [], prefillValues, onCancel, onEditFreely, onSend, isSending }: Props) {
   const fragments = useMemo(() => parseTemplate(template), [template]);
 
   const tagOccurrences = useMemo(() => {
@@ -200,12 +208,28 @@ export function MacroFillCard({ template, permiteEdicaoLivre, mediaType, prefill
         </div>
       )}
 
-      {mediaType && (
-        <div className="flex items-center gap-2 p-2 mb-3 rounded border border-blue-500/30 bg-blue-500/5 text-xs text-blue-600">
-          <Paperclip className="h-3.5 w-3.5 shrink-0" />
-          <span>
-            {mediaType === 'image' ? 'Imagem anexada' : mediaType === 'audio' ? 'Áudio anexado' : mediaType === 'video' ? 'Vídeo anexado' : 'Documento anexado'}
-          </span>
+      {anexos.length > 0 && (
+        <div className="p-2 mb-3 rounded border border-blue-500/30 bg-blue-500/5 text-xs text-blue-600 dark:text-blue-400">
+          <div className="flex items-center gap-2 font-medium">
+            <Paperclip className="h-3.5 w-3.5 shrink-0" />
+            <span>
+              {anexos.length === 1
+                ? `1 anexo — ${ANEXO_LABEL[anexos[0].media_type] ?? "Arquivo"}`
+                : `${anexos.length} anexos — enviados nesta ordem`}
+            </span>
+          </div>
+          {anexos.length > 1 && (
+            <ol className="mt-1.5 space-y-0.5 pl-[22px]">
+              {anexos.map((a, i) => (
+                <li key={a.id} className="flex gap-1.5 min-w-0">
+                  <span className="shrink-0 tabular-nums opacity-70">{i + 1}.</span>
+                  <span className="truncate" title={a.file_name || a.media_path}>
+                    {a.file_name || a.media_path.split("/").pop()}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
       )}
 

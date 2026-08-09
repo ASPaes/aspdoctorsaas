@@ -1,7 +1,8 @@
 import { useEffect, useRef, KeyboardEvent } from "react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { WhatsAppMacro } from "../../hooks/useWhatsAppMacros";
+import { Paperclip } from "lucide-react";
+import { macroAnexos, type WhatsAppMacro } from "../../hooks/useWhatsAppMacros";
 
 interface MacroSuggestionsProps {
   macros: WhatsAppMacro[];
@@ -40,6 +41,7 @@ export const MacroSuggestions = ({ macros, onSelect, selectedIndex = 0, onClose 
       <div className="p-1 max-h-[240px] overflow-y-auto">
         {macros.map((macro, idx) => {
           const isSelected = idx === selectedIndex;
+          const totalAnexos = macroAnexos(macro).length;
           return (
             <button
               key={macro.id}
@@ -61,6 +63,15 @@ export const MacroSuggestions = ({ macros, onSelect, selectedIndex = 0, onClose 
               <span className="text-sm font-medium truncate flex-1 min-w-0">
                 {macro.title}
               </span>
+              {totalAnexos > 0 && (
+                <span
+                  className="flex items-center gap-0.5 text-[10px] text-muted-foreground shrink-0 tabular-nums"
+                  title={`${totalAnexos} anexo${totalAnexos > 1 ? "s" : ""}`}
+                >
+                  <Paperclip className="h-3 w-3" />
+                  {totalAnexos}
+                </span>
+              )}
               {macro.category && (
                 <span className="text-[10px] opacity-60 shrink-0 uppercase tracking-wide">
                   {macro.category}
