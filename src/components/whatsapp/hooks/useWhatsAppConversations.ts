@@ -121,10 +121,17 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: false,
+    // O offset conta só as conversas com `last_message_at` — são as que a RPC
+    // pagina. Conversa recém-aberta (sem mensagem ainda) vem por fora, forçada
+    // por id na primeira página, e NÃO ocupa lugar na janela do servidor:
+    // somá-la aqui faria a página 2 pular uma conversa em silêncio.
     getNextPageParam: (lastPage: ConversationWithContact[], allPages) =>
       lastPage.length < pageSize
         ? undefined
-        : allPages.reduce((n, p) => n + p.length, 0),
+        : allPages.reduce(
+            (n, p) => n + p.filter((c) => c.last_message_at != null).length,
+            0
+          ),
     queryFn: async ({ pageParam }): Promise<ConversationWithContact[]> => {
       // DEM-0227: a fila tem RPC própria — mesma forma de retorno, ordem FIFO.
       //

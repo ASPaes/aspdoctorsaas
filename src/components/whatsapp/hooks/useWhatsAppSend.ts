@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeMessage, upsertInfinite, patchInfinite, type Message, type MsgPages } from './useWhatsAppMessages';
-import { patchConversationInCache, outgoingMediaPreview } from './conversationsCache';
+import { patchConversationInCache, isConversationInCache, outgoingMediaPreview } from './conversationsCache';
 
 interface SendMessageParams {
   conversationId: string;
@@ -169,6 +169,25 @@ export const useWhatsAppSend = () => {
       }
     },
     onSettled: (data, _error, variables) => {
+      // A edge function pode ter ABERTO o atendimento neste envio: quando o
+      // operador escreve a primeira frase num chat que ele mesmo iniciou, o
+      // send-whatsapp-message cria o support_attendances já `in_progress`, no
+      // nome dele e no setor dele. Isso muda o bucket da conversa — ela sai de
+      // "encerrada" e entra em "Atendendo".
+      //
+      // Quem enviou não pode depender do Realtime para descobrir a própria
+      // ação. Sem este refresh a conversa só entrava na pill certa no refetch
+      // de 60s, e o atendente concluía (com razão) que precisava dar F5.
+      //
+      // Só custa request quando a conversa NÃO está em nenhuma página
+      // carregada — que é exatamente o caso em que ela está faltando na lista.
+      // No envio comum, com o chat já na tela, isto não dispara nada.
+      if (!_error && !isConversationInCache(queryClient, variables.conversationId)) {
+        queryClient.invalidateQueries({ queryKey: ['whatsapp', 'active-attendance-conv-ids'] });
+        queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+        queryClient.invalidateQueries({ queryKey: ['whatsapp', 'pill-counts'] });
+      }
+
       if (data?.message) {
         const realMessage = normalizeMessage(data.message);
         queryClient.setQueryData<MsgPages>(

@@ -41,6 +41,30 @@ export function patchConversationInCache(
 }
 
 /**
+ * A conversa está em alguma página já carregada da sidebar?
+ *
+ * Serve para decidir se vale gastar um refetch. Quem pergunta é o envio de
+ * mensagem: a edge function pode ter acabado de abrir o atendimento, e nesse
+ * caso a conversa muda de bucket. Perguntar antes evita refazer a lista inteira
+ * a cada mensagem enviada — na esmagadora maioria dos envios a conversa já está
+ * na tela e não há nada a buscar.
+ */
+export function isConversationInCache(
+  queryClient: QueryClient,
+  conversationId: string,
+): boolean {
+  const entries = queryClient.getQueriesData({ queryKey: ["whatsapp", "conversations"] });
+  for (const [, data] of entries) {
+    const pages = (data as any)?.pages as any[][] | undefined;
+    if (!pages) continue;
+    for (const page of pages) {
+      if (page.some((c: any) => c.id === conversationId)) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Aplica uma transformação em TODAS as conversas em cache. Para patches que não
  * são por id de conversa — ex.: mudar um campo do contato em toda conversa dele.
  */

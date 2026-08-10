@@ -152,18 +152,29 @@ export function MediaContent({
   // Não-inline (document e afins) OU inline sem nada para buscar (mídia grande
   // que o webhook não baixou) caem no card, que sabe dizer "abra pelo WhatsApp".
   // Antes esse fallback só existia para document — vídeo grande não renderizava.
+  //
+  // O `containerRef` vem junto DE PROPÓSITO. O evolution-webhook grava a mensagem
+  // sem `media_url` quando o payload não traz `fileLength` e só depois faz o
+  // UPDATE com o caminho do Storage — ou seja, este ramo é o PRIMEIRO a
+  // renderizar para boa parte das mídias recebidas. Sem a ref aqui, o
+  // IntersectionObserver de `useHasBeenVisible` não achava elemento nenhum na
+  // montagem, nunca era criado (o efeito não roda de novo), e quando o UPDATE
+  // chegava a bolha caía no ramo inline com `hasBeenVisible` travado em false:
+  // download desabilitado e spinner eterno até o F5.
   if (!isInline || !hasRetrievableMedia) {
     return (
-      <AttachmentCard
-        messageId={messageId}
-        mediaFilename={mediaFilename || metadata?.fileName}
-        mediaExt={mediaExt}
-        mediaSizeBytes={mediaSizeBytes}
-        mediaKind={mediaKind || kindFromMessageType(messageType)}
-        mediaMimetype={mediaMimetype}
-        mediaUrl={mediaUrl}
-        mediaPath={mediaPath}
-      />
+      <div ref={containerRef} className="min-w-0">
+        <AttachmentCard
+          messageId={messageId}
+          mediaFilename={mediaFilename || metadata?.fileName}
+          mediaExt={mediaExt}
+          mediaSizeBytes={mediaSizeBytes}
+          mediaKind={mediaKind || kindFromMessageType(messageType)}
+          mediaMimetype={mediaMimetype}
+          mediaUrl={mediaUrl}
+          mediaPath={mediaPath}
+        />
+      </div>
     );
   }
 
