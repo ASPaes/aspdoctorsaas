@@ -1,4 +1,22 @@
-// omie-sync-processar — PROCESSADOR DA FILA (peca 3 final, Caminho D) — v14
+// omie-sync-processar — PROCESSADOR DA FILA (peca 3 final, Caminho D) — v15
+//
+// v15 (10/08/2026) — A MESMA PROVA DA v14 NO CANCELAMENTO JA CONVERGIDO.
+//     A v14 consertou so a reativacao e deixou de pe o caso gemeo, no mesmo arquivo: o ramo do
+//     cancelamento idempotente (v12) exigia reconConfiavel sozinho. Como a v14 mostrou que essa
+//     regua reprova todo cliente com mais de um contrato no mesmo CNPJ, a SAVANA voltaria a
+//     travar no proximo cancelamento -- pela mesma causa que acabara de ser corrigida.
+//     Agora os dois ramos aceitam a mesma segunda prova (churn 'ok' anterior para o mesmo
+//     contrato = fomos nos que pusemos aquele contrato em 99).
+//
+//     ASSIMETRIA DE RISCO, que a v14 nao tem: reativar errado ESCREVE no Omie e ativa contrato
+//     que nao devia -- erro barulhento, aparece na conciliacao. Ja o cancelamento convergido nao
+//     escreve nada e declara 'ok': de/para errado ali significa o contrato de verdade seguindo
+//     ATIVO, faturando um cliente que o DS cancelou, e ninguem volta a olhar porque a fila diz
+//     que deu certo. Erro silencioso.
+//     A prova exata seria "o contrato que o Omie mostra em 99 e o MESMO que cancelamos" -- da
+//     para fechar carimbando o nCodCtr (o ds-omie-contrato-alterar ja devolve, e o 409 traz o
+//     atual em detalhe.nCodCtr) numa coluna da omie_sync_fila a cada escrita bem-sucedida. Fica
+//     como entrega separada: o carimbo so vale dali pra frente e o churn 'ok' cobre o historico.
 //
 // v14 (10/08/2026) — REATIVACAO PROVADA PELO NOSSO PROPRIO CANCELAMENTO.
 //     Ate a v13, reativar no Omie (99 -> 10) exigia reconciliacao CASADO/CASADO_INATIVO com
@@ -357,8 +375,12 @@ Deno.serve(async (req)=>{
           // v14 (10/08/2026): segunda prova, independente da reconciliacao. So e consultada
           // quando a primeira falhou -- em regime normal isto nao adiciona query nenhuma.
           // Ver cabecalho v14 (caso SAVANA).
+          // v15: serve aos MESMOS dois casos que o reconConfiavel acima -- reativacao e
+          // cancelamento ja convergido. A condicao espelha a da linha do reconConfiavel de
+          // proposito: se as duas provas nao cobrirem o mesmo conjunto, o OR abaixo vira
+          // 'undefined || false' em silencio no ramo que ficou de fora.
           let nosCancelamos = false;
-          if (item.origem === "reativacao" && !reconConfiavel) {
+          if ((item.origem === "reativacao" || ehCancelamento) && !reconConfiavel) {
             const { data: churnOk } = await service.from("omie_sync_fila").select("id").eq("tenant_id", t.tenant_id).eq("contrato_id", item.contrato_id).eq("origem", "churn").eq("status", "ok").limit(1);
             nosCancelamos = Array.isArray(churnOk) && churnOk.length > 0;
           }
@@ -409,7 +431,16 @@ Deno.serve(async (req)=>{
           // contrato foi reativado depois de a linha entrar como 'churn', o payload ja vem como
           // alteracao e este ramo nao se aplica.
           // ====================================================================================
-          if (bloq === "depara_aponta_cancelado" && ehCancelamento && reconConfiavel) {
+          // v15 (10/08/2026): entra o `|| nosCancelamos`. Se existe churn 'ok' anterior para este
+          // mesmo contrato, o 99 que o Omie esta mostrando e o NOSSO -- nos o colocamos la. Sem
+          // isso, cliente com mais de um contrato no mesmo CNPJ (estado_match sempre 'AMBIGUO',
+          // ver cabecalho v14) travava aqui exatamente como travava na reativacao.
+          // CUIDADO ao mexer: o custo de errar aqui NAO e igual ao da reativacao. Este ramo nao
+          // escreve nada e declara 'ok'; de/para errado significa contrato de verdade seguindo
+          // ATIVO e faturando um cliente cancelado, sem ninguem voltar a olhar. A prova exata
+          // ("o 99 e o MESMO contrato que cancelamos") depende de carimbar o nCodCtr na fila a
+          // cada escrita -- entrega separada; ate la o churn 'ok' e a melhor prova que existe.
+          if (bloq === "depara_aponta_cancelado" && ehCancelamento && (reconConfiavel || nosCancelamos)) {
             await service.from("omie_sync_fila").update({
               status: "ok",
               ultimo_erro: null,
