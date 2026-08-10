@@ -1,6 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { processInboundMessage } from '../_shared/message-processor.ts';
-import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets, UNSUPPORTED_MESSAGE_LABEL } from '../_shared/message-types.ts';
+import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets } from '../_shared/message-types.ts';
+import {
+  unwrapMessage, getMessageType, getMessageContent,
+  resolveMediaNode, isIgnorableMessage,
+} from './message-shape.ts';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
 import { applyDeliveryStatus } from '../_shared/apply-delivery-status.ts';
 import { normalizeBRPhone, phoneSearchVariants } from '../_shared/phone.ts';
@@ -52,46 +56,12 @@ function touchLastEvent(supabase: any, instanceName: string) {
 }
 
 // ── Helpers de tipo de mensagem ───────────────────────────────────────────────
-
-// Desembrulha wrappers do WhatsApp (temporária, ver-uma-vez, doc-com-legenda) até a
-// mensagem real, ANTES de classificar/extrair. NÃO desce em editedMessage (edição tem
-// roteamento próprio). Idempotente; limite de profundidade contra payload malformado.
-function unwrapMessage(message: any, depth = 0): any {
-  if (!message || typeof message !== 'object' || depth > 5) return message || {};
-  const inner =
-    message.ephemeralMessage?.message ||
-    message.viewOnceMessage?.message ||
-    message.viewOnceMessageV2?.message ||
-    message.viewOnceMessageV2Extension?.message ||
-    message.documentWithCaptionMessage?.message ||
-    null;
-  return inner ? unwrapMessage(inner, depth + 1) : message;
-}
-
-function getMessageType(message: any): NormalizedInboundMessage['messageType'] {
-  message = unwrapMessage(message);
-  if (!message) return 'text';
-  if (message.reactionMessage) return 'reaction';
-  if (message.protocolMessage?.type === 0 || message.protocolMessage?.type === 'REVOKE') return 'revoke';
-  if (message.conversation || message.extendedTextMessage) return 'text';
-  if (message.imageMessage) return 'image';
-  if (message.audioMessage) return 'audio';
-  if (message.videoMessage) return 'video';
-  // PATCH: handle documentWithCaptionMessage wrapper (Evolution API v2)
-  if (message.documentWithCaptionMessage?.message?.documentMessage) return 'document';
-  if (message.documentMessage) return 'document';
-  if (message.stickerMessage) return 'sticker';
-  if (message.contactMessage) return 'contact';
-  if (message.contactsArrayMessage) return 'contacts';
-  return 'text';
-}
-
-
-function resolveDocumentMessage(message: any): any {
-  return message.documentMessage
-    || message.documentWithCaptionMessage?.message?.documentMessage
-    || null;
-}
+//
+// unwrapMessage / getMessageType / getMessageContent / resolveMediaNode /
+// isIgnorableMessage moraram aqui até 10/08/2026. Saíram para message-shape.ts
+// (mesmo diretório, sem tocar no _shared) porque é onde a lista de formatos do
+// Baileys precisa de teste: o que não estivesse na lista virava o texto
+// "📎 Mensagem não suportada" no chat do cliente.
 
 function isRevokeMessage(message: any): boolean {
   return !!(message?.protocolMessage &&
@@ -191,43 +161,6 @@ function normalizePhoneNumber(remoteJid: string): { phone: string; isGroup: bool
   const { phone, isGroup } = normalizeBRPhone(remoteJid);
   return { phone, isGroup };
 }
-
-function getMessageContent(message: any, type: string): string {
-  message = unwrapMessage(message);
-  if (message.conversation) return message.conversation;
-  if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
-  // Respostas interativas: o texto É a escolha do cliente
-  if (message.buttonsResponseMessage?.selectedDisplayText) return message.buttonsResponseMessage.selectedDisplayText;
-  if (message.templateButtonReplyMessage?.selectedDisplayText) return message.templateButtonReplyMessage.selectedDisplayText;
-  if (message.listResponseMessage) {
-    const l = message.listResponseMessage;
-    return l.title || l.singleSelectReply?.selectedRowId || l.description || '📋 Resposta de lista';
-  }
-  if (message.contactMessage) return message.contactMessage.displayName || '📇 Contato';
-  if (message.contactsArrayMessage) {
-    const count = message.contactsArrayMessage.contacts?.length || 0;
-    return `📇 ${count} contato${count !== 1 ? 's' : ''}`;
-  }
-  if (type === 'document') {
-    const docMsg = resolveDocumentMessage(message);
-    if (docMsg?.caption) return docMsg.caption;
-  }
-  const mediaMessage = message[`${type}Message`];
-  if (mediaMessage?.caption) return mediaMessage.caption;
-  if (type === 'reaction') {
-    return message.reactionMessage?.text || '';
-  }
-  // Enquete / localização → rótulo (permanece message_type='text')
-  const poll = message.pollCreationMessage || message.pollCreationMessageV2 || message.pollCreationMessageV3;
-  if (poll) return `📊 Enquete: ${poll.name || ''}`.trim();
-  if (message.locationMessage || message.liveLocationMessage) return '📍 Localização';
-  const descriptions: Record<string, string> = {
-    image: '📷 Imagem', audio: '🎵 Áudio', video: '🎥 Vídeo',
-    document: '📄 Documento', sticker: '🎨 Sticker',
-  };
-  return descriptions[type] || UNSUPPORTED_MESSAGE_LABEL;
-}
-
 
 // ── Download de mídia (Evolution API) ────────────────────────────────────────
 
@@ -1011,6 +944,15 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
   const { key, pushName, message: rawMessage, messageTimestamp } = data;
   const message = unwrapMessage(rawMessage);
 
+  // Ruído do protocolo: cabeçalho de álbum, aviso de sincronização de histórico,
+  // registro de chamada, "fixar mensagem". Nada disso é mensagem — antes virava
+  // "📎 Mensagem não suportada" no chat e ainda acordava a URA.
+  const ignorar = isIgnorableMessage(message);
+  if (ignorar) {
+    console.log(`${LOG} Ignorando ${key?.id}: ${ignorar}`);
+    return;
+  }
+
   console.log(`${LOG} Processing message: ${key?.id} type=${getMessageType(message)}`);
 
   try {
@@ -1103,10 +1045,10 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     let mediaTryDownloadAfter = false;
 
     if (messageType !== 'text' && messageType !== 'reaction' && messageType !== 'revoke') {
-      // PATCH: use resolveDocumentMessage for documents, fallback to standard path
-      const mediaMessage = messageType === 'document'
-        ? resolveDocumentMessage(message)
-        : message[`${messageType}Message`];
+      // O nó da mídia nem sempre é `<tipo>Message`: documento pode vir embrulhado,
+      // ptv é vídeo e lottie é sticker. Sem o nó certo não há mimetype/fileLength
+      // e o download não acontece.
+      const mediaMessage = resolveMediaNode(message, messageType as string);
       if (mediaMessage?.mimetype) {
         mediaMimetype = mediaMessage.mimetype;
         mediaFilename = mediaMessage.fileName || mediaMessage.filename || null;
