@@ -1,4 +1,26 @@
-// omie-sync-processar — PROCESSADOR DA FILA (peca 3 final, Caminho D) — v13
+// omie-sync-processar — PROCESSADOR DA FILA (peca 3 final, Caminho D) — v14
+//
+// v14 (10/08/2026) — REATIVACAO PROVADA PELO NOSSO PROPRIO CANCELAMENTO.
+//     Ate a v13, reativar no Omie (99 -> 10) exigia reconciliacao CASADO/CASADO_INATIVO com
+//     qtd_candidatos_omie <= 1. Esse contador conta CADASTROS DE CLIENTE que dividem o CNPJ --
+//     nao diz nada sobre o de/para DESTE contrato, que e 1:1 por construcao (sem ele o
+//     DoctorOMIE devolve 'sem_depara', nao 'depara_aponta_cancelado').
+//     Resultado medido na SAVANA LAZER E DIVERSAO (Digi Office, 10/08): cliente com DOIS
+//     contratos legitimos (BILHETERIA 149,00 e RESTAURANTE 165,63, nomes fantasia distintos) e
+//     quatro cadastros no espelho do Omie -- dois deles VAZIOS, sem contrato nenhum. So a
+//     contagem de cadastros ja dava estado_match='AMBIGUO', e a reativacao da BILHETERIA morreu
+//     em 'invalido' com de/para comprovadamente correto: o churn de 31/07 tinha cancelado, por
+//     esse mesmo de/para, exatamente o contrato 2025/01104 que agora precisava voltar.
+//     Todo cliente com mais de um contrato no mesmo CNPJ caia nisso -- nao era caso isolado.
+//
+//     A prova que passa a valer: SE FOMOS NOS QUE CANCELAMOS AQUELE CONTRATO NO OMIE, reativar
+//     e desfazer a nossa propria escrita -- nao ha o que adivinhar. O registro esta na propria
+//     omie_sync_fila (origem='churn', status='ok', mesmo contrato_id). Se o de/para estivesse
+//     errado, o estrago ja teria acontecido no cancelamento, nao na volta.
+//     A regra da v13 continua valendo em OR: nada que passava antes deixa de passar. E o caso
+//     MR. ROLLS (cadastros duplicados) segue barrado -- la o DS nunca cancelou aquele contrato,
+//     entao a prova nao existe. O DoctorOMIE tambem continua exigindo situacao alvo '10' e
+//     PROVANDO a reativacao na releitura (step 7); esta mudanca nao afrouxa nada disso.
 //
 // v13 (07/08/2026) — UMA CONTA OMIE POR UNIDADE BASE.
 //     O tenant Digi Office passa a ter DUAS contas Omie (Digi Office e Digi Up), cada uma com
@@ -332,7 +354,15 @@ Deno.serve(async (req)=>{
               "CASADO_INATIVO"
             ].indexOf(rec?.estado_match ?? "") !== -1 && rec?.multi_contrato !== true && (rec?.qtd_candidatos_omie ?? 99) <= 1;
           }
-          const permitirReativacao = item.origem === "reativacao" && reconConfiavel;
+          // v14 (10/08/2026): segunda prova, independente da reconciliacao. So e consultada
+          // quando a primeira falhou -- em regime normal isto nao adiciona query nenhuma.
+          // Ver cabecalho v14 (caso SAVANA).
+          let nosCancelamos = false;
+          if (item.origem === "reativacao" && !reconConfiavel) {
+            const { data: churnOk } = await service.from("omie_sync_fila").select("id").eq("tenant_id", t.tenant_id).eq("contrato_id", item.contrato_id).eq("origem", "churn").eq("status", "ok").limit(1);
+            nosCancelamos = Array.isArray(churnOk) && churnOk.length > 0;
+          }
+          const permitirReativacao = item.origem === "reativacao" && (reconConfiavel || nosCancelamos);
           // 1) PORTEIRO: alterar contrato PRIMEIRO. Sem de/para => ignora, NADA no Omie.
           const alt = await chamar(EP_ALTERAR, chave, {
             modo: "alterar",

@@ -5,6 +5,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // omie-integration-call
 //
+// v16 (10/08/2026): REATIVACAO PROVADA PELO NOSSO PROPRIO CANCELAMENTO.
+//     Espelha a v14 do omie-sync-processar -- as duas calculam permitir_reativacao com a MESMA
+//     regra e tem de mudar juntas, senao o botao "Enviar ao Omie" e o Reprocessar da fila passam
+//     a discordar sobre o mesmo contrato (e o Reprocessar consulta esta function em dry_run antes
+//     de reenfileirar, entao a divergencia apareceria como um bloqueio que a fila nao teria).
+//     Regra nova, em OR com a antiga: se existe na omie_sync_fila um churn 'ok' para o MESMO
+//     contrato, fomos nos que cancelamos aquele contrato no Omie e reativar e desfazer a nossa
+//     propria escrita. Motivo completo (caso SAVANA) no cabecalho v14 do omie-sync-processar.
+//
 // v15 (07/08/2026): UMA CONTA OMIE POR UNIDADE BASE.
 //     O tenant Digi Office passa a ter 2 contas (Digi Office e Digi Up). A chave vinha de
 //     obter_chave_omie_sistema(tenant), que levanta excecao com 2 contas -- este botao morreria
@@ -346,6 +355,11 @@ Deno.serve(async (req)=>{
           "CASADO",
           "CASADO_INATIVO"
         ].indexOf(rec?.estado_match ?? "") !== -1 && rec?.multi_contrato !== true && (rec?.qtd_candidatos_omie ?? 99) <= 1;
+        // v16: segunda prova, so consultada quando a reconciliacao nao autorizou. Ver cabecalho.
+        if (!permitirReativacao) {
+          const { data: churnOk } = await serviceClient.from("omie_sync_fila").select("id").eq("tenant_id", tenantEfetivo).eq("contrato_id", contratoId).eq("origem", "churn").eq("status", "ok").limit(1);
+          permitirReativacao = Array.isArray(churnOk) && churnOk.length > 0;
+        }
       }
       async function decidirContrato(modoContrato) {
         const modoAlt = modoContrato === "criar" ? "alterar" : "dry_run";
