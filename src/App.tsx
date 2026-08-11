@@ -1,6 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import AppToasters from "@/components/AppToasters";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -82,11 +81,9 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
     <TooltipProvider>
-      <Toaster />
-      {/* offset sobe o toast acima do composer do chat (~130px): sem isso a
-          notificação cai em cima do campo de digitar a mensagem. */}
-      <Sonner position="bottom-right" offset={{ bottom: "9rem" }} />
       <BrowserRouter>
+          {/* dentro do Router: o offset do toast depende da rota (ver AppToasters) */}
+          <AppToasters />
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />

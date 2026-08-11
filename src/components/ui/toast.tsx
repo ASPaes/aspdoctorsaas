@@ -14,9 +14,9 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      // sm:bottom-32 + p-4 = 9rem, mesmo offset do Sonner em App.tsx — mantém o
-      // toast acima do campo de digitar mensagem do chat.
-      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-32 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
+      // Canto inferior direito. Quem precisa subir o toast (a tela do chat, por
+      // causa do composer) passa `sm:bottom-32` via className — ver AppToasters.
+      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
       className,
     )}
     {...props}
@@ -69,7 +69,7 @@ const ToastClose = React.forwardRef<
   <ToastPrimitives.Close
     ref={ref}
     className={cn(
-      "absolute right-2 top-2 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity group-hover:opacity-100 group-[.destructive]:text-green-300 hover:text-foreground group-[.destructive]:hover:text-green-50 focus:opacity-100 focus:outline-none focus:ring-2 group-[.destructive]:focus:ring-green-400 group-[.destructive]:focus:ring-offset-green-600",
+      "absolute right-2 top-2 rounded-md p-1 text-foreground/50 opacity-70 transition-opacity group-hover:opacity-100 group-[.destructive]:text-green-300 hover:text-foreground hover:opacity-100 group-[.destructive]:hover:text-green-50 focus:opacity-100 focus:outline-none focus:ring-2 group-[.destructive]:focus:ring-green-400 group-[.destructive]:focus:ring-offset-green-600",
       className,
     )}
     toast-close=""

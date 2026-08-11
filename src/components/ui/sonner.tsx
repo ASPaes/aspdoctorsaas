@@ -10,6 +10,17 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      closeButton
+      duration={5000}
+      // o X do Sonner nasce no canto superior ESQUERDO; espelha para a direita,
+      // igual ao toast do Radix.
+      style={
+        {
+          "--toast-close-button-start": "auto",
+          "--toast-close-button-end": "0",
+          "--toast-close-button-transform": "translate(35%, -35%)",
+        } as React.CSSProperties
+      }
       toastOptions={{
         classNames: {
           toast:
@@ -17,6 +28,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
           description: "group-[.toast]:text-muted-foreground",
           actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
           cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+          closeButton:
+            "group-[.toast]:bg-background group-[.toast]:text-foreground/60 group-[.toast]:border-border group-[.toast]:hover:bg-muted group-[.toast]:hover:text-foreground",
         },
       }}
       {...props}
