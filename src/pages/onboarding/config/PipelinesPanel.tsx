@@ -33,6 +33,7 @@ import {
 import { SlaInput } from "./SlaInput";
 import { foraDaJanelaIds, formatSlaHuman, slugify } from "./utils";
 import { TrilhoSummary } from "./TrilhoSummary";
+import { ChecklistGroupDemandPicker, type DemandTypeLite } from "./ChecklistGroupDemandPicker";
 
 const SECTION_OPTIONS: { key: string; label: string }[] = [
   { key: "participantes", label: "Responsável & participantes" },
@@ -209,6 +210,52 @@ export function PipelinesPanel({ phaseId }: Props) {
   const checklist = checklistQuery.data ?? [];
   const produtos = produtosQuery.data ?? [];
   const departamentos = departamentosQuery.data ?? [];
+
+  // Vínculo do checklist com tipo de demanda: grupo SEM vínculo aparece em todas as
+  // jornadas; com vínculo, só nas daquele tipo. Quem aplica a regra é o banco
+  // (fn_onb_checklist_grupo_aplica) — aqui é só o cadastro.
+  const demandTypesQuery = useQuery({
+    queryKey: ["onb-demand-types", effectiveTenantId],
+    enabled: !!effectiveTenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_demand_types" as any) as any)
+        .select("id, nome, cor")
+        .eq("tenant_id", effectiveTenantId)
+        .eq("ativo", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as DemandTypeLite[];
+    },
+  });
+
+  const groupDemandsQuery = useQuery({
+    queryKey: ["onb-checklist-group-demands", effectiveTenantId, selectedStageId, groups.map((g) => g.id).join(",")],
+    enabled: !!effectiveTenantId && !!selectedStageId && groups.length > 0,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_checklist_group_demand_types" as any) as any)
+        .select("group_id, demand_type_id")
+        .eq("tenant_id", effectiveTenantId)
+        .in("group_id", groups.map((g) => g.id));
+      if (error) throw error;
+      return (data ?? []) as Array<{ group_id: string; demand_type_id: string }>;
+    },
+  });
+
+  const demandsByGroup = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const l of groupDemandsQuery.data ?? []) (map[l.group_id] ??= []).push(l.demand_type_id);
+    return map;
+  }, [groupDemandsQuery.data]);
+
+  async function toggleGroupDemand(groupId: string, demandTypeId: string, on: boolean) {
+    if (!effectiveTenantId) return;
+    const q = (supabase.from("onboarding_checklist_group_demand_types" as any) as any);
+    const { error } = on
+      ? await q.insert({ tenant_id: effectiveTenantId, group_id: groupId, demand_type_id: demandTypeId })
+      : await q.delete().eq("group_id", groupId).eq("demand_type_id", demandTypeId).eq("tenant_id", effectiveTenantId);
+    if (error) toast.error(error.message);
+    else qc.invalidateQueries({ queryKey: ["onb-checklist-group-demands"] });
+  }
 
   // ==================== Pipeline ops ====================
   async function savePipeline(p: Partial<Pipeline> & { id?: string }, isNew: boolean) {
@@ -591,6 +638,9 @@ export function PipelinesPanel({ phaseId }: Props) {
               onDeleteItem={deleteChecklistItem}
               onReorderItems={reorderChecklist}
               sensors={sensors}
+              demandTypes={demandTypesQuery.data ?? []}
+              demandsByGroup={demandsByGroup}
+              onToggleDemand={toggleGroupDemand}
             />
           )}
         </div>
@@ -888,10 +938,14 @@ function ChecklistEditor({
   groups, items, loading,
   onAddGroup, onRenameGroup, onDeleteGroup, onReorderGroups,
   onAddItem, onUpdateItem, onDeleteItem, onReorderItems, sensors,
+  demandTypes, demandsByGroup, onToggleDemand,
 }: {
   groups: ChecklistGroup[];
   items: ChecklistItem[];
   loading: boolean;
+  demandTypes: DemandTypeLite[];
+  demandsByGroup: Record<string, string[]>;
+  onToggleDemand: (groupId: string, demandTypeId: string, on: boolean) => void;
   onAddGroup: (nome: string) => void;
   onRenameGroup: (id: string, nome: string) => void;
   onDeleteGroup: (id: string) => void;
@@ -961,6 +1015,9 @@ function ChecklistEditor({
                     onUpdateItem={onUpdateItem}
                     onDeleteItem={onDeleteItem}
                     onReorderItems={onReorderItems}
+                    demandTypes={demandTypes}
+                    selectedDemandIds={demandsByGroup[g.id] ?? []}
+                    onToggleDemand={onToggleDemand}
                   />
                 ))}
               </div>
@@ -997,10 +1054,14 @@ function ChecklistEditor({
 // ============================================================================
 function SortableGroup({
   group, items, sensors, onRename, onDelete, onAddItem, onUpdateItem, onDeleteItem, onReorderItems,
+  demandTypes, selectedDemandIds, onToggleDemand,
 }: {
   group: ChecklistGroup;
   items: ChecklistItem[];
   sensors: any;
+  demandTypes: DemandTypeLite[];
+  selectedDemandIds: string[];
+  onToggleDemand: (groupId: string, demandTypeId: string, on: boolean) => void;
   onRename: (id: string, nome: string) => void;
   onDelete: (id: string) => void;
   onAddItem: (groupId: string, texto: string) => void;
@@ -1033,7 +1094,12 @@ function SortableGroup({
             {group.nome}
           </button>
         )}
-        <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">{items.length}</Badge>
+        <ChecklistGroupDemandPicker
+          demandTypes={demandTypes}
+          selectedIds={selectedDemandIds}
+          onToggle={(demandTypeId, on) => onToggleDemand(group.id, demandTypeId, on)}
+        />
+        <Badge variant="secondary" className="h-4 px-1.5 text-[10px] shrink-0">{items.length}</Badge>
         <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/head:opacity-100"
           onClick={() => onDelete(group.id)}>
           <Trash2 className="h-3 w-3 text-destructive" />
