@@ -87,7 +87,7 @@ function MemberRow({
   const cfg = statusConfig[member.status as keyof typeof statusConfig] || statusConfig.offline;
 
   return (
-    <div className="flex items-start gap-3 py-2 px-1 border-b border-border/50 last:border-0">
+    <div className="flex items-start gap-2 py-2 px-1 border-b border-border/50 last:border-0">
       {/* Name + status */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
@@ -234,8 +234,19 @@ export default function TeamPresencePopover() {
             {activeCount} ativo{activeCount !== 1 ? "s" : ""} · {pausedCount} pausado{pausedCount !== 1 ? "s" : ""}
           </p>
         </div>
-        <ScrollArea className="flex-1 overflow-auto">
-          <div className="px-2 py-1">
+        {/*
+          [&_[data-radix-scroll-area-viewport]>div]:!block — o Radix injeta um div
+          com `display:table` dentro do viewport. Com ele, a linha dimensiona pelo
+          CONTEUDO e nao pela largura do painel: o `truncate` do nome nunca dispara
+          e o que passa da borda e cortado pelo overflow-hidden do Root. Foi o que
+          escondeu o botao de encerrar expediente (DEM-0194). `block` devolve a
+          linha para 100% do painel e o nome volta a truncar.
+
+          pr-3: a barra de rolagem do Radix e absoluta (w-2.5) e ficaria por cima
+          dos botoes da direita.
+        */}
+        <ScrollArea className="flex-1 overflow-auto [&_[data-radix-scroll-area-viewport]>div]:!block">
+          <div className="pl-2 pr-3 py-1">
             {isLoading ? (
               <p className="text-xs text-muted-foreground text-center py-4">Carregando...</p>
             ) : members.length === 0 ? (
