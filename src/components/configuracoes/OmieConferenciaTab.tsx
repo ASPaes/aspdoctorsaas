@@ -80,7 +80,10 @@ type View = "visao_geral" | Bucket;
 
 const BUCKETS: { key: Bucket; label: string }[] = [
   { key: "vinculo_auto_ok", label: "Prontos para vincular" },
-  { key: "resolver", label: "Divergências de valor" },
+  // O balde 'resolver' é o ELSE final da detecção: cai aqui contrato casado e ativo que não bate
+  // em QUALQUER campo — valor, vigência inicial, vigência final ou dia de vencimento. Chamá-lo de
+  // "divergências de valor" fazia a linha que bate no valor e diverge na vigência parecer bug.
+  { key: "resolver", label: "Divergências a resolver" },
   { key: "atribuir_modelo", label: "Sem modelo" },
   { key: "escolher_candidato", label: "Ambíguos" },
   { key: "criar", label: "A criar no Omie" },
@@ -487,8 +490,11 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
     }
   }
 
+  // Arredonda como o recon-atualizar-valor-ds arredonda. Sem isso, diferença de centésimo de
+  // centavo habilitava o botão aqui e o backend recusava com "os valores já batem".
+  const deltaAjuste = delta == null ? null : Math.round(delta * 100) / 100;
   const ajusteTipo: "upsell" | "downsell" | null =
-    delta == null || delta === 0 ? null : delta > 0 ? "upsell" : "downsell";
+    deltaAjuste == null || deltaAjuste === 0 ? null : deltaAjuste > 0 ? "upsell" : "downsell";
   const ajusteAbs = delta != null ? Math.abs(delta) : 0;
 
   async function handleAtualizarValorDs() {
@@ -1348,14 +1354,17 @@ function VisaoGeralPanel({
           <div className="grid grid-cols-1 gap-3">
             <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50/40 dark:bg-red-950/20 p-3">
               <div className="text-[11px] uppercase tracking-wide text-red-700 dark:text-red-400">
-                Divergências de valor a resolver
+                Divergências a resolver
               </div>
               <div className="mt-1 flex items-baseline gap-2 flex-wrap">
                 <span className="text-2xl font-semibold text-red-700 dark:text-red-400">
                   {num(c.divergencia_valor_qtd).toLocaleString("pt-BR")}
                 </span>
                 <span className="text-sm text-muted-foreground">
-                  ({formatBRL(c.divergencia_valor_montante)})
+                  {/* A contagem é de TODAS as divergências do balde; o montante só existe para as
+                      de valor. Sem o "em valor", "2 (R$ 0,55)" parece número errado quando uma
+                      das duas diverge só na vigência. */}
+                  ({formatBRL(c.divergencia_valor_montante)} em valor)
                 </span>
               </div>
             </div>
