@@ -1,4 +1,29 @@
-// omie-sync-processar — PROCESSADOR DA FILA (peca 3 final, Caminho D) — v15
+// omie-sync-processar — PROCESSADOR DA FILA (peca 3 final, Caminho D) — v16
+//
+// v16 (10/08/2026) — A FILA DIZIA 'ok' PARA ESCRITA NAO CONFIRMADA.
+//     O ds-omie-contrato-alterar devolve tres campos justamente para isto -- valor_confirmado,
+//     divergencia_detectada, releitura_falhou -- e este arquivo nunca olhou nenhum deles. Decidia
+//     'ok' so por `alt.body.ok !== false`. O proprio cabecalho da v9 de la registra a premissa:
+//     "o omie-sync-processar so olha alt.ok".
+//
+//     CASO MEDIDO (contrato 801e25f6…, "Vinicius de Melo", Digi Up, 11/08 00:38): upsell 10 -> 15,
+//     o Omie respondeu "alterado com sucesso", a releitura devolveu 10 (consistencia eventual) e a
+//     seguinte morreu em REDUNDANT. Do lado do DoctorOMIE ficou integrations_log status='erro' com
+//     "Escrita nao confirmou". Do lado de ca, status='ok'. Ninguem foi avisado: o
+//     trg_omie_sync_falhou_notify so dispara em 'invalido'/'erro'. O unico sinal sobrou na aba
+//     Divergencias de valor, onde se le como "o DS nao mandou" -- e convida a corrigir a mao no
+//     Omie, que e como divergencia de mentira vira divergencia de verdade.
+//
+//     Agora: valor enviado + `valor_confirmado === false` => NAO e 'ok'. Volta para 'pendente' com
+//     backoff e, esgotadas as tentativas, 'erro' -- que alerta. A retentativa e o conserto de
+//     verdade, nao so o alarme: ela roda minutos depois, fora da janela de ~60s do REDUNDANT, e
+//     a leitura confirma o valor que ja esta no Omie.
+//     Casado com o ds-omie-contrato-alterar v17, que parou de gravar no espelho o valor nao
+//     confirmado. Um sem o outro nao fecha: sem a v17 a retentativa reescreve o espelho errado;
+//     sem esta v16 ninguem retenta.
+//
+//     Condicao estreita de proposito: `ehCancelamento` fica fora (nao manda valor) e a ausencia do
+//     campo (versao antiga da function la) cai no comportamento antigo, nao em retentativa infinita.
 //
 // v15 (10/08/2026) — A MESMA PROVA DA v14 NO CANCELAMENTO JA CONVERGIDO.
 //     A v14 consertou so a reativacao e deixou de pe o caso gemeo, no mesmo arquivo: o ramo do
@@ -523,6 +548,28 @@ Deno.serve(async (req)=>{
           } else if (cliente) {
             // Nada de cadastro mudou. O contrato ja foi alterado acima; o cliente nao viaja.
             cadastroPulado++;
+          }
+          // v16: 2b) A ESCRITA CONFIRMOU? Ver cabecalho v16. O alterar devolve valor_confirmado=false
+          // quando a releitura no Omie nao bateu com o que mandamos (ou nao pode ser feita). Isso
+          // NAO e sucesso -- e "nao sei". Retentar minutos depois sai da janela do REDUNDANT e
+          // resolve; declarar 'ok' aqui enterra o caso.
+          const valorEnviado = !ehCancelamento && contrato?.valor_mensal !== undefined && contrato?.valor_mensal !== null;
+          if (valorEnviado && alt.body?.valor_confirmado === false) {
+            const tent = (item.tentativas ?? 0) + 1;
+            const vira_erro = tent >= maxTent;
+            const motivo = alt.body?.divergencia_detectada ?? alt.body?.releitura_falhou ?? "releitura nao confirmou o valor";
+            await service.from("omie_sync_fila").update({
+              status: vira_erro ? "erro" : "pendente",
+              tentativas: tent,
+              ultimo_erro: `valor_nao_confirmado: ${motivo}`.slice(0, 800),
+              proxima_tentativa_em: proximaTentativa(tent),
+              ...vira_erro ? {
+                processado_em: new Date().toISOString()
+              } : {}
+            }).eq("id", item.id);
+            vira_erro ? falhaDef++ : retentar++;
+            await sleep(400);
+            continue;
           }
           // 3) OK.
           await service.from("omie_sync_fila").update({
