@@ -2,6 +2,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // recon-espelho-pull-cron — PECA A. Gemeo automatizado do recon-espelho-pull, chamado pelo pg_cron
 // via public.cron_recon_espelho(). Auth por segredo dedicado no vault (ver bloco AUTH abaixo).
 //
+// v6 (11/08/2026): carrega valor_servicos_omie, acompanhando o recon-espelho-pull v6. O gemeo
+//     copia o mapeamento de proposito; toda coluna nova do espelho tem de entrar nos DOIS, e
+//     este e o caminho que roda de 15 em 15min. Ver o comentario junto da linha.
+//
 // v5 (11/08/2026): PASSA A ALARMAR QUANDO A LEITURA DO OMIE PARA.
 //     Este cron ja era o unico processo do DoctorSaaS que fala com o DoctorOMIE de forma
 //     periodica, por conta e autenticado. O ds-omie-espelho-snapshot v2 passou a devolver
@@ -174,7 +178,7 @@ Deno.serve(async (req)=>{
       if (pagina === 1 && Array.isArray(rj?.saude)) saudeConta = rj.saude;
       const clientes = rj?.clientes ?? [];
       if (clientes.length === 0) break;
-      // Mapeamento IDENTICO ao recon-espelho-pull v4. Se um dia mudar la, muda aqui.
+      // Mapeamento IDENTICO ao recon-espelho-pull v6. Se um dia mudar la, muda aqui.
       const rows = clientes.map((c)=>({
           tenant_id: tenantDs,
           conta_integration_id: contaId,
@@ -186,6 +190,13 @@ Deno.serve(async (req)=>{
           omie_inativo: c.omie_inativo,
           codigo_contrato_omie: c.codigo_contrato_omie,
           valor_omie: c.valor_omie,
+          // "Total dos Servicos" (bruto, sem desconto). O valor_omie e o "Total do Contrato".
+          // ESTE cron e o caminho principal do espelho -- o botao e a excecao. Sem esta linha o
+          // upsert nao zerava a coluna (PostgREST so poe no SET o que veio no payload), mas a
+          // cada 15min atualizava o liquido e deixava o bruto congelado: desconto alterado no
+          // Omie faria a conferencia comparar bruto velho com liquido novo, e errar EM VEZ de
+          // acertar -- o oposto do que a base_valor_conferencia existe para fazer.
+          valor_servicos_omie: c.valor_servicos_omie ?? null,
           vigencia_inicial_omie: c.vigencia_inicial_omie,
           vigencia_final_omie: c.vigencia_final_omie,
           dia_venc_omie: c.dia_venc_omie,
