@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useOmieContaDoCliente } from "@/hooks/useOmieContaDoCliente";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -863,22 +864,11 @@ function ProdutoDialog({
 
   // ========= Omie: tenant a partir do cliente + integração ativa + padrões =========
 
-  const omieAtivoQ = useQuery({
-    queryKey: ["omie_integration_ativo_dialog", resolvedTenantId],
-    enabled: open && !!resolvedTenantId,
-    queryFn: async () => {
-      const { data, error } = await (supabase.from("omie_integration" as any) as any)
-        .select("tenant_id")
-        .eq("tenant_id", resolvedTenantId as string)
-        .eq("ativo", true)
-        .maybeSingle();
-      // eslint-disable-next-line no-console
-      console.log("[ProdutoDialog/Omie] tenantId resolvido:", resolvedTenantId, "omie_integration:", data, "error:", error);
-      if (error) throw error;
-      return !!data;
-    },
-  });
-  const omieAtivo = omieAtivoQ.data === true;
+  // A conta vem da unidade DO CLIENTE. Era .eq("tenant_id").maybeSingle(), que com duas contas
+  // erra e fazia o diálogo se comportar como se não houvesse Omie — sem os campos e sem a
+  // mensagem de enviar ao Omie ao salvar o produto.
+  const contaOmieQ = useOmieContaDoCliente(clienteId);
+  const omieAtivo = contaOmieQ.data?.ativo === true;
 
   const omiePadroesQ = useQuery({
     queryKey: ["omie_padroes_lists_dialog", resolvedTenantId],

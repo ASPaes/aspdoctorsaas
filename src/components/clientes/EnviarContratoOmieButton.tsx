@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useOmieContaDoCliente } from "@/hooks/useOmieContaDoCliente";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -33,18 +34,11 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
   const qc = useQueryClient();
 
   // Gate: só mostra se há data de corte configurada e o contrato é posterior.
-  const { data: dataCorte, isLoading: cutoffLoading } = useQuery({
-    queryKey: ["omie-data-corte", tenantId],
-    enabled: !!tenantId,
-    queryFn: async () => {
-      const { data, error } = await (supabase.from("omie_integration" as any) as any)
-        .select("integrar_a_partir_de")
-        .eq("tenant_id", tenantId)
-        .maybeSingle();
-      if (error) throw error;
-      return (data?.integrar_a_partir_de ?? null) as string | null;
-    },
-  });
+  // Data de corte DA CONTA que atende este contrato (contrato -> cliente -> unidade -> conta).
+  // Era por tenant com .maybeSingle(): com duas contas erra, e o botão sumia nas duas unidades.
+  const contaOmieQ = useOmieContaDoCliente(null, contratoId);
+  const dataCorte = contaOmieQ.data?.integrar_a_partir_de ?? null;
+  const cutoffLoading = contaOmieQ.isLoading;
 
   // Linha mais recente da fila para este contrato.
   const { data: fila } = useQuery<FilaRow | null>({

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useOmieContaDoCliente } from "@/hooks/useOmieContaDoCliente";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -465,19 +466,10 @@ function EnviarBotao({
 export default function IntegracaoOmieCard({ clienteId }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
-  const integracaoAtivaQuery = useQuery({
-    queryKey: ["omie_integration_ativa", tid],
-    enabled: !!tid,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("omie_integration")
-        .select("ativo")
-        .eq("tenant_id", tid as string)
-        .maybeSingle();
-      if (error) throw error;
-      return data?.ativo === true;
-    },
-  });
+  // A conta Omie vem da UNIDADE DO CLIENTE, não do tenant: com duas contas, o .maybeSingle()
+  // por tenant erra ("multiple rows returned"), a query falha e o card some da tela.
+  const contaOmieQuery = useOmieContaDoCliente(clienteId);
+  const integracaoAtivaQuery = { data: contaOmieQuery.data?.ativo === true, isLoading: contaOmieQuery.isLoading };
 
   const contratosQuery = useQuery({
     queryKey: ["contratos_ativos_omie", tid, clienteId],
