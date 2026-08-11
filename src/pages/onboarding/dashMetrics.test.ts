@@ -114,6 +114,7 @@ function t(p: Partial<TreinoLite> = {}): TreinoLite {
   return {
     status: "realizado",
     no_show: false,
+    no_shows: 0,
     is_retreinamento: false,
     proprietario_presente: null,
     conta_como_pdv: false,
@@ -162,21 +163,48 @@ describe("agregarTreinos", () => {
     expect(a.validos).toBe(10);
   });
 
-  it("a taxa de no-show usa o desfecho, não a flag pegajosa", () => {
-    // Hoje a tela mostra 33,3% somando sessões que seguiram adiante. O real é 0.
-    expect(agregarTreinos(julhoDigiOffice).noShowRate).toBe(0);
+  it("a taxa de no-show mede treinos que faltaram, não desfecho parado em no_show", () => {
+    // 2 dos 10 válidos tiveram falta. Pelo desfecho daria 0 — e a partir de 11/08 daria
+    // 0 sempre, porque o no-show devolve o treino para `previsto` em vez de deixá-lo
+    // parado em `no_show`.
+    expect(agregarTreinos(julhoDigiOffice).noShowRate).toBe(20);
   });
 
   it("conta separado quem faltou ao menos uma vez", () => {
     expect(agregarTreinos(julhoDigiOffice).comFalta).toBe(2);
   });
 
-  it("uma sessão realizada com a flag não conta como falta e como realizada ao mesmo tempo", () => {
-    const a = agregarTreinos([t({ no_show: true, tentativas: 3 })]);
+  it("uma sessão realizada com falta não conta como falta e como realizada ao mesmo tempo", () => {
+    const a = agregarTreinos([t({ no_show: true, no_shows: 1, tentativas: 3 })]);
     expect(a.realizado).toBe(1);
-    expect(a.noShow).toBe(0);
+    expect(a.noShow).toBe(0); // desfecho continua vindo do status
     expect(a.comFalta).toBe(1);
-    expect(a.noShowRate).toBe(0);
+    expect(a.faltas).toBe(1);
+  });
+
+  it("falta é contada pelo contador, não pelo status", () => {
+    const a = agregarTreinos([
+      t({ status: "realizado", no_shows: 2 }),  // faltou 2x e no fim aconteceu
+      t({ status: "agendado", no_shows: 1 }),   // faltou 1x e já foi remarcado
+      t({ status: "realizado", no_shows: 0 }),
+    ]);
+    expect(a.faltas).toBe(3);
+    expect(a.comFalta).toBe(2);
+    expect(a.noShowRate).toBe(66.7);
+  });
+
+  it("treino remarcado não apaga a falta do painel", () => {
+    // O caso que a régua antiga perdia: status volta para agendado e o desfecho some.
+    const a = agregarTreinos([t({ status: "agendado", no_show: true, no_shows: 1 })]);
+    expect(a.faltas).toBe(1);
+    expect(a.noShow).toBe(0);
+  });
+
+  it("cai na flag pegajosa quando o contador ainda não foi preenchido", () => {
+    // Linhas anteriores ao backfill: no_show=true com no_shows=0.
+    const a = agregarTreinos([t({ status: "no_show", no_show: true, no_shows: 0 })]);
+    expect(a.faltas).toBe(1);
+    expect(a.comFalta).toBe(1);
   });
 
   it("cancelado fica fora dos percentuais mas continua contado", () => {
@@ -187,7 +215,7 @@ describe("agregarTreinos", () => {
   });
 
   it("treino cancelado que teve falta conta como falta e como cancelado", () => {
-    const a = agregarTreinos([t({ status: "cancelado", no_show: true, tentativas: 2 })]);
+    const a = agregarTreinos([t({ status: "cancelado", no_show: true, no_shows: 1, tentativas: 2 })]);
     expect(a.cancelado).toBe(1);
     expect(a.comFalta).toBe(1);
     expect(a.validos).toBe(0);
@@ -223,12 +251,13 @@ describe("agregarTreinos", () => {
     expect(a.propPct).toBe(50);
   });
 
-  it("primeiro no-show é quem faltou já na 1ª tentativa", () => {
+  it("soma todas as faltas do mesmo treino", () => {
     const a = agregarTreinos([
-      t({ status: "no_show", no_show: true, tentativas: 1 }),
-      t({ no_show: true, tentativas: 3 }),
+      t({ status: "previsto", no_show: true, no_shows: 3 }),
+      t({ no_show: true, no_shows: 1 }),
     ]);
-    expect(a.primeiroNoShow).toBe(1);
+    expect(a.faltas).toBe(4);
+    expect(a.comFalta).toBe(2);
   });
 
   it("PDV conta só sessão realizada com o tipo marcado", () => {

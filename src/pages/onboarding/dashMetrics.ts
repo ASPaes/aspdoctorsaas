@@ -97,10 +97,12 @@ export function contarSituacao(journeys: Array<{ situacao: string | null }>): Co
 export type DesfechoTreino = "realizado" | "no_show" | "cancelado" | "em_aberto";
 
 /**
- * O desfecho vem SÓ do `status`. A coluna `no_show` é uma flag pegajosa gravada por
- * JourneyDetailSheet.tsx:1593 e nunca limpa — ela diz "faltou em algum momento", não
- * "terminou em falta". Usá-la como desfecho fazia uma sessão realizada na 3ª tentativa
- * ser contada como no-show e como realizada ao mesmo tempo.
+ * O desfecho vem SÓ do `status` — ele responde "como o treino terminou".
+ *
+ * Desde 11/08 o desfecho `no_show` é praticamente residual: marcar no-show devolve o
+ * treino para `previsto` e o manda de volta para a fila de agendamento, porque a falta
+ * é um EVENTO, não o fim da história. Quem conta falta é `no_shows` (ver
+ * `agregarTreinos`), não este desfecho. As linhas anteriores a 11/08 ainda param aqui.
  */
 export function desfechoTreino(status: string | null): DesfechoTreino {
   if (status === "realizado") return "realizado";
@@ -112,6 +114,8 @@ export function desfechoTreino(status: string | null): DesfechoTreino {
 export interface TreinoLite {
   status: string | null;
   no_show: boolean | null;
+  /** Contador de faltas. `tentativas` NÃO serve: sobe no no-show e na remarcação. */
+  no_shows: number | null;
   is_retreinamento: boolean | null;
   proprietario_presente: boolean | null;
   conta_como_pdv: boolean | null;
@@ -125,9 +129,11 @@ export interface AgregadoTreinos {
   emAberto: number;
   /** tudo menos cancelado — denominador de todo percentual */
   validos: number;
-  /** flag pegajosa: faltou ao menos uma vez, em qualquer desfecho, cancelado incluído */
+  /** treinos que faltaram ao menos uma vez, em qualquer desfecho, cancelado incluído */
   comFalta: number;
-  primeiroNoShow: number;
+  /** total de faltas: o mesmo treino pode ter faltado 3 vezes */
+  faltas: number;
+  /** % dos válidos que faltaram ao menos uma vez */
   noShowRate: number;
   realizadoPct: number;
   retreinos: number;
@@ -142,7 +148,7 @@ export interface AgregadoTreinos {
 
 export function agregarTreinos(treinos: TreinoLite[]): AgregadoTreinos {
   let realizado = 0, noShow = 0, cancelado = 0, emAberto = 0;
-  let comFalta = 0, primeiroNoShow = 0, retreinos = 0;
+  let comFalta = 0, faltas = 0, retreinos = 0;
   let propInformado = 0, propSim = 0, pdvFinalizados = 0;
 
   treinos.forEach((t) => {
@@ -153,9 +159,11 @@ export function agregarTreinos(treinos: TreinoLite[]): AgregadoTreinos {
     else emAberto++;
 
     // A falta é contada mesmo em sessão cancelada: o cliente faltou de verdade.
-    if (t.no_show === true) {
+    // O contador manda; a flag pegajosa cobre as linhas anteriores ao backfill de 11/08.
+    const faltasDoTreino = (t.no_shows ?? 0) > 0 ? (t.no_shows as number) : (t.no_show === true ? 1 : 0);
+    if (faltasDoTreino > 0) {
       comFalta++;
-      if ((t.tentativas ?? 0) <= 1) primeiroNoShow++;
+      faltas += faltasDoTreino;
     }
 
     if (d === "cancelado") return; // fora de todo o resto
@@ -172,8 +180,8 @@ export function agregarTreinos(treinos: TreinoLite[]): AgregadoTreinos {
 
   const validos = realizado + noShow + emAberto;
   return {
-    realizado, noShow, cancelado, emAberto, validos, comFalta, primeiroNoShow,
-    noShowRate: pct(noShow, realizado + noShow),
+    realizado, noShow, cancelado, emAberto, validos, comFalta, faltas,
+    noShowRate: pct(comFalta, validos),
     realizadoPct: pct(realizado, validos),
     retreinos,
     retreinosPct: pct(retreinos, validos),

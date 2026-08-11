@@ -47,6 +47,7 @@ interface TrainingRow {
   conta_como_pdv: boolean | null;
   status: string | null;
   no_show: boolean | null;
+  no_shows: number | null;
   tentativas: number | null;
   proprietario_presente: boolean | null;
   is_retreinamento: boolean | null;
@@ -98,7 +99,7 @@ export default function OnboardingDashboardPage() {
     queryFn: async () => {
       const rows = await fetchAllRows<TrainingRow>(() =>
         (supabase.from("vw_onboarding_training_kpis" as any) as any)
-          .select("journey_id, training_type_id, tipo_nome, conta_como_pdv, status, no_show, tentativas, proprietario_presente, is_retreinamento, conduzido_por, agendado_para, realizado_em")
+          .select("journey_id, training_type_id, tipo_nome, conta_como_pdv, status, no_show, no_shows, tentativas, proprietario_presente, is_retreinamento, conduzido_por, agendado_para, realizado_em")
           .eq("tenant_id", effectiveTenantId)
       );
       return rows;
@@ -303,8 +304,15 @@ export default function OnboardingDashboardPage() {
 
   const names = namesQ.data ?? {};
 
-  // KPIs treinos — desfecho vem do status; a flag no_show é pegajosa e vira número à parte.
+  // KPIs treinos — desfecho vem do status; falta vem do contador `no_shows`.
   const tr = useMemo(() => agregarTreinos(trainings), [trainings]);
+
+  /** Faltas do treino. O contador manda; a flag pegajosa cobre o que é anterior ao
+   *  backfill de 11/08. Contar falta pelo DESFECHO zeraria as colunas: desde 11/08 o
+   *  no-show devolve o treino para `previsto` em vez de parar em `no_show`. */
+  function faltasDe(t: { no_shows: number | null; no_show: boolean | null }): number {
+    return (t.no_shows ?? 0) > 0 ? (t.no_shows as number) : (t.no_show === true ? 1 : 0);
+  }
 
   // Tabela por implantador
   const byImplantador = useMemo(() => {
@@ -316,7 +324,7 @@ export default function OnboardingDashboardPage() {
       if (d === "cancelado") return; // cancelado não é performance de ninguém
       m[id].total += 1;
       if (d === "realizado") m[id].realizado += 1;
-      if (d === "no_show") m[id].no_show += 1;
+      m[id].no_show += faltasDe(t);
       if (t.is_retreinamento) m[id].retreino += 1;
     });
     return Object.entries(m)
@@ -339,9 +347,10 @@ export default function OnboardingDashboardPage() {
       switch (desfechoTreino(t.status)) {
         case "em_aberto": m[key].previstos += 1; break;
         case "realizado": m[key].realizados += 1; break;
-        case "no_show": m[key].no_show += 1; break;
+        case "no_show": m[key].previstos += 1; break; // desfecho residual: segue em aberto
         case "cancelado": m[key].cancelados += 1; break;
       }
+      m[key].no_show += faltasDe(t);
     });
     return Object.values(m).sort((a, b) => (b.realizados + b.previstos) - (a.realizados + a.previstos));
   }, [trainings]);
@@ -403,10 +412,10 @@ export default function OnboardingDashboardPage() {
               />
               <KpiCard
                 icon={AlertTriangle}
-                label="1º No-show"
-                value={String(tr.primeiroNoShow)}
-                sub={`${tr.comFalta} ${tr.comFalta === 1 ? "sessão faltou" : "sessões faltaram"} ao menos 1x`}
-                tone={tr.primeiroNoShow === 0 ? "success" : "warning"}
+                label="Faltas"
+                value={String(tr.faltas)}
+                sub={`${tr.comFalta} ${tr.comFalta === 1 ? "treino faltou" : "treinos faltaram"} ao menos 1x`}
+                tone={tr.faltas === 0 ? "success" : "warning"}
                 subTone="muted"
               />
               <KpiCard
@@ -438,7 +447,7 @@ export default function OnboardingDashboardPage() {
                 icon={AlertTriangle}
                 label="Taxa de no-show"
                 value={`${tr.noShowRate}%`}
-                sub={`${tr.noShow} de ${tr.realizado + tr.noShow} concluídos • meta < 20%`}
+                sub={`${tr.comFalta} de ${tr.validos} treinos • meta < 20%`}
                 tone={tr.noShowRate < 20 ? "success" : tr.noShowRate < 30 ? "warning" : "danger"}
                 subTone={tr.noShowRate < 20 ? "success" : "danger"}
               />
