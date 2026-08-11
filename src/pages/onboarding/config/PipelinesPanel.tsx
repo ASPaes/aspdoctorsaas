@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, GripVertical, Trash2, Loader2, Pencil, Flag, Pause, ChevronRight, Timer,
-  TimerOff, Archive, AlertTriangle,
+  TimerOff, Archive, AlertTriangle, UserX,
 } from "lucide-react";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
@@ -79,6 +79,8 @@ interface Stage {
   inicia_sla: boolean;
   /** Entrar nesta etapa PARA a contagem da jornada inteira. No máximo uma por pipeline. */
   encerra_sla: boolean;
+  /** Para onde o treino volta quando o cliente falta. No máximo uma por pipeline. */
+  retorno_no_show: boolean;
 }
 
 interface ChecklistGroup {
@@ -166,7 +168,7 @@ export function PipelinesPanel({ phaseId }: Props) {
     enabled: !!effectiveTenantId && !!selectedPipelineId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_stages" as any) as any)
-        .select("id, pipeline_id, nome, slug, position, sla_minutos, cor, is_initial, is_final, pausa_sla, ativo, visible_sections, inicia_sla, encerra_sla")
+        .select("id, pipeline_id, nome, slug, position, sla_minutos, cor, is_initial, is_final, pausa_sla, ativo, visible_sections, inicia_sla, encerra_sla, retorno_no_show")
         .eq("tenant_id", effectiveTenantId).eq("pipeline_id", selectedPipelineId).order("position");
       if (error) throw error;
       return (data ?? []) as Stage[];
@@ -277,6 +279,7 @@ export function PipelinesPanel({ phaseId }: Props) {
       visible_sections: s.visible_sections ?? ALL_SECTION_KEYS,
       inicia_sla: !!s.inicia_sla,
       encerra_sla: !!s.encerra_sla,
+      retorno_no_show: !!s.retorno_no_show,
     };
     try {
       if (isNew) {
@@ -300,6 +303,8 @@ export function PipelinesPanel({ phaseId }: Props) {
         toast.error("Outra etapa deste pipeline já encerra a contagem de SLA. Desmarque nela antes.");
       } else if (e?.code === "23505" && String(e?.message ?? "").includes("inicia_sla")) {
         toast.error("Outra etapa deste pipeline já inicia a contagem de SLA. Desmarque nela antes.");
+      } else if (e?.code === "23505" && String(e?.message ?? "").includes("retorno_no_show")) {
+        toast.error("Outra etapa deste pipeline já é o retorno do no-show. Desmarque nela antes.");
       } else {
         toast.error(e.message || "Erro ao salvar");
       }
@@ -607,6 +612,7 @@ export function PipelinesPanel({ phaseId }: Props) {
         initial={stageEditing}
         gatilhoStage={stages.find((s) => s.inicia_sla) ?? null}
         encerraStage={stages.find((s) => s.encerra_sla) ?? null}
+        retornoStage={stages.find((s) => s.retorno_no_show) ?? null}
         onClose={() => { setStageNewOpen(false); setStageEditing(null); }}
         onSave={(s) => { saveStage(s, !stageEditing); setStageNewOpen(false); setStageEditing(null); }}
       />
@@ -1246,12 +1252,14 @@ function PipelineDialog({
 // Stage dialog
 // ============================================================================
 function StageDialog({
-  open, initial, gatilhoStage, encerraStage, onClose, onSave,
+  open, initial, gatilhoStage, encerraStage, retornoStage, onClose, onSave,
 }: {
   open: boolean; initial: Stage | null;
   /** Etapa que hoje detém a flag de início de SLA neste pipeline (se houver). */
   gatilhoStage: Stage | null;
   encerraStage: Stage | null;
+  /** Etapa que hoje recebe os treinos que voltam por no-show (se houver). */
+  retornoStage: Stage | null;
   onClose: () => void;
   onSave: (s: Partial<Stage> & { id?: string }) => void;
 }) {
@@ -1265,6 +1273,7 @@ function StageDialog({
   const [ativo, setAtivo] = useState(true);
   const [iniciaSla, setIniciaSla] = useState(false);
   const [encerraSla, setEncerraSla] = useState(false);
+  const [retornoNoShow, setRetornoNoShow] = useState(false);
   const [visibleSections, setVisibleSections] = useState<string[]>(ALL_SECTION_KEYS);
   const [secoesOpen, setSecoesOpen] = useState(false);
 
@@ -1280,6 +1289,7 @@ function StageDialog({
       setAtivo(initial?.ativo ?? true);
       setIniciaSla(!!initial?.inicia_sla);
       setEncerraSla(!!initial?.encerra_sla);
+      setRetornoNoShow(!!initial?.retorno_no_show);
       setVisibleSections(initial?.visible_sections ?? ALL_SECTION_KEYS);
       setSecoesOpen(false);
     }
@@ -1299,6 +1309,9 @@ function StageDialog({
 
   // Simétrico do gatilho: só uma etapa por pipeline pode encerrar a contagem.
   const encerraEmOutra = !!encerraStage && encerraStage.id !== initial?.id;
+
+  // Idem para o destino do no-show: uma por pipeline.
+  const retornoEmOutra = !!retornoStage && retornoStage.id !== initial?.id;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -1377,6 +1390,16 @@ function StageDialog({
                   ? `Já definida em «${encerraStage!.nome}» — desmarque lá para usar aqui`
                   : "O cronômetro para na jornada inteira ao entrar aqui. Voltar o cartão reabre a contagem"}
               />
+              <ToggleRow
+                icon={<UserX className="h-3.5 w-3.5 text-destructive" />}
+                label="Retorno do no-show"
+                checked={retornoNoShow} onChange={setRetornoNoShow}
+                disabled={retornoEmOutra}
+                className="border-t border-border"
+                hint={retornoEmOutra
+                  ? `Já definida em «${retornoStage!.nome}» — desmarque lá para usar aqui`
+                  : "Quando o cliente falta, o treino volta para cá sem data marcada"}
+              />
             </div>
           </div>
 
@@ -1430,6 +1453,7 @@ function StageDialog({
             visible_sections: visibleSections,
             inicia_sla: gatilhoEmOutra ? false : iniciaSla,
             encerra_sla: encerraEmOutra ? false : encerraSla,
+            retorno_no_show: retornoEmOutra ? false : retornoNoShow,
           })}>Salvar</Button>
           </div>
         </DialogFooter>
