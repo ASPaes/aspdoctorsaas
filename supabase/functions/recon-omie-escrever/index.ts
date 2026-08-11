@@ -399,12 +399,33 @@ Deno.serve(async (req)=>{
     body: JSON.stringify({
       acao: "ler_padroes",
       tenant_id: tenantDs,
+      // 08/08/2026: SEM ISTO A MENSAGEM MENTE. Esta funcao chama a omie-integration-call para ler
+      // os padroes, e sem dizer a conta a chamada volta 'conta_nao_informada' (400) quando o tenant
+      // tem mais de uma conta Omie. A lista chegava vazia e o bloqueio saia como
+      // "Nenhum modelo permitido em Padroes Omie" -- com o modelo permitido, marcado e salvo na
+      // tela. Medido na Digi Up, com 'Cobranca Direta' selecionado e o contrato usando esse modelo.
+      conta_integration_id: conta.id,
       dados: {
         operacao: "ler"
       }
     })
   });
   const padroesJson = await padroesResp.json().catch(()=>({}));
+  // Ler os padroes e FALHAR e diferente de ler e nao haver modelo. Confundir os dois foi o que
+  // mandou o usuario configurar uma tela que ja estava configurada.
+  if (!padroesResp.ok || padroesJson?.ok === false) {
+    const detalhe = padroesJson?.error ?? `HTTP ${padroesResp.status}`;
+    const msg = `Nao foi possivel ler os Padroes Omie desta unidade (${detalhe}). A configuracao pode estar correta -- a falha e na leitura.`;
+    await registrarBloqueio("padroes_indisponiveis", msg, {
+      contrato: ctr.numero,
+      conta_integration_id: conta.id
+    });
+    return json({
+      ok: false,
+      bloqueado: "padroes_indisponiveis",
+      error: msg
+    }, 422);
+  }
   const permitidos = padroesJson?.resultado?.padroes?.modelos_permitidos ?? [];
   if (!Array.isArray(permitidos) || permitidos.length === 0) {
     const msg = "Nenhum modelo permitido em Padr\u00f5es Omie.";
