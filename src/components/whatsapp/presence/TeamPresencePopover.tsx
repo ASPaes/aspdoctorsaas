@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Users, Zap, Pause, LogOut, Wifi, WifiOff, Timer, AlertTriangle } from "lucide-react";
+import { Users, Zap, Pause, LogOut, Wifi, WifiOff, Timer, AlertTriangle, Play, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 function useNow(intervalMs = 1000) {
   const [now, setNow] = useState(Date.now());
@@ -20,9 +21,38 @@ function useNow(intervalMs = 1000) {
   return now;
 }
 
-function MemberRow({ member, now }: { member: TeamMemberPresence; now: number }) {
+function MemberRow({
+  member,
+  now,
+  onSetStatus,
+}: {
+  member: TeamMemberPresence;
+  now: number;
+  onSetStatus: (userId: string, status: "active" | "offline") => Promise<void>;
+}) {
   const isPaused = member.status === "paused";
   const isActive = member.status === "active";
+  const [busy, setBusy] = useState<"active" | "offline" | null>(null);
+
+  // DEM-0194: quem fechou o navegador sem encerrar o expediente continua
+  // 'active' e continua recebendo distribuicao. Estas duas acoes sao a correcao
+  // manual. Nao mexem em atendimento em andamento — so no que o operador
+  // recebe daqui pra frente.
+  const handle = async (status: "active" | "offline") => {
+    setBusy(status);
+    try {
+      await onSetStatus(member.user_id, status);
+      toast.success(
+        status === "offline"
+          ? `${member.agent_name} ficou offline e nao recebe novos atendimentos.`
+          : `${member.agent_name} voltou a ficar disponivel.`
+      );
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao alterar o status do atendente");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   // Pause calculations
   let pausedTotalMs = 0;
@@ -115,20 +145,58 @@ function MemberRow({ member, now }: { member: TeamMemberPresence; now: number })
         )}
       </div>
 
-      {/* Status badge */}
-      <Badge
-        variant={isActive ? "default" : isPaused ? "secondary" : "outline"}
-        className="text-[10px] h-5 shrink-0"
-      >
-        {cfg.label}
-      </Badge>
+      {/* Status + acoes do gestor */}
+      <div className="flex items-center gap-0.5 shrink-0">
+        <Badge
+          variant={isActive ? "default" : isPaused ? "secondary" : "outline"}
+          className="text-[10px] h-5"
+        >
+          {cfg.label}
+        </Badge>
+
+        {member.status !== "active" && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400"
+            disabled={busy !== null}
+            title={`Marcar ${member.agent_name} como ativo`}
+            aria-label={`Marcar ${member.agent_name} como ativo`}
+            onClick={() => handle("active")}
+          >
+            {busy === "active" ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Play className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        )}
+
+        {member.status !== "offline" && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+            disabled={busy !== null}
+            title={`Encerrar o expediente de ${member.agent_name}`}
+            aria-label={`Encerrar o expediente de ${member.agent_name}`}
+            onClick={() => handle("offline")}
+          >
+            {busy === "offline" ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <LogOut className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
 
 export default function TeamPresencePopover() {
   const [open, setOpen] = useState(false);
-  const { members, isLoading, isAdmin, refetch } = useTeamPresence();
+  const { members, isLoading, isAdmin, refetch, setMemberStatus } = useTeamPresence();
   const now = useNow(1000);
 
   useEffect(() => {
@@ -173,7 +241,9 @@ export default function TeamPresencePopover() {
             ) : members.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-4">Nenhum colaborador registrado</p>
             ) : (
-              members.map((m) => <MemberRow key={m.user_id} member={m} now={now} />)
+              members.map((m) => (
+                <MemberRow key={m.user_id} member={m} now={now} onSetStatus={setMemberStatus} />
+              ))
             )}
           </div>
         </ScrollArea>

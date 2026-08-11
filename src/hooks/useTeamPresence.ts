@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { subscribeSharedChannel } from "@/lib/realtimeChannelPool";
@@ -142,6 +142,35 @@ export function useTeamPresence() {
   });
 
 
+  /**
+   * DEM-0194: gestor forca o status de presenca de outro atendente.
+   *
+   * Toda a regra (permissao, auditoria, o que NAO mexer) vive na RPC
+   * agent_presence_admin_set_status — as tabelas de presenca nao aceitam UPDATE
+   * de terceiro por RLS, e nao devem passar a aceitar. Aqui so despachamos.
+   *
+   * Nao existe update otimista: a linha e de outra pessoa e volta pelo realtime
+   * de support_agent_presence (o proprio atendente recebe a mudanca na hora, via
+   * usePresenceRow). Pintar antes de confirmar so criaria divergencia entre as
+   * duas telas se a RPC recusasse.
+   */
+  const setMemberStatus = useCallback(
+    async (userId: string, status: "active" | "offline") => {
+      if (!tid) return;
+      const { error } = await (supabase.rpc as any)("agent_presence_admin_set_status", {
+        p_tenant_id: tid,
+        p_user_id: userId,
+        p_status: status,
+      });
+      if (error) throw error;
+      await queryClient.invalidateQueries({ queryKey: ["team_presence", tid] });
+      // Cobre o caso do gestor mexer na propria linha: a chave do usuario atual
+      // e ["agent_presence", tid, userId] e nao seria alcancada pela de cima.
+      queryClient.invalidateQueries({ queryKey: ["agent_presence", tid] });
+    },
+    [tid, queryClient]
+  );
+
   // Realtime subscription for instant updates across browsers
   useEffect(() => {
     if (!tid || !isAdmin) return;
@@ -165,5 +194,5 @@ export function useTeamPresence() {
     );
   }, [tid, isAdmin, queryClient]);
 
-  return { members, isLoading, isAdmin: !!isAdmin, refetch };
+  return { members, isLoading, isAdmin: !!isAdmin, refetch, setMemberStatus };
 }
