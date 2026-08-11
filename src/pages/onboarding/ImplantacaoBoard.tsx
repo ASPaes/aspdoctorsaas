@@ -21,6 +21,9 @@ export interface TrainingCardRow {
   realizado_em: string | null;
   tentativas: number | null;
   no_show: boolean | null;
+  /** Faltas de verdade. Não confundir com `tentativas`, que conta remarcações. */
+  no_shows: number | null;
+  ultimo_no_show_em: string | null;
   is_retreinamento: boolean | null;
   link_agendamento: string | null;
   current_stage_id: string | null;
@@ -503,7 +506,11 @@ export default function ImplantacaoBoard({
 
                     {items.map((t) => {
                       const feito = t.status === "realizado";
-                      const agendado = !!t.agendado_para && !feito;
+                      // Pelo STATUS, não pela presença da data: depois de um no-show a
+                      // `agendado_para` é limpa, mas os treinos anteriores a 11/08 ainda
+                      // carregam a data do treino que não aconteceu — e anunciavam
+                      // "Treino 04/08 16:00" numa coluna de fila de agendamento.
+                      const agendado = t.status === "agendado" && !!t.agendado_para;
                       return (
                         <div
                           key={t.training_id}
@@ -559,7 +566,7 @@ export default function ImplantacaoBoard({
                                 realizado
                               </span>
                             )}
-                            {!feito && !t.agendado_para && (
+                            {!feito && !agendado && (
                               <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded text-white" style={{ background: "#64748B" }}>
                                 sem data
                               </span>
@@ -608,6 +615,18 @@ export default function ImplantacaoBoard({
                             {feito && t.realizado_em && (
                               <span className="inline-flex items-center gap-1">
                                 <CheckCircle2 className="h-3 w-3" /> {formatTrainingDateTime(t.realizado_em)}
+                              </span>
+                            )}
+                            {(t.no_shows ?? 0) > 0 && (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-medium text-[hsl(0_84%_60%)] bg-[hsl(0_84%_60%)]/10"
+                                title={
+                                  t.ultimo_no_show_em
+                                    ? `Última falta: treino de ${formatTrainingDateTime(t.ultimo_no_show_em)}`
+                                    : "O cliente faltou ao treino"
+                                }
+                              >
+                                <UserX className="h-3 w-3" /> no-show · {t.no_shows}ª
                               </span>
                             )}
                             {(t.tentativas ?? 0) > 0 && (

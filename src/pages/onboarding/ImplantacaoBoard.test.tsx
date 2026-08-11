@@ -36,6 +36,8 @@ function card(p: Partial<TrainingCardRow> & { training_id: string; parent_ticket
     realizado_em: "2026-07-30T18:00:00Z",
     tentativas: 0,
     no_show: false,
+    no_shows: 0,
+    ultimo_no_show_em: null,
     is_retreinamento: false,
     link_agendamento: null,
     current_stage_id: FINAL,
@@ -88,12 +90,12 @@ afterEach(() => {
   container.remove();
 });
 
-function render() {
+function render(customRows: TrainingCardRow[] = rows) {
   act(() =>
     root.render(
       <ImplantacaoBoard
         stages={stages}
-        rows={rows}
+        rows={customRows}
         jornadasSemTreino={[]}
         goLivePorJornada={{}}
         goLiveForaDaJanela={0}
@@ -112,6 +114,39 @@ function colunaFinal(): HTMLElement {
   if (!col) throw new Error("coluna final não encontrada");
   return col as HTMLElement;
 }
+
+describe("ImplantacaoBoard — no-show", () => {
+  /** O treino volta com a data limpa, mas o legado ainda tem `agendado_para` preenchido:
+   *  a tarja tem que sair pelo status, não pela presença da data. */
+  it("treino sem agendamento não mostra a tarja azul, mesmo com data velha", () => {
+    render([
+      card({ training_id: "n1", parent_ticket_code: "TK-2026-2400", sub_seq: 1,
+             status: "previsto", current_stage_id: MARCADO, realizado_em: null,
+             agendado_para: "2026-08-04T19:00:00Z", no_shows: 1 }),
+    ]);
+    expect(container.textContent).not.toContain("Treino 04/08");
+    expect(container.textContent).toContain("sem data");
+  });
+
+  it("mostra o selo de no-show com a contagem de faltas", () => {
+    render([
+      card({ training_id: "n2", parent_ticket_code: "TK-2026-2401", sub_seq: 1,
+             status: "previsto", current_stage_id: MARCADO, realizado_em: null,
+             agendado_para: null, no_shows: 2 }),
+    ]);
+    expect(container.textContent).toContain("no-show · 2ª");
+  });
+
+  it("treino agendado de verdade continua com a tarja", () => {
+    render([
+      card({ training_id: "n3", parent_ticket_code: "TK-2026-2402", sub_seq: 1,
+             status: "agendado", current_stage_id: MARCADO, realizado_em: null,
+             agendado_para: "2026-08-12T13:00:00Z", no_shows: 1 }),
+    ]);
+    expect(container.textContent).toContain("Treino 12/08");
+    expect(container.textContent).toContain("no-show · 1ª");
+  });
+});
 
 describe("ImplantacaoBoard — etapa final agrupada por ticket pai", () => {
   it("mostra um cartão por ticket pai, não um por sub-ticket", () => {
