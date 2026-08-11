@@ -3,6 +3,10 @@
 // assim que esta function perdeu o portao de JWT do gateway ao entrar no repo. A auth interna
 // (auth.getUser + papel) sempre existiu e continua, mas o portao volta a ser explicito aqui.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// recon-espelho-pull v6 (10/08/2026): carrega valor_servicos_omie (Total dos Servicos do Omie).
+// Ver o comentario no map das linhas. Aditivo: se o snapshot nao mandar o campo, a coluna fica
+// nula e tudo continua comparando pelo valor_omie, como antes.
+//
 // recon-espelho-pull v5 (07/08/2026): UMA CONTA OMIE POR UNIDADE BASE.
 //
 // Esta era a funcao mais perigosa da mudanca. O espelho e por CONTA -- codigo_cliente_omie so e
@@ -150,6 +154,13 @@ Deno.serve(async (req)=>{
         omie_inativo: c.omie_inativo,
         codigo_contrato_omie: c.codigo_contrato_omie,
         valor_omie: c.valor_omie,
+        // v6: "Total dos Servicos" do Omie (bruto, sem desconto). O valor_omie e o "Total do
+        // Contrato" (liquido). O Omie nao manda bloco de totais -- o espelho_snapshot do
+        // DoctorOMIE reconstroi o bruto de Sum(quant x valorUnit) dos itens do raw. Quando o raw
+        // esta defasado, ele devolve o proprio valor_omie em vez de inventar desconto.
+        // Snapshot antigo (sem o campo) => undefined => a coluna fica nula e a deteccao cai no
+        // valor_omie. Nao quebra.
+        valor_servicos_omie: c.valor_servicos_omie ?? null,
         vigencia_inicial_omie: c.vigencia_inicial_omie,
         vigencia_final_omie: c.vigencia_final_omie,
         dia_venc_omie: c.dia_venc_omie,

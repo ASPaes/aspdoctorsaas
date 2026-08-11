@@ -177,6 +177,10 @@ type ReconciliacaoRow = {
   cnpj_norm: string | null;
   valor_mrr_ds: number | null;
   valor_omie: number | null;
+  /** "Total dos Serviços" do Omie — bruto, sem desconto. Nulo até o espelho ser puxado pela v6. */
+  valor_servicos_omie: number | null;
+  /** O valor que a detecção DE FATO comparou, já resolvido por omie_integration.base_valor_conferencia. */
+  valor_omie_efetivo: number | null;
   vigencia_inicial_ds: string | null;
   vigencia_final_ds: string | null;
   vigencia_final_omie: string | null;
@@ -250,7 +254,7 @@ function CandidatosLinha({
       const { data, error } = await supabase
         .from("omie_espelho_cadastro")
         .select(
-          "codigo_cliente_omie, codigo_contrato_omie, razao_social_omie, valor_omie, situacao_contrato, omie_inativo, origem_codigo, contratos_omie",
+          "codigo_cliente_omie, codigo_contrato_omie, razao_social_omie, valor_omie, valor_servicos_omie, situacao_contrato, omie_inativo, origem_codigo, contratos_omie",
         )
         .eq("cnpj_norm", cnpj)
         .eq("conta_integration_id", conta?.id ?? "")
@@ -279,6 +283,7 @@ function CandidatosLinha({
           ...e,
           codigo_contrato_omie: c.codigo_contrato_omie,
           valor_omie: c.valor_omie,
+          valor_servicos_omie: c.valor_servicos_omie ?? null,
           situacao_contrato: c.situacao_contrato,
         }));
       });
@@ -356,7 +361,14 @@ function CandidatosLinha({
               <div className="text-xs text-muted-foreground flex flex-wrap gap-2 mt-1">
                 <span>Cód cliente: {c.codigo_cliente_omie || "—"}</span>
                 <span>Cód contrato: {codigo || "—"}</span>
-                <span>Valor: {formatBRL(c.valor_omie)}</span>
+                {/* Contrato com desconto: escolher o candidato pelo valor exige ver os dois,
+                    senão o número aqui não bate com o MRR do DS e a escolha parece errada. */}
+                {c.valor_servicos_omie != null && c.valor_omie != null &&
+                 Math.abs(Number(c.valor_servicos_omie) - Number(c.valor_omie)) > 0.01 ? (
+                  <span>Valor: serviços {formatBRL(c.valor_servicos_omie)} · contrato {formatBRL(c.valor_omie)}</span>
+                ) : (
+                  <span>Valor: {formatBRL(c.valor_omie)}</span>
+                )}
                 {c.situacao_contrato && <Badge variant="outline" className="text-[10px]">{c.situacao_contrato}</Badge>}
                 {c.omie_inativo && <Badge variant="destructive" className="text-[10px]">Inativo</Badge>}
                 {c.origem_codigo && <Badge variant="secondary" className="text-[10px]">{originLabel(c.origem_codigo).label}</Badge>}
@@ -398,12 +410,19 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
   const clienteNoOmie = row.codigo_cliente_omie != null && String(row.codigo_cliente_omie) !== "";
   const contratoNoOmie = row.codigo_contrato_omie != null && String(row.codigo_contrato_omie) !== "";
   const nomesDiferem = row.nome_diverge === true;
+  // Compara pelo valor que a DETECÇÃO comparou. O ?? cobre a linha antiga, gerada antes da
+  // coluna existir — sem ele a tela mostraria "—" onde o painel mostra um número.
+  const valorOmieEfetivo = row.valor_omie_efetivo ?? row.valor_omie;
+  // O contrato tem desconto no Omie quando o bruto e o líquido não batem.
+  const temDescontoOmie =
+    row.valor_servicos_omie != null && row.valor_omie != null &&
+    Math.abs(Number(row.valor_servicos_omie) - Number(row.valor_omie)) > 0.01;
   const valoresBatem =
-    row.valor_mrr_ds != null && row.valor_omie != null &&
-    Number(row.valor_mrr_ds) === Number(row.valor_omie);
+    row.valor_mrr_ds != null && valorOmieEfetivo != null &&
+    Number(row.valor_mrr_ds) === Number(valorOmieEfetivo);
   const delta =
-    row.valor_mrr_ds != null && row.valor_omie != null
-      ? Number(row.valor_omie) - Number(row.valor_mrr_ds)
+    row.valor_mrr_ds != null && valorOmieEfetivo != null
+      ? Number(valorOmieEfetivo) - Number(row.valor_mrr_ds)
       : null;
 
   const cnpjFmt = formatCNPJ(row.cnpj_norm);
@@ -731,7 +750,7 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
           {contratoNoOmie ? (
             <>
               <div className="mt-0.5 text-sm flex items-center gap-2 flex-wrap">
-                <span className="font-medium">{formatBRL(row.valor_omie)}</span>
+                <span className="font-medium">{formatBRL(valorOmieEfetivo)}</span>
                 {row.situacao_contrato === "90" && (
                   <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-900">
                     Suspenso
@@ -748,7 +767,7 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
                   </Badge>
                 ) : delta != null ? (
                   <span className="text-xs text-muted-foreground">
-                    DS {formatBRL(row.valor_mrr_ds)} → Omie {formatBRL(row.valor_omie)}
+                    DS {formatBRL(row.valor_mrr_ds)} → Omie {formatBRL(valorOmieEfetivo)}
                     <span className={`ml-1 font-medium ${delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
                       (Δ {delta > 0 ? "+" : ""}{formatBRL(delta)})
                     </span>
@@ -759,6 +778,13 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
               <div className="text-[11px] text-muted-foreground/80 mt-0.5">
                 cód. {row.codigo_contrato_omie}
               </div>
+              {/* Sem isto, "Omie 354,70" não bate com o 252,25 que a pessoa vê na tela do Omie
+                  e vira chamado. Só aparece quando o contrato realmente tem desconto. */}
+              {temDescontoOmie && (
+                <div className="text-[11px] text-muted-foreground/80">
+                  serviços {formatBRL(row.valor_servicos_omie)} · contrato {formatBRL(row.valor_omie)}
+                </div>
+              )}
               {bucket === "vigencia_vencida_no_omie" && row.vigencia_final_omie && (
                 <div className="mt-1.5 inline-flex items-center gap-1.5 rounded border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/40 px-2 py-1 text-[11px] font-semibold text-red-700 dark:text-red-400">
                   Vigência final no Omie: {(() => {
@@ -882,7 +908,7 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
           <AlertDialogHeader>
             <AlertDialogTitle>Ajustar valor no DoctorSaaS</AlertDialogTitle>
             <AlertDialogDescription>
-              O valor do DoctorSaaS ({formatBRL(row.valor_mrr_ds)}) será alinhado ao do Omie ({formatBRL(row.valor_omie)}) através de um movimento de MRR de {ajusteTipo ?? "ajuste"} no valor de {formatBRL(ajusteAbs)}. Isso altera a base de MRR do cliente e será registrado como correção de conciliação. Não altera nada no Omie.
+              O valor do DoctorSaaS ({formatBRL(row.valor_mrr_ds)}) será alinhado ao do Omie ({formatBRL(valorOmieEfetivo)}) através de um movimento de MRR de {ajusteTipo ?? "ajuste"} no valor de {formatBRL(ajusteAbs)}. Isso altera a base de MRR do cliente e será registrado como correção de conciliação. Não altera nada no Omie.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1526,7 +1552,7 @@ export default function OmieConferenciaTab() {
       let q = supabase
         .from("reconciliacao_cadastro")
         .select(
-          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, vigencia_inicial_ds, vigencia_final_ds, vigencia_final_omie, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id, situacao_contrato, tem_cancelado_omie, status_usuario, candidato_escolhido",
+          "ds_contract_id, razao_ds, razao_omie, codigo_cliente_omie, codigo_contrato_omie, cnpj_norm, valor_mrr_ds, valor_omie, valor_servicos_omie, valor_omie_efetivo, vigencia_inicial_ds, vigencia_final_ds, vigencia_final_omie, dia_venc_ds, dia_venc_omie, modelo_ds, origem_codigo, omie_inativo, qtd_candidatos_omie, estado_match, estado_valor, diffs, acao_sugerida, nome_diverge, fornecedor_ds, fornecedor_id, situacao_contrato, tem_cancelado_omie, status_usuario, candidato_escolhido",
           { count: "exact" }
         );
       q = q.eq("conta_integration_id", conta?.id ?? "");

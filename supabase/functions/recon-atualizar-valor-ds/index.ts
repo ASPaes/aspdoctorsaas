@@ -85,7 +85,7 @@ Deno.serve(async (req)=>{
     error: unidadeBase !== null ? "A unidade escolhida não está ligada a nenhuma conta Omie." : "Este tenant tem mais de uma conta Omie. Escolha a unidade.",
     motivo: "conta_nao_resolvida"
   }, 400);
-  const { data: linha, error: qErr } = await admin.from("reconciliacao_cadastro").select("ds_contract_id, ds_customer_id, cnpj_norm, valor_mrr_ds, valor_omie, fornecedor_id, acao_sugerida, status_usuario").eq("tenant_id", tenantDs).eq("conta_integration_id", conta.id).eq("ds_contract_id", dsContractId).maybeSingle();
+  const { data: linha, error: qErr } = await admin.from("reconciliacao_cadastro").select("ds_contract_id, ds_customer_id, cnpj_norm, valor_mrr_ds, valor_omie, valor_omie_efetivo, fornecedor_id, acao_sugerida, status_usuario").eq("tenant_id", tenantDs).eq("conta_integration_id", conta.id).eq("ds_contract_id", dsContractId).maybeSingle();
   if (qErr) return json({
     ok: false,
     error: "Falha ao ler a linha",
@@ -104,7 +104,12 @@ Deno.serve(async (req)=>{
     error: "Linha não está no balde de divergência de valor"
   }, 422);
   const valorDs = Number(linha.valor_mrr_ds ?? 0);
-  const valorOmie = Number(linha.valor_omie ?? 0);
+  // 10/08/2026: alinha pelo valor que a DETECCAO comparou, nao pelo valor_omie cru.
+  // Com base_valor_conferencia='total_servicos', valor_omie e o Total do Contrato (liquido) e o
+  // efetivo e o Total dos Servicos (bruto). Usar o cru aqui geraria um downsell do tamanho do
+  // desconto -- exatamente a correcao que a chave existe para NAO fazer.
+  // ?? e nao ||: valor_omie_efetivo = 0 e um valor legitimo e um || o descartaria.
+  const valorOmie = Number(linha.valor_omie_efetivo ?? linha.valor_omie ?? 0);
   const delta = Math.round((valorOmie - valorDs) * 100) / 100;
   if (delta === 0) return json({
     ok: false,

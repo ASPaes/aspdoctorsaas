@@ -104,6 +104,11 @@ export default function OmiePadroesTab() {
   const [modelos, setModelos] = useState<ModeloContrato[]>([]);
   const [modelosPermitidos, setModelosPermitidos] = useState<string[]>([]);
 
+  // Base de valor da conferência: qual total do contrato do Omie vale no de/para.
+  // 'total_contrato' = líquido (nValTotMes, com desconto) · 'total_servicos' = bruto (sem desconto).
+  const [baseValor, setBaseValor] = useState<string>("total_contrato");
+  const [savingBaseValor, setSavingBaseValor] = useState(false);
+
   // Kill switch da integração
   const [pausada, setPausada] = useState(false);
   const [confirmPauseOpen, setConfirmPauseOpen] = useState(false);
@@ -181,7 +186,7 @@ export default function OmiePadroesTab() {
       // Data de corte + lista de modelos (paralelo)
       const [omieRow, modelosRes] = await Promise.all([
         (supabase.from("omie_integration" as any) as any)
-          .select("integrar_a_partir_de, integracao_pausada, alert_whatsapp_numbers")
+          .select("integrar_a_partir_de, integracao_pausada, alert_whatsapp_numbers, base_valor_conferencia")
           .eq("id", conta?.id ?? "")
           .maybeSingle(),
         (supabase.from("modelos_contrato" as any) as any)
@@ -192,6 +197,7 @@ export default function OmiePadroesTab() {
       const dc = (omieRow?.data as any)?.integrar_a_partir_de ?? null;
       setDataCorte(dc ? String(dc).slice(0, 10) : "");
       setPausada(!!(omieRow?.data as any)?.integracao_pausada);
+      setBaseValor(String((omieRow?.data as any)?.base_valor_conferencia ?? "total_contrato"));
       const _nums = (omieRow?.data as any)?.alert_whatsapp_numbers;
       setAlertNumbers(Array.isArray(_nums) ? _nums.map((n: any) => String(n)) : []);
       setModelos(((modelosRes?.data as any[]) ?? []).map((m) => ({ id: String(m.id), nome: String(m.nome) })));
@@ -306,6 +312,27 @@ export default function OmiePadroesTab() {
     } finally {
       setSavingPausa(false);
       setConfirmPauseOpen(false);
+    }
+  }
+
+  async function salvarBaseValor(v: string) {
+    const anterior = baseValor;
+    setBaseValor(v); // otimista: o Select é a única fonte visual e piscar de volta confunde
+    setSavingBaseValor(true);
+    try {
+      const { error } = await (supabase.from("omie_integration" as any) as any)
+        .update({ base_valor_conferencia: v })
+        .eq("id", conta?.id ?? "");
+      if (error) throw error;
+      toast({
+        title: "Base de valor salva",
+        description: "Puxe o espelho e rode a detecção na Conferência para os baldes recalcularem.",
+      });
+    } catch (err: any) {
+      setBaseValor(anterior);
+      toast({ title: "Erro ao salvar", description: err?.message || "Tente novamente.", variant: "destructive" });
+    } finally {
+      setSavingBaseValor(false);
     }
   }
 
@@ -433,6 +460,33 @@ export default function OmiePadroesTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Base de valor da conferência</CardTitle>
+          <CardDescription>
+            Qual valor do contrato do Omie vale como referência no de/para e na conferência.
+            Não altera nada no Omie nem no que é enviado — muda só como o painel decide se o valor bate.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Select value={baseValor} onValueChange={(v) => void salvarBaseValor(v)} disabled={savingBaseValor}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="total_contrato">Total do Contrato — com desconto</SelectItem>
+              <SelectItem value="total_servicos">Total dos Serviços — sem desconto</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            O MRR do DoctorSaaS é <strong>sem desconto</strong>. Se os contratos desta conta usam desconto
+            no Omie, a opção "Total do Contrato" faz cada um deles aparecer como divergência de valor —
+            mesmo estando certos dos dois lados.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Depois de trocar: puxe o espelho e rode a detecção na aba Conferência para os baldes se recalcularem.
+          </p>
+        </CardContent>
+      </Card>
 
       <p className="text-sm text-muted-foreground">
         Estes são os valores padrão usados ao enviar contratos ao Omie. Se um produto tiver o campo preenchido,
