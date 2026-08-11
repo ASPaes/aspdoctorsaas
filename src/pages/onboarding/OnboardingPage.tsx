@@ -19,6 +19,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { NewJourneyModal } from "./NewJourneyModal";
 import JourneyDetailSheet from "./JourneyDetailSheet";
+import { SaidaSemTreinoDialog } from "./SaidaSemTreinoDialog";
 import ImplantacaoBoard, { type TrainingCardRow, type JornadaSemTreino } from "./ImplantacaoBoard";
 import AcompanhamentoBoard from "./AcompanhamentoBoard";
 import { NewAcompanhamentoModal } from "@/components/tickets/NewAcompanhamentoModal";
@@ -628,6 +629,79 @@ export default function OnboardingPage() {
     return m;
   }, [stages, journeysFiltradas, filtroSituacao, phaseId, selectedPipelineId, phasesByJourney, proximaPhase, busca]);
 
+  /** DEM-0269: soltar na coluna de conclusão é a MESMA saída do botão Go-live e passa
+   *  pela mesma regra. Sem treino, a RPC recusa e a resposta abre o diálogo das duas
+   *  saídas — antes esse arrasto mandava direto para a Implantação, apesar de a coluna
+   *  se chamar "Onboarding concluído". */
+  const [saidaSemTreino, setSaidaSemTreino] = useState<string | null>(null);
+
+  function invalidarQuadro() {
+    queryClient.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+    queryClient.invalidateQueries({ queryKey: ["onboarding-journey-phases"] });
+    queryClient.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
+    queryClient.invalidateQueries({ queryKey: ["onboarding-stage-history"] });
+    queryClient.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+  }
+
+  async function avancarJornada(journeyId: string, semTreinoOk: boolean) {
+    try {
+      const { data, error } = await (supabase.rpc as any)("advance_onboarding_to_implantacao", {
+        p_journey_id: journeyId,
+        p_force: false,
+        p_sem_treino_ok: semTreinoOk,
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res && res.ok === false) {
+        if (res.reason === "sem_treino") {
+          setSaidaSemTreino(journeyId);
+          return;
+        }
+        toast.error(
+          res.reason === "nao_etapa_final" ? "Conclua as etapas do onboarding antes de avançar." :
+          res.reason === "nao_em_onboarding" ? "A jornada não está mais em Onboarding." :
+          "Não foi possível concluir o onboarding."
+        );
+        return;
+      }
+      setSaidaSemTreino(null);
+      toast.success(
+        res?.novo_responsavel_nome
+          ? `Onboarding concluído — implantação com ${res.novo_responsavel_nome}.`
+          : "Onboarding concluído — jornada em Implantação."
+      );
+      invalidarQuadro();
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao concluir onboarding");
+    }
+  }
+
+  async function encerrarNoOnboarding(journeyId: string, motivo: string, goLiveReal: string) {
+    try {
+      const { data, error } = await (supabase.rpc as any)("journey_go_live", {
+        p_journey_id: journeyId,
+        p_go_live_real: goLiveReal || null,
+        p_motivo: motivo.trim() || null,
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res && res.ok === false) {
+        toast.error(
+          res.reason === "treinos_em_aberto"
+            ? `Go-live bloqueado: ${res.qtd} treinamento${res.qtd > 1 ? "s" : ""} em aberto (${res.codigos}).`
+            : "Não foi possível registrar o go-live.",
+          { duration: 8000 },
+        );
+        return;
+      }
+      setSaidaSemTreino(null);
+      toast.success("Onboarding concluído — jornada encerrada sem treinamento.");
+      invalidarQuadro();
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao encerrar onboarding");
+    }
+  }
+
   async function handleDrop(journeyId: string, targetStageId: string, fromStageId: string) {
     if (fromStageId === targetStageId) return;
     // Soltar na coluna de conclusão → encerra esta fase e entra na próxima ativa.
@@ -643,33 +717,7 @@ export default function OnboardingPage() {
         );
         return;
       }
-      try {
-        const { data, error } = await (supabase.rpc as any)("advance_onboarding_to_implantacao", {
-          p_journey_id: journeyId,
-          p_force: false,
-        });
-        if (error) throw error;
-        const res = data as any;
-        if (res && res.ok === false) {
-          toast.error(
-            res.reason === "nao_etapa_final" ? "Conclua as etapas do onboarding antes de avançar." :
-            res.reason === "nao_em_onboarding" ? "A jornada não está mais em Onboarding." :
-            "Não foi possível concluir o onboarding."
-          );
-          return;
-        }
-        toast.success(
-          res?.novo_responsavel_nome
-            ? `Onboarding concluído — implantação com ${res.novo_responsavel_nome}.`
-            : "Onboarding concluído — jornada em Implantação."
-        );
-        queryClient.invalidateQueries({ queryKey: ["onboarding-journeys"] });
-        queryClient.invalidateQueries({ queryKey: ["onboarding-journey-phases"] });
-        queryClient.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
-        queryClient.invalidateQueries({ queryKey: ["onboarding-stage-history"] });
-      } catch (e: any) {
-        toast.error(e.message || "Erro ao concluir onboarding");
-      }
+      await avancarJornada(journeyId, false);
       return;
     }
     try {
@@ -1263,6 +1311,15 @@ export default function OnboardingPage() {
         subTicketId={detailSubTicket?.id ?? null}
         subTicketCode={detailSubTicket?.code ?? null}
         tenantId={effectiveTenantId}
+      />
+
+      <SaidaSemTreinoDialog
+        open={!!saidaSemTreino}
+        onOpenChange={(o) => { if (!o) setSaidaSemTreino(null); }}
+        onTransferir={() => saidaSemTreino && avancarJornada(saidaSemTreino, true)}
+        onEncerrar={({ motivo, goLiveReal }) =>
+          saidaSemTreino && encerrarNoOnboarding(saidaSemTreino, motivo, goLiveReal)
+        }
       />
     </div>
   );

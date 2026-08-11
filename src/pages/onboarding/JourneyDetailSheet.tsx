@@ -35,6 +35,7 @@ import { JourneyRuler } from "./JourneyRuler";
 import { useOnboardingParticipantRoles } from "@/hooks/useOnboardingParticipantRoles";
 import { TransferResponsavelDialog } from "./TransferResponsavelDialog";
 import { ResponsavelHistorico } from "./ResponsavelHistorico";
+import { SaidaSemTreinoDialog } from "./SaidaSemTreinoDialog";
 
 
 interface Props {
@@ -344,6 +345,10 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [nextStageId, setNextStageId] = useState<string>("");
   const [concludeOpen, setConcludeOpen] = useState(false);
   const [goLiveReal, setGoLiveReal] = useState<string>("");
+  // DEM-0269: as duas saídas do Onboarding quando não há treino, e a confirmação
+  // simples quando há.
+  const [saidaSemTreinoOpen, setSaidaSemTreinoOpen] = useState(false);
+  const [confirmImplantacaoOpen, setConfirmImplantacaoOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelMotivo, setCancelMotivo] = useState("");
   const [addParticipantOpen, setAddParticipantOpen] = useState(false);
@@ -875,6 +880,14 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const trainings = trainingQ.data ?? [];
   const attendances = attendancesQ.data ?? [];
 
+  // Mesma definição de fn_onb_tem_treino_vivo: só 'cancelado' não conta (a query
+  // já descarta os excluídos). Aqui é só para escolher qual diálogo abrir — quem
+  // decide de verdade é a RPC.
+  const temTreinoVivo = useMemo(
+    () => trainings.some((t: any) => t.status !== "cancelado"),
+    [trainings]
+  );
+
   // Timeline (aba dedicada): "Somente as minhas" atinge as duas colunas; o filtro de
   // tipos só tem efeito na de movimentação, já que a de notas é de um tipo só.
   const tlBase = useMemo(
@@ -1060,7 +1073,13 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const isTerminal = isConcluded || isCancelled;
   const isAdmin = profile?.is_super_admin === true || profile?.role === "admin";
   const etapaFinal = stages.find((s) => s.id === journey?.current_stage_id)?.is_final === true;
-  const canGoLive = (faseSlug === "implantacao" && etapaFinal) || isAdmin;
+  // DEM-0269: o Go-live virou a saída única do Onboarding, então precisa aparecer para
+  // head/user lá também — antes só admin via, e o time de onboarding inteiro é head,
+  // de modo que ninguém conseguia encerrar uma jornada.
+  // O Acompanhamento segue como estava (só admin): ninguém reclamou dele e liberar
+  // por tabela mudaria comportamento que não foi decidido.
+  const canGoLive =
+    ((faseSlug === "implantacao" || faseSlug === "onboarding") && etapaFinal) || isAdmin;
 
   // Ao agendar na fase de onboarding, o usuário escolhe concluir (→ implantação) ou manter.
   const isOnbPhase = faseSlug === "onboarding";
@@ -1232,15 +1251,20 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     }
   }
 
-  async function handleConclude() {
+  /** Go-live. `opts` chega do diálogo das duas saídas; sem ele, valem os campos do
+   *  diálogo de Go-live comum. */
+  async function handleConclude(opts?: { motivo?: string; goLiveReal?: string }) {
     if (!journey) return;
+    const glr = opts?.goLiveReal ?? goLiveReal;
+    const motivo = (opts?.motivo ?? "").trim();
     try {
       // journey_go_live decide pela CONFIGURAÇÃO: sem jornada seguinte ele conclui
       // (comportamento de sempre); com Acompanhamento ligado, grava o go-live e a
       // jornada segue viva até o acompanhamento fechar.
       const { data, error } = await (supabase.rpc as any)("journey_go_live", {
         p_journey_id: journey.journey_id,
-        p_go_live_real: goLiveReal || null,
+        p_go_live_real: glr || null,
+        p_motivo: motivo || null,
       });
       if (error) throw error;
       const res = data as any;
@@ -1264,6 +1288,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       }
       toast.success(res?.concluiu === false ? `Go-live registrado — jornada em ${res.fase ?? "acompanhamento"}.` : "Jornada concluída");
       setConcludeOpen(false);
+      setSaidaSemTreinoOpen(false);
       setGoLiveReal("");
       qc.invalidateQueries({ queryKey: ["onboarding-journey-detail"] });
       qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
@@ -1535,16 +1560,26 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     }
   }
 
-  async function handleConcludeOnboarding() {
+  /** Saída A: a jornada segue para a Implantação. `semTreinoOk` é o opt-in explícito
+   *  que a RPC exige quando não há treino vivo — só o diálogo o envia. */
+  async function avancarParaImplantacao(semTreinoOk: boolean) {
     if (!journey) return;
     try {
       const { data, error } = await (supabase.rpc as any)("advance_onboarding_to_implantacao", {
         p_journey_id: journey.journey_id,
         p_force: false,
+        p_sem_treino_ok: semTreinoOk,
       });
       if (error) throw error;
       const res = data as any;
       if (res && res.ok === false) {
+        // A tela achou que havia treino e o banco discordou (cancelado em outra aba,
+        // por exemplo): cai no mesmo diálogo em vez de mostrar erro seco.
+        if (res.reason === "sem_treino") {
+          setConfirmImplantacaoOpen(false);
+          setSaidaSemTreinoOpen(true);
+          return;
+        }
         const msg =
           res.reason === "nao_etapa_final" ? "Conclua as etapas do onboarding antes de avançar." :
           res.reason === "nao_em_onboarding" ? "A jornada não está mais em Onboarding." :
@@ -1552,6 +1587,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         toast.error(msg);
         return;
       }
+      setConfirmImplantacaoOpen(false);
+      setSaidaSemTreinoOpen(false);
       toast.success(
         res?.novo_responsavel_nome
           ? `Onboarding concluído — implantação com ${res.novo_responsavel_nome}.`
@@ -1568,6 +1605,18 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     } catch (e: any) {
       toast.error(e.message || "Erro ao concluir onboarding");
     }
+  }
+
+  /** Clique no Go-live. No Onboarding ele não conclui direto: a fase tem duas saídas
+   *  e quem escolhe é o operador. Fora do Onboarding, segue o fluxo de sempre. */
+  function handleGoLiveClick() {
+    if (faseSlug !== "onboarding" || !etapaFinal) {
+      // Fora da etapa final só admin chega aqui — mantém o go-live com o aviso.
+      setConcludeOpen(true);
+      return;
+    }
+    if (temTreinoVivo) setConfirmImplantacaoOpen(true);
+    else setSaidaSemTreinoOpen(true);
   }
 
   async function updateTraining(id: string, patch: Record<string, any>) {
@@ -1908,11 +1957,10 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       </Dialog>
                     </>
                   )}
-                  {isOnbPhase && etapaFinal && !isTerminal && (
-                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleConcludeOnboarding}>
-                      <Rocket className="h-3.5 w-3.5 mr-1" /> Concluir onboarding → Implantação
-                    </Button>
-                  )}
+                  {/* DEM-0269: "Concluir onboarding → Implantação" saiu daqui. Ter dois
+                      botões de saída na mesma barra, com destinos diferentes e nenhum
+                      checando treino, foi o que mandou a TK-2026-2873 para a Implantação
+                      errada. Agora a saída é uma só: o Go-live, logo abaixo. */}
                   {!isConcluded && (
                     openVendorReturn ? (
                       <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleResolveVendorReturn}>
@@ -1943,7 +1991,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         <Ban className="h-3.5 w-3.5 mr-1" /> Cancelar jornada
                       </Button>
                       {canGoLive && (
-                        <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
+                        <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={handleGoLiveClick}>
                           <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Go-live
                         </Button>
                       )}
@@ -1979,7 +2027,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         <Ban className="h-3.5 w-3.5 mr-1" /> Cancelar jornada
                       </Button>
                       {canGoLive && (
-                        <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={() => setConcludeOpen(true)}>
+                        <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={handleGoLiveClick}>
                           <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Go-live
                         </Button>
                       )}
@@ -3392,6 +3440,34 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     {journeyId && (
       <JourneyRuler journeyId={journeyId} open={rulerOpen} onOpenChange={setRulerOpen} />
     )}
+    {/* DEM-0269 · a jornada TEM treino: só confirma o destino. */}
+    <Dialog open={confirmImplantacaoOpen} onOpenChange={setConfirmImplantacaoOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Concluir o Onboarding?</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Há treino agendado nesta jornada, então ela segue para a{" "}
+          <span className="font-medium text-foreground">Implantação</span>.
+        </p>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => setConfirmImplantacaoOpen(false)}>Cancelar</Button>
+          <Button size="sm" className="text-white border-0" style={{ background: "#22C55E" }}
+                  onClick={() => avancarParaImplantacao(false)}>
+            <Rocket className="h-4 w-4 mr-1" /> Ir para a Implantação
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    {/* DEM-0269 · a jornada NÃO tem treino: as duas saídas. */}
+    <SaidaSemTreinoDialog
+      open={saidaSemTreinoOpen}
+      onOpenChange={setSaidaSemTreinoOpen}
+      onTransferir={() => avancarParaImplantacao(true)}
+      onEncerrar={({ motivo, goLiveReal: glr }) => handleConclude({ motivo, goLiveReal: glr })}
+    />
+
     <Dialog open={concludeOpen} onOpenChange={setConcludeOpen}>
       <DialogContent className="max-w-md">
         <DialogHeader>
@@ -3400,11 +3476,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         <p className="text-sm text-muted-foreground">
           Ao concluir, os relógios de SLA serão congelados e a etapa/pausa em aberto será fechada.
         </p>
-        {!(faseSlug === "implantacao" && etapaFinal) && (
+        {!etapaFinal && (
           <Alert className="border-warning/50 bg-warning/15 text-warning [&>svg]:text-warning py-2">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription className="text-xs">
-              Você está registrando o Go-live antes da etapa final da implantação (permissão de administrador).
+              Você está registrando o Go-live antes da etapa final
+              {phaseAtual?.nome ? ` de ${phaseAtual.nome}` : ""} (permissão de administrador).
             </AlertDescription>
           </Alert>
         )}
@@ -3414,7 +3491,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" size="sm" onClick={() => setConcludeOpen(false)}>Cancelar</Button>
-          <Button size="sm" className="text-white border-0" style={{ background: "#22C55E" }} onClick={handleConclude}>
+          <Button size="sm" className="text-white border-0" style={{ background: "#22C55E" }} onClick={() => handleConclude()}>
             <CheckCircle2 className="h-4 w-4 mr-1" /> Confirmar Go-live
           </Button>
         </div>
