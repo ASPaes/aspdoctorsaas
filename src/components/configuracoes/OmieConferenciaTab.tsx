@@ -1071,6 +1071,9 @@ function VisaoGeralPanel({
 
   const ds = data?.ds ?? {};
   const omie = data?.omie ?? {};
+  // Os textos de ajuda diziam "Digi Office" chumbado, de quando só existia uma conta Omie.
+  // Com uma conta por unidade isso vira mentira na tela da Digi Up.
+  const unidadeRotulo = conta?.rotulo || "desta conta";
   const c = data?.conciliado ?? {};
   const baldes = data?.baldes ?? {};
 
@@ -1144,7 +1147,7 @@ function VisaoGeralPanel({
                 <div className="text-[11px] text-muted-foreground flex items-center gap-1">
                   Clientes
                   <MetricHelpPopover>
-                    Clientes ativos (não cancelados) da unidade Digi Office — a única unidade que esta integração cobre. Inclui clientes sem contrato ativo, por isso este número é maior que "Contratos ativos". Digi Up e Nutrebem não entram: não fazem parte do escopo desta integração.
+                    {`Clientes ativos (não cancelados) da unidade ${unidadeRotulo} — o escopo desta conta Omie. Inclui clientes sem contrato ativo, por isso este número é maior que "Contratos ativos". As outras unidades têm a sua própria conta e não entram aqui.`}
                   </MetricHelpPopover>
                 </div>
                 <div className="text-xl font-semibold">{num(ds.clientes).toLocaleString("pt-BR")}</div>
@@ -1153,7 +1156,7 @@ function VisaoGeralPanel({
                 <div className="text-[11px] text-muted-foreground flex items-center gap-1">
                   Contratos ativos
                   <MetricHelpPopover>
-                    Contratos com situação ativa cujos clientes são da unidade Digi Office. Contratos cancelados não entram. Um cliente pode ter mais de um contrato.
+                    {`Contratos com situação ativa cujos clientes são da unidade ${unidadeRotulo}. Contratos cancelados não entram. Um cliente pode ter mais de um contrato.`}
                   </MetricHelpPopover>
                 </div>
                 <div className="text-xl font-semibold">{num(ds.contratos_ativos).toLocaleString("pt-BR")}</div>
@@ -1185,7 +1188,7 @@ function VisaoGeralPanel({
                 <div className="text-[11px] text-muted-foreground flex items-center gap-1">
                   Clientes
                   <MetricHelpPopover>
-                    Todos os clientes da conta Omie do DigiOffice, lidos no último "Reconferir agora". Inclui clientes sem nenhum contrato e cadastros legados (Hiper e outros sistemas anteriores). Não tem filtro de unidade — é a conta Omie inteira. Por isso é bem maior que o lado DoctorSaaS.
+                    {`Todos os clientes da conta Omie de ${unidadeRotulo}, lidos no último "Reconferir agora". Inclui clientes sem nenhum contrato e cadastros legados (Hiper e outros sistemas anteriores) — é a conta Omie inteira. Por isso é bem maior que o lado DoctorSaaS.`}
                   </MetricHelpPopover>
                 </div>
                 <div className="text-xl font-semibold">{num(omie.clientes).toLocaleString("pt-BR")}</div>
@@ -1194,7 +1197,7 @@ function VisaoGeralPanel({
                 <div className="text-[11px] text-muted-foreground flex items-center gap-1">
                   Contratos ativos
                   <MetricHelpPopover>
-                    Clientes do Omie que têm contrato de serviço vinculado. Inclui contratos de origem legada que nunca existiram no DoctorSaaS.
+                    Contratos do Omie com situação <strong>Ativa</strong>. Contrato suspenso ou cancelado não entra, e a contagem é por contrato — um cliente do Omie pode ter mais de um. Inclui contratos de origem legada que nunca existiram no DoctorSaaS.
                   </MetricHelpPopover>
                 </div>
                 <div className="text-xl font-semibold">{num(omie.contratos_ativos).toLocaleString("pt-BR")}</div>
@@ -1203,7 +1206,7 @@ function VisaoGeralPanel({
                 <div className="text-[11px] text-muted-foreground flex items-center gap-1">
                   MRR ativo
                   <MetricHelpPopover>
-                    Soma do valor mensal dos contratos do Omie. Como inclui contratos legados e de fora do escopo Digi Office, não deve bater com o MRR do DoctorSaaS. A comparação válida é a conciliação abaixo.
+                    Soma do valor mensal dos contratos <strong>ativos</strong> do Omie — os mesmos contados ao lado. Como inclui contratos legados que nunca existiram no DoctorSaaS, não precisa bater com o MRR daqui. A comparação válida é a conciliação abaixo.
                   </MetricHelpPopover>
                 </div>
                 <div className="text-xl font-semibold">{formatBRL(omie.mrr_total_ativos)}</div>
