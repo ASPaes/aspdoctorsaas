@@ -665,7 +665,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journeyId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_training_sessions" as any) as any)
-        .select("id, titulo, status, agendado_para, realizado_em, tentativas, no_show, proprietario_presente, is_retreinamento, conduzido_por, ticket_id, link_agendamento, training_type_id, ticket:ticket_id(ticket_code, sub_seq), participantes:onboarding_training_participants(id, presente)")
+        .select("id, titulo, status, agendado_para, realizado_em, tentativas, no_show, no_shows, ultimo_no_show_em, proprietario_presente, is_retreinamento, conduzido_por, ticket_id, link_agendamento, training_type_id, ticket:ticket_id(ticket_code, sub_seq), participantes:onboarding_training_participants(id, presente)")
         .eq("journey_id", journeyId)
         .is("deleted_at", null)
         .order("agendado_para", { ascending: true, nullsFirst: false });
@@ -1672,21 +1672,50 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     } catch (e: any) { toast.error(e.message || "Erro"); }
   }
 
-  async function handleMarkNoShow(id: string, currentAttempts: number) {
+  /** Uma ação só: registra a falta, limpa a agenda e devolve o cartão para a etapa de
+   *  retorno do pipeline. Escrever na tabela direto deixava o quadro parado — era o
+   *  cartão continuar em "Treinamento Marcado" com a tarja do treino que não houve. */
+  async function handleMarkNoShow(id: string) {
     try {
-      await updateTraining(id, { status: "no_show", no_show: true, tentativas: (currentAttempts || 0) + 1 });
-      toast.success("Marcado como no-show");
+      const { data, error } = await (supabase.rpc as any)("mark_onboarding_training_no_show", {
+        p_training_id: id,
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res?.ok === false) {
+        toast.error(
+          res.reason === "treino_realizado" ? "Treino já realizado não vira no-show." :
+          res.reason === "treino_cancelado" ? "Treinamento cancelado não anda no quadro." :
+          res.reason === "treino_excluido"  ? "Este treinamento foi excluído." :
+          "Não foi possível marcar o no-show.",
+        );
+        return;
+      }
+      qc.invalidateQueries({ queryKey: ["onboarding-training", journeyId] });
+      qc.invalidateQueries({ queryKey: ["onboarding-board-trainings"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-training-cards"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+      toast.success(
+        res?.moveu ? "No-show registrado · cartão voltou para a fila de agendamento" : "No-show registrado",
+      );
     } catch (e: any) { toast.error(e.message || "Erro"); }
   }
 
-  async function handleReschedule(id: string, currentAttempts: number) {
+  /** Pela RPC, não por UPDATE direto: é ela que devolve o cartão para a etapa inicial
+   *  quando o treino está na fila de agendamento depois de uma falta. */
+  async function handleReschedule(id: string) {
     if (!rescheduleDate) { toast.error("Escolha a nova data"); return; }
     try {
-      await updateTraining(id, {
-        status: "agendado",
-        agendado_para: new Date(rescheduleDate).toISOString(),
-        tentativas: (currentAttempts || 0) + 1,
+      const { data, error } = await (supabase.rpc as any)("update_onboarding_training", {
+        p_training_id: id,
+        p_agendado_para: new Date(rescheduleDate).toISOString(),
       });
+      if (error) throw error;
+      if ((data as any)?.ok === false) { toast.error("Não foi possível remarcar."); return; }
+      qc.invalidateQueries({ queryKey: ["onboarding-training", journeyId] });
+      qc.invalidateQueries({ queryKey: ["onboarding-board-trainings"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-training-cards"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
       toast.success("Treino remarcado");
       setRescheduleId(null);
       setRescheduleDate("");
@@ -2393,7 +2422,17 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                     {(t.tentativas ?? 0) > 0 && (
                                       <Badge variant="outline" className="text-[9px]">tentativas: {t.tentativas}</Badge>
                                     )}
-                                    {t.no_show && <Badge variant="destructive" className="text-[9px]">no-show</Badge>}
+                                    {((t.no_shows ?? 0) > 0 || t.no_show) && (
+                                      <Badge
+                                        variant="destructive"
+                                        className="text-[9px]"
+                                        title={t.ultimo_no_show_em
+                                          ? `Última falta: treino de ${formatDateTime(t.ultimo_no_show_em)}`
+                                          : undefined}
+                                      >
+                                        {(t.no_shows ?? 0) > 0 ? `no-show · ${t.no_shows}ª` : "no-show"}
+                                      </Badge>
+                                    )}
                                     {t.is_retreinamento && (
                                       <Badge variant="outline" className="text-[9px] border-[hsl(262_83%_58%)] text-[hsl(262_83%_58%)]">
                                         retreinamento
@@ -2469,7 +2508,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                             <CheckCircle2 className="h-3 w-3 mr-1" /> Realizado
                                           </Button>
                                           <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
-                                            onClick={() => handleMarkNoShow(t.id, t.tentativas ?? 0)}>
+                                            onClick={() => handleMarkNoShow(t.id)}>
                                             No-show
                                           </Button>
                                         </>
@@ -2495,7 +2534,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                             className="h-8 text-xs"
                                           />
                                           <Button size="sm" className="w-full h-7 text-xs"
-                                            onClick={() => handleReschedule(t.id, t.tentativas ?? 0)}>
+                                            onClick={() => handleReschedule(t.id)}>
                                             Confirmar
                                           </Button>
                                         </PopoverContent>
