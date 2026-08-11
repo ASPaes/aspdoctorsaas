@@ -966,7 +966,9 @@ type VisaoGeralData = {
     mrr_divergencia?: number;
     divergencia_valor_qtd?: number;
     divergencia_valor_montante?: number;
-    
+    /** Parte do conciliado cujo contrato está SUSPENSO no Omie — casado, mas o Omie não fatura. */
+    suspenso_qtd?: number;
+    suspenso_mrr_ds?: number;
   };
   baldes?: Record<string, number>;
   total_contratos?: number;
@@ -1277,6 +1279,24 @@ function VisaoGeralPanel({
                 />
               </div>
             </div>
+
+            {/* O pedaço do conciliado que o Omie NÃO está faturando. O vínculo é real (por isso
+                continua somando acima), mas contrato suspenso no Omie não gera cobrança enquanto
+                o DoctorSaaS o conta como receita ativa. Some quando não há nenhum. */}
+            {num(c.suspenso_qtd) > 0 && (
+              <button
+                type="button"
+                onClick={() => onIrParaBalde("contrato_suspenso")}
+                className="flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-500 hover:underline"
+              >
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Inclui {num(c.suspenso_qtd).toLocaleString("pt-BR")}{" "}
+                  {num(c.suspenso_qtd) === 1 ? "contrato suspenso" : "contratos suspensos"} no Omie
+                  ({formatBRL(c.suspenso_mrr_ds)}) — o Omie não fatura, o DoctorSaaS conta como ativo.
+                </span>
+              </button>
+            )}
           </div>
 
           {/* Divergência */}
