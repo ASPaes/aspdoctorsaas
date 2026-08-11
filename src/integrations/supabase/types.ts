@@ -4211,6 +4211,7 @@ export type Database = {
           tem_cancelado_omie: boolean | null
           tenant_id: string
           valor_omie: number | null
+          valor_servicos_omie: number | null
           vigencia_final_omie: string | null
           vigencia_inicial_omie: string | null
         }
@@ -4232,6 +4233,7 @@ export type Database = {
           tem_cancelado_omie?: boolean | null
           tenant_id: string
           valor_omie?: number | null
+          valor_servicos_omie?: number | null
           vigencia_final_omie?: string | null
           vigencia_inicial_omie?: string | null
         }
@@ -4253,6 +4255,7 @@ export type Database = {
           tem_cancelado_omie?: boolean | null
           tenant_id?: string
           valor_omie?: number | null
+          valor_servicos_omie?: number | null
           vigencia_final_omie?: string | null
           vigencia_inicial_omie?: string | null
         }
@@ -4270,6 +4273,7 @@ export type Database = {
         Row: {
           alert_whatsapp_numbers: string[]
           ativo: boolean
+          base_valor_conferencia: string
           id: string
           integracao_pausada: boolean
           integrar_a_partir_de: string | null
@@ -4288,6 +4292,7 @@ export type Database = {
         Insert: {
           alert_whatsapp_numbers?: string[]
           ativo?: boolean
+          base_valor_conferencia?: string
           id?: string
           integracao_pausada?: boolean
           integrar_a_partir_de?: string | null
@@ -4306,6 +4311,7 @@ export type Database = {
         Update: {
           alert_whatsapp_numbers?: string[]
           ativo?: boolean
+          base_valor_conferencia?: string
           id?: string
           integracao_pausada?: boolean
           integrar_a_partir_de?: string | null
@@ -5695,6 +5701,7 @@ export type Database = {
           pausa_sla: boolean
           pipeline_id: string
           position: number
+          retorno_no_show: boolean
           sla_minutos: number | null
           slug: string
           tenant_id: string
@@ -5714,6 +5721,7 @@ export type Database = {
           pausa_sla?: boolean
           pipeline_id: string
           position?: number
+          retorno_no_show?: boolean
           sla_minutos?: number | null
           slug: string
           tenant_id: string
@@ -5733,6 +5741,7 @@ export type Database = {
           pausa_sla?: boolean
           pipeline_id?: string
           position?: number
+          retorno_no_show?: boolean
           sla_minutos?: number | null
           slug?: string
           tenant_id?: string
@@ -5881,6 +5890,7 @@ export type Database = {
           journey_id: string
           link_agendamento: string | null
           no_show: boolean
+          no_shows: number
           observacao: string | null
           proprietario_presente: boolean | null
           realizado_em: string | null
@@ -5890,6 +5900,7 @@ export type Database = {
           ticket_id: string
           titulo: string
           training_type_id: string | null
+          ultimo_no_show_em: string | null
           updated_at: string
         }
         Insert: {
@@ -5906,6 +5917,7 @@ export type Database = {
           journey_id: string
           link_agendamento?: string | null
           no_show?: boolean
+          no_shows?: number
           observacao?: string | null
           proprietario_presente?: boolean | null
           realizado_em?: string | null
@@ -5915,6 +5927,7 @@ export type Database = {
           ticket_id: string
           titulo: string
           training_type_id?: string | null
+          ultimo_no_show_em?: string | null
           updated_at?: string
         }
         Update: {
@@ -5931,6 +5944,7 @@ export type Database = {
           journey_id?: string
           link_agendamento?: string | null
           no_show?: boolean
+          no_shows?: number
           observacao?: string | null
           proprietario_presente?: boolean | null
           realizado_em?: string | null
@@ -5940,6 +5954,7 @@ export type Database = {
           ticket_id?: string
           titulo?: string
           training_type_id?: string | null
+          ultimo_no_show_em?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -6698,6 +6713,8 @@ export type Database = {
           tenant_id: string
           valor_mrr_ds: number | null
           valor_omie: number | null
+          valor_omie_efetivo: number | null
+          valor_servicos_omie: number | null
           vigencia_final_ds: string | null
           vigencia_final_omie: string | null
           vigencia_inicial_ds: string | null
@@ -6738,6 +6755,8 @@ export type Database = {
           tenant_id: string
           valor_mrr_ds?: number | null
           valor_omie?: number | null
+          valor_omie_efetivo?: number | null
+          valor_servicos_omie?: number | null
           vigencia_final_ds?: string | null
           vigencia_final_omie?: string | null
           vigencia_inicial_ds?: string | null
@@ -6778,6 +6797,8 @@ export type Database = {
           tenant_id?: string
           valor_mrr_ds?: number | null
           valor_omie?: number | null
+          valor_omie_efetivo?: number | null
+          valor_servicos_omie?: number | null
           vigencia_final_ds?: string | null
           vigencia_final_omie?: string | null
           vigencia_inicial_ds?: string | null
@@ -9897,6 +9918,56 @@ export type Database = {
           },
         ]
       }
+      whatsapp_macro_anexos: {
+        Row: {
+          created_at: string
+          file_name: string | null
+          id: string
+          macro_id: string
+          media_path: string
+          media_type: string
+          mime_type: string | null
+          ordem: number
+          size_bytes: number | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          macro_id: string
+          media_path: string
+          media_type: string
+          mime_type?: string | null
+          ordem?: number
+          size_bytes?: number | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          macro_id?: string
+          media_path?: string
+          media_type?: string
+          mime_type?: string | null
+          ordem?: number
+          size_bytes?: number | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_macro_anexos_macro_id_fkey"
+            columns: ["macro_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_macros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_macro_tags: {
         Row: {
           ativo: boolean
@@ -11180,6 +11251,7 @@ export type Database = {
           journey_situacao: string | null
           link_agendamento: string | null
           no_show: boolean | null
+          no_shows: number | null
           parent_ticket_code: string | null
           parent_ticket_id: string | null
           participantes_presentes: number | null
@@ -11195,6 +11267,7 @@ export type Database = {
           training_id: string | null
           training_type_id: string | null
           training_type_nome: string | null
+          ultimo_no_show_em: string | null
         }
         Relationships: [
           {
@@ -11451,7 +11524,15 @@ export type Database = {
         Returns: Json
       }
       advance_onboarding_to_implantacao: {
-        Args: { p_force?: boolean; p_journey_id: string }
+        Args: {
+          p_force?: boolean
+          p_journey_id: string
+          p_sem_treino_ok?: boolean
+        }
+        Returns: Json
+      }
+      agent_presence_admin_set_status: {
+        Args: { p_status: string; p_tenant_id: string; p_user_id: string }
         Returns: Json
       }
       agent_presence_extend_pause: {
@@ -11570,7 +11651,11 @@ export type Database = {
         | { Args: never; Returns: undefined }
         | { Args: { p_date?: string }; Returns: undefined }
       conclude_onboarding_journey: {
-        Args: { p_go_live_real?: string; p_journey_id: string }
+        Args: {
+          p_go_live_real?: string
+          p_journey_id: string
+          p_motivo?: string
+        }
         Returns: Json
       }
       conferencia_saude:
@@ -12067,6 +12152,10 @@ export type Database = {
         Returns: number
       }
       fn_onb_stage_ordem: { Args: { p_stage_id: string }; Returns: number }
+      fn_onb_tem_treino_vivo: {
+        Args: { p_journey_id: string }
+        Returns: boolean
+      }
       fn_onb_training_initial_stage: {
         Args: { p_journey_id: string }
         Returns: string
@@ -13132,7 +13221,11 @@ export type Database = {
         Returns: boolean
       }
       journey_go_live: {
-        Args: { p_go_live_real?: string; p_journey_id: string }
+        Args: {
+          p_go_live_real?: string
+          p_journey_id: string
+          p_motivo?: string
+        }
         Returns: Json
       }
       kpi_cap_seconds: { Args: { p_metric: string }; Returns: number }
@@ -13207,6 +13300,10 @@ export type Database = {
       mark_notification_read: {
         Args: { p_recipient_id: string }
         Returns: undefined
+      }
+      mark_onboarding_training_no_show: {
+        Args: { p_training_id: string }
+        Returns: Json
       }
       mark_onboarding_training_realized: {
         Args: { p_training_id: string }
@@ -14006,6 +14103,10 @@ export type Database = {
           p_conversation_status: string
           p_opened_out_of_hours: boolean
         }
+        Returns: string
+      }
+      wa_last_attendance_owner: {
+        Args: { p_conversation_id: string; p_tenant_id: string }
         Returns: string
       }
       wa_open_or_reuse_conversation: {
