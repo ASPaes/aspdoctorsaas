@@ -110,12 +110,13 @@ function extractConversationId(pathname: string, search: string): string | null 
 }
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const uid = user?.id;
+  const tenantId = profile?.tenant_id;
 
   const [unreadCount, setUnreadCount] = useState(0);
   const [browserPermission, setBrowserPermission] = useState<
@@ -412,28 +413,50 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             queryKey: ["notifications-unread-count"],
           });
         }
-      )
-      .on(
+      );
+
+    // Contador "X mensagens novas" do sino: o dispatcher agrupa mensagens da
+    // mesma conversa atualizando a NOTIFICAÇÃO, não o recipient — por isso esta
+    // assinatura existe além das duas de cima.
+    //
+    // O filtro por tenant é do SERVIDOR de propósito. Sem filtro nenhum, cada
+    // navegador logado pedia a tabela `notifications` INTEIRA (208 mil
+    // alterações de linha na janela medida) e o Realtime avaliava a RLS de cada
+    // uma para cada sessão aberta — trabalho pago no servidor para o cliente
+    // descartar. Enquanto a decodificação do WAL trava (pico medido de 12,9 s)
+    // NINGUÉM recebe mensagem.
+    //
+    // Filtrar por `type` foi medido e DESCARTADO: 98,3% das notificações já são
+    // `whatsapp_new_message`, então cortaria 1,7%. O tenant corta de verdade.
+    //
+    // Custo conhecido: super admin que recebe notificação de OUTRO tenant perde
+    // o refresh automático do contador nesses casos — medido em 10 ocorrências
+    // em 30 dias, 1 usuário. O sino continua certo: a chegada (INSERT em
+    // notification_recipients, acima) não passa por aqui, e a lista revalida
+    // sozinha ao abrir.
+    if (tenantId) {
+      channel.on(
         "postgres_changes",
         {
           event: "UPDATE",
           schema: "public",
           table: "notifications",
+          filter: `tenant_id=eq.${tenantId}`,
         },
         (payload) => {
           const updated = payload.new as { id: string; type: string };
           if (updated?.type !== "whatsapp_new_message") return;
-          // Refresca lista do sino — counter "X mensagens novas" deve atualizar
           queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
         }
-      )
-      .subscribe();
+      );
+    }
 
+    channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [uid, queryClient, refreshUnreadCount, handleNotificationArrival]);
+  }, [uid, tenantId, queryClient, refreshUnreadCount, handleNotificationArrival]);
 
   // Favicon badge
   useEffect(() => {

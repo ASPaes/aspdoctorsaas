@@ -72,10 +72,24 @@ function WhatsAppContent() {
         table: "whatsapp_conversations",
         filter: `id=eq.${selected.id}`,
       }, recheckAccess)
+      // O filtro é do SERVIDOR de propósito. Sem ele, esta assinatura pedia
+      // support_attendances INTEIRA — 244 mil alterações de linha em 10 dias — e
+      // o Realtime tinha de avaliar a RLS de CADA uma delas para CADA navegador
+      // com uma conversa aberta, só para o `if` abaixo descartar tudo menos a
+      // conversa selecionada. É trabalho pago no servidor para ser jogado fora
+      // no cliente, e enquanto a decodificação do WAL trava (pico medido de
+      // 12,9 s) NINGUÉM recebe mensagem — era um dos motivos de "a mensagem
+      // demora a aparecer".
+      //
+      // O `if` continua como cinto de segurança: filtro do Realtime é
+      // best-effort e o handler tem de ser idempotente de qualquer jeito.
+      // DELETE segue chegando porque support_attendances é REPLICA IDENTITY
+      // FULL — com replica identity DEFAULT o filtro descartaria os DELETEs.
       .on("postgres_changes", {
         event: "*",
         schema: "public",
         table: "support_attendances",
+        filter: `conversation_id=eq.${selected.id}`,
       }, (payload) => {
         const row = (payload.new || payload.old) as any;
         if (row?.conversation_id === selected.id) recheckAccess();
