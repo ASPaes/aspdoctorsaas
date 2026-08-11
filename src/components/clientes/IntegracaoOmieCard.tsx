@@ -179,7 +179,23 @@ function EnviarBotao({
         body: { tenant_id: tenantId, ds_contract_id: contrato.id, modo: "dry_run" },
       });
       if (error) {
-        toast.error("Falha ao preparar o envio. Tente novamente.");
+        // A função responde bloqueio com 4xx, e o supabase-js descarta o corpo em não-2xx: sobrava
+        // "Falha ao preparar o envio", que já mascarou um 403 de head antes (ver v12 do
+        // omie-integration-call) e mascarou o bloqueio de data de corte agora. O corpo segue
+        // acessível em error.context — bloqueio vai para o mesmo diálogo do caminho 200.
+        let corpo: any = null;
+        try {
+          corpo = await (error as any)?.context?.json?.();
+        } catch {
+          /* corpo não era JSON */
+        }
+        if (corpo?.bloqueado || corpo?.error) {
+          setCandidatos(extrairCandidatos(corpo));
+          setBloqueioMsg(extrairMensagemErro(corpo));
+          setBloqueioOpen(true);
+        } else {
+          toast.error("Falha ao preparar o envio. Tente novamente.");
+        }
         return;
       }
       if (data?.ok === false) {
