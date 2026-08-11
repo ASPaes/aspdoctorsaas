@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Users, Zap, Pause, LogOut, Wifi, WifiOff, Timer, AlertTriangle, Play, Loader2 } from "lucide-react";
+import { Users, Zap, Pause, LogOut, Wifi, WifiOff, Timer, AlertTriangle, Play, Power, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 function useNow(intervalMs = 1000) {
@@ -185,7 +185,7 @@ function MemberRow({
             {busy === "offline" ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <LogOut className="h-3.5 w-3.5" />
+              <Power className="h-3.5 w-3.5" />
             )}
           </Button>
         )}
