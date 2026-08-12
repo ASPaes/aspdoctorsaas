@@ -92,7 +92,7 @@ BEGIN
   v_target_inicia    := COALESCE(v_target_inicia, false);
   v_pipe_tem_gatilho := COALESCE(v_pipe_tem_gatilho, false);
 
-  -- ── encerramento da contagem (01/08) ────────────────────────────────────────
+  -- encerramento da contagem (01/08)
   SELECT COALESCE(s.encerra_sla, false) INTO v_target_encerra
     FROM public.onboarding_stages s WHERE s.id = p_target_stage_id;
   v_target_encerra := COALESCE(v_target_encerra, false);
