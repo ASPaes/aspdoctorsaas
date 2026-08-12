@@ -43,6 +43,7 @@ import { TicketUpdateExistingDialog } from "./TicketUpdateExistingDialog";
 import { InterruptAutoReplyDialog } from "./InterruptAutoReplyDialog";
 import { CleanupConversationDialog } from "./CleanupConversationDialog";
 import { GroupLinkClienteModal } from "./GroupLinkClienteModal";
+import { ChatQuickRuleToggles } from "./ChatQuickRuleToggles";
 
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
@@ -873,6 +874,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 <TooltipContent side="bottom" className="text-xs">Reabrir conversa</TooltipContent>
               </Tooltip>
             )}
+
+            {/* Atalhos dos interruptores que antes só existiam em Detalhes */}
+            <ChatQuickRuleToggles
+              conversationId={conversation.id}
+              contactId={contact?.id ?? null}
+              rulesDisabled={!!(contact as any)?.rules_disabled}
+              isGroup={isGroupConv}
+            />
 
             <Tooltip>
               <TooltipTrigger asChild>

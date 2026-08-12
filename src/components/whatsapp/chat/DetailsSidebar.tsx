@@ -42,6 +42,7 @@ import { TopicBadges } from "./TopicBadges";
 import { ClienteLinkCard } from "./ClienteLinkCard";
 import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
 import { useRelevantAttendance } from "../hooks/useRelevantAttendance";
+import { useInactivityHold } from "../hooks/useInactivityHold";
 import {
   useLatestAttendanceResolucao,
   RESOLUCAO_LABEL,
@@ -888,48 +889,13 @@ function GroupAttendancesSection({
 
 /* ─── Inactivity hold toggle for the current open attendance ─── */
 function InactivityHoldSection({ attendanceId }: { attendanceId: string | null }) {
-  const qc = useQueryClient();
-  const [saving, setSaving] = useState(false);
-  const [localValue, setLocalValue] = useState<boolean | null>(null);
+  // Estado vive no cache (useInactivityHold), não local: o atalho do cabeçalho
+  // usa o mesmo hook, então os dois refletem a mesma verdade na hora.
+  const { enabled: effective, isSaving: saving, setHold } = useInactivityHold(attendanceId);
 
-  // Troca de conversa/atendimento zera o otimista — senão o card herdava o estado
-  // do atendimento anterior enquanto a query nova não voltava.
-  useEffect(() => {
-    setLocalValue(null);
-  }, [attendanceId]);
-
-  const { data: att } = useQuery({
-    queryKey: ["attendance-inactivity-hold", attendanceId],
-    staleTime: 30_000,
-    enabled: !!attendanceId,
-    queryFn: async () => {
-      const { data } = await (supabase.from("support_attendances" as any) as any)
-        .select("inactivity_hold")
-        .eq("id", attendanceId)
-        .maybeSingle();
-      return (data as any) ?? null;
-    },
-  });
-
-  const effective = !!attendanceId && (localValue ?? (att?.inactivity_hold === true));
-
-  const handleToggle = async (v: boolean) => {
+  const handleToggle = (v: boolean) => {
     if (!attendanceId) return;
-    setSaving(true);
-    setLocalValue(v);
-    try {
-      const { error } = await (supabase.from("support_attendances" as any) as any)
-        .update({ inactivity_hold: v } as any)
-        .eq("id", attendanceId);
-      if (error) throw error;
-      toast.success(v ? "Encerramento por inatividade desativado neste atendimento" : "Encerramento por inatividade reativado");
-      qc.invalidateQueries({ queryKey: ["attendance-inactivity-hold", attendanceId] });
-    } catch (e: any) {
-      setLocalValue(null);
-      toast.error(e?.message ?? "Falha ao atualizar");
-    } finally {
-      setSaving(false);
-    }
+    setHold(v);
   };
 
   return (
