@@ -193,15 +193,27 @@ export function MessageBubble({
     );
   }
 
+  // Tinta do balão enviado. O verde da marca (#22C55E) é CLARO: branco em cima dele dá
+  // 2,3:1 de contraste e o cinza do tema (`muted-foreground`) dá menos ainda — era por
+  // isso que o ✓ sumia dentro do verde. Tinta escura tirada do próprio verde resolve:
+  // 6,6:1 no ícone e 4,5:1 no horário. Não pode ser token de tema (`foreground` vira
+  // branco no escuro) porque o balão é verde nos dois temas.
+  const metaInk = isFromMe ? "text-emerald-950/80" : "opacity-60";
+
   const statusIcon = isFromMe && !isDeleted && !isPending && (
     msg.status === "read" || msg.status === "delivered" ? (
-      <CheckCheck className={cn("h-3 w-3", msg.status === "read" ? "text-blue-400" : "text-muted-foreground/60")} />
+      <CheckCheck strokeWidth={2.5} className={cn("h-3.5 w-3.5", msg.status === "read" ? "text-blue-800" : "text-emerald-950")} />
     ) : msg.status === "sending" ? (
-      <Clock className="h-3 w-3 text-muted-foreground/40" />
+      <Clock className="h-3.5 w-3.5 text-emerald-950/60" />
     ) : msg.status === "failed" ? (
-      <svg className="h-3 w-3 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      // Vermelho vivo é justamente o que NÃO se enxerga aqui: red-400 sobre o verde dá
+      // 1,2:1 — invisível. Em superfície clara e saturada quem aparece é tinta escura,
+      // então a falha vira disco preenchido com o "!" branco: 8,3:1 dentro do disco e
+      // 3,6:1 do disco contra o verde. Também deixa de depender de vermelho x verde,
+      // que é o par que o daltônico não separa.
+      <AlertCircle strokeWidth={2.5} className="h-4 w-4 fill-red-800 text-white drop-shadow-sm" />
     ) : (
-      <Check className="h-3 w-3 text-muted-foreground/60" />
+      <Check strokeWidth={2.5} className="h-3.5 w-3.5 text-emerald-950" />
     )
   );
 
@@ -257,7 +269,7 @@ export function MessageBubble({
           )}>
             {msg.content && <p className="whitespace-pre-wrap break-words">{renderMessageText(msg.content, groupParticipants)}</p>}
             <div className={cn("flex items-center gap-1 mt-0.5", isFromMe ? "justify-end" : "justify-start")}>
-              <span className="text-[10px] opacity-60">{time}</span>
+              <span className={cn("text-[10px]", metaInk)}>{time}</span>
               {statusIcon}
             </div>
           </div>
@@ -523,13 +535,13 @@ export function MessageBubble({
 
 
       <div className={cn("flex items-center gap-1 mt-0.5", isFromMe ? "justify-end" : "justify-start")}>
-        <span className="text-[10px] opacity-60">{time}</span>
+        <span className={cn("text-[10px]", metaInk)}>{time}</span>
         {msg.edited_at && (
           <Tooltip>
             <TooltipTrigger asChild>
-              {/* Herda a cor do balão (como o horário). Fixar text-muted-foreground
-                  deixava o selo azulado e ilegível sobre o verde do enviado. */}
-              <span className="text-[10px] italic opacity-75 cursor-help">(editada)</span>
+              {/* Mesma tinta do horário e do ✓. Fixar text-muted-foreground deixava o
+                  selo azulado e ilegível sobre o verde do enviado. */}
+              <span className={cn("text-[10px] italic cursor-help", isFromMe ? "text-emerald-950/75" : "opacity-75")}>(editada)</span>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-[260px] text-xs">
               <p>Esta mensagem foi editada após o envio. O painel mostra a última versão que recebeu — se for crítico, confira no WhatsApp.</p>
@@ -544,13 +556,12 @@ export function MessageBubble({
   const messageContent = (
     <div className="flex flex-col max-w-[75%]">
       {bubbleContent}
+      {/* O aviso de falha é o mesmo objeto dos dois lados — o lado do balão não muda o
+          que aconteceu. Antes o enviado usava vermelho escuro FIXO (`bg-red-950/40` +
+          `text-red-200`), que no tema claro virava rosa sobre rosa: 1,8:1. Agora
+          acompanha o tema: 9,4:1 no claro, 15:1 no escuro. */}
       {sendError && (
-        <div className={cn(
-          "mt-1 text-[11px] leading-snug rounded-md px-2 py-1 border",
-          isFromMe
-            ? "bg-red-950/40 text-red-200 border-red-900/40"
-            : "bg-red-50 text-red-800 border-red-200"
-        )}>
+        <div className="mt-1 text-[11px] leading-snug rounded-md px-2 py-1 border bg-red-50 text-red-900 border-red-300 dark:bg-red-950/60 dark:text-red-100 dark:border-red-900">
           <span className="font-semibold">{sendError.titulo}</span>
           <span className="opacity-80"> — {sendError.motivo}</span>
         </div>
