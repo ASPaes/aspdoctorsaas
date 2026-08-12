@@ -199,7 +199,13 @@ export default function OmiePadroesTab() {
       setPausada(!!(omieRow?.data as any)?.integracao_pausada);
       setBaseValor(String((omieRow?.data as any)?.base_valor_conferencia ?? "total_contrato"));
       const _nums = (omieRow?.data as any)?.alert_whatsapp_numbers;
-      setAlertNumbers(Array.isArray(_nums) ? _nums.map((n: any) => String(n)) : []);
+      // Exibe já com o 55 que o envio usa — os números salvos antes de 12/08 estão sem DDI.
+      setAlertNumbers(Array.isArray(_nums)
+        ? _nums.map((n: any) => {
+            const d = String(n).replace(/\D/g, "");
+            return d.length === 10 || d.length === 11 ? `55${d}` : d;
+          })
+        : []);
       setModelos(((modelosRes?.data as any[]) ?? []).map((m) => ({ id: String(m.id), nome: String(m.nome) })));
     } catch (err: any) {
       setErro(err?.message || "Erro ao carregar padrões.");
@@ -346,11 +352,13 @@ export default function OmiePadroesTab() {
   }
 
   function adicionarNumero() {
-    const n = novoNumero.replace(/\D/g, "");
-    if (n.length < 10 || n.length > 13) {
+    const d = novoNumero.replace(/\D/g, "");
+    if (d.length < 10 || d.length > 13) {
       toast({ title: "Número inválido", description: "Use DDD + número (ex: 5531999998888).", variant: "destructive" });
       return;
     }
+    // O 55 é obrigatório: sem DDI a Evolution responde exists:false e o alerta morre no outbox.
+    const n = d.length === 10 || d.length === 11 ? `55${d}` : d;
     setAlertNumbers((prev) => (prev.includes(n) ? prev : [...prev, n]));
     setNovoNumero("");
   }
@@ -650,8 +658,10 @@ export default function OmiePadroesTab() {
         <CardHeader>
           <CardTitle>Números para alertas de WhatsApp (OMIE)</CardTitle>
           <CardDescription>
-            Quem recebe no WhatsApp os avisos da integração OMIE (cancelamento que não propagou, vínculo ambíguo).
-            Estes números recebem <strong>além</strong> dos usuários já inscritos. O envio sai da instância de alertas do próprio tenant.
+            Quem recebe no WhatsApp os avisos da integração OMIE <strong>desta conta/unidade</strong> (cancelamento
+            que não propagou, vínculo ambíguo). Esta é a lista <strong>única</strong> do WhatsApp: quem não está aqui
+            não recebe o aviso no celular, mesmo sendo administrador ou inscrito no evento (esses continuam vendo o
+            alerta dentro do sistema). O envio sai da instância de alertas do próprio tenant.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -666,7 +676,7 @@ export default function OmiePadroesTab() {
             <Button type="button" variant="outline" onClick={adicionarNumero}>Adicionar</Button>
           </div>
           {alertNumbers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum número extra. Só os usuários inscritos recebem por WhatsApp.</p>
+            <p className="text-sm text-muted-foreground">Nenhum número cadastrado — ninguém recebe os avisos do OMIE por WhatsApp (só dentro do sistema).</p>
           ) : (
             <div className="space-y-2">
               {alertNumbers.map((n) => (
