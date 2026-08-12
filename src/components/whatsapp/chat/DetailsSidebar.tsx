@@ -43,6 +43,7 @@ import { ClienteLinkCard } from "./ClienteLinkCard";
 import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
 import { useRelevantAttendance } from "../hooks/useRelevantAttendance";
 import { useInactivityHold } from "../hooks/useInactivityHold";
+import { useContactRulesDisabled } from "../hooks/useContactRulesDisabled";
 import {
   useLatestAttendanceResolucao,
   RESOLUCAO_LABEL,
@@ -71,7 +72,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const { data: latestResolucao } = useLatestAttendanceResolucao(conversation.id);
   const { data: topicsData } = useConversationTopics(conversation.id);
   const categorizeMutation = useCategorizeConversation();
-  const { updateContact, isUpdatingContact, toggleRulesDisabled, isTogglingRulesDisabled } = useWhatsAppActions();
+  const { updateContact, isUpdatingContact } = useWhatsAppActions();
   const { profile } = useAuth();
 
   const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
@@ -85,13 +86,16 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const [groupAttendancesOpen, setGroupAttendancesOpen] = useState(true);
   const [selectedAttendance, setSelectedAttendance] = useState<any | null>(null);
 
-  // Optimistic local override for rules_disabled (parent state may not refresh immediately)
-  const [rulesDisabledLocal, setRulesDisabledLocal] = useState<boolean | null>(null);
-  const rulesDisabledFromProp = !!(contact as any)?.rules_disabled;
-  useEffect(() => {
-    setRulesDisabledLocal(null);
-  }, [contact?.id, rulesDisabledFromProp]);
-  const rulesDisabledEffective = rulesDisabledLocal ?? rulesDisabledFromProp;
+  // rules_disabled vem do hook, não do prop: a conversa selecionada é um
+  // snapshot que não se atualiza quando whatsapp_contacts muda. Isso substitui o
+  // estado local otimista que existia aqui e deixa o atalho do cabeçalho em
+  // sincronia com este card.
+  const {
+    rulesDisabled: rulesDisabledEffective,
+    rulesDisabledAt,
+    isSaving: isTogglingRulesDisabled,
+    setRulesDisabled,
+  } = useContactRulesDisabled(contact?.id ?? null);
 
   // Collapsible section states
   const [topicsOpen, setTopicsOpen] = useState(false);
@@ -652,11 +656,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               <Switch
                 checked={rulesDisabledEffective}
                 disabled={isTogglingRulesDisabled || !contact?.id}
-                onCheckedChange={(v) => {
-                  if (!contact?.id) return;
-                  setRulesDisabledLocal(v);
-                  toggleRulesDisabled({ contactId: contact.id, rulesDisabled: v });
-                }}
+                onCheckedChange={(v) => setRulesDisabled(v)}
               />
             </div>
             <p className="text-[10px] text-muted-foreground leading-relaxed">
@@ -665,9 +665,9 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               horário, atribuição automática e categorização IA.
               {" "}A configuração vale para todas as conversas {isGroup ? "deste grupo" : "deste número"}, em qualquer instância.
             </p>
-            {rulesDisabledEffective && (contact as any)?.rules_disabled_at && (
+            {rulesDisabledEffective && rulesDisabledAt && (
               <p className="text-[10px] text-amber-600 dark:text-amber-400">
-                Ativado em {new Date((contact as any).rules_disabled_at).toLocaleString('pt-BR')}
+                Ativado em {new Date(rulesDisabledAt).toLocaleString('pt-BR')}
               </p>
             )}
           </div>

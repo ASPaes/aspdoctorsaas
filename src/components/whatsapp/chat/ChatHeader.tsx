@@ -44,6 +44,7 @@ import { InterruptAutoReplyDialog } from "./InterruptAutoReplyDialog";
 import { CleanupConversationDialog } from "./CleanupConversationDialog";
 import { GroupLinkClienteModal } from "./GroupLinkClienteModal";
 import { ChatQuickRuleToggles } from "./ChatQuickRuleToggles";
+import { useContactRulesDisabled } from "../hooks/useContactRulesDisabled";
 
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
@@ -303,6 +304,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   );
   const contact = conversation.contact;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
+  const { rulesDisabled: contactRulesDisabled } = useContactRulesDisabled(contact?.id ?? null);
 
   // (attendanceMap/attendance já declarados no topo, próximo ao link-suggestion)
 
@@ -879,7 +881,6 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             <ChatQuickRuleToggles
               conversationId={conversation.id}
               contactId={contact?.id ?? null}
-              rulesDisabled={!!(contact as any)?.rules_disabled}
               isGroup={isGroupConv}
             />
 
@@ -951,7 +952,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none mt-0.5 pl-10">
           <SignatureControl conversationId={conversation.id} />
 
-          {(conversation.contact as any)?.rules_disabled && (
+          {/* Fonte é o hook, não o prop: a conversa selecionada é snapshot e não
+              se atualiza quando whatsapp_contacts muda — o badge ficava mudo
+              depois de tirar as regras. */}
+          {contactRulesDisabled && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge variant="outline" className="text-[10px] h-4 gap-1 shrink-0 whitespace-nowrap border-red-500/50 text-red-600 dark:text-red-400">
