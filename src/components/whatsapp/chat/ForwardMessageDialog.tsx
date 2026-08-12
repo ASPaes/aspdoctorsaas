@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Search, Loader2 } from 'lucide-react';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useWhatsAppConversations } from '../hooks/useWhatsAppConversations';
+import { useConversationSearch } from '../hooks/useConversationSearch';
 import { useForwardMessages } from '../hooks/useForwardMessages';
 
 interface Props {
@@ -16,17 +18,59 @@ interface Props {
 
 export function ForwardMessageDialog({ open, onOpenChange, messageIds, onDone }: Props) {
   const [search, setSearch] = useState('');
+  const term = search.trim();
   const { conversations, isLoading } = useWhatsAppConversations({ pageSize: 50 });
   const forwardMutation = useForwardMessages();
 
+  // A lista carregada é só a 1ª página (50 conversas). Filtrar apenas no cliente
+  // deixaria qualquer contato fora dessa janela inalcançável no encaminhamento,
+  // então a busca vai ao servidor — mesma RPC da sidebar do chat.
+  const debouncedSearch = useDebouncedValue(term, 300);
+  const isSearching = debouncedSearch.length >= 2;
+  const { data: searchResults = [], isLoading: isSearchLoading } =
+    useConversationSearch(debouncedSearch);
+
+  // Filtro local: responde à tecla na hora (antes do debounce) e cobre a busca de
+  // 1 caractere, que a RPC não atende.
+  const localMatches = useMemo(() => {
+    if (!term) return conversations;
+    const q = term.toLowerCase();
+    const digits = q.replace(/\D/g, '');
+    return conversations.filter((c) => {
+      const name = (c.contact?.name ?? '').toLowerCase();
+      const phone = c.contact?.phone_number ?? '';
+      return name.includes(q) || (digits.length > 0 && phone.includes(digits));
+    });
+  }, [conversations, term]);
+
+  // Enquanto o servidor não respondeu pelo termo ATUAL, vale o filtro local — sem
+  // isso a lista mostraria o resultado do termo anterior. Se a busca do servidor
+  // voltar vazia mas houver correspondência na página carregada, mostra a local:
+  // a RPC pode simplesmente não existir no banco e o erro chega como lista vazia.
+  const serverReady = isSearching && !isSearchLoading && term === debouncedSearch;
+  const results = !term
+    ? conversations
+    : serverReady && searchResults.length > 0
+      ? searchResults
+      : localMatches;
+
+  const listLoading = term ? isSearchLoading && localMatches.length === 0 : isLoading;
+
+  // O diálogo fica montado o tempo todo no ChatAreaFull — sem limpar aqui, a
+  // busca anterior reaparece já filtrada na próxima abertura.
+  const handleOpenChange = (next: boolean) => {
+    if (!next) setSearch('');
+    onOpenChange(next);
+  };
+
   const handleSelect = async (targetConversationId: string) => {
     await forwardMutation.mutateAsync({ messageIds, targetConversationId });
-    onOpenChange(false);
+    handleOpenChange(false);
     onDone();
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Encaminhar {messageIds.length} mensagem{messageIds.length !== 1 ? 'ns' : ''}</DialogTitle>
@@ -43,15 +87,15 @@ export function ForwardMessageDialog({ open, onOpenChange, messageIds, onDone }:
         </div>
 
         <ScrollArea className="h-[300px]">
-          {isLoading ? (
+          {listLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-          ) : conversations.length === 0 ? (
+          ) : results.length === 0 ? (
             <p className="text-center py-8 text-sm text-muted-foreground">Nenhuma conversa encontrada</p>
           ) : (
             <div className="space-y-1">
-              {conversations.map((conv) => (
+              {results.map((conv) => (
                 <button
                   key={conv.id}
                   onClick={() => handleSelect(conv.id)}
