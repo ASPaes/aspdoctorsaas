@@ -87,7 +87,15 @@ BEGIN
     RAISE EXCEPTION 'FALHOU 7: proxima fase de onboarding deveria ser implantacao';
   END IF;
 
-  -- 8. avanço sem destino cai na próxima e delega para a RPC específica
+  -- 8. avanço sem destino cai na próxima e delega para a RPC específica.
+  -- DEM-0269 (11/08): entrar na Implantação sem treino vivo passou a ser recusado
+  -- (`sem_treino`), e advance_onboarding_phase NÃO repassa o "pode seguir sem treino"
+  -- de propósito — quem trata a recusa é a tela. Para este teste exercitar a
+  -- DELEGAÇÃO, e não o portão, a jornada precisa de um treino vivo.
+  INSERT INTO public.onboarding_training_sessions (tenant_id, journey_id, ticket_id, titulo, status)
+  SELECT v_tenant, v_journey, j.ticket_id, 'ZZ Treino delegacao', 'previsto'
+    FROM public.onboarding_journeys j WHERE j.id = v_journey;
+
   v_res := public.advance_onboarding_phase(v_journey, NULL, true);
   IF NOT (v_res->>'ok')::boolean THEN
     RAISE EXCEPTION 'FALHOU 8: avanço para implantação falhou: %', v_res::text;

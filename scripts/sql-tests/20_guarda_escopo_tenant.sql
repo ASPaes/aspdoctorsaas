@@ -45,7 +45,17 @@ BEGIN
      AND NOT (p.prosrc ~* 'can_access_tenant_row|is_super_admin|current_tenant_id|auth\.uid|assert_tenant_scope')
      AND p.proname NOT IN ('fn_add_business_days','fn_business_due_at','fn_is_business_hours',
                            'segundos_uteis','fn_onb_util_min','fn_onboarding_phase_id',
-                           'fn_onboarding_role_id');
+                           'fn_onboarding_role_id',
+                           -- wa_last_attendance_owner: exceção MEDIDA, não esquecimento (12/08).
+                           -- É chamada POR LINHA dentro de whatsapp_list_conversations, que não é
+                           -- SECURITY DEFINER (revogar de authenticated quebraria a lista). Com
+                           -- assert_tenant_scope dentro dela, a listagem de conversas foi de
+                           -- 9,2ms para 21,9ms (+137%) medida no Docker com a base de produção,
+                           -- como authenticated e 50 linhas. É a query mais chamada do produto.
+                           -- O que ela vaza: um user_id, e só para quem já souber o UUID de uma
+                           -- conversa de outro tenant. Trocar isso por dobrar a latência da lista
+                           -- é mau negócio. Revisar se a função sair do caminho quente.
+                           'wa_last_attendance_owner');
   IF v_qtd <> 0 THEN RAISE EXCEPTION 'FALHOU 2: % RPC(s) ainda sem guarda', v_qtd; END IF;
 
   -- ── 3. operador comum do tenant A tentando ler o tenant B

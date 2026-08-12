@@ -18,9 +18,14 @@ BEGIN
   SELECT id INTO v_s2 FROM public.onboarding_stages
    WHERE pipeline_id = v_pipe AND ativo AND id <> v_s1 ORDER BY position LIMIT 1;
 
-  -- 1. a coluna existe e nasce false
-  IF EXISTS (SELECT 1 FROM public.onboarding_stages WHERE encerra_sla) THEN
-    RAISE EXCEPTION 'FALHA 1: alguma etapa já nasceu com encerra_sla true';
+  -- 1. a coluna existe e NASCE false. Medir isto pelo DEFAULT, não pela ausência de
+  -- linhas marcadas: marcar a etapa que encerra a contagem é o uso normal da feature
+  -- (hoje "Concluído" do Implantação PDV), e a versão antiga deste teste quebrava
+  -- assim que alguém configurava o primeiro pipeline.
+  IF (SELECT column_default FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='onboarding_stages'
+         AND column_name='encerra_sla') IS DISTINCT FROM 'false' THEN
+    RAISE EXCEPTION 'FALHA 1: encerra_sla não nasce false';
   END IF;
 
   -- 2. marcar uma etapa funciona

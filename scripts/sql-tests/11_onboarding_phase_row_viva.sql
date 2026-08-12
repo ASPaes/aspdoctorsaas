@@ -67,7 +67,7 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'FALHOU 2: jornada nova não abriu a linha da fase onboarding'; END IF;
 
   -- ========== 3. avançar fecha a linha de onboarding e abre a de implantação ==========
-  PERFORM public.advance_onboarding_to_implantacao(v_journey, true);
+  PERFORM public.advance_onboarding_to_implantacao(v_journey, true, true);
 
   PERFORM 1 FROM public.onboarding_phase_metrics
    WHERE journey_id = v_journey AND phase_id = v_ph_onb AND concluida_em IS NOT NULL;
@@ -96,12 +96,15 @@ BEGIN
    WHERE journey_id = v_journey AND phase_id = v_ph_onb AND concluida_em IS NULL;
   IF NOT FOUND THEN RAISE EXCEPTION 'FALHOU 6a: reverter deveria reabrir a fase de onboarding'; END IF;
 
-  PERFORM 1 FROM public.onboarding_phase_metrics
-   WHERE journey_id = v_journey AND phase_id = v_ph_imp AND concluida_em IS NOT NULL;
-  IF NOT FOUND THEN RAISE EXCEPTION 'FALHOU 6b: reverter deveria fechar a fase de implantação'; END IF;
+  -- Reverter APAGA a linha da Implantação, não a fecha: a fase não aconteceu, e
+  -- deixá-la fechada contaria uma implantação fantasma no relatório de fases.
+  -- Decisão registrada na própria RPC e coberta por 23_revert_onboarding_to_onboarding.
+  SELECT count(*) INTO v_qtd FROM public.onboarding_phase_metrics
+   WHERE journey_id = v_journey AND phase_id = v_ph_imp;
+  IF v_qtd <> 0 THEN RAISE EXCEPTION 'FALHOU 6b: reverter deveria apagar a fase de implantação, sobrou %', v_qtd; END IF;
 
   -- ========== 7. concluir a jornada fecha a fase aberta ==========
-  PERFORM public.advance_onboarding_to_implantacao(v_journey, true);
+  PERFORM public.advance_onboarding_to_implantacao(v_journey, true, true);
   PERFORM public.conclude_onboarding_journey(v_journey, current_date);
 
   SELECT count(*) INTO v_qtd FROM public.onboarding_phase_metrics

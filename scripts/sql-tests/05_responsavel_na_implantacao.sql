@@ -50,7 +50,7 @@ BEGIN
 
   -- 2. sem treino nenhum, concluir mantém o responsável atual (fallback do owner)
   UPDATE public.onboarding_stages SET is_final = true WHERE id = v_stage;
-  v_ret := public.advance_onboarding_to_implantacao(v_jid, false);
+  v_ret := public.advance_onboarding_to_implantacao(v_jid, false, true);
   IF (v_ret->>'ok')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'FALHOU 2: advance sem treino não deveria falhar (%)', v_ret;
   END IF;
@@ -72,7 +72,7 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'FALHOU 3: condutor do treino não entrou como Implantador'; END IF;
 
   -- 4. concluir o onboarding transfere para o condutor do treino
-  v_ret := public.advance_onboarding_to_implantacao(v_jid, false);
+  v_ret := public.advance_onboarding_to_implantacao(v_jid, false, true);
   IF (v_ret->>'ok')::boolean IS NOT TRUE THEN RAISE EXCEPTION 'FALHOU 4: advance falhou (%)', v_ret; END IF;
   PERFORM 1 FROM public.onboarding_journeys WHERE id = v_jid AND responsavel_user_id = v_tecnico;
   IF NOT FOUND THEN RAISE EXCEPTION 'FALHOU 4b: responsabilidade não passou para o condutor do treino'; END IF;
@@ -110,7 +110,7 @@ BEGIN
   -- 10. concluir de novo com o mesmo condutor não gera período novo (idempotente)
   UPDATE public.onboarding_journeys
      SET fase_atual = 'onboarding', current_stage_id = v_stage WHERE id = v_jid;
-  PERFORM public.advance_onboarding_to_implantacao(v_jid, false);
+  PERFORM public.advance_onboarding_to_implantacao(v_jid, false, true);
   SELECT count(*) INTO v_qtd FROM public.onboarding_responsavel_history WHERE journey_id = v_jid;
   IF v_qtd <> 2 THEN
     RAISE EXCEPTION 'FALHOU 10: esperava 2 períodos no histórico, achei % (transferência repetida)', v_qtd;

@@ -124,7 +124,7 @@ BEGIN
   INSERT INTO public.onboarding_stage_history (tenant_id, journey_id, stage_id, entrou_em)
   VALUES (v_tenant, v_j, v_final_onb, now() - interval '3 days') RETURNING id INTO v_hist;
 
-  PERFORM public.advance_onboarding_to_implantacao(v_j, true);
+  PERFORM public.advance_onboarding_to_implantacao(v_j, true, true);
 
   -- 5. o relógio NÃO pode ter partido: a etapa de destino não é a gatilho
   SELECT sla_iniciado_em INTO v_ini FROM public.onboarding_journeys WHERE id = v_j;

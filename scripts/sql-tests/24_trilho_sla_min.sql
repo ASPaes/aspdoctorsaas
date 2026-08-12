@@ -33,12 +33,20 @@ BEGIN
   IF v_total <> v_soma THEN RAISE EXCEPTION 'FALHA 2: fn devolveu %, soma manual %', v_total, v_soma; END IF;
 
   -- 3. marcar encerra_sla numa etapa do MEIO recorta a janela: total diminui
+  -- A etapa tem que sair do MESMO pipeline que o trilho percorre. A fase pode ter
+  -- mais de um pipeline e o trilho escolhe o do produto (ver 27_trilho_pipeline_do_produto):
+  -- marcar etapa de um pipeline fora do caminho não recorta nada e o teste acusava
+  -- falha sem haver bug.
   SELECT s.id, s.sla_minutos INTO v_e_meio, v_sla_meio
     FROM public.onboarding_stages s
-    JOIN public.onboarding_pipelines p ON p.id = s.pipeline_id
-    JOIN public.onboarding_phases ph ON ph.id = p.phase_id AND ph.position = 1
-   WHERE p.tenant_id = v_tenant AND s.ativo AND s.sla_minutos > 0
-     AND NOT COALESCE(s.pausa_sla,false)
+   WHERE s.pipeline_id = (
+           SELECT p.id FROM public.onboarding_pipelines p
+             JOIN public.onboarding_phases ph ON ph.id = p.phase_id
+            WHERE p.tenant_id = v_tenant AND ph.position = 1 AND p.ativo
+              AND EXISTS (SELECT 1 FROM public.onboarding_stages x
+                           WHERE x.pipeline_id = p.id AND x.ativo)
+            ORDER BY (p.produto_id = v_prod) DESC NULLS LAST, p.position LIMIT 1)
+     AND s.ativo AND s.sla_minutos > 0 AND NOT COALESCE(s.pausa_sla,false)
    ORDER BY s.position OFFSET 1 LIMIT 1;
   IF v_e_meio IS NULL THEN RAISE EXCEPTION 'PRE 3: não achei etapa do meio na 1ª jornada'; END IF;
 
