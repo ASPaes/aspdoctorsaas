@@ -10,6 +10,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
 import { resendMessage } from '../_shared/resend-message.ts';
+import { decidirReenvio } from './retry-policy.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -131,10 +132,28 @@ async function verificar(supabase: any, msg: any): Promise<string> {
     .update({ failure_confirmed_at: new Date().toISOString() })
     .eq('id', msg.id);
 
-  if ((msg.auto_retry_count ?? 0) === 0) {
+  // Em grupo, reenviar é pior do que não reenviar: o ack de falha é por participante e
+  // a mensagem provavelmente chegou aos outros. Ver retry-policy.ts.
+  const { data: conv } = await supabase
+    .from('whatsapp_conversations')
+    .select('is_group')
+    .eq('id', msg.conversation_id)
+    .maybeSingle();
+
+  const decisao = decidirReenvio({
+    isGroup: conv?.is_group === true,
+    messageType: msg.message_type,
+    autoRetryCount: msg.auto_retry_count,
+  });
+
+  let tentouReenvio = false;
+  if (decisao.reenviar) {
+    tentouReenvio = true;
     const out = await resendMessage(supabase, msg, { actorUserId: null, automatic: true });
     if (out.ok) return 'reenviada-automaticamente';
     console.error(`${LOG} reenvio automático falhou msg=${msg.id}: ${out.error}`);
+  } else {
+    console.log(`${LOG} sem reenvio automático msg=${msg.id}: ${decisao.motivo}`);
   }
 
   await supabase
@@ -145,15 +164,20 @@ async function verificar(supabase: any, msg: any): Promise<string> {
         ...(msg.metadata ?? {}),
         send_error: {
           origem: 'verify-failed-deliveries',
-          motivo: 'sem confirmação de entrega após a janela e após reenvio automático',
+          motivo: tentouReenvio
+            ? 'sem confirmação de entrega após a janela, e o reenvio automático também falhou'
+            : `sem confirmação de entrega após a janela; sem reenvio automático (${decisao.motivo})`,
           at: new Date().toISOString(),
         },
       },
     })
     .eq('id', msg.id);
 
-  await avisar(supabase, msg);
-  return 'falha-confirmada';
+  if (decisao.alarmar) {
+    await avisar(supabase, msg);
+    return 'falha-confirmada';
+  }
+  return 'falha-registrada-sem-alarme';
 }
 
 Deno.serve(async (req) => {
