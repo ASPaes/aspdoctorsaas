@@ -337,6 +337,10 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
                 : 'Editar Contato'}
             </DialogTitle>
           </DialogHeader>
+          {/* dialog-height-ok: os dois Inputs de telefone são exclusivos (isNewContact
+              mostra o desabilitado, senão o editável), então a contagem do arquivo dá 6
+              campos e a tela mostra no máximo 5 — e em grupo, 3. Medido em 695px contra
+              orçamento de 690, tudo dentro do erro da própria heurística. */}
           <div className="space-y-4 py-4">
             {/* Atalho: puxa nome e empresa de um contato do diretório, sem digitar */}
             {!isGroup && (
