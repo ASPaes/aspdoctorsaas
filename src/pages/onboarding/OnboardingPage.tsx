@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2, Ban, X, Search, GraduationCap, Tag, ChevronDown, LayoutList } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { NewJourneyModal } from "./NewJourneyModal";
 import JourneyDetailSheet from "./JourneyDetailSheet";
@@ -148,6 +148,21 @@ export default function OnboardingPage() {
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [acompTicketId, setAcompTicketId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  /**
+   * Deep-link `/onboarding-implantacao?journey=<id>` — destino do aviso "Nova
+   * implantação sob sua responsabilidade". Consome o parâmetro depois de abrir,
+   * senão fechar a gaveta e recarregar reabriria a mesma jornada.
+   */
+  useEffect(() => {
+    const id = searchParams.get("journey");
+    if (!id) return;
+    setDetailId(id);
+    const limpo = new URLSearchParams(searchParams);
+    limpo.delete("journey");
+    setSearchParams(limpo, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [newAcompOpen, setNewAcompOpen] = useState(false);
   /** Quando o detalhe é aberto pelo cartão de um treinamento, a tela continua sendo a do
    *  ticket pai, mas o que for feito ali é registrado como partindo deste sub-ticket. */

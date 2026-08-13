@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -142,6 +143,25 @@ export default function SupportTickets() {
   const [search, setSearch] = useState<string>("");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  /**
+   * Deep-link `/tickets?ticket=<id>` — é o destino do aviso "Novo chamado em seu
+   * nome". Antes de 13/08 nenhuma tela de ticket lia parâmetro de URL, então o
+   * clique na notificação abria a lista e parava aí.
+   *
+   * O parâmetro é consumido: fica na URL só o tempo de abrir o detalhe, senão
+   * fechar o dialog e recarregar reabriria o mesmo ticket.
+   */
+  useEffect(() => {
+    const id = searchParams.get("ticket");
+    if (!id) return;
+    setSelectedTicketId(id);
+    setDetailOpen(true);
+    const limpo = new URLSearchParams(searchParams);
+    limpo.delete("ticket");
+    setSearchParams(limpo, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [createOpen, setCreateOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [ticketsView, setTicketsView] = useState<string>("lista");
