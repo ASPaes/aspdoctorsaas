@@ -24,6 +24,14 @@ import ImplantacaoBoard, { type TrainingCardRow, type JornadaSemTreino } from ".
 import AcompanhamentoBoard from "./AcompanhamentoBoard";
 import { NewAcompanhamentoModal } from "@/components/tickets/NewAcompanhamentoModal";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
+import {
+  ONB_DONE_COL_ID,
+  GOLIVE_JANELA_MS,
+  goLiveEmFase,
+  montarJornadasPorPipeline,
+  somarColunas,
+  contarTicketsImplantacao,
+} from "./boardTotals";
 
 interface StageRow {
   id: string;
@@ -199,14 +207,21 @@ export default function OnboardingPage() {
     try { window.localStorage.setItem(`onb-board-pipeline-${effectiveTenantId}-${phaseId}`, id); } catch {}
   }
 
+  const pipelines = pipelinesQuery.data ?? [];
+  const pipelineIds = useMemo(() => pipelines.map((p) => p.id).sort().join(","), [pipelines]);
+
+  /** Etapas de TODOS os pipelines da fase, não só do selecionado: é o que permite contar
+   *  os tickets do pipeline fechado sem abri-lo. O quadro continua recebendo só as do
+   *  pipeline atual (`stages`, logo abaixo). De quebra, trocar de pipeline deixou de
+   *  refazer requisição — a chave da query não depende mais do selecionado. */
   const stagesQuery = useQuery({
-    queryKey: ["onboarding-stages", effectiveTenantId, selectedPipelineId],
-    enabled: canAccess && !!effectiveTenantId && !!selectedPipelineId,
+    queryKey: ["onboarding-stages", effectiveTenantId, phaseId, pipelineIds],
+    enabled: canAccess && !!effectiveTenantId && pipelines.length > 0,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_stages" as any) as any)
         .select("id, pipeline_id, nome, slug, position, cor, is_initial, is_final")
         .eq("tenant_id", effectiveTenantId)
-        .eq("pipeline_id", selectedPipelineId)
+        .in("pipeline_id", pipelineIds.split(","))
         // Etapa arquivada sai do quadro. A RPC onboarding_stage_remove exige
         // esvaziar a etapa antes de arquivar, então nenhum cartão fica escondido.
         .eq("ativo", true)
@@ -247,7 +262,23 @@ export default function OnboardingPage() {
     },
   });
 
-  const stages = stagesQuery.data ?? [];
+  const stagesDaFase = stagesQuery.data ?? [];
+  /** Etapa → pipeline dono. É por aqui que um cartão é atribuído a um pipeline sem
+   *  precisar carregar o quadro dele. */
+  const pipelinePorEtapa = useMemo(() => {
+    const m: Record<string, string> = {};
+    stagesDaFase.forEach((s) => { m[s.id] = s.pipeline_id; });
+    return m;
+  }, [stagesDaFase]);
+  const etapasPorPipeline = useMemo(() => {
+    const m: Record<string, StageRow[]> = {};
+    stagesDaFase.forEach((s) => { (m[s.pipeline_id] ||= []).push(s); });
+    return m;
+  }, [stagesDaFase]);
+  const stages = useMemo(
+    () => (selectedPipelineId ? etapasPorPipeline[selectedPipelineId] ?? [] : []),
+    [etapasPorPipeline, selectedPipelineId],
+  );
   const journeys = journeysQuery.data ?? [];
 
   // Treinos agendados por jornada — destaque no card da Implantação (data + especialista)
@@ -372,8 +403,6 @@ export default function OnboardingPage() {
     return m;
   }, [journeyTagsQuery.data]);
 
-  const ONB_DONE_COL_ID = "__onb_concluido__";
-
   /** Em que jornada(s) cada journey já esteve, com o pipeline percorrido e se ainda está aberta.
    *  Substitui os campos pipeline_onboarding_id / pipeline_implantacao_id, que só existiam
    *  para duas fases. */
@@ -401,24 +430,29 @@ export default function OnboardingPage() {
   });
   const phasesByJourney = journeyPhasesQuery.data ?? {};
 
-  /** Quando a Implantação daquela jornada foi encerrada (go-live). Nulo = ainda aberta.
-   *  É daqui que sai a janela de 30 dias da coluna final — e não de `situacao`, que
-   *  mente nos dois sentidos: sem jornada seguinte o go-live conclui a jornada e o
-   *  cartão sumia; com Acompanhamento ligado ela segue `em_andamento` e o cartão
-   *  ficaria no quadro da Implantação para sempre. */
-  const GOLIVE_JANELA_MS = 30 * 24 * 60 * 60 * 1000;
-
-  function goLiveEm(journeyId: string, situacao: string | null): number | null {
-    if (!phaseId || situacao === "cancelado") return null;
-    const passagem = phasesByJourney[journeyId]?.[phaseId];
-    if (!passagem || passagem.aberta || !passagem.concluida_em) return null;
-    return new Date(passagem.concluida_em).getTime();
+  /** A passagem desta jornada por ESTA fase — pipeline percorrido, se ainda está aberta e
+   *  quando encerrou. É a fonte de tudo que é "por fase" na tela. */
+  function passagemDaFase(journeyId: string) {
+    return phaseId ? phasesByJourney[journeyId]?.[phaseId] : undefined;
   }
 
-  const trainingCardsFiltrados = useMemo(() => {
+  function goLiveEm(journeyId: string, situacao: string | null): number | null {
+    return goLiveEmFase(passagemDaFase(journeyId), situacao);
+  }
+
+  /** Em qual pipeline desta fase a jornada está. É a chave que separa "Implantação PDV"
+   *  de "Implantação Gula" sem depender das etapas carregadas no quadro. */
+  function pipelineDaJornada(journeyId: string): string | null {
+    return passagemDaFase(journeyId)?.pipeline_id ?? null;
+  }
+
+  /** Treinos que estão no quadro da fase INTEIRA (todos os pipelines). O quadro consome
+   *  o recorte do pipeline aberto (`trainingCardsFiltrados`); o total de cada pipeline
+   *  sai daqui. Uma lista só, um filtro só — os dois números não têm como divergir. */
+  const treinosNaFase = useMemo(() => {
     if (!isImplantacao) return [] as TrainingCardRow[];
     const termo = busca.trim().toLowerCase();
-    const stageIds = new Set(stages.map((s) => s.id));
+    const stageIds = new Set(stagesDaFase.map((s) => s.id));
     const agora = Date.now();
     return trainingCards.filter((t) => {
       // Cancelado ANTES de a jornada chegar na Implantação não existe aqui — nem no
@@ -451,7 +485,16 @@ export default function OnboardingPage() {
       }
       return true;
     });
-  }, [isImplantacao, trainingCards, stages, busca, filtroResponsavel, filtroSituacao, filtroTipoTreino, phasesByJourney, phaseId]);
+  }, [isImplantacao, trainingCards, stagesDaFase, busca, filtroResponsavel, filtroSituacao, filtroTipoTreino, phasesByJourney, phaseId]);
+
+  /** Recorte do pipeline aberto — é o que o quadro renderiza.
+   *  O treino cancelado não tem etapa para consultar, então quem diz o pipeline dele é a
+   *  jornada. Antes o cancelado escapava do recorte e um descarte do Gula aparecia na
+   *  visão agrupada do PDV. */
+  const trainingCardsFiltrados = useMemo(
+    () => treinosNaFase.filter((t) => pipelineDaJornada(t.journey_id) === selectedPipelineId),
+    [treinosNaFase, selectedPipelineId, phasesByJourney, phaseId],
+  );
 
   /** Data do go-live por jornada — é o que manda o cartão para a coluna de conclusão.
    *  Sai de `journeys`, não dos cartões filtrados, porque uma jornada pode ter encerrado
@@ -533,10 +576,10 @@ export default function OnboardingPage() {
 
   /** Jornada que já entrou na Implantação e ainda não tem treinamento nenhum.
    *  Sem isto ela sumiria do quadro ao trocar cartão de jornada por cartão de treino. */
-  const jornadasSemTreino = useMemo<JornadaSemTreino[]>(() => {
+  const jornadasSemTreinoNaFase = useMemo<JornadaSemTreino[]>(() => {
     if (!isImplantacao) return [];
     const comTreino = new Set(trainingCards.map((t) => t.journey_id));
-    const stageIds = new Set(stages.map((s) => s.id));
+    const stageIds = new Set(stagesDaFase.map((s) => s.id));
     return journeysFiltradas
       .filter((j) => !comTreino.has(j.journey_id))
       .filter((j) => {
@@ -561,7 +604,12 @@ export default function OnboardingPage() {
         demand_type_nome: j.demand_type_nome ?? null,
         demand_type_cor: j.demand_type_cor ?? null,
       }));
-  }, [isImplantacao, trainingCards, journeysFiltradas, stages, filtroSituacao, busca, phasesByJourney, phaseId]);
+  }, [isImplantacao, trainingCards, journeysFiltradas, stagesDaFase, filtroSituacao, busca, phasesByJourney, phaseId]);
+
+  const jornadasSemTreino = useMemo(
+    () => jornadasSemTreinoNaFase.filter((j) => pipelineDaJornada(j.journey_id) === selectedPipelineId),
+    [jornadasSemTreinoNaFase, selectedPipelineId, phasesByJourney, phaseId],
+  );
 
   /** Implantação concluída que só está na tela porque há busca — fora da janela padrão. */
   const goLiveForaDaJanela = useMemo(() => {
@@ -598,36 +646,62 @@ export default function OnboardingPage() {
     filtroTipoTreino !== "todos" ||
     periodoEntrada !== null;
 
-  const journeysByStage = useMemo(() => {
-    const m: Record<string, JourneyRow[]> = {};
-    stages.forEach((s) => (m[s.id] = []));
-    m[ONB_DONE_COL_ID] = [];
-    const termo = busca.trim();
-    journeysFiltradas.forEach((j) => {
-      if (!phaseId) return;
-      // A jornada só aparece neste board se já percorreu (ou está percorrendo) esta fase.
-      const passagem = phasesByJourney[j.journey_id]?.[phaseId];
-      if (!passagem) return;
-      if (selectedPipelineId && passagem.pipeline_id !== selectedPipelineId) return;
-      if (filtroSituacao === "todos" && (j.situacao === "concluido" || j.situacao === "cancelado")) {
-        // Go-live dado DENTRO desta fase encerra a jornada aqui — sem treino a fazer, a
-        // Implantação nunca começa. O cartão fica na coluna de conclusão pela mesma janela
-        // de 30 dias da Implantação (busca derruba a janela) em vez de sumir do quadro.
-        // Quem seguiu adiante é encerrado no quadro da fase seguinte; cancelada não fica.
-        const golive = goLiveEm(j.journey_id, j.situacao ?? null);
-        const seguiuAdiante = !!proximaPhase && !!phasesByJourney[j.journey_id]?.[proximaPhase.id];
-        if (golive === null || seguiuAdiante) return;
-        if (!termo && Date.now() - golive > GOLIVE_JANELA_MS) return;
-      }
-      // Fase já encerrada → coluna de conclusão, para o cartão não sumir do board.
-      if (!passagem.aberta) {
-        m[ONB_DONE_COL_ID].push(j);
-        return;
-      }
-      if (j.current_stage_id && m[j.current_stage_id]) m[j.current_stage_id].push(j);
-    });
-    return m;
-  }, [stages, journeysFiltradas, filtroSituacao, phaseId, selectedPipelineId, phasesByJourney, proximaPhase, busca]);
+  /** Um mapa etapa→cartões POR pipeline, montado numa passada só. O quadro usa o do
+   *  pipeline aberto; o total de cada pipeline é a soma das colunas do seu mapa — mesma
+   *  função, então o número do cabeçalho não tem como discordar dos badges das colunas. */
+  const journeysByStagePorPipeline = useMemo(
+    () =>
+      montarJornadasPorPipeline<JourneyRow>({
+        jornadas: journeysFiltradas,
+        pipelineIds: pipelines.map((p) => p.id),
+        etapasPorPipeline,
+        passagemDaFase,
+        seguiuAdiante: (id) => !!proximaPhase && !!phasesByJourney[id]?.[proximaPhase.id],
+        filtroSituacao,
+        temBusca: busca.trim() !== "",
+        agora: Date.now(),
+      }),
+    [pipelines, etapasPorPipeline, journeysFiltradas, filtroSituacao, phaseId, phasesByJourney, proximaPhase, busca],
+  );
+
+  const journeysByStage = useMemo<Record<string, JourneyRow[]>>(
+    () => (selectedPipelineId ? journeysByStagePorPipeline[selectedPipelineId] ?? {} : {}),
+    [journeysByStagePorPipeline, selectedPipelineId],
+  );
+
+  /** Total de TICKETS de cada pipeline, com os filtros ativos.
+   *  No Onboarding o cartão É o ticket, então bate com a soma das colunas.
+   *  Na Implantação o cartão é o treinamento: um ticket com 3 treinos ocupa 3 colunas, e
+   *  somar cartão diria 73 onde existem 44 clientes. Por isso o ticket conta uma vez só —
+   *  o número ao lado do pipeline é menor que a soma dos badges das colunas de propósito.
+   *  O Acompanhamento tem quadro próprio e informa o dele por callback. */
+  const totaisPorPipeline = useMemo<Record<string, number>>(() => {
+    if (isAcompanhamento) return {};
+    const pipelineIds = pipelines.map((p) => p.id);
+    if (isImplantacao) {
+      return contarTicketsImplantacao({
+        treinos: treinosNaFase,
+        jornadasSemTreino: jornadasSemTreinoNaFase,
+        pipelineIds,
+        pipelineDaJornada,
+      });
+    }
+    const out: Record<string, number> = {};
+    pipelineIds.forEach((pid) => (out[pid] = somarColunas(journeysByStagePorPipeline[pid])));
+    return out;
+  }, [isAcompanhamento, isImplantacao, pipelines, treinosNaFase, jornadasSemTreinoNaFase, journeysByStagePorPipeline, phasesByJourney, phaseId]);
+
+  /** O quadro de Acompanhamento busca os próprios tickets — o total dele só pode vir de lá. */
+  const [totalAcompanhamento, setTotalAcompanhamento] = useState(0);
+
+  /** `null` = número desconhecido, e aí nada é mostrado em vez de um chute. Acontece
+   *  enquanto o quadro carrega (senão o badge pisca "0" e depois corrige) e no
+   *  Acompanhamento, cujo quadro só sabe informar o total do pipeline aberto. */
+  function totalDoPipeline(pipelineId: string, carregando: boolean): number | null {
+    if (carregando) return null;
+    if (isAcompanhamento) return pipelineId === selectedPipelineId ? totalAcompanhamento : null;
+    return totaisPorPipeline[pipelineId] ?? 0;
+  }
 
   /** DEM-0269: soltar na coluna de conclusão é a MESMA saída do botão Go-live e passa
    *  pela mesma regra. Sem treino, a RPC recusa e a resposta abre o diálogo das duas
@@ -764,6 +838,7 @@ export default function OnboardingPage() {
   }
 
   const loading = pipelinesQuery.isLoading || stagesQuery.isLoading || journeysQuery.isLoading;
+  const totalFaseAtual = selectedPipelineId ? totalDoPipeline(selectedPipelineId, loading) : null;
 
   return (
     <div className="flex flex-col h-full w-full min-h-0">
@@ -782,6 +857,14 @@ export default function OnboardingPage() {
                 </button>
               ))}
             </div>
+          )}
+          {/* Com dois pipelines o total mora no badge de cada um. Com um só a barra de
+              pipelines nem é renderizada, e sem isto a fase ficaria sem total nenhum. */}
+          {pipelines.length <= 1 && totalFaseAtual !== null && (
+            <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+              <span className="text-muted-foreground/40 mr-2">·</span>
+              {totalFaseAtual} {totalFaseAtual === 1 ? "ticket" : "tickets"}
+            </span>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -805,18 +888,32 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      {(pipelinesQuery.data ?? []).length > 1 && (
+      {pipelines.length > 1 && (
         <div className="flex flex-wrap items-center gap-1 px-4 py-2 border-b border-border bg-background">
           <div className="inline-flex rounded-md border border-border p-0.5 flex-wrap">
-            {(pipelinesQuery.data ?? []).map((p) => (
-              <button
-                key={p.id}
-                onClick={() => selectPipeline(p.id)}
-                className={`px-3 py-1 text-xs rounded ${p.id === selectedPipelineId ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-              >
-                {p.nome}
-              </button>
-            ))}
+            {pipelines.map((p) => {
+              const ativo = p.id === selectedPipelineId;
+              const total = totalDoPipeline(p.id, loading);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => selectPipeline(p.id)}
+                  title={total === null ? undefined : `${total} ${total === 1 ? "ticket" : "tickets"} com os filtros atuais`}
+                  className={`inline-flex items-center px-3 py-1 text-xs rounded ${ativo ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+                >
+                  {p.nome}
+                  {total !== null && (
+                    <span
+                      className={`ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-4 px-1 rounded text-[10px] font-medium tabular-nums ${
+                        ativo ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {total}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -966,6 +1063,7 @@ export default function OnboardingPage() {
           tenantId={effectiveTenantId}
           busca={busca}
           onOpenTicket={setAcompTicketId}
+          onTotalChange={setTotalAcompanhamento}
         />
       ) : isImplantacao ? (
         <ImplantacaoBoard

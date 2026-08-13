@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
@@ -42,11 +42,15 @@ export default function AcompanhamentoBoard({
   tenantId,
   busca,
   onOpenTicket,
+  onTotalChange,
 }: {
   stages: AcompanhamentoStage[];
   tenantId: string | null;
   busca: string;
   onOpenTicket: (ticketId: string) => void;
+  /** Quantos tickets estão no quadro agora. Os tickets são buscados aqui dentro, então
+   *  esta é a única forma de o cabeçalho da página mostrar o total desta jornada. */
+  onTotalChange?: (total: number) => void;
 }) {
   const qc = useQueryClient();
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
@@ -89,6 +93,17 @@ export default function AcompanhamentoBoard({
     });
     return m;
   }, [filtrados]);
+
+  /** Só o que está numa coluna do quadro. Ticket sem etapa não é renderizado — contá-lo
+   *  daria um total que ninguém acha na tela. */
+  const total = useMemo(
+    () => stages.reduce((acc, s) => acc + (porEtapa[s.id]?.length ?? 0), 0),
+    [stages, porEtapa],
+  );
+
+  useEffect(() => {
+    onTotalChange?.(total);
+  }, [total, onTotalChange]);
 
   async function handleDrop(ticketId: string, stageId: string) {
     const atual = tickets.find((t) => t.id === ticketId);
