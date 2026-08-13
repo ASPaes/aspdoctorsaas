@@ -265,7 +265,25 @@ fi
 # ja subiu para producao.
 #
 # ATUALIZE ESTE CORTE conforme as migrations forem para producao.
-LOCAL_ONLY_DESDE="20260727"
+#
+# 13/08/2026 — DESLIGADO, e o motivo importa mais que o valor.
+#
+# A Entrega A ja esta em producao (conferido: as 3 tabelas e as 4 funcoes-chave
+# existem no remoto). Com isso NAO EXISTE mais objeto que so viva no local, e o
+# replay perdeu a razao de ser.
+#
+# Pior: com o corte em 20260727 o script reaplicava 106 migrations POR CIMA do dump
+# fresco de producao. Como quase toda migration e CREATE OR REPLACE, isso sobrescrevia
+# o corpo VIVO de producao pela versao do repo -- que e mais velha sempre que a funcao
+# foi corrigida direto em prod, ou quando a correcao veio numa migration anterior ao
+# corte. Foi assim que o local terminou com fn_assign_conversation_if_ready ainda
+# carregando o ramo "multi-setor" removido de prod em 06/08, e sem a guarda de 11/08
+# em fn_track_awaiting_agent. Gerar migration a partir desse local reverte correcao em
+# producao sem avisar (quase aconteceu em 13/08).
+#
+# Para religar: so faz sentido se voltar a existir objeto exclusivo do local. Nesse
+# caso, aponte o corte para as migrations DAQUELE objeto, nunca para uma data ampla.
+LOCAL_ONLY_DESDE="99999999"
 say "8/9  Reaplicando as migrations que so existem no local (>= $LOCAL_ONLY_DESDE)"
 N_MIGR=0
 while IFS= read -r f; do
