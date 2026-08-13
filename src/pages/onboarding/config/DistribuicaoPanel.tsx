@@ -5,10 +5,9 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useOnboardingPhases } from "@/hooks/useOnboardingPhases";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Users, Shuffle, Scale, UserCheck, AlertTriangle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Loader2, Users, Shuffle, Scale, UserCheck, AlertTriangle, X } from "lucide-react";
 
 interface Pipeline {
   id: string;
@@ -28,15 +27,23 @@ interface Membro {
   user_id: string;
   nome: string;
   jornadas_ativas: number;
-  no_rodizio: boolean;
 }
 
 interface Pool {
+  pipeline_id: string | null;
+  pipeline_nome: string | null;
   department_id: string | null;
   department_nome: string | null;
   strategy: "menor_carga" | "round_robin" | "fixo" | null;
   fixed_agent_id: string | null;
+  /** 'lista' = quem foi escolhido a dedo; 'setor' = fallback na equipe do setor. */
+  origem: "lista" | "setor" | null;
   membros: Membro[];
+}
+
+interface PessoaDoTenant {
+  user_id: string;
+  nome: string;
 }
 
 const SEM_SETOR = "__sem__";
@@ -118,32 +125,60 @@ export function DistribuicaoPanel() {
   // A jornada onde a jornada nasce — é ela que alimenta o rodízio.
   const primeiraPhase = phases[0] ?? null;
 
-  // Só o pipeline da primeira jornada alimenta o motor: na virada para a seguinte a
+  // Só os pipelines da primeira jornada alimentam o motor: na virada para a seguinte a
   // responsabilidade vai para quem conduziu o treino, não para o rodízio.
-  const setoresDoRodizio = useMemo(() => {
-    if (!primeiraPhase) return [] as string[];
-    const ids = pipelines
-      .filter((p) => p.phase_id === primeiraPhase.id && p.department_id)
-      .map((p) => p.department_id as string);
-    return Array.from(new Set(ids));
+  //
+  // Sem filtro por department_id: desde 13/08 a lista de participantes é do PIPELINE,
+  // então um pipeline sem setor também pode distribuir.
+  const pipelinesDoRodizio = useMemo(() => {
+    if (!primeiraPhase) return [] as Pipeline[];
+    return pipelines.filter((p) => p.phase_id === primeiraPhase.id);
   }, [pipelines, primeiraPhase]);
 
   const poolsQ = useQuery({
-    queryKey: ["onb-dist-pools", effectiveTenantId, setoresDoRodizio.join(",")],
-    enabled: !!effectiveTenantId && setoresDoRodizio.length > 0,
+    queryKey: ["onb-dist-pools", effectiveTenantId, pipelinesDoRodizio.map((p) => p.id).join(",")],
+    enabled: !!effectiveTenantId && pipelinesDoRodizio.length > 0,
     queryFn: async () => {
       const out: Record<string, Pool> = {};
-      for (const dept of setoresDoRodizio) {
+      for (const pipe of pipelinesDoRodizio) {
         const { data, error } = await (supabase.rpc as any)("fn_onboarding_assignment_pool", {
           p_tenant_id: effectiveTenantId,
-          p_department_id: dept,
+          p_pipeline_id: pipe.id,
           p_produto_id: null,
           p_fase: "onboarding",
         });
         if (error) throw error;
-        out[dept] = data as Pool;
+        out[pipe.id] = data as Pool;
       }
       return out;
+    },
+  });
+
+  // Todo mundo que PODE entrar num rodízio. É esta lista que permite pôr alguém de
+  // outro setor num pipeline — o caso do onboarding do Gula, cujo responsável está
+  // no setor Suporte Gula e nunca apareceria no pool do setor Onboarding.
+  const pessoasQ = useQuery({
+    queryKey: ["onb-dist-pessoas", effectiveTenantId],
+    enabled: !!effectiveTenantId,
+    queryFn: async () => {
+      const { data: profs, error } = await supabase
+        .from("profiles")
+        .select("user_id, funcionario_id")
+        .eq("tenant_id", effectiveTenantId!)
+        .eq("status", "ativo");
+      if (error) throw error;
+      const ids = (profs ?? []).map((p) => p.funcionario_id).filter(Boolean) as number[];
+      const { data: funcs } = await supabase
+        .from("funcionarios")
+        .select("id, nome")
+        .in("id", ids.length ? ids : [0]);
+      const mapa = new Map((funcs ?? []).map((f) => [f.id, f.nome as string]));
+      return (profs ?? [])
+        .map((p) => ({
+          user_id: p.user_id as string,
+          nome: (p.funcionario_id ? mapa.get(p.funcionario_id) : null) || "Sem vínculo",
+        }))
+        .sort((a, b) => a.nome.localeCompare(b.nome)) as PessoaDoTenant[];
     },
   });
 
@@ -166,21 +201,23 @@ export function DistribuicaoPanel() {
     invalidar();
   }
 
-  async function salvarRegra(deptId: string, patch: Record<string, unknown>) {
-    const pool = poolsQ.data?.[deptId];
-    const excluidosAtuais = (pool?.membros ?? []).filter((m) => !m.no_rodizio).map((m) => m.user_id);
+  async function salvarRegra(pipelineId: string, patch: Record<string, unknown>) {
+    const pool = poolsQ.data?.[pipelineId];
+    // origem 'setor' significa lista vazia. Não materializar o setor aqui: salvar só a
+    // estratégia congelaria o fallback numa lista fixa sem ninguém ter pedido isso.
+    const listaAtual = pool?.origem === "lista" ? (pool?.membros ?? []).map((m) => m.user_id) : [];
 
     const { error } = await (supabase.from("onboarding_assignment_rules" as any) as any).upsert(
       {
         tenant_id: effectiveTenantId,
-        department_id: deptId,
+        pipeline_id: pipelineId,
         strategy: pool?.strategy ?? "menor_carga",
         fixed_agent_id: pool?.fixed_agent_id ?? null,
-        excluded_agents: excluidosAtuais,
+        included_agents: listaAtual,
         is_active: true,
         ...patch,
       },
-      { onConflict: "tenant_id,department_id" },
+      { onConflict: "tenant_id,pipeline_id" },
     );
 
     if (error) {
@@ -190,19 +227,19 @@ export function DistribuicaoPanel() {
     invalidar();
   }
 
-  async function alternarRodizio(deptId: string, userId: string, dentro: boolean) {
-    const pool = poolsQ.data?.[deptId];
-    const excluidos = new Set((pool?.membros ?? []).filter((m) => !m.no_rodizio).map((m) => m.user_id));
-    if (dentro) excluidos.delete(userId);
-    else excluidos.add(userId);
+  async function adicionarPessoa(pipelineId: string, userId: string) {
+    const pool = poolsQ.data?.[pipelineId];
+    const atual = pool?.origem === "lista" ? (pool?.membros ?? []).map((m) => m.user_id) : [];
+    if (atual.includes(userId)) return;
+    await salvarRegra(pipelineId, { included_agents: [...atual, userId] });
+  }
 
-    const restantes = (pool?.membros ?? []).filter((m) => !excluidos.has(m.user_id));
-    if (restantes.length === 0) {
-      toast.error("Precisa sobrar pelo menos uma pessoa no rodízio.");
-      return;
-    }
-
-    await salvarRegra(deptId, { excluded_agents: Array.from(excluidos) });
+  async function removerPessoa(pipelineId: string, userId: string) {
+    const pool = poolsQ.data?.[pipelineId];
+    // Removendo a partir do fallback, a lista precisa nascer materializada — senão
+    // tirar 1 de 3 pessoas do setor não teria efeito nenhum.
+    const atual = (pool?.membros ?? []).map((m) => m.user_id);
+    await salvarRegra(pipelineId, { included_agents: atual.filter((id) => id !== userId) });
   }
 
   const carregando = pipelinesQ.isLoading || deptsQ.isLoading;
@@ -282,7 +319,7 @@ export function DistribuicaoPanel() {
           <p className="text-[11px] text-muted-foreground flex items-start gap-1.5 pt-0.5">
             <AlertTriangle className="h-3.5 w-3.5 mt-px shrink-0" />
             <span>
-              O rodízio só age na <strong>criação</strong> da jornada, e só olha o setor de
+              O rodízio só age na <strong>criação</strong> da jornada, e só olha os pipelines de
               <strong> {primeiraPhase?.nome ?? "primeira jornada"}</strong>. Ao concluir essa etapa, a
               responsabilidade passa para quem conduziu o treino — o setor das jornadas seguintes serve
               para o ticket, não para distribuir.
@@ -300,9 +337,9 @@ export function DistribuicaoPanel() {
           </p>
         </div>
 
-        {setoresDoRodizio.length === 0 ? (
+        {pipelinesDoRodizio.length === 0 ? (
           <div className="text-sm text-muted-foreground text-center py-8 border border-dashed border-border rounded-lg">
-            Nenhum pipeline de onboarding tem setor definido — a distribuição automática está desligada.
+            Nenhum pipeline de onboarding ativo — a distribuição automática está desligada.
           </div>
         ) : poolsQ.isLoading ? (
           <div className="flex justify-center py-8">
@@ -310,19 +347,27 @@ export function DistribuicaoPanel() {
           </div>
         ) : (
           <div className="space-y-4">
-            {setoresDoRodizio.map((deptId) => {
-              const pool = poolsQ.data?.[deptId];
+            {pipelinesDoRodizio.map((pipe) => {
+              const pool = poolsQ.data?.[pipe.id];
               const membros = pool?.membros ?? [];
               const estrategia = pool?.strategy ?? "menor_carga";
-              const noRodizio = membros.filter((m) => m.no_rodizio);
+              const porSetor = pool?.origem !== "lista";
+              const disponiveis = (pessoasQ.data ?? []).filter(
+                (p) => !membros.some((m) => m.user_id === p.user_id),
+              );
 
               return (
-                <div key={deptId} className="rounded-lg border border-border bg-card overflow-hidden">
+                <div key={pipe.id} className="rounded-lg border border-border bg-card overflow-hidden">
                   <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-border bg-muted/30">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">{pool?.department_nome ?? "Setor"}</span>
-                    <Badge variant="secondary" className="ml-auto text-[10px]">
-                      {noRodizio.length} de {membros.length} no rodízio
+                    <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{pipe.nome}</p>
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        Setor {pool?.department_nome ?? "não definido"}
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="ml-auto text-[10px] shrink-0">
+                      {porSetor ? `${membros.length} do setor` : `${membros.length} no rodízio`}
                     </Badge>
                   </div>
 
@@ -331,7 +376,7 @@ export function DistribuicaoPanel() {
                       <label className="text-xs text-muted-foreground">Como escolher o responsável</label>
                       <Select
                         value={estrategia}
-                        onValueChange={(v) => salvarRegra(deptId, { strategy: v })}
+                        onValueChange={(v) => salvarRegra(pipe.id, { strategy: v })}
                       >
                         <SelectTrigger className="h-9">
                           <SelectValue />
@@ -357,7 +402,7 @@ export function DistribuicaoPanel() {
                         <label className="text-xs text-muted-foreground">Quem recebe</label>
                         <Select
                           value={pool?.fixed_agent_id ?? ""}
-                          onValueChange={(v) => salvarRegra(deptId, { fixed_agent_id: v })}
+                          onValueChange={(v) => salvarRegra(pipe.id, { fixed_agent_id: v })}
                         >
                           <SelectTrigger className="h-9">
                             <SelectValue placeholder="Escolha a pessoa" />
@@ -375,32 +420,67 @@ export function DistribuicaoPanel() {
 
                     <div className="space-y-1.5">
                       <label className="text-xs text-muted-foreground">Quem participa</label>
+
                       {membros.length === 0 ? (
                         <p className="text-xs text-muted-foreground py-3 text-center border border-dashed border-border rounded-md">
-                          Este setor não tem nenhum membro ativo — a jornada vai nascer sem responsável.
+                          {pool?.department_id
+                            ? "Ninguém escolhido e o setor está vazio — a jornada vai nascer sem responsável."
+                            : "Sem ninguém escolhido e sem setor — a jornada vai nascer sem responsável."}
                         </p>
                       ) : (
                         <div className="space-y-1">
                           {membros.map((m) => (
                             <div
                               key={m.user_id}
-                              className={cn(
-                                "flex items-center gap-2.5 px-2.5 py-2 rounded-md border border-border/60 transition-opacity",
-                                !m.no_rodizio && "opacity-50",
-                              )}
+                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-md border border-border/60"
                             >
                               <span className="flex-1 text-sm truncate">{m.nome}</span>
                               <span className="text-[11px] text-muted-foreground tabular-nums">
                                 {m.jornadas_ativas === 1 ? "1 jornada" : `${m.jornadas_ativas} jornadas`}
                               </span>
-                              <Switch
-                                checked={m.no_rodizio}
-                                onCheckedChange={(v) => alternarRodizio(deptId, m.user_id, v)}
-                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                                onClick={() => removerPessoa(pipe.id, m.user_id)}
+                                aria-label={`Tirar ${m.nome} do rodízio de ${pipe.nome}`}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
                             </div>
                           ))}
                         </div>
                       )}
+
+                      {porSetor && membros.length > 0 && (
+                        <p className="text-[11px] text-muted-foreground flex items-start gap-1.5">
+                          <AlertTriangle className="h-3.5 w-3.5 mt-px shrink-0" />
+                          <span>
+                            Ninguém escolhido para este pipeline — vale a equipe do setor{" "}
+                            <strong>{pool?.department_nome}</strong>. Adicionar alguém aqui passa a
+                            valer só para <strong>{pipe.nome}</strong>.
+                          </span>
+                        </p>
+                      )}
+
+                      <Select value="" onValueChange={(v) => adicionarPessoa(pipe.id, v)}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="+ Adicionar pessoa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {disponiveis.length === 0 ? (
+                            <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                              Todo mundo já está na lista
+                            </div>
+                          ) : (
+                            disponiveis.map((p) => (
+                              <SelectItem key={p.user_id} value={p.user_id}>
+                                {p.nome}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>
