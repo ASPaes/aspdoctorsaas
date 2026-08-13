@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       _bkp_consysa_owner_fone_20260727: {
@@ -3891,6 +3916,7 @@ export type Database = {
           descricao: string | null
           key: string
           label: string
+          whatsapp_extra_only: boolean
         }
         Insert: {
           ativo?: boolean
@@ -3901,6 +3927,7 @@ export type Database = {
           descricao?: string | null
           key: string
           label: string
+          whatsapp_extra_only?: boolean
         }
         Update: {
           ativo?: boolean
@@ -3911,6 +3938,7 @@ export type Database = {
           descricao?: string | null
           key?: string
           label?: string
+          whatsapp_extra_only?: boolean
         }
         Relationships: []
       }
@@ -4429,11 +4457,11 @@ export type Database = {
       onboarding_assignment_rules: {
         Row: {
           created_at: string
-          department_id: string
-          excluded_agents: string[]
           fixed_agent_id: string | null
           id: string
+          included_agents: string[]
           is_active: boolean
+          pipeline_id: string
           round_robin_last_index: number
           strategy: string
           tenant_id: string
@@ -4441,11 +4469,11 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          department_id: string
-          excluded_agents?: string[]
           fixed_agent_id?: string | null
           id?: string
+          included_agents?: string[]
           is_active?: boolean
+          pipeline_id: string
           round_robin_last_index?: number
           strategy?: string
           tenant_id: string
@@ -4453,11 +4481,11 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          department_id?: string
-          excluded_agents?: string[]
           fixed_agent_id?: string | null
           id?: string
+          included_agents?: string[]
           is_active?: boolean
+          pipeline_id?: string
           round_robin_last_index?: number
           strategy?: string
           tenant_id?: string
@@ -4465,10 +4493,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "onboarding_assignment_rules_department_id_fkey"
-            columns: ["department_id"]
+            foreignKeyName: "onboarding_assignment_rules_pipeline_id_fkey"
+            columns: ["pipeline_id"]
             isOneToOne: false
-            referencedRelation: "support_departments"
+            referencedRelation: "onboarding_pipelines"
             referencedColumns: ["id"]
           },
           {
@@ -4476,6 +4504,42 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_checklist_group_demand_types: {
+        Row: {
+          created_at: string
+          demand_type_id: string
+          group_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          demand_type_id: string
+          group_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          demand_type_id?: string
+          group_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_checklist_group_demand_types_demand_type_id_fkey"
+            columns: ["demand_type_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_demand_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_checklist_group_demand_types_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_stage_checklist_groups"
             referencedColumns: ["id"]
           },
         ]
@@ -7284,6 +7348,7 @@ export type Database = {
       support_attendances: {
         Row: {
           acceptance_deadline_at: string | null
+          agent_alert_notified_at: string | null
           ai_category: string | null
           ai_problem: string | null
           ai_solution: string | null
@@ -7365,6 +7430,7 @@ export type Database = {
         }
         Insert: {
           acceptance_deadline_at?: string | null
+          agent_alert_notified_at?: string | null
           ai_category?: string | null
           ai_problem?: string | null
           ai_solution?: string | null
@@ -7446,6 +7512,7 @@ export type Database = {
         }
         Update: {
           acceptance_deadline_at?: string | null
+          agent_alert_notified_at?: string | null
           ai_category?: string | null
           ai_problem?: string | null
           ai_solution?: string | null
@@ -12132,6 +12199,21 @@ export type Database = {
         Args: { p_cliente: string; p_data: string; p_tenant: string }
         Returns: number
       }
+      fn_notify_awaiting_agent: { Args: never; Returns: Json }
+      fn_notify_user: {
+        Args: {
+          p_action_url: string
+          p_body: string
+          p_conversation_id?: string
+          p_metadata: Json
+          p_severity: string
+          p_tenant_id: string
+          p_title: string
+          p_type: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       fn_omie_alertar_vinculo_ambiguo: { Args: never; Returns: undefined }
       fn_omie_notificar_falha: {
         Args: { p_fila_id: string }
@@ -12140,6 +12222,7 @@ export type Database = {
       fn_omie_wpp_extra: {
         Args: {
           p_body: string
+          p_conta_id?: string
           p_event_key: string
           p_notification_id: string
           p_tenant_id: string
@@ -12150,6 +12233,14 @@ export type Database = {
       fn_onb_arquivar_treinos_no_golive: {
         Args: { p_journey_id: string }
         Returns: number
+      }
+      fn_onb_checklist_grupo_aplica: {
+        Args: { p_demand_type_id: string; p_group_id: string }
+        Returns: boolean
+      }
+      fn_onb_pipeline_do_trilho: {
+        Args: { p_phase_id: string; p_produto_id: number; p_tenant_id: string }
+        Returns: string
       }
       fn_onb_stage_ordem: { Args: { p_stage_id: string }; Returns: number }
       fn_onb_tem_treino_vivo: {
@@ -12190,8 +12281,8 @@ export type Database = {
       }
       fn_onboarding_assignment_pool: {
         Args: {
-          p_department_id?: string
           p_fase?: string
+          p_pipeline_id?: string
           p_produto_id?: number
           p_tenant_id: string
         }
@@ -12206,7 +12297,7 @@ export type Database = {
         Returns: string
       }
       fn_onboarding_pick_assignee: {
-        Args: { p_department_id: string; p_tenant_id: string }
+        Args: { p_pipeline_id: string; p_tenant_id: string }
         Returns: string
       }
       fn_onboarding_role_id: {
@@ -14423,6 +14514,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       contrato_tipo: ["base", "aditivo"],
