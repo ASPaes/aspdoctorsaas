@@ -17,9 +17,14 @@ ALTER TABLE public.support_attendances
   ADD COLUMN IF NOT EXISTS agent_alert_notified_at timestamptz;
 
 -- Índice parcial: o cron só olha quem está esperando e ainda não foi avisado.
-CREATE INDEX IF NOT EXISTS idx_sa_awaiting_nao_avisado
-  ON public.support_attendances (awaiting_agent_since)
-  WHERE awaiting_agent_since IS NOT NULL AND agent_alert_notified_at IS NULL;
+--
+-- NÃO fica aqui: CREATE INDEX CONCURRENTLY não roda dentro de transação, e
+-- apply_migration envolve tudo numa. support_attendances é tabela quente (74
+-- escritas na última hora medidas em 13/08). Aplicado à parte, por execute_sql:
+--
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_sa_awaiting_nao_avisado
+--     ON public.support_attendances (awaiting_agent_since)
+--     WHERE awaiting_agent_since IS NOT NULL AND agent_alert_notified_at IS NULL;
 
 
 CREATE OR REPLACE FUNCTION public.fn_track_awaiting_agent()
