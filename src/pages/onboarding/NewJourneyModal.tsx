@@ -96,8 +96,8 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
     },
   });
 
-  // Pool do rodízio: membros do setor do pipeline daquele produto, com a carga
-  // atual de cada um. Depende do produto porque o pipeline é escolhido por ele.
+  // Pool do rodízio do PIPELINE daquele produto, com a carga atual de cada um.
+  // Depende do produto porque é ele que escolhe o pipeline.
   //
   // p_fase é sempre "onboarding" porque create_onboarding_journey abre a jornada na
   // PRIMEIRA fase — não na fase que estiver selecionada no board. Antes existia uma
@@ -109,26 +109,32 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("fn_onboarding_assignment_pool", {
         p_tenant_id: tenantId,
-        p_department_id: null,
+        p_pipeline_id: null,
         p_produto_id: produtoId ? Number(produtoId) : null,
         p_fase: "onboarding",
       });
       if (error) throw error;
       return (data ?? null) as {
-        department_id: string | null;
+        pipeline_id: string | null;
+        pipeline_nome: string | null;
         department_nome: string | null;
-        membros: Array<{ user_id: string; nome: string; jornadas_ativas: number; no_rodizio: boolean }>;
+        origem: "lista" | "setor" | null;
+        membros: Array<{ user_id: string; nome: string; jornadas_ativas: number }>;
       } | null;
     },
   });
 
-  const temSetor = !!poolQuery.data?.department_id;
+  // Ter setor deixou de ser o sinal certo: com lista própria por pipeline, um pipeline
+  // sem setor pode distribuir e um pipeline com setor pode estar sem ninguém.
   const poolMembros = poolQuery.data?.membros ?? [];
+  const temPool = poolMembros.length > 0;
 
-  // Fallback de quando o pipeline ainda não tem setor: lista de sempre.
+  // Lista completa do tenant: alimenta o grupo "Outros" do select. A exceção manual não
+  // pode depender de o pipeline estar sem configuração — era o que acontecia antes, e
+  // é por isso que escolher alguém de fora do setor só funcionava por acidente.
   const membrosQuery = useQuery({
     queryKey: ["onb-membros", tenantId],
-    enabled: open && !!tenantId && !temSetor,
+    enabled: open && !!tenantId,
     queryFn: async () => {
       const { data: profiles, error: pErr } = await supabase
         .from("profiles")
@@ -150,6 +156,10 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
         .sort((a, b) => a.nome.localeCompare(b.nome));
     },
   });
+
+  const outrosMembros = (membrosQuery.data ?? []).filter(
+    (m) => !poolMembros.some((p) => p.user_id === m.user_id),
+  );
 
   // O prazo passou a sair da soma das etapas do trilho do PRODUTO (01/08). Antes vinha do
   // tipo de demanda, que agora é só referência. A base aqui era 1440 e no diálogo de
@@ -317,26 +327,32 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="auto">Automático (rodízio)</SelectItem>
-                {temSetor
-                  ? poolMembros.map((m) => (
-                      <SelectItem key={m.user_id} value={m.user_id}>
-                        <span className="flex items-center gap-2">
-                          <span>{m.nome}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {m.jornadas_ativas === 1 ? "1 jornada" : `${m.jornadas_ativas} jornadas`}
-                          </span>
-                        </span>
-                      </SelectItem>
-                    ))
-                  : (membrosQuery.data ?? []).map((m) => (
+                {poolMembros.map((m) => (
+                  <SelectItem key={m.user_id} value={m.user_id}>
+                    <span className="flex items-center gap-2">
+                      <span>{m.nome}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {m.jornadas_ativas === 1 ? "1 jornada" : `${m.jornadas_ativas} jornadas`}
+                      </span>
+                    </span>
+                  </SelectItem>
+                ))}
+                {outrosMembros.length > 0 && (
+                  <>
+                    <div className="px-2 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Outros
+                    </div>
+                    {outrosMembros.map((m) => (
                       <SelectItem key={m.user_id} value={m.user_id}>{m.nome}</SelectItem>
                     ))}
+                  </>
+                )}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {temSetor
-                ? `Rodízio entre o setor ${poolQuery.data?.department_nome}.`
-                : "Este pipeline não tem setor definido — no automático, você fica como responsável. Configure em Configuração › Distribuição."}
+              {temPool
+                ? `No automático, o rodízio de ${poolQuery.data?.pipeline_nome ?? "onboarding"} escolhe.`
+                : "Este pipeline não tem ninguém na distribuição — no automático, você fica como responsável. Configure em Configuração › Distribuição."}
             </p>
           </div>
           <div className="space-y-1.5">
