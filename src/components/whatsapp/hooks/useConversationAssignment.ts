@@ -68,7 +68,7 @@ export const useConversationAssignment = () => {
           severity: 'info',
           title: 'Novo atendimento atribuído',
           body: [contactName, deptName].filter(Boolean).join(' • '),
-          actionUrl: `/whatsapp?conversationId=${conversationId}`,
+          actionUrl: `/whatsapp?conversation=${conversationId}`,
           metadata: { conversation_id: conversationId, department_id: conversation.department_id, assigned_by: user.id, reason },
           createdBy: user.id,
         });
@@ -135,7 +135,7 @@ export const useConversationAssignment = () => {
           severity: 'info',
           title: 'Atendimento transferido para você',
           body: [contactName, deptName].filter(Boolean).join(' • '),
-          actionUrl: `/whatsapp?conversationId=${conversationId}`,
+          actionUrl: `/whatsapp?conversation=${conversationId}`,
           metadata: { conversation_id: conversationId, department_id: convData.department_id, assigned_by: user.id, reason },
           createdBy: user.id,
         });
