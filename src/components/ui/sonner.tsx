@@ -12,6 +12,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       closeButton
       duration={5000}
+      visibleToasts={3}
       // o X do Sonner nasce no canto superior ESQUERDO; espelha para a direita,
       // igual ao toast do Radix.
       style={

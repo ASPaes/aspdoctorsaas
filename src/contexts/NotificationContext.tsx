@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast as sonnerToast } from "sonner";
+import { ChatToast } from "@/components/notifications/ChatToast";
 import { updateFaviconBadge } from "@/utils/notifications/favicon";
 
 const SOUND_URL =
@@ -280,31 +281,36 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }
 
       if (wantsToast) {
-        sonnerToast(notif.title, {
-          description: notif.body || undefined,
-          duration: 5000,
-          action: notif.action_url
-            ? {
-                label: "Abrir",
-                onClick: () => {
-                  if (notif.action_url) navigate(notif.action_url);
-                  supabase
-                    .rpc("mark_notification_read" as any, {
-                      p_recipient_id: recipient.id,
-                    })
-                    .then(() => {
-                      setUnreadCount((c) => Math.max(0, c - 1));
-                      queryClient.invalidateQueries({
-                        queryKey: ["notifications-list"],
-                      });
-                      queryClient.invalidateQueries({
-                        queryKey: ["notifications-unread-count"],
-                      });
-                    });
-                },
-              }
-            : undefined,
-        });
+        const abrir = () => {
+          if (notif.action_url) navigate(notif.action_url);
+          supabase
+            .rpc("mark_notification_read" as any, { p_recipient_id: recipient.id })
+            .then(() => {
+              setUnreadCount((c) => Math.max(0, c - 1));
+              queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
+              queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+            });
+        };
+
+        // id estável por conversa: a 2ª mensagem da mesma conversa ATUALIZA o
+        // toast em vez de empilhar. O banco já coalesce e manda unread_count.
+        const toastId = notifConvId ? `conv-${notifConvId}` : `notif-${notif.id}`;
+
+        sonnerToast.custom(
+          (id) => (
+            <ChatToast
+              title={notif.title}
+              body={notif.body || ""}
+              unreadCount={Number((notif.metadata as any)?.unread_count ?? 1)}
+              onOpen={() => {
+                sonnerToast.dismiss(id);
+                abrir();
+              }}
+              onDismiss={() => sonnerToast.dismiss(id)}
+            />
+          ),
+          { id: toastId, duration: 5000 },
+        );
       }
 
       if (
