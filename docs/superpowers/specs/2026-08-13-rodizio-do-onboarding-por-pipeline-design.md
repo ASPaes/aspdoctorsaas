@@ -42,10 +42,13 @@ Três pontos que ficam decididos:
    `excluded_agents` (quem NÃO participa) vira `included_agents` (quem participa), ordenada.
    O rodízio caminha nessa ordem.
 2. **Fallback = setor, nunca o tenant.** Pipeline sem regra, ou com a lista vazia, cai nos
-   membros do setor do pipeline com `menor_carga` — o comportamento de hoje. Sem isso, todo
-   tenant que ainda não configurou passaria a criar jornada órfã. O tenant inteiro só
-   aparece no **seletor da tela**, para poder adicionar alguém de fora do setor; nunca como
-   pool automático.
+   membros do setor do pipeline — o comportamento de hoje. Sem isso, todo tenant que ainda
+   não configurou passaria a criar jornada órfã. O tenant inteiro só aparece no **seletor da
+   tela**, para poder adicionar alguém de fora do setor; nunca como pool automático.
+   O fallback troca **o pool, não a estratégia**: se a regra existe, a estratégia dela vale
+   sobre os membros do setor; só quando não há regra nenhuma é que vale `menor_carga`.
+   Forçar `menor_carga` ao esvaziar a lista faria a tela mostrar "Rodízio" e o motor fazer
+   outra coisa.
 3. **`menor_carga` continua contando a pessoa inteira.** As jornadas ativas de alguém são
    as dele em todos os pipelines, não só as do pipeline que está distribuindo — é a carga
    real dela.
@@ -113,6 +116,7 @@ O que a nova versão faz, em ordem:
      `profiles.tenant_id = p_tenant_id AND COALESCE(status,'ativo') = 'ativo'`;
    - sem regra ou com lista vazia → membros ativos do setor do pipeline
      (`onboarding_pipelines.department_id` → `support_department_members`), `ORDER BY user_id`.
+     A estratégia continua a da regra; só na ausência de regra é que vira `menor_carga`.
 4. Sem candidato → `NULL` (a jornada nasce sem responsável, como hoje).
 5. `fixo` com o agente ainda no pool → ele. Senão cai em `menor_carga`.
 6. `round_robin` → `(last_index + 1) % n`, grava o índice novo, devolve a posição.
