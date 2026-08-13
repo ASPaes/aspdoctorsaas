@@ -45,7 +45,34 @@ jobs:
       # v4.3.5 → v4.4.0: a v4.3.5 declara runtime node20, que o runner já força
       # para node24 desde ago/2026 (o warning "Node.js 20 is deprecated" no log).
       # A v4.4.0 só oficializa isso — não muda nada do protocolo.
+      #
+      # ==========================================================================
+      # 13/08/2026 — TRÊS TENTATIVAS, porque a falha é de CONEXÃO, não de upload.
+      #
+      # As 4 falhas de 08–12/08 (runs #134, #137, #151, #152, #163, #170) têm a
+      # MESMA assinatura: `connect ETIMEDOUT <servidor>:21 (control socket)`, com
+      # duração fixa de 133–135s — que é o tempo do kernel Linux insistindo no SYN
+      # (6 retries) antes de desistir. Ou seja: a Hostinger não respondeu NADA na
+      # porta 21. Não chegou a autenticar, não chegou a subir arquivo.
+      #
+      # Não é o build nem o dist/: o passo `Build` passou em todas. É o servidor
+      # da Hostinger derrubando a conexão vinda do IP do runner do GitHub (IPs
+      # compartilhados, sujeitos ao anti-brute-force deles). O push seguinte, de
+      # outro runner/IP, passa — foi o que fez a #171 publicar o que a #170 não
+      # publicou.
+      #
+      # Uma única tentativa transforma um bloqueio momentâneo em run vermelha e em
+      # `.ftp-deploy-sync-state.json` velho no servidor (o que faz a run seguinte
+      # reenviar o dist/ inteiro — ver o comentário do `timeout` abaixo). Três
+      # tentativas espaçadas custam no máximo ~10 min do job (limite: 20).
+      #
+      # As tentativas 1 e 2 usam `continue-on-error` para não derrubar o job; a
+      # 3ª não usa — se ela falhar, o deploy falhou de verdade e tem que ficar
+      # vermelho.
+      # ==========================================================================
       - name: Deploy via FTPS
+        id: ftp1
+        continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ secrets.HOSTINGER_FTP_SERVER }}
@@ -65,4 +92,44 @@ jobs:
           local-dir: ./dist/
           # Pasta-raiz do subdomínio no Hostinger. Se a conta FTP já abrir dentro
           # do docroot do app, use ./ ; senão o caminho completo (terminar com /).
+          server-dir: ${{ secrets.HOSTINGER_FTP_SERVER_DIR }}
+
+      # 60s de espera: o bloqueio da Hostinger é de janela curta. Tentar de novo
+      # no mesmo instante bate na mesma porta fechada.
+      - name: Espera antes da 2a tentativa
+        if: steps.ftp1.outcome == 'failure'
+        run: sleep 60
+
+      - name: Deploy via FTPS (2a tentativa)
+        id: ftp2
+        if: steps.ftp1.outcome == 'failure'
+        continue-on-error: true
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.HOSTINGER_FTP_SERVER }}
+          username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
+          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          timeout: 180000
+          local-dir: ./dist/
+          server-dir: ${{ secrets.HOSTINGER_FTP_SERVER_DIR }}
+
+      - name: Espera antes da 3a tentativa
+        if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure'
+        run: sleep 120
+
+      # Última tentativa: SEM continue-on-error. Se falhar aqui, a run fica
+      # vermelha de propósito — aí é problema da Hostinger, não ruído.
+      - name: Deploy via FTPS (3a tentativa)
+        if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure'
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.HOSTINGER_FTP_SERVER }}
+          username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
+          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          timeout: 180000
+          local-dir: ./dist/
           server-dir: ${{ secrets.HOSTINGER_FTP_SERVER_DIR }}
