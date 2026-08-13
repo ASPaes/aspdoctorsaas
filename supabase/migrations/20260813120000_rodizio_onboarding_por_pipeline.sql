@@ -345,3 +345,152 @@ BEGIN
 
   RAISE NOTICE 'create_onboarding_journey: distribuicao migrada para pipeline';
 END $migration$;
+
+-- ==========================================================================
+-- 6. Leitura para a UI: pipeline, regra e participantes com a carga atual.
+--
+-- DROP + CREATE: a assinatura antiga é (uuid, uuid, bigint, text) — os MESMOS tipos —
+-- e o 2º parâmetro deixa de ser setor. O REPLACE recusaria a renomeação.
+-- ==========================================================================
+
+DROP FUNCTION IF EXISTS public.fn_onboarding_assignment_pool(uuid, uuid, bigint, text);
+
+CREATE OR REPLACE FUNCTION public.fn_onboarding_assignment_pool(
+  p_tenant_id   uuid,
+  p_pipeline_id uuid   DEFAULT NULL,
+  p_produto_id  bigint DEFAULT NULL,
+  p_fase        text   DEFAULT 'onboarding'
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_pipe      uuid := p_pipeline_id;
+  v_pipe_nome text;
+  v_dept      uuid;
+  v_dept_nome text;
+  v_strategy  text := 'menor_carga';
+  v_fixo      uuid;
+  v_incluidos uuid[] := '{}';
+  v_origem    text;
+  v_membros   jsonb;
+  v_vazio     jsonb := jsonb_build_object(
+                'pipeline_id', NULL, 'pipeline_nome', NULL,
+                'department_id', NULL, 'department_nome', NULL,
+                'strategy', NULL, 'fixed_agent_id', NULL,
+                'origem', NULL, 'membros', '[]'::jsonb);
+BEGIN
+  IF p_tenant_id IS NULL THEN
+    RETURN v_vazio;
+  END IF;
+
+  IF NOT public.can_access_tenant_row(p_tenant_id) THEN
+    RAISE EXCEPTION 'sem permissao para este tenant';
+  END IF;
+
+  -- Sem pipeline explícito, resolve pela fase/produto com a MESMA regra de
+  -- create_onboarding_journey — senão a prévia da tela mente sobre quem vai receber.
+  IF v_pipe IS NULL THEN
+    SELECT p.id INTO v_pipe
+      FROM public.onboarding_pipelines p
+     WHERE p.tenant_id = p_tenant_id
+       AND p.fase = p_fase::public.onb_fase
+       AND p.ativo
+       AND (p.produto_id = p_produto_id OR p.produto_id IS NULL)
+       AND EXISTS (SELECT 1 FROM public.onboarding_stages s WHERE s.pipeline_id = p.id AND s.ativo)
+     ORDER BY (p.produto_id = p_produto_id) DESC NULLS LAST, p.position
+     LIMIT 1;
+  END IF;
+
+  IF v_pipe IS NULL THEN
+    RETURN v_vazio;
+  END IF;
+
+  SELECT p.nome, p.department_id INTO v_pipe_nome, v_dept
+    FROM public.onboarding_pipelines p
+   WHERE p.id = v_pipe AND p.tenant_id = p_tenant_id;
+
+  -- pipeline de outro tenant: não vaza nome nem membros
+  IF v_pipe_nome IS NULL THEN
+    RETURN v_vazio;
+  END IF;
+
+  SELECT d.name INTO v_dept_nome FROM public.support_departments d WHERE d.id = v_dept;
+
+  SELECT r.strategy, r.fixed_agent_id, COALESCE(r.included_agents, '{}')
+    INTO v_strategy, v_fixo, v_incluidos
+    FROM public.onboarding_assignment_rules r
+   WHERE r.tenant_id = p_tenant_id AND r.pipeline_id = v_pipe AND r.is_active;
+
+  IF NOT FOUND THEN
+    v_strategy := 'menor_carga';
+    v_fixo := NULL;
+    v_incluidos := '{}';
+  END IF;
+
+  IF array_length(v_incluidos, 1) IS NOT NULL THEN
+    -- lista explícita: sai na ORDEM do array, que é a ordem do rodízio
+    v_origem := 'lista';
+    SELECT COALESCE(jsonb_agg(s.x ORDER BY s.ord), '[]'::jsonb) INTO v_membros
+      FROM (
+        SELECT t.ord,
+               jsonb_build_object(
+                 'user_id', t.u,
+                 'nome', COALESCE(f.nome, 'Sem vínculo'),
+                 'jornadas_ativas', (
+                   SELECT count(*)
+                     FROM public.onboarding_journeys j
+                    WHERE j.tenant_id = p_tenant_id
+                      AND j.responsavel_user_id = t.u
+                      AND j.situacao NOT IN ('concluido', 'cancelado')
+                 )
+               ) AS x
+          FROM unnest(v_incluidos) WITH ORDINALITY AS t(u, ord)
+          JOIN public.profiles pr ON pr.user_id = t.u AND pr.tenant_id = p_tenant_id
+          LEFT JOIN public.funcionarios f ON f.id = pr.funcionario_id
+         WHERE COALESCE(pr.status, 'ativo') = 'ativo'
+      ) s;
+  ELSE
+    -- fallback: a equipe do setor do pipeline, em ordem alfabética
+    v_origem := 'setor';
+    SELECT COALESCE(jsonb_agg(s.x ORDER BY s.ord), '[]'::jsonb) INTO v_membros
+      FROM (
+        SELECT COALESCE(f.nome, 'Sem vínculo') AS ord,
+               jsonb_build_object(
+                 'user_id', m.user_id,
+                 'nome', COALESCE(f.nome, 'Sem vínculo'),
+                 'jornadas_ativas', (
+                   SELECT count(*)
+                     FROM public.onboarding_journeys j
+                    WHERE j.tenant_id = p_tenant_id
+                      AND j.responsavel_user_id = m.user_id
+                      AND j.situacao NOT IN ('concluido', 'cancelado')
+                 )
+               ) AS x
+          FROM public.support_department_members m
+          JOIN public.profiles pr ON pr.user_id = m.user_id AND pr.tenant_id = p_tenant_id
+          LEFT JOIN public.funcionarios f ON f.id = pr.funcionario_id
+         WHERE m.department_id = v_dept
+           AND m.tenant_id = p_tenant_id
+           AND m.is_active
+           AND COALESCE(pr.status, 'ativo') = 'ativo'
+      ) s;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'pipeline_id', v_pipe,
+    'pipeline_nome', v_pipe_nome,
+    'department_id', v_dept,
+    'department_nome', v_dept_nome,
+    'strategy', v_strategy,
+    'fixed_agent_id', v_fixo,
+    'origem', v_origem,
+    'membros', v_membros
+  );
+END $$;
+
+REVOKE ALL ON FUNCTION public.fn_onboarding_assignment_pool(uuid, uuid, bigint, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.fn_onboarding_assignment_pool(uuid, uuid, bigint, text) TO authenticated, service_role;
