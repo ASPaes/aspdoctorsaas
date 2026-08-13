@@ -23,6 +23,11 @@ dist-ssr
 supabase/.branches
 supabase/.temp
 
+# Config local de agente de IA. O config.toml do Codex guarda o
+# SUPABASE_ACCESS_TOKEN (sbp_...) em texto claro - acesso total a conta,
+# nao e chave anon. Nunca versionar.
+.codex/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
