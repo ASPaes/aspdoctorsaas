@@ -87,3 +87,135 @@ ALTER TABLE public.onboarding_assignment_rules
 ALTER TABLE public.onboarding_assignment_rules
   DROP COLUMN IF EXISTS department_id,
   DROP COLUMN IF EXISTS excluded_agents;
+
+-- ==========================================================================
+-- 4. O motor: quem recebe a próxima jornada DESTE pipeline
+--
+-- DROP + CREATE, não CREATE OR REPLACE: os tipos são os mesmos (uuid, uuid) e só
+-- o nome do 2º parâmetro muda, e o REPLACE recusa renomear parâmetro.
+-- O DROP leva os grants junto — por isso o REVOKE/GRANT logo abaixo.
+-- ==========================================================================
+
+DROP FUNCTION IF EXISTS public.fn_onboarding_pick_assignee(uuid, uuid);
+
+CREATE OR REPLACE FUNCTION public.fn_onboarding_pick_assignee(
+  p_tenant_id   uuid,
+  p_pipeline_id uuid
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_rule      public.onboarding_assignment_rules%ROWTYPE;
+  v_tem_regra boolean := false;
+  v_strategy  text := 'menor_carga';
+  v_incluidos uuid[] := '{}';
+  v_dept      uuid;
+  v_cands     uuid[];
+  v_idx       int;
+  v_escolhido uuid;
+BEGIN
+  -- guarda cross-tenant de 31/07 (20260731230000): NÃO remover.
+  PERFORM public.assert_tenant_scope(p_tenant_id);
+
+  IF p_tenant_id IS NULL OR p_pipeline_id IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  -- FOR UPDATE serializa o round_robin: duas jornadas criadas ao mesmo tempo não
+  -- podem ler o mesmo round_robin_last_index e cair na mesma pessoa.
+  SELECT * INTO v_rule
+    FROM public.onboarding_assignment_rules
+   WHERE tenant_id = p_tenant_id
+     AND pipeline_id = p_pipeline_id
+     AND is_active
+   FOR UPDATE;
+
+  IF FOUND THEN
+    v_tem_regra := true;
+    v_strategy  := COALESCE(v_rule.strategy, 'menor_carga');
+    v_incluidos := COALESCE(v_rule.included_agents, '{}');
+  END IF;
+
+  IF array_length(v_incluidos, 1) IS NOT NULL THEN
+    -- Lista explícita: a ordem do array É a ordem do rodízio, por isso o WITH ORDINALITY.
+    -- Pode conter gente de fora do setor do pipeline — é o ponto da mudança.
+    SELECT ARRAY(
+      SELECT t.u
+        FROM unnest(v_incluidos) WITH ORDINALITY AS t(u, ord)
+       WHERE EXISTS (
+               SELECT 1 FROM public.profiles p
+                WHERE p.user_id = t.u
+                  AND p.tenant_id = p_tenant_id
+                  AND COALESCE(p.status, 'ativo') = 'ativo'
+             )
+       ORDER BY t.ord
+    ) INTO v_cands;
+  ELSE
+    -- Fallback: membros do SETOR do pipeline. Nunca o tenant inteiro — sem lista
+    -- configurada, distribuir para a empresa toda seria pior que não distribuir.
+    SELECT p.department_id INTO v_dept
+      FROM public.onboarding_pipelines p
+     WHERE p.id = p_pipeline_id AND p.tenant_id = p_tenant_id;
+
+    IF v_dept IS NULL THEN
+      RETURN NULL;
+    END IF;
+
+    SELECT ARRAY(
+      SELECT m.user_id
+        FROM public.support_department_members m
+        JOIN public.profiles p
+          ON p.user_id = m.user_id AND p.tenant_id = p_tenant_id
+       WHERE m.department_id = v_dept
+         AND m.tenant_id = p_tenant_id
+         AND m.is_active
+         AND COALESCE(p.status, 'ativo') = 'ativo'
+       ORDER BY m.user_id
+    ) INTO v_cands;
+  END IF;
+
+  IF v_cands IS NULL OR array_length(v_cands, 1) IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  IF v_tem_regra AND v_strategy = 'fixo'
+     AND v_rule.fixed_agent_id IS NOT NULL
+     AND v_rule.fixed_agent_id = ANY (v_cands) THEN
+    RETURN v_rule.fixed_agent_id;
+  END IF;
+
+  IF v_tem_regra AND v_strategy = 'round_robin' THEN
+    v_idx := (COALESCE(v_rule.round_robin_last_index, -1) + 1) % array_length(v_cands, 1);
+    UPDATE public.onboarding_assignment_rules
+       SET round_robin_last_index = v_idx
+     WHERE id = v_rule.id;
+    RETURN v_cands[v_idx + 1];
+  END IF;
+
+  -- menor_carga: padrão, e também o fallback de 'fixo' com o agente indisponível.
+  -- A carga é a da PESSOA inteira, em todos os pipelines — é a carga real dela.
+  SELECT u INTO v_escolhido
+    FROM unnest(v_cands) AS u
+   ORDER BY (
+             SELECT count(*)
+               FROM public.onboarding_journeys j
+              WHERE j.tenant_id = p_tenant_id
+                AND j.responsavel_user_id = u
+                AND j.situacao NOT IN ('concluido', 'cancelado')
+            ) ASC,
+            COALESCE((
+             SELECT max(h.de)
+               FROM public.onboarding_responsavel_history h
+              WHERE h.tenant_id = p_tenant_id AND h.user_id = u
+            ), '-infinity'::timestamptz) ASC,
+            u ASC
+   LIMIT 1;
+
+  RETURN v_escolhido;
+END $$;
+
+REVOKE ALL ON FUNCTION public.fn_onboarding_pick_assignee(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.fn_onboarding_pick_assignee(uuid, uuid) TO authenticated, service_role;
