@@ -219,3 +219,129 @@ END $$;
 
 REVOKE ALL ON FUNCTION public.fn_onboarding_pick_assignee(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.fn_onboarding_pick_assignee(uuid, uuid) TO authenticated, service_role;
+
+-- ==========================================================================
+-- 5. create_onboarding_journey: distribui pelo PIPELINE que ela já resolveu.
+--
+-- Por que PATCH e não CREATE OR REPLACE com o corpo inteiro:
+-- em 13/08/2026 a definição de produção (md5 141949e5…) e a do banco local
+-- (md5 621e31c6…) JÁ eram diferentes — o local tem `fn_onb_pipeline_do_trilho`,
+-- de outra sessão, que ainda não subiu para produção. Escrever o corpo inteiro
+-- aqui apagaria o trabalho de quem chegasse primeiro, nos dois sentidos.
+--
+-- Lendo `pg_get_functiondef` na hora do apply, a migration acerta os dois bancos
+-- e sobrevive a qualquer ordem entre as duas migrations. Cada troca é exata e
+-- tem asserção: se o texto não bater, a migration ESTOURA em vez de aplicar pela
+-- metade e deixar a distribuição em silêncio.
+--
+-- Mudanças: (a) v_tem_distribuicao decide quando distribuir; (b) passa v_pipe_onb
+-- em vez de v_dept; (c) o motivo e o evento citam o pipeline. O setor continua
+-- indo para o ticket, e a assinatura não muda.
+-- ==========================================================================
+
+DO $migration$
+DECLARE
+  v_def   text;
+  v_novo  text;
+  v_antes text;
+BEGIN
+  SELECT pg_get_functiondef(p.oid) INTO v_def
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public'
+     AND p.proname = 'create_onboarding_journey';
+
+  IF v_def IS NULL THEN
+    RAISE EXCEPTION 'create_onboarding_journey nao existe neste banco';
+  END IF;
+
+  -- idempotência: já migrada, não mexe
+  IF position('fn_onboarding_pick_assignee(p_tenant_id, v_pipe_onb)' in v_def) > 0 THEN
+    RAISE NOTICE 'create_onboarding_journey ja distribui pelo pipeline; nada a fazer';
+    RETURN;
+  END IF;
+
+  v_novo := v_def;
+
+  -- (a) declarações novas
+  v_antes := v_novo;
+  v_novo := replace(v_novo,
+    '  v_dept uuid; v_auto boolean := false;',
+    E'  v_dept uuid; v_auto boolean := false;\n  v_pipe_nome text; v_tem_distribuicao boolean;');
+  IF v_novo = v_antes THEN RAISE EXCEPTION 'patch a (declaracoes) nao encontrou o alvo'; END IF;
+
+  -- (a) o pipeline tem lista própria? NÃO pode virar "v_pipe_onb IS NOT NULL":
+  -- ele nunca é nulo aqui (a guarda de v_first_stage já estourou antes), o ELSE
+  -- viraria código morto e todo tenant sem configuração criaria jornada órfã.
+  v_antes := v_novo;
+  v_novo := replace(v_novo,
+    '  v_dept := COALESCE(p_department_id, v_dept);',
+    E'  v_dept := COALESCE(p_department_id, v_dept);\n\n  SELECT EXISTS (\n           SELECT 1 FROM public.onboarding_assignment_rules r\n            WHERE r.tenant_id = p_tenant_id AND r.pipeline_id = v_pipe_onb AND r.is_active\n              AND array_length(COALESCE(r.included_agents, ''{}''), 1) IS NOT NULL\n         ) INTO v_tem_distribuicao;');
+  IF v_novo = v_antes THEN RAISE EXCEPTION 'patch a2 (v_tem_distribuicao) nao encontrou o alvo'; END IF;
+
+  v_antes := v_novo;
+  v_novo := replace(v_novo,
+    '  ELSIF v_dept IS NOT NULL THEN',
+    '  ELSIF v_tem_distribuicao OR v_dept IS NOT NULL THEN');
+  IF v_novo = v_antes THEN RAISE EXCEPTION 'patch a3 (ELSIF) nao encontrou o alvo'; END IF;
+
+  -- (b) o motor recebe o pipeline
+  v_antes := v_novo;
+  v_novo := replace(v_novo,
+    'public.fn_onboarding_pick_assignee(p_tenant_id, v_dept)',
+    'public.fn_onboarding_pick_assignee(p_tenant_id, v_pipe_onb)');
+  IF v_novo = v_antes THEN RAISE EXCEPTION 'patch b (chamada do motor) nao encontrou o alvo'; END IF;
+
+  -- (c) a regra agora é do pipeline, e é o pipeline que aparece no motivo
+  v_antes := v_novo;
+  v_novo := replace(v_novo,
+    'SELECT COALESCE(r.strategy, ''menor_carga''), d.name',
+    'SELECT COALESCE(r.strategy, ''menor_carga''), p.nome');
+  IF v_novo = v_antes THEN RAISE EXCEPTION 'patch c1 (select da regra) nao encontrou o alvo'; END IF;
+
+  v_antes := v_novo;
+  v_novo := replace(v_novo, '        INTO v_strategy, v_dept_nome', '        INTO v_strategy, v_pipe_nome');
+  IF v_novo = v_antes THEN RAISE EXCEPTION 'patch c2 (INTO) nao encontrou o alvo'; END IF;
+
+  v_antes := v_novo;
+  v_novo := replace(v_novo, '        FROM public.support_departments d', '        FROM public.onboarding_pipelines p');
+  IF v_novo = v_antes THEN RAISE EXCEPTION 'patch c3 (FROM) nao encontrou o alvo'; END IF;
+
+  v_antes := v_novo;
+  v_novo := replace(v_novo,
+    'ON r.tenant_id = p_tenant_id AND r.department_id = d.id AND r.is_active',
+    'ON r.tenant_id = p_tenant_id AND r.pipeline_id = p.id AND r.is_active');
+  IF v_novo = v_antes THEN RAISE EXCEPTION 'patch c4 (JOIN) nao encontrou o alvo'; END IF;
+
+  v_antes := v_novo;
+  v_novo := replace(v_novo, '       WHERE d.id = v_dept;', '       WHERE p.id = v_pipe_onb;');
+  IF v_novo = v_antes THEN RAISE EXCEPTION 'patch c5 (WHERE) nao encontrou o alvo'; END IF;
+
+  v_antes := v_novo;
+  v_novo := replace(v_novo,
+    '|| '' · setor '' || COALESCE(v_dept_nome, ''—'')',
+    '|| '' · pipeline '' || COALESCE(v_pipe_nome, ''—'')');
+  IF v_novo = v_antes THEN RAISE EXCEPTION 'patch c6 (motivo) nao encontrou o alvo'; END IF;
+
+  -- (c) o evento de auditoria também passa a dizer de qual pipeline veio
+  v_antes := v_novo;
+  v_novo := replace(v_novo,
+    '              || '' · carga antes desta jornada: '' || v_carga,',
+    E'              || '' · pipeline '' || COALESCE(v_pipe_nome, ''—'')\n              || '' · carga antes desta jornada: '' || v_carga,');
+  IF v_novo = v_antes THEN RAISE EXCEPTION 'patch c7 (evento) nao encontrou o alvo'; END IF;
+
+  EXECUTE v_novo;
+
+  -- confere o resultado em vez de confiar no replace
+  SELECT pg_get_functiondef(p.oid) INTO v_def
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'create_onboarding_journey';
+
+  IF position('fn_onboarding_pick_assignee(p_tenant_id, v_pipe_onb)' in v_def) = 0
+     OR position('v_tem_distribuicao' in v_def) = 0
+     OR position('r.department_id' in v_def) > 0 THEN
+    RAISE EXCEPTION 'create_onboarding_journey nao ficou como esperado depois do patch';
+  END IF;
+
+  RAISE NOTICE 'create_onboarding_journey: distribuicao migrada para pipeline';
+END $migration$;
