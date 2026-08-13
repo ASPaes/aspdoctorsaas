@@ -120,7 +120,18 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
     initialPageParam: 0,
     staleTime: 30_000,
     refetchInterval: 60_000,
-    refetchOnWindowFocus: false,
+    // Volta para a aba = busca de novo. É a ÚNICA recuperação que a lista tem
+    // para a janela em que o operador está em outro app: ali o refetchInterval
+    // acima não corre (refetchIntervalInBackground é false por padrão) e o
+    // postgres_changes não tem replay, então o que entrou na fila nesse intervalo
+    // não chega por Realtime nunca. A pill já fazia isto (usePillCounts) e por
+    // isso o contador acertava enquanto a lista ficava velha — era o "Fila 2 com
+    // 1 cartão". Medido em 13/08: 3min28s entre a Lê entrar na fila e a primeira
+    // chamada de whatsapp_list_queue no projeto inteiro.
+    //
+    // O custo fica preso ao staleTime de 30s acima: voltar para a aba duas vezes
+    // no mesmo meio minuto não gera duas buscas.
+    refetchOnWindowFocus: true,
     // O offset conta só as conversas com `last_message_at` — são as que a RPC
     // pagina. Conversa recém-aberta (sem mensagem ainda) vem por fora, forçada
     // por id na primeira página, e NÃO ocupa lugar na janela do servidor:
