@@ -15,6 +15,20 @@
 -- saindo do pipeline e indo para o TICKET; só deixa de mandar em quem recebe.
 
 -- ==========================================================================
+-- 0. Não formar fila
+--
+-- Os ALTER TABLE abaixo pedem ACCESS EXCLUSIVE. Se alguém segurar a tabela — e em
+-- 13/08 foi um pg_dump paralelo de 3 workers, com ACCESS SHARE aberto por 19 min —
+-- o ALTER entra na fila E BLOQUEIA TODO MUNDO QUE VIER LER DEPOIS DELE. Na 1ª
+-- tentativa isso durou os 2 min do statement_timeout.
+--
+-- Com lock_timeout a migration desiste em 5s e não deixa ninguém preso atrás.
+-- Falhou? Espere o dump/lock sair e rode de novo — ela é transacional.
+-- ==========================================================================
+
+SET LOCAL lock_timeout = '5s';
+
+-- ==========================================================================
 -- 1. Colunas novas
 -- ==========================================================================
 
