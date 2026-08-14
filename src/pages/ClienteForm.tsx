@@ -131,6 +131,15 @@ const clienteSchema = z.object({
   dia_vencimento_mrr: z.number().nullable(),
 });
 
+// Razão Social é obrigatória só no cadastro novo — clientes antigos com o campo
+// vazio continuam editáveis sem travar o save.
+const clienteSchemaNovo = clienteSchema.extend({
+  razao_social: z.string().nullable().refine(
+    (v) => !!v && v.trim().length > 0,
+    { message: "Razão Social obrigatória" }
+  ),
+});
+
 export type ClienteFormValues = z.infer<typeof clienteSchema>;
 
 function ContratoEventosHistorico({ clienteId }: { clienteId: string }) {
@@ -331,7 +340,7 @@ export default function ClienteForm() {
   }, [id]);
 
   const form = useForm<ClienteFormValues>({
-    resolver: zodResolver(clienteSchema),
+    resolver: zodResolver(isEditing ? clienteSchema : clienteSchemaNovo),
     defaultValues: {
       data_cadastro: new Date().toISOString().split("T")[0],
       razao_social: null, nome_fantasia: null, cnpj: null, email: "",

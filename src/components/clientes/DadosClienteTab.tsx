@@ -410,7 +410,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
 
         <FormField control={form.control} name="razao_social" render={({ field }) => (
           <FormItem>
-            <FormLabel>Razão Social</FormLabel>
+            <FormLabel>Razão Social{clienteId ? "" : " *"}</FormLabel>
             <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
             <FormMessage />
           </FormItem>
