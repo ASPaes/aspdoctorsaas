@@ -130,6 +130,14 @@ verify_jwt = false
 [functions.omie-sync-processar]
 verify_jwt = false
 
+# ds-omie-anexo-enviar: chamada pelo pg_cron (cron_anexo_omie, via pg_net), que nao tem JWT
+# de usuario. A auth mora dentro da function: segredo 'anexo_cron_secret' no vault, comparado
+# com o Bearer recebido (fail-closed se o secret nao estiver setado).
+# Producao ESTA com verify_jwt=false (conferido em 14/08/2026 via functions list, version 8).
+# Sem esta entrada o deploy do CI usaria o padrao true e mataria o cron de anexos em silencio.
+[functions.ds-omie-anexo-enviar]
+verify_jwt = false
+
 # ds-enviar-whatsapp-externo: chamada pelo DoctorDev, que nao tem JWT deste projeto.
 # A auth e HMAC-SHA256 sobre o payload (segredo DEVFLOW_WA_SECRET), igual ao SSO.
 # Com verify_jwt=true o gateway barraria a chamada antes de chegar na function.
