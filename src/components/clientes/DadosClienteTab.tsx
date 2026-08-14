@@ -42,13 +42,19 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   const whatsappValue = form.watch("telefone_whatsapp");
   const whatsappContatoValue = form.watch("telefone_whatsapp_contato");
 
-  // Auto-detect tipo_pessoa from existing CNPJ/CPF value
+  // Auto-detect tipo_pessoa from existing CNPJ/CPF value.
+  // O valor do cliente chega depois da montagem (form.reset da query), então isso
+  // precisa reagir ao cnpj. Trava depois da 1ª detecção — senão, ao digitar um CNPJ,
+  // os 11 dígitos intermediários virariam "física" e a máscara truncaria o resto.
+  const tipoDetectadoRef = useRef(false);
   const cnpjValue = form.watch("cnpj");
   useEffect(() => {
+    if (!clienteId || tipoDetectadoRef.current) return;
     const digits = (cnpjValue ?? "").replace(/\D/g, "");
-    if (digits.length === 11) setTipoPessoa("fisica");
-    else if (digits.length >= 14) setTipoPessoa("juridica");
-  }, []); // only on mount
+    if (digits.length < 11) return;
+    tipoDetectadoRef.current = true;
+    setTipoPessoa(digits.length === 11 ? "fisica" : "juridica");
+  }, [cnpjValue, clienteId]);
 
   // Matriz lookup state
   const [matrizSearch, setMatrizSearch] = useState("");
@@ -341,6 +347,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         <FormItem>
           <FormLabel>Tipo</FormLabel>
           <Select value={tipoPessoa} onValueChange={(v: "juridica" | "fisica") => {
+            tipoDetectadoRef.current = true; // escolha manual manda; para de auto-detectar
             setTipoPessoa(v);
             form.setValue("cnpj", "");
           }}>
