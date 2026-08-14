@@ -50,12 +50,25 @@ function extrairMensagemErro(corpo: any): string {
 
   const mensagemDe = (obj: any): string => {
     if (obj == null) return "";
-    return (
+
+    const base =
       (obj.error ? String(obj.error) : "") ||
       (obj.erro ? String(obj.erro) : "") ||
-      (obj.mensagem ? String(obj.mensagem) : "") ||
-      (obj.bloqueado != null ? `Bloqueado: ${obj.bloqueado}` : "")
-    );
+      (obj.mensagem ? String(obj.mensagem) : "");
+
+    // `erros` é a lista de motivos do montar_payload_contrato_omie (contrato sem produto, sem
+    // Data da Venda, cliente fora do escopo da unidade...). A omie-integration-call embrulha
+    // tudo isso num `bloqueado: "validacao"` sem `error`, então, sem ler `erros` aqui, a tela
+    // mostrava só "Bloqueado: validacao" e o motivo real nunca saía do corpo da resposta.
+    const erros = Array.isArray(obj.erros)
+      ? obj.erros.filter((e: any) => typeof e === "string" && e.trim() !== "").map(String)
+      : [];
+    if (erros.length > 0) {
+      const lista = erros.length === 1 ? erros[0] : erros.map((e) => `• ${e}`).join("\n");
+      return base ? `${base}\n\n${lista}` : lista;
+    }
+
+    return base || (obj.bloqueado != null ? `Bloqueado: ${obj.bloqueado}` : "");
   };
 
   const raiz = mensagemDe(corpo);
