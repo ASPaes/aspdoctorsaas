@@ -185,3 +185,8 @@ verify_jwt = true
 
 [functions.recon-vincular-unitario]
 verify_jwt = true
+
+# Traz as filiais do DoctorOEM para o espelho e monta o de/para com clientes.
+# Chamada por agendamento/painel com a service_role. Nunca pelo navegador.
+[functions.oem-espelho-sync]
+verify_jwt = true
