@@ -68,6 +68,35 @@ async function lerTudo<T>(db: SupabaseClient, query: (from: number, to: number) 
   return tudo;
 }
 
+/**
+ * verify_jwt garante apenas que quem chamou está logado — e esta função roda
+ * com service_role, que ignora RLS. Sem esta checagem, qualquer usuário do
+ * sistema poderia disparar a recarga do espelho de qualquer empresa.
+ */
+async function exigirAdmin(req: Request, ds: SupabaseClient): Promise<void> {
+  const auth = req.headers.get("authorization") ?? "";
+  const token = auth.replace(/^Bearer\s+/i, "");
+  if (!token) throw new Error("Sem token de autenticação.");
+
+  const comoUsuario = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false } },
+  );
+  const { data: u, error } = await comoUsuario.auth.getUser();
+  if (error || !u?.user) throw new Error("Token inválido.");
+
+  const { data: perfil } = await ds
+    .from("profiles")
+    .select("role, is_super_admin")
+    .eq("user_id", u.user.id)
+    .maybeSingle();
+
+  const liberado =
+    perfil?.is_super_admin === true || ["admin", "head"].includes(String(perfil?.role));
+  if (!liberado) throw new Error("Apenas administradores podem atualizar o espelho do OEM.");
+}
+
 Deno.serve(async (req) => {
   const inicio = Date.now();
   try {
@@ -76,6 +105,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { persistSession: false } },
     );
+    await exigirAdmin(req, ds);
     const oemUrl = Deno.env.get("DOCTOROEM_URL");
     const oemKey = Deno.env.get("DOCTOROEM_SERVICE_KEY");
     const mapaRaw = Deno.env.get("OEM_MAPA_TENANTS");

@@ -51,6 +51,7 @@ export const SECTION_TO_RESOURCE: Record<string, string> = {
   // Integrações
   "integracoes-omie": "cfg.integracoes_omie",
   "integracoes-hiper": "cfg.integracoes_hiper",
+  "integracoes-oem": "cfg.integracoes_omie",
 };
 
 export const CADASTRO_SECTIONS = [
@@ -231,6 +232,7 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
           items: [
             { value: "integracoes-omie", label: "Omie" },
             { value: "integracoes-hiper", label: "Hiper" },
+            { value: "integracoes-oem", label: "OEM" },
           ],
         },
       ],
