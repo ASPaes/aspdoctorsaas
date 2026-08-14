@@ -11,6 +11,24 @@
   RewriteRule ^ index.html [L]
 </IfModule>
 
+# Dotfiles não são para o público. O caso concreto: a action de FTPS grava
+# .ftp-deploy-sync-state.json na raiz do site para saber o que mudou entre um
+# deploy e outro — e ele estava respondendo 200, listando TODOS os arquivos da
+# build com hash. Não tem credencial, mas é o inventário do site inteiro.
+# O arquivo precisa continuar no servidor (a sincronização depende dele); o que
+# muda aqui é ele deixar de ser alcançável por HTTP.
+# Regex casa o nome do arquivo, não o caminho: /.well-known/acme-challenge/<token>
+# continua liberado, porque o nome do arquivo ali é o token.
+<FilesMatch "^\.">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
 # Cache: assets com hash são imutáveis; index.html nunca cacheia
 <IfModule mod_headers.c>
   <FilesMatch "\.(js|css|woff2?|ttf|eot|png|jpe?g|gif|svg|webp|ico)$">
