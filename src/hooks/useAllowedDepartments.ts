@@ -32,11 +32,14 @@ export function useAllowedDepartments() {
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       if (isAdmin) {
+        // Setor que só segura opção de autoatendimento da URA fica de fora: não
+        // recebe atendimento, então filtrar por ele devolveria sempre vazio.
         const { data, error } = await supabase
           .from("support_departments")
           .select("id, name, slug, description, is_active, is_default_fallback, default_instance_id, tenant_id")
           .eq("tenant_id", tid!)
           .eq("is_active", true)
+          .neq("ura_action", "auto_reply")
           .order("name");
         if (error) throw error;
         return (data ?? []) as AllowedDepartment[];

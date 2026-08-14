@@ -15,7 +15,8 @@ function useDepartmentOptions() {
   const { data } = useQuery({
     queryKey: ["departments_for_crud", tid],
     queryFn: async () => {
-      let q = supabase.from("support_departments").select("id, name").eq("is_active", true).order("name");
+      // Setor que só segura opção de autoatendimento da URA não recebe cadastro.
+      let q = supabase.from("support_departments").select("id, name").eq("is_active", true).neq("ura_action", "auto_reply").order("name");
       if (tid) q = q.eq("tenant_id", tid);
       const { data, error } = await q;
       if (error) throw error;

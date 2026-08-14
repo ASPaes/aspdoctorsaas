@@ -6,10 +6,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Save, Loader2, ListOrdered, Eye } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Save, Loader2, ListOrdered, Eye, MessageSquareReply } from "lucide-react";
+
+type UraAction = "route" | "auto_reply";
 
 interface DeptUraRow {
   id: string;
@@ -18,7 +22,23 @@ interface DeptUraRow {
   ura_option_number: number | null;
   ura_label: string | null;
   show_in_ura: boolean;
+  ura_action: UraAction | null;
+  ura_auto_reply_message: string | null;
+  ura_auto_close_minutes: number | null;
+  ura_auto_close_message: string | null;
 }
+
+interface RowEdit {
+  number: string;
+  label: string;
+  show: boolean;
+  action: UraAction;
+  replyMessage: string;
+  closeMinutes: string;
+  closeMessage: string;
+}
+
+const MINUTOS_PADRAO = 3;
 
 export default function UraOptionsManager() {
   const { toast } = useToast();
@@ -30,7 +50,7 @@ export default function UraOptionsManager() {
     queryFn: async () => {
       let q = supabase
         .from("support_departments")
-        .select("id, name, is_active, ura_option_number, ura_label, show_in_ura")
+        .select("id, name, is_active, ura_option_number, ura_label, show_in_ura, ura_action, ura_auto_reply_message, ura_auto_close_minutes, ura_auto_close_message")
         .eq("is_active", true)
         .order("ura_option_number", { nullsFirst: false });
       if (tid) q = q.eq("tenant_id", tid);
@@ -42,30 +62,27 @@ export default function UraOptionsManager() {
   });
 
   // Local editable state
-  const [edits, setEdits] = useState<Record<string, { number: string; label: string; show: boolean }>>({});
+  const [edits, setEdits] = useState<Record<string, RowEdit>>({});
+
+  const baseEdit = (d: DeptUraRow): RowEdit => ({
+    number: d.ura_option_number?.toString() ?? "",
+    label: d.ura_label ?? "",
+    show: d.show_in_ura,
+    action: d.ura_action === "auto_reply" ? "auto_reply" : "route",
+    replyMessage: d.ura_auto_reply_message ?? "",
+    closeMinutes: d.ura_auto_close_minutes?.toString() ?? "",
+    closeMessage: d.ura_auto_close_message ?? "",
+  });
 
   // Initialize edits from fetched data
   const rows = useMemo(() => {
-    return departments.map((d) => {
-      const edit = edits[d.id];
-      return {
-        id: d.id,
-        name: d.name,
-        number: edit?.number ?? (d.ura_option_number?.toString() ?? ""),
-        label: edit?.label ?? (d.ura_label ?? ""),
-        show: edit?.show ?? d.show_in_ura,
-      };
-    });
+    return departments.map((d) => ({ id: d.id, name: d.name, ...(edits[d.id] ?? baseEdit(d)) }));
   }, [departments, edits]);
 
-  const updateField = (id: string, field: "number" | "label" | "show", value: string | boolean) => {
+  const updateField = <K extends keyof RowEdit>(id: string, field: K, value: RowEdit[K]) => {
     const dept = departments.find((d) => d.id === id);
     if (!dept) return;
-    const current = edits[id] ?? {
-      number: dept.ura_option_number?.toString() ?? "",
-      label: dept.ura_label ?? "",
-      show: dept.show_in_ura,
-    };
+    const current = edits[id] ?? baseEdit(dept);
     setEdits((prev) => ({ ...prev, [id]: { ...current, [field]: value } }));
   };
 
@@ -84,7 +101,14 @@ export default function UraOptionsManager() {
     return dupes;
   }, [rows]);
 
-  const hasErrors = duplicateNumbers.size > 0;
+  // Opção que responde sem mensagem cairia no roteamento normal: o cliente
+  // escolheria "Indique e ganhe" e ia parar na fila de um atendente.
+  const semMensagem = useMemo(
+    () => rows.filter((r) => r.show && r.action === "auto_reply" && !r.replyMessage.trim()),
+    [rows],
+  );
+
+  const hasErrors = duplicateNumbers.size > 0 || semMensagem.length > 0;
 
   // Auto-number: fill missing numbers sequentially for show_in_ura=true rows
   const autoNumber = () => {
@@ -103,11 +127,7 @@ export default function UraOptionsManager() {
       if (!row || !row.show || row.number.trim() !== "") continue;
 
       while (usedNumbers.has(nextNum)) nextNum++;
-      const current = newEdits[dept.id] ?? {
-        number: "",
-        label: dept.ura_label ?? "",
-        show: dept.show_in_ura,
-      };
+      const current = newEdits[dept.id] ?? baseEdit(dept);
       newEdits[dept.id] = { ...current, number: nextNum.toString() };
       usedNumbers.add(nextNum);
       nextNum++;
@@ -118,22 +138,30 @@ export default function UraOptionsManager() {
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const updates = rows.map((r) => ({
-        id: r.id,
-        ura_option_number: r.show && r.number.trim() !== "" ? parseInt(r.number, 10) : null,
-        ura_label: r.label.trim() || null,
-        show_in_ura: r.show,
-      }));
+      const updates = rows.map((r) => {
+        const isAuto = r.action === "auto_reply";
+        const minutos = parseInt(r.closeMinutes, 10);
+        return {
+          id: r.id,
+          ura_option_number: r.show && r.number.trim() !== "" ? parseInt(r.number, 10) : null,
+          ura_label: r.label.trim() || null,
+          show_in_ura: r.show,
+          ura_action: r.action,
+          // Campos de autoatendimento só existem para esse tipo: trocar o tipo de
+          // volta para "rotear" limpa o que ficou, senão a configuração antiga
+          // voltaria a valer sozinha se alguém reativasse a opção.
+          ura_auto_reply_message: isAuto ? r.replyMessage.trim() || null : null,
+          ura_auto_close_minutes: isAuto && !isNaN(minutos) && minutos > 0 ? minutos : null,
+          ura_auto_close_message: isAuto ? r.closeMessage.trim() || null : null,
+        };
+      });
 
       for (const u of updates) {
+        const { id, ...campos } = u;
         const { error } = await supabase
           .from("support_departments")
-          .update({
-            ura_option_number: u.ura_option_number,
-            ura_label: u.ura_label,
-            show_in_ura: u.show_in_ura,
-          })
-          .eq("id", u.id);
+          .update(campos)
+          .eq("id", id);
         if (error) throw error;
       }
     },
@@ -174,10 +202,11 @@ export default function UraOptionsManager() {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Header */}
-        <div className="grid grid-cols-[1fr_80px_1fr_80px] gap-2 items-center text-sm font-medium text-muted-foreground px-1">
+        <div className="grid grid-cols-[1fr_80px_1fr_150px_80px] gap-2 items-center text-sm font-medium text-muted-foreground px-1">
           <span>Setor</span>
           <span className="text-center">Nº URA</span>
           <span>Label (opcional)</span>
+          <span>Ao escolher</span>
           <span className="text-center">Visível</span>
         </div>
 
@@ -186,30 +215,98 @@ export default function UraOptionsManager() {
         {rows.map((row) => {
           const numVal = parseInt(row.number, 10);
           const isDupe = !isNaN(numVal) && duplicateNumbers.has(numVal) && row.show;
+          const isAuto = row.action === "auto_reply";
+          const faltaMensagem = isAuto && row.show && !row.replyMessage.trim();
 
           return (
-            <div key={row.id} className="grid grid-cols-[1fr_80px_1fr_80px] gap-2 items-center">
-              <span className="text-sm font-medium truncate">{row.name}</span>
-              <Input
-                type="number"
-                min={1}
-                className={`text-center h-9 ${isDupe ? "border-destructive ring-1 ring-destructive" : ""}`}
-                value={row.number}
-                onChange={(e) => updateField(row.id, "number", e.target.value)}
-                placeholder="—"
-              />
-              <Input
-                className="h-9"
-                value={row.label}
-                onChange={(e) => updateField(row.id, "label", e.target.value)}
-                placeholder={row.name}
-              />
-              <div className="flex justify-center">
-                <Switch
-                  checked={row.show}
-                  onCheckedChange={(v) => updateField(row.id, "show", v)}
+            <div key={row.id} className="space-y-2">
+              <div className="grid grid-cols-[1fr_80px_1fr_150px_80px] gap-2 items-center">
+                <span className="text-sm font-medium truncate">{row.name}</span>
+                <Input
+                  type="number"
+                  min={1}
+                  className={`text-center h-9 ${isDupe ? "border-destructive ring-1 ring-destructive" : ""}`}
+                  value={row.number}
+                  onChange={(e) => updateField(row.id, "number", e.target.value)}
+                  placeholder="—"
                 />
+                <Input
+                  className="h-9"
+                  value={row.label}
+                  onChange={(e) => updateField(row.id, "label", e.target.value)}
+                  placeholder={row.name}
+                />
+                <Select
+                  value={row.action}
+                  onValueChange={(v) => updateField(row.id, "action", v as UraAction)}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="route">Chamar o setor</SelectItem>
+                    <SelectItem value="auto_reply">Responder e voltar</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex justify-center">
+                  <Switch
+                    checked={row.show}
+                    onCheckedChange={(v) => updateField(row.id, "show", v)}
+                  />
+                </div>
               </div>
+
+              {isAuto && (
+                <div className="ml-1 rounded-lg border border-primary/25 bg-primary/[0.04] p-3 space-y-3">
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <MessageSquareReply className="h-3.5 w-3.5 text-primary" />
+                    Manda a mensagem abaixo e devolve o cliente pro menu. Ninguém é
+                    acionado e o atendimento não entra na fila.
+                  </p>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Mensagem de resposta</Label>
+                    <Textarea
+                      rows={3}
+                      value={row.replyMessage}
+                      onChange={(e) => updateField(row.id, "replyMessage", e.target.value)}
+                      placeholder="Ex.: Indique e ganhe R$ 150,00 no PIX! Cadastre sua indicação aqui: https://..."
+                      className={faltaMensagem ? "border-destructive ring-1 ring-destructive" : ""}
+                    />
+                    {faltaMensagem && (
+                      <p className="text-xs text-destructive">
+                        Sem mensagem, quem escolher esta opção cai na fila de um atendente.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-[150px_1fr]">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Encerrar após</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min={1}
+                          className="h-9 text-center"
+                          value={row.closeMinutes}
+                          onChange={(e) => updateField(row.id, "closeMinutes", e.target.value)}
+                          placeholder={String(MINUTOS_PADRAO)}
+                        />
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">min sem falar</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Mensagem de encerramento</Label>
+                      <Input
+                        className="h-9"
+                        value={row.closeMessage}
+                        onChange={(e) => updateField(row.id, "closeMessage", e.target.value)}
+                        placeholder="Ex.: Obrigado pela indicação! 💚"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
@@ -217,6 +314,13 @@ export default function UraOptionsManager() {
         {duplicateNumbers.size > 0 && (
           <p className="text-sm text-destructive">
             ⚠️ Números duplicados: {Array.from(duplicateNumbers).join(", ")}. Corrija antes de salvar.
+          </p>
+        )}
+
+        {semMensagem.length > 0 && (
+          <p className="text-sm text-destructive">
+            ⚠️ Sem mensagem de resposta: {semMensagem.map((r) => r.label || r.name).join(", ")}.
+            Preencha antes de salvar.
           </p>
         )}
 

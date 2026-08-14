@@ -98,11 +98,13 @@ export function AssignmentRuleDialog({ open, onOpenChange, rule, onSave }: Assig
     queryKey: ["support-departments-active-dialog", tid],
     enabled: !!tid,
     queryFn: async () => {
+      // Setor de opção da URA não distribui atendimento: não entra na regra.
       const { data, error } = await supabase
         .from("support_departments")
         .select("id, name")
         .eq("tenant_id", tid as string)
         .eq("is_active", true)
+        .neq("ura_action", "auto_reply")
         .order("name");
       if (error) throw error;
       return data ?? [];

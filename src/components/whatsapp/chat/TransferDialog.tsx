@@ -49,10 +49,13 @@ function useDepartments() {
     enabled: !!tid,
     staleTime: 5 * 60_000,
     queryFn: async () => {
+      // Setor de opção da URA (ex.: "Indique e ganhe") é só o cabide da opção:
+      // não tem agente dentro. Transferir um atendimento para lá seria enterrá-lo.
       let q = supabase
         .from("support_departments")
         .select("id, name, is_active")
         .eq("is_active", true)
+        .neq("ura_action", "auto_reply")
         .order("name");
       if (tid) q = q.eq("tenant_id", tid);
       const { data, error } = await q;

@@ -413,6 +413,55 @@ async function closeAttendance(
   return "closed";
 }
 
+// ─── Autoatendimento da URA ──────────────────────────────────────────────────
+// Passada independente da inatividade comum. Quem escolheu uma opção da URA que
+// só responde (ex.: o link do "Indique e ganhe") fica em ura_state='self_service':
+// sem setor, sem atendente, fora da fila. Se voltar a falar, o motor devolve o
+// menu. Se sumir, quem encerra é aqui.
+//
+// A RPC fecha atendimento E conversa numa transação e devolve o que já fechou.
+// A despedida sai depois: se o envio falhar, o cliente fica sem a mensagem, mas
+// o estado no banco continua íntegro. A ordem inversa (enviar e depois fechar)
+// repetiria a despedida a cada ciclo se a função morresse no meio.
+async function closeUraSelfService(
+  supabase: any,
+  correlationId: string,
+  budget: { sends: number },
+): Promise<{ closed: number; sem_despedida: number }> {
+  const { data: rows, error } = await supabase
+    .rpc("fn_close_ura_selfservice", { p_limit: 20 });
+
+  if (error) {
+    console.error(`${LOG}[${correlationId}] erro na RPC fn_close_ura_selfservice:`, error);
+    return { closed: 0, sem_despedida: 0 };
+  }
+
+  let closed = 0;
+  let semDespedida = 0;
+
+  for (const r of (rows ?? []) as any[]) {
+    closed++;
+    if (budget.sends >= MAX_SENDS_PER_RUN) { semDespedida++; continue; }
+
+    const built = await buildSendContext(supabase, r.tenant_id, r.conversation_id);
+    if (!built) { semDespedida++; continue; }
+
+    const message = (r.mensagem || "").trim()
+      || `\u{2705} Atendimento *${r.attendance_code}* encerrado.\n\nSe precisar de algo, é só nos enviar uma nova mensagem. \u{1F60A}`;
+
+    await sendAndPersistAutoMessage(
+      supabase, built.ctx, r.conversation_id, message,
+      {
+        system: true, attendance_event: "closed", attendance_id: r.attendance_id,
+        ura_self_service_close: true,
+      },
+    );
+    budget.sends++;
+  }
+
+  return { closed, sem_despedida: semDespedida };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -436,6 +485,11 @@ serve(async (req) => {
 
     let scanned = 0;
     let stopReason = "fim_da_fila";
+
+    // Autoatendimento primeiro: são poucos por dia e vivem minutos. Rodando
+    // antes, o teto de envios do ciclo não os deixa sem a despedida — e o
+    // p_limit de 20 impede que eles engulam o orçamento da inatividade.
+    const ura = await closeUraSelfService(supabase, correlationId, budget);
 
     // Nova RPC pré-filtra atendimentos que precisam ação imediata (needs_warn/needs_close),
     // com overrides setor>instância>global já resolvidos. Reduz drasticamente o volume.
@@ -463,10 +517,15 @@ serve(async (req) => {
     const elapsed = Date.now() - startedAt;
     console.log(`${LOG}[${correlationId}] done`, {
       scanned, sends: budget.sends, stopReason, elapsed_ms: elapsed, ...summary,
+      ura_self_service_closed: ura.closed, ura_self_service_sem_despedida: ura.sem_despedida,
     });
 
     return new Response(
-      JSON.stringify({ success: true, scanned, sends: budget.sends, stopReason, ...summary, elapsed_ms: elapsed }),
+      JSON.stringify({
+        success: true, scanned, sends: budget.sends, stopReason, ...summary,
+        ura_self_service_closed: ura.closed, ura_self_service_sem_despedida: ura.sem_despedida,
+        elapsed_ms: elapsed,
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 

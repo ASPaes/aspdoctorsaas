@@ -107,6 +107,7 @@ interface Department {
   name: string;
   is_active: boolean;
   default_instance_id: string | null;
+  ura_action: string | null;
 }
 
 interface Funcionario {
@@ -517,7 +518,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_departments")
-        .select("id, name, is_active, default_instance_id")
+        .select("id, name, is_active, default_instance_id, ura_action")
         .eq("tenant_id", tenantId!)
         .order("name");
       if (error) throw error;
@@ -626,7 +627,10 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     },
   });
 
-  const activeDepts = departments.filter((d) => d.is_active);
+  // Fora do dropdown, não da consulta: quem só segura opção de autoatendimento
+  // da URA não recebe agente, mas a lista completa ainda precisa resolver o nome
+  // de um setor já gravado em alguém.
+  const activeDepts = departments.filter((d) => d.is_active && d.ura_action !== "auto_reply");
 
   // Selected funcionário info
   const selectedFunc = useMemo(

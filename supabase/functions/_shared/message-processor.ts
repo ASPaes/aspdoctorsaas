@@ -1317,6 +1317,34 @@ export async function sendUraWelcome(supabase: any, ctx: SendContext, conversati
   } catch (err) { console.error('[processor] Error in sendUraWelcome:', err); }
 }
 
+// Reenvia o menu da URA e devolve o atendimento pro estado de espera de opção.
+// Três caminhos chegam aqui: setor fechado, autoatendimento respondido e o
+// cliente que volta a falar depois de um autoatendimento.
+async function resendUraMenu(supabase: any, ctx: SendContext, conversationId: string, tenantId: string, attendanceId: string, header: string): Promise<void> {
+  const nowIso = new Date().toISOString();
+  const { data: depts } = await supabase.from('support_departments')
+    .select('name, ura_option_number, ura_label')
+    .eq('tenant_id', tenantId).eq('is_active', true).eq('show_in_ura', true)
+    .not('ura_option_number', 'is', null).order('ura_option_number');
+
+  // ura_completed_at volta a NULL de propósito: é ele que tira o atendimento do
+  // radar do cron fn_process_ura_timeouts. Voltando pro menu, o relógio do
+  // timeout normal precisa correr de novo.
+  await supabase.from('support_attendances').update({
+    ura_option_selected: null, ura_selected_option: null,
+    ura_state: 'pending', ura_asked_at: nowIso, ura_completed_at: null,
+    ura_invalid_count: 0, updated_at: nowIso,
+  }).eq('id', attendanceId);
+
+  if (depts && depts.length > 0) {
+    const optionsList = depts.map((d: any) => `${d.ura_option_number}. ${d.ura_label || d.name}`).join('\n');
+    await sendAndPersistAutoMessage(supabase, ctx, conversationId,
+      `${header}\n${optionsList}\n0. Encerrar atendimento`,
+      { ura: true, ura_resent: true },
+    );
+  }
+}
+
 export async function handleUraResponse(supabase: any, ctx: SendContext, conversationId: string, tenantId: string, messageContent: string, supportConfig: any): Promise<boolean> {
   const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
   if (!uraEnabled) return false;
@@ -1330,6 +1358,15 @@ export async function handleUraResponse(supabase: any, ctx: SendContext, convers
     await supabase.from('support_attendances').update({ waiting_ack_count: current + 1 }).eq('id', att.id);
     att.waiting_ack_count = current + 1;
   };
+  // Autoatendimento: o cliente escolheu uma opção que só responde (ex.: o link
+  // de indicação) e voltou a falar. Isso devolve ele pro menu — não vira fila,
+  // não chama atendente. Se ele tivesse sumido, quem encerra é o
+  // check-inactivity-timeout, com a mensagem de agradecimento do setor.
+  if (att.ura_state === 'self_service' && !att.assigned_to) {
+    await resendUraMenu(supabase, ctx, conversationId, tenantId, att.id, 'Posso ajudar em mais alguma coisa? Escolha o setor:');
+    return true;
+  }
+
   const isUraPending = att.ura_state === 'pending' || (att.ura_sent_at && att.ura_state === 'none');
   if (!isUraPending && att.ura_state !== 'pending') {
     if ((att.department_id || att.ura_option_selected !== null) && !att.assigned_to) { await sendWaitingAck(); return true; }
@@ -1344,7 +1381,7 @@ export async function handleUraResponse(supabase: any, ctx: SendContext, convers
   }
   const trimmed = (messageContent || '').trim();
   if (detectsHumanIntent(trimmed)) { await markHumanFallback(supabase, att.id); await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig); await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(HUMAN_FALLBACK_MESSAGES)); return true; }
-  const { data: departments } = await supabase.from('support_departments').select('id, name, ura_option_number, ura_label').eq('tenant_id', tenantId).eq('is_active', true).eq('show_in_ura', true).not('ura_option_number', 'is', null).order('ura_option_number');
+  const { data: departments } = await supabase.from('support_departments').select('id, name, ura_option_number, ura_label, ura_action, ura_auto_reply_message').eq('tenant_id', tenantId).eq('is_active', true).eq('show_in_ura', true).not('ura_option_number', 'is', null).order('ura_option_number');
   const hasDepts = departments && departments.length > 0;
   const optionNumber = parseInt(trimmed, 10);
   const deptByNumber = new Map<number, any>();
@@ -1370,6 +1407,27 @@ export async function handleUraResponse(supabase: any, ctx: SendContext, convers
   const nowIso = new Date().toISOString();
   const selectedDept = hasDepts ? deptByNumber.get(optionNumber) : null;
   const deptName = selectedDept ? (selectedDept.ura_label || selectedDept.name) : `Opção ${optionNumber}`;
+
+  // ── Opção de autoatendimento ──
+  // Manda a mensagem configurada (ex.: o link do Indique) e para por aí: não
+  // define setor, não entra na fila de ninguém, não passa por horário de
+  // atendimento — quem responde é a URA, que atende a qualquer hora.
+  // Sem mensagem configurada, cai no fluxo normal de roteamento: melhor mandar
+  // pro setor do que deixar o cliente sem resposta.
+  const autoReplyMsg = (selectedDept?.ura_auto_reply_message || '').trim();
+  if (selectedDept?.ura_action === 'auto_reply' && autoReplyMsg) {
+    await sendAndPersistAutoMessage(supabase, ctx, conversationId, autoReplyMsg,
+      { ura: true, ura_self_service: true, department_id: selectedDept.id });
+    // ura_completed_at preenchido tira este atendimento do cron
+    // fn_process_ura_timeouts, que só pega quem está com ele NULL — senão em
+    // 2 minutos ele jogaria o cliente no setor padrão, num atendente.
+    await supabase.from('support_attendances').update({
+      ura_option_selected: optionNumber, ura_selected_option: optionNumber,
+      ura_state: 'self_service', ura_completed_at: nowIso,
+      ura_invalid_count: 0, updated_at: nowIso,
+    }).eq('id', att.id);
+    return true;
+  }
 
   // ── Check horário do setor selecionado ──
   // Se o setor tem business_hours_enabled e está fechado agora, envia mensagem e volta pro menu URA
@@ -1407,24 +1465,8 @@ export async function handleUraResponse(supabase: any, ctx: SendContext, convers
         await sendAndPersistAutoMessage(supabase, ctx, conversationId, deptMsg, {
           ura: true, department_closed: true, department_id: selectedDept.id,
         });
-        // Reseta URA: limpa seleção e reenvia menu
-        await supabase.from('support_attendances').update({
-          ura_option_selected: null, ura_selected_option: null,
-          ura_state: 'pending', ura_asked_at: nowIso,
-          ura_invalid_count: 0, updated_at: nowIso,
-        }).eq('id', att.id);
-        // Reenvia menu URA
-        const { data: uraDepts } = await supabase.from('support_departments')
-          .select('id, name, ura_option_number, ura_label, show_in_ura')
-          .eq('tenant_id', tenantId).eq('is_active', true).eq('show_in_ura', true)
-          .not('ura_option_number', 'is', null).order('ura_option_number');
-        if (uraDepts && uraDepts.length > 0) {
-          const optionsList = uraDepts.map((d: any) => `${d.ura_option_number}. ${d.ura_label || d.name}`).join('\n');
-          await sendAndPersistAutoMessage(supabase, ctx, conversationId,
-            `Escolha outro setor:\n${optionsList}\n0. Encerrar atendimento`,
-            { ura: true, ura_resent: true },
-          );
-        }
+        // Reseta a URA e reenvia o menu
+        await resendUraMenu(supabase, ctx, conversationId, tenantId, att.id, 'Escolha outro setor:');
         return true;
       }
     }

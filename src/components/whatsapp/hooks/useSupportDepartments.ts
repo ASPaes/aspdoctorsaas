@@ -19,10 +19,14 @@ export function useSupportDepartments() {
   return useQuery<SupportDepartment[]>({
     queryKey: ["support_departments", tid],
     queryFn: async () => {
+      // Fora os setores que existem só para segurar uma opção de autoatendimento
+      // da URA: ninguém trabalha neles, então não entram em filtro nem em
+      // seletor de operação.
       let q = supabase
         .from("support_departments")
         .select("*")
         .eq("is_active", true)
+        .neq("ura_action", "auto_reply")
         .order("name");
       if (tid) q = q.eq("tenant_id", tid);
       const { data, error } = await q;

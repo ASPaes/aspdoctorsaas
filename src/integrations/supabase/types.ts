@@ -7876,6 +7876,10 @@ export type Database = {
           sort_order: number
           tenant_id: string
           updated_at: string
+          ura_action: string
+          ura_auto_close_message: string | null
+          ura_auto_close_minutes: number | null
+          ura_auto_reply_message: string | null
           ura_label: string | null
           ura_option_number: number | null
           usa_tickets: boolean
@@ -7905,6 +7909,10 @@ export type Database = {
           sort_order?: number
           tenant_id: string
           updated_at?: string
+          ura_action?: string
+          ura_auto_close_message?: string | null
+          ura_auto_close_minutes?: number | null
+          ura_auto_reply_message?: string | null
           ura_label?: string | null
           ura_option_number?: number | null
           usa_tickets?: boolean
@@ -7934,6 +7942,10 @@ export type Database = {
           sort_order?: number
           tenant_id?: string
           updated_at?: string
+          ura_action?: string
+          ura_auto_close_message?: string | null
+          ura_auto_close_minutes?: number | null
+          ura_auto_reply_message?: string | null
           ura_label?: string | null
           ura_option_number?: number | null
           usa_tickets?: boolean
