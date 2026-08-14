@@ -193,6 +193,8 @@ type FilaItem = {
   cnpj?: string | null;
   // A RPC já devolvia este campo e a tela ignorava.
   contrato_removido?: boolean | null;
+  // Um envio POSTERIOR do mesmo contrato já chegou ao Omie: esta linha é rastro, não pendência.
+  superada?: boolean | null;
   origem?: string | null;
   status?: string | null;
   tentativas?: number | null;
@@ -350,6 +352,23 @@ function diagnosticar(item: FilaItem): Diagnostico {
         "O contrato entrou na fila e depois foi excluído. Nada foi escrito no OMIE — não há o que corrigir.",
       passos: ["Descarte a linha. É só limpeza de fila."],
       descartavel: true,
+    };
+  }
+
+  /**
+   * Vem ANTES de qualquer diagnóstico por causa, e é de propósito: o que a linha diz que faltou
+   * (modelo de contrato, de/para, o que for) já foi corrigido — o envio seguinte passou. Continuar
+   * mostrando a causa antiga faz o operador ir corrigir o que já está certo, e oferecer
+   * "Reprocessar" mandaria de novo ao Omie o que já está lá.
+   */
+  if (item.superada) {
+    return {
+      titulo: "Já resolvido por um envio posterior",
+      aconteceu:
+        "Esta tentativa falhou, mas depois dela o contrato foi enviado de novo e chegou ao OMIE. É só o rastro da tentativa antiga — não há o que corrigir.",
+      passos: ["Descarte a linha. É só limpeza de fila."],
+      descartavel: true,
+      podeReprocessar: false,
     };
   }
 
@@ -683,7 +702,15 @@ export default function OmieFilaSincronizacaoPanel({
                               {formatCNPJ(item.cnpj)}
                             </span>
                           )}
-                          <StatusBadge status={item.status} />
+                          {/* Linha superada continuava com o selo vermelho "Bloqueado": lida como
+                              problema em aberto quando o contrato ja esta certo no Omie. */}
+                          {item.superada ? (
+                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium bg-muted text-muted-foreground border-border">
+                              Resolvido depois
+                            </span>
+                          ) : (
+                            <StatusBadge status={item.status} />
+                          )}
                           <Badge variant="outline" className="text-[10px]">
                             {labelOrigem(item.origem)}
                           </Badge>
@@ -721,7 +748,9 @@ export default function OmieFilaSincronizacaoPanel({
                           {!terminal && item.proxima_tentativa_em && (
                             <> · Próxima tentativa {relativeTime(item.proxima_tentativa_em)}</>
                           )}
-                          {terminal && <> · Não será reenviado sozinho</>}
+                          {terminal && (
+                            <>{item.superada ? <> · Nada pendente</> : <> · Não será reenviado sozinho</>}</>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 flex-wrap">
