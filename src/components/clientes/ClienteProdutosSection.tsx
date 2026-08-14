@@ -43,7 +43,7 @@ import { Switch } from "@/components/ui/switch";
 
 import SugestaoMRRDialog from "./SugestaoMRRDialog";
 import ReajusteModulosDialog from "./ReajusteModulosDialog";
-import EnviarContratoOmieButton from "./EnviarContratoOmieButton";
+import EnviarOmieComPreviaButton from "./EnviarOmieComPreviaButton";
 import ContratoAnexoSection, {
   type ContratoAnexo,
   ANEXO_ACCEPT,
@@ -1144,7 +1144,10 @@ function ProdutoDialog({
 
       // Fluxo de lançamento novo com Omie ativo: oferece o envio ao Omie no fim do fluxo,
       // no momento em que a pessoa sabe que terminou o lançamento. Reaproveita o
-      // EnviarContratoOmieButton (dry_run → confirmação → criar).
+      // EnviarOmieComPreviaButton (dry_run → confirmação → criar), o MESMO botão do card do
+      // cliente. Antes usava o EnviarContratoOmieButton, que empurra para a fila sem resumo
+      // nenhum e só mostra o motivo da recusa no tooltip — o texto ao lado prometia
+      // pré-visualização e não havia nenhuma.
       if (!isEdit && !produtoTrocou && omieAtivo && resolvedTenantId) {
         const { data: ctr } = await (supabase.from("contratos" as any) as any)
           .select("id, numero, created_at")
@@ -1190,6 +1193,14 @@ function ProdutoDialog({
     onClose();
   };
 
+  // Mesmo portão que o EnviarContratoOmieButton aplica na lista de contratos: só existe envio
+  // manual para contrato criado a partir da data de corte DA CONTA que atende este cliente.
+  const dataCorteOmie = contaOmieQ.data?.integrar_a_partir_de ?? null;
+  const podeEnviarAoOmie =
+    !!dataCorteOmie &&
+    !!postSaveContrato?.created_at &&
+    postSaveContrato.created_at.slice(0, 10) >= dataCorteOmie.slice(0, 10);
+
   return (
     <Dialog open={open} onOpenChange={(o) => {
       if (o) return;
@@ -1215,21 +1226,35 @@ function ProdutoDialog({
                 Contrato Nº <span className="font-medium text-foreground">{postSaveContrato.numero ?? "—"}</span>. A criação no Omie é manual: envie agora se o lançamento estiver completo, ou depois pelo painel de conferência.
               </div>
             </div>
-            <div className="rounded-md border p-4 space-y-3">
-              <div className="text-sm">
-                Ao clicar em <span className="font-medium">Enviar ao Omie</span>, mostramos primeiro um resumo do que será criado (pré-visualização). Nada é enviado sem sua confirmação.
+            {podeEnviarAoOmie && resolvedTenantId ? (
+              <div className="rounded-md border p-4 space-y-3">
+                <div className="text-sm">
+                  Ao clicar em <span className="font-medium">Enviar ao Omie</span>, mostramos primeiro um resumo do que será criado (pré-visualização). Nada é enviado sem sua confirmação.
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <EnviarOmieComPreviaButton
+                    tenantId={resolvedTenantId}
+                    clienteId={clienteId}
+                    contrato={{
+                      id: postSaveContrato.id,
+                      numero: postSaveContrato.numero,
+                      // Contrato recém-criado: o de/para ainda não existe. Se existir mesmo assim
+                      // (reenvio), quem detecta é o dry_run, que avisa "JÁ existe e será ATUALIZADO".
+                      sincronizado: false,
+                      codigo_contrato_omie: null,
+                    }}
+                  />
+                  <Button type="button" variant="ghost" onClick={handleClosePostSave}>
+                    Enviar depois
+                  </Button>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <EnviarContratoOmieButton
-                  tenantId={resolvedTenantId}
-                  contratoId={postSaveContrato.id}
-                  createdAt={postSaveContrato.created_at}
-                />
-                <Button type="button" variant="ghost" onClick={handleClosePostSave}>
-                  Enviar depois
-                </Button>
+            ) : (
+              <div className="rounded-md border p-4 text-sm text-muted-foreground">
+                Este contrato está fora da data de corte da integração Omie desta unidade, então não
+                há envio manual por aqui. Ele aparece no painel de conferência.
               </div>
-            </div>
+            )}
             <DialogFooter>
               <Button type="button" onClick={handleClosePostSave}>Concluir</Button>
             </DialogFooter>
