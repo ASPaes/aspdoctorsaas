@@ -390,6 +390,45 @@ export async function resolveDepartmentForInstance(supabase: any, instanceId: st
   } catch { return null; }
 }
 
+/**
+ * A URA vai perguntar o setor? Entao quem decide e o cliente, nao a instancia.
+ *
+ * Carimbar o setor da instancia no primeiro "oi" fazia duas coisas erradas:
+ *   1. a conversa nascia etiquetada ("Suporte Tecnico") antes de qualquer escolha,
+ *      e ate 14/08/2026 isso ainda liberava a distribuicao 1s antes de o menu sair
+ *      (corrigido no banco em fn_assign_conversation_if_ready);
+ *   2. o bloco de horario em processMessageUpsert passa a usar o expediente DESSE
+ *      setor em vez de checar se ALGUM setor esta aberto — cliente das 08:00 caia
+ *      em "fora do horario" porque o Suporte abre 08:30, sem nunca ver o menu.
+ *
+ * E a mesma regra que as 3 triggers de setor do banco ja aplicam
+ * (sync_conversation_department, fn_auto_assign_dept_by_instance,
+ * fn_reroute_dept_by_instance_on_customer_att): com URA ligada, ninguem carimba.
+ * So este ponto do codigo nao aplicava.
+ *
+ * Fora do horario a URA nao pergunta nada — la o carimbo continua, feito em
+ * ensureWaitingAttendanceForOutOfHours.
+ *
+ * Na duvida (erro de leitura), retorna false: mantem o comportamento antigo em vez
+ * de deixar a conversa sem setor.
+ */
+export async function uraDecidesDepartment(supabase: any, tenantId: string, instanceId: string, isGroup: boolean): Promise<boolean> {
+  if (isGroup) return false; // grupo nunca passa por URA
+  try {
+    const { data: cfg } = await supabase.from('configuracoes')
+      .select('support_ura_enabled, ura_enabled').eq('tenant_id', tenantId).maybeSingle();
+    const uraEnabled = cfg?.support_ura_enabled ?? cfg?.ura_enabled ?? false;
+    if (uraEnabled !== true) return false;
+
+    const { data: inst } = await supabase.from('whatsapp_instances')
+      .select('skip_ura').eq('id', instanceId).maybeSingle();
+    return inst?.skip_ura !== true;
+  } catch (err) {
+    console.error('[processor] uraDecidesDepartment error (mantendo carimbo):', err);
+    return false;
+  }
+}
+
 export async function findOrCreateContact(
   supabase: any, instanceId: string, phoneNumber: string, name: string,
   isGroup: boolean, isFromMe: boolean, tenantId: string,
@@ -479,14 +518,17 @@ export async function findOrCreateConversation(
 
     const { data: existing } = await supabase.from('whatsapp_conversations').select('id, department_id, status').eq('tenant_id', tenantId).eq('instance_id', instanceId).eq('contact_id', contactId).maybeSingle();
     if (existing) {
-      if (!existing.department_id) {
+      // Setor so e carimbado aqui quando a URA NAO vai perguntar — ver uraDecidesDepartment.
+      if (!existing.department_id && !(await uraDecidesDepartment(supabase, tenantId, instanceId, isGroup))) {
         const deptId = await resolveDepartmentForInstance(supabase, instanceId, tenantId);
         if (deptId) await supabase.from('whatsapp_conversations').update({ department_id: deptId }).eq('id', existing.id);
       }
       return existing.id;
     }
 
-    const departmentId = await resolveDepartmentForInstance(supabase, instanceId, tenantId);
+    const departmentId = (await uraDecidesDepartment(supabase, tenantId, instanceId, isGroup))
+      ? null
+      : await resolveDepartmentForInstance(supabase, instanceId, tenantId);
     const { data: newConv, error } = await supabase.from('whatsapp_conversations').insert({ instance_id: instanceId, contact_id: contactId, status: isFromMe ? 'closed' : 'active', tenant_id: tenantId, is_group: isGroup, group_jid: groupJid, ...(departmentId ? { department_id: departmentId } : {}) }).select('id').single();
     if (error) {
       // 23505 = corrida entre requests ou conversa existente sob outro contato.
@@ -931,6 +973,26 @@ async function ensureWaitingAttendanceForOutOfHours(
       .limit(1)
       .maybeSingle();
     if (existing) return; // já tem attendance ativa
+
+    // Fora do horário a URA não chega a perguntar nada, então o setor precisa vir
+    // da instância — é ele que faz o chat ser distribuído quando o expediente abrir
+    // (fn_retry_waiting_conversations exige setor na conversa; sem ele o chat fica
+    // parado sem dono). Durante o expediente quem carimba é a escolha do cliente,
+    // e findOrCreateConversation não mexe mais nisso — ver uraDecidesDepartment.
+    const { data: convDept } = await supabase.from('whatsapp_conversations')
+      .select('department_id, instance_id, current_instance_id, is_group')
+      .eq('id', conversationId).maybeSingle();
+    if (convDept && !convDept.department_id && convDept.is_group !== true) {
+      const instId = convDept.current_instance_id || convDept.instance_id;
+      if (instId) {
+        const deptId = await resolveDepartmentForInstance(supabase, instId, tenantId);
+        if (deptId) {
+          await supabase.from('whatsapp_conversations')
+            .update({ department_id: deptId, updated_at: new Date().toISOString() })
+            .eq('id', conversationId);
+        }
+      }
+    }
 
     const nowIso = new Date().toISOString();
 
