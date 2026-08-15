@@ -23,6 +23,7 @@ interface MediaContentProps {
   mediaKind?: string | null;
   mediaMimetype?: string | null;
   mediaPath?: string | null;
+  mediaPurgedAt?: string | null;
 }
 
 /**
@@ -78,6 +79,7 @@ export function MediaContent({
   mediaKind,
   mediaMimetype,
   mediaPath,
+  mediaPurgedAt,
 }: MediaContentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -173,6 +175,7 @@ export function MediaContent({
           mediaMimetype={mediaMimetype}
           mediaUrl={mediaUrl}
           mediaPath={mediaPath}
+          mediaPurgedAt={mediaPurgedAt}
         />
       </div>
     );

@@ -20,6 +20,7 @@ export interface Message {
   media_ext: string | null;
   media_size_bytes: number | null;
   media_kind: string | null;
+  media_purged_at: string | null;
   status: string;
   is_from_me: boolean;
   isFromMe?: boolean;
@@ -93,7 +94,7 @@ export const normalizeMessage = (message: Partial<Message> & Record<string, any>
 const MESSAGE_SELECT = [
   'id', 'conversation_id', 'message_id', 'remote_jid', 'content', 'message_type',
   'media_url', 'media_mimetype', 'media_path', 'media_filename', 'media_ext',
-  'media_size_bytes', 'media_kind', 'status', 'is_from_me', 'timestamp', 'edited_at',
+  'media_size_bytes', 'media_kind', 'media_purged_at', 'status', 'is_from_me', 'timestamp', 'edited_at',
   'quoted_message_id', 'mentions', 'mentions_everyone', 'metadata', 'audio_transcription', 'transcription_status',
   'sent_by_user_id', 'instance_id', 'sender_name', 'sender_role',
   'delete_status', 'delete_scope', 'delete_error',

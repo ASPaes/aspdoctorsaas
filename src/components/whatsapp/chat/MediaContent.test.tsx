@@ -71,7 +71,7 @@ afterEach(() => {
   queryClient.clear();
 });
 
-function renderWith(mediaUrl: string | null) {
+function renderWith(mediaUrl: string | null, mediaPurgedAt?: string | null) {
   act(() => {
     root.render(
       <QueryClientProvider client={queryClient}>
@@ -81,6 +81,7 @@ function renderWith(mediaUrl: string | null) {
           mediaUrl={mediaUrl as unknown as string}
           mediaPath={mediaUrl}
           mediaMimetype="image/jpeg"
+          mediaPurgedAt={mediaPurgedAt}
         />
       </QueryClientProvider>
     );
@@ -120,5 +121,50 @@ describe("MediaContent — mídia que chega depois da mensagem", () => {
     await flush();
 
     expect(container.querySelector("img")).not.toBeNull();
+  });
+});
+
+describe("MediaContent — arquivo purgado pela retenção do setor", () => {
+  it("diz que foi removido pela retenção, e não 'abra pelo WhatsApp'", async () => {
+    // A purga zera media_path E media_url, exatamente como a mídia que o webhook
+    // nunca conseguiu baixar. O que separa os dois casos é media_purged_at.
+    renderWith(null, "2026-08-14T12:00:00Z");
+    fireIntersection();
+    await flush();
+
+    expect(container.textContent).toContain("removido do servidor pela política de retenção");
+    expect(container.textContent).toContain("14/08/2026");
+    // O aviso do arquivo grande é o ramo errado: manda o atendente procurar no
+    // WhatsApp um arquivo que também já não está lá.
+    expect(container.textContent).not.toContain("Abra pelo WhatsApp");
+    expect(container.textContent).not.toContain("Não foi possível baixar este arquivo");
+    // Sem arquivo no Storage, botão de abrir/baixar só entrega 404.
+    expect(container.querySelectorAll("button").length).toBe(0);
+  });
+
+  it("mantém nome e tamanho para o atendente saber o que pedir de novo", async () => {
+    act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <MediaContent
+            messageId="msg-2"
+            messageType="document"
+            mediaUrl={null as unknown as string}
+            mediaPath={null}
+            mediaFilename="contrato-assinado.pdf"
+            mediaExt="pdf"
+            mediaSizeBytes={2 * 1024 * 1024}
+            mediaKind="document"
+            mediaMimetype="application/pdf"
+            mediaPurgedAt="2026-08-14T12:00:00Z"
+          />
+        </QueryClientProvider>
+      );
+    });
+    await flush();
+
+    expect(container.textContent).toContain("contrato-assinado.pdf");
+    expect(container.textContent).toContain("2.0 MB");
+    expect(container.textContent).toContain("removido do servidor pela política de retenção");
   });
 });

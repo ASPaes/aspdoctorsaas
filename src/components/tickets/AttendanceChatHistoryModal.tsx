@@ -84,7 +84,7 @@ export function AttendanceChatHistoryModal({
     queryFn: async () => {
       let q = (supabase.from("whatsapp_messages" as any) as any)
         .select(
-          "id, content, audio_transcription, is_from_me, sender_name, sender_role, message_type, media_kind, media_url, media_path, media_filename, media_ext, media_size_bytes, media_mimetype, timestamp, deleted_at"
+          "id, content, audio_transcription, is_from_me, sender_name, sender_role, message_type, media_kind, media_url, media_path, media_purged_at, media_filename, media_ext, media_size_bytes, media_mimetype, timestamp, deleted_at"
         )
         .eq("conversation_id", conversationId)
         .is("deleted_at", null)
@@ -290,6 +290,7 @@ export function AttendanceChatHistoryModal({
                           mediaSizeBytes={msg.media_size_bytes}
                           mediaKind={msg.media_kind}
                           mediaMimetype={msg.media_mimetype}
+                          mediaPurgedAt={msg.media_purged_at}
                         />
                       </div>
                     )}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Image, Music, Video, File, ExternalLink, Download, Loader2, Smartphone, Eye } from 'lucide-react';
+import { FileText, Image, Music, Video, File, ExternalLink, Download, Loader2, Smartphone, Eye, Archive } from 'lucide-react';
 import { formatBytes } from '@/utils/whatsapp/formatBytes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ interface AttachmentCardProps {
   mediaMimetype?: string | null;
   mediaUrl?: string | null;
   mediaPath?: string | null;
+  mediaPurgedAt?: string | null;
 }
 
 const KIND_ICONS: Record<string, typeof FileText> = {
@@ -48,10 +49,16 @@ export function AttachmentCard({
   mediaMimetype,
   mediaUrl,
   mediaPath,
+  mediaPurgedAt,
 }: AttachmentCardProps) {
   // Lazy fetch metadata if missing
   const isTemp = messageId?.startsWith('temp-');
   const hasMediaUrl = !!mediaUrl || !!mediaPath;
+  // Purgado pela retenção do setor: a fn_chat_media_purge_confirmar zera
+  // media_path/media_url, então SEM esta checagem o card cairia no aviso de
+  // "arquivo grande — abra pelo WhatsApp", que é falso duas vezes: o arquivo não
+  // era grande e no WhatsApp ele também já não está.
+  const isPurged = !!mediaPurgedAt;
   const needsMeta = !isTemp && hasMediaUrl && (!mediaFilename || mediaSizeBytes == null);
   const { data: meta } = useMediaMeta(needsMeta ? messageId : null);
 
@@ -131,7 +138,8 @@ export function AttachmentCard({
 
   // Sem media_url/media_path a mídia nunca foi baixada — vale para QUALQUER tipo,
   // não só document. Vídeo acima de 12 MB cai exatamente aqui.
-  const showLargeFileWarning = !hasMediaUrl;
+  // `!isPurged`: os dois estados chegam com media_path nulo e a causa é oposta.
+  const showLargeFileWarning = !hasMediaUrl && !isPurged;
 
   const info = (
     <>
@@ -182,8 +190,11 @@ export function AttachmentCard({
           <div className="flex flex-1 items-center gap-3 min-w-0">{info}</div>
         )}
         {/* Sem arquivo no Storage não há o que abrir nem baixar — o bloco de
-            botões nem existe, em vez de virar um container vazio. */}
-        {!showLargeFileWarning && (
+            botões nem existe, em vez de virar um container vazio.
+            `!isPurged` é obrigatório aqui: purgado NÃO liga showLargeFileWarning,
+            então sem esta condição os botões voltariam a aparecer e o clique
+            bateria num 404 do proxy. */}
+        {!showLargeFileWarning && !isPurged && (
           <div className="flex flex-col gap-1 flex-shrink-0">
             {canPreviewPdf ? (
               // "Abrir em nova guia" migra para dentro do preview: três botões
@@ -209,6 +220,20 @@ export function AttachmentCard({
           Tamanho conhecido = o webhook recusou por passar do teto de 12 MB.
           Tamanho desconhecido = a tentativa de download falhou; dizer "arquivo
           grande" nesse caso seria chute. */}
+      {/* Nome, extensão e tamanho continuam no card acima de propósito: o
+          atendente precisa saber O QUE havia ali para pedir de novo ao cliente.
+          Tom neutro, não âmbar — não é falha, é a política de retenção do setor
+          funcionando. */}
+      {isPurged && (
+        <div className="mt-2 flex items-start gap-2 rounded-md border border-border/60 bg-muted/60 px-2.5 py-2">
+          <Archive className="h-3.5 w-3.5 mt-px shrink-0 text-muted-foreground" />
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Arquivo removido do servidor pela política de retenção
+            {mediaPurgedAt ? ` em ${new Date(mediaPurgedAt).toLocaleDateString('pt-BR')}` : ''}.
+          </p>
+        </div>
+      )}
+
       {showLargeFileWarning && (
         <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-2">
           <Smartphone className="h-3.5 w-3.5 mt-px shrink-0 text-amber-600 dark:text-amber-400" />
