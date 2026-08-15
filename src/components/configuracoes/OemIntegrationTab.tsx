@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle,
+  Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
 } from "lucide-react";
 
 // ============================================================================
@@ -47,6 +47,19 @@ type Recon = {
   margem: number | null;
 };
 
+type Conta = {
+  id: string;
+  unidades_base_ids: number[] | null;
+  chave_prefixo: string | null;
+  api_url: string;
+  ativo: boolean;
+  ultimo_status: string;
+  ultimo_sync_em: string | null;
+  ultimo_sync_status: string | null;
+  ultimo_sync_msg: string | null;
+  criado_em: string;
+};
+
 const brl = (v: number | null | undefined) =>
   (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -73,10 +86,46 @@ export default function OemIntegrationTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [sincronizando, setSincronizando] = useState(false);
   const [busca, setBusca] = useState("");
+  const [contaSel, setContaSel] = useState<string | null>(null);
+  const [novaUnidade, setNovaUnidade] = useState<string>("");
+  const [novaChave, setNovaChave] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  // Uma conta POR UNIDADE BASE, igual ao Omie. A view não tem a coluna da
+  // chave nem o ponteiro do Vault — nada disso chega ao navegador.
+  const { data: contas = [] } = useQuery({
+    queryKey: ["oem-contas", tid],
+    queryFn: async () => {
+      const { data } = await (supabase.from("oem_integration_status" as any) as any)
+        .select("id, unidades_base_ids, chave_prefixo, api_url, ativo, ultimo_status, ultimo_sync_em, ultimo_sync_status, ultimo_sync_msg, criado_em")
+        .eq("tenant_id", tid)
+        .order("criado_em");
+      return (data ?? []) as Conta[];
+    },
+    enabled: !!tid,
+  });
+
+  const { data: unidades = [] } = useQuery({
+    queryKey: ["oem-unidades", tid],
+    queryFn: async () => {
+      const { data } = await (supabase.from("unidades_base" as any) as any)
+        .select("id, nome").eq("tenant_id", tid).order("nome");
+      return (data ?? []) as { id: number; nome: string }[];
+    },
+    enabled: !!tid,
+  });
+
+  const conta = useMemo(
+    () => contas.find((c) => c.id === contaSel) ?? contas[0] ?? null,
+    [contas, contaSel],
+  );
+  const rotulo = (c: Conta) =>
+    (c.unidades_base_ids ?? []).map((u) => unidades.find((x) => x.id === u)?.nome ?? `Unidade ${u}`)
+      .join(", ") || "Todas as unidades";
 
   // São ~3.000 linhas: acima do teto de 1000 do PostgREST, então fetchAllRows.
   const { data: linhas = [], isLoading } = useQuery({
-    queryKey: ["oem-recon", tid],
+    queryKey: ["oem-recon", conta?.id],
     queryFn: () =>
       fetchAllRows<Recon>(() =>
         (supabase.from("reconciliacao_oem" as any) as any)
@@ -85,10 +134,31 @@ export default function OemIntegrationTab() {
             "bloqueado_oem, ds_customer_id, razao_ds, mensalidade_ds, cancelado_ds, " +
             "qtd_candidatos_ds, estado_match, acao_sugerida, status_usuario, margem",
           )
-          .eq("tenant_id", tid),
+          .eq("conta_integration_id", conta!.id),
       ),
-    enabled: !!tid,
+    enabled: !!conta?.id,
   });
+
+  async function salvarChave() {
+    if (!tid || !novaUnidade || !novaChave.trim()) return;
+    setSalvando(true);
+    try {
+      const { error } = await (supabase as any).rpc("salvar_chave_oem", {
+        p_tenant_id: tid,
+        p_unidades: [Number(novaUnidade)],
+        p_chave: novaChave.trim(),
+      });
+      if (error) throw error;
+      toast({ title: "Conta conectada", description: "Agora atualize o espelho para trazer as filiais." });
+      setNovaChave("");
+      setNovaUnidade("");
+      queryClient.invalidateQueries({ queryKey: ["oem-contas", tid] });
+    } catch (e: any) {
+      toast({ title: "Falha ao salvar", description: e?.message ?? "Erro", variant: "destructive" });
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   const { data: ultimaCarga } = useQuery({
     queryKey: ["oem-espelho-ultima", tid],
@@ -127,7 +197,7 @@ export default function OemIntegrationTab() {
   async function sincronizar() {
     setSincronizando(true);
     try {
-      const { data, error } = await supabase.functions.invoke("oem-espelho-sync", { body: {} });
+      const { data, error } = await supabase.functions.invoke("oem-espelho-sync", { body: conta ? { contaId: conta.id } : {} });
       if (error) throw error;
       const res = (data as any)?.resultados?.[0];
       toast({
@@ -136,8 +206,9 @@ export default function OemIntegrationTab() {
           ? `${res.filiais} filiais · ${res.linhasRecon} vínculos · ${res.decisoesPreservadas} decisões preservadas`
           : "Concluído.",
       });
-      queryClient.invalidateQueries({ queryKey: ["oem-recon", tid] });
+      queryClient.invalidateQueries({ queryKey: ["oem-recon", conta?.id] });
       queryClient.invalidateQueries({ queryKey: ["oem-espelho-ultima", tid] });
+      queryClient.invalidateQueries({ queryKey: ["oem-conexao", tid] });
     } catch (e: any) {
       toast({
         title: "Falha ao sincronizar",
@@ -181,15 +252,31 @@ export default function OemIntegrationTab() {
               )}
             </CardDescription>
           </div>
-          <Button onClick={sincronizar} disabled={sincronizando} className="gap-2 shrink-0">
-            {sincronizando ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            {sincronizando ? "Atualizando…" : "Atualizar espelho"}
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Seletor de conta, igual ao do Omie. Com uma conta só ele some —
+                a tela se comporta como se o multi-conta não existisse. */}
+            {contas.length > 1 && (
+              <select
+                className="h-9 rounded-md border bg-background px-3 text-sm"
+                value={conta?.id ?? ""}
+                onChange={(e) => setContaSel(e.target.value)}
+              >
+                {contas.map((c) => (
+                  <option key={c.id} value={c.id}>{rotulo(c)}</option>
+                ))}
+              </select>
+            )}
+            <Button onClick={sincronizar} disabled={sincronizando || !conta} className="gap-2">
+              {sincronizando ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {sincronizando ? "Atualizando…" : "Atualizar espelho"}
+            </Button>
+          </div>
         </CardHeader>
       </Card>
 
       <Tabs defaultValue="visao" className="w-full">
         <TabsList>
+          <TabsTrigger value="conexao">Conexão</TabsTrigger>
           <TabsTrigger value="visao">Visão geral</TabsTrigger>
           <TabsTrigger value="escolher" className="gap-1.5">
             Escolher candidato
@@ -201,6 +288,87 @@ export default function OemIntegrationTab() {
           </TabsTrigger>
           <TabsTrigger value="pendencias">Pendências</TabsTrigger>
         </TabsList>
+
+        {/* ------------------------------------------------------------ conexão */}
+        <TabsContent value="conexao" className="space-y-4 max-w-3xl">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <KeyRound className="h-4 w-4" /> Contas conectadas
+              </CardTitle>
+              <CardDescription>
+                Uma conta por unidade base, como no Omie. A chave é gerada no{' '}
+                <strong>Nexus Hub</strong> e colada aqui — é ela que diz de qual empresa do
+                DoctorOEM vêm as filiais.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {contas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma conta conectada ainda.</p>
+              ) : (
+                <div className="rounded-md border divide-y">
+                  {contas.map((c) => (
+                    <div key={c.id} className="flex items-center gap-3 p-3 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium">{rotulo(c)}</p>
+                        <p className="font-mono text-xs text-muted-foreground">{c.chave_prefixo}…</p>
+                      </div>
+                      {c.ultimo_sync_em ? (
+                        <div className="text-right">
+                          <Badge variant={c.ultimo_sync_status === 'sucesso' ? 'secondary' : 'destructive'}>
+                            {c.ultimo_sync_status}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground mt-1">{c.ultimo_sync_msg}</p>
+                        </div>
+                      ) : (
+                        <Badge variant="outline">nunca sincronizou</Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Conectar uma unidade</CardTitle>
+              <CardDescription>
+                No Nexus Hub, crie a empresa, preencha as credenciais da API do OEM e gere uma
+                chave de integração. Cole aqui escolhendo a unidade que ela atende.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
+                <select
+                  className="h-10 rounded-md border bg-background px-3 text-sm"
+                  value={novaUnidade}
+                  onChange={(e) => setNovaUnidade(e.target.value)}
+                >
+                  <option value="">Escolha a unidade…</option>
+                  {unidades.map((u) => (
+                    <option key={u.id} value={u.id}>{u.nome}</option>
+                  ))}
+                </select>
+                <Input
+                  placeholder="oem_live_…"
+                  value={novaChave}
+                  onChange={(e) => setNovaChave(e.target.value)}
+                  type="password"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <Button onClick={salvarChave} disabled={salvando || !novaUnidade || !novaChave.trim()}>
+                  {salvando ? 'Salvando…' : 'Conectar'}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  A chave vai para o cofre do banco. Nem esta tela consegue lê-la de volta —
+                  para trocar, gere outra no Nexus Hub e cole aqui.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* ------------------------------------------------------- visão geral */}
         <TabsContent value="visao" className="space-y-4">
