@@ -198,3 +198,11 @@ verify_jwt = true
 # Chamada por agendamento/painel com a service_role. Nunca pelo navegador.
 [functions.oem-espelho-sync]
 verify_jwt = true
+
+# Apaga do Storage a mídia de chat vencida (documento/vídeo/imagem; áudio nunca).
+# Chamada pelo pg_cron, que manda a anon key no Authorization — a mesma receita
+# do check-csat-timeout. `true` de propósito: sem JWT válido do projeto ninguém
+# dispara uma purga de fora. Quem tem JWT só conseguiria antecipar o que já ia
+# ser apagado à noite — o prazo e o filtro moram na fn_chat_media_purge_lote.
+[functions.purge-chat-media]
+verify_jwt = true
