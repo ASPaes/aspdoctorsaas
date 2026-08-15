@@ -240,6 +240,27 @@ Deno.serve(async (req) => {
     const encodedName = encodeURIComponent(filename);
     const disposition = `${mode === 'attachment' ? 'attachment' : 'inline'}; filename="${asciiName}"; filename*=UTF-8''${encodedName}`;
 
+    // Registro de download — só no mode=attachment.
+    //
+    // É o único modo em que o arquivo vai para a máquina do usuário: o botão
+    // "Baixar" do AttachmentCard responde com Content-Disposition: attachment.
+    // `inline` abre para ver e `url` devolve link assinado para o player — tratar
+    // esses como download inflaria o registro com quem só passou o olho.
+    //
+    // Tenant da MENSAGEM, não do usuário: super admin baixa arquivo de outro
+    // tenant, e o registro tem que ficar no tenant do arquivo.
+    //
+    // Fire-and-forget: falhar o registro nunca pode derrubar o download.
+    if (mode === 'attachment') {
+      supabase.from('whatsapp_media_downloads').insert({
+        tenant_id: msg.tenant_id,
+        message_id: msg.id,
+        user_id: userId,
+      }).then(({ error }) => {
+        if (error) console.error('[whatsapp-media-proxy] Falha ao registrar download:', error);
+      });
+    }
+
     // Lazy backfill size + path if needed
     if (!msg.media_size_bytes || !msg.media_path) {
       supabase.from('whatsapp_messages').update({
