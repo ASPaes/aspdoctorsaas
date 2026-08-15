@@ -1,6 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // ds-omie-cliente-upsert
 //
+// v14 (14/08/2026): o 9 do celular. Unica excecao ao "so preenche lacuna" da v11.
+//      Contexto: ate hoje o DS NUNCA mandou telefone -- o montar_payload_contrato_omie nao
+//      montava telefone1_ddd/telefone1_numero, entao os campos que estao em CAMPOS desde a v9
+//      chegavam sempre vazios. Corrigido no lado do DS na mesma data; a partir daqui o telefone
+//      chega de verdade, e o ramo "assumindo por CNPJ" precisa saber o que fazer com ele.
+//      Regra: se o Omie tem celular de 8 digitos (comecando em 6-9, numeracao pre-2016) e o DS
+//      traz EXATAMENTE 9 + os mesmos 8 digitos no MESMO DDD, manda o do DS. E o mesmo numero na
+//      forma nova, nao uma divergencia de cadastro. Numero diferente no DS nao encosta.
+//      Vale so neste ramo: cliente ja no de/para nunca passa por aqui.
+//
 // v13 (15/07/2026): o LOG passa a dizer a VERDADE sobre o que aconteceu.
 //      Antes, logRow gravava evento:"criar" CRAVADO em toda operacao de cliente. Resultado real:
 //      o Ale alterou um endereco pela tela, a integracao mandou AlterarCliente, o Omie respondeu
@@ -55,6 +65,7 @@ const CAMPOS_ACEITOS = new Set([
   ...CAMPOS
 ]);
 const vazio = (v)=>v === undefined || v === null || String(v).trim() === "";
+const soDig = (v)=>String(v ?? "").replace(/\D/g, "");
 async function omieCall(endpoint, call, param, creds) {
   const res = await fetch(`${OMIE_BASE}${endpoint}`, {
     method: "POST",
@@ -251,6 +262,7 @@ Deno.serve(async (req)=>{
     let param = {};
     let camposEnviados = [];
     let pulouChamada = false;
+    let nonoDigito = false;
     if (alvoOmieId && comoResolveu === "encontrado_por_cnpj") {
       // ASSUMINDO cliente existente: SO PREENCHE LACUNA. Nunca sobrescreve.
       call = "AlterarCliente";
@@ -261,6 +273,23 @@ Deno.serve(async (req)=>{
         if (!vazio(cliente[k]) && vazio(cadastroAtual?.[k])) {
           param[k] = String(cliente[k]);
           camposEnviados.push(k);
+        }
+      }
+      // v14 (14/08/2026): UNICA excecao ao "so preenche lacuna" -- o 9 do celular.
+      // Celular de 8 digitos comecando em 6-9 e numeracao pre-2016: o 9 na frente e o
+      // mapeamento oficial da Anatel, nao chute. Nao e "o DS discorda do Omie", e o MESMO
+      // numero escrito na forma antiga -- por isso vale sobrescrever aqui e so aqui.
+      // Trava dupla, de proposito: so entra se o DS trouxer exatamente 9 + os mesmos 8
+      // digitos, no mesmo DDD. Numero diferente no DS nao encosta no cadastro do Omie.
+      if (!param.telefone1_numero) {
+        const dsNum = soDig(cliente.telefone1_numero);
+        const omieNum = soDig(cadastroAtual?.telefone1_numero);
+        const dsDdd = soDig(cliente.telefone1_ddd);
+        const omieDdd = soDig(cadastroAtual?.telefone1_ddd);
+        if (omieNum.length === 8 && /[6-9]/.test(omieNum[0]) && dsNum === "9" + omieNum && dsDdd && (!omieDdd || omieDdd === dsDdd)) {
+          param.telefone1_numero = dsNum;
+          camposEnviados.push("telefone1_numero");
+          nonoDigito = true;
         }
       }
       if (camposEnviados.length === 0) pulouChamada = true;
@@ -357,7 +386,8 @@ Deno.serve(async (req)=>{
         omie: resp,
         metodo: pulouChamada ? "nenhum" : call,
         como_resolveu: comoResolveu,
-        campos_enviados: camposEnviados
+        campos_enviados: camposEnviados,
+        nono_digito: nonoDigito
       },
       synced_at: nowIso
     };
@@ -377,9 +407,10 @@ Deno.serve(async (req)=>{
         ...resp,
         como_resolveu: comoResolveu,
         campos_enviados: camposEnviados,
-        metodo: pulouChamada ? "nenhum" : call
+        metodo: pulouChamada ? "nenhum" : call,
+        nono_digito: nonoDigito
       },
-      error_message: tudo_ok ? pulouChamada ? "Cliente ja existe no Omie e nao havia campo vazio para preencher; nada foi enviado." : null : `de/para_ok=${depara_ok} espelho_ok=${espelho_ok}`
+      error_message: tudo_ok ? pulouChamada ? "Cliente ja existe no Omie e nao havia campo vazio para preencher; nada foi enviado." : nonoDigito ? "Celular do Omie estava com 8 digitos (sem o 9); corrigido com o numero do DS." : null : `de/para_ok=${depara_ok} espelho_ok=${espelho_ok}`
     }, evento);
     return json({
       ok: true,
@@ -391,6 +422,7 @@ Deno.serve(async (req)=>{
       cliente_assumido: comoResolveu === "encontrado_por_cnpj",
       campos_recebidos: camposAlterados,
       campos_enviados: camposEnviados,
+      nono_digito: nonoDigito,
       nada_a_enviar: pulouChamada,
       depara_gravado: depara_ok,
       espelho_gravado: espelho_ok,
