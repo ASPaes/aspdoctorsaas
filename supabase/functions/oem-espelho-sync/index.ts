@@ -262,8 +262,11 @@ Deno.serve(async (req) => {
           cnpj_norm: k || null, ds_customer_id: c.id,
           razao_ds: c.nome_fantasia ?? c.razao_social,
           mensalidade_ds: c.mensalidade, cancelado_ds: c.cancelado,
+          // Cliente sem filial não tem o que escolher — marcá-lo como
+          // "escolher_candidato" enchia a fila de decisão com centenas de
+          // linhas sem filial e sem candidato nenhum.
           qtd_candidatos_ds: 0, estado_match: "SO_NO_DS",
-          acao_sugerida: c.cancelado ? "fora_do_escopo" : "escolher_candidato",
+          acao_sugerida: c.cancelado ? "fora_do_escopo" : "sem_licenca",
           status_usuario: "novo",
         });
       }

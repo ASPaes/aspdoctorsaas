@@ -12,7 +12,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
+  Undo2, CheckCircle2,
 } from "lucide-react";
+import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
 
 // ============================================================================
 // Integrações › OEM
@@ -45,6 +47,8 @@ type Recon = {
   acao_sugerida: string | null;
   status_usuario: string;
   margem: number | null;
+  observacao: string | null;
+  resolvido_em: string | null;
 };
 
 type Conta = {
@@ -90,6 +94,8 @@ export default function OemIntegrationTab() {
   const [novaUnidade, setNovaUnidade] = useState<string>("");
   const [novaChave, setNovaChave] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [escolhendo, setEscolhendo] = useState<LinhaRecon | null>(null);
+  const [desfazendo, setDesfazendo] = useState<string | null>(null);
 
   // Uma conta POR UNIDADE BASE, igual ao Omie. A view não tem a coluna da
   // chave nem o ponteiro do Vault — nada disso chega ao navegador.
@@ -132,7 +138,8 @@ export default function OemIntegrationTab() {
           .select(
             "id, cnpj_norm, empresa_codigo, filial_codigo, razao_oem, custo_oem, status_oem, " +
             "bloqueado_oem, ds_customer_id, razao_ds, mensalidade_ds, cancelado_ds, " +
-            "qtd_candidatos_ds, estado_match, acao_sugerida, status_usuario, margem",
+            "qtd_candidatos_ds, estado_match, acao_sugerida, status_usuario, margem, " +
+            "observacao, resolvido_em",
           )
           .eq("conta_integration_id", conta!.id),
       ),
@@ -179,18 +186,58 @@ export default function OemIntegrationTab() {
     const comPar = ativas.filter(
       (l) => l.ds_customer_id && l.mensalidade_ds != null && l.custo_oem != null && !l.cancelado_ds,
     );
+
+    // Um cliente pode ter várias licenças: a mensalidade entra uma vez só, o
+    // custo soma todas. É essa conta que dá a margem real do cliente.
+    const porCliente = new Map<string, number>();
+    const custoCliente = new Map<string, number>();
+    for (const l of comPar) {
+      const k = l.ds_customer_id!;
+      porCliente.set(k, Number(l.mensalidade_ds || 0));
+      custoCliente.set(k, (custoCliente.get(k) ?? 0) + Number(l.custo_oem || 0));
+    }
+    const porClienteNeg = [...porCliente.entries()]
+      .map(([id, mensal]) => {
+        const custo = custoCliente.get(id) ?? 0;
+        const ref = comPar.find((l) => l.ds_customer_id === id)!;
+        return {
+          id,
+          razao_ds: ref.razao_ds,
+          razao_oem: ref.razao_oem,
+          filiais: comPar.filter((l) => l.ds_customer_id === id).length,
+          mensalidade_ds: mensal,
+          custo_oem: custo,
+          margem: mensal - custo,
+        };
+      })
+      .filter((x) => x.margem < 0)
+      .sort((a, b) => a.margem - b.margem);
+
     return {
       total: linhas.length,
       filiais: linhas.filter((l) => l.filial_codigo).length,
       ativas: ativas.length,
       vinculadas: ativas.filter((l) => l.acao_sugerida === "vinculo_auto_ok").length,
-      escolher: linhas.filter((l) => l.acao_sugerida === "escolher_candidato" && l.status_usuario === "novo"),
-      semCliente: ativas.filter((l) => l.estado_match === "SO_NO_OEM"),
+      // Só entra na fila quem TEM filial: cliente sem licença não tem o que
+      // escolher, e o `l.filial_codigo` protege as linhas gravadas antes de a
+      // sincronização parar de marcá-las como escolher_candidato.
+      escolher: linhas.filter(
+        (l) => l.filial_codigo && l.acao_sugerida === "escolher_candidato" && l.status_usuario === "novo",
+      ),
+      decididas: linhas
+        .filter((l) => l.resolvido_em && (l.status_usuario === "vinculado" || l.status_usuario === "ignorado"))
+        .sort((a, b) => String(b.resolvido_em).localeCompare(String(a.resolvido_em))),
+      semCliente: ativas.filter((l) => l.estado_match === "SO_NO_OEM" && l.status_usuario === "novo"),
       soNoDs: linhas.filter((l) => l.estado_match === "SO_NO_DS" && !l.cancelado_ds),
       comPar,
-      receita: comPar.reduce((a, l) => a + Number(l.mensalidade_ds || 0), 0),
+      clientesComPar: porCliente.size,
+      // A mensalidade é do CLIENTE e o custo é da FILIAL. Somar mensalidade_ds
+      // linha a linha contava a receita uma vez por filial: um cliente com 3
+      // licenças aparecia valendo o triplo, e a margem saía inflada no mesmo
+      // tanto. A receita é somada uma vez por cliente; o custo, por filial.
+      receita: [...porCliente.values()].reduce((a, m) => a + m, 0),
       custo: comPar.reduce((a, l) => a + Number(l.custo_oem || 0), 0),
-      negativas: comPar.filter((l) => Number(l.margem) < 0).sort((a, b) => Number(a.margem) - Number(b.margem)),
+      negativas: porClienteNeg,
     };
   }, [linhas]);
 
@@ -217,6 +264,24 @@ export default function OemIntegrationTab() {
       });
     } finally {
       setSincronizando(false);
+    }
+  }
+
+  function recarregarRecon() {
+    queryClient.invalidateQueries({ queryKey: ["oem-recon", conta?.id] });
+  }
+
+  async function desvincular(id: string) {
+    setDesfazendo(id);
+    try {
+      const { error } = await (supabase as any).rpc("desvincular_filial_oem", { p_recon_id: id });
+      if (error) throw error;
+      toast({ title: "Decisão desfeita", description: "A linha volta para a fila." });
+      recarregarRecon();
+    } catch (e: any) {
+      toast({ title: "Não deu para desfazer", description: e?.message ?? "Erro", variant: "destructive" });
+    } finally {
+      setDesfazendo(null);
     }
   }
 
@@ -424,21 +489,76 @@ export default function OemIntegrationTab() {
                   </div>
                   <Badge variant="outline">{l.qtd_candidatos_ds} candidatos</Badge>
                   <span className="tabular-nums text-muted-foreground w-24 text-right">{brl(l.custo_oem)}</span>
+                  <Button size="sm" variant="secondary" onClick={() => setEscolhendo(l)}>
+                    Escolher
+                  </Button>
                 </div>
               ))}
             </div>
           )}
-          <p className="text-xs text-muted-foreground">
-            A escolha do cliente ainda não é feita por aqui — é a próxima entrega. Esta lista já
-            mostra exatamente quais filiais precisam de decisão.
-          </p>
+          {filtra(r.escolher).length > 100 && (
+            <p className="text-xs text-muted-foreground">
+              Mostrando as 100 primeiras de {filtra(r.escolher).length}. Refine a busca para ver as demais.
+            </p>
+          )}
+
+          {/* Decidido à mão — sem o caminho de volta, um clique errado vira
+              vínculo permanente: a sincronização preserva a escolha errada
+              exatamente como preservaria a certa. */}
+          {r.decididas.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  {r.decididas.length} decisões tomadas à mão
+                </CardTitle>
+                <CardDescription>
+                  Sobrevivem às próximas sincronizações. Desfazer devolve a filial ao casamento automático.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 max-h-80 overflow-y-auto">
+                <div className="divide-y">
+                  {filtra(r.decididas).map((l) => (
+                    <div key={l.id} className="flex items-center gap-3 px-6 py-2.5 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{l.razao_oem ?? l.razao_ds}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {l.status_usuario === "ignorado"
+                            ? "ignorada"
+                            : `→ ${l.razao_ds ?? "cliente removido"}`}
+                          {l.filial_codigo && ` · filial ${l.filial_codigo}`}
+                          {l.resolvido_em &&
+                            ` · ${new Date(l.resolvido_em).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`}
+                        </p>
+                      </div>
+                      <Badge variant={l.status_usuario === "ignorado" ? "outline" : "secondary"}>
+                        {l.status_usuario}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="gap-1.5"
+                        disabled={desfazendo === l.id}
+                        onClick={() => desvincular(l.id)}
+                      >
+                        {desfazendo === l.id
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <Undo2 className="h-3.5 w-3.5" />}
+                        Desfazer
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* ------------------------------------------------------------ margem */}
         <TabsContent value="margem" className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-3">
-            <Numero valor={brl(r.receita)} rotulo="Receita" sub={`${r.comPar.length} clientes ativos`} />
-            <Numero valor={brl(r.custo)} rotulo="Custo das licenças" />
+            <Numero valor={brl(r.receita)} rotulo="Receita" sub={`${r.clientesComPar} clientes ativos`} />
+            <Numero valor={brl(r.custo)} rotulo="Custo das licenças" sub={`${r.comPar.length} licenças`} />
             <Numero valor={brl(r.receita - r.custo)} rotulo="Margem" tom="bom" />
           </div>
 
@@ -459,9 +579,9 @@ export default function OemIntegrationTab() {
                   {r.negativas.map((l) => (
                     <div key={l.id} className="flex items-center gap-3 px-6 py-2.5 text-sm">
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{l.razao_oem}</p>
+                        <p className="font-medium truncate">{l.razao_ds ?? l.razao_oem}</p>
                         <p className="text-xs text-muted-foreground truncate">
-                          {l.razao_ds} · filial {l.filial_codigo}
+                          {l.filiais === 1 ? "1 licença" : `${l.filiais} licenças`} no OEM
                         </p>
                       </div>
                       <span className="tabular-nums text-muted-foreground w-24 text-right">
@@ -503,6 +623,11 @@ export default function OemIntegrationTab() {
                         <p className="text-xs text-muted-foreground">filial {l.filial_codigo} · CNPJ {l.cnpj_norm}</p>
                       </div>
                       <span className="tabular-nums text-muted-foreground">{brl(l.custo_oem)}</span>
+                      {/* Não casou por CNPJ, mas o cliente pode existir com
+                          outro CNPJ — a busca livre do diálogo resolve. */}
+                      <Button size="sm" variant="ghost" onClick={() => setEscolhendo(l)}>
+                        Vincular
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -536,6 +661,15 @@ export default function OemIntegrationTab() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <EscolherClienteOemDialog
+        linha={escolhendo}
+        tenantId={tid}
+        unidades={conta?.unidades_base_ids ?? []}
+        aberto={!!escolhendo}
+        onOpenChange={(v) => { if (!v) setEscolhendo(null); }}
+        onDecidido={recarregarRecon}
+      />
     </div>
   );
 }
