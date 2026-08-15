@@ -17,7 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ExternalLink, Building2, MessageSquareText, Clock } from "lucide-react";
+import { ExternalLink, Building2, MessageSquareText, Clock, HardDrive } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
@@ -32,6 +33,7 @@ export default function SetoresInstanciasTab() {
   const [warningMinutes, setWarningMinutes] = useState<string>("");
   const [agentAlertMinutes, setAgentAlertMinutes] = useState<string>("");
   const [agentCloseMinutes, setAgentCloseMinutes] = useState<string>("");
+  const [retentionDays, setRetentionDays] = useState<string>("");
   const { instances } = useWhatsAppInstances();
   const { data: supportConfig } = useSupportConfig();
   const globalCloseMin = supportConfig?.support_auto_close_inactivity_minutes;
@@ -47,7 +49,7 @@ export default function SetoresInstanciasTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_departments")
-        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message, auto_close_inactivity_minutes, inactivity_warning_before_minutes, agent_alert_minutes, agent_alert_enabled, agent_no_response_close_minutes, agent_no_response_close_enabled")
+        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message, auto_close_inactivity_minutes, inactivity_warning_before_minutes, agent_alert_minutes, agent_alert_enabled, agent_no_response_close_minutes, agent_no_response_close_enabled, media_retention_enabled, media_retention_days, is_default_fallback")
         .eq("tenant_id", tid!)
         .eq("is_active", true)
         .order("name");
@@ -67,6 +69,7 @@ export default function SetoresInstanciasTab() {
     setWarningMinutes(selectedDept?.inactivity_warning_before_minutes?.toString() ?? "");
     setAgentAlertMinutes(selectedDept?.agent_alert_minutes?.toString() ?? "");
     setAgentCloseMinutes(selectedDept?.agent_no_response_close_minutes?.toString() ?? "");
+    setRetentionDays(selectedDept?.media_retention_days?.toString() ?? "30");
   }, [selectedDept]);
 
   const { data: deptInstances = [] } = useQuery({
@@ -258,6 +261,44 @@ export default function SetoresInstanciasTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
       toast.success("Preferência de encerramento salva");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const saveRetentionEnabled = useMutation({
+    mutationFn: async (value: boolean) => {
+      if (!selectedId) return;
+      const { error } = await supabase
+        .from("support_departments")
+        .update({ media_retention_enabled: value } as any)
+        .eq("id", selectedId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, value) => {
+      queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
+      toast.success(value ? "Limpeza automática ligada" : "Limpeza automática desligada");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const saveRetentionDays = useMutation({
+    mutationFn: async (days: string) => {
+      if (!selectedId) return;
+      const parsed = parseInt(days.trim(), 10);
+      // O CHECK do banco é 1..3650. Barrar aqui evita que o erro do Postgres
+      // chegue cru na tela.
+      if (isNaN(parsed) || parsed < 1 || parsed > 3650) {
+        throw new Error("Informe um número de dias entre 1 e 3650.");
+      }
+      const { error } = await supabase
+        .from("support_departments")
+        .update({ media_retention_days: parsed } as any)
+        .eq("id", selectedId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
+      toast.success("Prazo de retenção salvo");
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -563,6 +604,80 @@ export default function SetoresInstanciasTab() {
                       {saveWelcome.isPending ? "Salvando..." : "Salvar mensagem"}
                     </Button>
                   </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <h4 className="text-sm font-medium">Arquivos do chat</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Libera espaço apagando do servidor os arquivos antigos trocados nas conversas deste setor.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <HardDrive className="h-4 w-4 text-muted-foreground" />
+                        <Label>Apagar arquivos antigos automaticamente</Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Documentos, vídeos e imagens. <strong>Áudios nunca são apagados.</strong> Anexos de chamados e de contratos também não.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={selectedDept?.media_retention_enabled ?? false}
+                      disabled={saveRetentionEnabled.isPending}
+                      onCheckedChange={(v) => saveRetentionEnabled.mutate(v)}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={3650}
+                      step={1}
+                      className="w-32"
+                      disabled={!selectedDept?.media_retention_enabled}
+                      value={retentionDays}
+                      onChange={(e) => setRetentionDays(e.target.value)}
+                    />
+                    <span className="text-xs text-muted-foreground">dias</span>
+                    <Button
+                      size="sm"
+                      disabled={
+                        !selectedDept?.media_retention_enabled ||
+                        saveRetentionDays.isPending ||
+                        retentionDays === (selectedDept?.media_retention_days?.toString() ?? "30")
+                      }
+                      onClick={() => saveRetentionDays.mutate(retentionDays)}
+                    >
+                      {saveRetentionDays.isPending ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+
+                  {/* O aviso fica INLINE e sempre visível quando ligado, não só na
+                      hora de salvar: a exclusão não tem desfazer e a conversa
+                      guarda só o nome do arquivo depois. */}
+                  {selectedDept?.media_retention_enabled ? (
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      A exclusão é definitiva. Passado o prazo, a conversa mostra só o nome do arquivo, sem o conteúdo.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">
+                      Desligado — nenhum arquivo deste setor é apagado.
+                    </p>
+                  )}
+
+                  {/* O setor padrão do tenant é o que responde pelos arquivos que
+                      não dá para atribuir a setor nenhum: conversa de grupo (que
+                      não tem setor por design) e chat que nunca virou atendimento.
+                      Ligar a limpeza nele alcança bem mais do que o próprio setor. */}
+                  {selectedDept?.is_default_fallback && (
+                    <p className="text-xs text-muted-foreground">
+                      Este é o setor padrão do tenant: o prazo dele também vale para conversas de grupo e para chats que nunca tiveram atendimento.
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
