@@ -1395,6 +1395,9 @@ export default function OnboardingPage() {
         open={newOpen}
         onOpenChange={setNewOpen}
         tenantId={effectiveTenantId}
+        /* O quadro aberto é o padrão do "Abrir em" — com "Implantação Gula" na tela, a
+           jornada nasce ali, não no Onboarding. */
+        defaultPipelineId={selectedPipelineId}
         onCreated={() => {
           queryClient.invalidateQueries({ queryKey: ["onboarding-journeys"] });
           queryClient.invalidateQueries({ queryKey: ["onboarding-journey-phases"] });

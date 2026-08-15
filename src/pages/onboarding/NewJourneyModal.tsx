@@ -11,6 +11,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Loader2, ChevronsUpDown, Check } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useOnboardingPhases } from "@/hooks/useOnboardingPhases";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -18,9 +19,17 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   tenantId: string | null;
   onCreated: () => void;
+  /** Pipeline aberto no quadro — vira o padrão do "Abrir em". Null = o quadro ainda não
+   *  resolveu qual pipeline mostrar; aí o primeiro da lista assume. */
+  defaultPipelineId?: string | null;
 }
 
-export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Props) {
+/** Fases em que uma jornada pode NASCER. Acompanhamento tem quadro e fluxo próprios (o
+ *  botão da tela vira "Novo acompanhamento"), e onboarding_journeys.fase_atual é um enum
+ *  de duas fases — a RPC recusa qualquer outra. */
+const FASES_DE_ABERTURA = ["onboarding", "implantacao"];
+
+export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated, defaultPipelineId }: Props) {
   const [clienteId, setClienteId] = useState<string>("");
   const [clienteLabel, setClienteLabel] = useState<string>("");
   const [clienteBusca, setClienteBusca] = useState<string>("");
@@ -39,6 +48,9 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
   const [demandTypeId, setDemandTypeId] = useState<string>("");
   // "auto" = deixa o motor de distribuição escolher (padrão).
   const [implantadorUserId, setImplantadorUserId] = useState<string>("auto");
+  /** Quadro em que a jornada nasce. É ele que carrega a fase — não existe escolher
+   *  "Implantação" e cair no pipeline do Onboarding. */
+  const [pipelineId, setPipelineId] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   const clienteBuscaDebounced = useDebouncedValue(clienteBusca, 300);
@@ -48,9 +60,72 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
       setClienteId(""); setClienteLabel(""); setClienteBusca("");
       setProdutoId(""); setAssunto(""); setDataInicio(""); setGoLive("");
       setGoLiveEdited(false);
-      setDemandTypeId(""); setImplantadorUserId("auto");
+      setDemandTypeId(""); setImplantadorUserId("auto"); setPipelineId("");
     }
   }, [open]);
+
+  const phasesQuery = useOnboardingPhases(tenantId, { enabled: open });
+
+  const pipelinesQuery = useQuery({
+    queryKey: ["onb-pipelines-abertura", tenantId],
+    enabled: open && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_pipelines" as any) as any)
+        .select("id, nome, phase_id, position")
+        .eq("tenant_id", tenantId!)
+        .eq("ativo", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; phase_id: string | null; position: number }>;
+    },
+  });
+
+  /** Pipeline sem etapa ativa não pode receber jornada — a RPC recusa, e o cartão ficaria
+   *  invisível num quadro sem coluna. Some da lista em vez de virar erro no Criar. */
+  const pipelinesComEtapaQuery = useQuery({
+    queryKey: ["onb-pipelines-com-etapa", tenantId],
+    enabled: open && !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_stages" as any) as any)
+        .select("pipeline_id")
+        .eq("tenant_id", tenantId!)
+        .eq("ativo", true);
+      if (error) throw error;
+      return new Set((data ?? []).map((s: any) => s.pipeline_id as string));
+    },
+  });
+
+  const opcoesAbertura = useMemo(() => {
+    const fases = (phasesQuery.data ?? []).filter((f) => FASES_DE_ABERTURA.includes(f.slug ?? ""));
+    const comEtapa = pipelinesComEtapaQuery.data;
+    return (pipelinesQuery.data ?? [])
+      .filter((p) => !comEtapa || comEtapa.has(p.id))
+      .map((p) => {
+        const fase = fases.find((f) => f.id === p.phase_id);
+        return fase
+          ? { ...p, fase_id: fase.id, fase_nome: fase.nome, fase_slug: fase.slug ?? "", fase_position: fase.position }
+          : null;
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.fase_position - b.fase_position || a.position - b.position) as Array<{
+        id: string; nome: string; fase_id: string; fase_nome: string; fase_slug: string;
+        fase_position: number; position: number;
+      }>;
+  }, [phasesQuery.data, pipelinesQuery.data, pipelinesComEtapaQuery.data]);
+
+  /** O quadro aberto vira o padrão — era exatamente o que faltava: com "Implantação Gula"
+   *  selecionado, a jornada nascia no Onboarding assim mesmo. */
+  useEffect(() => {
+    if (!open || opcoesAbertura.length === 0) return;
+    if (opcoesAbertura.some((o) => o.id === pipelineId)) return;
+    const padrao = opcoesAbertura.find((o) => o.id === defaultPipelineId) ?? opcoesAbertura[0];
+    setPipelineId(padrao.id);
+  }, [open, opcoesAbertura, defaultPipelineId, pipelineId]);
+
+  const aberturaEscolhida = useMemo(
+    () => opcoesAbertura.find((o) => o.id === pipelineId) ?? null,
+    [opcoesAbertura, pipelineId],
+  );
 
   const clientesQuery = useQuery({
     queryKey: ["onb-clientes-search", tenantId, clienteBuscaDebounced],
@@ -96,22 +171,18 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
     },
   });
 
-  // Pool do rodízio do PIPELINE daquele produto, com a carga atual de cada um.
-  // Depende do produto porque é ele que escolhe o pipeline.
-  //
-  // p_fase é sempre "onboarding" porque create_onboarding_journey abre a jornada na
-  // PRIMEIRA fase — não na fase que estiver selecionada no board. Antes existia uma
-  // prop `fase` aqui que dava a impressão contrária e não era usada; foi removida.
-  // Quando a RPC genérica de fase chegar (Entrega C), isto passa a receber phase_id.
+  // Pool do rodízio do quadro escolhido, com a carga atual de cada um. Desde 14/08 o
+  // pipeline vai explícito: a jornada nasce no quadro do "Abrir em", então a prévia de
+  // quem vai receber tem que sair do MESMO pipeline (antes era sempre o de onboarding).
   const poolQuery = useQuery({
-    queryKey: ["onb-assignment-pool", tenantId, produtoId],
+    queryKey: ["onb-assignment-pool", tenantId, produtoId, pipelineId],
     enabled: open && !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("fn_onboarding_assignment_pool", {
         p_tenant_id: tenantId,
-        p_pipeline_id: null,
+        p_pipeline_id: pipelineId || null,
         p_produto_id: produtoId ? Number(produtoId) : null,
-        p_fase: "onboarding",
+        p_fase: aberturaEscolhida?.fase_slug || "onboarding",
       });
       if (error) throw error;
       return (data ?? null) as {
@@ -164,8 +235,11 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
   // O prazo passou a sair da soma das etapas do trilho do PRODUTO (01/08). Antes vinha do
   // tipo de demanda, que agora é só referência. A base aqui era 1440 e no diálogo de
   // edição era 480 — o mesmo cálculo com bases diferentes; agora existe uma só.
+  //
+  // p_from_phase_id recorta o trilho da fase de abertura em diante: jornada que nasce na
+  // Implantação não pode ter no prazo as etapas do Onboarding que ela nunca vai percorrer.
   const trilhoQuery = useQuery({
-    queryKey: ["onb-trilho-sla", tenantId, produtoId],
+    queryKey: ["onb-trilho-sla", tenantId, produtoId, aberturaEscolhida?.fase_id ?? null],
     enabled: open && !!tenantId,
     staleTime: 0,
     refetchOnMount: "always",
@@ -173,6 +247,7 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
       const { data, error } = await (supabase.rpc as any)("fn_onb_trilho_sla_min", {
         p_tenant_id: tenantId,
         p_produto_id: produtoId ? Number(produtoId) : null,
+        p_from_phase_id: aberturaEscolhida?.fase_id ?? null,
       });
       if (error) throw error;
       return (data as number | null) ?? 0;
@@ -186,7 +261,7 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
 
   // Golive previsto = início + soma das etapas da janela contada (fn_journey_go_live).
   const goLiveCalcQuery = useQuery({
-    queryKey: ["onb-golive-calc", tenantId, produtoId, dataInicio],
+    queryKey: ["onb-golive-calc", tenantId, produtoId, dataInicio, aberturaEscolhida?.fase_id ?? null],
     enabled: open && !!tenantId,
     staleTime: 0,
     refetchOnMount: "always",
@@ -197,6 +272,7 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
         p_start: startIso,
         p_produto_id: produtoId ? Number(produtoId) : null,
         p_department_id: null,
+        p_from_phase_id: aberturaEscolhida?.fase_id ?? null,
       });
       if (error) throw error;
       return (data as string | null) ?? null;
@@ -213,6 +289,10 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
       toast.error("Preencha cliente, produto e assunto.");
       return;
     }
+    if (!pipelineId) {
+      toast.error("Escolha em qual quadro a jornada será aberta.");
+      return;
+    }
     setSaving(true);
     try {
       const { data, error } = await (supabase.rpc as any)("create_onboarding_journey", {
@@ -225,6 +305,8 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
         p_demand_type_id: demandTypeId || null,
         // "auto" → o motor de distribuição escolhe (fn_onboarding_pick_assignee)
         p_implantador_user_id: implantadorUserId === "auto" ? null : implantadorUserId || null,
+        // A escolha da tela ganha do trilho do produto (decisão de 14/08/2026).
+        p_pipeline_id: pipelineId,
       });
       if (error) throw error;
       const res = data as any;
@@ -232,7 +314,11 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
         toast.error(res.message || "Não foi possível criar a jornada");
         return;
       }
-      toast.success("Jornada criada");
+      toast.success(
+        aberturaEscolhida
+          ? `Jornada criada em ${aberturaEscolhida.fase_nome} › ${aberturaEscolhida.nome}`
+          : "Jornada criada",
+      );
       onCreated();
       onOpenChange(false);
     } catch (e: any) {
@@ -252,6 +338,35 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
         {/* 2 colunas: em 1 coluna o formulário passava de 730px e não cabia em
             notebook 13". sm: garante volta a 1 coluna em tela estreita. */}
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 py-2 sm:grid-cols-2">
+          {/* Onde a jornada nasce. Vem preenchido com o quadro aberto, e é editável porque
+              existe cliente que entra direto na Implantação, sem passar pelo Onboarding. */}
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Abrir em *</Label>
+            <Select value={pipelineId} onValueChange={(v) => { setPipelineId(v); setGoLiveEdited(false); }}>
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    pipelinesQuery.isLoading || phasesQuery.isLoading ? "Carregando..." : "Selecione o quadro"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {opcoesAbertura.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>
+                    <span className="text-muted-foreground">{o.fase_nome}</span>
+                    <span className="mx-1.5 text-muted-foreground/50">›</span>
+                    {o.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {aberturaEscolhida?.fase_slug === "implantacao" && (
+              <p className="text-xs text-amber-500">
+                A jornada nasce direto na Implantação — o Onboarding não é percorrido e não
+                entra no prazo.
+              </p>
+            )}
+          </div>
           <div className="space-y-1.5">
             <Label>Cliente *</Label>
             <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
@@ -351,7 +466,7 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated }: Pro
             </Select>
             <p className="text-xs text-muted-foreground">
               {temPool
-                ? `No automático, o rodízio de ${poolQuery.data?.pipeline_nome ?? "onboarding"} escolhe.`
+                ? `No automático, o rodízio de ${poolQuery.data?.pipeline_nome ?? aberturaEscolhida?.nome ?? "onboarding"} escolhe.`
                 : "Este pipeline não tem ninguém na distribuição — no automático, você fica como responsável. Configure em Configuração › Distribuição."}
             </p>
           </div>
