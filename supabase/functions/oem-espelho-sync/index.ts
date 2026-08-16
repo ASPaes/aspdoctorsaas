@@ -255,6 +255,36 @@ Deno.serve(async (req) => {
         porCnpj.get(k)!.push(c);
       }
 
+      // ------------------------------------------- 3c. quando o CNPJ é do GRUPO
+      //
+      // Medido no grupo 8201 (Bem Docado) em 16/08/2026: **23 filiais, 1 CNPJ**.
+      // O OEM manda o CNPJ do grupo em toda filial, não o da loja. No
+      // DoctorSaaS cada loja tem o seu, e só uma delas bate com o do grupo —
+      // então o casamento por CNPJ jogou as 23 licenças no mesmo cadastro.
+      //
+      // O sinal é objetivo e sai do próprio espelho: CNPJ que aparece em mais
+      // de uma filial não identifica loja nenhuma. Aí quem desempata é o NOME,
+      // que nesse grupo bate quase um a um (MAIS DOCADO SAPOPEMBA, BEM DOCADO
+      // JARDIM, BEM DOCADO SAO RAFAEL...).
+      const filiaisPorCnpj = new Map<string, number>();
+      for (const l of linhas) {
+        if (!l.cnpj_norm) continue;
+        filiaisPorCnpj.set(l.cnpj_norm, (filiaisPorCnpj.get(l.cnpj_norm) ?? 0) + 1);
+      }
+      const cnpjDeGrupo = (c: string | null) => !!c && (filiaisPorCnpj.get(c) ?? 0) > 1;
+
+      // Razão social e fantasia entram as duas: o OEM guarda nome de loja e o
+      // DoctorSaaS às vezes guarda a mesma coisa na fantasia, às vezes na razão.
+      const porNome = new Map<string, ClienteDs[]>();
+      for (const c of clientes) {
+        for (const n of [c.nome_fantasia, c.razao_social]) {
+          const k = normNome(n);
+          if (!k) continue;
+          if (!porNome.has(k)) porNome.set(k, []);
+          if (!porNome.get(k)!.some((x) => x.id === c.id)) porNome.get(k)!.push(c);
+        }
+      }
+
       const porId = new Map<string, ClienteDs>(clientes.map((c) => [c.id, c]));
 
       // ------------------ 3b. o vínculo DURÁVEL: o código na ficha do cliente
@@ -288,7 +318,20 @@ Deno.serve(async (req) => {
       const comFilial = new Set<string>();
 
       for (const l of linhas) {
-        const cands = l.cnpj_norm ? (porCnpj.get(l.cnpj_norm) ?? []) : [];
+        // CNPJ de grupo não identifica loja: quando ele se repete entre filiais,
+        // o critério passa a ser o nome. Não é preferência — é o único campo
+        // que sobra distinguindo uma loja da outra.
+        const porGrupo = cnpjDeGrupo(l.cnpj_norm);
+        const criterio: "cnpj" | "nome" = porGrupo ? "nome" : "cnpj";
+
+        const cands = porGrupo
+          ? [...new Map(
+              [l.nome_fantasia, l.razao_social]
+                .flatMap((n) => porNome.get(normNome(n)) ?? [])
+                .map((c) => [c.id, c] as const),
+            ).values()]
+          : (l.cnpj_norm ? (porCnpj.get(l.cnpj_norm) ?? []) : []);
+
         // Cliente ativo tem preferência: o cancelado costuma ser cadastro velho.
         const ativos = cands.filter((c) => !c.cancelado);
         const escolha = ativos.length === 1 ? ativos[0] : cands.length === 1 ? cands[0] : null;
@@ -335,10 +378,13 @@ Deno.serve(async (req) => {
         const nomeOem = l.razao_social ?? null;
         const nomeDs  = cli?.razao_social ?? null;
         const cnpjDs  = cli ? (cli.cnpj_digits || digitos(cli.cnpj) || null) : null;
+        // Com CNPJ de grupo não há o que conferir nesse campo: o OEM não mandou
+        // o CNPJ da loja. Comparar o do grupo com o do cliente acusaria
+        // divergência em toda filial do grupo — alarme garantido e sempre falso.
         const divs = cli
           ? apurarDivergencias(
-              [l.razao_social, l.nome_fantasia], l.cnpj_norm,
-              [cli.razao_social, cli.nome_fantasia], cnpjDs,
+              [l.razao_social, l.nome_fantasia], porGrupo ? null : l.cnpj_norm,
+              [cli.razao_social, cli.nome_fantasia], porGrupo ? null : cnpjDs,
             )
           : [];
 
@@ -351,6 +397,7 @@ Deno.serve(async (req) => {
           razao_ds: cli?.nome_fantasia ?? cli?.razao_social ?? null,
           cnpj_ds: cnpjDs,
           razao_social_oem: nomeOem, razao_social_ds: nomeDs,
+          criterio_match: porCod ? "codigo" : criterio,
           divergencias: divs.length ? divs : null,
           mensalidade_ds: cli?.mensalidade ?? null, cancelado_ds: cli?.cancelado ?? null,
           qtd_candidatos_ds: cands.length,
