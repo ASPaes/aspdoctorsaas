@@ -382,6 +382,17 @@ export default function OemIntegrationTab() {
     // Só a conferência respeita este filtro: as outras abas têm semânticas
     // próprias de status e mudá-las junto quebraria os números delas.
     const naFaixa = (l: Recon) => statusConf === "todos" || l.status_oem === statusConf;
+
+    // REGRA DE ESCOPO (Alexandre, 16/08/2026): conferência é sobre o que está
+    // vivo. Cliente cancelado no DoctorSaaS ou licença desativada no OEM não
+    // entra em lista nenhuma que peça decisão — pedir vínculo para cadastro
+    // morto é gerar trabalho que não muda nada. Das 426 "cliente sem produto
+    // ativo", boa parte era exatamente isso.
+    //
+    // Desativado no OEM não cobra (regra do Alexandre: desativado não cobra,
+    // bloqueado cobra), então também não há custo a reconciliar.
+    const vivo = (l: Recon) => l.status_oem === "Ativo" && !l.cancelado_ds;
+
     const ativas = linhas.filter((l) => l.status_oem === "Ativo");
     const comPar = ativas.filter(
       (l) => l.ds_customer_id && l.mensalidade_ds != null && l.custo_oem != null && !l.cancelado_ds,
@@ -432,7 +443,8 @@ export default function OemIntegrationTab() {
       // escolher, e o `l.filial_codigo` protege as linhas gravadas antes de a
       // sincronização parar de marcá-las como escolher_candidato.
       escolher: linhas.filter(
-        (l) => l.filial_codigo && l.acao_sugerida === "escolher_candidato" && l.status_usuario === "novo",
+        (l) => l.filial_codigo && l.acao_sugerida === "escolher_candidato"
+          && l.status_usuario === "novo" && vivo(l),
       ),
       decididas: linhas
         .filter((l) => l.resolvido_em && (l.status_usuario === "vinculado" || l.status_usuario === "ignorado"))
@@ -447,9 +459,12 @@ export default function OemIntegrationTab() {
       //   - o cliente não tem produto ativo → não há onde gravar, e também não
       //     há de onde sair o custo.
       semCodigo: (() => {
-        const comFilial = linhas.filter((l) => l.ds_customer_id && l.filial_codigo);
+        const todosComFilial = linhas.filter((l) => l.ds_customer_id && l.filial_codigo);
+        const comFilial = todosComFilial.filter(vivo);
+        // A contagem de filiais por cliente usa TODAS as linhas: uma segunda
+        // filial desativada ainda torna a escolha ambígua para quem decide.
         const porCli = new Map<string, Set<string>>();
-        for (const l of comFilial) {
+        for (const l of todosComFilial) {
           const k = l.ds_customer_id!;
           if (!porCli.has(k)) porCli.set(k, new Set());
           porCli.get(k)!.add(String(l.filial_codigo));
@@ -460,6 +475,9 @@ export default function OemIntegrationTab() {
           semProduto: pendentes.filter((l) => (porCli.get(l.ds_customer_id!)?.size ?? 0) <= 1),
           gravados: comFilial.length - pendentes.length,
           total: comFilial.length,
+          // Fora de escopo por estarem mortos dos dois lados — contados para a
+          // tela poder dizer que eles existem sem pedir trabalho por eles.
+          foraDeEscopo: todosComFilial.length - comFilial.length,
         };
       })(),
       // Conferência: o vínculo está feito, mas algo deixou de bater. CNPJ vem
@@ -468,12 +486,17 @@ export default function OemIntegrationTab() {
       // Vínculo achado por nome merece outro olhar: ele existe porque o OEM
       // mandou o CNPJ do grupo e não o da loja.
       porNome: linhas.filter((l) => l.criterio_match === "nome" && l.ds_customer_id).length,
-      divCnpj: linhas.filter((l) => l.divergencias?.includes("cnpj") && naFaixa(l)),
+      // Cliente cancelado sai da conferência mesmo quando o usuário escolhe
+      // "Todas": o seletor é sobre o status da LICENÇA, não sobre reabrir
+      // cadastro morto.
+      divCnpj: linhas.filter((l) => l.divergencias?.includes("cnpj") && naFaixa(l) && !l.cancelado_ds),
       divNome: linhas.filter(
-        (l) => l.divergencias?.includes("nome") && !l.divergencias?.includes("cnpj") && naFaixa(l),
+        (l) => l.divergencias?.includes("nome") && !l.divergencias?.includes("cnpj")
+          && naFaixa(l) && !l.cancelado_ds,
       ),
       confereOk: linhas.filter(
-        (l) => l.ds_customer_id && l.filial_codigo && !l.divergencias?.length && naFaixa(l),
+        (l) => l.ds_customer_id && l.filial_codigo && !l.divergencias?.length
+          && naFaixa(l) && !l.cancelado_ds,
       ).length,
       comPar,
       clientesComPar: porCliente.size,
@@ -806,6 +829,8 @@ export default function OemIntegrationTab() {
             ela para e pergunta. <strong>Escolher</strong> abre a lista de{" "}
             <strong>clientes do DoctorSaaS</strong> para você dizer qual deles é o dono daquela
             licença. Sua decisão fica gravada e sobrevive às próximas atualizações do espelho.
+            Só entram aqui licenças <strong>ativas</strong> no OEM de clientes <strong>não
+            cancelados</strong> — desativado não cobra, e cadastro cancelado não vira vínculo.
           </Explica>
           <div className="relative max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1130,6 +1155,10 @@ export default function OemIntegrationTab() {
         {/* -------------------------------------------------------- pendências */}
         <TabsContent value="pendencias" className="space-y-3">
           <Explica>
+            Tudo nesta aba trata só do que está <strong>vivo dos dois lados</strong>: licença ativa
+            no OEM e cliente não cancelado no DoctorSaaS. Desativado não cobra, e cadastro
+            cancelado não vira vínculo — pedir decisão sobre eles seria trabalho que não muda nada.
+            <br /><br />
             Os dois lados que não se encontraram. À esquerda, <strong>licenças do OEM</strong> que
             estão sendo cobradas e não têm cliente correspondente no DoctorSaaS — o valor é o
             custo da licença. À direita, <strong>clientes do DoctorSaaS</strong> que não têm
@@ -1216,6 +1245,11 @@ export default function OemIntegrationTab() {
                   {r.semCodigo.gravados} de {r.semCodigo.total} vínculos já gravaram o par
                   grupo · filial no produto do cliente. Os demais não gravaram por um destes dois
                   motivos — em nenhum dos dois o sistema deve escolher sozinho.
+                  {r.semCodigo.foraDeEscopo > 0 && (
+                    <> Outros <strong>{r.semCodigo.foraDeEscopo}</strong> ficaram de fora da conta:
+                    são licenças desativadas no OEM ou de clientes cancelados no DoctorSaaS, e não
+                    se pede vínculo para cadastro morto — desativado não cobra.</>
+                  )}
                 </CardDescription>
                 <div className="pt-2">
                   <div className="relative max-w-sm">
