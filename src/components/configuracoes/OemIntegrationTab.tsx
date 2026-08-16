@@ -110,6 +110,56 @@ function Origem({ lado }: { lado: "oem" | "ds" }) {
   );
 }
 
+// Contar não resolve: com 342 casos, o número sozinho não diz em qual cliente
+// mexer. A lista é o que transforma o diagnóstico em trabalho.
+function ListaSemCodigo({
+  titulo, itens, total, explica,
+}: {
+  titulo: string;
+  itens: Recon[];
+  total: number;
+  explica: React.ReactNode;
+}) {
+  const TETO = 100;
+  return (
+    <div className="rounded-lg border">
+      <div className="p-3 border-b">
+        <p className="text-2xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+          {total}
+        </p>
+        <p className="text-sm font-medium mt-1">{titulo}</p>
+        <p className="text-xs text-muted-foreground mt-1">{explica}</p>
+      </div>
+      <div className="divide-y max-h-72 overflow-y-auto">
+        {itens.slice(0, TETO).map((l) => (
+          <div key={l.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+            <div className="min-w-0 flex-1">
+              <p className="truncate">{l.razao_ds ?? l.razao_oem ?? "—"}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                <span className="text-sky-600 dark:text-sky-400">OEM</span> {l.razao_oem} · filial{" "}
+                {l.filial_codigo} · grupo {l.empresa_codigo}
+              </p>
+            </div>
+            <span className="tabular-nums text-muted-foreground shrink-0">
+              {(Number(l.custo_oem) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            </span>
+          </div>
+        ))}
+        {itens.length === 0 && (
+          <p className="px-3 py-4 text-sm text-muted-foreground text-center">
+            Nada aqui com a busca atual.
+          </p>
+        )}
+      </div>
+      {itens.length > TETO && (
+        <p className="border-t px-3 py-2 text-xs text-muted-foreground">
+          Mostrando {TETO} de {itens.length} — use a busca acima para chegar num caso específico.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function OemIntegrationTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -887,29 +937,37 @@ export default function OemIntegrationTab() {
                   grupo · filial no produto do cliente. Os demais não gravaram por um destes dois
                   motivos — em nenhum dos dois o sistema deve escolher sozinho.
                 </CardDescription>
+                <div className="pt-2">
+                  <div className="relative max-w-sm">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Buscar por nome, CNPJ ou código" className="pl-8"
+                      value={busca} onChange={(e) => { setBusca(e.target.value); setPagina(0); }} />
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border p-3">
-                  <p className="text-2xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">
-                    {r.semCodigo.multiplas.length}
-                  </p>
-                  <p className="text-sm font-medium mt-1">Mais de uma filial no mesmo cliente</p>
-                  <p className="text-xs text-muted-foreground mt-1">
+              <CardContent className="grid gap-3 lg:grid-cols-2">
+                <ListaSemCodigo
+                  titulo="Mais de uma filial no mesmo cliente"
+                  itens={filtra(r.semCodigo.multiplas)}
+                  total={r.semCodigo.multiplas.length}
+                  explica={<>
                     A regra é <strong>1 filial = 1 cliente</strong>. Aqui várias licenças apontam
                     para o mesmo cadastro, então gravar o código escolheria uma no chute. Ou faltam
-                    cadastros de cliente, ou o casamento automático por CNPJ errou.
-                  </p>
-                </div>
-                <div className="rounded-lg border p-3">
-                  <p className="text-2xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">
-                    {r.semCodigo.semProduto.length}
-                  </p>
-                  <p className="text-sm font-medium mt-1">Cliente sem produto ativo</p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                    cadastros de cliente, ou o casamento automático por CNPJ errou. O caminho é
+                    criar o cadastro que falta e vincular cada filial ao seu.
+                  </>}
+                />
+                <ListaSemCodigo
+                  titulo="Cliente sem produto ativo"
+                  itens={filtra(r.semCodigo.semProduto)}
+                  total={r.semCodigo.semProduto.length}
+                  explica={<>
                     A licença é cobrada no OEM, mas o cliente não tem nenhuma linha de produto
-                    ativa no DoctorSaaS — não há onde gravar o código, nem de onde sair o custo.
-                  </p>
-                </div>
+                    ativa no DoctorSaaS — não há onde gravar o código, nem de onde sair o custo. O
+                    caminho é lançar o produto na ficha do cliente; o código entra na próxima
+                    atualização do espelho.
+                  </>}
+                />
               </CardContent>
             </Card>
           )}
