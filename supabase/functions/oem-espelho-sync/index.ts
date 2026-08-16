@@ -310,12 +310,15 @@ Deno.serve(async (req) => {
         // Razão social contra razão social. Comparar com nome fantasia jogaria
         // nome de loja ("FILIAL 1") contra nome de empresa e daria divergência
         // em praticamente tudo.
-        const divs = cli
-          ? apurarDivergencias(
-              l.razao_social ?? l.nome_fantasia, l.cnpj_norm,
-              cli.razao_social ?? cli.nome_fantasia, cli.cnpj_digits || digitos(cli.cnpj),
-            )
-          : [];
+        // Os dois valores comparados são gravados junto. A tela precisa exibir
+        // exatamente o par que decidiu a divergência: mostrar fantasia e
+        // comparar razão social fazia a linha acusar diferença entre duas
+        // strings idênticas na tela, e alerta que não se consegue verificar
+        // ensina a desconfiar da tela.
+        const nomeOem = l.razao_social ?? l.nome_fantasia ?? null;
+        const nomeDs  = cli ? (cli.razao_social ?? cli.nome_fantasia ?? null) : null;
+        const cnpjDs  = cli ? (cli.cnpj_digits || digitos(cli.cnpj) || null) : null;
+        const divs = cli ? apurarDivergencias(nomeOem, l.cnpj_norm, nomeDs, cnpjDs) : [];
 
         recon.push({
           tenant_id: conta.tenant_id, conta_integration_id: conta.id,
@@ -324,7 +327,8 @@ Deno.serve(async (req) => {
           custo_oem: l.custo_total, status_oem: l.status, bloqueado_oem: l.bloqueado,
           ds_customer_id: alvo?.id ?? null,
           razao_ds: cli?.nome_fantasia ?? cli?.razao_social ?? null,
-          cnpj_ds: cli ? (cli.cnpj_digits || digitos(cli.cnpj) || null) : null,
+          cnpj_ds: cnpjDs,
+          razao_social_oem: nomeOem, razao_social_ds: nomeDs,
           divergencias: divs.length ? divs : null,
           mensalidade_ds: cli?.mensalidade ?? null, cancelado_ds: cli?.cancelado ?? null,
           qtd_candidatos_ds: cands.length,

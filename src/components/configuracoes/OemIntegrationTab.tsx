@@ -51,6 +51,11 @@ type Recon = {
   resolvido_em: string | null;
   cnpj_ds: string | null;
   divergencias: string[] | null;
+  // O par que a conferência de fato comparou. razao_oem/razao_ds são nome
+  // fantasia e servem para reconhecer a loja nas outras abas; aqui não valem,
+  // porque não foram eles que decidiram a divergência.
+  razao_social_oem: string | null;
+  razao_social_ds: string | null;
 };
 
 type Conta = {
@@ -147,16 +152,35 @@ function LinhaConferencia({
           </Button>
         </div>
       </div>
-      <div className="grid gap-x-4 gap-y-1 sm:grid-cols-[4rem_1fr_1fr] items-baseline">
-        <span className="text-xs text-muted-foreground">Nome</span>
+      <div className="grid gap-x-4 gap-y-1 sm:grid-cols-[5.5rem_1fr_1fr] items-baseline">
+        {/* Razão social, que é o par comparado — e não nome fantasia, que é o
+            que a linha mostrava antes e fazia duas strings iguais na tela
+            aparecerem como divergentes. */}
+        <span className="text-xs text-muted-foreground">Razão social</span>
         <span className={`truncate ${cor(difNome)}`}>
           <span className="text-sky-600 dark:text-sky-400 text-xs mr-1.5">OEM</span>
-          {l.razao_oem ?? "—"}
+          {l.razao_social_oem ?? "—"}
         </span>
         <span className={`truncate ${cor(difNome)}`}>
           <span className="text-emerald-600 dark:text-emerald-400 text-xs mr-1.5">DS</span>
-          {l.razao_ds ?? "—"}
+          {l.razao_social_ds ?? "—"}
         </span>
+
+        {/* Fantasia entra só como referência: é por ela que se reconhece a loja,
+            mas não é ela que decide a divergência. */}
+        {(l.razao_oem || l.razao_ds) && (
+          <>
+            <span className="text-xs text-muted-foreground">Fantasia</span>
+            <span className="truncate text-muted-foreground text-xs">
+              <span className="text-sky-600 dark:text-sky-400 mr-1.5">OEM</span>
+              {l.razao_oem ?? "—"}
+            </span>
+            <span className="truncate text-muted-foreground text-xs">
+              <span className="text-emerald-600 dark:text-emerald-400 mr-1.5">DS</span>
+              {l.razao_ds ?? "—"}
+            </span>
+          </>
+        )}
 
         <span className="text-xs text-muted-foreground">CNPJ</span>
         <span className={`tabular-nums ${cor(difCnpj)}`}>
@@ -235,6 +259,9 @@ export default function OemIntegrationTab() {
   const [escolhendo, setEscolhendo] = useState<LinhaRecon | null>(null);
   const [desfazendo, setDesfazendo] = useState<string | null>(null);
   const [pagina, setPagina] = useState(0);
+  // Licença desativada não cobra, então divergência nela é ruído na maior parte
+  // do tempo. A tela abre em "Ativo" e o usuário amplia se quiser.
+  const [statusConf, setStatusConf] = useState<"Ativo" | "Desativado" | "todos">("Ativo");
   const POR_PAGINA = 25;
 
   // Uma conta POR UNIDADE BASE, igual ao Omie. A view não tem a coluna da
@@ -300,7 +327,8 @@ export default function OemIntegrationTab() {
             "id, cnpj_norm, empresa_codigo, filial_codigo, razao_oem, custo_oem, status_oem, " +
             "bloqueado_oem, ds_customer_id, razao_ds, mensalidade_ds, cancelado_ds, " +
             "qtd_candidatos_ds, estado_match, acao_sugerida, status_usuario, margem, " +
-            "observacao, resolvido_em, cnpj_ds, divergencias",
+            "observacao, resolvido_em, cnpj_ds, divergencias, " +
+            "razao_social_oem, razao_social_ds",
           )
           .eq("conta_integration_id", conta!.id),
       ),
@@ -343,6 +371,9 @@ export default function OemIntegrationTab() {
   });
 
   const r = useMemo(() => {
+    // Só a conferência respeita este filtro: as outras abas têm semânticas
+    // próprias de status e mudá-las junto quebraria os números delas.
+    const naFaixa = (l: Recon) => statusConf === "todos" || l.status_oem === statusConf;
     const ativas = linhas.filter((l) => l.status_oem === "Ativo");
     const comPar = ativas.filter(
       (l) => l.ds_customer_id && l.mensalidade_ds != null && l.custo_oem != null && !l.cancelado_ds,
@@ -416,9 +447,13 @@ export default function OemIntegrationTab() {
       // Conferência: o vínculo está feito, mas algo deixou de bater. CNPJ vem
       // primeiro porque é o sinal forte — nome divergente é o normal entre um
       // sistema que guarda loja e outro que guarda razão social.
-      divCnpj: linhas.filter((l) => l.divergencias?.includes("cnpj")),
-      divNome: linhas.filter((l) => l.divergencias?.includes("nome") && !l.divergencias?.includes("cnpj")),
-      confereOk: linhas.filter((l) => l.ds_customer_id && l.filial_codigo && !l.divergencias?.length).length,
+      divCnpj: linhas.filter((l) => l.divergencias?.includes("cnpj") && naFaixa(l)),
+      divNome: linhas.filter(
+        (l) => l.divergencias?.includes("nome") && !l.divergencias?.includes("cnpj") && naFaixa(l),
+      ),
+      confereOk: linhas.filter(
+        (l) => l.ds_customer_id && l.filial_codigo && !l.divergencias?.length && naFaixa(l),
+      ).length,
       comPar,
       clientesComPar: porCliente.size,
       // A mensalidade é do CLIENTE e o custo é da FILIAL. Somar mensalidade_ds
@@ -429,7 +464,7 @@ export default function OemIntegrationTab() {
       custo: comPar.reduce((a, l) => a + Number(l.custo_oem || 0), 0),
       negativas: porClienteNeg,
     };
-  }, [linhas, filiaisComCodigo]);
+  }, [linhas, filiaisComCodigo, statusConf]);
 
   async function sincronizar() {
     setSincronizando(true);
@@ -871,16 +906,43 @@ export default function OemIntegrationTab() {
               tom="normal" sub="esperado: o OEM guarda nome de loja" />
           </div>
 
-          <div className="relative max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar por nome, CNPJ ou código" className="pl-8"
-              value={busca} onChange={(e) => { setBusca(e.target.value); setPagina(0); }} />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative max-w-sm flex-1 min-w-[16rem]">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar por nome, CNPJ ou código" className="pl-8"
+                value={busca} onChange={(e) => { setBusca(e.target.value); setPagina(0); }} />
+            </div>
+            {/* Licença desativada não cobra — divergência nela raramente é o que
+                se quer olhar. A tela abre em Ativo e amplia sob demanda. */}
+            <div className="inline-flex rounded-md border p-0.5">
+              {([
+                ["Ativo", "Ativas"],
+                ["Desativado", "Desativadas"],
+                ["todos", "Todas"],
+              ] as const).map(([v, rot]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setStatusConf(v)}
+                  className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                    statusConf === v
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {rot}
+                </button>
+              ))}
+            </div>
           </div>
 
           {r.divCnpj.length === 0 && r.divNome.length === 0 ? (
             <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
-              Nada divergindo. Se você ainda não clicou em <strong>Atualizar espelho</strong> depois
-              de gravar os códigos, a conferência ainda não rodou nenhuma vez.
+              Nada divergindo{statusConf !== "todos" &&
+                <> entre as licenças <strong>{statusConf === "Ativo" ? "ativas" : "desativadas"}</strong></>}.
+              {statusConf !== "todos" && " Experimente “Todas”."} Se você ainda não clicou em{" "}
+              <strong>Atualizar espelho</strong> depois de gravar os códigos, a conferência ainda
+              não rodou nenhuma vez.
             </CardContent></Card>
           ) : (
             <>
