@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
-  Undo2, CheckCircle2,
+  Undo2, CheckCircle2, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
 
@@ -122,6 +122,8 @@ export default function OemIntegrationTab() {
   const [salvando, setSalvando] = useState(false);
   const [escolhendo, setEscolhendo] = useState<LinhaRecon | null>(null);
   const [desfazendo, setDesfazendo] = useState<string | null>(null);
+  const [pagina, setPagina] = useState(0);
+  const POR_PAGINA = 25;
 
   // Uma conta POR UNIDADE BASE, igual ao Omie. A view não tem a coluna da
   // chave nem o ponteiro do Vault — nada disso chega ao navegador.
@@ -322,6 +324,17 @@ export default function OemIntegrationTab() {
       [l.razao_oem, l.razao_ds, l.cnpj_norm, l.filial_codigo, l.empresa_codigo]
         .some((c) => String(c ?? "").toLowerCase().includes(q)));
   };
+
+  // Paginação da fila de decisão. É lista client-side (o fetchAllRows já trouxe
+  // tudo), então paginar aqui é só fatiar — mas sem isso a tela cortava em 100
+  // e as demais simplesmente não existiam para quem não soubesse buscar.
+  const escolherFiltrado = filtra(r.escolher);
+  const totalPaginas = Math.max(1, Math.ceil(escolherFiltrado.length / POR_PAGINA));
+  // Decidir a última filial da última página encolhe a lista debaixo dos pés:
+  // sem o clamp, a tela ficaria numa página que não existe mais, vazia.
+  const paginaAtual = Math.min(pagina, totalPaginas - 1);
+  const inicio = paginaAtual * POR_PAGINA;
+  const escolherPagina = escolherFiltrado.slice(inicio, inicio + POR_PAGINA);
 
   if (!tid) {
     return <p className="text-sm text-muted-foreground">Selecione uma empresa para ver a integração.</p>;
@@ -537,7 +550,10 @@ export default function OemIntegrationTab() {
           <div className="relative max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar por nome, CNPJ ou código" className="pl-8"
-              value={busca} onChange={(e) => setBusca(e.target.value)} />
+              value={busca}
+              // Buscar com a página 3 aberta mostraria "nenhum resultado" tendo
+              // resultado na 1 — toda busca volta para o começo.
+              onChange={(e) => { setBusca(e.target.value); setPagina(0); }} />
           </div>
           {r.escolher.length === 0 ? (
             <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
@@ -559,7 +575,7 @@ export default function OemIntegrationTab() {
                 <span className="w-[86px] shrink-0" />
               </div>
               <div className="divide-y">
-                {filtra(r.escolher).slice(0, 100).map((l) => (
+                {escolherPagina.map((l) => (
                   <div key={l.id} className="flex items-center gap-3 p-3 text-sm">
                     <HelpCircle className="h-4 w-4 text-amber-500 shrink-0" />
                     <div className="min-w-0 flex-1">
@@ -583,10 +599,26 @@ export default function OemIntegrationTab() {
               </div>
             </div>
           )}
-          {filtra(r.escolher).length > 100 && (
-            <p className="text-xs text-muted-foreground">
-              Mostrando as 100 primeiras de {filtra(r.escolher).length}. Refine a busca para ver as demais.
-            </p>
+          {escolherFiltrado.length > POR_PAGINA && (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground tabular-nums">
+                {inicio + 1}–{Math.min(inicio + POR_PAGINA, escolherFiltrado.length)} de{" "}
+                {escolherFiltrado.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="gap-1"
+                  disabled={paginaAtual === 0} onClick={() => setPagina(paginaAtual - 1)}>
+                  <ChevronLeft className="h-4 w-4" /> Anterior
+                </Button>
+                <span className="text-xs text-muted-foreground tabular-nums px-1">
+                  {paginaAtual + 1} / {totalPaginas}
+                </span>
+                <Button variant="outline" size="sm" className="gap-1"
+                  disabled={paginaAtual >= totalPaginas - 1} onClick={() => setPagina(paginaAtual + 1)}>
+                  Próxima <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           )}
 
           {/* Decidido à mão — sem o caminho de volta, um clique errado vira
@@ -767,6 +799,9 @@ export default function OemIntegrationTab() {
               </CardHeader>
               <CardContent className="p-0 max-h-80 overflow-y-auto">
                 <div className="divide-y">
+                  {/* Corte de 200 para não montar milhares de linhas de DOM.
+                      Cortar em silêncio é que não pode: o rodapé diz quantas
+                      ficaram de fora. */}
                   {r.soNoDs.slice(0, 200).map((l) => (
                     <div key={l.id} className="flex items-center gap-3 px-6 py-2 text-sm">
                       <div className="min-w-0 flex-1">
@@ -777,6 +812,11 @@ export default function OemIntegrationTab() {
                     </div>
                   ))}
                 </div>
+                {r.soNoDs.length > 200 && (
+                  <p className="border-t px-6 py-2 text-xs text-muted-foreground">
+                    Mostrando os 200 primeiros — outros {r.soNoDs.length - 200} não estão nesta lista.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
