@@ -34,11 +34,28 @@ comment on column public.reconciliacao_oem.razao_social_ds is
 commit;
 
 -- ---------------------------------------------------------------------------
--- CONFERÊNCIA (só leitura) — depois de "Atualizar espelho", nenhuma linha com
--- divergência de nome pode ter os dois valores comparados iguais:
+-- CONFERÊNCIA (só leitura)
 --
---   select count(*) from public.reconciliacao_oem
---    where 'nome' = any(divergencias)
---      and upper(coalesce(razao_social_oem,'')) = upper(coalesce(razao_social_ds,''));
---   -- esperado: 0
+-- ⚠️ A primeira versão desta query usava
+--     upper(coalesce(razao_social_oem,'')) = upper(coalesce(razao_social_ds,''))
+--   e deu 994 — exatamente o total de divergências de nome. Não era defeito no
+--   dado: quem preenche as colunas é a edge function, e antes de "Atualizar
+--   espelho" as duas estão NULL. O coalesce transformou NULL em '' e a query
+--   contou "vazio igual a vazio" como falso positivo. Comparar campo que ainda
+--   não foi preenchido só serve para inventar alarme.
+--
+-- A versão certa separa "ainda não rodou" de "rodou e bateu":
+--
+--   select
+--     count(*)                                                      as div_nome,
+--     count(*) filter (where razao_social_oem is null
+--                        and razao_social_ds  is null)              as ainda_nao_conferido,
+--     count(*) filter (where coalesce(razao_social_oem,'') <> ''
+--                        and coalesce(razao_social_ds ,'') <> ''
+--                        and upper(razao_social_oem) = upper(razao_social_ds)) as falso_positivo
+--   from public.reconciliacao_oem
+--   where 'nome' = any(divergencias);
+--
+--   falso_positivo tem que ser 0. ainda_nao_conferido tem que ser 0 depois de
+--   uma atualização do espelho.
 -- ---------------------------------------------------------------------------
