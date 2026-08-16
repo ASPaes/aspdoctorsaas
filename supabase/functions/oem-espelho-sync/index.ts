@@ -445,6 +445,13 @@ Deno.serve(async (req) => {
         if (error) throw new Error(`reconciliacao_oem: ${error.message}`);
       }
 
+      // O código na ficha é a chave durável do vínculo. Gravá-lo só no backfill
+      // e no vínculo manual deixava todo vínculo automático novo sem chave —
+      // fora da ficha do cliente e fora da conferência.
+      const { data: codigosGravados } = await ds.rpc("oem_gravar_codigos_em_lote", {
+        p_conta: conta.id,
+      });
+
       await ds.from("oem_integration").update({
         ultimo_sync_em: new Date().toISOString(),
         ultimo_sync_status: "sucesso",
@@ -461,6 +468,7 @@ Deno.serve(async (req) => {
         contaId: conta.id, unidades, filiais: linhas.length, removidas: mortas.length,
         clientesDs: clientes.length, linhasRecon: recon.length,
         decisoesPreservadas: decidido.size,
+        codigosGravados: codigosGravados ?? 0,
         ultimaSincronizacaoOem: corpo.ultimaSincronizacao ?? null,
         estado_match: conta_("estado_match"), acao_sugerida: conta_("acao_sugerida"),
       });

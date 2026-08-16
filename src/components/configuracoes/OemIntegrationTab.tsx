@@ -317,6 +317,26 @@ export default function OemIntegrationTab() {
     },
   });
 
+  // Quantos produtos ATIVOS cada cliente tem. Sem isto a tela classificava por
+  // eliminação — "não é o caso de várias filiais, então deve ser falta de
+  // produto" — e rotulava de "cliente sem produto ativo" cliente com produto,
+  // custo e contrato. Rótulo deduzido é rótulo que mente.
+  const { data: produtosAtivos = new Map<string, number>() } = useQuery({
+    queryKey: ["oem-produtos-ativos", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const linhas = await fetchAllRows<{ cliente_id: string }>(() =>
+        (supabase.from("cliente_produtos" as any) as any)
+          .select("cliente_id")
+          .eq("tenant_id", tid)
+          .eq("ativo", true),
+      );
+      const m = new Map<string, number>();
+      for (const l of linhas) m.set(l.cliente_id, (m.get(l.cliente_id) ?? 0) + 1);
+      return m;
+    },
+  });
+
   const conta = useMemo(
     () => contas.find((c) => c.id === contaSel) ?? contas[0] ?? null,
     [contas, contaSel],
@@ -477,9 +497,18 @@ export default function OemIntegrationTab() {
           porCli.get(k)!.add(String(l.filial_codigo));
         }
         const pendentes = comFilial.filter((l) => !filiaisComCodigo.has(String(l.filial_codigo)));
+        const nProd = (l: Recon) => produtosAtivos.get(l.ds_customer_id!) ?? 0;
+        // Cada balde é uma causa VERIFICADA, com uma saída própria. O que não
+        // se encaixa em nenhuma vai para "outro motivo" em vez de ser empurrado
+        // para o rótulo mais próximo.
         return {
           multiplas: pendentes.filter((l) => (porCli.get(l.ds_customer_id!)?.size ?? 0) > 1),
-          semProduto: pendentes.filter((l) => (porCli.get(l.ds_customer_id!)?.size ?? 0) <= 1),
+          semProduto: pendentes.filter(
+            (l) => (porCli.get(l.ds_customer_id!)?.size ?? 0) <= 1 && nProd(l) === 0),
+          variosProdutos: pendentes.filter(
+            (l) => (porCli.get(l.ds_customer_id!)?.size ?? 0) <= 1 && nProd(l) > 1),
+          outroMotivo: pendentes.filter(
+            (l) => (porCli.get(l.ds_customer_id!)?.size ?? 0) <= 1 && nProd(l) === 1),
           gravados: comFilial.length - pendentes.length,
           total: comFilial.length,
           // Fora de escopo por estarem mortos dos dois lados — contados para a
@@ -515,7 +544,7 @@ export default function OemIntegrationTab() {
       custo: comPar.reduce((a, l) => a + Number(l.custo_oem || 0), 0),
       negativas: porClienteNeg,
     };
-  }, [linhas, filiaisComCodigo, statusConf]);
+  }, [linhas, filiaisComCodigo, produtosAtivos, statusConf]);
 
   async function sincronizar() {
     setSincronizando(true);
@@ -1304,7 +1333,8 @@ export default function OemIntegrationTab() {
           {/* O código do OEM só chega à ficha do cliente quando o cadastro
               comporta. O que não chegou é buraco de cadastro, e some da vista
               se ficar só no relatório de quem rodou a migration. */}
-          {(r.semCodigo.multiplas.length > 0 || r.semCodigo.semProduto.length > 0) && (
+          {(r.semCodigo.multiplas.length > 0 || r.semCodigo.semProduto.length > 0
+            || r.semCodigo.variosProdutos.length > 0 || r.semCodigo.outroMotivo.length > 0) && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -1377,6 +1407,46 @@ export default function OemIntegrationTab() {
                     atualização do espelho.
                   </>}
                 />
+                {r.semCodigo.variosProdutos.length > 0 && (
+                  <ListaSemCodigo
+                    titulo="Cliente com mais de um produto ativo"
+                    itens={filtra(r.semCodigo.variosProdutos)}
+                    total={r.semCodigo.variosProdutos.length}
+                    acao={(l) => (
+                      <Button size="sm" variant="secondary" className="gap-1.5"
+                        disabled={!l.ds_customer_id}
+                        onClick={() => navigate(`/clientes/${l.ds_customer_id}`)}>
+                        <ExternalLink className="h-3.5 w-3.5" /> Abrir ficha
+                      </Button>
+                    )}
+                    explica={<>
+                      O cliente tem mais de uma linha de produto ativa e não dá para saber em qual
+                      gravar o código. O caminho é inativar o produto que não vale mais, ou dizer
+                      qual é o do OEM abrindo a ficha.
+                    </>}
+                  />
+                )}
+                {r.semCodigo.outroMotivo.length > 0 && (
+                  <ListaSemCodigo
+                    titulo="Ainda não gravado"
+                    itens={filtra(r.semCodigo.outroMotivo)}
+                    total={r.semCodigo.outroMotivo.length}
+                    acao={(l) => (
+                      <Button size="sm" variant="secondary" className="gap-1.5"
+                        disabled={confirmando === l.id} onClick={() => confirmar(l)}>
+                        {confirmando === l.id
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <CheckCircle2 className="h-3.5 w-3.5" />}
+                        Gravar agora
+                      </Button>
+                    )}
+                    explica={<>
+                      Vínculo único e cliente com um produto ativo — não há impedimento nenhum. São
+                      vínculos criados depois do último “Atualizar espelho”: o código entra sozinho
+                      na próxima carga, e o botão adianta caso a caso.
+                    </>}
+                  />
+                )}
               </CardContent>
             </Card>
           )}
