@@ -153,6 +153,23 @@ export default function OemIntegrationTab() {
     enabled: !!tid,
   });
 
+  // Quais licenças já têm o código gravado na ficha do cliente. Medido em
+  // 15/08/2026: de 1.254 vínculos, 637 gravaram. É pelo que NÃO gravou que se
+  // enxerga o buraco de cadastro — e ele não pode viver só num relatório.
+  const { data: filiaisComCodigo = new Set<string>() } = useQuery({
+    queryKey: ["oem-codigos-gravados", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const linhas = await fetchAllRows<{ oem_codigo_filial: string }>(() =>
+        (supabase.from("cliente_produtos" as any) as any)
+          .select("oem_codigo_filial")
+          .eq("tenant_id", tid)
+          .not("oem_codigo_filial", "is", null),
+      );
+      return new Set(linhas.map((l) => String(l.oem_codigo_filial)));
+    },
+  });
+
   const conta = useMemo(
     () => contas.find((c) => c.id === contaSel) ?? contas[0] ?? null,
     [contas, contaSel],
@@ -261,6 +278,29 @@ export default function OemIntegrationTab() {
         .sort((a, b) => String(b.resolvido_em).localeCompare(String(a.resolvido_em))),
       semCliente: ativas.filter((l) => l.estado_match === "SO_NO_OEM" && l.status_usuario === "novo"),
       soNoDs: linhas.filter((l) => l.estado_match === "SO_NO_DS" && !l.cancelado_ds),
+      // Vínculo existe mas o código não chegou à ficha do cliente. São dois
+      // motivos distintos, e a saída de cada um é diferente:
+      //   - o mesmo cliente recebeu mais de uma filial → falta cadastro de
+      //     cliente (a regra é 1 filial = 1 cliente) ou o vínculo automático
+      //     errou. Gravar o código escolheria uma filial no chute.
+      //   - o cliente não tem produto ativo → não há onde gravar, e também não
+      //     há de onde sair o custo.
+      semCodigo: (() => {
+        const comFilial = linhas.filter((l) => l.ds_customer_id && l.filial_codigo);
+        const porCli = new Map<string, Set<string>>();
+        for (const l of comFilial) {
+          const k = l.ds_customer_id!;
+          if (!porCli.has(k)) porCli.set(k, new Set());
+          porCli.get(k)!.add(String(l.filial_codigo));
+        }
+        const pendentes = comFilial.filter((l) => !filiaisComCodigo.has(String(l.filial_codigo)));
+        return {
+          multiplas: pendentes.filter((l) => (porCli.get(l.ds_customer_id!)?.size ?? 0) > 1),
+          semProduto: pendentes.filter((l) => (porCli.get(l.ds_customer_id!)?.size ?? 0) <= 1),
+          gravados: comFilial.length - pendentes.length,
+          total: comFilial.length,
+        };
+      })(),
       comPar,
       clientesComPar: porCliente.size,
       // A mensalidade é do CLIENTE e o custo é da FILIAL. Somar mensalidade_ds
@@ -271,7 +311,7 @@ export default function OemIntegrationTab() {
       custo: comPar.reduce((a, l) => a + Number(l.custo_oem || 0), 0),
       negativas: porClienteNeg,
     };
-  }, [linhas]);
+  }, [linhas, filiaisComCodigo]);
 
   async function sincronizar() {
     setSincronizando(true);
@@ -830,6 +870,49 @@ export default function OemIntegrationTab() {
               </CardContent>
             </Card>
           </div>
+
+          {/* O código do OEM só chega à ficha do cliente quando o cadastro
+              comporta. O que não chegou é buraco de cadastro, e some da vista
+              se ficar só no relatório de quem rodou a migration. */}
+          {(r.semCodigo.multiplas.length > 0 || r.semCodigo.semProduto.length > 0) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  {r.semCodigo.total - r.semCodigo.gravados} licenças vinculadas sem código na
+                  ficha do cliente
+                </CardTitle>
+                <CardDescription>
+                  {r.semCodigo.gravados} de {r.semCodigo.total} vínculos já gravaram o par
+                  grupo · filial no produto do cliente. Os demais não gravaram por um destes dois
+                  motivos — em nenhum dos dois o sistema deve escolher sozinho.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border p-3">
+                  <p className="text-2xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+                    {r.semCodigo.multiplas.length}
+                  </p>
+                  <p className="text-sm font-medium mt-1">Mais de uma filial no mesmo cliente</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    A regra é <strong>1 filial = 1 cliente</strong>. Aqui várias licenças apontam
+                    para o mesmo cadastro, então gravar o código escolheria uma no chute. Ou faltam
+                    cadastros de cliente, ou o casamento automático por CNPJ errou.
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-2xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+                    {r.semCodigo.semProduto.length}
+                  </p>
+                  <p className="text-sm font-medium mt-1">Cliente sem produto ativo</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    A licença é cobrada no OEM, mas o cliente não tem nenhuma linha de produto
+                    ativa no DoctorSaaS — não há onde gravar o código, nem de onde sair o custo.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
 
