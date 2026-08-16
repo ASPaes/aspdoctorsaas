@@ -904,6 +904,11 @@ export default function OemIntegrationTab() {
                       <p className="text-xs text-muted-foreground">
                         filial {l.filial_codigo} · grupo {l.empresa_codigo} · CNPJ {l.cnpj_norm}
                       </p>
+                      {/* Sem isto, a filial travada pela regra 1:1 aparece com
+                          "1 candidatos" e nenhuma pista de por que não casou. */}
+                      {l.observacao && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">{l.observacao}</p>
+                      )}
                     </div>
                     <span className="w-28 text-center">
                       <Badge variant="outline">{l.qtd_candidatos_ds} candidatos</Badge>

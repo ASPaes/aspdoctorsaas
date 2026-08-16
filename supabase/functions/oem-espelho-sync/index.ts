@@ -327,13 +327,14 @@ Deno.serve(async (req) => {
       const recon: Record<string, unknown>[] = [];
       const comFilial = new Set<string>();
 
-      for (const l of linhas) {
+      // A escolha automática de uma filial, isolada num lugar só porque agora é
+      // usada duas vezes: uma para descobrir quem está sendo disputado, outra
+      // para montar a linha.
+      const escolhaAuto = (l: typeof linhas[number]) => {
         // CNPJ de grupo não identifica loja: quando ele se repete entre filiais,
         // o critério passa a ser o nome. Não é preferência — é o único campo
         // que sobra distinguindo uma loja da outra.
         const porGrupo = cnpjDeGrupo(l.cnpj_norm);
-        const criterio: "cnpj" | "nome" = porGrupo ? "nome" : "cnpj";
-
         const cands = porGrupo
           ? [...new Map(
               [l.nome_fantasia, l.razao_social]
@@ -341,16 +342,59 @@ Deno.serve(async (req) => {
                 .map((c) => [c.id, c] as const),
             ).values()]
           : (l.cnpj_norm ? (porCnpj.get(l.cnpj_norm) ?? []) : []);
-
         // Cliente ativo tem preferência: o cancelado costuma ser cadastro velho.
         const ativos = cands.filter((c) => !c.cancelado);
-        const escolha = ativos.length === 1 ? ativos[0] : cands.length === 1 ? cands[0] : null;
+        return {
+          porGrupo,
+          cands,
+          escolha: ativos.length === 1 ? ativos[0] : cands.length === 1 ? cands[0] : null,
+        };
+      };
+
+      // ------------------------------- 5a. a trava: 1 filial = 1 cliente
+      //
+      // Regra do Alexandre. Até aqui cada filial escolhia seu cliente sozinha,
+      // e nada impedia duas de escolherem o mesmo — foi assim que um cadastro
+      // acumulou as licenças de um grupo inteiro. Amontoar em silêncio é pior
+      // que não casar: quem olha a ficha vê custo que não é daquele cliente, e
+      // ninguém é perguntado porque a máquina se deu por satisfeita.
+      //
+      // Cliente disputado por mais de uma filial — ou já preso por código ou
+      // decisão humana — sai do automático e as filiais candidatas vão para a
+      // fila de escolha. O número de "resolvidos" piora na tela e melhora na
+      // verdade.
+      const fixado = new Set<string>();
+      for (const l of linhas) {
+        const cod = porCodigo.get(String(l.filial_codigo));
+        const hum = decidido.get(l.filial_codigo)?.ds_customer_id;
+        if (cod) fixado.add(cod);
+        else if (hum) fixado.add(hum);
+      }
+      const pretendido = new Map<string, number>();
+      for (const l of linhas) {
+        if (porCodigo.get(String(l.filial_codigo))) continue;
+        if (decidido.get(l.filial_codigo)?.ds_customer_id) continue;
+        const id = escolhaAuto(l).escolha?.id;
+        if (id) pretendido.set(id, (pretendido.get(id) ?? 0) + 1);
+      }
+      const disputado = new Set<string>();
+      for (const [id, n] of pretendido) if (n > 1 || fixado.has(id)) disputado.add(id);
+
+      for (const l of linhas) {
+        const { porGrupo, cands, escolha: escolhaBruta } = escolhaAuto(l);
+        const criterio: "cnpj" | "nome" = porGrupo ? "nome" : "cnpj";
+        // Aqui a trava age: pretendente de cliente disputado não vira vínculo.
+        const escolha = escolhaBruta && disputado.has(escolhaBruta.id) ? null : escolhaBruta;
         const anterior = decidido.get(l.filial_codigo);
 
         let estado: string, acao: string, alvo: ClienteDs | null = escolha;
         if (cands.length === 0) { estado = "SO_NO_OEM"; acao = "criar_cliente"; }
         else if (escolha) { estado = "CASADO"; acao = "vinculo_auto_ok"; }
         else { estado = "AMBIGUO"; acao = "escolher_candidato"; alvo = null; }
+        // Um candidato só, mas disputado, não é ambiguidade de nome — é falta
+        // de cadastro. Dizer isso na tela evita mandar procurar "o outro
+        // candidato" que não existe.
+        const travado = !!escolhaBruta && !escolha;
 
         // Decisão humana anterior vence a sugestão automática...
         if (anterior?.ds_customer_id) {
@@ -408,13 +452,15 @@ Deno.serve(async (req) => {
           cnpj_ds: cnpjDs,
           razao_social_oem: nomeOem, razao_social_ds: nomeDs,
           criterio_match: porCod ? "codigo" : criterio,
+          observacao: travado
+            ? "Este cliente já é de outra filial. Falta o cadastro de cliente desta loja — ou o vínculo vai para o cadastro errado."
+            : (anterior?.observacao ?? null),
           divergencias: divs.length ? divs : null,
           mensalidade_ds: cli?.mensalidade ?? null, cancelado_ds: cli?.cancelado ?? null,
           qtd_candidatos_ds: cands.length,
           estado_match: estado, acao_sugerida: acao,
           status_usuario: anterior?.status_usuario ?? (estado === "CASADO" ? "vinculado" : "novo"),
           candidato_escolhido: anterior?.candidato_escolhido ?? null,
-          observacao: anterior?.observacao ?? null,
           resolvido_em: anterior?.resolvido_em ?? null,
           resolvido_por: anterior?.resolvido_por ?? null,
         });
