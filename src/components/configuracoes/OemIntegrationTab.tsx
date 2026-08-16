@@ -114,16 +114,39 @@ function Origem({ lado }: { lado: "oem" | "ds" }) {
 
 // Divergência tem que mostrar os DOIS lados na mesma linha. Dizer "CNPJ
 // divergente" sem dizer contra o quê obriga a abrir duas telas para entender.
-function LinhaConferencia({ l }: { l: Recon }) {
+function LinhaConferencia({
+  l, onTrocar, onDesfazer, desfazendo,
+}: {
+  l: Recon;
+  onTrocar: (l: Recon) => void;
+  onDesfazer: (id: string) => void;
+  desfazendo: string | null;
+}) {
   const difNome = l.divergencias?.includes("nome");
   const difCnpj = l.divergencias?.includes("cnpj");
   const cor = (dif?: boolean) => (dif ? "text-destructive font-medium" : "text-muted-foreground");
   return (
     <div className="px-4 py-3 text-sm space-y-1.5">
-      <p className="text-xs text-muted-foreground">
-        filial {l.filial_codigo} · grupo {l.empresa_codigo}
-        {l.status_oem && ` · ${l.status_oem}`}
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          filial {l.filial_codigo} · grupo {l.empresa_codigo}
+          {l.status_oem && ` · ${l.status_oem}`}
+        </p>
+        {/* A saída na própria linha: mostrar o problema e mandar procurar o
+            mesmo registro em outra aba é meia funcionalidade. */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button size="sm" variant="secondary" onClick={() => onTrocar(l)}>
+            Trocar cliente
+          </Button>
+          <Button size="sm" variant="ghost" className="gap-1.5"
+            disabled={desfazendo === l.id} onClick={() => onDesfazer(l.id)}>
+            {desfazendo === l.id
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <Undo2 className="h-3.5 w-3.5" />}
+            Desfazer
+          </Button>
+        </div>
+      </div>
       <div className="grid gap-x-4 gap-y-1 sm:grid-cols-[4rem_1fr_1fr] items-baseline">
         <span className="text-xs text-muted-foreground">Nome</span>
         <span className={`truncate ${cor(difNome)}`}>
@@ -832,7 +855,11 @@ export default function OemIntegrationTab() {
             <strong> grupo · filial</strong> foi gravado na ficha do cliente, é ele que segura a
             ligação, e não o CNPJ. A cada atualização do espelho os outros dois campos são
             comparados dos dois lados, e o que deixou de bater aparece aqui.{" "}
-            <strong>Divergência é aviso, não desvínculo</strong> — nada é desfeito sozinho.
+            <strong>Divergência é aviso, não desvínculo</strong> — nada é desfeito sozinho, e por
+            isso cada linha traz as duas saídas: <strong>Trocar cliente</strong>, quando o vínculo
+            está no cadastro errado, e <strong>Desfazer</strong>, que devolve a filial à fila de
+            escolha. Se o certo for corrigir o cadastro (num dos dois sistemas), não mexa aqui — a
+            próxima atualização do espelho tira a linha desta lista sozinha.
           </Explica>
 
           <div className="grid gap-3 sm:grid-cols-3">
@@ -872,7 +899,10 @@ export default function OemIntegrationTab() {
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="divide-y border-t max-h-96 overflow-y-auto">
-                      {filtra(r.divCnpj).map((l) => <LinhaConferencia key={l.id} l={l} />)}
+                      {filtra(r.divCnpj).map((l) => (
+                        <LinhaConferencia key={l.id} l={l} onTrocar={setEscolhendo}
+                          onDesfazer={desvincular} desfazendo={desfazendo} />
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
@@ -892,7 +922,10 @@ export default function OemIntegrationTab() {
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="divide-y border-t max-h-96 overflow-y-auto">
-                      {filtra(r.divNome).map((l) => <LinhaConferencia key={l.id} l={l} />)}
+                      {filtra(r.divNome).map((l) => (
+                        <LinhaConferencia key={l.id} l={l} onTrocar={setEscolhendo}
+                          onDesfazer={desvincular} desfazendo={desfazendo} />
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
