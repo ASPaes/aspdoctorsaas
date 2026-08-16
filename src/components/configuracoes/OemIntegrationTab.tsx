@@ -49,6 +49,8 @@ type Recon = {
   margem: number | null;
   observacao: string | null;
   resolvido_em: string | null;
+  cnpj_ds: string | null;
+  divergencias: string[] | null;
 };
 
 type Conta = {
@@ -107,6 +109,43 @@ function Origem({ lado }: { lado: "oem" | "ds" }) {
     >
       {lado === "oem" ? "OEM" : "DoctorSaaS"}
     </span>
+  );
+}
+
+// Divergência tem que mostrar os DOIS lados na mesma linha. Dizer "CNPJ
+// divergente" sem dizer contra o quê obriga a abrir duas telas para entender.
+function LinhaConferencia({ l }: { l: Recon }) {
+  const difNome = l.divergencias?.includes("nome");
+  const difCnpj = l.divergencias?.includes("cnpj");
+  const cor = (dif?: boolean) => (dif ? "text-destructive font-medium" : "text-muted-foreground");
+  return (
+    <div className="px-4 py-3 text-sm space-y-1.5">
+      <p className="text-xs text-muted-foreground">
+        filial {l.filial_codigo} · grupo {l.empresa_codigo}
+        {l.status_oem && ` · ${l.status_oem}`}
+      </p>
+      <div className="grid gap-x-4 gap-y-1 sm:grid-cols-[4rem_1fr_1fr] items-baseline">
+        <span className="text-xs text-muted-foreground">Nome</span>
+        <span className={`truncate ${cor(difNome)}`}>
+          <span className="text-sky-600 dark:text-sky-400 text-xs mr-1.5">OEM</span>
+          {l.razao_oem ?? "—"}
+        </span>
+        <span className={`truncate ${cor(difNome)}`}>
+          <span className="text-emerald-600 dark:text-emerald-400 text-xs mr-1.5">DS</span>
+          {l.razao_ds ?? "—"}
+        </span>
+
+        <span className="text-xs text-muted-foreground">CNPJ</span>
+        <span className={`tabular-nums ${cor(difCnpj)}`}>
+          <span className="text-sky-600 dark:text-sky-400 text-xs mr-1.5">OEM</span>
+          {l.cnpj_norm ?? "—"}
+        </span>
+        <span className={`tabular-nums ${cor(difCnpj)}`}>
+          <span className="text-emerald-600 dark:text-emerald-400 text-xs mr-1.5">DS</span>
+          {l.cnpj_ds ?? "—"}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -238,7 +277,7 @@ export default function OemIntegrationTab() {
             "id, cnpj_norm, empresa_codigo, filial_codigo, razao_oem, custo_oem, status_oem, " +
             "bloqueado_oem, ds_customer_id, razao_ds, mensalidade_ds, cancelado_ds, " +
             "qtd_candidatos_ds, estado_match, acao_sugerida, status_usuario, margem, " +
-            "observacao, resolvido_em",
+            "observacao, resolvido_em, cnpj_ds, divergencias",
           )
           .eq("conta_integration_id", conta!.id),
       ),
@@ -351,6 +390,12 @@ export default function OemIntegrationTab() {
           total: comFilial.length,
         };
       })(),
+      // Conferência: o vínculo está feito, mas algo deixou de bater. CNPJ vem
+      // primeiro porque é o sinal forte — nome divergente é o normal entre um
+      // sistema que guarda loja e outro que guarda razão social.
+      divCnpj: linhas.filter((l) => l.divergencias?.includes("cnpj")),
+      divNome: linhas.filter((l) => l.divergencias?.includes("nome") && !l.divergencias?.includes("cnpj")),
+      confereOk: linhas.filter((l) => l.ds_customer_id && l.filial_codigo && !l.divergencias?.length).length,
       comPar,
       clientesComPar: porCliente.size,
       // A mensalidade é do CLIENTE e o custo é da FILIAL. Somar mensalidade_ds
@@ -421,7 +466,7 @@ export default function OemIntegrationTab() {
     const q = busca.trim().toLowerCase();
     if (!q) return lista;
     return lista.filter((l) =>
-      [l.razao_oem, l.razao_ds, l.cnpj_norm, l.filial_codigo, l.empresa_codigo]
+      [l.razao_oem, l.razao_ds, l.cnpj_norm, l.cnpj_ds, l.filial_codigo, l.empresa_codigo]
         .some((c) => String(c ?? "").toLowerCase().includes(q)));
   };
 
@@ -503,6 +548,10 @@ export default function OemIntegrationTab() {
           <TabsTrigger value="escolher" className="gap-1.5">
             Escolher candidato
             {r.escolher.length > 0 && <Badge variant="secondary">{r.escolher.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="conferencia" className="gap-1.5">
+            Conferência
+            {r.divCnpj.length > 0 && <Badge variant="destructive">{r.divCnpj.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="margem" className="gap-1.5">
             Margem
@@ -773,6 +822,82 @@ export default function OemIntegrationTab() {
                 </div>
               </CardContent>
             </Card>
+          )}
+        </TabsContent>
+
+        {/* ------------------------------------------------------- conferência */}
+        <TabsContent value="conferencia" className="space-y-3">
+          <Explica>
+            Aqui não se decide vínculo — ele já está feito. A partir do momento em que o par
+            <strong> grupo · filial</strong> foi gravado na ficha do cliente, é ele que segura a
+            ligação, e não o CNPJ. A cada atualização do espelho os outros dois campos são
+            comparados dos dois lados, e o que deixou de bater aparece aqui.{" "}
+            <strong>Divergência é aviso, não desvínculo</strong> — nada é desfeito sozinho.
+          </Explica>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Numero valor={String(r.confereOk)} rotulo="Conferem" tom="bom"
+              sub="nome e CNPJ batendo" />
+            <Numero valor={String(r.divCnpj.length)} rotulo="CNPJ divergente"
+              tom={r.divCnpj.length ? "ruim" : "bom"} sub="sinal forte — provável vínculo errado" />
+            <Numero valor={String(r.divNome.length)} rotulo="Só o nome divergente"
+              tom="normal" sub="esperado: o OEM guarda nome de loja" />
+          </div>
+
+          <div className="relative max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar por nome, CNPJ ou código" className="pl-8"
+              value={busca} onChange={(e) => { setBusca(e.target.value); setPagina(0); }} />
+          </div>
+
+          {r.divCnpj.length === 0 && r.divNome.length === 0 ? (
+            <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
+              Nada divergindo. Se você ainda não clicou em <strong>Atualizar espelho</strong> depois
+              de gravar os códigos, a conferência ainda não rodou nenhuma vez.
+            </CardContent></Card>
+          ) : (
+            <>
+              {r.divCnpj.length > 0 && (
+                <Card className="border-destructive/40">
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2 text-destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      {r.divCnpj.length} com CNPJ diferente dos dois lados
+                    </CardTitle>
+                    <CardDescription>
+                      O código diz que esta licença é deste cliente, mas os CNPJs não são o mesmo.
+                      Ou o cadastro mudou de um lado só, ou o vínculo está no cliente errado —
+                      neste caso, desfaça em <strong>Escolher candidato</strong> e refaça.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="divide-y border-t max-h-96 overflow-y-auto">
+                      {filtra(r.divCnpj).map((l) => <LinhaConferencia key={l.id} l={l} />)}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {r.divNome.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">
+                      {r.divNome.length} com só o nome diferente
+                    </CardTitle>
+                    <CardDescription>
+                      CNPJ bate, então o vínculo está certo. O OEM guarda nome de loja
+                      (“FILIAL 1”) e o DoctorSaaS guarda razão social — divergir aqui é o normal,
+                      e a comparação já ignora acento, caixa e sufixo (LTDA, ME, EPP).
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="divide-y border-t max-h-96 overflow-y-auto">
+                      {filtra(r.divNome).map((l) => <LinhaConferencia key={l.id} l={l} />)}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
         </TabsContent>
 

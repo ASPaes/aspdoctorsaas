@@ -36,6 +36,33 @@ const json = (corpo: unknown, status = 200) =>
 
 const digitos = (s: unknown) => String(s ?? "").replace(/\D/g, "");
 
+// Comparar nome cru marcaria quase tudo como divergente: acento, caixa,
+// pontuação e sufixo societário mudam sem que a empresa seja outra. O que sobra
+// depois disso é diferença de verdade — "FILIAL 1" contra "Padaria do João" —,
+// e mesmo essa é comum, porque o OEM guarda nome de loja e o DoctorSaaS guarda
+// razão social. Por isso divergência de nome é aviso fraco; a de CNPJ é a forte.
+const normNome = (s: unknown) =>
+  String(s ?? "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .replace(/\b(LTDA|ME|EPP|EIRELI|MEI|CIA|S\/A|SA)\b/g, " ")
+    .replace(/[^A-Z0-9]+/g, " ")
+    .trim();
+
+/** O que não bate entre os dois lados de um vínculo já feito. */
+function apurarDivergencias(
+  oemNome: string | null, oemCnpj: string | null,
+  dsNome: string | null, dsCnpj: string | null,
+): string[] {
+  const d: string[] = [];
+  const a = normNome(oemNome), b = normNome(dsNome);
+  // Lado vazio não é divergência: é cadastro incompleto, outro assunto.
+  if (a && b && a !== b) d.push("nome");
+  const ca = digitos(oemCnpj), cb = digitos(dsCnpj);
+  if (ca && cb && ca !== cb) d.push("cnpj");
+  return d;
+}
+
 type FilialOem = {
   empresa_codigo: string | null; filial_codigo: string | null;
   nome_fantasia: string | null; razao_social: string | null; grupo_economico: string | null;
@@ -214,6 +241,24 @@ Deno.serve(async (req) => {
         porCnpj.get(k)!.push(c);
       }
 
+      const porId = new Map<string, ClienteDs>(clientes.map((c) => [c.id, c]));
+
+      // ------------------ 3b. o vínculo DURÁVEL: o código na ficha do cliente
+      // Desde 15/08/2026 o par grupo+filial fica gravado em cliente_produtos.
+      // É a chave que sobrevive a tudo: o de/para é apagado e refeito a cada
+      // carga, e o CNPJ pode mudar dos dois lados — o código, não. Por isso ele
+      // vem ANTES do casamento por CNPJ e antes até da decisão manual antiga.
+      const porCodigo = new Map<string, string>();
+      {
+        const vinculados = await lerTudo<{ cliente_id: string; oem_codigo_filial: string }>(
+          (a, b) => ds.from("cliente_produtos")
+            .select("cliente_id, oem_codigo_filial")
+            .eq("tenant_id", conta.tenant_id)
+            .not("oem_codigo_filial", "is", null)
+            .order("cliente_id").range(a, b));
+        for (const v of vinculados) porCodigo.set(String(v.oem_codigo_filial), v.cliente_id);
+      }
+
       // ---------------------- 4. preserva as decisões humanas já tomadas
       const antigas = await lerTudo<any>((a, b) =>
         ds.from("reconciliacao_oem")
@@ -240,13 +285,37 @@ Deno.serve(async (req) => {
         else if (escolha) { estado = "CASADO"; acao = "vinculo_auto_ok"; }
         else { estado = "AMBIGUO"; acao = "escolher_candidato"; alvo = null; }
 
-        // Decisão humana anterior sempre vence a sugestão automática.
+        // Decisão humana anterior vence a sugestão automática...
         if (anterior?.ds_customer_id) {
           alvo = cands.find((c) => c.id === anterior.ds_customer_id)
             ?? ({ id: anterior.ds_customer_id } as ClienteDs);
         }
+        // ...e o código gravado na ficha vence tudo. É o único elo que não
+        // depende de o CNPJ continuar igual dos dois lados — e é justamente
+        // quando ele deixa de estar igual que a conferência tem serviço.
+        const porCod = porCodigo.get(String(l.filial_codigo));
+        if (porCod) {
+          alvo = porId.get(porCod) ?? ({ id: porCod } as ClienteDs);
+          estado = "CASADO";
+          acao = "vinculo_auto_ok";
+        }
+
         if (alvo?.id) comFilial.add(alvo.id);
-        const cli = alvo && "mensalidade" in alvo ? alvo : cands.find((c) => c.id === alvo?.id) ?? null;
+        const cli = alvo && "mensalidade" in alvo
+          ? alvo
+          : porId.get(String(alvo?.id)) ?? cands.find((c) => c.id === alvo?.id) ?? null;
+
+        // Só faz sentido conferir o que já está vinculado: sem vínculo não há
+        // dois lados para comparar.
+        // Razão social contra razão social. Comparar com nome fantasia jogaria
+        // nome de loja ("FILIAL 1") contra nome de empresa e daria divergência
+        // em praticamente tudo.
+        const divs = cli
+          ? apurarDivergencias(
+              l.razao_social ?? l.nome_fantasia, l.cnpj_norm,
+              cli.razao_social ?? cli.nome_fantasia, cli.cnpj_digits || digitos(cli.cnpj),
+            )
+          : [];
 
         recon.push({
           tenant_id: conta.tenant_id, conta_integration_id: conta.id,
@@ -255,6 +324,8 @@ Deno.serve(async (req) => {
           custo_oem: l.custo_total, status_oem: l.status, bloqueado_oem: l.bloqueado,
           ds_customer_id: alvo?.id ?? null,
           razao_ds: cli?.nome_fantasia ?? cli?.razao_social ?? null,
+          cnpj_ds: cli ? (cli.cnpj_digits || digitos(cli.cnpj) || null) : null,
+          divergencias: divs.length ? divs : null,
           mensalidade_ds: cli?.mensalidade ?? null, cancelado_ds: cli?.cancelado ?? null,
           qtd_candidatos_ds: cands.length,
           estado_match: estado, acao_sugerida: acao,
