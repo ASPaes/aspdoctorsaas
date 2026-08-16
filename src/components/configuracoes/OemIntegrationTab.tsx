@@ -277,7 +277,17 @@ export default function OemIntegrationTab() {
     setSincronizando(true);
     try {
       const { data, error } = await supabase.functions.invoke("oem-espelho-sync", { body: conta ? { contaId: conta.id } : {} });
-      if (error) throw error;
+      // Em erro HTTP o supabase-js só diz "non-2xx status code" e joga fora o
+      // corpo. A causa real (sem permissão, chave errada, DoctorOEM fora do ar)
+      // está no `mensagem` que a function devolve — vale a pena ir buscar.
+      if (error) {
+        const resp = (error as any)?.context;
+        if (resp instanceof Response) {
+          const corpo = await resp.clone().json().catch(() => null);
+          if (corpo?.mensagem) throw new Error(corpo.mensagem);
+        }
+        throw error;
+      }
       const res = (data as any)?.resultados?.[0];
       toast({
         title: "Espelho atualizado",

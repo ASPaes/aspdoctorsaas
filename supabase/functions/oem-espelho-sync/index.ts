@@ -21,6 +21,19 @@
 // ============================================================================
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
+// O botão "Atualizar espelho" é chamado do navegador. Sem responder ao
+// preflight OPTIONS, o fetch nem sai: o supabase-js devolve "Failed to send a
+// request to the Edge Function" — que parece erro de rede, mas é CORS. Nasceu
+// sem isso porque só tinha sido exercitada por chamada de servidor.
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+const json = (corpo: unknown, status = 200) =>
+  Response.json(corpo, { status, headers: cors });
+
 const digitos = (s: unknown) => String(s ?? "").replace(/\D/g, "");
 
 type FilialOem = {
@@ -93,6 +106,8 @@ async function exigirAdmin(req: Request, ds: SupabaseClient): Promise<void> {
 }
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+
   const inicio = Date.now();
   try {
     const ds = createClient(
@@ -110,7 +125,7 @@ Deno.serve(async (req) => {
     const { data: contas, error: errC } = await q;
     if (errC) throw new Error(`oem_integration: ${errC.message}`);
     if (!contas?.length) {
-      return Response.json({
+      return json({
         ok: true, duracaoMs: Date.now() - inicio, resultados: [],
         mensagem: "Nenhuma conta OEM configurada. Configure em Integrações › OEM › Conexão.",
       });
@@ -297,10 +312,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    return Response.json({ ok: true, duracaoMs: Date.now() - inicio, resultados });
+    return json({ ok: true, duracaoMs: Date.now() - inicio, resultados });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[oem-espelho-sync]", msg);
-    return Response.json({ ok: false, duracaoMs: Date.now() - inicio, mensagem: msg }, { status: 500 });
+    // Falta de permissão não é erro do servidor: 500 esconde a causa e some com
+    // a mensagem na tela, que é justamente a que o usuário precisa ler.
+    const semPermissao = /token|autentic|administrador/i.test(msg);
+    return json({ ok: false, duracaoMs: Date.now() - inicio, mensagem: msg }, semPermissao ? 403 : 500);
   }
 });
