@@ -304,10 +304,20 @@ Deno.serve(async (req) => {
       }
 
       // ---------------------- 4. preserva as decisões humanas já tomadas
+      //
+      // O filtro é `resolvido_em is not null`, e NÃO `status_usuario <> 'novo'`.
+      // A própria sincronização grava status_usuario='vinculado' no casamento
+      // automático, então o filtro antigo tratava palpite da máquina como
+      // decisão a preservar: as 23 licenças que o CNPJ de grupo jogou no
+      // cadastro errado sobreviveriam a qualquer melhoria do algoritmo, e a
+      // correção do CNPJ de grupo não teria efeito nenhum sobre elas.
+      //
+      // Só existe decisão humana onde alguém carimbou quem e quando — é o que
+      // as RPCs vincular/ignorar/desvincular gravam.
       const antigas = await lerTudo<any>((a, b) =>
         ds.from("reconciliacao_oem")
           .select("filial_codigo, ds_customer_id, candidato_escolhido, status_usuario, observacao, resolvido_em, resolvido_por")
-          .eq("conta_integration_id", conta.id).neq("status_usuario", "novo").range(a, b));
+          .eq("conta_integration_id", conta.id).not("resolvido_em", "is", null).range(a, b));
       const decidido = new Map<string, any>();
       for (const d of antigas) if (d.filial_codigo) decidido.set(String(d.filial_codigo), d);
 
