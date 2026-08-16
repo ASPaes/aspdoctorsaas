@@ -1338,8 +1338,31 @@ export default function OemIntegrationTab() {
           {/* O código do OEM só chega à ficha do cliente quando o cadastro
               comporta. O que não chegou é buraco de cadastro, e some da vista
               se ficar só no relatório de quem rodou a migration. */}
-          {(r.semCodigo.multiplas.length > 0 || r.semCodigo.semProduto.length > 0
-            || r.semCodigo.variosProdutos.length > 0 || r.semCodigo.outroMotivo.length > 0) && (
+          {/* Zerado, este card VIRA a boa notícia em vez de sumir. Card que
+              desaparece quando está tudo certo é indistinguível de tela
+              quebrada — foi o que fez o Alexandre perguntar "os demais
+              sumiram, por quê?" depois de a trava 1:1 esvaziar os baldes. */}
+          {r.semCodigo.multiplas.length === 0 && r.semCodigo.semProduto.length === 0
+            && r.semCodigo.variosProdutos.length === 0 && r.semCodigo.outroMotivo.length === 0 ? (
+            <Card className="border-emerald-500/40">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Todos os vínculos gravaram o código na ficha do cliente
+                </CardTitle>
+                <CardDescription>
+                  Os {r.semCodigo.gravados} vínculos em escopo têm o par grupo · filial gravado no
+                  produto do cliente — é essa chave que segura a ligação quando o CNPJ muda de um
+                  lado. O que ainda precisa de gente está em <strong>Escolher candidato</strong>,
+                  não aqui.
+                  {r.semCodigo.foraDeEscopo > 0 && (
+                    <> Outros <strong>{r.semCodigo.foraDeEscopo}</strong> ficam de fora da conta:
+                    licenças desativadas no OEM ou de clientes cancelados.</>
+                  )}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ) : (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
