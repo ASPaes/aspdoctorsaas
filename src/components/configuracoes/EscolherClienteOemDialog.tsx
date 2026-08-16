@@ -140,7 +140,7 @@ export default function EscolherClienteOemDialog({
   const idsCandidatos = new Set(candidatos.map((c) => c.id));
   const extras = achados.filter((c) => !idsCandidatos.has(c.id));
 
-  const Linha = ({ c, sugerido }: { c: Candidato; sugerido: boolean }) => (
+  const Linha = ({ c }: { c: Candidato }) => (
     <div className="flex items-center gap-3 p-3 text-sm">
       <div className="min-w-0 flex-1">
         <p className="font-medium truncate">
@@ -148,9 +148,15 @@ export default function EscolherClienteOemDialog({
           {c.cancelado && <Badge variant="outline" className="ml-2 text-xs">cancelado</Badge>}
         </p>
         <p className="text-xs text-muted-foreground">
-          CNPJ {c.cnpj || c.cnpj_digits || "—"} · mensalidade {brl(c.mensalidade)}
-          {sugerido && linha?.custo_oem != null && (
-            <> · margem <strong>{brl(Number(c.mensalidade || 0) - Number(linha.custo_oem))}</strong></>
+          CNPJ {c.cnpj || c.cnpj_digits || "—"} · mensalidade que ele paga {brl(c.mensalidade)}
+          {linha?.custo_oem != null && (
+            <> · margem se vincular{" "}
+              <strong className={
+                Number(c.mensalidade || 0) - Number(linha.custo_oem) < 0 ? "text-destructive" : ""
+              }>
+                {brl(Number(c.mensalidade || 0) - Number(linha.custo_oem))}
+              </strong>
+            </>
           )}
         </p>
       </div>
@@ -166,20 +172,35 @@ export default function EscolherClienteOemDialog({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Escolher o cliente desta filial</DialogTitle>
-          <DialogDescription>
-            {linha && (
-              <>
-                <strong>{linha.razao_oem}</strong> — filial {linha.filial_codigo} · grupo{" "}
-                {linha.empresa_codigo} · CNPJ {linha.cnpj_norm ?? "—"} · custo {brl(linha.custo_oem)}
-              </>
-            )}
+          <DialogDescription asChild>
+            <div className="space-y-2">
+              <p>
+                Em cima, a <strong>filial do OEM</strong> (a licença). Embaixo, os{" "}
+                <strong>clientes do DoctorSaaS</strong>. Vincular diz que aquela licença é
+                daquele cliente.
+              </p>
+              {linha && (
+                <div className="rounded-md border bg-muted/40 px-3 py-2 text-foreground">
+                  <p className="font-medium">
+                    <span className="mr-1.5 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-600 dark:text-sky-400">
+                      OEM
+                    </span>
+                    {linha.razao_oem}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    filial {linha.filial_codigo} · grupo {linha.empresa_codigo} · CNPJ{" "}
+                    {linha.cnpj_norm ?? "—"} · <strong>custo da licença {brl(linha.custo_oem)}</strong>
+                  </p>
+                </div>
+              )}
+            </div>
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-1.5">
-              Clientes com este CNPJ ({candidatos.length})
+              Clientes do DoctorSaaS com este CNPJ ({candidatos.length})
             </p>
             {isLoading ? (
               <Skeleton className="h-20 w-full" />
@@ -189,14 +210,14 @@ export default function EscolherClienteOemDialog({
               </p>
             ) : (
               <div className="rounded-md border divide-y max-h-56 overflow-y-auto">
-                {candidatos.map((c) => <Linha key={c.id} c={c} sugerido />)}
+                {candidatos.map((c) => <Linha key={c.id} c={c} />)}
               </div>
             )}
           </div>
 
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-1.5">
-              Ou procure outro cliente
+              Ou procure outro cliente do DoctorSaaS
             </p>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -214,7 +235,7 @@ export default function EscolherClienteOemDialog({
                 ) : extras.length === 0 ? (
                   <div className="p-3 text-sm text-muted-foreground">Nada encontrado.</div>
                 ) : (
-                  extras.map((c) => <Linha key={c.id} c={c} sugerido={false} />)
+                  extras.map((c) => <Linha key={c.id} c={c} />)
                 )}
               </div>
             )}

@@ -84,6 +84,32 @@ function Numero({
   );
 }
 
+// Duas bases, dois vocabulários. A tela mistura as duas o tempo todo e sem
+// rótulo ninguém sabe qual número está olhando: "custo" é sempre do OEM (o que
+// a licença custa) e "mensalidade" é sempre do DoctorSaaS (o que o cliente
+// paga). Onde aparecer valor, aparece de onde ele vem.
+function Explica({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+      {children}
+    </div>
+  );
+}
+
+function Origem({ lado }: { lado: "oem" | "ds" }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+        lado === "oem"
+          ? "bg-sky-500/15 text-sky-600 dark:text-sky-400"
+          : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+      }`}
+    >
+      {lado === "oem" ? "OEM" : "DoctorSaaS"}
+    </span>
+  );
+}
+
 export default function OemIntegrationTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -99,13 +125,17 @@ export default function OemIntegrationTab() {
 
   // Uma conta POR UNIDADE BASE, igual ao Omie. A view não tem a coluna da
   // chave nem o ponteiro do Vault — nada disso chega ao navegador.
-  const { data: contas = [] } = useQuery({
+  // O erro NÃO pode virar lista vazia: foi assim que "Nenhuma conta conectada
+  // ainda" ficou aparecendo com conta conectada — a policy de leitura faltava e
+  // a tela dizia que não havia nada, em vez de dizer que não conseguiu ler.
+  const { data: contas = [], error: erroContas } = useQuery({
     queryKey: ["oem-contas", tid],
     queryFn: async () => {
-      const { data } = await (supabase.from("oem_integration_status" as any) as any)
+      const { data, error } = await (supabase.from("oem_integration_status" as any) as any)
         .select("id, unidades_base_ids, chave_prefixo, api_url, ativo, ultimo_status, ultimo_sync_em, ultimo_sync_status, ultimo_sync_msg, criado_em")
         .eq("tenant_id", tid)
         .order("criado_em");
+      if (error) throw error;
       return (data ?? []) as Conta[];
     },
     enabled: !!tid,
@@ -315,6 +345,20 @@ export default function OemIntegrationTab() {
                   <strong>{new Date(ultimaCarga.atualizado_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</strong>.
                 </>
               )}
+              {/* A tela mistura as duas bases o tempo todo; a cor diz de qual
+                  lado veio o número, e o rótulo diz o que ele é. */}
+              <span className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-sky-500" />
+                  <span className="text-sky-600 dark:text-sky-400">OEM</span> — a licença e o que
+                  ela <strong>custa</strong>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span className="text-emerald-600 dark:text-emerald-400">DoctorSaaS</span> — o
+                  cliente e a <strong>mensalidade</strong> que ele paga
+                </span>
+              </span>
             </CardDescription>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -356,6 +400,13 @@ export default function OemIntegrationTab() {
 
         {/* ------------------------------------------------------------ conexão */}
         <TabsContent value="conexao" className="space-y-4 max-w-3xl">
+          <Explica>
+            É aqui que o DoctorSaaS aprende de qual empresa do <strong>DoctorOEM</strong> vêm as
+            filiais. A chave é gerada lá, no Nexus Hub, e colada aqui — <strong>uma conta por
+            unidade base</strong>, como no Omie, para que as filiais de uma unidade não se
+            misturem com os clientes de outra. Quem fala com a API do OEM é o DoctorOEM; o
+            DoctorSaaS só recebe a cópia.
+          </Explica>
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
@@ -368,7 +419,11 @@ export default function OemIntegrationTab() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {contas.length === 0 ? (
+              {erroContas ? (
+                <p className="text-sm text-destructive">
+                  Não foi possível ler as contas conectadas: {(erroContas as any)?.message ?? "erro"}.
+                </p>
+              ) : contas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhuma conta conectada ainda.</p>
               ) : (
                 <div className="rounded-md border divide-y">
@@ -437,6 +492,11 @@ export default function OemIntegrationTab() {
 
         {/* ------------------------------------------------------- visão geral */}
         <TabsContent value="visao" className="space-y-4">
+          <Explica>
+            O resumo do cruzamento entre as <strong>licenças do OEM</strong> e os{" "}
+            <strong>clientes do DoctorSaaS</strong>. Nada aqui é editável — é o retrato do que a
+            última atualização do espelho encontrou.
+          </Explica>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Numero valor={String(r.filiais)} rotulo="Filiais no OEM" sub={`${r.ativas} ativas`} />
             <Numero valor={String(r.vinculadas)} rotulo="Vinculadas automaticamente" tom="bom"
@@ -467,6 +527,13 @@ export default function OemIntegrationTab() {
 
         {/* ---------------------------------------------------------- escolher */}
         <TabsContent value="escolher" className="space-y-3">
+          <Explica>
+            Cada linha aqui é uma <strong>filial do OEM</strong> — uma licença — cujo CNPJ tem
+            mais de um cliente cadastrado no DoctorSaaS. A máquina não desempata sozinha, então
+            ela para e pergunta. <strong>Escolher</strong> abre a lista de{" "}
+            <strong>clientes do DoctorSaaS</strong> para você dizer qual deles é o dono daquela
+            licença. Sua decisão fica gravada e sobrevive às próximas atualizações do espelho.
+          </Explica>
           <div className="relative max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar por nome, CNPJ ou código" className="pl-8"
@@ -477,23 +544,43 @@ export default function OemIntegrationTab() {
               Nenhuma filial aguardando escolha.
             </CardContent></Card>
           ) : (
-            <div className="rounded-md border divide-y">
-              {filtra(r.escolher).slice(0, 100).map((l) => (
-                <div key={l.id} className="flex items-center gap-3 p-3 text-sm">
-                  <HelpCircle className="h-4 w-4 text-amber-500 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{l.razao_oem}</p>
-                    <p className="text-xs text-muted-foreground">
-                      filial {l.filial_codigo} · grupo {l.empresa_codigo} · CNPJ {l.cnpj_norm}
-                    </p>
+            <div className="rounded-md border">
+              <div className="flex items-center gap-3 border-b bg-muted/50 px-3 py-2 text-xs font-medium">
+                <span className="w-4 shrink-0" />
+                <span className="min-w-0 flex-1 text-sky-600 dark:text-sky-400">
+                  Filial no OEM
+                </span>
+                <span className="w-28 text-center text-emerald-600 dark:text-emerald-400">
+                  Candidatos
+                </span>
+                <span className="w-28 text-right text-sky-600 dark:text-sky-400">
+                  Custo
+                </span>
+                <span className="w-[86px] shrink-0" />
+              </div>
+              <div className="divide-y">
+                {filtra(r.escolher).slice(0, 100).map((l) => (
+                  <div key={l.id} className="flex items-center gap-3 p-3 text-sm">
+                    <HelpCircle className="h-4 w-4 text-amber-500 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{l.razao_oem}</p>
+                      <p className="text-xs text-muted-foreground">
+                        filial {l.filial_codigo} · grupo {l.empresa_codigo} · CNPJ {l.cnpj_norm}
+                      </p>
+                    </div>
+                    <span className="w-28 text-center">
+                      <Badge variant="outline">{l.qtd_candidatos_ds} candidatos</Badge>
+                    </span>
+                    <span className="tabular-nums text-muted-foreground w-28 text-right">
+                      {brl(l.custo_oem)}
+                    </span>
+                    <Button size="sm" variant="secondary" className="w-[86px]"
+                      onClick={() => setEscolhendo(l)}>
+                      Escolher
+                    </Button>
                   </div>
-                  <Badge variant="outline">{l.qtd_candidatos_ds} candidatos</Badge>
-                  <span className="tabular-nums text-muted-foreground w-24 text-right">{brl(l.custo_oem)}</span>
-                  <Button size="sm" variant="secondary" onClick={() => setEscolhendo(l)}>
-                    Escolher
-                  </Button>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
           {filtra(r.escolher).length > 100 && (
@@ -513,7 +600,8 @@ export default function OemIntegrationTab() {
                   {r.decididas.length} decisões tomadas à mão
                 </CardTitle>
                 <CardDescription>
-                  Sobrevivem às próximas sincronizações. Desfazer devolve a filial ao casamento automático.
+                  Filial no OEM → cliente no DoctorSaaS. Sobrevivem às próximas sincronizações;
+                  desfazer devolve a filial ao casamento automático.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0 max-h-80 overflow-y-auto">
@@ -521,11 +609,13 @@ export default function OemIntegrationTab() {
                   {filtra(r.decididas).map((l) => (
                     <div key={l.id} className="flex items-center gap-3 px-6 py-2.5 text-sm">
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{l.razao_oem ?? l.razao_ds}</p>
+                        <p className="font-medium truncate flex items-center gap-1.5">
+                          <Origem lado="oem" /> {l.razao_oem ?? l.razao_ds}
+                        </p>
                         <p className="text-xs text-muted-foreground truncate">
                           {l.status_usuario === "ignorado"
-                            ? "ignorada"
-                            : `→ ${l.razao_ds ?? "cliente removido"}`}
+                            ? "ignorada — não vira cliente"
+                            : `→ cliente ${l.razao_ds ?? "removido"}`}
                           {l.filial_codigo && ` · filial ${l.filial_codigo}`}
                           {l.resolvido_em &&
                             ` · ${new Date(l.resolvido_em).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`}
@@ -556,10 +646,22 @@ export default function OemIntegrationTab() {
 
         {/* ------------------------------------------------------------ margem */}
         <TabsContent value="margem" className="space-y-3">
+          <Explica>
+            <strong>Receita</strong> é a soma das mensalidades no DoctorSaaS — o que os clientes
+            pagam. <strong>Custo</strong> é a soma das licenças ativas no OEM — o que a operação
+            paga. A mensalidade é do <strong>cliente</strong> e o custo é da <strong>filial</strong>:
+            um cliente com três lojas paga uma mensalidade e consome três licenças, então a
+            mensalidade entra uma vez por cliente e o custo, uma vez por licença. Diferente da
+            conferência do Omie, aqui os dois números <strong>têm</strong> que ser diferentes — a
+            diferença é o resultado, não um erro. Licença desativada não entra: desativado não
+            cobra, bloqueado cobra.
+          </Explica>
           <div className="grid gap-3 sm:grid-cols-3">
-            <Numero valor={brl(r.receita)} rotulo="Receita" sub={`${r.clientesComPar} clientes ativos`} />
-            <Numero valor={brl(r.custo)} rotulo="Custo das licenças" sub={`${r.comPar.length} licenças`} />
-            <Numero valor={brl(r.receita - r.custo)} rotulo="Margem" tom="bom" />
+            <Numero valor={brl(r.receita)} rotulo="Receita — mensalidades (DoctorSaaS)"
+              sub={`${r.clientesComPar} clientes ativos`} />
+            <Numero valor={brl(r.custo)} rotulo="Custo — licenças ativas (OEM)"
+              sub={`${r.comPar.length} licenças`} />
+            <Numero valor={brl(r.receita - r.custo)} rotulo="Margem — receita menos custo" tom="bom" />
           </div>
 
           {r.negativas.length > 0 && (
@@ -575,6 +677,18 @@ export default function OemIntegrationTab() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
+                <div className="flex items-center gap-3 border-y bg-muted/50 px-6 py-2 text-xs font-medium">
+                  <span className="min-w-0 flex-1 text-emerald-600 dark:text-emerald-400">
+                    Cliente
+                  </span>
+                  <span className="w-28 text-right text-sky-600 dark:text-sky-400">
+                    Custo
+                  </span>
+                  <span className="w-28 text-right text-emerald-600 dark:text-emerald-400">
+                    Mensalidade
+                  </span>
+                  <span className="w-24 text-right">Margem</span>
+                </div>
                 <div className="divide-y">
                   {r.negativas.map((l) => (
                     <div key={l.id} className="flex items-center gap-3 px-6 py-2.5 text-sm">
@@ -584,11 +698,11 @@ export default function OemIntegrationTab() {
                           {l.filiais === 1 ? "1 licença" : `${l.filiais} licenças`} no OEM
                         </p>
                       </div>
-                      <span className="tabular-nums text-muted-foreground w-24 text-right">
-                        custo {brl(l.custo_oem)}
+                      <span className="tabular-nums text-muted-foreground w-28 text-right">
+                        {brl(l.custo_oem)}
                       </span>
-                      <span className="tabular-nums text-muted-foreground w-24 text-right">
-                        cobra {brl(l.mensalidade_ds)}
+                      <span className="tabular-nums text-muted-foreground w-28 text-right">
+                        {brl(l.mensalidade_ds)}
                       </span>
                       <span className="tabular-nums font-medium text-destructive w-24 text-right">
                         {brl(l.margem)}
@@ -603,6 +717,13 @@ export default function OemIntegrationTab() {
 
         {/* -------------------------------------------------------- pendências */}
         <TabsContent value="pendencias" className="space-y-3">
+          <Explica>
+            Os dois lados que não se encontraram. À esquerda, <strong>licenças do OEM</strong> que
+            estão sendo cobradas e não têm cliente correspondente no DoctorSaaS — o valor é o
+            custo da licença. À direita, <strong>clientes do DoctorSaaS</strong> que não têm
+            licença nenhuma no OEM — o valor é a mensalidade que eles pagam. Podem ser de outro
+            produto, e nesse caso não é erro.
+          </Explica>
           <div className="grid gap-3 sm:grid-cols-2">
             <Card>
               <CardHeader>
@@ -610,8 +731,8 @@ export default function OemIntegrationTab() {
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
                   {r.semCliente.length} filiais ativas sem cliente
                 </CardTitle>
-                <CardDescription>
-                  Existem no OEM e são cobradas, mas não têm cadastro no DoctorSaaS.
+                <CardDescription className="flex items-center gap-1.5">
+                  <Origem lado="oem" /> valor = custo da licença
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0 max-h-80 overflow-y-auto">
@@ -638,10 +759,10 @@ export default function OemIntegrationTab() {
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Link2 className="h-4 w-4 text-muted-foreground" />
-                  {r.soNoDs.length} clientes ativos sem filial
+                  {r.soNoDs.length} clientes ativos sem licença
                 </CardTitle>
-                <CardDescription>
-                  Estão no DoctorSaaS e não têm licença no OEM. Podem ser de outro produto.
+                <CardDescription className="flex items-center gap-1.5">
+                  <Origem lado="ds" /> valor = mensalidade do cliente
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0 max-h-80 overflow-y-auto">
