@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
@@ -12,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
-  Undo2, CheckCircle2, ChevronLeft, ChevronRight,
+  Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
 } from "lucide-react";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
 
@@ -202,12 +203,13 @@ function LinhaConferencia({
 // Contar não resolve: com 342 casos, o número sozinho não diz em qual cliente
 // mexer. A lista é o que transforma o diagnóstico em trabalho.
 function ListaSemCodigo({
-  titulo, itens, total, explica,
+  titulo, itens, total, explica, acao,
 }: {
   titulo: string;
   itens: Recon[];
   total: number;
   explica: React.ReactNode;
+  acao: (l: Recon) => React.ReactNode;
 }) {
   const TETO = 100;
   return (
@@ -232,6 +234,7 @@ function ListaSemCodigo({
             <span className="tabular-nums text-muted-foreground shrink-0">
               {(Number(l.custo_oem) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
             </span>
+            <div className="shrink-0">{acao(l)}</div>
           </div>
         ))}
         {itens.length === 0 && (
@@ -253,6 +256,7 @@ export default function OemIntegrationTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
+  const navigate = useNavigate();
   const [sincronizando, setSincronizando] = useState(false);
   const [busca, setBusca] = useState("");
   const [contaSel, setContaSel] = useState<string | null>(null);
@@ -261,6 +265,7 @@ export default function OemIntegrationTab() {
   const [salvando, setSalvando] = useState(false);
   const [escolhendo, setEscolhendo] = useState<LinhaRecon | null>(null);
   const [desfazendo, setDesfazendo] = useState<string | null>(null);
+  const [confirmando, setConfirmando] = useState<string | null>(null);
   const [pagina, setPagina] = useState(0);
   // Licença desativada não cobra, então divergência nela é ruído na maior parte
   // do tempo. A tela abre em "Ativo" e o usuário amplia se quiser.
@@ -520,6 +525,28 @@ export default function OemIntegrationTab() {
 
   function recarregarRecon() {
     queryClient.invalidateQueries({ queryKey: ["oem-recon", conta?.id] });
+  }
+
+  // "Esta é a licença deste cliente" — grava o código na ficha e tira a linha
+  // da pendência. As outras filiais que apontavam para o mesmo cadastro
+  // continuam pendentes, que é o certo: cada uma precisa do seu cliente.
+  async function confirmar(l: Recon) {
+    if (!l.ds_customer_id) return;
+    setConfirmando(l.id);
+    try {
+      const { error } = await (supabase as any).rpc("vincular_filial_oem", {
+        p_recon_id: l.id,
+        p_cliente_id: l.ds_customer_id,
+      });
+      if (error) throw error;
+      toast({ title: "Vínculo confirmado", description: "O código foi gravado na ficha do cliente." });
+      recarregarRecon();
+      queryClient.invalidateQueries({ queryKey: ["oem-codigos-gravados", tid] });
+    } catch (e: any) {
+      toast({ title: "Não deu para confirmar", description: e?.message ?? "Erro", variant: "destructive" });
+    } finally {
+      setConfirmando(null);
+    }
   }
 
   async function desvincular(id: string) {
@@ -1203,6 +1230,20 @@ export default function OemIntegrationTab() {
                   titulo="Mais de uma filial no mesmo cliente"
                   itens={filtra(r.semCodigo.multiplas)}
                   total={r.semCodigo.multiplas.length}
+                  acao={(l) => (
+                    <div className="flex items-center gap-1.5">
+                      <Button size="sm" variant="secondary" className="gap-1.5"
+                        disabled={confirmando === l.id} onClick={() => confirmar(l)}>
+                        {confirmando === l.id
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <CheckCircle2 className="h-3.5 w-3.5" />}
+                        É esta
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEscolhendo(l)}>
+                        Outro cliente
+                      </Button>
+                    </div>
+                  )}
                   explica={<>
                     A regra é <strong>1 filial = 1 cliente</strong>. Aqui várias licenças apontam
                     para o mesmo cadastro, então gravar o código escolheria uma no chute. Ou faltam
@@ -1214,6 +1255,16 @@ export default function OemIntegrationTab() {
                   titulo="Cliente sem produto ativo"
                   itens={filtra(r.semCodigo.semProduto)}
                   total={r.semCodigo.semProduto.length}
+                  // Aqui não há o que decidir nesta tela: falta lançar o produto
+                  // na ficha. O botão leva para lá em vez de fingir uma ação.
+                  acao={(l) => (
+                    <Button size="sm" variant="secondary" className="gap-1.5"
+                      disabled={!l.ds_customer_id}
+                      onClick={() => navigate(`/clientes/${l.ds_customer_id}`)}>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Abrir ficha
+                    </Button>
+                  )}
                   explica={<>
                     A licença é cobrada no OEM, mas o cliente não tem nenhuma linha de produto
                     ativa no DoctorSaaS — não há onde gravar o código, nem de onde sair o custo. O
