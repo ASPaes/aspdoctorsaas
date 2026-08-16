@@ -903,7 +903,7 @@ export default function OemIntegrationTab() {
             <Numero valor={String(r.divCnpj.length)} rotulo="CNPJ divergente"
               tom={r.divCnpj.length ? "ruim" : "bom"} sub="sinal forte — provável vínculo errado" />
             <Numero valor={String(r.divNome.length)} rotulo="Só o nome divergente"
-              tom="normal" sub="esperado: o OEM guarda nome de loja" />
+              tom="normal" sub="CNPJ bate — é diferença de cadastro" />
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -977,9 +977,11 @@ export default function OemIntegrationTab() {
                       {r.divNome.length} com só o nome diferente
                     </CardTitle>
                     <CardDescription>
-                      CNPJ bate, então o vínculo está certo. O OEM guarda nome de loja
-                      (“FILIAL 1”) e o DoctorSaaS guarda razão social — divergir aqui é o normal,
-                      e a comparação já ignora acento, caixa e sufixo (LTDA, ME, EPP).
+                      CNPJ bate, então o vínculo está certo — aqui é diferença de cadastro. A
+                      comparação cruza <strong>razão social e nome fantasia dos dois lados</strong>:
+                      basta um nome bater com um nome para não acusar nada, e acento, caixa,
+                      pontuação e sufixo (LTDA, ME, EPP) são ignorados. O que sobra são nomes
+                      genuinamente diferentes.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="p-0">

@@ -49,15 +49,29 @@ const normNome = (s: unknown) =>
     .replace(/[^A-Z0-9]+/g, " ")
     .trim();
 
-/** O que não bate entre os dois lados de um vínculo já feito. */
+/**
+ * O que não bate entre os dois lados de um vínculo já feito.
+ *
+ * NOME É COMPARADO POR CONJUNTO, não campo a campo — e isso não é preciosismo.
+ * A primeira versão comparava `razao_social ?? nome_fantasia` dos dois lados e
+ * acusou 994 divergências. Medido em 16/08/2026: **994 de 994** eram casos em
+ * que o OEM não tinha razão social e o código caiu na fantasia, comparando
+ * nome de loja contra razão social. Zero eram empresa diferente. Um alarme que
+ * erra 100% das vezes é pior que não ter alarme: treina a ignorar a tela.
+ *
+ * A regra certa é: se QUALQUER nome de um lado bate com QUALQUER nome do outro,
+ * é a mesma empresa. Só divergem quando nada cruza.
+ */
 function apurarDivergencias(
-  oemNome: string | null, oemCnpj: string | null,
-  dsNome: string | null, dsCnpj: string | null,
+  oemNomes: (string | null)[], oemCnpj: string | null,
+  dsNomes: (string | null)[], dsCnpj: string | null,
 ): string[] {
   const d: string[] = [];
-  const a = normNome(oemNome), b = normNome(dsNome);
-  // Lado vazio não é divergência: é cadastro incompleto, outro assunto.
-  if (a && b && a !== b) d.push("nome");
+  const a = new Set(oemNomes.map(normNome).filter(Boolean));
+  const b = new Set(dsNomes.map(normNome).filter(Boolean));
+  // Lado sem nenhum nome não é divergência: é cadastro incompleto, outro assunto.
+  if (a.size && b.size && ![...a].some((x) => b.has(x))) d.push("nome");
+
   const ca = digitos(oemCnpj), cb = digitos(dsCnpj);
   if (ca && cb && ca !== cb) d.push("cnpj");
   return d;
@@ -315,10 +329,18 @@ Deno.serve(async (req) => {
         // comparar razão social fazia a linha acusar diferença entre duas
         // strings idênticas na tela, e alerta que não se consegue verificar
         // ensina a desconfiar da tela.
-        const nomeOem = l.razao_social ?? l.nome_fantasia ?? null;
-        const nomeDs  = cli ? (cli.razao_social ?? cli.nome_fantasia ?? null) : null;
+        // Guarda a razão social CRUA, sem cair na fantasia: a tela precisa
+        // poder mostrar "—" quando o OEM não tem esse campo, em vez de repetir
+        // a fantasia e dar a impressão de que havia o que comparar.
+        const nomeOem = l.razao_social ?? null;
+        const nomeDs  = cli?.razao_social ?? null;
         const cnpjDs  = cli ? (cli.cnpj_digits || digitos(cli.cnpj) || null) : null;
-        const divs = cli ? apurarDivergencias(nomeOem, l.cnpj_norm, nomeDs, cnpjDs) : [];
+        const divs = cli
+          ? apurarDivergencias(
+              [l.razao_social, l.nome_fantasia], l.cnpj_norm,
+              [cli.razao_social, cli.nome_fantasia], cnpjDs,
+            )
+          : [];
 
         recon.push({
           tenant_id: conta.tenant_id, conta_integration_id: conta.id,
