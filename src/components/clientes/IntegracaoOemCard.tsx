@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useOemIntegracaoAtiva } from "@/hooks/useOemIntegracaoAtiva";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Cpu, Lock, TrendingDown } from "lucide-react";
@@ -37,17 +38,7 @@ export default function IntegracaoOemCard({ clienteId }: { clienteId: string }) 
 
   // Sem conta OEM conectada o card nem existe — não é para aparecer vazio nos
   // tenants que não usam a integração.
-  const { data: temConta } = useQuery({
-    queryKey: ["oem-conta-existe", tid],
-    enabled: !!tid,
-    queryFn: async () => {
-      const { count } = await (supabase.from("oem_integration_status" as any) as any)
-        .select("id", { count: "exact", head: true })
-        .eq("tenant_id", tid)
-        .eq("ativo", true);
-      return (count ?? 0) > 0;
-    },
-  });
+  const temConta = useOemIntegracaoAtiva();
 
   const { data: licencas = [] } = useQuery({
     queryKey: ["oem-licencas-cliente", tid, clienteId],

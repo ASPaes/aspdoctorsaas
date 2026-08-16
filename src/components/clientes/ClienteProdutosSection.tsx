@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useOmieContaDoCliente } from "@/hooks/useOmieContaDoCliente";
+import { useOemIntegracaoAtiva } from "@/hooks/useOemIntegracaoAtiva";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,10 @@ interface ClienteProduto {
   fornecedor_id: number | null;
   codigo_fornecedor: string | null;
   link_portal_fornecedor: string | null;
+  // Gravados pelo vínculo em Integrações › OEM, nunca à mão: são a identidade
+  // da licença lá, e é por eles que a conferência sabe qual filial é esta.
+  oem_codigo_grupo: string | null;
+  oem_codigo_filial: string | null;
   vlr_ativacao: number | null;
   vlr_mensal: number | null;
   vlr_custo: number | null;
@@ -99,6 +104,7 @@ const fmtBRL = (n: number | null | undefined) =>
 
 export default function ClienteProdutosSection({ clienteId }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
+  const oemAtivo = useOemIntegracaoAtiva();
   const qc = useQueryClient();
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -452,6 +458,14 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                             Ativ: R$ {fmtBRL(p.vlr_ativacao)}
                           </Badge>
                         )}
+                        {/* Sem precisar expandir: é a identidade da licença no
+                            OEM e a primeira coisa que se procura conferindo. */}
+                        {oemAtivo === true && p.oem_codigo_filial && (
+                          <Badge variant="outline"
+                            className="shrink-0 text-sky-600 dark:text-sky-400 border-sky-500/30">
+                            OEM {p.oem_codigo_grupo ?? "—"} · {p.oem_codigo_filial}
+                          </Badge>
+                        )}
                       </div>
                       <div>
                         {modsAtivos > 0 ? (
@@ -491,7 +505,28 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                             </a>
                           ) : <div>—</div>}
                         </div>
+                        {/* Só para quem usa a integração — nos outros tenants
+                            seriam duas linhas em branco sem explicação. */}
+                        {oemAtivo === true && (
+                          <>
+                            <div>
+                              <div className="text-muted-foreground text-xs">Código Grupo (OEM)</div>
+                              <div className="tabular-nums">{p.oem_codigo_grupo || "—"}</div>
+                            </div>
+                            <div>
+                              <div className="text-muted-foreground text-xs">Código Filial (OEM)</div>
+                              <div className="tabular-nums">{p.oem_codigo_filial || "—"}</div>
+                            </div>
+                          </>
+                        )}
                       </div>
+                      {oemAtivo === true && !p.oem_codigo_filial && (
+                        <p className="text-xs text-muted-foreground">
+                          Sem licença do OEM vinculada. O código é gravado aqui quando o vínculo é
+                          feito em <strong>Configurações › Integrações › OEM</strong> — não se
+                          preenche à mão.
+                        </p>
+                      )}
 
                       <div className="rounded border bg-background/50 overflow-x-auto">
                         {mods.length === 0 ? (
