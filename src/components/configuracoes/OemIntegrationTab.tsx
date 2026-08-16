@@ -388,21 +388,31 @@ export default function OemIntegrationTab() {
       porCliente.set(k, Number(l.mensalidade_ds || 0));
       custoCliente.set(k, (custoCliente.get(k) ?? 0) + Number(l.custo_oem || 0));
     }
+    // A margem POR CLIENTE só vale onde o vínculo está confirmado. Sem isso, um
+    // cadastro que recebeu as 38 licenças de um grupo aparece devendo R$ 890 —
+    // número inventado por atribuição, não por prejuízo. Os totais acima
+    // continuam corretos: soma de custo é soma de custo, independe de a quem
+    // cada licença foi atribuída.
+    const confirmado = (l: Recon) => filiaisComCodigo.has(String(l.filial_codigo));
     const porClienteNeg = [...porCliente.entries()]
       .map(([id, mensal]) => {
-        const custo = custoCliente.get(id) ?? 0;
-        const ref = comPar.find((l) => l.ds_customer_id === id)!;
+        const doCliente = comPar.filter((l) => l.ds_customer_id === id);
+        const confirmadas = doCliente.filter(confirmado);
+        const ref = doCliente[0];
+        const custo = confirmadas.reduce((a, l) => a + Number(l.custo_oem || 0), 0);
         return {
           id,
-          razao_ds: ref.razao_ds,
-          razao_oem: ref.razao_oem,
-          filiais: comPar.filter((l) => l.ds_customer_id === id).length,
+          razao_ds: ref?.razao_ds ?? null,
+          razao_oem: ref?.razao_oem ?? null,
+          filiais: confirmadas.length,
+          naoConfirmadas: doCliente.length - confirmadas.length,
           mensalidade_ds: mensal,
           custo_oem: custo,
           margem: mensal - custo,
         };
       })
-      .filter((x) => x.margem < 0)
+      // Nenhuma licença confirmada = nada a afirmar sobre a margem dele.
+      .filter((x) => x.filiais > 0 && x.margem < 0)
       .sort((a, b) => a.margem - b.margem);
 
     return {
@@ -1027,7 +1037,10 @@ export default function OemIntegrationTab() {
                 </CardTitle>
                 <CardDescription>
                   A licença no OEM sai mais caro que a mensalidade cobrada. Pode ser acordo
-                  comercial — ou cadastro incompleto.
+                  comercial — ou cadastro incompleto. Só entram aqui os clientes com{" "}
+                  <strong>vínculo confirmado</strong>: sem isso, um cadastro que recebeu as
+                  licenças de um grupo inteiro apareceria devendo centenas de reais por
+                  atribuição, não por prejuízo.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
@@ -1049,7 +1062,9 @@ export default function OemIntegrationTab() {
                       <div className="min-w-0 flex-1">
                         <p className="font-medium truncate">{l.razao_ds ?? l.razao_oem}</p>
                         <p className="text-xs text-muted-foreground truncate">
-                          {l.filiais === 1 ? "1 licença" : `${l.filiais} licenças`} no OEM
+                          {l.filiais === 1 ? "1 licença confirmada" : `${l.filiais} licenças confirmadas`} no OEM
+                          {l.naoConfirmadas > 0 &&
+                            ` · ${l.naoConfirmadas} sem confirmação, fora desta conta`}
                         </p>
                       </div>
                       <span className="tabular-nums text-muted-foreground w-28 text-right">

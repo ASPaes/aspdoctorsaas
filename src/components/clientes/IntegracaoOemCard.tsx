@@ -28,6 +28,7 @@ type Licenca = {
   bloqueado_oem: boolean | null;
   mensalidade_ds: number | null;
   status_usuario: string;
+  resolvido_em: string | null;
 };
 
 const brl = (v: number | null | undefined) =>
@@ -40,24 +41,93 @@ export default function IntegracaoOemCard({ clienteId }: { clienteId: string }) 
   // tenants que não usam a integração.
   const temConta = useOemIntegracaoAtiva();
 
-  const { data: licencas = [] } = useQuery({
-    queryKey: ["oem-licencas-cliente", tid, clienteId],
+  // A FONTE DA VERDADE DO VÍNCULO É O CÓDIGO NA FICHA DO PRODUTO.
+  //
+  // Este card lia reconciliacao_oem por ds_customer_id e listava tudo que
+  // apontava para o cliente. No grupo Bem Docado isso deu 38 licenças numa
+  // ficha só — e, pior, somou o custo do grupo inteiro (R$ 1.028,53) contra a
+  // mensalidade de um cliente (R$ 138,02), inventando uma margem de -R$ 890,51
+  // que não existe. Ficha de cliente mostrando prejuízo falso é pior que ficha
+  // sem informação nenhuma.
+  //
+  // ds_customer_id é PALPITE do casamento automático por CNPJ; quando o CNPJ do
+  // grupo se repete, ele aponta todas as filiais para o mesmo cadastro. O que
+  // vale é o par grupo+filial gravado em cliente_produtos, que só é escrito
+  // quando não há dúvida.
+  const { data: codigos = [] } = useQuery({
+    queryKey: ["oem-codigos-cliente", tid, clienteId],
     enabled: !!tid && !!clienteId && temConta === true,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("cliente_produtos" as any) as any)
+        .select("oem_codigo_filial")
+        .eq("cliente_id", clienteId)
+        .not("oem_codigo_filial", "is", null);
+      if (error) throw error;
+      return (data ?? []).map((r: any) => String(r.oem_codigo_filial));
+    },
+  });
+
+  // Quantas licenças o de/para ainda atribui a este cliente sem confirmação.
+  // Não viram lista: viram aviso, porque nenhuma delas é dele com certeza.
+  const { data: pendentes = 0 } = useQuery({
+    queryKey: ["oem-pendentes-cliente", tid, clienteId],
+    enabled: !!tid && !!clienteId && temConta === true && codigos.length === 0,
+    queryFn: async () => {
+      const { count, error } = await (supabase.from("reconciliacao_oem" as any) as any)
+        .select("id", { count: "exact", head: true })
+        .eq("ds_customer_id", clienteId)
+        .not("filial_codigo", "is", null);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
+  const { data: licencas = [] } = useQuery({
+    queryKey: ["oem-licencas-cliente", tid, clienteId, codigos.join(",")],
+    enabled: !!tid && !!clienteId && temConta === true && codigos.length > 0,
     queryFn: async () => {
       const { data, error } = await (supabase.from("reconciliacao_oem" as any) as any)
         .select(
           "id, filial_codigo, empresa_codigo, razao_oem, custo_oem, status_oem, " +
-          "bloqueado_oem, mensalidade_ds, status_usuario",
+          "bloqueado_oem, mensalidade_ds, status_usuario, resolvido_em",
         )
-        .eq("ds_customer_id", clienteId)
-        .not("filial_codigo", "is", null)
+        .eq("tenant_id", tid)
+        .in("filial_codigo", codigos)
         .order("filial_codigo");
       if (error) throw error;
       return (data ?? []) as Licenca[];
     },
   });
 
-  if (!tid || temConta !== true || licencas.length === 0) return null;
+  if (!tid || temConta !== true) return null;
+
+  // Vínculo indefinido: o de/para aponta para cá, mas nenhuma licença foi
+  // confirmada. Dizer isso é mais útil do que listar 38 palpites.
+  if (codigos.length === 0) {
+    if (!pendentes) return null;
+    return (
+      <Card className="border-amber-500/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Cpu className="h-4 w-4" /> Licenças no OEM
+            <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-500/40">
+              vínculo indefinido
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            {pendentes === 1
+              ? "Uma licença do OEM aponta para este cliente, mas o vínculo não foi confirmado."
+              : `${pendentes} licenças do OEM apontam para este cliente — o casamento automático é por CNPJ e, num grupo que repete o CNPJ, ele aponta todas para o mesmo cadastro.`}{" "}
+            Enquanto isso não for resolvido em <strong>Configurações › Integrações › OEM ›
+            Pendências</strong>, nenhuma delas é dada como deste cliente, e nenhum custo é
+            atribuído a ele aqui.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  if (licencas.length === 0) return null;
 
   const ativas = licencas.filter((l) => l.status_oem === "Ativo");
   const custo = ativas.reduce((a, l) => a + Number(l.custo_oem || 0), 0);
@@ -94,7 +164,10 @@ export default function IntegracaoOemCard({ clienteId }: { clienteId: string }) 
                 <p className="truncate">{l.razao_oem ?? `Filial ${l.filial_codigo}`}</p>
                 <p className="text-xs text-muted-foreground">
                   filial {l.filial_codigo} · grupo {l.empresa_codigo}
-                  {l.status_usuario === "vinculado" && " · vinculada à mão"}
+                  {/* `status_usuario = 'vinculado'` também é o que a
+                      sincronização grava no casamento automático — o que separa
+                      a decisão humana é o carimbo de quem e quando. */}
+                  {l.resolvido_em && " · vinculada à mão"}
                 </p>
               </div>
               {l.bloqueado_oem && <Badge variant="destructive" className="text-xs">bloqueada</Badge>}
