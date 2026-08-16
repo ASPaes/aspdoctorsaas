@@ -194,47 +194,67 @@ grant execute on function public.desvincular_filial_oem(uuid) to authenticated, 
 -- ------------------------------------------------------------- o backfill
 -- "Todos que já estão com o vínculo realizado precisam ficar registrados aqui."
 -- Vale para o vínculo automático por CNPJ também, não só para o feito à mão.
+--
+-- ⚠️ O CASO QUE O LOOP INGÊNUO ERRARIA
+-- A regra é 1 filial = 1 cliente, mas o dado pode não obedecer: quando um CNPJ
+-- tem VÁRIAS filiais e UM só cliente ativo no DoctorSaaS, o casamento
+-- automático apontou todas elas para esse mesmo cliente (é o `ativos.length
+-- === 1` do oem-espelho-sync). Percorrer isso em ordem gravaria a filial A,
+-- depois B por cima, depois C — e a última venceria em silêncio, deixando o
+-- cadastro dizendo ser uma licença que não é.
+--
+-- Esses ficam de fora e viram pendência visível. Ou faltam cadastros de cliente
+-- (a regra do Alexandre diz que deveriam existir), ou o vínculo automático
+-- errou. Nos dois casos é decisão de gente, não de backfill.
 do $$
-declare
-  r record;
-  v_res int;
-  v_ok int := 0; v_ambiguo int := 0; v_sem_produto int := 0;
+declare r record; v_res int;
 begin
   for r in
     select ro.ds_customer_id, ro.empresa_codigo, ro.filial_codigo
       from public.reconciliacao_oem ro
      where ro.ds_customer_id is not null
        and ro.filial_codigo  is not null
+       and ro.ds_customer_id in (
+             select ds_customer_id from public.reconciliacao_oem
+              where ds_customer_id is not null and filial_codigo is not null
+              group by 1 having count(distinct filial_codigo) = 1
+           )
   loop
     v_res := public.oem_gravar_codigos_no_produto(
       r.ds_customer_id, r.empresa_codigo, r.filial_codigo);
-    if    v_res =  1 then v_ok := v_ok + 1;
-    elsif v_res = -1 then v_ambiguo := v_ambiguo + 1;
-    else                  v_sem_produto := v_sem_produto + 1;
-    end if;
   end loop;
-
-  raise notice 'Backfill OEM: % gravados · % com mais de um produto ativo · % sem produto ativo',
-    v_ok, v_ambiguo, v_sem_produto;
 end $$;
 
 commit;
 
 -- ---------------------------------------------------------------------------
--- CONFERÊNCIA (só leitura)
+-- CONFERÊNCIA — rodar DEPOIS, como consulta separada.
 --
---   -- quantas linhas de produto ficaram com código:
---   select count(*) from public.cliente_produtos where oem_codigo_filial is not null;
+-- O SQL Editor do Supabase não mostra RAISE NOTICE, então o resultado do
+-- backfill não sai por lá. Esta consulta reconstrói os números a partir do
+-- dado, que é mais confiável do que um contador de dentro do loop:
 --
---   -- os que o backfill não conseguiu gravar, e por quê:
---   select case when p.n = 0 then 'sem produto ativo' else 'mais de um produto ativo' end as motivo,
---          count(*)
---     from public.reconciliacao_oem ro
---     join lateral (select count(*) n from public.cliente_produtos cp
---                    where cp.cliente_id = ro.ds_customer_id and cp.ativo) p on true
---    where ro.ds_customer_id is not null and ro.filial_codigo is not null and p.n <> 1
---    group by 1;
+--   select
+--     count(*)                                        as vinculos_com_filial,
+--     count(*) filter (where cp.oem_codigo_filial
+--                         = ro.filial_codigo)         as gravados,
+--     count(*) filter (where x.filiais_do_cliente > 1) as varias_filiais_mesmo_cliente,
+--     count(*) filter (where x.filiais_do_cliente = 1
+--                        and x.produtos_ativos > 1)   as mais_de_um_produto_ativo,
+--     count(*) filter (where x.filiais_do_cliente = 1
+--                        and x.produtos_ativos = 0)   as sem_produto_ativo
+--   from public.reconciliacao_oem ro
+--   join lateral (
+--     select (select count(*) from public.cliente_produtos c
+--              where c.cliente_id = ro.ds_customer_id and c.ativo) as produtos_ativos,
+--            (select count(distinct r2.filial_codigo) from public.reconciliacao_oem r2
+--              where r2.ds_customer_id = ro.ds_customer_id
+--                and r2.filial_codigo is not null)                 as filiais_do_cliente
+--   ) x on true
+--   left join public.cliente_produtos cp
+--     on cp.cliente_id = ro.ds_customer_id and cp.ativo
+--   where ro.ds_customer_id is not null and ro.filial_codigo is not null;
 --
---   -- prova de que a mensalidade NÃO foi mexida: comparar antes/depois de
---   --   select sum(mensalidade) from clientes where cancelado = false;
+-- Prova de que a mensalidade NÃO foi mexida — rodar ANTES e DEPOIS:
+--   select sum(mensalidade) from public.clientes where cancelado = false;
 -- ---------------------------------------------------------------------------
