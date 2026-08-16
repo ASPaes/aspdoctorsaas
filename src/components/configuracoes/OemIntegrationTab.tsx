@@ -1165,8 +1165,9 @@ export default function OemIntegrationTab() {
             Tudo nesta aba trata só do que está <strong>vivo dos dois lados</strong>: licença ativa
             no OEM e cliente não cancelado no DoctorSaaS. Desativado não cobra, e cadastro
             cancelado não vira vínculo — pedir decisão sobre eles seria trabalho que não muda nada.
-            A exceção está logo abaixo: <strong>licença ativa em cliente cancelado</strong> não é
-            vínculo a fazer, é dinheiro saindo, e por isso tem lugar próprio.
+            A exceção é <strong>licença ativa em cliente cancelado</strong>: não é vínculo a
+            fazer, é dinheiro saindo, e por isso tem card próprio logo abaixo — que aparece
+            também quando o número é zero, porque zero ali é o que se quer ver.
             <br /><br />
             Os dois lados que não se encontraram. À esquerda, <strong>licenças do OEM</strong> que
             estão sendo cobradas e não têm cliente correspondente no DoctorSaaS — o valor é o
@@ -1174,8 +1175,25 @@ export default function OemIntegrationTab() {
             licença nenhuma no OEM — o valor é a mensalidade que eles pagam. Podem ser de outro
             produto, e nesse caso não é erro.
           </Explica>
-          {/* Dinheiro, não cadastro: vem antes de tudo nesta aba. */}
-          {r.pagandoPorCancelado.length > 0 && (
+          {/* Dinheiro, não cadastro: vem antes de tudo nesta aba.
+              E aparece SEMPRE, inclusive zerado — "nenhum" é a resposta que se
+              quer ver aqui, e um card que some quando está tudo bem deixa quem
+              procura sem saber se está tudo bem ou se a tela quebrou. */}
+          {r.pagandoPorCancelado.length === 0 ? (
+            <Card className="border-emerald-500/40">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Nenhuma licença ativa em cliente cancelado
+                </CardTitle>
+                <CardDescription>
+                  Não há licença sendo cobrada no OEM para cliente que já cancelou no DoctorSaaS —
+                  o vazamento mais caro que esta integração consegue enxergar está zerado. Se
+                  aparecer alguma, ela entra aqui com o custo mensal somado.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ) : (
             <Card className="border-destructive/50">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2 text-destructive">
