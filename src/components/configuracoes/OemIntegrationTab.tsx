@@ -449,6 +449,13 @@ export default function OemIntegrationTab() {
       decididas: linhas
         .filter((l) => l.resolvido_em && (l.status_usuario === "vinculado" || l.status_usuario === "ignorado"))
         .sort((a, b) => String(b.resolvido_em).localeCompare(String(a.resolvido_em))),
+      // Licença ATIVA no OEM em cliente CANCELADO no DoctorSaaS. Não é vínculo
+      // a fazer — é dinheiro saindo: a licença é cobrada e o cliente não paga
+      // mais. Ficou fora das listas de decisão pela regra de escopo, e sem um
+      // lugar próprio sumiria de vista justamente o caso que custa caro.
+      pagandoPorCancelado: ativas
+        .filter((l) => l.filial_codigo && l.cancelado_ds === true)
+        .sort((a, b) => Number(b.custo_oem || 0) - Number(a.custo_oem || 0)),
       semCliente: ativas.filter((l) => l.estado_match === "SO_NO_OEM" && l.status_usuario === "novo"),
       soNoDs: linhas.filter((l) => l.estado_match === "SO_NO_DS" && !l.cancelado_ds),
       // Vínculo existe mas o código não chegou à ficha do cliente. São dois
@@ -1158,6 +1165,8 @@ export default function OemIntegrationTab() {
             Tudo nesta aba trata só do que está <strong>vivo dos dois lados</strong>: licença ativa
             no OEM e cliente não cancelado no DoctorSaaS. Desativado não cobra, e cadastro
             cancelado não vira vínculo — pedir decisão sobre eles seria trabalho que não muda nada.
+            A exceção está logo abaixo: <strong>licença ativa em cliente cancelado</strong> não é
+            vínculo a fazer, é dinheiro saindo, e por isso tem lugar próprio.
             <br /><br />
             Os dois lados que não se encontraram. À esquerda, <strong>licenças do OEM</strong> que
             estão sendo cobradas e não têm cliente correspondente no DoctorSaaS — o valor é o
@@ -1165,6 +1174,50 @@ export default function OemIntegrationTab() {
             licença nenhuma no OEM — o valor é a mensalidade que eles pagam. Podem ser de outro
             produto, e nesse caso não é erro.
           </Explica>
+          {/* Dinheiro, não cadastro: vem antes de tudo nesta aba. */}
+          {r.pagandoPorCancelado.length > 0 && (
+            <Card className="border-destructive/50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2 text-destructive">
+                  <TrendingDown className="h-4 w-4" />
+                  {r.pagandoPorCancelado.length} licenças ativas de clientes cancelados —{" "}
+                  {brl(r.pagandoPorCancelado.reduce((a, l) => a + Number(l.custo_oem || 0), 0))}/mês
+                </CardTitle>
+                <CardDescription>
+                  A licença continua <strong>ativa e sendo cobrada no OEM</strong>, mas o cliente
+                  está <strong>cancelado no DoctorSaaS</strong> — receita zero, custo cheio. Aqui
+                  não há vínculo a fazer: a saída é <strong>pedir a desativação no portal do
+                  OEM</strong>. O DoctorSaaS não escreve no OEM, então isso é feito lá e some desta
+                  lista na próxima atualização do espelho.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y border-t max-h-96 overflow-y-auto">
+                  {filtra(r.pagandoPorCancelado).map((l) => (
+                    <div key={l.id} className="flex items-center gap-3 px-6 py-2.5 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{l.razao_oem ?? l.razao_ds}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          filial {l.filial_codigo} · grupo {l.empresa_codigo}
+                          {l.razao_ds && <> · cliente {l.razao_ds}</>}
+                        </p>
+                      </div>
+                      <span className="tabular-nums font-medium text-destructive w-24 text-right">
+                        {brl(l.custo_oem)}
+                      </span>
+                      <Button size="sm" variant="ghost" className="gap-1.5 shrink-0"
+                        disabled={!l.ds_customer_id}
+                        onClick={() => navigate(`/clientes/${l.ds_customer_id}`)}>
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Abrir ficha
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2">
             <Card>
               <CardHeader>
