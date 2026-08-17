@@ -34,6 +34,10 @@ type Licenca = {
 const brl = (v: number | null | undefined) =>
   (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+// Quantas vezes a mensalidade cobre o custo. Sem custo ativo não existe divisão
+// — e "infinito" não é informação, então o campo simplesmente não aparece.
+const num2 = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 export default function IntegracaoOemCard({ clienteId }: { clienteId: string }) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
@@ -133,6 +137,9 @@ export default function IntegracaoOemCard({ clienteId }: { clienteId: string }) 
   const custo = ativas.reduce((a, l) => a + Number(l.custo_oem || 0), 0);
   const mensalidade = Number(licencas[0]?.mensalidade_ds || 0);
   const margem = mensalidade - custo;
+  // Derivado do mesmo par custo/mensalidade que a margem: qualquer mudança em
+  // um dos dois já chega aqui no próximo render, sem estado nem efeito.
+  const markup = custo > 0 ? mensalidade / custo : null;
   const bloqueadas = ativas.filter((l) => l.bloqueado_oem).length;
 
   return (
@@ -154,6 +161,14 @@ export default function IntegracaoOemCard({ clienteId }: { clienteId: string }) 
             Margem: <strong className="tabular-nums">{brl(margem)}</strong>
             {margem < 0 && <TrendingDown className="inline h-3.5 w-3.5 ml-1" />}
           </span>
+          {markup !== null && (
+            <span
+              className={markup < 1 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}
+              title={`${brl(mensalidade)} ÷ ${brl(custo)}`}
+            >
+              Markup: <strong className="tabular-nums">{num2(markup)}</strong>
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
