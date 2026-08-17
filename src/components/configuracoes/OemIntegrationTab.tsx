@@ -93,6 +93,19 @@ const doc = (v: string | null | undefined) => {
   return d;
 };
 
+// Busca que aceita o documento como ele aparece na TELA. As duas bases guardam
+// CNPJ só com dígitos, e a tela mostra com máscara: quem copiava o número do
+// cadastro e colava aqui — "23.293.992/0001-98" — não achava nada, porque o
+// texto guardado é "23293992000198". Compara primeiro como foi digitado e, se
+// não bater, compara os dois lados sem pontuação nenhuma.
+function combina(q: string, campos: (string | null | undefined)[]) {
+  const alvo = campos.map((c) => String(c ?? "").toLowerCase());
+  if (alvo.some((c) => c.includes(q))) return true;
+  const digitos = q.replace(/\D/g, "");
+  if (digitos.length < 2) return false;
+  return alvo.some((c) => c.replace(/\D/g, "").includes(digitos));
+}
+
 // Colunas ordenáveis da aba Custos.
 type CustoSort = "cliente" | "cnpj" | "custo_ds" | "mensalidade" | "markup" | "custo_oem";
 
@@ -661,8 +674,7 @@ export default function OemIntegrationTab() {
   const custosVisiveis = useMemo(() => {
     const q = buscaCusto.trim().toLowerCase();
     const base = q
-      ? custos.lista.filter((c) =>
-          [c.cliente, c.cnpj, ...c.filiais].some((v) => String(v ?? "").toLowerCase().includes(q)))
+      ? custos.lista.filter((c) => combina(q, [c.cliente, c.cnpj, ...c.filiais]))
       : custos.lista;
 
     const dir = custoDir === "asc" ? 1 : -1;
@@ -804,8 +816,7 @@ export default function OemIntegrationTab() {
     const q = busca.trim().toLowerCase();
     if (!q) return lista;
     return lista.filter((l) =>
-      [l.razao_oem, l.razao_ds, l.cnpj_norm, l.cnpj_ds, l.filial_codigo, l.empresa_codigo]
-        .some((c) => String(c ?? "").toLowerCase().includes(q)));
+      combina(q, [l.razao_oem, l.razao_ds, l.cnpj_norm, l.cnpj_ds, l.filial_codigo, l.empresa_codigo]));
   };
 
   // Paginação da fila de decisão. É lista client-side (o fetchAllRows já trouxe
