@@ -14,7 +14,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
   Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
+  ArrowUpDown, ArrowUp, ArrowDown, DownloadCloud,
 } from "lucide-react";
+import { maskCNPJ, maskCPF } from "@/lib/masks";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
 
 // ============================================================================
@@ -77,6 +79,22 @@ type Conta = {
 
 const brl = (v: number | null | undefined) =>
   (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const num2 = (v: number) =>
+  v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Documento vem só com dígitos das duas bases. 11 é CPF, 14 é CNPJ; o que não
+// for nenhum dos dois sai como veio, sem máscara mentirosa por cima.
+const doc = (v: string | null | undefined) => {
+  const d = String(v ?? "").replace(/\D/g, "");
+  if (!d) return "—";
+  if (d.length === 11) return maskCPF(d);
+  if (d.length === 14) return maskCNPJ(d);
+  return d;
+};
+
+// Colunas ordenáveis da aba Custos.
+type CustoSort = "cliente" | "cnpj" | "custo_ds" | "mensalidade" | "markup" | "custo_oem";
 
 function Numero({
   valor, rotulo, sub, tom = "normal",
@@ -267,6 +285,10 @@ export default function OemIntegrationTab() {
   const [desfazendo, setDesfazendo] = useState<string | null>(null);
   const [confirmando, setConfirmando] = useState<string | null>(null);
   const [pagina, setPagina] = useState(0);
+  const [buscaCusto, setBuscaCusto] = useState("");
+  const [paginaCusto, setPaginaCusto] = useState(0);
+  const [custoSort, setCustoSort] = useState<CustoSort>("cliente");
+  const [custoDir, setCustoDir] = useState<"asc" | "desc">("asc");
   // Licença desativada não cobra, então divergência nela é ruído na maior parte
   // do tempo. A tela abre em "Ativo" e o usuário amplia se quiser.
   const [statusConf, setStatusConf] = useState<"Ativo" | "Desativado" | "todos">("Ativo");
@@ -303,19 +325,40 @@ export default function OemIntegrationTab() {
   // Quais licenças já têm o código gravado na ficha do cliente. Medido em
   // 15/08/2026: de 1.254 vínculos, 637 gravaram. É pelo que NÃO gravou que se
   // enxerga o buraco de cadastro — e ele não pode viver só num relatório.
-  const { data: filiaisComCodigo = new Set<string>() } = useQuery({
+  // Traz também o CUSTO do lado DoctorSaaS (`vlr_custo`, digitado na ficha do
+  // produto) — é ele que a aba Custos compara com o que a licença cobra de fato
+  // no OEM. Uma query só: o código da filial e o custo moram na mesma linha.
+  const { data: produtosOem = [] } = useQuery({
     queryKey: ["oem-codigos-gravados", tid],
     enabled: !!tid,
-    queryFn: async () => {
-      const linhas = await fetchAllRows<{ oem_codigo_filial: string }>(() =>
+    queryFn: () =>
+      fetchAllRows<{ oem_codigo_filial: string; cliente_id: string; vlr_custo: number | null; ativo: boolean }>(() =>
         (supabase.from("cliente_produtos" as any) as any)
-          .select("oem_codigo_filial")
+          .select("oem_codigo_filial, cliente_id, vlr_custo, ativo")
           .eq("tenant_id", tid)
           .not("oem_codigo_filial", "is", null),
-      );
-      return new Set(linhas.map((l) => String(l.oem_codigo_filial)));
-    },
+      ),
   });
+
+  // O conjunto de filiais com código gravado continua contando TODO produto,
+  // ativo ou não: o que ele responde é "o vínculo foi confirmado?", e produto
+  // cancelado não desfaz confirmação.
+  const filiaisComCodigo = useMemo(
+    () => new Set(produtosOem.map((p) => String(p.oem_codigo_filial))),
+    [produtosOem],
+  );
+
+  // Já o CUSTO só soma produto ATIVO — produto cancelado não custa mais nada, e
+  // somá-lo faria a tela cobrar do cliente um custo que não existe.
+  const custoDsPorFilial = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of produtosOem) {
+      if (!p.ativo) continue;
+      const k = String(p.oem_codigo_filial);
+      m.set(k, (m.get(k) ?? 0) + Number(p.vlr_custo || 0));
+    }
+    return m;
+  }, [produtosOem]);
 
   // Quantos produtos ATIVOS cada cliente tem. Sem isto a tela classificava por
   // eliminação — "não é o caso de várias filiais, então deve ser falta de
@@ -546,6 +589,141 @@ export default function OemIntegrationTab() {
     };
   }, [linhas, filiaisComCodigo, produtosAtivos, statusConf]);
 
+  // ------------------------------------------------------------------ custos
+  //
+  // Dois custos com o mesmo nome e origens diferentes, e é por isso que a aba
+  // existe: o CUSTO DS é o `vlr_custo` digitado na ficha do produto, e o CUSTO
+  // OEM é o que a licença cobra de fato. Onde os dois divergem, o cadastro está
+  // desatualizado — é essa a lacuna que o botão "Atualizar DS" vai fechar.
+  //
+  // Uma linha por CLIENTE, e só com vínculo CONFIRMADO (código gravado na ficha)
+  // — pela mesma razão da aba Margem: sem confirmação, um cadastro que recebeu
+  // as licenças de um grupo inteiro apareceria com um custo que não é dele.
+  const custos = useMemo(() => {
+    const confirmadas = linhas.filter(
+      (l) =>
+        l.ds_customer_id && l.filial_codigo && l.status_oem === "Ativo" && !l.cancelado_ds
+        && filiaisComCodigo.has(String(l.filial_codigo)),
+    );
+
+    type Linha = {
+      id: string; cliente: string; cnpj: string | null; filiais: string[];
+      mensalidade: number; custo_ds: number; custo_oem: number;
+    };
+    const porCliente = new Map<string, Linha>();
+    for (const l of confirmadas) {
+      const k = l.ds_customer_id!;
+      const filial = String(l.filial_codigo);
+      const custoDs = custoDsPorFilial.get(filial) ?? 0;
+      const atual = porCliente.get(k);
+      if (!atual) {
+        porCliente.set(k, {
+          id: k,
+          cliente: l.razao_ds ?? l.razao_oem ?? "—",
+          cnpj: l.cnpj_ds ?? l.cnpj_norm ?? null,
+          filiais: [filial],
+          // A mensalidade é do CLIENTE: entra uma vez só, mesmo que ele tenha
+          // várias licenças. O custo é da FILIAL e soma todas.
+          mensalidade: Number(l.mensalidade_ds || 0),
+          custo_ds: custoDs,
+          custo_oem: Number(l.custo_oem || 0),
+        });
+      } else {
+        atual.filiais.push(filial);
+        atual.custo_ds += custoDs;
+        atual.custo_oem += Number(l.custo_oem || 0);
+      }
+    }
+
+    const lista = [...porCliente.values()].map((c) => ({
+      ...c,
+      // Markup é quantas vezes a mensalidade cobre o custo da licença, e o
+      // divisor é SEMPRE o custo do OEM (decisão do Alexandre, 17/08/2026: o
+      // valor do OEM é o correto por definição; o do DoctorSaaS é cópia que
+      // pode estar velha). É o mesmo divisor do markup da ficha do cliente —
+      // dois markups com o mesmo nome e denominadores diferentes seriam duas
+      // respostas para a mesma pergunta.
+      // Sem custo não há divisão: null é "não dá para calcular", não zero.
+      markup: c.custo_oem > 0 ? c.mensalidade / c.custo_oem : null,
+      // Centavo de diferença já é divergência de cadastro; o que não passa
+      // disso é arredondamento e não merece alarme.
+      divergente: Math.abs(c.custo_ds - c.custo_oem) >= 0.01,
+    }));
+
+    return {
+      lista,
+      totalDs: lista.reduce((a, c) => a + c.custo_ds, 0),
+      totalOem: lista.reduce((a, c) => a + c.custo_oem, 0),
+      divergentes: lista.filter((c) => c.divergente).length,
+    };
+  }, [linhas, filiaisComCodigo, custoDsPorFilial]);
+
+  const custosVisiveis = useMemo(() => {
+    const q = buscaCusto.trim().toLowerCase();
+    const base = q
+      ? custos.lista.filter((c) =>
+          [c.cliente, c.cnpj, ...c.filiais].some((v) => String(v ?? "").toLowerCase().includes(q)))
+      : custos.lista;
+
+    const dir = custoDir === "asc" ? 1 : -1;
+    const numero = (c: (typeof base)[number]) =>
+      custoSort === "custo_ds" ? c.custo_ds
+      : custoSort === "mensalidade" ? c.mensalidade
+      : custoSort === "custo_oem" ? c.custo_oem
+      : c.markup;
+
+    return [...base].sort((a, b) => {
+      if (custoSort === "cliente") return dir * a.cliente.localeCompare(b.cliente, "pt-BR");
+      if (custoSort === "cnpj") return dir * String(a.cnpj ?? "").localeCompare(String(b.cnpj ?? ""));
+      const na = numero(a);
+      const nb = numero(b);
+      // Markup incalculável fica no fim nas duas direções: ele não é o menor
+      // valor da lista, é a ausência de valor.
+      if (na == null) return nb == null ? 0 : 1;
+      if (nb == null) return -1;
+      return dir * (na - nb);
+    });
+  }, [custos.lista, buscaCusto, custoSort, custoDir]);
+
+  const totalPaginasCusto = Math.max(1, Math.ceil(custosVisiveis.length / POR_PAGINA));
+  const paginaCustoAtual = Math.min(paginaCusto, totalPaginasCusto - 1);
+  const custosPagina = custosVisiveis.slice(
+    paginaCustoAtual * POR_PAGINA,
+    paginaCustoAtual * POR_PAGINA + POR_PAGINA,
+  );
+
+  function ordenarCusto(campo: CustoSort) {
+    if (campo === custoSort) {
+      setCustoDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setCustoSort(campo);
+      // Nome começa em A→Z; dinheiro, do maior para o menor, que é onde está o
+      // que importa olhar.
+      setCustoDir(campo === "cliente" || campo === "cnpj" ? "asc" : "desc");
+    }
+    setPaginaCusto(0);
+  }
+
+  // Cabeçalho clicável. É função, não componente, para não remontar (e perder o
+  // foco) a cada re-render da tabela.
+  function thCusto(campo: CustoSort, rotulo: React.ReactNode, cls: string, direita = false) {
+    const ativo = custoSort === campo;
+    const Icone = !ativo ? ArrowUpDown : custoDir === "asc" ? ArrowUp : ArrowDown;
+    return (
+      <button
+        type="button"
+        onClick={() => ordenarCusto(campo)}
+        className={`flex items-center gap-1 hover:text-foreground transition-colors ${
+          direita ? "justify-end" : ""
+        } ${ativo ? "text-foreground" : ""} ${cls}`}
+      >
+        {direita && <Icone className={`h-3 w-3 ${ativo ? "" : "opacity-40"}`} />}
+        <span className="truncate">{rotulo}</span>
+        {!direita && <Icone className={`h-3 w-3 ${ativo ? "" : "opacity-40"}`} />}
+      </button>
+    );
+  }
+
   async function sincronizar() {
     setSincronizando(true);
     try {
@@ -716,6 +894,10 @@ export default function OemIntegrationTab() {
           <TabsTrigger value="margem" className="gap-1.5">
             Margem
             {r.negativas.length > 0 && <Badge variant="destructive">{r.negativas.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="custos" className="gap-1.5">
+            Custos
+            {custos.divergentes > 0 && <Badge variant="secondary">{custos.divergentes}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="pendencias">Pendências</TabsTrigger>
         </TabsList>
@@ -1191,6 +1373,160 @@ export default function OemIntegrationTab() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* ------------------------------------------------------------ custos */}
+        <TabsContent value="custos" className="space-y-3">
+          <Explica>
+            Os dois custos da mesma licença, lado a lado. O <strong>Custo DS</strong> é o valor
+            digitado na ficha do produto, dentro do DoctorSaaS; o <strong>Custo OEM</strong> é o
+            que a licença cobra de fato. Onde os dois divergem, quem está desatualizado é o
+            cadastro daqui — e é isso que o botão <strong>Atualizar DS</strong> vai resolver,
+            trazendo o valor do OEM para a ficha. O <strong>Markup</strong> é a mensalidade
+            dividida pelo <strong>Custo OEM</strong>: quantas vezes o que o cliente paga cobre o
+            que a licença custa. O divisor é sempre o do OEM, aqui e na ficha do cliente, porque
+            é ele o valor correto — então, num cliente com Custo DS desatualizado, a conta do
+            markup não fecha com o número da coluna ao lado, e é o Custo DS que está errado. Só
+            entram os clientes com <strong>vínculo confirmado</strong> e licença ativa — sem
+            confirmação, o custo seria atribuído no chute.
+          </Explica>
+
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+              <div className="min-w-0">
+                <CardTitle className="text-base">
+                  {custos.lista.length} cliente(s) com licença ativa
+                </CardTitle>
+                <CardDescription>
+                  Custo DS <strong className="tabular-nums">{brl(custos.totalDs)}</strong> · Custo
+                  OEM <strong className="tabular-nums">{brl(custos.totalOem)}</strong>
+                  {custos.divergentes > 0 && (
+                    <> · <span className="text-amber-600 dark:text-amber-400">
+                      {custos.divergentes} com valor diferente entre as duas bases
+                    </span></>
+                  )}
+                </CardDescription>
+              </div>
+              {/* Ainda não existe o envio; o botão fica visível e desligado para
+                  não prometer o que não faz. O `title` vai no span porque botão
+                  desabilitado não recebe evento de mouse. */}
+              <span
+                className="shrink-0"
+                title="Em construção — a atualização do custo a partir do OEM ainda não está disponível."
+              >
+                <Button variant="outline" disabled className="gap-2">
+                  <DownloadCloud className="h-4 w-4" /> Atualizar todos
+                </Button>
+              </span>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="px-6 pb-3">
+                <div className="relative max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    className="pl-9"
+                    placeholder="Buscar por cliente, CNPJ ou filial…"
+                    value={buscaCusto}
+                    onChange={(e) => { setBuscaCusto(e.target.value); setPaginaCusto(0); }}
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <div className="min-w-[940px]">
+                  <div className="flex items-center gap-3 border-y bg-muted/50 px-6 py-2 text-xs font-medium text-muted-foreground">
+                    {thCusto("cliente", "Cliente", "min-w-0 flex-1")}
+                    {thCusto("cnpj", "CNPJ/CPF", "w-40 shrink-0")}
+                    {thCusto("custo_ds", <span className="text-emerald-600 dark:text-emerald-400">Custo DS</span>, "w-28 shrink-0", true)}
+                    {thCusto("mensalidade", <span className="text-emerald-600 dark:text-emerald-400">Mensalidade DS</span>, "w-32 shrink-0", true)}
+                    {thCusto("markup", "Markup", "w-24 shrink-0", true)}
+                    {thCusto("custo_oem", <span className="text-sky-600 dark:text-sky-400">Custo OEM</span>, "w-28 shrink-0", true)}
+                    <span className="w-36 shrink-0 text-right">Ação</span>
+                  </div>
+
+                  {custosPagina.length === 0 ? (
+                    <p className="px-6 py-8 text-sm text-muted-foreground text-center">
+                      {custos.lista.length === 0
+                        ? "Nenhum cliente com vínculo confirmado e licença ativa nesta conta."
+                        : "Nenhum cliente encontrado para esta busca."}
+                    </p>
+                  ) : (
+                    <div className="divide-y">
+                      {custosPagina.map((c) => (
+                        <div key={c.id} className="flex items-center gap-3 px-6 py-2.5 text-sm">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium truncate">{c.cliente}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {c.filiais.length === 1
+                                ? `filial ${c.filiais[0]}`
+                                : `${c.filiais.length} filiais: ${c.filiais.join(", ")}`}
+                            </p>
+                          </div>
+                          <span className="w-40 shrink-0 tabular-nums text-muted-foreground">
+                            {doc(c.cnpj)}
+                          </span>
+                          <span
+                            className={`w-28 shrink-0 text-right tabular-nums ${
+                              c.divergente ? "text-amber-600 dark:text-amber-400 font-medium" : ""
+                            }`}
+                            title={c.divergente
+                              ? `Diferente do OEM em ${brl(Math.abs(c.custo_ds - c.custo_oem))}`
+                              : undefined}
+                          >
+                            {brl(c.custo_ds)}
+                          </span>
+                          <span className="w-32 shrink-0 text-right tabular-nums">
+                            {brl(c.mensalidade)}
+                          </span>
+                          <span
+                            className={`w-24 shrink-0 text-right tabular-nums font-medium ${
+                              c.markup == null ? "text-muted-foreground"
+                              : c.markup < 1 ? "text-destructive"
+                              : "text-emerald-600 dark:text-emerald-400"
+                            }`}
+                            title={c.markup == null
+                              ? "Licença sem custo no OEM — não há como calcular"
+                              : `${brl(c.mensalidade)} ÷ ${brl(c.custo_oem)} (custo do OEM)`}
+                          >
+                            {c.markup == null ? "—" : num2(c.markup)}
+                          </span>
+                          <span className="w-28 shrink-0 text-right tabular-nums text-muted-foreground">
+                            {brl(c.custo_oem)}
+                          </span>
+                          <span
+                            className="w-36 shrink-0 flex justify-end"
+                            title="Em construção — a atualização do custo a partir do OEM ainda não está disponível."
+                          >
+                            <Button variant="outline" size="sm" disabled className="gap-1.5">
+                              <DownloadCloud className="h-3.5 w-3.5" /> Atualizar DS
+                            </Button>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {totalPaginasCusto > 1 && (
+                <div className="flex items-center justify-between border-t px-6 py-3 text-sm">
+                  <span className="text-muted-foreground">
+                    {custosVisiveis.length} cliente(s) · página {paginaCustoAtual + 1} de {totalPaginasCusto}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" disabled={paginaCustoAtual === 0}
+                      onClick={() => setPaginaCusto(paginaCustoAtual - 1)}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={paginaCustoAtual >= totalPaginasCusto - 1}
+                      onClick={() => setPaginaCusto(paginaCustoAtual + 1)}>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* -------------------------------------------------------- pendências */}
