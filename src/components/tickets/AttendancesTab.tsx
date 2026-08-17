@@ -234,8 +234,11 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   toDate.setHours(23, 59, 59, 999);
   const toISO = toDate.toISOString();
 
+  // Mesma sanitização da lista, para que os cards contem exatamente o mesmo conjunto.
+  const searchParam = debouncedSearch.trim().length >= 2 ? debouncedSearch.trim().replace(/[%,()]/g, "") : null;
+
   const { data: metrics } = useQuery({
-    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveResolucaoFilter, effectiveTipoFilter, isAdminOrHead, userId, clienteIdOverride ?? null, selectedUnidadeId],
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveInstanceFilter, effectiveResolucaoFilter, effectiveTipoFilter, isAdminOrHead, userId, searchParam, clienteIdOverride ?? null, selectedUnidadeId],
     enabled: !!tid,
     queryFn: async () => {
       const toEnd = new Date(dateRange.to);
@@ -256,6 +259,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
         p_unidade_base_id: selectedUnidadeId ?? null,
         p_resolucao: effectiveResolucaoFilter !== "all" ? effectiveResolucaoFilter : null,
         p_is_group: effectiveTipoFilter === "all" ? null : effectiveTipoFilter === "group",
+        p_instance_id: effectiveInstanceFilter !== "all" ? effectiveInstanceFilter : null,
+        p_search: searchParam,
       });
       if (error) throw error;
       return data as {
