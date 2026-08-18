@@ -124,7 +124,7 @@ function combina(q: string, campos: (string | null | undefined)[]) {
 }
 
 // Colunas ordenáveis da aba Custos.
-type CustoSort = "cliente" | "cnpj" | "custo_ds" | "mensalidade" | "markup" | "custo_oem";
+type CustoSort = "cliente" | "cnpj" | "custo_ds" | "mensalidade" | "markup" | "custo_oem" | "diferenca";
 
 function Numero({
   valor, rotulo, sub, tom = "normal",
@@ -745,6 +745,12 @@ export default function OemIntegrationTab() {
       // respostas para a mesma pergunta.
       // Sem custo não há divisão: null é "não dá para calcular", não zero.
       markup: c.custo_oem > 0 ? c.mensalidade / c.custo_oem : null,
+      // Quanto o cadastro daqui está fora do que a licença cobra. O sinal é a
+      // informação: POSITIVO = Custo DS acima do OEM (a margem real é melhor
+      // do que a tela do cliente mostra); NEGATIVO = abaixo (a margem real é
+      // pior). É a mesma conta do total no topo do card — lá somada, aqui
+      // cliente a cliente.
+      diferenca: c.custo_ds - c.custo_oem,
       // Centavo de diferença já é divergência de cadastro; o que não passa
       // disso é arredondamento e não merece alarme.
       divergente: Math.abs(c.custo_ds - c.custo_oem) >= 0.01,
@@ -778,6 +784,10 @@ export default function OemIntegrationTab() {
       custoSort === "custo_ds" ? c.custo_ds
       : custoSort === "mensalidade" ? c.mensalidade
       : custoSort === "custo_oem" ? c.custo_oem
+      // Ordena pelo valor COM sinal, não pelo tamanho do erro: é o que a
+      // coluna mostra. Descendo, quem está mais a maior no DS vem primeiro;
+      // subindo, quem está mais a menor.
+      : custoSort === "diferenca" ? c.diferenca
       : c.markup;
 
     return [...base].sort((a, b) => {
@@ -1693,7 +1703,11 @@ export default function OemIntegrationTab() {
             digitado na ficha do produto, dentro do DoctorSaaS; o <strong>Custo OEM</strong> é o
             que a licença cobra de fato. Onde os dois divergem, quem está desatualizado é o
             cadastro daqui — e é isso que o botão <strong>Atualizar DS</strong> vai resolver,
-            trazendo o valor do OEM para a ficha. A <strong>Mensalidade DS</strong> é o
+            trazendo o valor do OEM para a ficha. A <strong>Diferença DS</strong> é{" "}
+            <strong>Custo DS − Custo OEM</strong>, e o sinal é a informação: com{" "}
+            <strong>+</strong>, o cadastro daqui está cobrando custo acima do que a licença cobra
+            e a margem real é <em>melhor</em> do que a ficha mostra; com <strong>−</strong>, está
+            abaixo e a margem real é <em>pior</em>. A <strong>Mensalidade DS</strong> é o
             <strong> MRR atual</strong> do cliente — a base já com os movimentos vigentes
             (upsell, cross-sell, downsell e reajuste) —, o mesmo número que a ficha dele mostra
             em <em>MRR Atual</em>. O <strong>Markup</strong> é essa mensalidade dividida pelo{" "}
@@ -1784,7 +1798,7 @@ export default function OemIntegrationTab() {
               </div>
 
               <div className="overflow-x-auto">
-                <div className="min-w-[940px]">
+                <div className="min-w-[1064px]">
                   <div className="flex items-center gap-3 border-y bg-muted/50 px-6 py-2 text-xs font-medium text-muted-foreground">
                     <Checkbox
                       className="shrink-0"
@@ -1801,6 +1815,7 @@ export default function OemIntegrationTab() {
                     {thCusto("mensalidade", <span className="text-emerald-600 dark:text-emerald-400">Mensalidade DS</span>, "w-32 shrink-0", true)}
                     {thCusto("markup", "Markup", "w-24 shrink-0", true)}
                     {thCusto("custo_oem", <span className="text-sky-600 dark:text-sky-400">Custo OEM</span>, "w-28 shrink-0", true)}
+                    {thCusto("diferenca", "Diferença DS", "w-28 shrink-0", true)}
                     <span className="w-36 shrink-0 text-right">Ação</span>
                   </div>
 
@@ -1867,6 +1882,28 @@ export default function OemIntegrationTab() {
                           </span>
                           <span className="w-28 shrink-0 text-right tabular-nums text-muted-foreground">
                             {brl(c.custo_oem)}
+                          </span>
+                          {/* Custo DS − Custo OEM. O "+" é escrito à mão: o
+                              formato de moeda só marca o negativo, e sem o
+                              sinal os dois lados da diferença ficariam iguais
+                              na leitura rápida. Quem está em dia mostra zero
+                              apagado, não fica em branco — em branco pareceria
+                              conta que não foi feita. */}
+                          <span
+                            className={`w-28 shrink-0 text-right tabular-nums ${
+                              c.divergente
+                                ? "text-amber-600 dark:text-amber-400 font-medium"
+                                : "text-muted-foreground"
+                            }`}
+                            title={c.divergente
+                              ? `${brl(c.custo_ds)} (DS) − ${brl(c.custo_oem)} (OEM): o cadastro daqui está ${
+                                  brl(Math.abs(c.diferenca))
+                                } ${c.diferenca > 0 ? "acima" : "abaixo"} do que a licença cobra`
+                              : "O custo daqui é igual ao do OEM"}
+                          >
+                            {!c.divergente
+                              ? brl(0)
+                              : c.diferenca > 0 ? `+${brl(c.diferenca)}` : brl(c.diferenca)}
                           </span>
                           <span className="w-36 shrink-0 flex justify-end">
                             <Button
