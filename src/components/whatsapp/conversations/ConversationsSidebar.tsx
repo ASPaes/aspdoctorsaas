@@ -497,6 +497,35 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       }
     }
 
+    // Chat agendado desce pro fim, na ordem da agenda (a hora mais próxima primeiro).
+    // O operador marcou hora com o cliente: até lá ele não disputa atenção com quem
+    // está esperando agora. Exceção decidida pelo owner em 18/08: se o cliente
+    // escreveu DEPOIS do agendamento, o chat volta pra ordem normal e sobe — agenda
+    // manda na fila, mensagem nova manda na agenda.
+    //
+    // Ordena a página carregada, não o tenant inteiro: a ordem do servidor em
+    // whatsapp_list_conversations vive de idx_wa_conv_tenant_lastmsg_active e um
+    // ORDER BY com agenda a derrubaria. Na prática não muda nada — chat agendado sem
+    // mensagem nova é chat parado, e chat parado já está na primeira página.
+    const scheduleRank = (c: ConversationWithContact): number | null => {
+      const att = attendanceMap.get(c.id);
+      if (!att?.scheduled_until) return null;
+      const until = new Date(att.scheduled_until).getTime();
+      if (isNaN(until) || until <= nowMs) return null;
+      const at = att.scheduled_at ? new Date(att.scheduled_at).getTime() : null;
+      const last = c.last_message_at ? new Date(c.last_message_at).getTime() : 0;
+      if (c.isLastMessageFromMe === false && at != null && last > at) return null;
+      return until;
+    };
+    result.sort((a, b) => {
+      const aRank = scheduleRank(a);
+      const bRank = scheduleRank(b);
+      if (aRank == null && bRank == null) return 0;
+      if (aRank == null) return -1;
+      if (bRank == null) return 1;
+      return aRank - bRank;
+    });
+
     // Alerta de ausência do agente: sobe pro topo (sort estável preserva ordem interna)
     result.sort((a, b) => {
       const aDue = getStateForConv(a).agent_alert_due_at;
