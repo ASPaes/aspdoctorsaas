@@ -324,6 +324,10 @@ export default function OemIntegrationTab() {
   // Seleção por CLIENTE (o id), não por linha da página: ela sobrevive a
   // paginar, ordenar e buscar, que é o que a pessoa espera de um checkbox.
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  // "A corrigir" e "Em dia" em vez de "divergente" e "conferido": o primeiro par
+  // diz o que fazer, o segundo só descreve o estado — e "conferido" sugeriria
+  // que alguém conferiu, quando o que houve foi o valor bater com o do OEM.
+  const [filtroCusto, setFiltroCusto] = useState<"todos" | "corrigir" | "emdia">("todos");
   const [custoDir, setCustoDir] = useState<"asc" | "desc">("asc");
   // Licença desativada não cobra, então divergência nela é ruído na maior parte
   // do tempo. A tela abre em "Ativo" e o usuário amplia se quiser.
@@ -746,19 +750,28 @@ export default function OemIntegrationTab() {
       divergente: Math.abs(c.custo_ds - c.custo_oem) >= 0.01,
     }));
 
+    const totalDs = lista.reduce((a, c) => a + c.custo_ds, 0);
+    const totalOem = lista.reduce((a, c) => a + c.custo_oem, 0);
     return {
       lista,
-      totalDs: lista.reduce((a, c) => a + c.custo_ds, 0),
-      totalOem: lista.reduce((a, c) => a + c.custo_oem, 0),
+      totalDs,
+      totalOem,
+      // O que a diferença SIGNIFICA, não só quanto ela é: cadastro acima do
+      // que o OEM cobra faz a margem parecer pior do que é, e abaixo, melhor.
+      diferenca: totalDs - totalOem,
       divergentes: lista.filter((c) => c.divergente).length,
+      emDia: lista.filter((c) => !c.divergente).length,
     };
   }, [linhas, filiaisComCodigo, custoDsPorFilial]);
 
   const custosVisiveis = useMemo(() => {
     const q = buscaCusto.trim().toLowerCase();
+    const porEstado = filtroCusto === "todos"
+      ? custos.lista
+      : custos.lista.filter((c) => (filtroCusto === "corrigir" ? c.divergente : !c.divergente));
     const base = q
-      ? custos.lista.filter((c) => combina(q, [c.cliente, c.cnpj, ...c.filiais]))
-      : custos.lista;
+      ? porEstado.filter((c) => combina(q, [c.cliente, c.cnpj, ...c.filiais]))
+      : porEstado;
 
     const dir = custoDir === "asc" ? 1 : -1;
     const numero = (c: (typeof base)[number]) =>
@@ -778,7 +791,7 @@ export default function OemIntegrationTab() {
       if (nb == null) return -1;
       return dir * (na - nb);
     });
-  }, [custos.lista, buscaCusto, custoSort, custoDir]);
+  }, [custos.lista, buscaCusto, filtroCusto, custoSort, custoDir]);
 
   // O lote é EXATAMENTE o que está marcado — nunca "todos os elegíveis". Com
   // busca ativa, mandar a base inteira gravaria em centenas de clientes que a
@@ -1698,6 +1711,16 @@ export default function OemIntegrationTab() {
                 <CardDescription>
                   Custo DS <strong className="tabular-nums">{brl(custos.totalDs)}</strong> · Custo
                   OEM <strong className="tabular-nums">{brl(custos.totalOem)}</strong>
+                  {Math.abs(custos.diferenca) >= 0.01 && (
+                    <> = <strong className="tabular-nums text-amber-600 dark:text-amber-400">
+                      {brl(Math.abs(custos.diferenca))}
+                    </strong>{" "}
+                    {/* Dizer o sentido importa: cadastro acima do que o OEM cobra
+                        faz a margem parecer pior do que é; abaixo, melhor. */}
+                    <span className="text-amber-600 dark:text-amber-400">
+                      {custos.diferenca > 0 ? "a maior no DS" : "a menor no DS"}
+                    </span></>
+                  )}
                   {custos.divergentes > 0 && (
                     <> · <span className="text-amber-600 dark:text-amber-400">
                       {custos.divergentes} com valor diferente entre as duas bases
@@ -1723,8 +1746,8 @@ export default function OemIntegrationTab() {
               </Button>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="px-6 pb-3">
-                <div className="relative max-w-sm">
+              <div className="px-6 pb-3 flex flex-wrap items-center gap-3">
+                <div className="relative w-full max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     className="pl-9"
@@ -1732,6 +1755,28 @@ export default function OemIntegrationTab() {
                     value={buscaCusto}
                     onChange={(e) => { setBuscaCusto(e.target.value); setPaginaCusto(0); }}
                   />
+                </div>
+                {/* Mesmo controle da Conferência. O contador vai no rótulo: o
+                    tamanho da fila é a informação, não um detalhe. */}
+                <div className="inline-flex rounded-md border p-0.5">
+                  {([
+                    ["todos", "Todos", custos.lista.length],
+                    ["corrigir", "A corrigir", custos.divergentes],
+                    ["emdia", "Em dia", custos.emDia],
+                  ] as const).map(([v, rot, n]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => { setFiltroCusto(v); setPaginaCusto(0); }}
+                      className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                        filtroCusto === v
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {rot} <span className="tabular-nums opacity-70">{n}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -1760,7 +1805,11 @@ export default function OemIntegrationTab() {
                     <p className="px-6 py-8 text-sm text-muted-foreground text-center">
                       {custos.lista.length === 0
                         ? "Nenhum cliente com vínculo confirmado e licença ativa nesta conta."
-                        : "Nenhum cliente encontrado para esta busca."}
+                        : filtroCusto === "corrigir" && custos.divergentes === 0
+                          ? "Nenhum cliente a corrigir — todos os custos estão iguais aos do OEM."
+                          : buscaCusto.trim()
+                            ? "Nenhum cliente encontrado para esta busca."
+                            : "Nenhum cliente neste filtro."}
                     </p>
                   ) : (
                     <div className="divide-y">
