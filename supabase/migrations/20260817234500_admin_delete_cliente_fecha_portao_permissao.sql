@@ -80,8 +80,7 @@ begin
 
   elsif nullif(current_setting('request.jwt.claims', true), '') is not null then
     -- Chamada pela API sem 'sub' no JWT. Nao ha usuario para checar papel nenhum;
-    -- so o backend pode seguir. Sem este ramo, era o buraco por onde passava
-    -- qualquer service_role.
+    -- so o backend pode seguir.
     if coalesce(
          nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role',
          ''
