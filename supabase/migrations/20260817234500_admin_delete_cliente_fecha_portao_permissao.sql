@@ -26,6 +26,10 @@
 --   por SQL (SQL Editor, psql) continua passando de proposito — nao ha
 --   request.jwt.claims ali, e quem tem esse acesso ja poderia dar DELETE na mao.
 --
+-- Os cinco "coalesce(p_incluir_chat, ...)" internos passaram de true para false no
+-- mesmo movimento. Sem isso o default novo protegia so quem OMITE o parametro:
+-- quem passasse null explicito caia no coalesce e apagava o chat do mesmo jeito.
+--
 -- CREATE OR REPLACE, sem DROP: assinatura inalterada, GRANTs sobrevivem.
 -- Corpo identico ao de producao + o default false do p_incluir_chat da migration
 -- anterior. Rode as duas na ordem.
@@ -123,7 +127,7 @@ begin
         n_open_att;
     end if;
 
-    if coalesce(p_incluir_chat, true) then
+    if coalesce(p_incluir_chat, false) then
       select count(*) into n_live_chat
       from whatsapp_conversations c
       where c.contact_id in (select id from whatsapp_contacts where cliente_id = p_cliente_id)
@@ -184,7 +188,7 @@ begin
     delete from cliente_produtos   where cliente_id = p_cliente_id;
     get diagnostics n_produtos = row_count;
 
-    if coalesce(p_incluir_chat, true) then
+    if coalesce(p_incluir_chat, false) then
       update support_kb_articles set source_attendance_id = null
         where source_attendance_id in (
           select id from support_attendances
@@ -211,7 +215,7 @@ begin
     delete from cs_tickets where cliente_id = p_cliente_id;
     get diagnostics n_cs = row_count;
 
-    if coalesce(p_incluir_chat, true) then
+    if coalesce(p_incluir_chat, false) then
       delete from whatsapp_contacts where cliente_id = p_cliente_id;
       get diagnostics n_chat = row_count;
     end if;
@@ -221,7 +225,7 @@ begin
     insert into audit_events(tenant_id, actor_user_id, event_type, metadata)
     values (v_cliente.tenant_id, auth.uid(), 'cliente_excluido',
       jsonb_build_object('mode','purge','cliente_id',p_cliente_id,
-        'razao_social',v_cliente.razao_social,'incluir_chat',coalesce(p_incluir_chat,true),
+        'razao_social',v_cliente.razao_social,'incluir_chat',coalesce(p_incluir_chat,false),
         'apagados', jsonb_build_object(
           'contratos',n_contratos,'cliente_produtos',n_produtos,'movimentos_mrr',n_mov,
           'support_attendances',n_attend,'support_tickets',n_tickets,'cs_tickets',n_cs,
@@ -229,7 +233,7 @@ begin
 
     return jsonb_build_object('ok', true, 'mode', 'purge',
       'cliente_id', p_cliente_id,
-      'incluir_chat', coalesce(p_incluir_chat, true),
+      'incluir_chat', coalesce(p_incluir_chat, false),
       'apagados', jsonb_build_object(
         'contratos', n_contratos, 'cliente_produtos', n_produtos,
         'movimentos_mrr', n_mov, 'support_attendances', n_attend,
