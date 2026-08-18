@@ -98,6 +98,7 @@ type ClienteDs = {
   id: string; nome_fantasia: string | null; razao_social: string | null;
   cnpj_digits: string | null; cnpj: string | null;
   mensalidade: number | null; cancelado: boolean | null;
+  unidade_base_id: number | null;
 };
 
 type Conta = {
@@ -245,15 +246,26 @@ Deno.serve(async (req) => {
 
       // -------------------------------- 3. clientes DESTA conta (por unidade)
       const unidades = conta.unidades_base_ids ?? [];
-      const clientes = await lerTudo<ClienteDs>((a, b) => {
-        let c = ds.from("clientes")
-          .select("id, nome_fantasia, razao_social, cnpj_digits, cnpj, mensalidade, cancelado")
-          .eq("tenant_id", conta.tenant_id).order("id").range(a, b);
-        // Sem unidades definidas a conta atende o tenant inteiro; com elas,
-        // só os clientes daquelas unidades entram no de/para.
-        if (unidades.length) c = c.in("unidade_base_id", unidades);
-        return c;
-      });
+
+      // Lê o TENANT INTEIRO e filtra por unidade aqui dentro, em vez de filtrar
+      // no banco, porque as duas coisas têm alcances diferentes:
+      //
+      //   - o CASAMENTO por CNPJ/nome só pode olhar os clientes das unidades
+      //     desta conta, senão uma unidade puxaria a filial de outra;
+      //   - a BUSCA POR ID alcança o tenant inteiro, porque o vínculo por
+      //     código já foi decidido e pode apontar para cliente de outra unidade.
+      //
+      // Filtrando no banco, esses ficavam de fora e a linha saía com
+      // mensalidade, CNPJ e "cancelado" NULOS — 3 clientes assim em 18/08/2026,
+      // aparecendo na aba Custos com mensalidade zero e sem markup.
+      const todosDoTenant = await lerTudo<ClienteDs>((a, b) =>
+        ds.from("clientes")
+          .select("id, nome_fantasia, razao_social, cnpj_digits, cnpj, mensalidade, cancelado, unidade_base_id")
+          .eq("tenant_id", conta.tenant_id).order("id").range(a, b));
+
+      const clientes = unidades.length
+        ? todosDoTenant.filter((c) => unidades.includes(Number(c.unidade_base_id)))
+        : todosDoTenant;
 
       // MENSALIDADE = MRR ATUAL, NÃO A BASE.
       //
@@ -323,7 +335,9 @@ Deno.serve(async (req) => {
         }
       }
 
-      const porId = new Map<string, ClienteDs>(clientes.map((c) => [c.id, c]));
+      // Do TENANT inteiro: é por ela que o vínculo já confirmado encontra o
+      // cliente, mesmo que ele seja de outra unidade.
+      const porId = new Map<string, ClienteDs>(todosDoTenant.map((c) => [c.id, c]));
 
       // ------------------ 3b. o vínculo DURÁVEL: o código na ficha do cliente
       // Desde 15/08/2026 o par grupo+filial fica gravado em cliente_produtos.
