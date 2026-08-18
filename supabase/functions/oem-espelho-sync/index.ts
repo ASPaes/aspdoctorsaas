@@ -255,6 +255,36 @@ Deno.serve(async (req) => {
         return c;
       });
 
+      // MENSALIDADE = MRR ATUAL, NÃO A BASE.
+      //
+      // `clientes.mensalidade` é o MRR Base. O que vale para margem e markup é
+      // o saldo de hoje: base + movimentos vigentes (upsell, cross-sell,
+      // downsell, reajuste). No TROPEIRÃO DO JUCÃO a base é R$ 3.113,84 e o
+      // atual R$ 1.869,99 — um downsell de R$ 1.568,31 no meio. Medido nesta
+      // conta: 359 dos 1.063 clientes vivos têm os dois valores diferentes.
+      //
+      // Uma chamada para todos: a fonte canônica (`fn_mrr_cliente_em`) é por
+      // cliente, e 1.063 idas ao banco não cabem aqui.
+      const mrrAtual = new Map<string, number>();
+      try {
+        const { data: mapa, error: errM } = await ds.rpc("fn_mrr_por_cliente_em", {
+          p_tenant: conta.tenant_id,
+        });
+        if (errM) throw new Error(errM.message);
+        for (const [id, v] of Object.entries((mapa ?? {}) as Record<string, unknown>)) {
+          if (v != null) mrrAtual.set(id, Number(v));
+        }
+      } catch (e) {
+        // Sem o MRR atual o espelho ainda vale — ele cai para a base, que é o
+        // comportamento antigo. Ficar sem espelho por causa disto seria pior,
+        // e o motivo tem que aparecer no log em vez de sumir.
+        console.error("[oem-espelho] fn_mrr_por_cliente_em:",
+          e instanceof Error ? e.message : String(e));
+      }
+      // Cliente sem entrada no mapa mantém a base — nunca vira zero.
+      const mensalidadeDe = (c: ClienteDs | null | undefined) =>
+        (c ? (mrrAtual.get(c.id) ?? c.mensalidade ?? null) : null);
+
       const porCnpj = new Map<string, ClienteDs[]>();
       for (const c of clientes) {
         const k = c.cnpj_digits || digitos(c.cnpj);
@@ -464,7 +494,7 @@ Deno.serve(async (req) => {
             ? "Este cliente já é de outra filial. Falta o cadastro de cliente desta loja — ou o vínculo vai para o cadastro errado."
             : (anterior?.observacao ?? null),
           divergencias: divs.length ? divs : null,
-          mensalidade_ds: cli?.mensalidade ?? null, cancelado_ds: cli?.cancelado ?? null,
+          mensalidade_ds: mensalidadeDe(cli), cancelado_ds: cli?.cancelado ?? null,
           qtd_candidatos_ds: cands.length,
           estado_match: estado, acao_sugerida: acao,
           status_usuario: anterior?.status_usuario ?? (estado === "CASADO" ? "vinculado" : "novo"),
@@ -484,7 +514,7 @@ Deno.serve(async (req) => {
           tenant_id: conta.tenant_id, conta_integration_id: conta.id,
           cnpj_norm: k || null, ds_customer_id: c.id,
           razao_ds: c.nome_fantasia ?? c.razao_social,
-          mensalidade_ds: c.mensalidade, cancelado_ds: c.cancelado,
+          mensalidade_ds: mensalidadeDe(c), cancelado_ds: c.cancelado,
           // Cliente sem filial não tem o que escolher — marcá-lo como
           // "escolher_candidato" enchia a fila de decisão com centenas de
           // linhas sem filial e sem candidato nenhum.

@@ -1693,9 +1693,12 @@ export default function OemIntegrationTab() {
             digitado na ficha do produto, dentro do DoctorSaaS; o <strong>Custo OEM</strong> é o
             que a licença cobra de fato. Onde os dois divergem, quem está desatualizado é o
             cadastro daqui — e é isso que o botão <strong>Atualizar DS</strong> vai resolver,
-            trazendo o valor do OEM para a ficha. O <strong>Markup</strong> é a mensalidade
-            dividida pelo <strong>Custo OEM</strong>: quantas vezes o que o cliente paga cobre o
-            que a licença custa. O divisor é sempre o do OEM, aqui e na ficha do cliente, porque
+            trazendo o valor do OEM para a ficha. A <strong>Mensalidade DS</strong> é o
+            <strong> MRR atual</strong> do cliente — a base já com os movimentos vigentes
+            (upsell, cross-sell, downsell e reajuste) —, o mesmo número que a ficha dele mostra
+            em <em>MRR Atual</em>. O <strong>Markup</strong> é essa mensalidade dividida pelo{" "}
+            <strong>Custo OEM</strong>: quantas vezes o que o cliente paga cobre o que a licença
+            custa. O divisor é sempre o do OEM, aqui e na ficha do cliente, porque
             é ele o valor correto — então, num cliente com Custo DS desatualizado, a conta do
             markup não fecha com o número da coluna ao lado, e é o Custo DS que está errado. Só
             entram os clientes com <strong>vínculo confirmado</strong> e licença ativa — sem
