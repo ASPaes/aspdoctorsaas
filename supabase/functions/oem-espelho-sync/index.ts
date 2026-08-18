@@ -86,6 +86,14 @@ type FilialOem = {
   numero_filiais: number | null; modulos_ativos: unknown; last_sync: string | null;
 };
 
+// Uma célula da grade de preços do parceiro: quanto o módulo custa naquele
+// produto. Vem pronto do oem-exportar — aqui não se calcula preço nenhum.
+type ItemPrecoOem = {
+  produto_codigo: string; produto_nome: string;
+  modulo_codigo: number; modulo_nome: string;
+  quantidade: number; valor_unitario: number; valor_total: number;
+};
+
 type ClienteDs = {
   id: string; nome_fantasia: string | null; razao_social: string | null;
   cnpj_digits: string | null; cnpj: string | null;
@@ -498,6 +506,69 @@ Deno.serve(async (req) => {
         p_conta: conta.id,
       });
 
+      // ------------------------------------- 6. tabela de preços dos módulos
+      //
+      // Outro nível do mesmo assunto: acima veio o que CADA FILIAL paga; aqui
+      // vem quanto CADA MÓDULO custa de tabela em cada produto do catálogo do
+      // parceiro. É a grade de "Regras comerciais" do portal do OEM, e ela não
+      // tem cliente dentro. Os dois valores diferem de propósito — no grupo
+      // 8201 o módulo "Gestao" é 39,90 na tabela e 25,12 na loja.
+      //
+      // FALHA AQUI NÃO INVALIDA O ESPELHO. As filiais já estão gravadas neste
+      // ponto e são o que sustenta Custos, Margem e Conferência; perder tudo
+      // isso porque o catálogo não respondeu seria trocar o certo pelo ruim.
+      // O motivo sobe no resultado e a tela mostra.
+      const precosPayload = corpo.precos as
+        | { itens?: ItemPrecoOem[]; atualizado_em?: string }
+        | null | undefined;
+      let precosGravados = 0;
+      let precosErro: string | null = (corpo.precosErro as string | null) ?? null;
+
+      if (precosPayload?.itens?.length) {
+        const agora = precosPayload.atualizado_em ?? new Date().toISOString();
+        const precos = precosPayload.itens
+          .filter((i) => i.produto_codigo && Number.isFinite(Number(i.modulo_codigo)))
+          .map((i) => ({
+            tenant_id: conta.tenant_id,
+            conta_integration_id: conta.id,
+            produto_codigo: String(i.produto_codigo),
+            produto_nome: String(i.produto_nome ?? i.produto_codigo),
+            modulo_codigo: Number(i.modulo_codigo),
+            modulo_nome: String(i.modulo_nome ?? `Módulo ${i.modulo_codigo}`),
+            quantidade: Number(i.quantidade ?? 1) || 1,
+            valor_unitario: Number(i.valor_unitario ?? 0) || 0,
+            valor_total: Number(i.valor_total ?? 0) || 0,
+            atualizado_em: agora,
+          }));
+
+        const { error: errP } = await ds.from("oem_espelho_modulo_preco")
+          .upsert(precos, { onConflict: "conta_integration_id,produto_codigo,modulo_codigo" });
+        if (errP) {
+          precosErro = `oem_espelho_modulo_preco: ${errP.message}`;
+          console.error("[oem-espelho-sync]", precosErro);
+        } else {
+          precosGravados = precos.length;
+          // Módulo que saiu do catálogo do parceiro sai da grade. Sem isto ele
+          // ficaria para sempre com o último preço lido, e ninguém saberia que
+          // aquele preço não vale mais.
+          //
+          // A limpeza é RESTRITA AOS PRODUTOS QUE VIERAM nesta carga. Lá no
+          // DoctorOEM, produto cujo GET falha é pulado para não derrubar os
+          // outros — se apagássemos tudo o que ficou velho, um erro de rede num
+          // produto sumiria com a coluna inteira dele. Melhor a coluna com o
+          // preço da carga anterior do que a tela dizendo que não existe preço.
+          const produtosVindos = [...new Set(precos.map((p) => p.produto_codigo))];
+          const { error: errD } = await ds.from("oem_espelho_modulo_preco")
+            .delete()
+            .eq("conta_integration_id", conta.id)
+            .in("produto_codigo", produtosVindos)
+            .lt("atualizado_em", agora);
+          if (errD) console.error("[oem-espelho-sync] limpeza de preços:", errD.message);
+        }
+      } else if (!precosErro) {
+        precosErro = "O DoctorOEM não devolveu a tabela de preços.";
+      }
+
       await ds.from("oem_integration").update({
         ultimo_sync_em: new Date().toISOString(),
         ultimo_sync_status: "sucesso",
@@ -515,6 +586,7 @@ Deno.serve(async (req) => {
         clientesDs: clientes.length, linhasRecon: recon.length,
         decisoesPreservadas: decidido.size,
         codigosGravados: codigosGravados ?? 0,
+        precosGravados, precosErro,
         ultimaSincronizacaoOem: corpo.ultimaSincronizacao ?? null,
         estado_match: conta_("estado_match"), acao_sugerida: conta_("acao_sugerida"),
       });
