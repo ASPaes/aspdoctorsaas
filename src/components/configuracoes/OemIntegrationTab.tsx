@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
   Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
-  ArrowUpDown, ArrowUp, ArrowDown, DownloadCloud,
+  ArrowUpDown, ArrowUp, ArrowDown, DownloadCloud, Boxes,
 } from "lucide-react";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
@@ -62,6 +62,18 @@ type Recon = {
   // Como o vínculo foi achado: codigo (confirmado na ficha) · cnpj · nome
   // (o CNPJ era do grupo e não desempata).
   criterio_match: string | null;
+};
+
+// Uma célula da tabela de preços do parceiro: quanto o módulo custa naquele
+// produto do catálogo. Não tem cliente dentro — é preço de tabela, e é o que
+// diferencia esta aba das de Custos/Margem, onde o valor é o da licença.
+type PrecoModulo = {
+  produto_codigo: string;
+  produto_nome: string;
+  modulo_codigo: number;
+  modulo_nome: string;
+  valor_unitario: number | null;
+  atualizado_em: string;
 };
 
 type Conta = {
@@ -305,6 +317,11 @@ export default function OemIntegrationTab() {
   // Licença desativada não cobra, então divergência nela é ruído na maior parte
   // do tempo. A tela abre em "Ativo" e o usuário amplia se quiser.
   const [statusConf, setStatusConf] = useState<"Ativo" | "Desativado" | "todos">("Ativo");
+  // Grade de preços: dos ~57 módulos do catálogo, a maioria está zerada em
+  // quase todo produto. A tela abre igual ao portal (mostrando tudo) e quem
+  // quiser enxergar só o que cobra liga o filtro.
+  const [buscaModulo, setBuscaModulo] = useState("");
+  const [soComValor, setSoComValor] = useState(false);
   const POR_PAGINA = 25;
 
   // Uma conta POR UNIDADE BASE, igual ao Omie. A view não tem a coluna da
@@ -418,6 +435,61 @@ export default function OemIntegrationTab() {
       ),
     enabled: !!conta?.id,
   });
+
+  // Tabela de preços desta conta. São ~120 pares produto×módulo — longe do
+  // teto do PostgREST —, mas o fetchAllRows é a convenção do projeto e não
+  // custa nada aqui: se o catálogo crescer, não vira bug silencioso.
+  const { data: precos = [], isLoading: precosCarregando } = useQuery({
+    queryKey: ["oem-precos-modulo", conta?.id],
+    enabled: !!conta?.id,
+    queryFn: () =>
+      fetchAllRows<PrecoModulo>(() =>
+        (supabase.from("oem_espelho_modulo_preco" as any) as any)
+          .select("produto_codigo, produto_nome, modulo_codigo, modulo_nome, valor_unitario, atualizado_em")
+          .eq("conta_integration_id", conta!.id)
+          .order("modulo_codigo"),
+      ),
+  });
+
+  // Monta a grade módulo × produto, que é como o portal mostra e como se lê a
+  // regra comercial: a mesma linha (o módulo) custa diferente em cada coluna
+  // (o produto). Célula vazia não é zero — é módulo que não existe naquele
+  // produto, e confundir os dois faria a tela inventar preço.
+  const grade = useMemo(() => {
+    const produtos = new Map<string, string>();
+    const modulos = new Map<number, { nome: string; valores: Map<string, number> }>();
+    let atualizado: string | null = null;
+
+    for (const p of precos) {
+      produtos.set(p.produto_codigo, p.produto_nome);
+      if (!modulos.has(p.modulo_codigo)) {
+        modulos.set(p.modulo_codigo, { nome: p.modulo_nome, valores: new Map() });
+      }
+      modulos.get(p.modulo_codigo)!.valores.set(p.produto_codigo, Number(p.valor_unitario) || 0);
+      if (!atualizado || p.atualizado_em > atualizado) atualizado = p.atualizado_em;
+    }
+
+    // Ordem pelo código, dos dois lados: é a ordem em que o OEM devolve e a que
+    // o portal usa — "Gestao" primeiro, os agregados no fim. Ordenar por nome
+    // jogaria o módulo principal para o meio da lista.
+    const listaProdutos = [...produtos.entries()]
+      .map(([codigo, nome]) => ({ codigo, nome }))
+      .sort((a, b) => Number(a.codigo) - Number(b.codigo));
+    const listaModulos = [...modulos.entries()]
+      .map(([codigo, m]) => ({ codigo, ...m }))
+      .sort((a, b) => a.codigo - b.codigo);
+
+    return { produtos: listaProdutos, modulos: listaModulos, atualizado };
+  }, [precos]);
+
+  const modulosVisiveis = useMemo(() => {
+    const q = buscaModulo.trim().toLowerCase();
+    return grade.modulos.filter((m) => {
+      if (soComValor && ![...m.valores.values()].some((v) => v > 0)) return false;
+      if (!q) return true;
+      return m.nome.toLowerCase().includes(q) || String(m.codigo).includes(q);
+    });
+  }, [grade.modulos, buscaModulo, soComValor]);
 
   async function salvarChave() {
     if (!tid || !novaUnidade || !novaChave.trim()) return;
@@ -756,9 +828,20 @@ export default function OemIntegrationTab() {
         title: "Espelho atualizado",
         description: res
           ? `${res.filiais} filiais · ${res.linhasRecon} vínculos · ${res.decisoesPreservadas} decisões preservadas`
+            + (res.precosGravados ? ` · ${res.precosGravados} preços de módulo` : "")
           : "Concluído.",
       });
+      // A tabela de preços é secundária: quando ela falha, o espelho das
+      // filiais já subiu e o aviso não pode passar por sucesso silencioso.
+      if (res?.precosErro) {
+        toast({
+          title: "Tabela de preços não veio",
+          description: String(res.precosErro),
+          variant: "destructive",
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["oem-recon", conta?.id] });
+      queryClient.invalidateQueries({ queryKey: ["oem-precos-modulo", conta?.id] });
       queryClient.invalidateQueries({ queryKey: ["oem-espelho-ultima", tid] });
       queryClient.invalidateQueries({ queryKey: ["oem-conexao", tid] });
     } catch (e: any) {
@@ -893,6 +976,9 @@ export default function OemIntegrationTab() {
       <Tabs defaultValue="visao" className="w-full">
         <TabsList>
           <TabsTrigger value="conexao">Conexão</TabsTrigger>
+          <TabsTrigger value="modulos" className="gap-1.5">
+            <Boxes className="h-3.5 w-3.5" /> Módulos
+          </TabsTrigger>
           <TabsTrigger value="visao">Visão geral</TabsTrigger>
           <TabsTrigger value="escolher" className="gap-1.5">
             Escolher candidato
@@ -1001,6 +1087,125 @@ export default function OemIntegrationTab() {
                   para trocar, gere outra no Nexus Hub e cole aqui.
                 </p>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------------------ módulos */}
+        <TabsContent value="modulos" className="space-y-3">
+          <Explica>
+            A <strong>tabela de preços</strong> da sua conta no OEM: quanto{" "}
+            <strong>cada módulo custa</strong> em cada produto do catálogo. É a mesma grade de{" "}
+            <strong>Dados da empresa › Regras comerciais</strong> do portal, e vem{" "}
+            <strong>por conta conectada</strong> — cada unidade tem a sua. Isto é preço de{" "}
+            <strong>tabela</strong>, não o que um cliente paga: a licença de cada filial pode ter
+            valor negociado, e é ela que aparece nas abas Custos e Margem.
+          </Explica>
+
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+              <div className="min-w-0">
+                <CardTitle className="text-base">
+                  {grade.modulos.length} módulo(s) em {grade.produtos.length} produto(s)
+                </CardTitle>
+                <CardDescription>
+                  {grade.atualizado
+                    ? <>Lida do OEM em{" "}
+                        <strong>
+                          {new Date(grade.atualizado).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+                        </strong>{" "}— atualiza junto com o espelho.</>
+                    : "A grade chega no próximo Atualizar espelho."}
+                </CardDescription>
+              </div>
+              <Button
+                variant={soComValor ? "default" : "outline"}
+                size="sm"
+                className="shrink-0"
+                onClick={() => setSoComValor((v) => !v)}
+              >
+                {soComValor ? "Mostrando só os que cobram" : "Só módulos com valor"}
+              </Button>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              <div className="px-6 pb-3">
+                <div className="relative max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    className="pl-9"
+                    placeholder="Buscar módulo pelo nome ou código…"
+                    value={buscaModulo}
+                    onChange={(e) => setBuscaModulo(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {precosCarregando ? (
+                <div className="space-y-2 px-6 pb-6">
+                  {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
+                </div>
+              ) : grade.modulos.length === 0 ? (
+                <p className="px-6 py-8 text-sm text-muted-foreground text-center">
+                  Nenhuma tabela de preços carregada ainda. Clique em{" "}
+                  <strong>Atualizar espelho</strong> — ela vem junto com as filiais.
+                </p>
+              ) : modulosVisiveis.length === 0 ? (
+                <p className="px-6 py-8 text-sm text-muted-foreground text-center">
+                  Nenhum módulo encontrado com esse filtro.
+                </p>
+              ) : (
+                // A primeira coluna fica presa: com 6 produtos a grade rola na
+                // horizontal, e sem isso o nome do módulo sai da tela — quem
+                // rola perde a linha que está lendo.
+                <div className="overflow-x-auto border-t">
+                  <table className="w-full text-sm">
+                    <thead>
+                      {/* Cabeçalho e célula presa usam o MESMO tom: a coluna
+                          fixa precisa ser opaca para tapar o que passa por
+                          baixo, e com `bg-muted/50` na linha ela apareceria
+                          mais escura que o resto do cabeçalho. */}
+                      <tr className="bg-muted text-xs font-medium text-muted-foreground">
+                        <th className="sticky left-0 z-10 bg-muted px-6 py-2 text-left font-medium min-w-[260px]">
+                          Módulo
+                        </th>
+                        {grade.produtos.map((p) => (
+                          <th key={p.codigo} className="px-4 py-2 text-right font-medium whitespace-nowrap">
+                            {p.nome}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    {/* Sem hover de linha de propósito: a coluna presa é opaca
+                        e não acompanharia o realce, deixando a primeira coluna
+                        apagada enquanto o resto da linha acende. */}
+                    <tbody className="divide-y">
+                      {modulosVisiveis.map((m) => (
+                        <tr key={m.codigo}>
+                          <td className="sticky left-0 z-10 bg-card px-6 py-2 font-medium">
+                            <span className="truncate">{m.nome}</span>
+                            <span className="ml-2 font-mono text-xs text-muted-foreground">#{m.codigo}</span>
+                          </td>
+                          {grade.produtos.map((p) => {
+                            const v = m.valores.get(p.codigo);
+                            return (
+                              <td
+                                key={p.codigo}
+                                className={`px-4 py-2 text-right tabular-nums whitespace-nowrap ${
+                                  v === undefined || v === 0 ? "text-muted-foreground" : ""
+                                }`}
+                              >
+                                {/* Célula vazia = o módulo não existe nesse
+                                    produto. Diferente de existir valendo zero. */}
+                                {v === undefined ? "—" : brl(v)}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
