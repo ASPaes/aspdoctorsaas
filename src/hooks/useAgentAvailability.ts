@@ -29,7 +29,14 @@ export function useAgentAvailability(): AgentAvailability {
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const [currentRes, limitRes] = await Promise.all([
-        supabase.rpc('fn_current_chat_count' as any, { p_user_id: user!.id, p_tenant_id: (profile as any)!.tenant_id }),
+        // fn_current_chat_count_individual, nao fn_current_chat_count: o cracha
+        // conta o que esta na aba "Atendendo", e essa aba nao mostra grupo
+        // (lista e pill filtram is_group = false). A fn_current_chat_count
+        // conta grupo de proposito — ela e o portao de capacidade do motor de
+        // distribuicao, e la grupo continua ocupando vaga. Consequencia aceita
+        // pelo owner em 18/08: quem esta so com grupo ve 0/5 e mesmo assim nao
+        // recebe da fila, porque para o motor ele esta ocupado.
+        supabase.rpc('fn_current_chat_count_individual' as any, { p_user_id: user!.id, p_tenant_id: (profile as any)!.tenant_id }),
         supabase.rpc('fn_effective_chat_limit' as any, { p_user_id: user!.id, p_tenant_id: (profile as any)!.tenant_id }),
       ]);
 

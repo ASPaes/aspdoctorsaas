@@ -22,11 +22,27 @@ vi.mock("@/contexts/TenantFilterContext", () => ({
   useTenantFilter: () => ({ effectiveTenantId: "tenant-1" }),
 }));
 
-// O canal Realtime tem teste próprio (realtimeChannelPool.test.ts). Aqui ele sai
-// do caminho de propósito: o que está sob teste é a recuperação SEM Realtime.
+// O canal Realtime tem teste próprio (realtimeChannelPool.test.ts). Aqui o
+// `configure` sai do caminho de propósito — nenhum handler de postgres_changes
+// roda. O que fica é o `onStatus`, capturado para que o teste consiga simular
+// uma reconexão do socket.
+const rt = vi.hoisted(() => ({ listeners: [] as Array<(s: string) => void> }));
 vi.mock("@/lib/realtimeChannelPool", () => ({
-  subscribeSharedChannel: () => () => {},
+  subscribeSharedChannel: (
+    _topic: string,
+    _configure: unknown,
+    onStatus?: (s: string) => void
+  ) => {
+    if (onStatus) rt.listeners.push(onStatus);
+    return () => {
+      rt.listeners = rt.listeners.filter((l) => l !== onStatus);
+    };
+  },
 }));
+
+const emitirStatus = (status: string) => {
+  for (const l of [...rt.listeners]) l(status);
+};
 
 function Sonda() {
   useWhatsAppConversations({ bucket: "waiting", queueOrder: true });
@@ -52,6 +68,7 @@ beforeEach(() => {
   rpc.mockReset();
   rpc.mockResolvedValue({ data: [], error: null });
   document.body.innerHTML = "";
+  rt.listeners = [];
   // Relógio falso ligado durante o teste INTEIRO. Voltar para o relógio real no
   // meio devolve o Date.now() e desfaz o avanço, e aí a query deixa de estar
   // velha — o teste passava a medir o staleTime errado.
@@ -83,6 +100,31 @@ describe("useWhatsAppConversations — recuperação ao voltar para a aba", () =
     await act(async () => { focusManager.setFocused(true); });
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
 
+    expect(rpc).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("useWhatsAppConversations — recuperação depois de uma queda do Realtime", () => {
+  it("busca a lista de novo quando o canal volta a SUBSCRIBED", async () => {
+    await montar();
+    expect(rpc).toHaveBeenCalledTimes(1);
+
+    // Primeiro SUBSCRIBED da sessão: a query ACABOU de buscar. Só calibra.
+    await act(async () => { emitirStatus("SUBSCRIBED"); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(rpc).toHaveBeenCalledTimes(1);
+
+    // Socket cai. `postgres_changes` não tem replay: o que for atribuído ao
+    // operador nesta janela não chega por Realtime nunca. Sem tocar no foco nem
+    // no relógio — a aba segue aberta e na frente, que é o caso que doía.
+    await act(async () => { emitirStatus("CHANNEL_ERROR"); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(rpc).toHaveBeenCalledTimes(1);
+
+    // Reconectou. É aqui que a lista tem que ir buscar o intervalo perdido, em
+    // vez de esperar o poll de 60s.
+    await act(async () => { emitirStatus("SUBSCRIBED"); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(rpc).toHaveBeenCalledTimes(2);
   });
 });

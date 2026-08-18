@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { subscribeSharedChannel } from '@/lib/realtimeChannelPool';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
@@ -222,6 +222,29 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  // Reconexão do canal: `postgres_changes` NÃO tem replay. O que acontece
+  // enquanto o socket está caído não chega por Realtime nunca, e a lista só se
+  // recuperava no poll de 60s ou no F5 — o contador, não, porque tem caminho
+  // próprio e staleTime menor. Medido em 18/08: atendimento criado às
+  // 13:18:17,9, `whatsapp_pill_counts` em 2,9s, `whatsapp_list_conversations`
+  // só 68,7s depois.
+  //
+  // E não é caso raro: em produção NENHUMA assinatura de `realtime.subscription`
+  // vive mais de 56 min e a mediana é 15 — o canal é refeito o tempo todo.
+  //
+  // O primeiro SUBSCRIBED da sessão só calibra: a query acabou de buscar e um
+  // refetch aqui seria puro desperdício em toda montagem. Do segundo em diante
+  // é rejoin, e aí a lista vai buscar a janela que perdeu.
+  const jaAssinouRef = useRef(false);
+  const onChannelStatus = useCallback((status: string) => {
+    if (status !== 'SUBSCRIBED') return;
+    if (!jaAssinouRef.current) {
+      jaAssinouRef.current = true;
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+  }, [queryClient]);
+
   // Realtime: canal compartilhado com ref-count para não colidir entre montagens
   useEffect(() => {
     const channelName = `conversations-rt-${tid ?? 'none'}`;
@@ -331,8 +354,8 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         // refetch de 60s.
         invalidateList();
       });
-    });
-  }, [queryClient, tid]);
+    }, onChannelStatus);
+  }, [queryClient, tid, onChannelStatus]);
 
   return {
     conversations,
