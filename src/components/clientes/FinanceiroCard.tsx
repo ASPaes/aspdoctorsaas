@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEspelhoFinanceiro } from "@/hooks/useEspelhoFinanceiro";
+import { useCustoOemDoCliente } from "@/hooks/useCustoOemDoCliente";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,9 +63,11 @@ interface MiniCardProps {
   tone?: "neutral" | "deduction" | "result";
   sub?: React.ReactNode;
   kpiKey?: string;
+  /** Selo ao lado do rótulo. Hoje só o COGS usa, para o estado do OEM. */
+  selo?: React.ReactNode;
 }
 
-function MiniCard({ label, value, tone = "neutral", sub, kpiKey }: MiniCardProps) {
+function MiniCard({ label, value, tone = "neutral", sub, kpiKey, selo }: MiniCardProps) {
   const bg =
     tone === "deduction"
       ? "bg-destructive/10 border-destructive/20"
@@ -76,10 +79,13 @@ function MiniCard({ label, value, tone = "neutral", sub, kpiKey }: MiniCardProps
   return (
     <div className={`rounded-md border p-2 ${bg}`}>
       <div className="flex items-center gap-1">
-        <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium leading-tight">
+        {/* `min-w-0 truncate`: com o selo do OEM ao lado, em tela estreita quem
+            cede é o rótulo, e não o selo empurrando o card para fora. */}
+        <p className="min-w-0 truncate text-[10px] uppercase tracking-wide text-muted-foreground font-medium leading-tight">
           {label}
         </p>
         {kpiKey && <KpiHelpPopover kpiKey={kpiKey} />}
+        {selo}
       </div>
       <p className={`text-base font-bold mt-0.5 ${valueColor}`}>{value}</p>
       {sub}
@@ -172,6 +178,23 @@ export default function FinanceiroCard({
   const custoBase = custo_operacao ?? 0;
   const mrrAtual = espelho.mrrEfetivo;
   const custoAtual = espelho.custoEfetivo;
+
+  // ------------------------------------------------- o COGS bate com o OEM?
+  //
+  // A COMPARAÇÃO É CONTRA O CUSTO DOS PRODUTOS (custoBase), não contra o COGS
+  // exibido. São coisas diferentes quando o cliente tem movimento de MRR com
+  // custo: o COGS soma esse delta, e o OEM não sabe nada dele. Comparar o COGS
+  // cheio acusaria divergência em cliente com o cadastro perfeito — e é o
+  // custoBase que o botão "Atualizar DS" da aba Custos grava.
+  //
+  // Só há selo quando existe licença ATIVA vinculada. Sem vínculo confirmado,
+  // ou com todas desativadas, não há com o que comparar — e um selo verde ali
+  // seria mentira tranquilizadora.
+  const oem = useCustoOemDoCliente(clienteId);
+  const custoOem = oem.estado === "ok" ? oem.custoOem : null;
+  // Centavo já é divergência de cadastro; abaixo disso é arredondamento.
+  const oemDivergente = custoOem !== null && Math.abs(custoBase - custoOem) >= 0.01;
+  const deltaMovimentos = custoAtual - custoBase;
   const lucroPositivo = espelho.lucro_real > 0;
 
   // MRR comparison styles
@@ -355,6 +378,33 @@ export default function FinanceiroCard({
                   value={fmt(custoAtual)}
                   tone="deduction"
                   kpiKey={STEP_KPI_KEYS["(-) COGS"]}
+                  selo={custoOem === null ? null : (
+                    <span
+                      className={`ml-auto shrink-0 inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
+                        oemDivergente
+                          ? "border-destructive/40 text-destructive"
+                          : "border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+                      }`}
+                      title={
+                        (oemDivergente
+                          ? `Custo dos produtos ${fmt(custoBase)} · OEM ${fmt(custoOem)} — ${
+                              fmt(Math.abs(custoBase - custoOem))
+                            } ${custoBase > custoOem ? "a mais" : "a menos"} aqui. `
+                            + "Corrija em Configurações › Integrações › OEM › Custos."
+                          : `O custo dos produtos (${fmt(custoBase)}) é igual ao que a licença cobra no OEM.`)
+                        + (Math.abs(deltaMovimentos) >= 0.01
+                          ? ` O COGS acima inclui ${fmt(deltaMovimentos)} de movimentos de MRR, que não vêm do OEM.`
+                          : "")
+                      }
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          oemDivergente ? "bg-destructive" : "bg-emerald-500"
+                        }`}
+                      />
+                      {oemDivergente ? "Divergente do OEM" : "Igual ao OEM"}
+                    </span>
+                  )}
                 />
                 <span className="text-muted-foreground text-lg font-medium">=</span>
                 <MiniCard
