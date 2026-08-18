@@ -819,7 +819,15 @@ export default function OemIntegrationTab() {
 
   // O checkbox do cabeçalho age sobre a LISTA FILTRADA inteira, não só sobre a
   // página: quem busca por um CNPJ e marca o topo quer aqueles, todos.
-  const idsVisiveis = useMemo(() => custosVisiveis.map((c) => c.id), [custosVisiveis]);
+  //
+  // SÓ O QUE ESTÁ DIVERGENTE É SELECIONÁVEL. Cliente com o custo já igual ao do
+  // OEM não tem o que gravar, e deixá-lo entrar no lote inflava a contagem do
+  // botão: "Atualizar 40 selecionados" que na prática escrevia em 12. A lista
+  // de marcáveis é esta, e ela manda no cabeçalho e na linha.
+  const idsVisiveis = useMemo(
+    () => custosVisiveis.filter((c) => c.divergente).map((c) => c.id),
+    [custosVisiveis],
+  );
   const marcadosVisiveis = idsVisiveis.filter((id) => selecionados.has(id)).length;
   const todosVisiveisMarcados = idsVisiveis.length > 0 && marcadosVisiveis === idsVisiveis.length;
 
@@ -1800,14 +1808,20 @@ export default function OemIntegrationTab() {
               <div className="overflow-x-auto">
                 <div className="min-w-[1064px]">
                   <div className="flex items-center gap-3 border-y bg-muted/50 px-6 py-2 text-xs font-medium text-muted-foreground">
+                    {/* Sem nada a corrigir na lista (filtro "Em dia", ou tudo
+                        já igual ao OEM) não há o que marcar — o checkbox fica
+                        desligado em vez de virar clique que não faz nada. */}
                     <Checkbox
                       className="shrink-0"
+                      disabled={idsVisiveis.length === 0}
                       checked={todosVisiveisMarcados ? true : marcadosVisiveis > 0 ? "indeterminate" : false}
                       onCheckedChange={(v) => alternarTodosVisiveis(v === true)}
-                      aria-label="Marcar todos os clientes da lista"
-                      title={todosVisiveisMarcados
-                        ? "Desmarcar todos os da lista"
-                        : `Marcar os ${idsVisiveis.length} clientes desta lista`}
+                      aria-label="Marcar todos os clientes a corrigir da lista"
+                      title={idsVisiveis.length === 0
+                        ? "Nenhum cliente desta lista precisa de atualização"
+                        : todosVisiveisMarcados
+                          ? "Desmarcar todos os da lista"
+                          : `Marcar os ${idsVisiveis.length} clientes a corrigir desta lista`}
                     />
                     {thCusto("cliente", "Cliente", "min-w-0 flex-1")}
                     {thCusto("cnpj", "CNPJ/CPF", "w-40 shrink-0")}
@@ -1838,12 +1852,21 @@ export default function OemIntegrationTab() {
                             selecionados.has(c.id) ? "bg-primary/5" : ""
                           }`}
                         >
-                          <Checkbox
-                            className="shrink-0"
-                            checked={selecionados.has(c.id)}
-                            onCheckedChange={(v) => alternarUm(c.id, v === true)}
-                            aria-label={`Marcar ${c.cliente}`}
-                          />
+                          {/* Cliente em dia não tem caixa de seleção: não há o
+                              que gravar nele, e deixá-lo marcável fazia o botão
+                              prometer atualizações que não aconteceriam. O
+                              espaço continua ocupado para as colunas não
+                              dançarem de uma linha para a outra. */}
+                          {c.divergente ? (
+                            <Checkbox
+                              className="shrink-0"
+                              checked={selecionados.has(c.id)}
+                              onCheckedChange={(v) => alternarUm(c.id, v === true)}
+                              aria-label={`Marcar ${c.cliente}`}
+                            />
+                          ) : (
+                            <span className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          )}
                           <div className="min-w-0 flex-1">
                             <p className="font-medium truncate">{c.cliente}</p>
                             <p className="text-xs text-muted-foreground truncate">
