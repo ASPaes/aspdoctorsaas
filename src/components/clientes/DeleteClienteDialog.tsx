@@ -83,13 +83,25 @@ export default function DeleteClienteDialog({
 
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<PreviewData | null>(null);
-  const [confirmText, setConfirmText] = useState("");
+  // Uma confirmacao POR MODO, e com textos diferentes de proposito. Ate 17/08/2026
+  // havia um campo so: digitar a razao social destravava "Transferir e excluir" E
+  // "Excluir tudo" ao mesmo tempo, com os dois botoes lado a lado. Foi assim que um
+  // cadastro duplicado foi purgado no lugar de transferido, levando o ticket e o chat.
+  // Texto do purge nao e a razao social: nada que voce digite para transferir libera
+  // o botao que apaga.
+  const [confirmTransfer, setConfirmTransfer] = useState("");
+  const [confirmPurge, setConfirmPurge] = useState("");
   const [targetId, setTargetId] = useState<string | null>(null);
   const [targetLabel, setTargetLabel] = useState<string>("");
   const [comboOpen, setComboOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [includeChat, setIncludeChat] = useState(true);
+  // Desligado por padrao desde 17/08/2026. Ligado, o purge apaga whatsapp_contacts e,
+  // por ON DELETE CASCADE, a conversa inteira: mensagens, reacoes, notas, resumos,
+  // sentimento e atendimentos. Foi assim que o TK-2026-3061 e o chat do cliente
+  // sumiram ao excluir um cadastro DUPLICADO. Destruir historico agora e escolha
+  // explicita, nao o que acontece quando ninguem mexe no switch.
+  const [includeChat, setIncludeChat] = useState(false);
   const [executing, setExecuting] = useState<"transfer" | "purge" | null>(null);
 
   const loadPreview = async (target?: string | null) => {
@@ -110,10 +122,11 @@ export default function DeleteClienteDialog({
 
   useEffect(() => {
     if (open) {
-      setConfirmText("");
+      setConfirmTransfer("");
+      setConfirmPurge("");
       setTargetId(null);
       setTargetLabel("");
-      setIncludeChat(true);
+      setIncludeChat(false);
       loadPreview(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -146,12 +159,14 @@ export default function DeleteClienteDialog({
   };
 
   const blockedByMatriz = preview?.is_matriz && (preview?.filiais_count ?? 0) > 0;
-  const confirmOk =
-    confirmText.trim().toLowerCase() === (clienteNome ?? "").trim().toLowerCase() &&
+  const PURGE_FRASE = "EXCLUIR TUDO";
+  const confirmTransferOk =
+    confirmTransfer.trim().toLowerCase() === (clienteNome ?? "").trim().toLowerCase() &&
     clienteNome.trim().length > 0;
+  const confirmPurgeOk = confirmPurge.trim().toUpperCase() === PURGE_FRASE;
 
   const handleTransfer = async () => {
-    if (!targetId || !confirmOk || blockedByMatriz) return;
+    if (!targetId || !confirmTransferOk || blockedByMatriz) return;
     setExecuting("transfer");
     try {
       const { error } = await (supabase.rpc as any)("admin_delete_cliente", {
@@ -173,7 +188,7 @@ export default function DeleteClienteDialog({
   };
 
   const handlePurge = async () => {
-    if (!confirmOk || blockedByMatriz) return;
+    if (!confirmPurgeOk || blockedByMatriz) return;
     setExecuting("purge");
     try {
       const { error } = await (supabase.rpc as any)("admin_delete_cliente", {
@@ -315,12 +330,27 @@ export default function DeleteClienteDialog({
                       </div>
                     )}
 
+                  <div className="space-y-1.5">
+                    <Label htmlFor="confirm-transfer" className="text-xs">
+                      Digite a razão social para confirmar:{" "}
+                      <span className="font-mono font-medium">{clienteNome}</span>
+                    </Label>
+                    <Input
+                      id="confirm-transfer"
+                      value={confirmTransfer}
+                      onChange={(e) => setConfirmTransfer(e.target.value)}
+                      placeholder="Digite a razão social..."
+                      autoComplete="off"
+                      className="h-9"
+                    />
+                  </div>
+
                   <Button
                     variant="destructive"
                     className="w-full"
                     disabled={
                       !targetId ||
-                      !confirmOk ||
+                      !confirmTransferOk ||
                       blockedByMatriz ||
                       executing !== null
                     }
@@ -358,10 +388,25 @@ export default function DeleteClienteDialog({
                       Esta ação não pode ser desfeita. Todos os vínculos serão removidos permanentemente.
                     </div>
                   </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="confirm-purge" className="text-xs">
+                      Para confirmar, digite{" "}
+                      <span className="font-mono font-medium">{PURGE_FRASE}</span>
+                    </Label>
+                    <Input
+                      id="confirm-purge"
+                      value={confirmPurge}
+                      onChange={(e) => setConfirmPurge(e.target.value)}
+                      placeholder={PURGE_FRASE}
+                      autoComplete="off"
+                      className="h-9"
+                    />
+                  </div>
+
                   <Button
                     variant="destructive"
                     className="w-full"
-                    disabled={!confirmOk || blockedByMatriz || executing !== null}
+                    disabled={!confirmPurgeOk || blockedByMatriz || executing !== null}
                     onClick={handlePurge}
                   >
                     {executing === "purge" && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -371,20 +416,6 @@ export default function DeleteClienteDialog({
               </Card>
             </div>
 
-            {/* Confirmação */}
-            <div className="space-y-1.5 pt-2 border-t">
-              <Label htmlFor="confirm-text" className="text-sm">
-                Digite a razão social para confirmar:{" "}
-                <span className="font-mono font-medium">{clienteNome}</span>
-              </Label>
-              <Input
-                id="confirm-text"
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-                placeholder="Digite a razão social..."
-                autoComplete="off"
-              />
-            </div>
           </div>
         ) : (
           <div className="text-sm text-muted-foreground py-4">
