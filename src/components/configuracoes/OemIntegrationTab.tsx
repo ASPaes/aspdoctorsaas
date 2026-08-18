@@ -9,8 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
   Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
@@ -313,6 +318,12 @@ export default function OemIntegrationTab() {
   const [buscaCusto, setBuscaCusto] = useState("");
   const [paginaCusto, setPaginaCusto] = useState(0);
   const [custoSort, setCustoSort] = useState<CustoSort>("cliente");
+  // Qual linha está gravando (o código da filial), e se o lote foi confirmado.
+  const [atualizandoDs, setAtualizandoDs] = useState<string | null>(null);
+  const [confirmandoLote, setConfirmandoLote] = useState(false);
+  // Seleção por CLIENTE (o id), não por linha da página: ela sobrevive a
+  // paginar, ordenar e buscar, que é o que a pessoa espera de um checkbox.
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [custoDir, setCustoDir] = useState<"asc" | "desc">("asc");
   // Licença desativada não cobra, então divergência nela é ruído na maior parte
   // do tempo. A tela abre em "Ativo" e o usuário amplia se quiser.
@@ -769,6 +780,44 @@ export default function OemIntegrationTab() {
     });
   }, [custos.lista, buscaCusto, custoSort, custoDir]);
 
+  // O lote é EXATAMENTE o que está marcado — nunca "todos os elegíveis". Com
+  // busca ativa, mandar a base inteira gravaria em centenas de clientes que a
+  // pessoa nem está vendo.
+  const alvoLote = useMemo(() => {
+    const marcados = custos.lista.filter((c) => selecionados.has(c.id));
+    return {
+      filiais: marcados.flatMap((c) => c.filiais),
+      quantidade: marcados.length,
+      // Marcado mas já igual ao OEM não vira escrita; dizer isso na confirmação
+      // evita o "cliquei em 40 e ele diz que atualizou 12".
+      aGravar: marcados.filter((c) => c.divergente).length,
+    };
+  }, [custos.lista, selecionados]);
+
+  // O checkbox do cabeçalho age sobre a LISTA FILTRADA inteira, não só sobre a
+  // página: quem busca por um CNPJ e marca o topo quer aqueles, todos.
+  const idsVisiveis = useMemo(() => custosVisiveis.map((c) => c.id), [custosVisiveis]);
+  const marcadosVisiveis = idsVisiveis.filter((id) => selecionados.has(id)).length;
+  const todosVisiveisMarcados = idsVisiveis.length > 0 && marcadosVisiveis === idsVisiveis.length;
+
+  function alternarTodosVisiveis(marcar: boolean) {
+    setSelecionados((atual) => {
+      const proximo = new Set(atual);
+      for (const id of idsVisiveis) {
+        if (marcar) proximo.add(id); else proximo.delete(id);
+      }
+      return proximo;
+    });
+  }
+
+  function alternarUm(id: string, marcar: boolean) {
+    setSelecionados((atual) => {
+      const proximo = new Set(atual);
+      if (marcar) proximo.add(id); else proximo.delete(id);
+      return proximo;
+    });
+  }
+
   const totalPaginasCusto = Math.max(1, Math.ceil(custosVisiveis.length / POR_PAGINA));
   const paginaCustoAtual = Math.min(paginaCusto, totalPaginasCusto - 1);
   const custosPagina = custosVisiveis.slice(
@@ -786,6 +835,39 @@ export default function OemIntegrationTab() {
       setCustoDir(campo === "cliente" || campo === "cnpj" ? "asc" : "desc");
     }
     setPaginaCusto(0);
+  }
+
+  // Traz o custo do OEM para o cadastro do produto. `filiais` nulo = todas as
+  // elegíveis desta empresa; a RPC decide o que é elegível, não a tela, senão a
+  // regra viveria em dois lugares e sairia de sincronia.
+  async function atualizarCustoDs(filiais: string[] | null, rotulo: string, chave: string) {
+    if (!tid) return;
+    setAtualizandoDs(chave);
+    try {
+      const { data, error } = await (supabase as any).rpc("atualizar_custo_ds_oem", {
+        p_tenant_id: tid,
+        p_filiais: filiais,
+      });
+      if (error) throw error;
+      const r = (data ?? {}) as { atualizados?: number; sem_custo_no_oem?: number; ambiguos?: number };
+      // O que NÃO foi gravado precisa aparecer: um "pronto" que escondeu 12
+      // linhas recusadas é pior do que não ter botão.
+      const recusas: string[] = [];
+      if (r.sem_custo_no_oem) recusas.push(`${r.sem_custo_no_oem} sem custo no OEM`);
+      if (r.ambiguos) recusas.push(`${r.ambiguos} com mais de um produto ativo`);
+      toast({
+        title: r.atualizados ? `${r.atualizados} custo(s) atualizado(s)` : "Nada a atualizar",
+        description: recusas.length
+          ? `${rotulo}. Não gravados: ${recusas.join(" · ")}.`
+          : r.atualizados ? rotulo : "Os valores já estavam iguais aos do OEM.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["oem-codigos-gravados", tid] });
+      setSelecionados(new Set());
+    } catch (e: any) {
+      toast({ title: "Não deu para atualizar", description: e?.message ?? "Erro", variant: "destructive" });
+    } finally {
+      setAtualizandoDs(null);
+    }
   }
 
   // Cabeçalho clicável. É função, não componente, para não remontar (e perder o
@@ -1623,17 +1705,22 @@ export default function OemIntegrationTab() {
                   )}
                 </CardDescription>
               </div>
-              {/* Ainda não existe o envio; o botão fica visível e desligado para
-                  não prometer o que não faz. O `title` vai no span porque botão
-                  desabilitado não recebe evento de mouse. */}
-              <span
-                className="shrink-0"
-                title="Em construção — a atualização do custo a partir do OEM ainda não está disponível."
+              {/* Escrever custo em muitas fichas de uma vez pede confirmação
+                  explícita — e o número de fichas afetadas vai nela. Sem nada
+                  marcado o botão não tem alvo, então fica desligado. */}
+              <Button
+                variant="outline"
+                className="gap-2 shrink-0"
+                disabled={atualizandoDs !== null || alvoLote.quantidade === 0}
+                onClick={() => setConfirmandoLote(true)}
               >
-                <Button variant="outline" disabled className="gap-2">
-                  <DownloadCloud className="h-4 w-4" /> Atualizar todos
-                </Button>
-              </span>
+                {atualizandoDs === "__lote__"
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <DownloadCloud className="h-4 w-4" />}
+                {alvoLote.quantidade > 0
+                  ? `Atualizar ${alvoLote.quantidade} selecionado${alvoLote.quantidade > 1 ? "s" : ""}`
+                  : "Atualizar selecionados"}
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               <div className="px-6 pb-3">
@@ -1651,6 +1738,15 @@ export default function OemIntegrationTab() {
               <div className="overflow-x-auto">
                 <div className="min-w-[940px]">
                   <div className="flex items-center gap-3 border-y bg-muted/50 px-6 py-2 text-xs font-medium text-muted-foreground">
+                    <Checkbox
+                      className="shrink-0"
+                      checked={todosVisiveisMarcados ? true : marcadosVisiveis > 0 ? "indeterminate" : false}
+                      onCheckedChange={(v) => alternarTodosVisiveis(v === true)}
+                      aria-label="Marcar todos os clientes da lista"
+                      title={todosVisiveisMarcados
+                        ? "Desmarcar todos os da lista"
+                        : `Marcar os ${idsVisiveis.length} clientes desta lista`}
+                    />
                     {thCusto("cliente", "Cliente", "min-w-0 flex-1")}
                     {thCusto("cnpj", "CNPJ/CPF", "w-40 shrink-0")}
                     {thCusto("custo_ds", <span className="text-emerald-600 dark:text-emerald-400">Custo DS</span>, "w-28 shrink-0", true)}
@@ -1669,7 +1765,18 @@ export default function OemIntegrationTab() {
                   ) : (
                     <div className="divide-y">
                       {custosPagina.map((c) => (
-                        <div key={c.id} className="flex items-center gap-3 px-6 py-2.5 text-sm">
+                        <div
+                          key={c.id}
+                          className={`flex items-center gap-3 px-6 py-2.5 text-sm ${
+                            selecionados.has(c.id) ? "bg-primary/5" : ""
+                          }`}
+                        >
+                          <Checkbox
+                            className="shrink-0"
+                            checked={selecionados.has(c.id)}
+                            onCheckedChange={(v) => alternarUm(c.id, v === true)}
+                            aria-label={`Marcar ${c.cliente}`}
+                          />
                           <div className="min-w-0 flex-1">
                             <p className="font-medium truncate">{c.cliente}</p>
                             <p className="text-xs text-muted-foreground truncate">
@@ -1709,12 +1816,21 @@ export default function OemIntegrationTab() {
                           <span className="w-28 shrink-0 text-right tabular-nums text-muted-foreground">
                             {brl(c.custo_oem)}
                           </span>
-                          <span
-                            className="w-36 shrink-0 flex justify-end"
-                            title="Em construção — a atualização do custo a partir do OEM ainda não está disponível."
-                          >
-                            <Button variant="outline" size="sm" disabled className="gap-1.5">
-                              <DownloadCloud className="h-3.5 w-3.5" /> Atualizar DS
+                          <span className="w-36 shrink-0 flex justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5"
+                              disabled={atualizandoDs !== null || !c.divergente}
+                              title={c.divergente
+                                ? `Gravar ${brl(c.custo_oem)} no custo do produto deste cliente`
+                                : "O custo daqui já é igual ao do OEM"}
+                              onClick={() => atualizarCustoDs(c.filiais, c.cliente, c.id)}
+                            >
+                              {atualizandoDs === c.id
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <DownloadCloud className="h-3.5 w-3.5" />}
+                              Atualizar DS
                             </Button>
                           </span>
                         </div>
@@ -1744,6 +1860,45 @@ export default function OemIntegrationTab() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <AlertDialog open={confirmandoLote} onOpenChange={setConfirmandoLote}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {alvoLote.aGravar > 0
+                  ? `Atualizar o custo de ${alvoLote.aGravar} cliente(s)?`
+                  : `Nenhum dos ${alvoLote.quantidade} marcados precisa de atualização`}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                O custo cadastrado aqui será substituído pelo que o OEM cobra na fatura,
+                em todos os clientes com valor diferente. Isso muda a margem que aparece
+                na ficha de cada um deles. Não há desfazer — o valor anterior não fica
+                guardado em lugar nenhum.
+                <br /><br />
+                {alvoLote.quantidade > alvoLote.aGravar && (
+                  <><br /><br />Dos <strong>{alvoLote.quantidade} marcados</strong>,{" "}
+                  {alvoLote.quantidade - alvoLote.aGravar} já {alvoLote.quantidade - alvoLote.aGravar === 1
+                    ? "está igual ao OEM e não será tocado" : "estão iguais ao OEM e não serão tocados"}.</>
+                )}
+                <br /><br />
+                Licença sem custo no OEM e cliente com mais de um produto ativo são
+                <strong> deixados de fora</strong>, e a tela diz quantos foram.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => atualizarCustoDs(
+                  alvoLote.filiais,
+                  `${alvoLote.quantidade} cliente(s) selecionado(s)`,
+                  "__lote__",
+                )}
+              >
+                Atualizar selecionados
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* -------------------------------------------------------- pendências */}
         <TabsContent value="pendencias" className="space-y-3">
