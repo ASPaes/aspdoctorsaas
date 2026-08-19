@@ -69,7 +69,7 @@ export default function HistoricoModulosProduto({ clienteProdutoId }: { clienteP
       >
         {aberto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         <History className="h-4 w-4" />
-        Histórico
+        Histórico de módulos
       </Button>
 
       {aberto && (
