@@ -53,6 +53,7 @@ import ContratoAnexoSection, {
   uploadContratoAnexo,
 } from "./ContratoAnexoSection";
 import { isAdminLike } from "@/lib/permissions";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 
 interface Props {
   clienteId: string;
@@ -896,7 +897,13 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         produtos={produtosLookup.data ?? []}
         fornecedores={fornecedoresLookup.data ?? []}
         onSaved={invalidateAll}
-        modulosCountForEdit={produtoDialog.edit ? (modulosByProduto[produtoDialog.edit.id]?.length ?? 0) : 0}
+        modulosNomesForEdit={produtoDialog.edit
+          ? Array.from(new Set(
+              (modulosByProduto[produtoDialog.edit.id] ?? [])
+                .map(m => (m.produto_modulos?.nome ?? "").trim())
+                .filter(Boolean),
+            ))
+          : []}
         editContratoId={produtoDialog.edit ? (contratoIdByCliProd[produtoDialog.edit.id] ?? null) : null}
         onProductCreated={(cliProdId) => setExpanded(s => ({ ...s, [cliProdId]: true }))}
       />
@@ -1266,8 +1273,8 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
 
 // ============ Produto Dialog ============
 function ProdutoDialog({
-  open, edit, onClose, clienteId, tid, produtos, fornecedores, onSaved, modulosCountForEdit,
-  editContratoId, onProductCreated,
+  open, edit, onClose, clienteId, tid, produtos, fornecedores, onSaved,
+  modulosNomesForEdit, editContratoId, onProductCreated,
 }: {
   open: boolean;
   edit: ClienteProduto | null;
@@ -1277,7 +1284,7 @@ function ProdutoDialog({
   produtos: { id: number; nome: string }[];
   fornecedores: { id: number; nome: string }[];
   onSaved: () => void;
-  modulosCountForEdit: number;
+  modulosNomesForEdit: string[];
   editContratoId?: string | null;
   onProductCreated?: (cliProdId: string) => void;
 }) {
@@ -1287,7 +1294,7 @@ function ProdutoDialog({
   const isTenantAdmin = profile?.role === "admin";
   const isHead = profile?.role === "head";
   const canAttach = isAdminLike(profile);
-  const canSwapProduto = isEdit && (isSuperAdmin || isTenantAdmin || isHead) && modulosCountForEdit === 0;
+  const canSwapProduto = isEdit && (isSuperAdmin || isTenantAdmin || isHead);
   const [stagedFile, setStagedFile] = useState<File | null>(null);
   const stagedFileInputRef = useRef<HTMLInputElement | null>(null);
   const [produtoId, setProdutoId] = useState<string>("");
@@ -1331,6 +1338,43 @@ function ProdutoDialog({
     },
   });
   const resolvedTenantId: string | null = (clienteTenantQ.data?.tenant_id ?? tid) ?? null;
+
+  // Trocar produto reaponta cada módulo do cliente para o de MESMO NOME no
+  // produto destino (é o que admin_swap_cliente_produto faz). Então o destino
+  // só serve se tiver todos eles — e a tela precisa dizer isso antes de salvar,
+  // em vez de deixar o usuário descobrir no erro do banco.
+  const catalogoModulosQ = useQuery<{ produto_id: number; nome: string }[]>({
+    queryKey: ["produto_modulos_catalogo", resolvedTenantId],
+    enabled: open && isEdit && canSwapProduto && modulosNomesForEdit.length > 0 && !!resolvedTenantId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const rows = await fetchAllRows<{ produto_id: number; nome: string }>(() => {
+        let q = (supabase.from("produto_modulos" as any) as any).select("produto_id, nome");
+        if (resolvedTenantId) q = q.eq("tenant_id", resolvedTenantId);
+        return q;
+      });
+      return rows ?? [];
+    },
+  });
+
+  const chave = (n: string) => n.trim().toLowerCase();
+
+  const faltantesPorProduto = useMemo(() => {
+    const out: Record<number, string[]> = {};
+    if (modulosNomesForEdit.length === 0) return out;
+    const porProduto = new Map<number, Set<string>>();
+    (catalogoModulosQ.data ?? []).forEach(r => {
+      const set = porProduto.get(r.produto_id) ?? new Set<string>();
+      set.add(chave(r.nome ?? ""));
+      porProduto.set(r.produto_id, set);
+    });
+    produtos.forEach(p => {
+      const tem = porProduto.get(p.id) ?? new Set<string>();
+      const faltam = modulosNomesForEdit.filter(n => !tem.has(chave(n)));
+      if (faltam.length > 0) out[p.id] = faltam;
+    });
+    return out;
+  }, [catalogoModulosQ.data, modulosNomesForEdit, produtos]);
 
   const modelosContratoLookup = useQuery<{ id: number; nome: string }[]>({
     queryKey: ["modelos_contrato_lookup", resolvedTenantId],
@@ -1536,11 +1580,13 @@ function ProdutoDialog({
           );
           if (rpcError) throw rpcError;
           const updated = (rpcData as any)?.contrato_itens_atualizados ?? 0;
+          const remap = (rpcData as any)?.modulos_reapontados ?? 0;
           toast({
             title: "Produto trocado",
-            description: updated > 0
-              ? `${updated} item(ns) de contrato tiveram descrição atualizada.`
-              : "Nenhum item de contrato afetado.",
+            description: [
+              updated > 0 ? `${updated} item(ns) de contrato com descrição atualizada.` : "Nenhum item de contrato afetado.",
+              remap > 0 ? `${remap} módulo(s) reapontado(s) para o novo produto.` : null,
+            ].filter(Boolean).join(" "),
           });
           delete payload.fornecedor_id;
         }
@@ -1797,16 +1843,34 @@ function ProdutoDialog({
               <Select value={produtoId} onValueChange={setProdutoId} disabled={isEdit && !canSwapProduto}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
-                  {produtos.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}
+                  {produtos.map(p => {
+                    // Enquanto o catálogo não chega, nada fica bloqueado — piscar
+                    // tudo desabilitado é pior que esperar meio segundo.
+                    const faltam = String(p.id) === produtoIdOriginal || !catalogoModulosQ.isSuccess
+                      ? []
+                      : (faltantesPorProduto[p.id] ?? []);
+                    return (
+                      <SelectItem key={p.id} value={String(p.id)} disabled={faltam.length > 0}>
+                        {p.nome}
+                        {faltam.length > 0 && (
+                          <span className="text-muted-foreground">
+                            {" — sem "}{faltam.slice(0, 2).join(", ")}
+                            {faltam.length > 2 ? ` +${faltam.length - 2}` : ""}
+                          </span>
+                        )}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
-              {isEdit && !canSwapProduto && (
+              {isEdit && !canSwapProduto ? (
+                <p className="text-xs text-muted-foreground">Apenas admin pode trocar o produto.</p>
+              ) : isEdit && modulosNomesForEdit.length > 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  {modulosCountForEdit > 0
-                    ? "Remova os módulos vinculados para trocar o produto."
-                    : "Apenas admin pode trocar o produto."}
+                  Ficam disponíveis os produtos que têm os mesmos {modulosNomesForEdit.length} módulo{modulosNomesForEdit.length > 1 ? "s" : ""} deste.
+                  A troca reaponta cada módulo do cliente para o de mesmo nome no produto escolhido.
                 </p>
-              )}
+              ) : null}
             </div>
             <div className="space-y-1">
               <Label>Código Fornecedor</Label>
@@ -2167,6 +2231,12 @@ function ProdutoDialog({
                   <ul className="list-disc pl-5 space-y-1">
                     <li>Atualizará o produto vinculado ao cliente</li>
                     <li>Sobrescreverá a descrição dos itens de contrato apontados</li>
+                    {modulosNomesForEdit.length > 0 && (
+                      <li>
+                        Reapontará {modulosNomesForEdit.length} módulo{modulosNomesForEdit.length > 1 ? "s" : ""} do cliente
+                        para o{modulosNomesForEdit.length > 1 ? "s" : ""} de mesmo nome no produto escolhido
+                      </li>
+                    )}
                     <li><strong>NÃO altera valores</strong> (mensal/ativação) do contrato — revise manualmente se necessário</li>
                   </ul>
                   <p className="text-amber-500 font-medium">
