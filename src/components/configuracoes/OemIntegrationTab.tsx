@@ -2417,6 +2417,12 @@ export default function OemIntegrationTab() {
           queryClient.invalidateQueries({ queryKey: ["oem-vinculos-produto", conta?.id] });
           queryClient.invalidateQueries({ queryKey: ["produto_modulos"] });
           queryClient.invalidateQueries({ queryKey: ["crud_produtos_master"] });
+          // Sem estas duas, a aba Produtos e módulos continuava jurando que o
+          // produto não tinha vínculo: o app usa staleTime de 5 min, então quem
+          // tivesse aberto o produto ANTES de vincular via o cache velho e
+          // achava que o vínculo não pegou.
+          queryClient.invalidateQueries({ queryKey: ["oem-vinculo-do-produto"] });
+          queryClient.invalidateQueries({ queryKey: ["oem-precos-da-conta"] });
         }}
       />
     </div>

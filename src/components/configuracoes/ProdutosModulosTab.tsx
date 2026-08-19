@@ -119,72 +119,82 @@ export default function ProdutosModulosTab() {
   });
 
   // ----------------------------------------------------------------- OEM
-  // O produto vinculado ao OEM sabe de QUAL CONTA ele veio, e é a grade dessa
-  // conta que vale para ele — a tabela de preços do parceiro é por unidade.
-  // Produto sem vínculo não mostra coluna nenhuma: preço de outra operação não
-  // é o preço dele.
+  // As abas são os VÍNCULOS do produto — não as colunas que existem na grade.
+  // Mostrar coluna não vinculada dizia que o produto tinha preço no FULL sem
+  // ele ter sido ligado ao FULL.
   //
-  // Sem maybeSingle de propósito: a UNIQUE é por conta+produto, então o mesmo
-  // produto PODE estar vinculado em duas contas — e o maybeSingle erraria com
+  // São várias linhas de propósito: desde 18/08/2026 o mesmo produto pode estar
+  // em mais de uma coluna (GESTAO LEGAL e FULL), e ainda pode estar em contas
+  // diferentes (uma por unidade). Nada de maybeSingle aqui — ele erraria com
   // "multiple rows", que foi exatamente o bug da segunda conta Omie logo abaixo.
-  const vinculoOemQ = useQuery({
+  const vinculosOemQ = useQuery({
     queryKey: ["oem-vinculo-do-produto", tid, selectedProdutoId],
     enabled: !!selectedProdutoId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("oem_produto_vinculo" as any) as any)
-        .select("conta_integration_id, produto_codigo, criado_em")
+        .select("conta_integration_id, produto_codigo, produto_nome, ultimo_upgrade_em, criado_em")
         .eq("produto_id", selectedProdutoId)
-        .order("criado_em")
-        .limit(1);
+        .order("criado_em");
       if (error) throw error;
-      return ((data ?? [])[0] ?? null) as { conta_integration_id: string; produto_codigo: string } | null;
+      return (data ?? []) as {
+        conta_integration_id: string; produto_codigo: string;
+        produto_nome: string | null; ultimo_upgrade_em: string | null;
+      }[];
     },
   });
-  const contaOemId = vinculoOemQ.data?.conta_integration_id ?? null;
+
+  // A aba é identificada por conta+código: o mesmo código pode existir em duas
+  // contas com preços diferentes, e aí "FULL" sozinho não diz qual é qual.
+  const chaveAba = (conta: string, codigo: string) => `${conta}|${codigo}`;
+
+  const colunasOem = useMemo(
+    () => (vinculosOemQ.data ?? []).map((v) => ({
+      chave: chaveAba(v.conta_integration_id, v.produto_codigo),
+      conta: v.conta_integration_id,
+      codigo: v.produto_codigo,
+      nome: v.produto_nome ?? v.produto_codigo,
+      ultimoUpgrade: v.ultimo_upgrade_em,
+    })),
+    [vinculosOemQ.data],
+  );
+
+  const contasOem = useMemo(
+    () => [...new Set(colunasOem.map((c) => c.conta))],
+    [colunasOem],
+  );
 
   const precosOemQ = useQuery({
-    queryKey: ["oem-precos-da-conta", contaOemId],
-    enabled: !!contaOemId,
+    queryKey: ["oem-precos-da-conta", contasOem.join(",")],
+    enabled: contasOem.length > 0,
     queryFn: () =>
-      fetchAllRows<{ produto_codigo: string; produto_nome: string; modulo_codigo: number; modulo_nome: string; valor_unitario: number | null }>(() =>
+      fetchAllRows<{ conta_integration_id: string; produto_codigo: string; produto_nome: string; modulo_codigo: number; modulo_nome: string; valor_unitario: number | null }>(() =>
         (supabase.from("oem_espelho_modulo_preco" as any) as any)
-          .select("produto_codigo, produto_nome, modulo_codigo, modulo_nome, valor_unitario")
-          .eq("conta_integration_id", contaOemId)
+          .select("conta_integration_id, produto_codigo, produto_nome, modulo_codigo, modulo_nome, valor_unitario")
+          .in("conta_integration_id", contasOem)
           .order("modulo_codigo"),
       ),
   });
 
-  // Só as DUAS primeiras colunas, na mesma ordem da aba do OEM (pelo código do
-  // produto no catálogo, que é a ordem em que o parceiro devolve). As demais
-  // ficam de fora até fazerem falta.
-  const colunasOem = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const p of precosOemQ.data ?? []) m.set(p.produto_codigo, p.produto_nome);
-    return [...m.entries()]
-      .map(([codigo, nome]) => ({ codigo, nome }))
-      .sort((a, b) => Number(a.codigo) - Number(b.codigo))
-      .slice(0, 2);
-  }, [precosOemQ.data]);
-
   const modulosOem = useMemo(() => {
     if (!colunaOem) return [];
     return (precosOemQ.data ?? [])
-      .filter((p) => p.produto_codigo === colunaOem)
+      .filter((p) => chaveAba(p.conta_integration_id, p.produto_codigo) === colunaOem)
       .sort((a, b) => a.modulo_codigo - b.modulo_codigo);
   }, [precosOemQ.data, colunaOem]);
 
   // Produto vinculado NÃO mostra a lista cadastrada nesta tela: as abas são só
-  // as colunas do parceiro, e ela abre na coluna do vínculo. Decisão do
-  // Alexandre em 18/08/2026 — com o vínculo, a lista de cá é a do OEM, e ter as
-  // duas lado a lado só criava a dúvida de qual das duas era a verdade.
+  // as colunas vinculadas, e ela abre na primeira. Decisão do Alexandre em
+  // 18/08/2026 — com o vínculo, a lista de cá é a do OEM, e ter as duas lado a
+  // lado só criava a dúvida de qual das duas era a verdade.
   // (Editar margem/venda de produto vinculado passa a não ter caminho aqui.)
-  const vinculadoOem = !!vinculoOemQ.data;
+  const vinculadoOem = colunasOem.length > 0;
   useEffect(() => {
-    if (!vinculadoOem || colunasOem.length === 0 || colunaOem) return;
-    const doVinculo = vinculoOemQ.data?.produto_codigo;
-    const inicial = colunasOem.find((c) => c.codigo === doVinculo) ?? colunasOem[0];
-    setColunaOem(inicial.codigo);
-  }, [vinculadoOem, colunasOem, colunaOem, vinculoOemQ.data]);
+    if (colunasOem.length === 0) return;
+    // Também corrige a aba órfã: desvincular a coluna aberta deixaria a tela
+    // presa numa aba que não existe mais, mostrando lista vazia.
+    if (colunaOem && colunasOem.some((c) => c.chave === colunaOem)) return;
+    setColunaOem(colunasOem[0].chave);
+  }, [colunasOem, colunaOem]);
 
   // Omie integration active check — usa o mesmo effectiveTenantId que as demais telas (super admin pode simular tenant).
   //
@@ -478,10 +488,10 @@ export default function ProdutosModulosTab() {
                   <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
                     {colunasOem.map((c) => (
                       <Button
-                        key={c.codigo}
-                        size="sm" variant={colunaOem === c.codigo ? "secondary" : "ghost"}
+                        key={c.chave}
+                        size="sm" variant={colunaOem === c.chave ? "secondary" : "ghost"}
                         className="h-7 px-2 text-xs"
-                        onClick={() => setColunaOem(c.codigo)}
+                        onClick={() => setColunaOem(c.chave)}
                       >
                         {c.nome}
                       </Button>
@@ -512,7 +522,7 @@ export default function ProdutosModulosTab() {
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">
                   Preço de <strong>tabela</strong> do parceiro para{" "}
-                  <strong>{colunasOem.find((c) => c.codigo === colunaOem)?.nome}</strong> — só
+                  <strong>{colunasOem.find((c) => c.chave === colunaOem)?.nome}</strong> — só
                   leitura, o cadastro de {selectedProduto.nome} não muda.
                 </p>
                 <div className="border border-border rounded-md overflow-x-auto">
