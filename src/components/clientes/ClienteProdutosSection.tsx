@@ -126,6 +126,11 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
   const [qtdCancelamento, setQtdCancelamento] = useState(1);
   const [cancelandoModulo, setCancelandoModulo] = useState(false);
+  // Somar unidade é a mesma escrita no OEM, ao contrário: a licença é gravada
+  // inteira e o que muda é a quantidade do módulo.
+  const [qtdModulo, setQtdModulo] = useState<ClienteProdutoModulo | null>(null);
+  const [novaQtdModulo, setNovaQtdModulo] = useState(1);
+  const [salvandoQtd, setSalvandoQtd] = useState(false);
   const [mrrDialog, setMrrDialog] = useState<MRRDialogState>({
     open: false, tipo: "upsell", valorDelta: 0, custoDelta: 0, descricao: "",
   });
@@ -616,18 +621,31 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                       // do espelho. O cancelamento, não — ele
                                       // trava a linha (`cancelado_manual`).
                                       m.ativo ? (
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              type="button" variant="ghost" size="icon"
-                                              className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                                              onClick={() => { setCancelarModulo(m); setMotivoCancelamento(""); setQtdCancelamento(Number(m.quantidade) || 1); }}
-                                            >
-                                              <X className="h-4 w-4" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>Cancelamento de módulo</TooltipContent>
-                                        </Tooltip>
+                                        <div className="flex items-center justify-end gap-0.5">
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                type="button" variant="ghost" size="icon" className="h-7 w-7"
+                                                onClick={() => { setQtdModulo(m); setNovaQtdModulo((Number(m.quantidade) || 1) + 1); }}
+                                              >
+                                                <Plus className="h-4 w-4" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Alterar quantidade no OEM</TooltipContent>
+                                          </Tooltip>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                type="button" variant="ghost" size="icon"
+                                                className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                                                onClick={() => { setCancelarModulo(m); setMotivoCancelamento(""); setQtdCancelamento(Number(m.quantidade) || 1); }}
+                                              >
+                                                <X className="h-4 w-4" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Cancelamento de módulo</TooltipContent>
+                                          </Tooltip>
+                                        </div>
                                       ) : (
                                         <span className="text-xs text-muted-foreground">Cancelado</span>
                                       )
@@ -785,6 +803,72 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         moduloId={mrrDialog.moduloId}
         onRegistrado={invalidateAll}
       />
+
+      <Dialog open={!!qtdModulo} onOpenChange={(o) => { if (!o) setQtdModulo(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Quantidade na licença</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded border bg-muted/40 px-3 py-2 text-sm">
+              <span className="font-medium">{qtdModulo?.produto_modulos?.nome ?? "—"}</span>
+              <span className="block text-xs text-muted-foreground">
+                Hoje: {Number(qtdModulo?.quantidade) || 1} ·
+                {" "}custo unitário R$ {fmtBRL(qtdModulo?.vlr_custo)}
+              </span>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Nova quantidade</Label>
+              <Input
+                type="number" min={1} step={1}
+                value={novaQtdModulo}
+                onChange={(e) => setNovaQtdModulo(Math.max(1, Number(e.target.value) || 1))}
+              />
+              <p className="text-xs text-muted-foreground">
+                O pedido vai para o OEM primeiro. Para <strong>reduzir</strong> com registro de
+                motivo, use o X de cancelamento.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setQtdModulo(null)} disabled={salvandoQtd}>
+              Voltar
+            </Button>
+            <Button
+              type="button" className="gap-1.5" disabled={salvandoQtd}
+              onClick={async () => {
+                if (!qtdModulo) return;
+                setSalvandoQtd(true);
+                try {
+                  const { data, error } = await supabase.functions.invoke("oem-cancelar-modulo", {
+                    body: { acao: "quantidade", modulo_id: qtdModulo.id, nova_quantidade: novaQtdModulo },
+                  });
+                  const r = (data ?? {}) as { ok?: boolean; mensagem?: string; baixa_no_oem?: boolean };
+                  if (error || r.ok === false) {
+                    throw new Error(r.mensagem || error?.message || "Não deu para alterar.");
+                  }
+                  toast({
+                    title: r.baixa_no_oem ? "Quantidade alterada no OEM e na ficha" : "Quantidade alterada",
+                    description: `${qtdModulo.produto_modulos?.nome ?? "Módulo"} · ${Number(qtdModulo.quantidade) || 1} → ${novaQtdModulo}.`,
+                  });
+                  setQtdModulo(null);
+                  invalidateAll();
+                } catch (e: any) {
+                  toast({ variant: "destructive", title: "Não deu para alterar", description: e?.message });
+                } finally {
+                  setSalvandoQtd(false);
+                }
+              }}
+            >
+              {salvandoQtd ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!cancelarModulo} onOpenChange={(o) => { if (!o) setCancelarModulo(null); }}>
         <DialogContent className="sm:max-w-md">
