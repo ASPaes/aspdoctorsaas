@@ -495,10 +495,16 @@ export default function OemIntegrationTab() {
     },
   });
 
-  const vinculoPorProduto = useMemo(
-    () => new Map(vinculos.map((v) => [v.produto_codigo, v])),
-    [vinculos],
-  );
+  // Um produto do OEM pode virar VÁRIOS produtos do DoctorSaaS — a mesma
+  // licença é vendida aqui em mais de uma linha (Servidor e Terminal).
+  const vinculosPorProduto = useMemo(() => {
+    const m = new Map<string, VinculoOem[]>();
+    for (const v of vinculos) {
+      const lista = m.get(v.produto_codigo);
+      if (lista) lista.push(v); else m.set(v.produto_codigo, [v]);
+    }
+    return m;
+  }, [vinculos]);
   const nomeProdutoDs = useMemo(
     () => new Map(produtosDs.map((p) => [p.id, p.nome])),
     [produtosDs],
@@ -1344,27 +1350,30 @@ export default function OemIntegrationTab() {
                             uma lista separada obrigaria a conferir de novo qual
                             coluna é qual. */}
                         {grade.produtos.map((p) => {
-                          const v = vinculoPorProduto.get(p.codigo);
+                          const vs = vinculosPorProduto.get(p.codigo) ?? [];
+                          const nomes = vs.map((v) => nomeProdutoDs.get(v.produto_id) ?? `Produto #${v.produto_id}`);
                           return (
                             <th key={p.codigo} className="px-4 py-2 text-right font-medium whitespace-nowrap align-top">
                               <div className="flex flex-col items-end gap-1">
                                 <span>{p.nome}</span>
                                 <Button
                                   size="sm"
-                                  variant={v ? "secondary" : "outline"}
+                                  variant={vs.length ? "secondary" : "outline"}
                                   className="h-6 gap-1 px-2 text-[11px] font-normal"
                                   onClick={() => abrirVinculo(p.codigo, p.nome)}
-                                  title={v
-                                    ? (v.ultimo_upgrade_em
-                                        ? `Módulos importados em ${new Date(v.ultimo_upgrade_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`
-                                        : "Vinculado, módulos ainda não importados")
-                                    : "Vincular a um produto do DoctorSaaS"}
+                                  // Com vários vinculados o botão mostra a
+                                  // contagem e os nomes vão para o title: a
+                                  // coluna é estreita e o nome de um só deles
+                                  // faria parecer que os outros não existem.
+                                  title={vs.length
+                                    ? `${nomes.join(" · ")}${vs.some((v) => v.ultimo_upgrade_em) ? "" : " (módulos ainda não importados)"}`
+                                    : "Vincular a produtos do DoctorSaaS"}
                                 >
-                                  {v ? <Link2 className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                                  {vs.length ? <Link2 className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
                                   <span className="max-w-[140px] truncate">
-                                    {v
-                                      ? (nomeProdutoDs.get(v.produto_id) ?? `Produto #${v.produto_id}`)
-                                      : "Vincular produto"}
+                                    {vs.length === 0 ? "Vincular produto"
+                                      : vs.length === 1 ? nomes[0]
+                                      : `${vs.length} produtos`}
                                   </span>
                                 </Button>
                               </div>
@@ -2396,7 +2405,7 @@ export default function OemIntegrationTab() {
 
       <VincularProdutoOemDialog
         produtoOem={vinculandoProduto}
-        vinculo={vinculandoProduto ? (vinculoPorProduto.get(vinculandoProduto.codigo) ?? null) : null}
+        vinculos={vinculandoProduto ? (vinculosPorProduto.get(vinculandoProduto.codigo) ?? []) : []}
         contaId={conta?.id ?? null}
         tenantId={tid}
         aberto={!!vinculandoProduto}
