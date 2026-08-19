@@ -96,6 +96,10 @@ interface ClienteProdutoModulo {
   data_ativacao: string | null;
   data_inativacao: string | null;
   ativo: boolean;
+  // 'oem' = espelhado da licença no OEM e mantido pela sincronização; 'manual'
+  // = digitado aqui. A linha do OEM não se edita: a próxima carga do espelho
+  // sobrescreveria, e trabalho que some sozinho é pior que trabalho barrado.
+  origem?: string | null;
   produto_modulos?: { nome: string; descricao: string | null } | null;
 }
 
@@ -548,7 +552,18 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                             <TableBody>
                               {mods.map(m => (
                                 <TableRow key={m.id}>
-                                  <TableCell className="font-medium">{m.produto_modulos?.nome ?? "—"}</TableCell>
+                                  <TableCell className="font-medium">
+                                    {m.produto_modulos?.nome ?? "—"}
+                                    {m.origem === "oem" && (
+                                      <Badge
+                                        variant="outline"
+                                        className="ml-2 text-[10px] font-normal"
+                                        title="Vem da licença no OEM e se atualiza sozinho a cada carga do espelho."
+                                      >
+                                        OEM
+                                      </Badge>
+                                    )}
+                                  </TableCell>
                                   <TableCell className="text-center">{Number(m.quantidade) || 1}</TableCell>
                                   <TableCell className="text-right">
                                     R$ {fmtBRL(m.vlr_mensal)}
@@ -570,6 +585,12 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                     <Badge variant={m.ativo ? "default" : "secondary"}>{m.ativo ? "Ativo" : "Inativo"}</Badge>
                                   </TableCell>
                                   <TableCell className="text-right">
+                                    {m.origem === "oem" ? (
+                                      // Sem botões: editar, inativar ou excluir
+                                      // aqui seria desfeito na próxima carga do
+                                      // espelho. Quem muda isso é o OEM.
+                                      <span className="text-xs text-muted-foreground">Mantido pelo OEM</span>
+                                    ) : (
                                     <div className="flex items-center justify-end gap-0.5">
                                       <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: m })}>
                                         <Pencil className="h-3.5 w-3.5" />
@@ -581,6 +602,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                         <Trash2 className="h-3.5 w-3.5" />
                                       </Button>
                                     </div>
+                                    )}
                                   </TableCell>
                                 </TableRow>
                               ))}
