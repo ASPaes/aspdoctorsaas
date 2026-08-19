@@ -199,6 +199,13 @@ verify_jwt = true
 [functions.oem-espelho-sync]
 verify_jwt = true
 
+# Cancela um módulo da licença: dá a baixa no OEM (via DoctorOEM) e só então na
+# ficha. Chamada pelo NAVEGADOR com o token da pessoa — é ela que assina o
+# cancelamento no histórico —, por isso verify_jwt = true; a checagem de papel
+# acontece de novo por dentro.
+[functions.oem-cancelar-modulo]
+verify_jwt = true
+
 # Apaga do Storage a mídia de chat vencida (documento/vídeo/imagem; áudio nunca).
 # Chamada pelo pg_cron, que manda a anon key no Authorization — a mesma receita
 # do check-csat-timeout. `true` de propósito: sem JWT válido do projeto ninguém
