@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   Package, Plus, Pencil, Trash2, ChevronDown, ChevronRight,
-  ExternalLink, Loader2, Puzzle, Percent, AlertTriangle, Paperclip,
+  ExternalLink, Loader2, Puzzle, Percent, AlertTriangle, Paperclip, X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -119,6 +119,13 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   }>({ open: false });
   const [confirmDelete, setConfirmDelete] = useState<ClienteProduto | null>(null);
   const [confirmDeleteModulo, setConfirmDeleteModulo] = useState<ClienteProdutoModulo | null>(null);
+  // Cancelamento de módulo da licença: motivo é opcional e a quantidade só
+  // aparece quando há mais de uma — perguntar "quantas?" para quem tem uma só
+  // é passo a mais sem decisão nenhuma.
+  const [cancelarModulo, setCancelarModulo] = useState<ClienteProdutoModulo | null>(null);
+  const [motivoCancelamento, setMotivoCancelamento] = useState("");
+  const [qtdCancelamento, setQtdCancelamento] = useState(1);
+  const [cancelandoModulo, setCancelandoModulo] = useState(false);
   const [mrrDialog, setMrrDialog] = useState<MRRDialogState>({
     open: false, tipo: "upsell", valorDelta: 0, custoDelta: 0, descricao: "",
   });
@@ -564,7 +571,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                 <TableHead className="text-right">Vlr Mensal (unit.)</TableHead>
                                 <TableHead className="text-right">Vlr Custo (unit.)</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead className="w-40 text-right">Ações</TableHead>
+                                <TableHead className="w-40 text-right">Cancelamento</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -604,10 +611,26 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                   </TableCell>
                                   <TableCell className="text-right">
                                     {m.origem === "oem" ? (
-                                      // Sem botões: editar, inativar ou excluir
-                                      // aqui seria desfeito na próxima carga do
-                                      // espelho. Quem muda isso é o OEM.
-                                      <span className="text-xs text-muted-foreground">Mantido pelo OEM</span>
+                                      // Só o cancelamento: editar valor ou
+                                      // excluir seria desfeito na próxima carga
+                                      // do espelho. O cancelamento, não — ele
+                                      // trava a linha (`cancelado_manual`).
+                                      m.ativo ? (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              type="button" variant="ghost" size="icon"
+                                              className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                                              onClick={() => { setCancelarModulo(m); setMotivoCancelamento(""); setQtdCancelamento(Number(m.quantidade) || 1); }}
+                                            >
+                                              <X className="h-4 w-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Cancelamento de módulo</TooltipContent>
+                                        </Tooltip>
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">Cancelado</span>
+                                      )
                                     ) : (
                                     <div className="flex items-center justify-end gap-0.5">
                                       <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: m })}>
@@ -762,6 +785,103 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         moduloId={mrrDialog.moduloId}
         onRegistrado={invalidateAll}
       />
+
+      <Dialog open={!!cancelarModulo} onOpenChange={(o) => { if (!o) setCancelarModulo(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancelar módulo</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded border bg-muted/40 px-3 py-2 text-sm">
+              <span className="font-medium">{cancelarModulo?.produto_modulos?.nome ?? "—"}</span>
+              <span className="block text-xs text-muted-foreground">
+                {Number(cancelarModulo?.quantidade) || 1} contratada(s) ·
+                {" "}custo unitário R$ {fmtBRL(cancelarModulo?.vlr_custo)}
+              </span>
+            </div>
+
+            {(Number(cancelarModulo?.quantidade) || 1) > 1 && (
+              <div className="space-y-1.5">
+                <Label>Quantidade a cancelar</Label>
+                <Select value={String(qtdCancelamento)} onValueChange={(v) => setQtdCancelamento(Number(v))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: Number(cancelarModulo?.quantidade) || 1 }, (_, i) => i + 1).map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n} {n === (Number(cancelarModulo?.quantidade) || 1) ? "(todas)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Cancelando parte, o módulo continua na ficha com a quantidade restante.
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label>Motivo <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Textarea
+                rows={3}
+                placeholder="Ex.: cliente devolveu um terminal"
+                value={motivoCancelamento}
+                onChange={(e) => setMotivoCancelamento(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Aparece no histórico de módulos, junto com quem cancelou e quando.
+              </p>
+            </div>
+
+            {cancelarModulo?.origem === "oem" && (
+              <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  O cancelamento vale <strong>aqui</strong> e a sincronização do OEM não o desfaz.
+                  A baixa no portal do parceiro continua sendo feita à mão — enquanto ela não
+                  acontecer, o OEM segue cobrando.
+                </span>
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCancelarModulo(null)} disabled={cancelandoModulo}>
+              Voltar
+            </Button>
+            <Button
+              type="button"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1.5"
+              disabled={cancelandoModulo}
+              onClick={async () => {
+                if (!cancelarModulo) return;
+                setCancelandoModulo(true);
+                try {
+                  const { error } = await (supabase as any).rpc("fn_cancelar_modulo_cliente", {
+                    p_id: cancelarModulo.id,
+                    p_quantidade: qtdCancelamento,
+                    p_motivo: motivoCancelamento.trim() || null,
+                  });
+                  if (error) throw error;
+                  toast({
+                    title: "Módulo cancelado",
+                    description: `${cancelarModulo.produto_modulos?.nome ?? "Módulo"} · ${qtdCancelamento} de ${Number(cancelarModulo.quantidade) || 1}.`,
+                  });
+                  setCancelarModulo(null);
+                  invalidateAll();
+                } catch (e: any) {
+                  toast({ variant: "destructive", title: "Não deu para cancelar", description: e?.message });
+                } finally {
+                  setCancelandoModulo(false);
+                }
+              }}
+            >
+              {cancelandoModulo ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+              Cancelar módulo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!confirmDeleteModulo} onOpenChange={(o) => !o && setConfirmDeleteModulo(null)}>
         <AlertDialogContent>

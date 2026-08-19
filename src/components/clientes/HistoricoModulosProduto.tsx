@@ -22,6 +22,7 @@ type Evento = {
   quantidade: number | null;
   origem: string;
   usuario_nome: string | null;
+  motivo: string | null;
   created_at: string;
 };
 
@@ -51,7 +52,7 @@ export default function HistoricoModulosProduto({ clienteProdutoId }: { clienteP
     enabled: aberto,
     queryFn: async () => {
       const { data, error } = await (supabase.from("cliente_produto_modulo_eventos" as any) as any)
-        .select("id, modulo_nome, acao, quantidade, origem, usuario_nome, created_at")
+        .select("id, modulo_nome, acao, quantidade, origem, usuario_nome, motivo, created_at")
         .eq("cliente_produto_id", clienteProdutoId)
         .order("created_at", { ascending: false })
         .limit(300);
@@ -91,6 +92,7 @@ export default function HistoricoModulosProduto({ clienteProdutoId }: { clienteP
                   <TableHead className="w-16 text-center">Qtd</TableHead>
                   <TableHead className="w-44">Quando</TableHead>
                   <TableHead className="w-52">Quem</TableHead>
+                  <TableHead>Motivo</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -119,6 +121,11 @@ export default function HistoricoModulosProduto({ clienteProdutoId }: { clienteP
                           : e.origem === "oem"
                             ? "Sincronização OEM"
                             : "—"}
+                      </TableCell>
+                      {/* Motivo é opcional e só existe em cancelamento: a
+                          coluna fica vazia no resto em vez de repetir traço. */}
+                      <TableCell className="text-muted-foreground whitespace-pre-wrap break-words">
+                        {e.motivo || ""}
                       </TableCell>
                     </TableRow>
                   );
