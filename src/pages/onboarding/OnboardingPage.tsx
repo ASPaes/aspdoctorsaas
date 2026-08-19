@@ -387,11 +387,12 @@ export default function OnboardingPage() {
     queryKey: ["onboarding-journeys-tags", effectiveTenantId],
     enabled: canAccess && !!effectiveTenantId,
     queryFn: async () => {
-      const { data, error } = await (supabase.from("onboarding_journey_tags" as any) as any)
-        .select("journey_id, tag:tag_id(id, name, color)")
-        .eq("tenant_id", effectiveTenantId);
-      if (error) throw error;
-      return (data ?? []) as Array<{ journey_id: string; tag: { id: string; name: string; color: string } | null }>;
+      return await fetchAllRows<{ journey_id: string; tag: { id: string; name: string; color: string } | null }>(
+        () => (supabase.from("onboarding_journey_tags" as any) as any)
+          .select("journey_id, tag:tag_id(id, name, color)")
+          .eq("tenant_id", effectiveTenantId)
+          .order("journey_id"),
+      );
     },
   });
 
@@ -493,6 +494,13 @@ export default function OnboardingPage() {
 
       if (filtroResponsavel !== "todos" && t.conduzido_por !== filtroResponsavel) return false;
       if (filtroTipoTreino !== "todos" && t.training_type_id !== filtroTipoTreino) return false;
+      // A tag de controle mora na JORNADA e o cartão da Implantação é o treinamento.
+      // Sem esta linha o filtro de tag só alcançava a jornada sem treino nenhum — o
+      // quadro inteiro ignorava a tag marcada dentro do ticket.
+      if (filtroTags.length > 0) {
+        const tags = tagsByJourney[t.journey_id] ?? [];
+        if (!tags.some((tag) => filtroTags.includes(tag.id))) return false;
+      }
       if (termo) {
         const hay = [t.cliente_nome, t.ticket_code, t.parent_ticket_code, t.titulo, t.conduzido_por_nome]
           .filter(Boolean).join(" ").toLowerCase();
@@ -500,7 +508,7 @@ export default function OnboardingPage() {
       }
       return true;
     });
-  }, [isImplantacao, trainingCards, stagesDaFase, busca, filtroResponsavel, filtroSituacao, filtroTipoTreino, phasesByJourney, phaseId]);
+  }, [isImplantacao, trainingCards, stagesDaFase, busca, filtroResponsavel, filtroSituacao, filtroTipoTreino, filtroTags, tagsByJourney, phasesByJourney, phaseId]);
 
   /** Recorte do pipeline aberto — é o que o quadro renderiza.
    *  O treino cancelado não tem etapa para consultar, então quem diz o pipeline dele é a
