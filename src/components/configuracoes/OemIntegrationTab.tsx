@@ -19,10 +19,11 @@ import {
 import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
   Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
-  ArrowUpDown, ArrowUp, ArrowDown, DownloadCloud, Boxes,
+  ArrowUpDown, ArrowUp, ArrowDown, DownloadCloud, Boxes, Plus,
 } from "lucide-react";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
+import VincularProdutoOemDialog, { type ProdutoOem, type VinculoOem } from "./VincularProdutoOemDialog";
 
 // ============================================================================
 // Integrações › OEM
@@ -337,6 +338,8 @@ export default function OemIntegrationTab() {
   // quiser enxergar só o que cobra liga o filtro.
   const [buscaModulo, setBuscaModulo] = useState("");
   const [soComValor, setSoComValor] = useState(false);
+  // Qual coluna da grade está sendo vinculada a um produto do DoctorSaaS.
+  const [vinculandoProduto, setVinculandoProduto] = useState<ProdutoOem | null>(null);
   const POR_PAGINA = 25;
 
   // Uma conta POR UNIDADE BASE, igual ao Omie. A view não tem a coluna da
@@ -466,6 +469,41 @@ export default function OemIntegrationTab() {
       ),
   });
 
+  // O de-para produto do OEM ↔ produto do DoctorSaaS. É ele que transforma a
+  // grade em cadastro: sem vínculo, a coluna é só preço de tabela. Vem POR
+  // CONTA, igual à grade — a mesma unidade que tem a chave tem o vínculo.
+  const { data: vinculos = [] } = useQuery({
+    queryKey: ["oem-vinculos-produto", conta?.id],
+    enabled: !!conta?.id,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("oem_produto_vinculo" as any) as any)
+        .select("produto_codigo, produto_id, ultimo_upgrade_em")
+        .eq("conta_integration_id", conta!.id);
+      if (error) throw error;
+      return (data ?? []) as VinculoOem[];
+    },
+  });
+
+  const { data: produtosDs = [] } = useQuery({
+    queryKey: ["oem-produtos-ds", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("produtos" as any) as any)
+        .select("id, nome").eq("tenant_id", tid).order("nome");
+      if (error) throw error;
+      return (data ?? []) as { id: number; nome: string }[];
+    },
+  });
+
+  const vinculoPorProduto = useMemo(
+    () => new Map(vinculos.map((v) => [v.produto_codigo, v])),
+    [vinculos],
+  );
+  const nomeProdutoDs = useMemo(
+    () => new Map(produtosDs.map((p) => [p.id, p.nome])),
+    [produtosDs],
+  );
+
   // Monta a grade módulo × produto, que é como o portal mostra e como se lê a
   // regra comercial: a mesma linha (o módulo) custa diferente em cada coluna
   // (o produto). Célula vazia não é zero — é módulo que não existe naquele
@@ -505,6 +543,22 @@ export default function OemIntegrationTab() {
       return m.nome.toLowerCase().includes(q) || String(m.codigo).includes(q);
     });
   }, [grade.modulos, buscaModulo, soComValor]);
+
+  // A coluna da grade vira a lista de módulos daquele produto. Só entra o que
+  // existe na coluna: célula vazia é módulo que não existe naquele produto.
+  function abrirVinculo(codigo: string, nome: string) {
+    setVinculandoProduto({
+      codigo,
+      nome,
+      modulos: precos
+        .filter((p) => p.produto_codigo === codigo)
+        .map((p) => ({
+          codigo: p.modulo_codigo,
+          nome: p.modulo_nome,
+          valor: Number(p.valor_unitario) || 0,
+        })),
+    });
+  }
 
   async function salvarChave() {
     if (!tid || !novaUnidade || !novaChave.trim()) return;
@@ -1213,6 +1267,10 @@ export default function OemIntegrationTab() {
             <strong>por conta conectada</strong> — cada unidade tem a sua. Isto é preço de{" "}
             <strong>tabela</strong>, não o que um cliente paga: a licença de cada filial pode ter
             valor negociado, e é ela que aparece nas abas Custos e Margem.
+            <br />
+            No topo de cada coluna dá para <strong>vincular o produto do OEM a um produto
+            cadastrado no DoctorSaaS</strong> e, se você quiser, trazer os módulos daquela coluna
+            para dentro dele — o custo de cada módulo vem do preço de tabela.
           </Explica>
 
           <Card>
@@ -1281,11 +1339,38 @@ export default function OemIntegrationTab() {
                         <th className="sticky left-0 z-10 bg-muted px-6 py-2 text-left font-medium min-w-[260px]">
                           Módulo
                         </th>
-                        {grade.produtos.map((p) => (
-                          <th key={p.codigo} className="px-4 py-2 text-right font-medium whitespace-nowrap">
-                            {p.nome}
-                          </th>
-                        ))}
+                        {/* Cada coluna carrega o vínculo com o produto do
+                            DoctorSaaS: é onde a decisão está sendo tomada, e
+                            uma lista separada obrigaria a conferir de novo qual
+                            coluna é qual. */}
+                        {grade.produtos.map((p) => {
+                          const v = vinculoPorProduto.get(p.codigo);
+                          return (
+                            <th key={p.codigo} className="px-4 py-2 text-right font-medium whitespace-nowrap align-top">
+                              <div className="flex flex-col items-end gap-1">
+                                <span>{p.nome}</span>
+                                <Button
+                                  size="sm"
+                                  variant={v ? "secondary" : "outline"}
+                                  className="h-6 gap-1 px-2 text-[11px] font-normal"
+                                  onClick={() => abrirVinculo(p.codigo, p.nome)}
+                                  title={v
+                                    ? (v.ultimo_upgrade_em
+                                        ? `Módulos importados em ${new Date(v.ultimo_upgrade_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`
+                                        : "Vinculado, módulos ainda não importados")
+                                    : "Vincular a um produto do DoctorSaaS"}
+                                >
+                                  {v ? <Link2 className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                                  <span className="max-w-[140px] truncate">
+                                    {v
+                                      ? (nomeProdutoDs.get(v.produto_id) ?? `Produto #${v.produto_id}`)
+                                      : "Vincular produto"}
+                                  </span>
+                                </Button>
+                              </div>
+                            </th>
+                          );
+                        })}
                       </tr>
                     </thead>
                     {/* Sem hover de linha de propósito: a coluna presa é opaca
@@ -2307,6 +2392,23 @@ export default function OemIntegrationTab() {
         aberto={!!escolhendo}
         onOpenChange={(v) => { if (!v) setEscolhendo(null); }}
         onDecidido={recarregarRecon}
+      />
+
+      <VincularProdutoOemDialog
+        produtoOem={vinculandoProduto}
+        vinculo={vinculandoProduto ? (vinculoPorProduto.get(vinculandoProduto.codigo) ?? null) : null}
+        contaId={conta?.id ?? null}
+        tenantId={tid}
+        aberto={!!vinculandoProduto}
+        onOpenChange={(v) => { if (!v) setVinculandoProduto(null); }}
+        onConcluido={() => {
+          // O upgrade mexe em produto_modulos, que a tela de Produtos e módulos
+          // também lê — invalidar só o vínculo deixaria a outra tela mostrando
+          // o catálogo velho até alguém recarregar a página.
+          queryClient.invalidateQueries({ queryKey: ["oem-vinculos-produto", conta?.id] });
+          queryClient.invalidateQueries({ queryKey: ["produto_modulos"] });
+          queryClient.invalidateQueries({ queryKey: ["crud_produtos_master"] });
+        }}
       />
     </div>
   );
