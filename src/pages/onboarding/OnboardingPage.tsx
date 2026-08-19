@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 import { useOnboardingPhases } from "@/hooks/useOnboardingPhases";
+import { useOnboardingBoardRealtime } from "./useOnboardingBoardRealtime";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -140,6 +141,9 @@ export default function OnboardingPage() {
   const { selectedUnidadeIds, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const { canAccess, isLoading: accessLoading } = useOnboardingAccess();
   const queryClient = useQueryClient();
+  // Quadro vivo: ação de qualquer usuário (mover etapa, criar jornada, trocar
+  // responsável) reaparece aqui em ~1s, sem F5.
+  useOnboardingBoardRealtime(effectiveTenantId);
   const phasesQuery = useOnboardingPhases(effectiveTenantId, { enabled: canAccess });
   const phases = phasesQuery.data ?? [];
   const [phaseId, setPhaseId] = useState<string | null>(null);
