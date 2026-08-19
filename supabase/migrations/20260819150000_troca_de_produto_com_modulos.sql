@@ -19,8 +19,11 @@
 --      mudar so o modulo_id nao e adicionar, cancelar nem mudar quantidade.
 --   3. contrato_itens.modulo_id tambem aponta para produto_modulos e e reapontado
 --      junto, senao sobra item de contrato preso ao catalogo antigo.
---   4. Comparacao por lower(btrim(nome)) -- a mesma que a tela usa para dizer,
---      antes de salvar, quais produtos aceitam a troca.
+--   4. Comparacao por public.fn_norm_nome_modulo (tira acento, caixa e espaco
+--      duplo) -- a MESMA normalizacao do espelho do OEM. Com lower(btrim(...)),
+--      catalogo importado do OEM ("GESTAO") nao casaria com catalogo digitado a
+--      mao ("Gestao" com til). A tela repete essa normalizacao para dizer, antes
+--      de salvar, quais produtos aceitam a troca.
 -- =====================================================================
 
 CREATE OR REPLACE FUNCTION public.admin_swap_cliente_produto(
@@ -113,7 +116,7 @@ BEGIN
                FROM produto_modulos pm_new
               WHERE pm_new.produto_id = p_novo_produto_id
                 AND pm_new.tenant_id = v_cp_tenant
-                AND lower(btrim(pm_new.nome)) = lower(btrim(pm_old.nome))
+                AND public.fn_norm_nome_modulo(pm_new.nome) = public.fn_norm_nome_modulo(pm_old.nome)
            );
 
     IF v_faltando IS NOT NULL THEN
@@ -125,12 +128,12 @@ BEGIN
     PERFORM set_config('doctorsaas.skip_valor_sync', 'true', true);
 
     WITH destino AS (
-      SELECT DISTINCT ON (lower(btrim(nome)))
-             lower(btrim(nome)) AS chave, id
+      SELECT DISTINCT ON (public.fn_norm_nome_modulo(nome))
+             public.fn_norm_nome_modulo(nome) AS chave, id
         FROM produto_modulos
        WHERE produto_id = p_novo_produto_id
          AND tenant_id = v_cp_tenant
-       ORDER BY lower(btrim(nome)), ativo DESC, created_at
+       ORDER BY public.fn_norm_nome_modulo(nome), ativo DESC, created_at
     )
     UPDATE cliente_produto_modulos cpm
        SET modulo_id  = d.id,
@@ -138,17 +141,17 @@ BEGIN
       FROM produto_modulos pm_old, destino d
      WHERE cpm.cliente_produto_id = p_cliente_produto_id
        AND pm_old.id = cpm.modulo_id
-       AND d.chave = lower(btrim(pm_old.nome))
+       AND d.chave = public.fn_norm_nome_modulo(pm_old.nome)
        AND cpm.modulo_id <> d.id;
     GET DIAGNOSTICS v_modulos_remap = ROW_COUNT;
 
     WITH destino AS (
-      SELECT DISTINCT ON (lower(btrim(nome)))
-             lower(btrim(nome)) AS chave, id
+      SELECT DISTINCT ON (public.fn_norm_nome_modulo(nome))
+             public.fn_norm_nome_modulo(nome) AS chave, id
         FROM produto_modulos
        WHERE produto_id = p_novo_produto_id
          AND tenant_id = v_cp_tenant
-       ORDER BY lower(btrim(nome)), ativo DESC, created_at
+       ORDER BY public.fn_norm_nome_modulo(nome), ativo DESC, created_at
     )
     UPDATE contrato_itens ci
        SET modulo_id = d.id
@@ -156,7 +159,7 @@ BEGIN
      WHERE ci.cliente_produto_id = p_cliente_produto_id
        AND ci.modulo_id IS NOT NULL
        AND pm_old.id = ci.modulo_id
-       AND d.chave = lower(btrim(pm_old.nome))
+       AND d.chave = public.fn_norm_nome_modulo(pm_old.nome)
        AND ci.modulo_id <> d.id;
 
     PERFORM set_config('doctorsaas.skip_valor_sync', '', true);

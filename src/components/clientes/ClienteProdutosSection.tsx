@@ -1357,7 +1357,18 @@ function ProdutoDialog({
     },
   });
 
-  const chave = (n: string) => n.trim().toLowerCase();
+  // Mesma normalização de public.fn_norm_nome_modulo, que é a que o banco usa
+  // para casar os módulos na troca (e o espelho do OEM para casar catálogo):
+  // tira espaço das pontas, acento, caixa e espaço duplo do meio. Só assim
+  // "GESTAO" importado do OEM casa com "Gestão" digitado à mão — com
+  // lower/trim puro a tela ofereceria uma troca que o banco recusaria.
+  const chave = (n: string) =>
+    (n ?? "")
+      .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ");
 
   const faltantesPorProduto = useMemo(() => {
     const out: Record<number, string[]> = {};
