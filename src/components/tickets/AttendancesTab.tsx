@@ -25,7 +25,8 @@ const RESOLUCAO_LABELS: Record<string, string> = {
   resolvido: "✅ Resolvido",
   parcial: "🟡 Parcial",
   nao_resolvido: "🟠 Sem solução",
-  sem_resposta_agente: "🔴 Sem resposta",
+  sem_resposta_agente: "🔴 Agente não respondeu",
+  sem_resposta_cliente: "⚪ Cliente não retornou",
   "(sem)": "Sem análise",
 };
 const RESOLUCAO_CLASSES: Record<string, string> = {
@@ -33,6 +34,7 @@ const RESOLUCAO_CLASSES: Record<string, string> = {
   parcial: "bg-amber-500/10 text-amber-400 border-amber-500/20",
   nao_resolvido: "bg-orange-500/10 text-orange-400 border-orange-500/20",
   sem_resposta_agente: "bg-red-500/10 text-red-400 border-red-500/20",
+  sem_resposta_cliente: "bg-slate-500/10 text-slate-400 border-slate-500/20",
 };
 const TIPO_LABELS: Record<string, string> = {
   individual: "Individual",
@@ -526,7 +528,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
                 <SelectItem value="resolvido">✅ Resolvido</SelectItem>
                 <SelectItem value="parcial">🟡 Parcial</SelectItem>
                 <SelectItem value="nao_resolvido">🟠 Sem solução</SelectItem>
-                <SelectItem value="sem_resposta_agente">🔴 Sem resposta</SelectItem>
+                <SelectItem value="sem_resposta_agente">🔴 Agente não respondeu</SelectItem>
+                <SelectItem value="sem_resposta_cliente">⚪ Cliente não retornou</SelectItem>
                 <SelectItem value="(sem)">Sem análise</SelectItem>
               </SelectContent>
             </Select>

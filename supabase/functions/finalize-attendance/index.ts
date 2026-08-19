@@ -67,7 +67,7 @@ serve(async (req) => {
     // 1. Fetch attendance
     const { data: att, error: attErr } = await supabase
       .from("support_attendances")
-      .select("id, tenant_id, conversation_id, opened_at, closed_at, area_id, ai_summary, first_human_response_at, msg_customer_count, closure_type, is_group, sentiment_at")
+      .select("id, tenant_id, conversation_id, opened_at, closed_at, area_id, ai_summary, first_human_response_at, msg_customer_count, msg_agent_count, closure_type, is_group, sentiment_at")
       .eq("id", attendanceId)
       .single();
 
@@ -100,11 +100,16 @@ serve(async (req) => {
       kbAlreadyExists = true;
     }
 
-    // 2.5 Regra determinística: cliente ficou sem resposta de humano
+    // 2.5 Regra determinística A: ninguém do time respondeu o cliente.
+    // Mede por msg_agent_count, NÃO por first_human_response_at: esse campo só é
+    // carimbado em envio pelo painel (trg_set_first_human_response exige
+    // sent_by_user_id NOT NULL), então técnico que responde pelo celular deixa ele
+    // NULL e cairia aqui por engano. Os dois caminhos incrementam msg_agent_count.
+    // Sem restrição de closure_type: se ninguém respondeu, o desfecho é o mesmo
+    // tenha o atendimento fechado por inatividade, silêncio ou CSAT.
     const semRespostaAgente =
-      att.first_human_response_at == null &&
-      (att.msg_customer_count ?? 0) > 0 &&
-      (att.closure_type === "inactivity_auto" || att.closure_type === "silent");
+      (att.msg_agent_count ?? 0) === 0 &&
+      (att.msg_customer_count ?? 0) > 0;
 
     if (semRespostaAgente) {
       console.log(`[${FUNCTION_NAME}][${requestId}] Deterministico: sem_resposta_agente, pulando IA e KB`);
@@ -192,6 +197,50 @@ serve(async (req) => {
         JSON.stringify({ success: true, ai: false, reason: "too_few_messages" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // 4.5 Regra determinística B: o cliente nunca engajou.
+    // "Nunca engajou" = não existe mensagem do cliente DEPOIS da primeira mensagem
+    // do agente. NÃO é o mesmo que "o agente teve a última palavra" — conversa longa
+    // que morre no meio do troubleshooting é cliente que desistiu e precisa continuar
+    // caindo em nao_resolvido, senão o caso pior some do radar.
+    // Não dá para decidir isso em SQL: não existe first_operator_message_at por
+    // atendimento, e first_human_response_at é cego para envio pelo celular. As
+    // mensagens já estão em memória aqui, então o custo é zero.
+    // Só vale quando o fetch trouxe a janela inteira (limite de 40 acima). Acima
+    // disso houve engajamento por definição e a regra não deveria disparar.
+    const fechouPorAbandono =
+      att.closure_type === "inactivity_auto" || att.closure_type === "silent";
+
+    if (fechouPorAbandono && messages.length < 40) {
+      // `messages` vem do banco em ordem decrescente; copia para não interferir no
+      // .reverse() in-place que o passo 5 faz logo abaixo.
+      const cronologico = [...messages].reverse();
+      const real = (m: any) => m.message_type !== "system";
+      const idxPrimeiroAgente = cronologico.findIndex((m: any) => m.is_from_me === true && real(m));
+      const clienteVoltou =
+        idxPrimeiroAgente >= 0 &&
+        cronologico.slice(idxPrimeiroAgente + 1).some((m: any) => m.is_from_me !== true && real(m));
+
+      if (idxPrimeiroAgente >= 0 && !clienteVoltou) {
+        console.log(`[${FUNCTION_NAME}][${requestId}] Deterministico: sem_resposta_cliente, pulando IA e KB`);
+        const nowIso = new Date().toISOString();
+        await supabase
+          .from("support_attendances")
+          .update({
+            sentiment_score: 0,
+            sentiment_final: "neutral",
+            resolucao: "sem_resposta_cliente",
+            sentiment_at: nowIso,
+            sentiment_model: "deterministic",
+            updated_at: nowIso,
+          })
+          .eq("id", attendanceId);
+        return new Response(
+          JSON.stringify({ success: true, ai: false, resolucao: "sem_resposta_cliente" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // 5. Format messages
