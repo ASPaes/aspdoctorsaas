@@ -70,9 +70,21 @@ Deno.serve(async (req) => {
       .eq("id", linha.cliente_produto_id)
       .maybeSingle();
 
+    // Duas ações pela mesma porta, porque no OEM é a mesma escrita: a licença
+    // é gravada inteira e o que muda é a quantidade do módulo. Cancelar é
+    // reduzir até zero; somar um usuário é subir de 1 para 2.
+    const acao = corpo.acao === "quantidade" ? "quantidade" : "cancelar";
     const atual = Math.max(Number(linha.quantidade) || 1, 1);
-    const cancelar = Math.min(Math.max(quantidade ?? atual, 1), atual);
-    const novaQtd = atual - cancelar;
+    const cancelar = acao === "cancelar"
+      ? Math.min(Math.max(quantidade ?? atual, 1), atual)
+      : 0;
+    const novaQtd = acao === "cancelar"
+      ? atual - cancelar
+      : Math.max(Number(corpo.nova_quantidade) || 0, 1);
+
+    if (acao === "quantidade" && novaQtd === atual) {
+      return json({ ok: false, mensagem: "A quantidade informada é a mesma que já está na licença." }, 400);
+    }
 
     // Módulo digitado à mão não tem licença no parceiro: cancela só aqui, sem
     // inventar uma baixa que não existe.
@@ -149,6 +161,22 @@ Deno.serve(async (req) => {
     }
 
     // ------------------------------------------------------------- na ficha
+    if (acao === "quantidade") {
+      // `quantidade_manual` segura a nova quantidade até o espelho confirmar;
+      // a própria sincronização a limpa quando o OEM devolver o mesmo número.
+      const { error: errQ } = await comoUsuario
+        .from("cliente_produto_modulos")
+        .update({ quantidade: novaQtd, quantidade_manual: novaQtd, updated_at: new Date().toISOString() })
+        .eq("id", moduloId);
+      if (errQ) {
+        return json({
+          ok: false, etapa: "ficha",
+          mensagem: `A licença foi alterada no OEM, mas a ficha não: ${errQ.message}. A próxima carga do espelho corrige.`,
+        }, 500);
+      }
+      return json({ ok: true, quantidade: novaQtd, oem: respostaOem, baixa_no_oem: temLicenca });
+    }
+
     const { data: resultado, error: errR } = await comoUsuario.rpc("fn_cancelar_modulo_cliente", {
       p_id: moduloId,
       p_quantidade: cancelar,
