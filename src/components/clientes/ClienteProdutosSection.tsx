@@ -45,6 +45,7 @@ import { Switch } from "@/components/ui/switch";
 import SugestaoMRRDialog from "./SugestaoMRRDialog";
 import ReajusteModulosDialog from "./ReajusteModulosDialog";
 import EnviarOmieComPreviaButton from "./EnviarOmieComPreviaButton";
+import HistoricoModulosProduto from "./HistoricoModulosProduto";
 import ContratoAnexoSection, {
   type ContratoAnexo,
   ANEXO_ACCEPT,
@@ -627,6 +628,8 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                           </Table>
                         )}
                       </div>
+
+                      <HistoricoModulosProduto clienteProdutoId={p.id} />
 
                       <ContratoAnexoSection
                         contratoId={contratoIdByCliProd[p.id] ?? null}
