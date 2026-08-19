@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,6 +54,9 @@ export default function ProdutosModulosTab() {
   const qc = useQueryClient();
 
   const [selectedProdutoId, setSelectedProdutoId] = useState<number | null>(null);
+  // Qual coluna da grade do OEM está sendo espiada. null = o cadastro do
+  // produto, que é o que a tela sempre mostrou.
+  const [colunaOem, setColunaOem] = useState<string | null>(null);
 
   // Produto dialog
   const [produtoDialogOpen, setProdutoDialogOpen] = useState(false);
@@ -113,6 +117,61 @@ export default function ProdutosModulosTab() {
       return (data ?? []) as Modulo[];
     },
   });
+
+  // ----------------------------------------------------------------- OEM
+  // O produto vinculado ao OEM sabe de QUAL CONTA ele veio, e é a grade dessa
+  // conta que vale para ele — a tabela de preços do parceiro é por unidade.
+  // Produto sem vínculo não mostra coluna nenhuma: preço de outra operação não
+  // é o preço dele.
+  //
+  // Sem maybeSingle de propósito: a UNIQUE é por conta+produto, então o mesmo
+  // produto PODE estar vinculado em duas contas — e o maybeSingle erraria com
+  // "multiple rows", que foi exatamente o bug da segunda conta Omie logo abaixo.
+  const vinculoOemQ = useQuery({
+    queryKey: ["oem-vinculo-do-produto", tid, selectedProdutoId],
+    enabled: !!selectedProdutoId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("oem_produto_vinculo" as any) as any)
+        .select("conta_integration_id, produto_codigo, criado_em")
+        .eq("produto_id", selectedProdutoId)
+        .order("criado_em")
+        .limit(1);
+      if (error) throw error;
+      return ((data ?? [])[0] ?? null) as { conta_integration_id: string; produto_codigo: string } | null;
+    },
+  });
+  const contaOemId = vinculoOemQ.data?.conta_integration_id ?? null;
+
+  const precosOemQ = useQuery({
+    queryKey: ["oem-precos-da-conta", contaOemId],
+    enabled: !!contaOemId,
+    queryFn: () =>
+      fetchAllRows<{ produto_codigo: string; produto_nome: string; modulo_codigo: number; modulo_nome: string; valor_unitario: number | null }>(() =>
+        (supabase.from("oem_espelho_modulo_preco" as any) as any)
+          .select("produto_codigo, produto_nome, modulo_codigo, modulo_nome, valor_unitario")
+          .eq("conta_integration_id", contaOemId)
+          .order("modulo_codigo"),
+      ),
+  });
+
+  // Só as DUAS primeiras colunas, na mesma ordem da aba do OEM (pelo código do
+  // produto no catálogo, que é a ordem em que o parceiro devolve). As demais
+  // ficam de fora até fazerem falta.
+  const colunasOem = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of precosOemQ.data ?? []) m.set(p.produto_codigo, p.produto_nome);
+    return [...m.entries()]
+      .map(([codigo, nome]) => ({ codigo, nome }))
+      .sort((a, b) => Number(a.codigo) - Number(b.codigo))
+      .slice(0, 2);
+  }, [precosOemQ.data]);
+
+  const modulosOem = useMemo(() => {
+    if (!colunaOem) return [];
+    return (precosOemQ.data ?? [])
+      .filter((p) => p.produto_codigo === colunaOem)
+      .sort((a, b) => a.modulo_codigo - b.modulo_codigo);
+  }, [precosOemQ.data, colunaOem]);
 
   // Omie integration active check — usa o mesmo effectiveTenantId que as demais telas (super admin pode simular tenant).
   //
@@ -361,7 +420,7 @@ export default function ProdutosModulosTab() {
                         <Button
                           variant={selectedProdutoId === p.id ? "default" : "outline"}
                           size="sm"
-                          onClick={() => setSelectedProdutoId(p.id)}
+                          onClick={() => { setSelectedProdutoId(p.id); setColunaOem(null); }}
                         >
                           <Package />Módulos
                         </Button>
@@ -390,15 +449,94 @@ export default function ProdutosModulosTab() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-semibold">Módulos de {selectedProduto.nome}</h3>
-                <Badge variant="secondary">{(modulosQ.data ?? []).length} módulos</Badge>
+                <Badge variant="secondary">
+                  {colunaOem
+                    ? `${modulosOem.length} módulos no OEM`
+                    : `${(modulosQ.data ?? []).length} módulos`}
+                </Badge>
               </div>
               <div className="flex items-center gap-2">
-                <ProtectedElement resource="cfg.produtos" action="insert" mode="notify">
-                  <Button onClick={openNewModulo} size="sm"><Plus />Novo Módulo</Button>
-                </ProtectedElement>
+                {/* As colunas da grade do parceiro, ao lado do cadastro: é a
+                    mesma pergunta feita duas vezes ("o que este produto tem?"),
+                    e ter que ir até Integrações para responder a segunda faz
+                    perder de vista a primeira. Só aparece para produto
+                    vinculado — sem vínculo não existe grade que seja dele. */}
+                {colunasOem.length > 0 && (
+                  <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
+                    <Button
+                      size="sm" variant={colunaOem === null ? "secondary" : "ghost"}
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setColunaOem(null)}
+                    >
+                      Cadastrados
+                    </Button>
+                    {colunasOem.map((c) => (
+                      <Button
+                        key={c.codigo}
+                        size="sm" variant={colunaOem === c.codigo ? "secondary" : "ghost"}
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setColunaOem(c.codigo)}
+                      >
+                        {c.nome}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+                {/* Em modo OEM não há o que criar: a lista é do parceiro. */}
+                {!colunaOem && (
+                  <ProtectedElement resource="cfg.produtos" action="insert" mode="notify">
+                    <Button onClick={openNewModulo} size="sm"><Plus />Novo Módulo</Button>
+                  </ProtectedElement>
+                )}
               </div>
             </div>
 
+            {colunaOem ? (
+              // Espelho da grade de Integrações › OEM › Módulos, recortado
+              // nesta coluna. Só leitura: nada aqui altera o cadastro — quem
+              // importa é o botão de vínculo na tela do OEM.
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Preço de <strong>tabela</strong> do parceiro para{" "}
+                  <strong>{colunasOem.find((c) => c.codigo === colunaOem)?.nome}</strong> — só
+                  leitura, o cadastro de {selectedProduto.nome} não muda.
+                </p>
+                <div className="border border-border rounded-md overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Módulo</TableHead>
+                        <TableHead className="w-[120px]">Código</TableHead>
+                        <TableHead className="w-[160px] text-right">Valor no OEM</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {precosOemQ.isLoading ? (
+                        Array.from({ length: 3 }).map((_, i) => (
+                          <TableRow key={i}><TableCell colSpan={3}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                        ))
+                      ) : modulosOem.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-center text-muted-foreground py-6">
+                            Nenhum módulo nesta coluna. Atualize o espelho em Integrações › OEM.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        modulosOem.map((m) => (
+                          <TableRow key={m.modulo_codigo}>
+                            <TableCell className="font-medium">{m.modulo_nome}</TableCell>
+                            <TableCell className="font-mono text-xs text-muted-foreground">#{m.modulo_codigo}</TableCell>
+                            <TableCell className={`text-right tabular-nums ${Number(m.valor_unitario) ? "" : "text-muted-foreground"}`}>
+                              {fmtBRL(Number(m.valor_unitario) || 0)}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ) : (
             <div className="border border-border rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -452,6 +590,7 @@ export default function ProdutosModulosTab() {
                 </TableBody>
               </Table>
             </div>
+            )}
           </div>
         </>
       )}
