@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   Package, Plus, Pencil, Trash2, ChevronDown, ChevronRight,
-  ExternalLink, Loader2, Puzzle, Percent, AlertTriangle, Paperclip, X,
+  ExternalLink, Loader2, Puzzle, Percent, AlertTriangle, Paperclip, X, XCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -126,6 +126,15 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
   const [qtdCancelamento, setQtdCancelamento] = useState(1);
   const [cancelandoModulo, setCancelandoModulo] = useState(false);
+  // Cancelar produto é o caminho certo para tirar produto do cliente: a RPC
+  // cancel_cliente_produto desfaz o item de contrato (ou cancela o contrato
+  // inteiro, se for o único item) e inativa o produto. A lixeira só serve para
+  // produto órfão — sem item de contrato, que é o único caso em que o DELETE
+  // passa pela FK.
+  const [cancelarProduto, setCancelarProduto] = useState<ClienteProduto | null>(null);
+  const [motivoProdutoId, setMotivoProdutoId] = useState<string>("");
+  const [obsCancelProduto, setObsCancelProduto] = useState("");
+  const [cancelandoProduto, setCancelandoProduto] = useState(false);
   // Somar unidade é a mesma escrita no OEM, ao contrário: a licença é gravada
   // inteira e o que muda é a quantidade do módulo.
   const [qtdModulo, setQtdModulo] = useState<ClienteProdutoModulo | null>(null);
@@ -324,8 +333,27 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   };
 
   // ---- Mutations ----
+  // Módulo NUNCA bloqueia: cliente_produto_modulos.cliente_produto_id é ON DELETE
+  // CASCADE. Quem bloqueia é contrato_itens.cliente_produto_id, que não tem cascade
+  // — e todo produto criado por create_cliente_produto_with_contract nasce com um
+  // item de contrato. Checar antes para dizer o motivo real em vez de culpar módulo.
   const deleteProdutoMut = useMutation({
     mutationFn: async (id: string) => {
+      const { data: itens, error: itensErr } = await (supabase.from("contrato_itens" as any) as any)
+        .select("contrato_id")
+        .eq("cliente_produto_id", id)
+        .limit(1);
+      if (itensErr) throw itensErr;
+      const contratoId = (itens ?? [])[0]?.contrato_id as string | undefined;
+      if (contratoId) {
+        const { data: ct } = await (supabase.from("contratos" as any) as any)
+          .select("numero")
+          .eq("id", contratoId)
+          .maybeSingle();
+        const bloqueio: any = new Error("EM_CONTRATO");
+        bloqueio.contratoNumero = (ct as any)?.numero ?? null;
+        throw bloqueio;
+      }
       const { error } = await (supabase.from("cliente_produtos" as any) as any).delete().eq("id", id);
       if (error) throw error;
     },
@@ -334,14 +362,102 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
       invalidateAll();
     },
     onError: (err: any) => {
+      if (err?.message === "EM_CONTRATO") {
+        const num = err?.contratoNumero ? ` ${err.contratoNumero}` : "";
+        toast({
+          title: "Produto vinculado a um contrato",
+          description: `Este produto é item do contrato${num}. Excluir apagaria o item e desmontaria o total do contrato — cancele o produto pelo contrato.`,
+          variant: "destructive",
+        });
+        return;
+      }
       const msg = String(err?.message || "");
       if (msg.includes("foreign key") || msg.includes("violates")) {
-        toast({ title: "Não é possível excluir", description: "Remova os módulos vinculados primeiro.", variant: "destructive" });
+        toast({ title: "Não é possível excluir", description: "Há registros vinculados a este produto. O banco recusou a exclusão.", variant: "destructive" });
       } else {
         toast({ title: "Erro ao excluir", description: msg, variant: "destructive" });
       }
     },
   });
+
+  const motivosCancelamentoQuery = useQuery<{ id: number; descricao: string }[]>({
+    queryKey: ["motivos_cancelamento", lookupTenantId],
+    enabled: !!cancelarProduto,
+    staleTime: 30 * 60 * 1000,
+    queryFn: async () => {
+      let q = (supabase.from("motivos_cancelamento" as any) as any).select("id, descricao").order("descricao");
+      if (lookupTenantId) q = q.eq("tenant_id", lookupTenantId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+
+  // O efeito do cancelamento muda conforme o contrato: item único cancela o
+  // contrato (com churn); item entre vários só sai do contrato (sem churn).
+  // O usuário precisa saber disso ANTES de confirmar.
+  const cancelInfoQuery = useQuery<{ contratoId: string | null; numero: string | null; itens: number }>({
+    queryKey: ["cancel_produto_info", cancelarProduto?.id],
+    enabled: !!cancelarProduto,
+    queryFn: async () => {
+      const { data: itens, error } = await (supabase.from("contrato_itens" as any) as any)
+        .select("contrato_id")
+        .eq("cliente_produto_id", cancelarProduto!.id)
+        .limit(1);
+      if (error) throw error;
+      const cid = (itens ?? [])[0]?.contrato_id as string | undefined;
+      if (!cid) return { contratoId: null, numero: null, itens: 0 };
+      const [{ count }, { data: ct }] = await Promise.all([
+        (supabase.from("contrato_itens" as any) as any)
+          .select("id", { count: "exact", head: true })
+          .eq("contrato_id", cid),
+        (supabase.from("contratos" as any) as any).select("numero").eq("id", cid).maybeSingle(),
+      ]);
+      return { contratoId: cid, numero: (ct as any)?.numero ?? null, itens: count ?? 0 };
+    },
+  });
+
+  const cancelarProdutoAgora = async () => {
+    if (!cancelarProduto || !motivoProdutoId) return;
+    setCancelandoProduto(true);
+    try {
+      const { data, error } = await (supabase.rpc as any)("cancel_cliente_produto", {
+        p_cliente_produto_id: cancelarProduto.id,
+        p_motivo_id: Number(motivoProdutoId),
+        p_observacao: obsCancelProduto.trim() || null,
+      });
+      if (error) throw error;
+      const r = (data ?? {}) as { contrato_cancelado?: boolean; item_removido?: boolean; sem_contrato?: boolean };
+      toast({
+        title: "Produto cancelado",
+        description: r.contrato_cancelado
+          ? "Era o único item do contrato: o contrato foi cancelado junto e o churn ficou registrado."
+          : r.item_removido
+            ? "O produto saiu do contrato e os totais foram recalculados."
+            : "Produto inativado (não havia contrato vinculado).",
+      });
+      const prod = cancelarProduto;
+      setCancelarProduto(null);
+      invalidateAll();
+      // Só cancelar_contrato grava churn. Quando o produto apenas sai de um
+      // contrato com outros itens, o MRR não registra nada sozinho — daí a
+      // sugestão de downsell, igual ao que a inativação de módulo faz.
+      if (!r.contrato_cancelado && (Number(prod.vlr_mensal) || 0) > 0) {
+        setMrrDialog({
+          open: true,
+          tipo: "downsell",
+          valorDelta: -(Number(prod.vlr_mensal) || 0),
+          custoDelta: -(Number(prod.vlr_custo) || 0),
+          descricao: `Produto ${prod.produtos?.nome ?? ""} cancelado`,
+          moduloId: null,
+        });
+      }
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Não deu para cancelar", description: e?.message });
+    } finally {
+      setCancelandoProduto(false);
+    }
+  };
 
   const deleteModuloMut = useMutation({
     mutationFn: async (id: string) => {
@@ -475,6 +591,11 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                             Ativ: R$ {fmtBRL(p.vlr_ativacao)}
                           </Badge>
                         )}
+                        {!p.ativo && (
+                          <Badge variant="outline" className="shrink-0 text-destructive border-destructive/40">
+                            Cancelado
+                          </Badge>
+                        )}
                         {/* Sem precisar expandir: é a identidade da licença no
                             OEM e a primeira coisa que se procura conferindo. */}
                         {oemAtivo === true && p.oem_codigo_filial && (
@@ -496,9 +617,31 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                       <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setProdutoDialog({ open: true, edit: p })}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setConfirmDelete(p)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {p.ativo && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive"
+                              onClick={() => { setMotivoProdutoId(""); setObsCancelProduto(""); setCancelarProduto(p); }}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Cancelar produto</p></TooltipContent>
+                        </Tooltip>
+                      )}
+                      {/* Produto que está em contrato não pode ser excluído: a FK de
+                          contrato_itens recusa. Só aparece a lixeira para o órfão. */}
+                      {contratoItensQuery.isSuccess && !contratoIdByCliProd[p.id] && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setConfirmDelete(p)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Excluir (produto sem contrato)</p></TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                   </div>
 
@@ -870,6 +1013,102 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!cancelarProduto} onOpenChange={(o) => { if (!o) setCancelarProduto(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-destructive" />
+              Cancelar produto
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded border bg-muted/40 px-3 py-2 text-sm">
+              <span className="font-medium">{cancelarProduto?.produtos?.nome ?? "—"}</span>
+              <span className="block text-xs text-muted-foreground">
+                R$ {fmtBRL(cancelarProduto?.vlr_mensal)}/mês · custo R$ {fmtBRL(cancelarProduto?.vlr_custo)}
+                {cancelInfoQuery.data?.numero ? ` · contrato ${cancelInfoQuery.data.numero}` : ""}
+              </span>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Motivo *</Label>
+              <Select value={motivoProdutoId} onValueChange={setMotivoProdutoId}>
+                <SelectTrigger><SelectValue placeholder="Selecione o motivo" /></SelectTrigger>
+                <SelectContent>
+                  {(motivosCancelamentoQuery.data ?? []).map(m => (
+                    <SelectItem key={m.id} value={String(m.id)}>{m.descricao}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {motivosCancelamentoQuery.isSuccess && (motivosCancelamentoQuery.data ?? []).length === 0 && (
+                <p className="text-xs text-destructive">
+                  Nenhum motivo cadastrado para este tenant. Cadastre em Configurações › Cadastros › Motivos de cancelamento.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Observação <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Textarea
+                rows={3}
+                maxLength={500}
+                placeholder="Detalhes que ajudem a entender a saída"
+                value={obsCancelProduto}
+                onChange={(e) => setObsCancelProduto(e.target.value)}
+              />
+            </div>
+
+            {cancelInfoQuery.isLoading ? (
+              <Skeleton className="h-12 w-full" />
+            ) : cancelInfoQuery.data?.contratoId && (cancelInfoQuery.data?.itens ?? 0) <= 1 ? (
+              <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  É o <strong>único item</strong> do contrato {cancelInfoQuery.data?.numero ?? ""}: o contrato
+                  inteiro será cancelado, com churn no MRR. Sendo o último contrato ativo, o cliente
+                  passa a contar como cancelado.
+                </span>
+              </p>
+            ) : cancelInfoQuery.data?.contratoId ? (
+              <p className="flex items-start gap-2 rounded-md border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs text-sky-700 dark:text-sky-400">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  O contrato {cancelInfoQuery.data?.numero ?? ""} continua ativo com os outros
+                  {" "}{(cancelInfoQuery.data?.itens ?? 1) - 1} item(ns): o produto só sai dele e os totais
+                  são recalculados. Como isso <strong>não</strong> gera churn sozinho, a sugestão de
+                  downsell abre em seguida.
+                </span>
+              </p>
+            ) : null}
+
+            {oemAtivo === true && cancelarProduto?.oem_codigo_filial && (
+              <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  A baixa da licença <strong>no OEM não sai daqui</strong>. Para o parceiro parar de
+                  cobrar, cancele os módulos pelo X de cada um (esse sim dá baixa) ou trate no portal.
+                </span>
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCancelarProduto(null)} disabled={cancelandoProduto}>
+              Voltar
+            </Button>
+            <Button
+              type="button" variant="destructive" className="gap-1.5"
+              disabled={cancelandoProduto || !motivoProdutoId}
+              onClick={cancelarProdutoAgora}
+            >
+              {cancelandoProduto ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+              Cancelar produto
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!cancelarModulo} onOpenChange={(o) => { if (!o) setCancelarModulo(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1004,7 +1243,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir produto do cliente?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Se houver módulos vinculados, será necessário removê-los primeiro.
+              Este produto não está em nenhum contrato: excluir apaga o registro e os módulos vinculados junto (cascata), sem histórico. Para produto de contrato, use Cancelar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
