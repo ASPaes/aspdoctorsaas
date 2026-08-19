@@ -837,9 +837,9 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
               <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
-                  O cancelamento vale <strong>aqui</strong> e a sincronização do OEM não o desfaz.
-                  A baixa no portal do parceiro continua sendo feita à mão — enquanto ela não
-                  acontecer, o OEM segue cobrando.
+                  A baixa é pedida <strong>ao OEM primeiro</strong>: se o parceiro recusar, nada
+                  muda aqui e você vê o motivo. Dando certo, a linha também fica travada contra a
+                  próxima carga do espelho.
                 </span>
               </p>
             )}
@@ -857,14 +857,22 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                 if (!cancelarModulo) return;
                 setCancelandoModulo(true);
                 try {
-                  const { error } = await (supabase as any).rpc("fn_cancelar_modulo_cliente", {
-                    p_id: cancelarModulo.id,
-                    p_quantidade: qtdCancelamento,
-                    p_motivo: motivoCancelamento.trim() || null,
+                  // Pela edge function, não pelo RPC direto: é ela que dá a
+                  // baixa no OEM antes de mexer na ficha. Chamar o RPC daqui
+                  // cancelaria só de um lado.
+                  const { data, error } = await supabase.functions.invoke("oem-cancelar-modulo", {
+                    body: {
+                      modulo_id: cancelarModulo.id,
+                      quantidade: qtdCancelamento,
+                      motivo: motivoCancelamento.trim() || null,
+                    },
                   });
-                  if (error) throw error;
+                  const r = (data ?? {}) as { ok?: boolean; mensagem?: string; baixa_no_oem?: boolean };
+                  if (error || r.ok === false) {
+                    throw new Error(r.mensagem || error?.message || "Não deu para cancelar.");
+                  }
                   toast({
-                    title: "Módulo cancelado",
+                    title: r.baixa_no_oem ? "Cancelado no OEM e na ficha" : "Módulo cancelado",
                     description: `${cancelarModulo.produto_modulos?.nome ?? "Módulo"} · ${qtdCancelamento} de ${Number(cancelarModulo.quantidade) || 1}.`,
                   });
                   setCancelarModulo(null);
