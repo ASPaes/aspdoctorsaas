@@ -532,6 +532,23 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                         </p>
                       )}
 
+                      {/* Acima da tabela: com a lista do OEM a coluna cresceu
+                          para 5–11 linhas, e as ações ficavam abaixo de tudo —
+                          quem quer somar um módulo tinha que rolar a lista
+                          inteira para achar o botão. */}
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: null })}>
+                          <Plus className="h-4 w-4 mr-1" /> <Puzzle className="h-4 w-4 mr-1" /> Adicionar Módulo
+                        </Button>
+                        <Button
+                          type="button" variant="outline" size="sm"
+                          onClick={() => setReajusteDialog({ open: true, clienteProdutoId: p.id, produtoNome: p.produtos?.nome ?? '' })}
+                          disabled={modsAtivos === 0}
+                        >
+                          <Percent className="h-4 w-4 mr-1" /> Reajuste %
+                        </Button>
+                      </div>
+
                       <div className="rounded border bg-background/50 overflow-x-auto">
                         {mods.length === 0 ? (
                           <div className="p-4 text-center text-sm text-muted-foreground">
@@ -609,19 +626,6 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                             </TableBody>
                           </Table>
                         )}
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: null })}>
-                          <Plus className="h-4 w-4 mr-1" /> <Puzzle className="h-4 w-4 mr-1" /> Adicionar Módulo
-                        </Button>
-                        <Button
-                          type="button" variant="outline" size="sm"
-                          onClick={() => setReajusteDialog({ open: true, clienteProdutoId: p.id, produtoNome: p.produtos?.nome ?? '' })}
-                          disabled={modsAtivos === 0}
-                        >
-                          <Percent className="h-4 w-4 mr-1" /> Reajuste %
-                        </Button>
                       </div>
 
                       <ContratoAnexoSection
