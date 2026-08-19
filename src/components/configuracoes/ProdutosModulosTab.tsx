@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { Button } from "@/components/ui/button";
@@ -172,6 +172,19 @@ export default function ProdutosModulosTab() {
       .filter((p) => p.produto_codigo === colunaOem)
       .sort((a, b) => a.modulo_codigo - b.modulo_codigo);
   }, [precosOemQ.data, colunaOem]);
+
+  // Produto vinculado NÃO mostra a lista cadastrada nesta tela: as abas são só
+  // as colunas do parceiro, e ela abre na coluna do vínculo. Decisão do
+  // Alexandre em 18/08/2026 — com o vínculo, a lista de cá é a do OEM, e ter as
+  // duas lado a lado só criava a dúvida de qual das duas era a verdade.
+  // (Editar margem/venda de produto vinculado passa a não ter caminho aqui.)
+  const vinculadoOem = !!vinculoOemQ.data;
+  useEffect(() => {
+    if (!vinculadoOem || colunasOem.length === 0 || colunaOem) return;
+    const doVinculo = vinculoOemQ.data?.produto_codigo;
+    const inicial = colunasOem.find((c) => c.codigo === doVinculo) ?? colunasOem[0];
+    setColunaOem(inicial.codigo);
+  }, [vinculadoOem, colunasOem, colunaOem, vinculoOemQ.data]);
 
   // Omie integration active check — usa o mesmo effectiveTenantId que as demais telas (super admin pode simular tenant).
   //
@@ -463,13 +476,6 @@ export default function ProdutosModulosTab() {
                     vinculado — sem vínculo não existe grade que seja dele. */}
                 {colunasOem.length > 0 && (
                   <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
-                    <Button
-                      size="sm" variant={colunaOem === null ? "secondary" : "ghost"}
-                      className="h-7 px-2 text-xs"
-                      onClick={() => setColunaOem(null)}
-                    >
-                      Cadastrados
-                    </Button>
                     {colunasOem.map((c) => (
                       <Button
                         key={c.codigo}
@@ -491,7 +497,15 @@ export default function ProdutosModulosTab() {
               </div>
             </div>
 
-            {colunaOem ? (
+            {vinculadoOem && !colunaOem ? (
+              // Produto vinculado abre direto numa coluna do OEM. Enquanto a
+              // grade não chega não dá para mostrar a lista cadastrada "só um
+              // instante": ela piscaria e sumiria, parecendo defeito.
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-64" />
+                <Skeleton className="h-40 w-full" />
+              </div>
+            ) : colunaOem ? (
               // Espelho da grade de Integrações › OEM › Módulos, recortado
               // nesta coluna. Só leitura: nada aqui altera o cadastro — quem
               // importa é o botão de vínculo na tela do OEM.
