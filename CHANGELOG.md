@@ -12,6 +12,14 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Agosto / 2026
 
+### 19/08
+
+- 🆕 **Clientes — Produtos & Módulos** — **Cada produto ganhou um botão *Histórico*, que abre a lista de tudo o que entrou e saiu de módulo naquele produto.** Mostra a **ação** (Adicionado, Cancelado, Reativado, Removido ou mudança de Quantidade), o **nome do módulo**, a **quantidade**, a **data e a hora** e **quem fez** — e quando quem fez foi a leitura automática do OEM, aparece *Sincronização OEM* em vez de um campo vazio, para não parecer que alguém mexeu sem deixar rastro. O nome do módulo e o do usuário ficam gravados no próprio registro: renomear um módulo depois não reescreve o passado. O histórico começa hoje, mas já nasce com o que dá para saber com certeza — a entrada de cada módulo que existe hoje aparece com a data real em que ele foi cadastrado, e os que estão inativos aparecem com a data em que saíram. Fica fechado até você clicar, e só então consulta.
+
+- 🔧 **Clientes / OEM** — **A linha *Desconto* valendo R$ 0,00 sumiu da lista de módulos.** Ela vinha da leitura do OEM e aparecia na ficha como se fosse mais um item da licença, sem valor nenhum. A correção foi feita na origem — o carregador do OEM deixou de exportar o desconto zerado — e as linhas que já tinham entrado foram removidas. **Vale só para o desconto:** módulo de verdade custando R$ 0,00, como *Usuário Cloud* e *Mesa/Ficha*, continua aparecendo, porque ele está na licença mesmo sem cobrar. Na mesma passada, módulo que sai da licença agora **desaparece** da ficha em vez de ficar como linha *Inativo* — a não ser que ele tenha histórico de MRR, e aí continua visível, só que inativo.
+
+- ⬆️ **Clientes — Produtos & Módulos** — **Os botões *Adicionar Módulo* e *Reajuste %* subiram para cima da lista.** Com os módulos do OEM a tabela passou a ter de 5 a 11 linhas, e quem queria somar um módulo tinha que rolar a lista inteira até achar o botão.
+
 ### 18/08
 
 - 🔧 **Implantação — Kanban** — **O quadro só mostrava o que tinha mudado depois de um Ctrl+F5.** Mover um cartão de etapa, criar uma jornada nova ou trocar o responsável aparecia na tela de quem fez a ação, mas não na dos outros — e o responsável recém-vinculado não via a demanda dele até recarregar a página. Agora o quadro se atualiza **sozinho, em cerca de 1 segundo**, para todo mundo que estiver com ele aberto: vale nas três abas — **Onboarding**, **Implantação** e **Acompanhamento** — no cartão que muda de coluna, na jornada que entra, no treinamento que é movido, no responsável que troca e nas etiquetas. Se a conexão em tempo real cair e voltar, o quadro busca sozinho o que passou enquanto ele esteve fora, sem precisar de F5.
