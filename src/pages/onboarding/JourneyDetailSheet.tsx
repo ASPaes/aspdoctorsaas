@@ -3668,6 +3668,16 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
 type AccField = { id: string; nome: string; tipo: "text" | "number" | "date" | "option" | "boolean"; opcoes: string[] | null; position: number };
 type AccValue = { id: string; field_id: string; valor: string | null; coletado: boolean };
 
+// Colagem em <input type="number">: se o texto tiver qualquer caractere que nao seja
+// numero (hifen, espaco, parenteses), o browser devolve value="" e o valor colado some
+// sem nunca ser salvo. Devolve os digitos limpos, ou null quando o browser da conta.
+function sanitizeNumericPaste(texto: string): string | null {
+  const t = texto.trim().replace(/\s+/g, "");
+  if (!t) return null;
+  if (/^-?\d*\.?\d+$/.test(t.replace(",", "."))) return null;
+  return t.replace(/\D/g, "") || null;
+}
+
 function AccountingCard({
   fields, values, loading, onSave,
 }: {
@@ -3739,6 +3749,13 @@ function AccountingCard({
                       className="h-8 text-xs"
                       value={rawValor}
                       onChange={(e) => setDrafts((d) => ({ ...d, [f.id]: e.target.value }))}
+                      onPaste={(e) => {
+                        const limpo = sanitizeNumericPaste(e.clipboardData.getData("text"));
+                        if (limpo === null) return;
+                        e.preventDefault();
+                        setDrafts((d) => ({ ...d, [f.id]: limpo }));
+                        if (limpo !== (cur?.valor ?? "")) commit(f, limpo, coletado);
+                      }}
                       onBlur={() => { if (rawValor !== (cur?.valor ?? "")) commit(f, rawValor || null, coletado); }}
                     />
                   )}
