@@ -944,7 +944,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         produtoFuncionarioId={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.funcionario_id ?? null}
         produtoOrigemVendaId={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.origem_venda_id ?? null}
         oemCodigoFilial={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.oem_codigo_filial ?? null}
-        onMRRSuggest={(d) => setMrrDialog({ open: true, ...d })}
+        clienteId={clienteId}
       />
 
       <ReajusteModulosDialog
@@ -2242,8 +2242,8 @@ function ProdutoDialog({
 
 // ============ Modulo Dialog ============
 function ModuloDialog({
-  open, edit, clienteProdutoId, produtoId, tid, lookupTid, onClose, onSaved,
-  produtoDataAtivacao, produtoFuncionarioId, produtoOrigemVendaId, oemCodigoFilial, onMRRSuggest,
+  open, edit, clienteProdutoId, produtoId, tid, lookupTid, clienteId, onClose, onSaved,
+  produtoDataAtivacao, produtoFuncionarioId, produtoOrigemVendaId, oemCodigoFilial,
 }: {
   open: boolean;
   edit: ClienteProdutoModulo | null;
@@ -2253,16 +2253,13 @@ function ModuloDialog({
   // O tenant do cliente — o `tid` global fica null quando o super admin está em
   // "Todos", e aí os catálogos de vendedor e origem viriam vazios.
   lookupTid?: string | null;
+  clienteId: string;
   onClose: () => void;
   onSaved: () => void;
   produtoDataAtivacao?: string | null;
   produtoFuncionarioId?: number | null;
   produtoOrigemVendaId?: number | null;
   oemCodigoFilial?: string | null;
-  onMRRSuggest?: (data: {
-    tipo: "upsell"; valorDelta: number; custoDelta: number; descricao: string; moduloId?: string | null;
-    dataMovimento?: string | null; funcionarioId?: number | null; origemVenda?: string | null;
-  }) => void;
 }) {
   const isEdit = !!edit;
   const [moduloId, setModuloId] = useState<string>("");
@@ -2440,6 +2437,8 @@ function ModuloDialog({
       return;
     }
     setSaving(true);
+    let novoModuloId: string | null = null;
+    let upsellFalhou = false;
     try {
       const payload: any = {
         quantidade: quantidade || 1,
@@ -2456,33 +2455,52 @@ function ModuloDialog({
           .update(payload).eq("id", edit.id);
         if (error) throw error;
       } else {
-        const { error } = await (supabase.from("cliente_produto_modulos" as any) as any).insert({
+        const { data: novo, error } = await (supabase.from("cliente_produto_modulos" as any) as any).insert({
           ...payload,
           tenant_id: tid,
           cliente_produto_id: clienteProdutoId,
           modulo_id: moduloId,
           ativo: true,
-        });
+        }).select("id").single();
         if (error) throw error;
+        novoModuloId = (novo as any)?.id ?? null;
       }
-      toast({ title: isEdit ? "Módulo atualizado" : "Módulo adicionado" });
-      onSaved();
-      onClose();
+
+      // O upsell é gravado direto, sem perguntar: somar módulo pago É a venda, e
+      // deixar isso numa confirmação opcional era o caminho para o MRR ficar
+      // atrás da ficha do cliente. Falha aqui não desfaz o módulo — o módulo já
+      // está certo; quem falta é o movimento, e o aviso diz isso.
       if (!isEdit && (vlrMensal || 0) > 0) {
-        const nomeModulo = catalogoQuery.data?.find(m => m.id === moduloId)?.nome ?? "";
-        onMRRSuggest?.({
+        const qtd = quantidade || 1;
+        const nomeModulo = catalogoQuery.data?.find(m => m.id === moduloId)?.nome ?? "módulo";
+        const { error: mrrError } = await supabase.from("movimentos_mrr").insert({
+          tenant_id: tid,
+          cliente_id: clienteId,
           tipo: "upsell",
-          valorDelta: (vlrMensal || 0) * (quantidade || 1),
-          custoDelta: (vlrCusto || 0) * (quantidade || 1),
-          descricao: `Módulo ${nomeModulo} adicionado${(quantidade || 1) > 1 ? ` (${quantidade}×)` : ""}`,
-          moduloId: null,
+          data_movimento: dataVenda || hojeISO(),
+          valor_delta: (vlrMensal || 0) * qtd,
+          custo_delta: (vlrCusto || 0) * qtd,
+          descricao: qtd > 1 ? `Adição de ${qtd} ${nomeModulo}` : `Adição de ${nomeModulo}`,
+          cliente_produto_modulo_id: novoModuloId,
+          funcionario_id: funcionarioId ? Number(funcionarioId) : null,
           // movimentos_mrr.origem_venda é texto (o nome), não o id — é assim que
           // o MovimentosMrrModal grava e o relatório de vendas lê.
-          dataMovimento: dataVenda || null,
-          funcionarioId: funcionarioId ? Number(funcionarioId) : null,
-          origemVenda: origensVendaQuery.data?.find(o => String(o.id) === origemVendaId)?.nome ?? null,
-        });
+          origem_venda: origensVendaQuery.data?.find(o => String(o.id) === origemVendaId)?.nome ?? null,
+          status: "ativo",
+        } as any);
+        if (mrrError) {
+          toast({
+            variant: "destructive",
+            title: "Módulo salvo, mas o upsell não entrou",
+            description: `${mrrError.message} — registre o movimento à mão em Movimentos MRR.`,
+          });
+          upsellFalhou = true;
+        }
       }
+
+      if (!upsellFalhou) toast({ title: isEdit ? "Módulo atualizado" : "Módulo adicionado" });
+      onSaved();
+      onClose();
     } catch (err: any) {
       toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
     } finally {
