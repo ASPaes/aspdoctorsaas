@@ -85,7 +85,7 @@ Deno.serve(async (req)=>{
     error: unidadeBase !== null ? "A unidade escolhida não está ligada a nenhuma conta Omie." : "Este tenant tem mais de uma conta Omie. Escolha a unidade.",
     motivo: "conta_nao_resolvida"
   }, 400);
-  const { data: linha, error: qErr } = await admin.from("reconciliacao_cadastro").select("ds_contract_id, ds_customer_id, cnpj_norm, valor_mrr_ds, valor_omie, valor_omie_efetivo, fornecedor_id, acao_sugerida, status_usuario").eq("tenant_id", tenantDs).eq("conta_integration_id", conta.id).eq("ds_contract_id", dsContractId).maybeSingle();
+  const { data: linha, error: qErr } = await admin.from("reconciliacao_cadastro").select("ds_contract_id, ds_customer_id, cnpj_norm, valor_mrr_ds, valor_omie, valor_omie_efetivo, fornecedor_id, acao_sugerida").eq("tenant_id", tenantDs).eq("conta_integration_id", conta.id).eq("ds_contract_id", dsContractId).maybeSingle();
   if (qErr) return json({
     ok: false,
     error: "Falha ao ler a linha",
@@ -95,10 +95,13 @@ Deno.serve(async (req)=>{
     ok: false,
     error: "Contrato não encontrado"
   }, 404);
-  if (linha.status_usuario === "vinculado") return json({
-    ok: false,
-    error: "Linha já resolvida/vinculada"
-  }, 409);
+  // 20/08/2026: NAO existe mais portao por status_usuario. 'resolver' e um balde de ALARME -- a
+  // lista o mostra de proposito sem filtrar status_usuario (OmieConferenciaTab, ALARM_BUCKETS),
+  // porque a linha some sozinha quando o Omie muda. Com o portao, toda linha ja vinculada uma vez
+  // que voltasse a divergir tinha o botao morto: a tela oferecia a acao e a function respondia 409
+  // "Linha ja resolvida/vinculada". Foi o caso do RESTAURANTE CASA CAJU (Digi Office), vinculado em
+  // 11/07 e divergente de novo em 20/08. 'vinculado' diz que o de/para existe, nao que ESTA
+  // divergencia foi tratada. Quem garante que a linha e divergencia de valor viva e o check abaixo.
   if (linha.acao_sugerida !== "resolver") return json({
     ok: false,
     error: "Linha não está no balde de divergência de valor"
@@ -115,7 +118,20 @@ Deno.serve(async (req)=>{
     ok: false,
     error: "Os valores já batem — nada a corrigir"
   }, 422);
-  const { data: jaExiste, error: exErr } = await admin.from("movimentos_mrr").select("id").eq("tenant_id", tenantDs).eq("contrato_id", dsContractId).eq("origem_venda", "conciliacao_omie").eq("status", "ativo").is("estorno_de", null).limit(1);
+  const tipo = delta > 0 ? "upsell" : "downsell";
+  // Data de HOJE em America/Sao_Paulo. O toISOString().slice(0,10) cru era UTC: depois das 21h
+  // (UTC-3) ele ja devolve o dia seguinte, e no ultimo dia do mes isso datava a correcao no mes
+  // errado -- o Net New le data_movimento. Mesma data usada na trava logo abaixo e no insert.
+  const hoje = new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/Sao_Paulo"
+  });
+  // Trava de duplicidade: SO o mesmo dia. Antes bastava existir QUALQUER correcao de conciliacao
+  // ativa no contrato -- e como o movimento de ajuste fica ativo para sempre, a primeira correcao
+  // matava o botao para todas as divergencias futuras do mesmo contrato (o mesmo beco sem saida do
+  // portao de status_usuario removido acima). Segurar o duplo-clique/dois operadores no mesmo dia
+  // e o que a trava precisa fazer; divergencia nova em outro dia e ajuste novo, legitimo, calculado
+  // contra o valor_mrr_ds que ja inclui o movimento anterior.
+  const { data: jaExiste, error: exErr } = await admin.from("movimentos_mrr").select("id").eq("tenant_id", tenantDs).eq("contrato_id", dsContractId).eq("origem_venda", "conciliacao_omie").eq("status", "ativo").eq("data_movimento", hoje).is("estorno_de", null).limit(1);
   if (exErr) return json({
     ok: false,
     error: "Falha ao checar duplicidade",
@@ -123,10 +139,8 @@ Deno.serve(async (req)=>{
   }, 500);
   if (jaExiste && jaExiste.length > 0) return json({
     ok: false,
-    error: "Já existe uma correção de conciliação ativa para este contrato"
+    error: "Este contrato já recebeu uma correção de conciliação hoje"
   }, 409);
-  const tipo = delta > 0 ? "upsell" : "downsell";
-  const hoje = new Date().toISOString().slice(0, 10);
   const { data: mov, error: insErr } = await admin.from("movimentos_mrr").insert({
     tenant_id: tenantDs,
     cliente_id: linha.ds_customer_id,
