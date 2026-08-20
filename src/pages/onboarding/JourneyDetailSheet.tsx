@@ -26,7 +26,15 @@ import {
   ExternalLink, Link2,
   Sparkles, Rocket, StickyNote, Undo2, XCircle, Tag,
   Check, ChevronDown, Pencil, GitCommitHorizontal, MessageSquareText,
+  GripVertical, Search,
 } from "lucide-react";
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove, SortableContext, useSortable, verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 import EditTrainingDialog, { type EditableTraining } from "./EditTrainingDialog";
 import TrainingParticipantsDialog, { type TrainingForParticipants } from "./TrainingParticipantsDialog";
@@ -324,6 +332,65 @@ interface JourneyChecklistRow {
   done_by: string | null;
 }
 
+interface JourneyModule {
+  id: string;
+  nome: string;
+  produto_modulo_id: string | null;
+  origem: string;
+  position: number;
+  created_at: string;
+}
+
+const MODULE_ORIGEM_COLOR: Record<string, string> = {
+  manual: "hsl(215 16% 47%)",
+  produto: "hsl(199 89% 48%)",
+  cliente: "hsl(262 83% 58%)",
+};
+
+function SortableModuleRow({ m, onDelete }: { m: JourneyModule; onDelete: (id: string) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: m.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 bg-card ${isDragging ? "border-primary shadow-lg" : "border-border"}`}
+    >
+      <div className="flex items-center gap-1.5 min-w-0">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0 touch-none"
+          aria-label="Reordenar módulo"
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </button>
+        <span className="text-xs font-medium truncate">{m.nome}</span>
+        <Badge
+          variant="outline"
+          className="text-[9px] capitalize border-0 text-white shrink-0"
+          style={{ backgroundColor: MODULE_ORIGEM_COLOR[m.origem] || MODULE_ORIGEM_COLOR.manual }}
+        >
+          {m.origem}
+        </Badge>
+      </div>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+        onClick={() => onDelete(m.id)}
+      >
+        <Trash2 className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+}
+
 export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tenantId, subTicketId = null, subTicketCode = null }: Props) {
   const { user, profile } = useAuth();
   const qc = useQueryClient();
@@ -374,7 +441,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   // Modules
   const [addModuleOpen, setAddModuleOpen] = useState(false);
   const [newModuleName, setNewModuleName] = useState("");
-  const [newModuleProdutoModuloId, setNewModuleProdutoModuloId] = useState<string>("");
+  const [moduleSearch, setModuleSearch] = useState("");
+  const moduleSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   // Vendor return
   const [returnOpen, setReturnOpen] = useState(false);
@@ -679,12 +747,13 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journeyId && !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_journey_modules" as any) as any)
-        .select("id, nome, produto_modulo_id, origem, created_at")
+        .select("id, nome, produto_modulo_id, origem, position, created_at")
         .eq("tenant_id", tenantId)
         .eq("journey_id", journeyId)
+        .order("position", { ascending: true })
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; nome: string; produto_modulo_id: string | null; origem: string; created_at: string }>;
+      return (data ?? []) as JourneyModule[];
     },
   });
 
@@ -1740,13 +1809,32 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     } catch (e: any) { toast.error(e.message || "Erro"); }
   }
 
+  /** Módulos do produto que já estão na jornada — não deixa duplicar. */
+  const modulosJaNaJornada = useMemo(
+    () => new Set((modulesQ.data ?? []).map((m) => m.produto_modulo_id).filter(Boolean) as string[]),
+    [modulesQ.data],
+  );
+
+  const produtoModulosFiltrados = useMemo(() => {
+    const termo = moduleSearch.trim().toLowerCase();
+    const lista = produtoModulosQ.data ?? [];
+    if (!termo) return lista;
+    return lista.filter((m) => m.nome.toLowerCase().includes(termo));
+  }, [produtoModulosQ.data, moduleSearch]);
+
+  /** Próxima posição livre da lista — o módulo novo entra no fim. */
+  function nextModulePosition() {
+    const list = modulesQ.data ?? [];
+    return list.reduce((max, m) => Math.max(max, m.position ?? 0), 0) + 1;
+  }
+
   async function handleAddModuleManual() {
     if (!tenantId || !journeyId) return;
     const nome = newModuleName.trim();
     if (!nome) { toast.error("Informe o nome do módulo"); return; }
     try {
       const { error } = await (supabase.from("onboarding_journey_modules" as any) as any)
-        .insert({ tenant_id: tenantId, journey_id: journeyId, nome, origem: "manual" });
+        .insert({ tenant_id: tenantId, journey_id: journeyId, nome, origem: "manual", position: nextModulePosition() });
       if (error) throw error;
       toast.success("Módulo adicionado");
       setNewModuleName("");
@@ -1755,19 +1843,44 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     } catch (e: any) { toast.error(e.message || "Erro ao adicionar módulo"); }
   }
 
-  async function handleAddModuleFromProduto() {
-    if (!tenantId || !journeyId || !newModuleProdutoModuloId) return;
-    const pm = (produtoModulosQ.data ?? []).find((m) => m.id === newModuleProdutoModuloId);
+  async function handleAddModuleFromProduto(produtoModuloId: string) {
+    if (!tenantId || !journeyId || !produtoModuloId) return;
+    const pm = (produtoModulosQ.data ?? []).find((m) => m.id === produtoModuloId);
     if (!pm) return;
     try {
       const { error } = await (supabase.from("onboarding_journey_modules" as any) as any)
-        .insert({ tenant_id: tenantId, journey_id: journeyId, nome: pm.nome, produto_modulo_id: pm.id, origem: "produto" });
+        .insert({ tenant_id: tenantId, journey_id: journeyId, nome: pm.nome, produto_modulo_id: pm.id, origem: "produto", position: nextModulePosition() });
       if (error) throw error;
       toast.success("Módulo adicionado");
-      setNewModuleProdutoModuloId("");
+      setModuleSearch("");
       setAddModuleOpen(false);
       qc.invalidateQueries({ queryKey: ["onboarding-journey-modules", journeyId, tenantId] });
     } catch (e: any) { toast.error(e.message || "Erro ao adicionar módulo"); }
+  }
+
+  async function handleReorderModules(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id || !tenantId) return;
+    const list = modulesQ.data ?? [];
+    const oldIdx = list.findIndex((m) => m.id === active.id);
+    const newIdx = list.findIndex((m) => m.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    const reordered = arrayMove(list, oldIdx, newIdx).map((m, i) => ({ ...m, position: i + 1 }));
+    const key = ["onboarding-journey-modules", journeyId, tenantId];
+    qc.setQueryData(key, reordered);
+    try {
+      const results = await Promise.all(reordered.map((m) =>
+        (supabase.from("onboarding_journey_modules" as any) as any)
+          .update({ position: m.position })
+          .eq("id", m.id)
+          .eq("tenant_id", tenantId)
+      ));
+      const failed = results.find((r: any) => r?.error);
+      if (failed) throw (failed as any).error;
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao reordenar módulos");
+      qc.invalidateQueries({ queryKey: key });
+    }
   }
 
   async function handleImportFromCliente() {
@@ -1775,14 +1888,16 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     const items = clienteProdutoModulosQ.data ?? [];
     if (items.length === 0) { toast.error("Cliente não possui módulos cadastrados"); return; }
     const existing = new Set((modulesQ.data ?? []).map((m) => m.produto_modulo_id).filter(Boolean));
+    const base = nextModulePosition();
     const rows = items
       .filter((it) => !existing.has(it.modulo_id))
-      .map((it) => ({
+      .map((it, i) => ({
         tenant_id: tenantId,
         journey_id: journeyId,
         nome: it.produto_modulos.nome,
         produto_modulo_id: it.modulo_id,
         origem: "cliente",
+        position: base + i,
       }));
     if (rows.length === 0) { toast.info("Todos os módulos do cliente já estão importados"); return; }
     try {
@@ -2926,18 +3041,39 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                               {(produtoModulosQ.data ?? []).length > 0 && (
                                 <>
                                   <Separator />
-                                  <div className="space-y-1">
+                                  <div className="space-y-1.5">
                                     <label className="text-[11px] font-medium">Ou escolher do produto</label>
-                                    <div className="flex gap-1.5">
-                                      <Select value={newModuleProdutoModuloId} onValueChange={setNewModuleProdutoModuloId}>
-                                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar módulo" /></SelectTrigger>
-                                        <SelectContent>
-                                          {(produtoModulosQ.data ?? []).map((m) => (
-                                            <SelectItem key={m.id} value={m.id} className="text-xs">{m.nome}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      <Button size="sm" className="h-8 px-3" onClick={handleAddModuleFromProduto} disabled={!newModuleProdutoModuloId}>Add</Button>
+                                    <div className="relative">
+                                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                                      <Input
+                                        value={moduleSearch}
+                                        onChange={(e) => setModuleSearch(e.target.value)}
+                                        placeholder="Pesquisar módulo..."
+                                        className="h-8 text-xs pl-7"
+                                      />
+                                    </div>
+                                    <div className="max-h-44 overflow-y-auto rounded-md border border-border p-1 space-y-0.5">
+                                      {produtoModulosFiltrados.length === 0 ? (
+                                        <p className="text-[11px] text-muted-foreground text-center py-3">Nenhum módulo encontrado.</p>
+                                      ) : (
+                                        produtoModulosFiltrados.map((m) => {
+                                          const jaAdicionado = modulosJaNaJornada.has(m.id);
+                                          return (
+                                            <button
+                                              key={m.id}
+                                              type="button"
+                                              disabled={jaAdicionado}
+                                              onClick={() => handleAddModuleFromProduto(m.id)}
+                                              className="w-full flex items-center justify-between gap-2 rounded px-2 py-1.5 text-xs text-left hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                            >
+                                              <span className="truncate">{m.nome}</span>
+                                              {jaAdicionado
+                                                ? <Check className="h-3 w-3 text-muted-foreground shrink-0" />
+                                                : <Plus className="h-3 w-3 text-muted-foreground shrink-0" />}
+                                            </button>
+                                          );
+                                        })
+                                      )}
                                     </div>
                                   </div>
                                 </>
@@ -2951,35 +3087,15 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           {(modulesQ.data ?? []).length === 0 ? (
                             <p className="text-xs text-muted-foreground py-2 text-center">Nenhum módulo cadastrado.</p>
                           ) : (
-                            (modulesQ.data ?? []).map((m) => {
-                              const origemColor: Record<string, string> = {
-                                manual: "hsl(215 16% 47%)",
-                                produto: "hsl(199 89% 48%)",
-                                cliente: "hsl(262 83% 58%)",
-                              };
-                              return (
-                                <div key={m.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <span className="text-xs font-medium truncate">{m.nome}</span>
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[9px] capitalize border-0 text-white shrink-0"
-                                      style={{ backgroundColor: origemColor[m.origem] || origemColor.manual }}
-                                    >
-                                      {m.origem}
-                                    </Badge>
-                                  </div>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                                    onClick={() => handleDeleteModule(m.id)}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
+                            <DndContext sensors={moduleSensors} collisionDetection={closestCenter} onDragEnd={handleReorderModules}>
+                              <SortableContext items={(modulesQ.data ?? []).map((m) => m.id)} strategy={verticalListSortingStrategy}>
+                                <div className="space-y-1.5">
+                                  {(modulesQ.data ?? []).map((m) => (
+                                    <SortableModuleRow key={m.id} m={m} onDelete={handleDeleteModule} />
+                                  ))}
                                 </div>
-                              );
-                            })
+                              </SortableContext>
+                            </DndContext>
                           )}
                         </div>
                       )}
