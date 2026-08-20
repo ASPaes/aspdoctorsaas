@@ -44,6 +44,7 @@ import { InterruptAutoReplyDialog } from "./InterruptAutoReplyDialog";
 import { CleanupConversationDialog } from "./CleanupConversationDialog";
 import { GroupLinkClienteModal } from "./GroupLinkClienteModal";
 import { ChatQuickRuleToggles } from "./ChatQuickRuleToggles";
+import { AcessoFastButton } from "./AcessoFastButton";
 import { useContactRulesDisabled } from "../hooks/useContactRulesDisabled";
 
 import { useSenderMap } from "../hooks/useSenderMap";
@@ -820,6 +821,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 clienteId={(conversation.contact as any)?.cliente_id ?? null}
               />
             )}
+
+            <AcessoFastButton conversationId={conversation.id} tenantId={conversation.tenant_id} />
 
             <Tooltip>
               <TooltipTrigger asChild>
