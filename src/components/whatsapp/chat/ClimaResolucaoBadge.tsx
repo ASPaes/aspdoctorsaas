@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { SentimentChip } from "./SentimentChip";
@@ -8,6 +9,7 @@ import {
   RESOLUCAO_CLASS,
   sentimentPtLabel,
   ResolucaoTipo,
+  RESOLUCAO_ANALISE_JANELA_MS,
 } from "../hooks/useLatestAttendanceResolucao";
 
 interface Props {
@@ -52,6 +54,31 @@ export function ClimaResolucaoBadge({ conversationId, hasActiveAttendance, senti
         <TooltipContent className="text-xs">
           Clima ao vivo do atendimento em andamento
           {sentiment?.summary && <p className="max-w-xs pt-1 mt-1 border-t">{sentiment.summary}</p>}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  // Caso A2: atendimento recém-encerrado, veredito de desfecho ainda a caminho.
+  // NUNCA cair no desfecho do atendimento ANTERIOR aqui: era isso que fazia o
+  // técnico ver "Sem solução" logo depois de resolver o problema.
+  const analisando =
+    !!latest &&
+    !latest.resolucao &&
+    !!latest.closed_at &&
+    Date.now() - new Date(latest.closed_at).getTime() < RESOLUCAO_ANALISE_JANELA_MS;
+
+  if (analisando) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium border select-none cursor-default bg-muted/60 text-muted-foreground border-border">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span className="hidden sm:inline">Analisando desfecho…</span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="text-xs">
+          A IA está avaliando como este atendimento terminou. O resultado aparece aqui assim que ficar pronto.
         </TooltipContent>
       </Tooltip>
     );

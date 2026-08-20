@@ -344,9 +344,16 @@ export const useWhatsAppActions = () => {
               body: { attendanceId: activeAtt.id },
             }).then((res) => {
               if (res.error) console.error('[closeConversation] finalize-attendance error:', res.error);
-
+              // Unico sinal confiavel de "veredito de desfecho pronto". A analise
+              // chega bem depois do fechamento (mediana ~9s, p95 ~128s) e o
+              // QueryClient roda com refetchOnWindowFocus=false, entao sem este
+              // invalidate o badge ficaria em "Analisando" ate a pagina remontar.
+              queryClient.invalidateQueries({ queryKey: ['latest-attendance-resolucao', conversationId] });
             }).catch((err) => {
               console.error('[closeConversation] finalize-attendance failed:', err);
+              // Mesmo em falha, buscar o estado real: os caminhos deterministicos
+              // da function podem ter gravado a resolucao antes do erro.
+              queryClient.invalidateQueries({ queryKey: ['latest-attendance-resolucao', conversationId] });
             });
           } catch (finalizeErr) {
             console.error('[closeConversation] Error invoking finalize-attendance:', finalizeErr);
@@ -374,12 +381,24 @@ export const useWhatsAppActions = () => {
           return newMap;
         }
       );
+
+      // Badge de desfecho: assumir "em analise" JA no clique. Sem isto o hook
+      // dispara assim que hasActiveAttendance vira false — antes de o UPDATE
+      // chegar ao banco — e devolve o desfecho do atendimento ANTERIOR, fazendo
+      // o tecnico ver "Sem solucao" no atendimento que acabou de resolver.
+      queryClient.setQueryData(['latest-attendance-resolucao', conversationId], {
+        id: '',
+        resolucao: null,
+        sentiment_final: null,
+        closed_at: new Date().toISOString(),
+      });
     },
     onSuccess: (_conversationId, variables) => {
       toast.success(variables.isGroup === true ? 'Atendimento do grupo encerrado' : 'Conversa encerrada com sucesso');
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', _conversationId] });
       queryClient.invalidateQueries({ queryKey: ['latest-closed-attendance', _conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['latest-attendance-resolucao', _conversationId] });
       queryClient.invalidateQueries({ queryKey: ['kb-draft'] });
     },
     onError: (err: any) => {

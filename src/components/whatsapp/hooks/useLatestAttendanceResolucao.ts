@@ -12,7 +12,17 @@ export interface LatestAttendanceResolucao {
   id: string;
   resolucao: ResolucaoTipo | null;
   sentiment_final: string | null;
+  /**
+   * Usado para distinguir "ainda sem veredito" de "veredito ausente".
+   * A analise de desfecho da `finalize-attendance` chega depois do fechamento
+   * (mediana ~9s, p95 ~128s), entao um atendimento recem-encerrado com
+   * `resolucao` nula esta em analise, nao sem solucao.
+   */
+  closed_at: string | null;
 }
+
+/** Janela em que um atendimento sem `resolucao` ainda conta como "em analise". */
+export const RESOLUCAO_ANALISE_JANELA_MS = 5 * 60 * 1000;
 
 export function useLatestAttendanceResolucao(conversationId?: string | null) {
   return useQuery<LatestAttendanceResolucao | null>({
@@ -21,7 +31,7 @@ export function useLatestAttendanceResolucao(conversationId?: string | null) {
     staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_attendances" as any) as any)
-        .select("id, resolucao, sentiment_final")
+        .select("id, resolucao, sentiment_final, closed_at")
         .eq("conversation_id", conversationId)
         .in("status", ["closed", "inactive_closed"])
         .order("closed_at", { ascending: false })
