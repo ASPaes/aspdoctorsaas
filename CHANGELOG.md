@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Agosto / 2026
 
+### 20/08
+
+- 🔧 **Atendimento — Chat** — **A caixa para editar uma mensagem já enviada abria minúscula.** Ao corrigir o texto de uma mensagem enviada, o campo nascia do tamanho do balão original — em mensagem curta, uma faixa estreita —, e assim que o texto passava de uma linha já aparecia barra de rolagem: para reler o que estava escrevendo era preciso rolar dentro de um espaço de duas linhas. Agora o balão **se alarga ao entrar em edição**, ocupando a largura disponível do chat, e o campo abre com **duas linhas visíveis**, crescendo até seis conforme você escreve. O prazo e o funcionamento da edição continuam os mesmos.
+
 ### 19/08
 
 - ð§ **Onboarding â Dados da contabilidade** â **Colar um nÃºmero nos campos numÃ©ricos do card agora salva, como jÃ¡ acontecia ao digitar.** No *Telefone Contabilidade* â e em qualquer outro campo do tipo nÃºmero, como o *ID CSC* â copiar o nÃºmero de outro lugar e colar nÃ£o gravava nada: o valor aparecia na tela, mas ao sair do campo ele voltava vazio, e sÃ³ digitando dÃ­gito por dÃ­gito o dado ficava salvo. Acontecia porque o nÃºmero colado quase sempre vem formatado (*(31) 98649-2622*, *+55 31 98649-2622*), e o campo descartava o texto inteiro por causa dos parÃªnteses, do espaÃ§o e do hÃ­fen. Agora a colagem Ã© **limpa automaticamente** â fica sÃ³ o nÃºmero, *31986492622* â e **salva na hora**, sem precisar sair do campo.

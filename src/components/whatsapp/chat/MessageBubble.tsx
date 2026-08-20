@@ -431,11 +431,11 @@ export function MessageBubble({
           `content` ("🎥 Vídeo") vira eco do que o card já diz. Legenda escrita
           pelo cliente continua aparecendo — só o placeholder some. */}
       {isEditing ? (
-        <div className="min-w-[240px]">
+        <div className="w-full min-w-[280px] sm:min-w-[420px]">
           <textarea
             value={editText}
             autoFocus
-            rows={Math.min(6, (editText.match(/\n/g)?.length ?? 0) + 1)}
+            rows={Math.min(6, Math.max(2, (editText.match(/\n/g)?.length ?? 0) + 1))}
             disabled={editMessage.isPending}
             onChange={(e) => setEditText(e.target.value)}
             onKeyDown={(e) => {
@@ -554,7 +554,7 @@ export function MessageBubble({
   );
 
   const messageContent = (
-    <div className="flex flex-col max-w-[75%]">
+    <div className={cn("flex flex-col max-w-[75%]", isEditing && "w-full")}>
       {bubbleContent}
       {/* O aviso de falha é o mesmo objeto dos dois lados — o lado do balão não muda o
           que aconteceu. Antes o enviado usava vermelho escuro FIXO (`bg-red-950/40` +
