@@ -531,7 +531,15 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
         toast.error(res?.error || "Falha ao ajustar valor");
       }
     } catch (e: any) {
-      toast.error(e?.message || "Falha ao ajustar valor");
+      // O invoke só lança "Edge Function returned a non-2xx status code" — o motivo real vem no
+      // corpo. Sem ler o corpo (como o Vincular já lia), todo 4xx aparecia como erro genérico e
+      // não dava para diferenciar "já ajustado hoje" de "sessão expirada".
+      let msg = e?.message || "Falha ao ajustar valor";
+      try {
+        const body = await e?.context?.json?.();
+        if (body?.error) msg = body.error;
+      } catch {}
+      toast.error(msg);
     } finally {
       setAjusteLoading(false);
     }
