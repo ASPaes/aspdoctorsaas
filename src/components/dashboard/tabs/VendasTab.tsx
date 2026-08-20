@@ -342,6 +342,8 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
                       <YAxis type="category" dataKey="label" tick={{ fontSize: tvMode ? 14 : 11 }} width={110} className="fill-muted-foreground" />
                       <RechartsTooltip
                         contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }}
+                        itemStyle={{ color: 'hsl(var(--foreground))', fontSize: '0.8125rem' }}
+                        labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
                         formatter={(value: number, _: string, props: any) => [formatVal(value), props.payload.label]}
                       />
                       <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} maxBarSize={tvMode ? 36 : 28} />
@@ -543,6 +545,8 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
                       </Pie>
                       <RechartsTooltip
                         contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }}
+                        itemStyle={{ color: 'hsl(var(--foreground))', fontSize: '0.8125rem' }}
+                        labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
                         formatter={(value: number, _: string, props: any) => [`${value} (${(props.payload.percent * 100).toFixed(1)}%)`, props.payload.name]}
                       />
                       <Legend
@@ -615,6 +619,8 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
                       <YAxis type="category" dataKey="displayName" tick={{ fontSize: tvMode ? 14 : 11 }} width={80} className="fill-muted-foreground" />
                       <RechartsTooltip
                         contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }}
+                        itemStyle={{ color: 'hsl(var(--foreground))', fontSize: '0.8125rem' }}
+                        labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
                         formatter={(value: number, _: string, props: any) => [`${value} (${(props.payload.percent * 100).toFixed(1)}%)`, props.payload.name]}
                       />
                       <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} maxBarSize={tvMode ? 40 : 30} />
