@@ -604,9 +604,24 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     }
   }, [conversations, onSelect]);
 
-  const handleSelect = (conv: ConversationWithContact) => {
-    onSelect(conv);
-  };
+  // Resultado da busca por contato é uma linha PARCIAL (a RPC não devolve
+  // is_group, group_jid nem metadata). Abrir o chat com ele fazia o grupo virar
+  // conversa 1:1 na tela inteira — JID exibido como telefone, vínculo de cliente
+  // gravado no atendimento/metadata em vez de whatsapp_contacts.cliente_id, que é
+  // de onde o grupo lê. Buscar a linha inteira antes de selecionar custa uma query
+  // por abertura e só acontece na busca.
+  const handleSelect = useCallback(async (conv: ConversationWithContact) => {
+    if (!conv.isPartial) {
+      onSelect(conv);
+      return;
+    }
+    const { data } = await supabase
+      .from("whatsapp_conversations")
+      .select("*, contact:whatsapp_contacts(*)")
+      .eq("id", conv.id)
+      .maybeSingle();
+    onSelect((data as unknown as ConversationWithContact) ?? conv);
+  }, [onSelect]);
 
   const handleMessageSelect = useCallback(async (conversationId: string, messageId: string) => {
     const { data } = await supabase

@@ -20,6 +20,9 @@ export interface ConversationWithContact {
   created_at: string;
   updated_at: string;
   metadata: Record<string, any> | null;
+  /** Colunas de whatsapp_conversations — o chat inteiro decide grupo por elas. */
+  is_group?: boolean;
+  group_jid?: string | null;
   tenant_id: string;
   is_last_message_from_me: boolean;
   auto_reply_disabled?: boolean;
@@ -53,6 +56,13 @@ export interface ConversationWithContact {
   };
   isLastMessageFromMe?: boolean;
   sentiment?: { needs_cs_ticket: boolean | null; cs_ticket_created_id: string | null } | null;
+  /**
+   * Linha PARCIAL, vinda da busca por contato (search_conversations_by_contact).
+   * Essa RPC não devolve `is_group`, `group_jid` nem `metadata`, então o objeto
+   * não serve para abrir o chat: quem seleciona tem de buscar a linha inteira
+   * antes. Ver useConversationSearch.
+   */
+  isPartial?: boolean;
 }
 
 export interface ConversationsFilters {

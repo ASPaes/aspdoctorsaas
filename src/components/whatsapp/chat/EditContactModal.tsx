@@ -272,8 +272,12 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
           onSuccess: async () => {
             if (linkedCliente) {
               try {
-                // Sync cliente_contatos apenas quando cliente mudou (dedup)
-                if (linkedCliente.id !== originalClienteId) {
+                // Sync cliente_contatos apenas quando cliente mudou (dedup).
+                // Grupo NUNCA entra aqui: o "telefone" dele é o JID
+                // (120363…@g.us), e gravá-lo como fone do cliente fazia
+                // get_clientes_candidatos_by_phone passar a "reconhecer" o JID e
+                // sugerir aquele cliente para o grupo — vínculo fantasma.
+                if (!isGroup && linkedCliente.id !== originalClienteId) {
                   const digits = (normalized || contactPhone || '').replace(/\D/g, '');
                   if (digits) {
                     const { data: profile } = await supabase.auth.getUser().then(async (r) => {

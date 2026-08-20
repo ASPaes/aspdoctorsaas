@@ -24,8 +24,18 @@ export function useConversationSearch(debouncedSearch: string) {
       if (error) throw error;
       if (!data) return [];
 
+      // A RPC devolve só um recorte de whatsapp_conversations — não vêm
+      // `is_group`, `group_jid` nem `metadata`. Grupo aberto por aqui era tratado
+      // como conversa 1:1: o cabeçalho mostrava o JID como telefone e o card de
+      // cliente caía no fluxo individual (attendance/metadata), gravando o vínculo
+      // onde o grupo não lê — vinculava, dizia "sucesso" e sumia no F5.
+      // `is_group` sai do contato (whatsapp_contacts.is_group, que a RPC devolve)
+      // só para a LISTA renderizar certo; para ABRIR o chat isso não basta, por
+      // isso a linha vai marcada como parcial e quem seleciona rebusca inteira.
       return (data as any[]).map((row): ConversationWithContact => ({
         id: row.id,
+        is_group: row.contact_is_group ?? false,
+        isPartial: true,
         contact_id: row.contact_id,
         instance_id: row.instance_id,
         department_id: row.department_id,
