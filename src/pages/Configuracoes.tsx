@@ -52,6 +52,8 @@ import ClienteImportModal from "@/components/import/ClienteImportModal";
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
 import CategoriasServicosTab from "@/components/configuracoes/CategoriasServicosTab";
 import OmieIntegrationTab from "@/components/configuracoes/OmieIntegrationTab";
+import IntegracoesHubTab from "@/components/configuracoes/IntegracoesHubTab";
+import { INTEGRACOES_RESOURCES } from "@/lib/integracoes";
 import OemIntegrationTab from "@/components/configuracoes/OemIntegrationTab";
 import HiperIntegrationTab from "@/components/configuracoes/HiperIntegrationTab";
 import PermissoesPapeisContent from "@/components/configuracoes/PermissoesPapeisContent";
@@ -103,6 +105,7 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   geral: { breadcrumb: ["Sistema", "Geral"], title: "Geral", description: "Fuso horário e configurações globais do sistema." },
   setup: { breadcrumb: ["Sistema", "Guia de configuração"], title: "Guia de configuração", description: "Passos recomendados para configurar a plataforma." },
   notificacoes: { breadcrumb: ["Sistema", "Théo"], title: "Théo", description: "O Théo é quem envia todos os avisos da plataforma — do pulso diário aos alertas críticos. Configure aqui quem recebe cada aviso e por quais canais." },
+  integracoes: { breadcrumb: ["Integrações"], title: "Integrações", description: "Sistemas conectados ao DoctorSaaS. Clique numa integração para configurar a conexão." },
   "integracoes-omie": { breadcrumb: ["Integrações", "Omie"], title: "Omie", description: "Conecte o sistema ao Omie para sincronizar clientes e contratos." },
   "integracoes-hiper": { breadcrumb: ["Integrações", "Hiper"], title: "Hiper", description: "Conecte o sistema ao PortalHiper para sincronizar a carteira de clientes." },
   "integracoes-oem": { breadcrumb: ["Integrações", "OEM"], title: "OEM", description: "Licenças do PDV Legal/TabletCloud: vínculo com clientes, margem e pendências." },
@@ -295,6 +298,9 @@ export default function Configuracoes() {
   const { can, rbacEnabled, rbacLoading } = usePermissions();
   const canSeeSection = (section: string) => {
     if (!rbacEnabled) return isAdmin;
+    // O índice de integrações não tem recurso próprio: quem enxerga qualquer
+    // uma das integrações enxerga a página que as lista.
+    if (section === "integracoes") return INTEGRACOES_RESOURCES.some((r) => can(r, "view"));
     const resource = SECTION_TO_RESOURCE[section];
     if (!resource) return isAdmin;
     return can(resource, "view");
@@ -460,6 +466,8 @@ export default function Configuracoes() {
         return <SetupGuideCollapsible />;
       case "notificacoes":
         return <NotificacoesTab />;
+      case "integracoes":
+        return <IntegracoesHubTab onSelectSection={handleSectionChange} />;
       case "integracoes-omie":
         return <OmieIntegrationTab />;
       case "integracoes-oem":

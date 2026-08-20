@@ -77,6 +77,12 @@ type Group = {
   icon: React.ComponentType<{ className?: string }>;
   adminOnly?: boolean;
   subgroups: SubGroup[];
+  /**
+   * Grupo que é uma seção só: o cabeçalho vira o próprio item de navegação e a
+   * lista não aparece. Os `subgroups` continuam existindo para decidir quem
+   * enxerga o grupo — quem não vê nenhuma integração não vê o menu.
+   */
+  flatSection?: string;
 };
 
 interface SettingsSidebarProps {
@@ -227,6 +233,7 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
     {
       label: "Integrações",
       icon: Plug,
+      flatSection: "integracoes",
       subgroups: [
         {
           items: [
@@ -300,6 +307,29 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
           })).filter((sg) => sg.visibleItems.length > 0);
 
           if (visibleSubgroups.length === 0) return null;
+
+          if (group.flatSection) {
+            const isActive = activeSection === group.flatSection || visibleSubgroups.some((sg) =>
+              sg.visibleItems.some((it) => it.value === activeSection),
+            );
+            return (
+              <div key={group.label} className="px-2">
+                <button
+                  type="button"
+                  onClick={() => onSectionChange(group.flatSection!)}
+                  className={cn(
+                    "w-full flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] uppercase tracking-wider font-medium cursor-pointer transition",
+                    isActive
+                      ? "bg-background border border-border text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                  )}
+                >
+                  <Icon className="h-[14px] w-[14px]" />
+                  <span>{group.label}</span>
+                </button>
+              </div>
+            );
+          }
 
           return (
             <div key={group.label}>
