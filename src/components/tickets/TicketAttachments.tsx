@@ -5,7 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Paperclip, Upload, Trash2, Download, Loader2, FileText, Image, Film, Music, File, Eye, Search, X as XIcon, Pencil, Check } from "lucide-react";
+// File vem aliasado: sem isso o icone sombreia o construtor File do DOM em
+// posicao de valor, e `new File(...)` passa no typecheck resolvendo para um
+// componente React. Ja aconteceu uma vez neste arquivo.
+import { Paperclip, Upload, Trash2, Download, Loader2, FileText, Image, Film, Music, File as FileIcon, Eye, Search, X as XIcon, Pencil, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { filterAttachments } from "@/lib/attachmentSearch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -44,8 +47,7 @@ function nomeDePrint(file: File): File {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, "0");
   const nome = `print-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.${ext}`;
-  // globalThis.File porque `File` neste arquivo é o ícone do lucide-react, não o construtor.
-  return new globalThis.File([file], nome, { type: file.type });
+  return new File([file], nome, { type: file.type });
 }
 
 // Upload por XHR em vez de functions.invoke por um motivo só: arquivo de 50MB precisa de barra de
@@ -90,12 +92,12 @@ async function efErrorMessage(error: any): Promise<string> {
 }
 
 function fileIcon(type: string | null) {
-  if (!type) return <File className="h-4 w-4 text-muted-foreground" />;
+  if (!type) return <FileIcon className="h-4 w-4 text-muted-foreground" />;
   if (type.startsWith('image')) return <Image className="h-4 w-4 text-muted-foreground" />;
   if (type.startsWith('video')) return <Film className="h-4 w-4 text-muted-foreground" />;
   if (type.startsWith('audio')) return <Music className="h-4 w-4 text-muted-foreground" />;
   if (type.includes('pdf')) return <FileText className="h-4 w-4 text-muted-foreground" />;
-  return <File className="h-4 w-4 text-muted-foreground" />;
+  return <FileIcon className="h-4 w-4 text-muted-foreground" />;
 }
 
 function formatSize(bytes: number | null): string {

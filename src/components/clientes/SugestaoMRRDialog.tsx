@@ -20,6 +20,12 @@ interface SugestaoMRRDialogProps {
   custoDelta: number;
   descricaoSugerida: string;
   moduloId?: string | null;
+  // Quem originou o movimento já sabe a data, o vendedor e a origem da venda;
+  // sem repassar, o upsell de módulo entrava sem dono e ficava de fora de
+  // qualquer relatório de venda por vendedor ou por canal.
+  dataSugerida?: string | null;
+  funcionarioId?: number | null;
+  origemVenda?: string | null;
   onRegistrado: () => void;
 }
 
@@ -29,20 +35,28 @@ const fmtBRL = (n: number) =>
 const tipoLabel = (t: SugestaoMRRDialogProps["tipo"]) =>
   t === "upsell" ? "Upsell" : t === "cross_sell" ? "Cross-sell" : "Downsell";
 
+// Data de hoje no fuso local. `toISOString()` devolve UTC: das 21h em diante ele
+// já entrega o dia seguinte.
+const hojeISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 export default function SugestaoMRRDialog({
   open, onOpenChange, clienteId, tenantId, tipo,
-  valorDelta, custoDelta, descricaoSugerida, moduloId, onRegistrado,
+  valorDelta, custoDelta, descricaoSugerida, moduloId,
+  dataSugerida, funcionarioId, origemVenda, onRegistrado,
 }: SugestaoMRRDialogProps) {
   const [descricao, setDescricao] = useState(descricaoSugerida);
-  const [dataMovimento, setDataMovimento] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dataMovimento, setDataMovimento] = useState(() => hojeISO());
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
       setDescricao(descricaoSugerida);
-      setDataMovimento(new Date().toISOString().slice(0, 10));
+      setDataMovimento(dataSugerida || hojeISO());
     }
-  }, [open, descricaoSugerida]);
+  }, [open, descricaoSugerida, dataSugerida]);
 
   const isNeg = valorDelta < 0;
   const Icon = tipo === "downsell" ? TrendingDown : tipo === "cross_sell" ? ArrowRightLeft : TrendingUp;
@@ -63,6 +77,8 @@ export default function SugestaoMRRDialog({
         custo_delta: custoDelta,
         descricao: descricao,
         cliente_produto_modulo_id: moduloId || null,
+        funcionario_id: funcionarioId ?? null,
+        origem_venda: origemVenda || null,
         status: "ativo",
       } as any);
       if (error) throw error;

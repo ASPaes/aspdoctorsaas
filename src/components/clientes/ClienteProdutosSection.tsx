@@ -66,6 +66,11 @@ interface MRRDialogState {
   custoDelta: number;
   descricao: string;
   moduloId?: string | null;
+  // Vendedor/origem/data vêm de quem originou o movimento (hoje: o módulo).
+  // Sem isso o upsell de módulo entrava sem dono e sumia do relatório de venda.
+  dataMovimento?: string | null;
+  funcionarioId?: number | null;
+  origemVenda?: string | null;
 }
 
 interface ClienteProduto {
@@ -82,6 +87,9 @@ interface ClienteProduto {
   vlr_mensal: number | null;
   vlr_custo: number | null;
   data_ativacao: string | null;
+  data_venda?: string | null;
+  funcionario_id?: number | null;
+  origem_venda_id?: number | null;
   ativo: boolean;
   produtos?: { nome: string } | null;
   fornecedores?: { nome: string } | null;
@@ -97,6 +105,11 @@ interface ClienteProdutoModulo {
   vlr_custo: number | null;
   data_ativacao: string | null;
   data_inativacao: string | null;
+  // A venda do módulo tem dono próprio: módulo somado meses depois costuma ser
+  // de outro vendedor/canal que o produto original.
+  data_venda?: string | null;
+  funcionario_id?: number | null;
+  origem_venda_id?: number | null;
   ativo: boolean;
   // 'oem' = espelhado da licença no OEM e mantido pela sincronização; 'manual'
   // = digitado aqui. A linha do OEM não se edita: a próxima carga do espelho
@@ -107,6 +120,29 @@ interface ClienteProdutoModulo {
 
 const fmtBRL = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Mesma normalização de public.fn_norm_nome_modulo: é por ela que o módulo do
+// catálogo casa com a linha da grade do OEM. Divergir daqui faria a tela achar
+// um preço que o banco não acha (ou o contrário).
+const normNomeModulo = (nome: string | null | undefined) =>
+  (nome ?? "")
+    .trim()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
+// Markup = quanto o preço de venda é do custo. Sem custo não existe markup —
+// mostrar "0" ou "∞" aqui daria a impressão de uma margem medida.
+const fmtMarkup = (venda: number, custo: number) =>
+  custo > 0 ? `${(venda / custo).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}×` : "—";
+
+// Data de hoje no fuso local. `toISOString()` devolve UTC: das 21h em diante ele
+// já entrega o dia seguinte, e a venda entraria com data errada.
+const hojeISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 export default function ClienteProdutosSection({ clienteId }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -138,9 +174,6 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   const [cancelandoProduto, setCancelandoProduto] = useState(false);
   // Somar unidade é a mesma escrita no OEM, ao contrário: a licença é gravada
   // inteira e o que muda é a quantidade do módulo.
-  const [qtdModulo, setQtdModulo] = useState<ClienteProdutoModulo | null>(null);
-  const [novaQtdModulo, setNovaQtdModulo] = useState(1);
-  const [salvandoQtd, setSalvandoQtd] = useState(false);
   const [mrrDialog, setMrrDialog] = useState<MRRDialogState>({
     open: false, tipo: "upsell", valorDelta: 0, custoDelta: 0, descricao: "",
   });
@@ -769,17 +802,6 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                           <Tooltip>
                                             <TooltipTrigger asChild>
                                               <Button
-                                                type="button" variant="ghost" size="icon" className="h-7 w-7"
-                                                onClick={() => { setQtdModulo(m); setNovaQtdModulo((Number(m.quantidade) || 1) + 1); }}
-                                              >
-                                                <Plus className="h-4 w-4" />
-                                              </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>Alterar quantidade no OEM</TooltipContent>
-                                          </Tooltip>
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <Button
                                                 type="button" variant="ghost" size="icon"
                                                 className="h-7 w-7 text-destructive hover:bg-destructive/10"
                                                 onClick={() => { setCancelarModulo(m); setMotivoCancelamento(""); setQtdCancelamento(Number(m.quantidade) || 1); }}
@@ -915,9 +937,13 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         clienteProdutoId={moduloDialog.clienteProdutoId}
         produtoId={moduloDialog.produtoId}
         tid={tid}
+        lookupTid={lookupTenantId}
         onClose={() => setModuloDialog({ open: false })}
         onSaved={invalidateAll}
         produtoDataAtivacao={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.data_ativacao ?? null}
+        produtoFuncionarioId={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.funcionario_id ?? null}
+        produtoOrigemVendaId={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.origem_venda_id ?? null}
+        oemCodigoFilial={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.oem_codigo_filial ?? null}
         onMRRSuggest={(d) => setMrrDialog({ open: true, ...d })}
       />
 
@@ -951,74 +977,11 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         custoDelta={mrrDialog.custoDelta}
         descricaoSugerida={mrrDialog.descricao}
         moduloId={mrrDialog.moduloId}
+        dataSugerida={mrrDialog.dataMovimento ?? null}
+        funcionarioId={mrrDialog.funcionarioId ?? null}
+        origemVenda={mrrDialog.origemVenda ?? null}
         onRegistrado={invalidateAll}
       />
-
-      <Dialog open={!!qtdModulo} onOpenChange={(o) => { if (!o) setQtdModulo(null); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Quantidade na licença</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="rounded border bg-muted/40 px-3 py-2 text-sm">
-              <span className="font-medium">{qtdModulo?.produto_modulos?.nome ?? "—"}</span>
-              <span className="block text-xs text-muted-foreground">
-                Hoje: {Number(qtdModulo?.quantidade) || 1} ·
-                {" "}custo unitário R$ {fmtBRL(qtdModulo?.vlr_custo)}
-              </span>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Nova quantidade</Label>
-              <Input
-                type="number" min={1} step={1}
-                value={novaQtdModulo}
-                onChange={(e) => setNovaQtdModulo(Math.max(1, Number(e.target.value) || 1))}
-              />
-              <p className="text-xs text-muted-foreground">
-                O pedido vai para o OEM primeiro. Para <strong>reduzir</strong> com registro de
-                motivo, use o X de cancelamento.
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setQtdModulo(null)} disabled={salvandoQtd}>
-              Voltar
-            </Button>
-            <Button
-              type="button" className="gap-1.5" disabled={salvandoQtd}
-              onClick={async () => {
-                if (!qtdModulo) return;
-                setSalvandoQtd(true);
-                try {
-                  const { data, error } = await supabase.functions.invoke("oem-cancelar-modulo", {
-                    body: { acao: "quantidade", modulo_id: qtdModulo.id, nova_quantidade: novaQtdModulo },
-                  });
-                  const r = (data ?? {}) as { ok?: boolean; mensagem?: string; baixa_no_oem?: boolean };
-                  if (error || r.ok === false) {
-                    throw new Error(r.mensagem || error?.message || "Não deu para alterar.");
-                  }
-                  toast({
-                    title: r.baixa_no_oem ? "Quantidade alterada no OEM e na ficha" : "Quantidade alterada",
-                    description: `${qtdModulo.produto_modulos?.nome ?? "Módulo"} · ${Number(qtdModulo.quantidade) || 1} → ${novaQtdModulo}.`,
-                  });
-                  setQtdModulo(null);
-                  invalidateAll();
-                } catch (e: any) {
-                  toast({ variant: "destructive", title: "Não deu para alterar", description: e?.message });
-                } finally {
-                  setSalvandoQtd(false);
-                }
-              }}
-            >
-              {salvandoQtd ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Salvar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!cancelarProduto} onOpenChange={(o) => { if (!o) setCancelarProduto(null); }}>
         <DialogContent className="sm:max-w-md">
@@ -2279,17 +2242,27 @@ function ProdutoDialog({
 
 // ============ Modulo Dialog ============
 function ModuloDialog({
-  open, edit, clienteProdutoId, produtoId, tid, onClose, onSaved, produtoDataAtivacao, onMRRSuggest,
+  open, edit, clienteProdutoId, produtoId, tid, lookupTid, onClose, onSaved,
+  produtoDataAtivacao, produtoFuncionarioId, produtoOrigemVendaId, oemCodigoFilial, onMRRSuggest,
 }: {
   open: boolean;
   edit: ClienteProdutoModulo | null;
   clienteProdutoId?: string;
   produtoId?: number;
   tid: string | null;
+  // O tenant do cliente — o `tid` global fica null quando o super admin está em
+  // "Todos", e aí os catálogos de vendedor e origem viriam vazios.
+  lookupTid?: string | null;
   onClose: () => void;
   onSaved: () => void;
   produtoDataAtivacao?: string | null;
-  onMRRSuggest?: (data: { tipo: "upsell"; valorDelta: number; custoDelta: number; descricao: string; moduloId?: string | null }) => void;
+  produtoFuncionarioId?: number | null;
+  produtoOrigemVendaId?: number | null;
+  oemCodigoFilial?: string | null;
+  onMRRSuggest?: (data: {
+    tipo: "upsell"; valorDelta: number; custoDelta: number; descricao: string; moduloId?: string | null;
+    dataMovimento?: string | null; funcionarioId?: number | null; origemVenda?: string | null;
+  }) => void;
 }) {
   const isEdit = !!edit;
   const [moduloId, setModuloId] = useState<string>("");
@@ -2298,6 +2271,9 @@ function ModuloDialog({
   const [vlrCusto, setVlrCusto] = useState<number | null>(0);
   const [vlrAtivacao, setVlrAtivacao] = useState<number | null>(0);
   const [dataAt, setDataAt] = useState("");
+  const [dataVenda, setDataVenda] = useState("");
+  const [funcionarioId, setFuncionarioId] = useState<string>("");
+  const [origemVendaId, setOrigemVendaId] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   useMemo(() => {
@@ -2308,8 +2284,22 @@ function ModuloDialog({
       setVlrCusto(edit?.vlr_custo ?? 0);
       setVlrAtivacao(edit?.vlr_ativacao ?? 0);
       setDataAt(edit?.data_ativacao ?? produtoDataAtivacao ?? "");
+      // Módulo novo é venda de hoje, e vendedor/origem herdam do produto — quem
+      // vendeu o produto é quem costuma somar o módulo depois. Na edição, nada
+      // é inventado: mostra o que está gravado.
+      setDataVenda(edit ? (edit.data_venda ?? "") : hojeISO());
+      setFuncionarioId(
+        edit
+          ? (edit.funcionario_id ? String(edit.funcionario_id) : "")
+          : (produtoFuncionarioId ? String(produtoFuncionarioId) : "")
+      );
+      setOrigemVendaId(
+        edit
+          ? (edit.origem_venda_id ? String(edit.origem_venda_id) : "")
+          : (produtoOrigemVendaId ? String(produtoOrigemVendaId) : "")
+      );
     }
-  }, [open, edit, produtoDataAtivacao]);
+  }, [open, edit, produtoDataAtivacao, produtoFuncionarioId, produtoOrigemVendaId]);
 
   const catalogoQuery = useQuery<{ id: string; nome: string; descricao: string | null }[]>({
     queryKey: ["catalogo_modulos_produto", tid, produtoId],
@@ -2320,6 +2310,125 @@ function ModuloDialog({
         .eq("produto_id", produtoId)
         .eq("ativo", true)
         .order("nome");
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+
+  // ------------------------------------------------------------------- OEM
+  // Produto vinculado ao OEM tem o custo do módulo DITADO pela grade do
+  // parceiro (Integrações › OEM › Módulos). Aqui ele é lido, não digitado:
+  // digitar por cima só criaria uma margem que não existe — o próximo upgrade
+  // do vínculo devolveria o valor do OEM e o markup mostrado viraria mentira.
+  const vinculosOemQuery = useQuery<{
+    conta_integration_id: string; produto_codigo: string; produto_nome: string | null;
+  }[]>({
+    queryKey: ["oem-vinculo-do-produto", produtoId],
+    enabled: open && !!produtoId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("oem_produto_vinculo" as any) as any)
+        .select("conta_integration_id, produto_codigo, produto_nome, criado_em")
+        .eq("produto_id", produtoId)
+        .order("criado_em");
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+  const vinculosOem = vinculosOemQuery.data ?? [];
+
+  // O mesmo produto pode estar em mais de uma coluna do OEM (GESTAO LEGAL e
+  // FULL), e o módulo custa diferente em cada uma. Quem desempata é a licença
+  // do cliente: a filial diz em qual produto do parceiro ela está. Só vale a
+  // pena perguntar quando há mais de uma coluna.
+  const filialOemQuery = useQuery<string | null>({
+    queryKey: ["oem-filial-produto-principal", lookupTid ?? tid, oemCodigoFilial],
+    enabled: open && vinculosOem.length > 1 && !!oemCodigoFilial,
+    queryFn: async () => {
+      // `limit(1)`, não `maybeSingle()`: a filial é única por TENANT, e o super
+      // admin em "Todos" enxerga as duas — o maybeSingle erraria com
+      // "multiple rows" e a tela perderia a coluna.
+      let q = (supabase.from("oem_espelho_filial" as any) as any)
+        .select("produto_principal")
+        .eq("filial_codigo", oemCodigoFilial as string)
+        .limit(1);
+      const t = lookupTid ?? tid;
+      if (t) q = q.eq("tenant_id", t);
+      const { data, error } = await q;
+      if (error) throw error;
+      return ((data ?? [])[0]?.produto_principal ?? null) as string | null;
+    },
+  });
+
+  const colunaOem = useMemo(() => {
+    if (vinculosOem.length === 0) return null;
+    if (vinculosOem.length === 1) return vinculosOem[0];
+    const alvo = normNomeModulo(filialOemQuery.data ?? "");
+    // Sem resposta da filial fica a primeira coluna vinculada — a mesma que a
+    // tela de Produtos & Módulos abre por padrão.
+    if (!alvo) return vinculosOem[0];
+    return (
+      vinculosOem.find(v =>
+        normNomeModulo(v.produto_codigo) === alvo || normNomeModulo(v.produto_nome ?? "") === alvo
+      ) ?? vinculosOem[0]
+    );
+  }, [vinculosOem, filialOemQuery.data]);
+
+  const precosOemQuery = useQuery<{ modulo_nome: string; valor_unitario: number | null }[]>({
+    queryKey: ["oem-precos-da-coluna", colunaOem?.conta_integration_id, colunaOem?.produto_codigo],
+    enabled: open && !!colunaOem,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("oem_espelho_modulo_preco" as any) as any)
+        .select("modulo_nome, valor_unitario")
+        .eq("conta_integration_id", colunaOem!.conta_integration_id)
+        .eq("produto_codigo", colunaOem!.produto_codigo);
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+
+  // Casa pelo nome normalizado, como fn_norm_nome_modulo faz do lado do banco.
+  const custoOemPorModulo = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const linha of precosOemQuery.data ?? []) {
+      m.set(normNomeModulo(linha.modulo_nome), Number(linha.valor_unitario) || 0);
+    }
+    return m;
+  }, [precosOemQuery.data]);
+
+  const nomeModuloSelecionado = catalogoQuery.data?.find(m => m.id === moduloId)?.nome ?? "";
+  const custoOem = moduloId && nomeModuloSelecionado
+    ? custoOemPorModulo.get(normNomeModulo(nomeModuloSelecionado))
+    : undefined;
+  // Módulo que não está na grade do parceiro continua digitável: pode ser um
+  // serviço que só o DoctorSaaS cobra.
+  const custoTravadoPeloOem = custoOem !== undefined;
+
+  useEffect(() => {
+    // Só na inclusão. Na edição o que vale é o que está gravado — puxar a
+    // grade aqui mudaria em silêncio o custo de um módulo já vendido.
+    if (!open || isEdit || custoOem === undefined) return;
+    setVlrCusto(custoOem);
+  }, [open, isEdit, custoOem]);
+
+  const funcionariosQuery = useQuery<{ id: number; nome: string }[]>({
+    queryKey: ["funcionarios_lookup", lookupTid],
+    enabled: open && !!lookupTid,
+    queryFn: async () => {
+      let q = (supabase.from("funcionarios" as any) as any).select("id, nome").order("nome");
+      if (lookupTid) q = q.eq("tenant_id", lookupTid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+
+  const origensVendaQuery = useQuery<{ id: number; nome: string }[]>({
+    queryKey: ["origens_venda_lookup", lookupTid],
+    enabled: open && !!lookupTid,
+    queryFn: async () => {
+      let q = (supabase.from("origens_venda" as any) as any).select("id, nome").order("nome");
+      if (lookupTid) q = q.eq("tenant_id", lookupTid);
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as any;
     },
@@ -2338,6 +2447,9 @@ function ModuloDialog({
         vlr_custo: vlrCusto || 0,
         vlr_ativacao: vlrAtivacao || 0,
         data_ativacao: dataAt || null,
+        data_venda: dataVenda || null,
+        funcionario_id: funcionarioId ? Number(funcionarioId) : null,
+        origem_venda_id: origemVendaId ? Number(origemVendaId) : null,
       };
       if (isEdit && edit) {
         const { error } = await (supabase.from("cliente_produto_modulos" as any) as any)
@@ -2364,6 +2476,11 @@ function ModuloDialog({
           custoDelta: (vlrCusto || 0) * (quantidade || 1),
           descricao: `Módulo ${nomeModulo} adicionado${(quantidade || 1) > 1 ? ` (${quantidade}×)` : ""}`,
           moduloId: null,
+          // movimentos_mrr.origem_venda é texto (o nome), não o id — é assim que
+          // o MovimentosMrrModal grava e o relatório de vendas lê.
+          dataMovimento: dataVenda || null,
+          funcionarioId: funcionarioId ? Number(funcionarioId) : null,
+          origemVenda: origensVendaQuery.data?.find(o => String(o.id) === origemVendaId)?.nome ?? null,
         });
       }
     } catch (err: any) {
@@ -2409,7 +2526,12 @@ function ModuloDialog({
           </div>
           <div className="space-y-1">
             <Label>Valor Custo (unit.)</Label>
-            <NumericInput value={vlrCusto} onChange={setVlrCusto} suffix="R$" />
+            <NumericInput value={vlrCusto} onChange={setVlrCusto} suffix="R$" disabled={custoTravadoPeloOem} />
+            {custoTravadoPeloOem && (
+              <p className="text-xs text-muted-foreground">
+                Custo de tabela do OEM{colunaOem?.produto_nome ? ` · ${colunaOem.produto_nome}` : ""} — não editável aqui.
+              </p>
+            )}
           </div>
           <div className="space-y-1">
             <Label>Valor Ativação</Label>
@@ -2419,12 +2541,46 @@ function ModuloDialog({
             <Label>Data Ativação</Label>
             <Input type="date" value={dataAt} onChange={(e) => setDataAt(e.target.value)} />
           </div>
+          <div className="space-y-1">
+            <Label>Data da Venda</Label>
+            <Input type="date" value={dataVenda} onChange={(e) => setDataVenda(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>Vendedor</Label>
+            <Select value={funcionarioId || "__none__"} onValueChange={(v) => setFuncionarioId(v === "__none__" ? "" : v)}>
+              <SelectTrigger>
+                <SelectValue placeholder={funcionariosQuery.isLoading ? "Carregando..." : "Selecione"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— Nenhum —</SelectItem>
+                {(funcionariosQuery.data ?? []).map(f => (
+                  <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Origem da Venda</Label>
+            <Select value={origemVendaId || "__none__"} onValueChange={(v) => setOrigemVendaId(v === "__none__" ? "" : v)}>
+              <SelectTrigger>
+                <SelectValue placeholder={origensVendaQuery.isLoading ? "Carregando..." : "Selecione"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— Nenhuma —</SelectItem>
+                {(origensVendaQuery.data ?? []).map(o => (
+                  <SelectItem key={o.id} value={String(o.id)}>{o.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="md:col-span-2 rounded-md border bg-muted/30 p-3 flex flex-wrap items-center justify-between gap-2 text-sm">
             <span className="text-muted-foreground">Total do módulo ({quantidade}×)</span>
             <span className="font-semibold">
               Mensal: <span className="text-primary">R$ {fmtBRL((Number(vlrMensal) || 0) * (quantidade || 1))}</span>
               {"  ·  "}
               Custo: <span className="text-muted-foreground">R$ {fmtBRL((Number(vlrCusto) || 0) * (quantidade || 1))}</span>
+              {"  ·  "}
+              Markup: <span className="text-muted-foreground">{fmtMarkup(Number(vlrMensal) || 0, Number(vlrCusto) || 0)}</span>
             </span>
           </div>
         </div>

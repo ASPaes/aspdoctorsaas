@@ -14,6 +14,14 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 20/08
 
+- 🆕 **Clientes — Produtos & Módulos** — **A janela de *Adicionar Módulo* agora registra a venda: Data da Venda, Vendedor e Origem da Venda.** Módulo somado meses depois é uma venda nova, e até aqui ela entrava sem dono — não dava para saber quem vendeu nem por qual canal. Os três campos usam as **mesmas listas de vendedores e de origens de venda** já cadastradas, e nascem preenchidos com a data de hoje e com o vendedor e a origem do próprio produto, que é o caso comum. O **movimento de MRR (upsell)** sugerido ao salvar passa a levar o mesmo vendedor e a mesma origem, então o upsell de módulo finalmente aparece nos relatórios de venda por vendedor e por canal.
+
+- ⬆️ **Clientes — Produtos & Módulos** — **Ao adicionar um módulo de produto vinculado ao OEM, o custo já vem preenchido pela tabela do parceiro — e não é mais digitado.** O *Valor Custo (unit.)* nascia zerado e cada pessoa preenchia de memória; agora ele é **puxado da grade de Integrações › OEM › Módulos** assim que você escolhe o módulo, e fica **travado**, com a origem escrita embaixo do campo (*Custo de tabela do OEM · FULL*). Módulo que não existe na grade do parceiro continua digitável normalmente, porque nesse caso o custo é só nosso. Quando o produto está ligado a **mais de uma coluna do OEM**, vale a coluna da licença daquele cliente.
+
+- ⬆️ **Clientes — Produtos & Módulos** — **O rodapé da janela de módulo agora mostra o markup.** Além de *Mensal* e *Custo*, aparece **Markup** — quanto o preço de venda é do custo (*3,50×*) —, recalculado enquanto você digita o valor mensal, para dar para ver a margem antes de salvar. Sem custo informado, mostra *—* em vez de um número que não significa nada.
+
+- 🔧 **Clientes — Produtos & Módulos** — **Saiu o botão *+* que ficava ao lado do X em cada módulo da licença.** Ele abria um caminho paralelo para aumentar a quantidade e convivia com o *Adicionar Módulo* logo acima, fazendo a mesma coisa por duas portas diferentes. Agora é uma só: para somar quantidade, use **Adicionar Módulo**. O **X** de cancelamento continua igual.
+
 - 🔧 **Atendimento — Chat** — **A caixa para editar uma mensagem já enviada abria minúscula.** Ao corrigir o texto de uma mensagem enviada, o campo nascia do tamanho do balão original — em mensagem curta, uma faixa estreita —, e assim que o texto passava de uma linha já aparecia barra de rolagem: para reler o que estava escrevendo era preciso rolar dentro de um espaço de duas linhas. Agora o balão **se alarga ao entrar em edição**, ocupando a largura disponível do chat, e o campo abre com **duas linhas visíveis**, crescendo até seis conforme você escreve. O prazo e o funcionamento da edição continuam os mesmos.
 
 ### 19/08
