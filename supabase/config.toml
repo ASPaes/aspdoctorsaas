@@ -213,3 +213,6 @@ verify_jwt = true
 # ser apagado à noite — o prazo e o filtro moram na fn_chat_media_purge_lote.
 [functions.purge-chat-media]
 verify_jwt = true
+
+[functions.acessofast-resolver]
+verify_jwt = false

@@ -67,11 +67,11 @@ describe("buildIntegracoesGroups", () => {
 });
 
 describe("catálogo", () => {
-  it("só é clicável quem tem tela — Asaas e AcessoFast não têm", () => {
+  it("só é clicável quem tem tela — hoje só o Asaas não tem", () => {
     const semTela = INTEGRACOES_CATALOGO.flatMap((g) => g.itens)
       .filter((i) => !i.section)
       .map((i) => i.id);
-    expect(semTela.sort()).toEqual(["acessofast", "asaas"]);
+    expect(semTela.sort()).toEqual(["asaas"]);
   });
 
   it("toda seção apontada existe no padrão das Configurações", () => {

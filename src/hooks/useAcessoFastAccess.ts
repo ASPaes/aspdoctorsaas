@@ -3,29 +3,31 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 /**
- * Libera o botão "Conectar" (AcessoFast) por tenant, via flag
- * `tenants.acessofast_enabled` — mesmo desenho do useOnboardingAccess.
+ * Libera o botão de acesso remoto (AcessoFast) no chat.
  *
- * Padrão `false`: quem não contratou o AcessoFast não vê um botão que cai no
- * login de um sistema que não conhece.
+ * O portão é a integração conectada — a chave que o cliente colou em
+ * Configurações → Integrações → AcessoFast. Antes era a flag
+ * `tenants.acessofast_enabled`, que dizia "contratou" mas não dizia "está
+ * conectado": o botão aparecia mesmo sem credencial nenhuma do outro lado.
+ *
+ * Sem `is_super_admin` como bypass, de propósito: o super admin simulando um
+ * tenant sem integração veria um botão que não resolve nada.
  */
 export function useAcessoFastAccess() {
   const { profile } = useAuth();
-  const isSuperAdmin = profile?.is_super_admin === true;
+  const tenantId = profile?.tenant_id ?? null;
 
   const q = useQuery<boolean>({
-    queryKey: ["tenant-acessofast-enabled", profile?.tenant_id],
-    enabled: !!profile?.tenant_id && !isSuperAdmin,
+    queryKey: ["acessofast-access", tenantId],
+    enabled: !!tenantId,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await (supabase.from("tenants" as any) as any)
-        .select("acessofast_enabled").eq("id", profile!.tenant_id).maybeSingle();
+      const { data, error } = await (supabase.from("acessofast_integration" as any) as any)
+        .select("tenant_id").eq("tenant_id", tenantId).maybeSingle();
       if (error) throw error;
-      return !!(data as any)?.acessofast_enabled;
+      return !!data;
     },
   });
 
-  const canAccess = isSuperAdmin || (q.data ?? false);
-  const isLoading = !isSuperAdmin && !!profile?.tenant_id && q.isLoading;
-  return { canAccess, isLoading };
+  return { canAccess: q.data ?? false, isLoading: !!tenantId && q.isLoading };
 }

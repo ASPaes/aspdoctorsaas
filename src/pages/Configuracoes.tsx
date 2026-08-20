@@ -53,6 +53,7 @@ import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateCo
 import CategoriasServicosTab from "@/components/configuracoes/CategoriasServicosTab";
 import OmieIntegrationTab from "@/components/configuracoes/OmieIntegrationTab";
 import IntegracoesHubTab from "@/components/configuracoes/IntegracoesHubTab";
+import AcessoFastIntegrationTab from "@/components/configuracoes/AcessoFastIntegrationTab";
 import { INTEGRACOES_RESOURCES } from "@/lib/integracoes";
 import OemIntegrationTab from "@/components/configuracoes/OemIntegrationTab";
 import HiperIntegrationTab from "@/components/configuracoes/HiperIntegrationTab";
@@ -109,6 +110,7 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   "integracoes-omie": { breadcrumb: ["Integrações", "Omie"], title: "Omie", description: "Conecte o sistema ao Omie para sincronizar clientes e contratos." },
   "integracoes-hiper": { breadcrumb: ["Integrações", "Hiper"], title: "Hiper", description: "Conecte o sistema ao PortalHiper para sincronizar a carteira de clientes." },
   "integracoes-oem": { breadcrumb: ["Integrações", "OEM"], title: "OEM", description: "Licenças do PDV Legal/TabletCloud: vínculo com clientes, margem e pendências." },
+  "integracoes-acessofast": { breadcrumb: ["Integrações", "AcessoFast"], title: "AcessoFast", description: "Conecte o AcessoFast para abrir acesso remoto na máquina do cliente direto da conversa." },
 };
 
 
@@ -474,6 +476,8 @@ export default function Configuracoes() {
         return <OemIntegrationTab />;
       case "integracoes-hiper":
         return <HiperIntegrationTab />;
+      case "integracoes-acessofast":
+        return <AcessoFastIntegrationTab />;
       default:
         return null;
     }

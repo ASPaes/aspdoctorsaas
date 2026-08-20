@@ -68,14 +68,16 @@ describe("IntegracoesHubView", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it("AcessoFast mostra o status da contratação, sem virar link", () => {
+  it("AcessoFast abre a tela da chave de integração", () => {
+    // Passou a ter tela quando a conexão virou chave colada pelo cliente: antes
+    // era só uma flag de contratação e não havia o que configurar aqui.
     const onSelect = vi.fn();
-    const grupos = buildIntegracoesGroups({ acessofast: { kind: "ativo" } }, tudo);
+    const grupos = buildIntegracoesGroups({ acessofast: { kind: "desconectado" } }, tudo);
     render(<IntegracoesHubView grupos={grupos} onSelect={onSelect} />);
 
-    expect(linha("acessofast").textContent).toContain("Ativo");
+    expect(linha("acessofast").textContent).toContain("Não conectado");
     act(() => linha("acessofast").click());
-    expect(onSelect).not.toHaveBeenCalled();
+    expect(onSelect).toHaveBeenCalledWith("integracoes-acessofast");
   });
 
   it("integração sem permissão não é renderizada", () => {
