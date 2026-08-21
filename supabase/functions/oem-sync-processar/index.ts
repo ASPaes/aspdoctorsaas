@@ -83,8 +83,14 @@ Deno.serve(async (req) => {
 
     const corpo = await req.json().catch(() => ({} as Record<string, unknown>));
     const limite = Math.min(Math.max(Number(corpo.limite ?? 20) || 20, 1), 50);
+    // Uma linha só, pedida pelo clique que acabou de enfileirar: quem cancelou
+    // um módulo não pode esperar os 2 minutos do cron para saber o resultado.
+    const filaId = typeof corpo.fila_id === "string" ? corpo.fila_id : null;
 
-    const { data: linhas, error: errC } = await ds.rpc("fn_oem_fila_claim", { p_limite: limite });
+    const { data: linhas, error: errC } = await ds.rpc("fn_oem_fila_claim", {
+      p_limite: filaId ? 1 : limite,
+      p_id: filaId,
+    });
     if (errC) return json({ ok: false, mensagem: `Não deu para pegar a fila: ${errC.message}` }, 500);
 
     const fila = (linhas ?? []) as Linha[];
@@ -183,11 +189,32 @@ Deno.serve(async (req) => {
       });
 
       if (sucesso) {
+        // O parceiro aceitou. SÓ AGORA a ficha muda — é esta ordem que impede
+        // as duas bases de divergirem, e é a mesma de antes da fila existir.
+        //
+        // Se a gravação daqui falhar, a linha NÃO volta para 'erro': repetir
+        // reenviaria ao OEM uma baixa que ele já fez. Fica 'invalido' com o
+        // motivo, para gente decidir.
+        const { data: aplic, error: errA } = await ds.rpc("fn_oem_fila_aplicar", { p_id: l.id });
+        if (errA) {
+          erros++;
+          await ds.from("oem_sync_fila").update({
+            status: "invalido",
+            ultimo_erro: `O OEM aceitou, mas a ficha não foi atualizada: ${errA.message}`,
+            resposta: resposta as Record<string, unknown> | null,
+            http,
+            processado_em: new Date().toISOString(),
+          }).eq("id", l.id);
+          continue;
+        }
         okCount++;
         await ds.from("oem_sync_fila").update({
           status: "ok",
           ultimo_erro: null,
-          resposta: resposta as Record<string, unknown> | null,
+          resposta: {
+            oem: resposta as Record<string, unknown> | null,
+            ficha: aplic as Record<string, unknown> | null,
+          },
           http,
           processado_em: new Date().toISOString(),
         }).eq("id", l.id);
