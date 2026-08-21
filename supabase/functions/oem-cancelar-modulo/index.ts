@@ -52,6 +52,12 @@ Deno.serve(async (req) => {
     const moduloId = String(corpo.modulo_id ?? "");
     const quantidade = Number(corpo.quantidade ?? 0) || null;
     const motivo = typeof corpo.motivo === "string" ? corpo.motivo.trim() || null : null;
+    const motivoId = Number(corpo.motivo_id ?? 0) || null;
+    // A data vem da tela (o operador pode lançar cancelamento retroativo). Só
+    // aceito YYYY-MM-DD: qualquer outra coisa vira null e o banco usa hoje.
+    const data = typeof corpo.data === "string" && /^\d{4}-\d{2}-\d{2}$/.test(corpo.data)
+      ? corpo.data
+      : null;
     const simular = corpo.simular === true;
     if (!moduloId) return json({ ok: false, mensagem: "Informe modulo_id." }, 400);
 
@@ -181,6 +187,8 @@ Deno.serve(async (req) => {
       p_id: moduloId,
       p_quantidade: cancelar,
       p_motivo: motivo,
+      p_motivo_id: motivoId,
+      p_data: data,
     });
     if (errR) {
       return json({
