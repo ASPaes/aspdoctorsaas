@@ -161,6 +161,8 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   // é passo a mais sem decisão nenhuma.
   const [cancelarModulo, setCancelarModulo] = useState<ClienteProdutoModulo | null>(null);
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
+  const [motivoModuloId, setMotivoModuloId] = useState<string>("");
+  const [dataCancelModulo, setDataCancelModulo] = useState("");
   const [qtdCancelamento, setQtdCancelamento] = useState(1);
   const [cancelandoModulo, setCancelandoModulo] = useState(false);
   // Cancelar produto é o caminho certo para tirar produto do cliente: a RPC
@@ -416,7 +418,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
 
   const motivosCancelamentoQuery = useQuery<{ id: number; descricao: string }[]>({
     queryKey: ["motivos_cancelamento", lookupTenantId],
-    enabled: !!cancelarProduto,
+    enabled: !!cancelarProduto || !!cancelarModulo,
     staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       let q = (supabase.from("motivos_cancelamento" as any) as any).select("id, descricao").order("descricao");
@@ -804,7 +806,13 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                               <Button
                                                 type="button" variant="ghost" size="icon"
                                                 className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                                                onClick={() => { setCancelarModulo(m); setMotivoCancelamento(""); setQtdCancelamento(Number(m.quantidade) || 1); }}
+                                                onClick={() => {
+                                                  setCancelarModulo(m);
+                                                  setMotivoCancelamento("");
+                                                  setMotivoModuloId("");
+                                                  setDataCancelModulo(hojeISO());
+                                                  setQtdCancelamento(Number(m.quantidade) || 1);
+                                                }}
                                               >
                                                 <X className="h-4 w-4" />
                                               </Button>
@@ -1087,11 +1095,44 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
 
           <div className="space-y-4">
             <div className="rounded border bg-muted/40 px-3 py-2 text-sm">
-              <span className="font-medium">{cancelarModulo?.produto_modulos?.nome ?? "—"}</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium">{cancelarModulo?.produto_modulos?.nome ?? "—"}</span>
+                {cancelarModulo?.origem === "oem" && (
+                  <Badge variant="outline" className="text-[10px] uppercase">OEM</Badge>
+                )}
+              </div>
               <span className="block text-xs text-muted-foreground">
                 {Number(cancelarModulo?.quantidade) || 1} contratada(s) ·
+                {" "}mensal R$ {fmtBRL(cancelarModulo?.vlr_mensal)} ·
                 {" "}custo unitário R$ {fmtBRL(cancelarModulo?.vlr_custo)}
               </span>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Data do cancelamento</Label>
+              <Input
+                type="date"
+                value={dataCancelModulo}
+                onChange={(e) => setDataCancelModulo(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Vem preenchida com hoje. É ela que vale como data de inativação do módulo —
+                mude se o cliente cancelou antes.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Motivo</Label>
+              <Select value={motivoModuloId} onValueChange={setMotivoModuloId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={motivosCancelamentoQuery.isLoading ? "Carregando..." : "Selecione"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(motivosCancelamentoQuery.data ?? []).map(m => (
+                    <SelectItem key={m.id} value={String(m.id)}>{m.descricao}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {(Number(cancelarModulo?.quantidade) || 1) > 1 && (
@@ -1114,7 +1155,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
             )}
 
             <div className="space-y-1.5">
-              <Label>Motivo <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Label>Observação <span className="text-muted-foreground font-normal">(opcional)</span></Label>
               <Textarea
                 rows={3}
                 placeholder="Ex.: cliente devolveu um terminal"
@@ -1122,7 +1163,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                 onChange={(e) => setMotivoCancelamento(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Aparece no histórico de módulos, junto com quem cancelou e quando.
+                Aparece no histórico de módulos, junto com o motivo, quem cancelou e quando.
               </p>
             </div>
 
@@ -1145,7 +1186,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
             <Button
               type="button"
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1.5"
-              disabled={cancelandoModulo}
+              disabled={cancelandoModulo || !motivoModuloId || !dataCancelModulo}
               onClick={async () => {
                 if (!cancelarModulo) return;
                 setCancelandoModulo(true);
@@ -1158,6 +1199,8 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                       modulo_id: cancelarModulo.id,
                       quantidade: qtdCancelamento,
                       motivo: motivoCancelamento.trim() || null,
+                      motivo_id: motivoModuloId ? Number(motivoModuloId) : null,
+                      data: dataCancelModulo || null,
                     },
                   });
                   const r = (data ?? {}) as { ok?: boolean; mensagem?: string; baixa_no_oem?: boolean };
