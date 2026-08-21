@@ -208,7 +208,10 @@ export default function OemFilaSincronizacaoPanel() {
           <>
             {/* O silêncio do processador é pior que o erro: sem este aviso, uma
                 fila parada parece uma fila vazia. */}
-            {s?.cron_saudavel === false && (
+            {/* Segunda trava do mesmo alarme: só faz sentido dizer que a fila
+                "não está andando" se houver alguma coisa parada nela. Com a
+                fila vazia, processador quieto é processador saudável. */}
+            {s?.cron_saudavel === false && (Number(s.pendentes) + Number(s.erros)) > 0 && (
               <Alert className="border-amber-500/50 text-amber-900 dark:text-amber-200 [&>svg]:text-amber-600">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
