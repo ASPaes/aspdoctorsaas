@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 21/08
 
+- 🔧 **WhatsApp — Atendimento** — **Mensagem do cliente aparecia em branco no chat.** Nos números atendidos pela conexão oficial do WhatsApp (Meta), alguns tipos de mensagem — resposta de botão, enquete, "ver uma vez" e recursos novos do aplicativo — viravam uma bolha vazia: só o número e o horário, sem texto e sem nenhum sinal de que algo tinha chegado. Agora **resposta de botão e de lista aparecem como texto**, porque é a escolha que o cliente fez, e o que o WhatsApp não consegue entregar aparece como **📎 Mensagem não suportada** — o atendente vê que o cliente escreveu e pode pedir o reenvio.
+
 - 🔧 **Clientes — Histórico de módulos** — **A linha de *Quantidade* mostrava o total, não o que foi lançado.** Somar uma unidade num módulo que tinha duas registrava *"Quantidade · 3"* — o número certo do estado atual, e a resposta errada para a pergunta que o histórico existe para responder: o que aconteceu ali. Agora registra **quanto entrou** (*"Quantidade · 1"*), a mesma régua que o cancelamento já usava. O total continua na ficha do cliente, que é o lugar dele.
 
 - 🔧 **Clientes — MRR e Omie** — **Desativar um movimento de MRR não atualizava o contrato no Omie.** O valor caía aqui e o Omie continuava cobrando o antigo — divergência silenciosa, do tipo que só aparece na fatura. A sincronização já era acionada quando o movimento mudava, mas desistia logo no começo por ver que ele estava inativo: ignorava justamente o evento que precisava enviar. Agora **desativar, estornar ou encerrar um movimento manda o contrato para o Omie**, como qualquer outra alteração de valor. Movimento que já nasce desativado continua sem gerar sincronização, porque nesse caso nada mudou.

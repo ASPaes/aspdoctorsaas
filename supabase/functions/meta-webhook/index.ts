@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { processInboundMessage } from '../_shared/message-processor.ts';
-import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets } from '../_shared/message-types.ts';
+import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets, UNSUPPORTED_MESSAGE_LABEL } from '../_shared/message-types.ts';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
 import { applyDeliveryStatus } from '../_shared/apply-delivery-status.ts';
 import { normalizeBRPhone } from '../_shared/phone.ts';
@@ -47,10 +47,16 @@ function mapMessageType(msg: any): NormalizedInboundMessage['messageType'] {
 // Edicao previa deste arquivo introduziu double-encoding UTF-8 nos emojis literais,
 // causando que mensagens de midia inbound sem caption chegassem corrompidas ao banco.
 // Manter escapes Unicode protege contra re-corrupcao se o arquivo for editado novamente.
+//
+// INVARIANTE: nunca retornar string vazia. O MessageBubble so renderiza o texto quando
+// `content` e truthy — conteudo vazio vira bolha em branco no chat: numero do cliente,
+// hora, e mais nada. Foi o que aconteceu na instancia digi_meta-9933 em 20/08/2026,
+// porque todo tipo fora da lista caia no `return '';` do final. A evolution-webhook ja
+// resolve isso ha tempos com UNSUPPORTED_MESSAGE_LABEL.
 function extractContent(msg: any): string {
-  if (!msg) return '';
+  if (!msg) return UNSUPPORTED_MESSAGE_LABEL;
   const t = msg.type;
-  if (t === 'text') return msg.text?.body || '';
+  if (t === 'text') return msg.text?.body || UNSUPPORTED_MESSAGE_LABEL;
   if (t === 'image') return msg.image?.caption || '\u{1F4F7} Imagem';
   if (t === 'video') return msg.video?.caption || '\u{1F3A5} V\u{ED}deo';
   if (t === 'audio') return '\u{1F3B5} \u{C1}udio';
@@ -58,8 +64,19 @@ function extractContent(msg: any): string {
   if (t === 'sticker') return '\u{1F3A8} Sticker';
   if (t === 'contacts') { const c = msg.contacts?.length || 0; return `\u{1F464} ${c} contato${c !== 1 ? 's' : ''}`; }
   if (t === 'location') return `\u{1F4CD} Localiza\u{E7}\u{E3}o: ${msg.location?.latitude},${msg.location?.longitude}`;
-  if (t === 'reaction') return msg.reaction?.emoji || '';
-  return '';
+  if (t === 'reaction') return msg.reaction?.emoji || UNSUPPORTED_MESSAGE_LABEL;
+  // Resposta interativa: o texto E a escolha do cliente, nao um rotulo.
+  if (t === 'interactive') {
+    const i = msg.interactive || {};
+    return i.button_reply?.title || i.list_reply?.title || i.nfm_reply?.body
+      || i.button_reply?.id || i.list_reply?.id || '\u{1F4AC} Resposta';
+  }
+  if (t === 'button') return msg.button?.text || msg.button?.payload || '\u{1F518} Resposta de bot\u{E3}o';
+  if (t === 'order') { const n = msg.order?.product_items?.length || 0; return `\u{1F6D2} Pedido com ${n} ${n === 1 ? 'item' : 'itens'}`; }
+  if (t === 'system') return msg.system?.body || '\u{2699}\u{FE0F} Evento do WhatsApp';
+  // `unsupported`, `request_welcome` e qualquer tipo novo da Meta caem aqui: o rotulo
+  // aparece no chat e o tipo real vai para metadata logo apos o insert (ver processMessage).
+  return UNSUPPORTED_MESSAGE_LABEL;
 }
 
 // === Extract media metadata ===
@@ -293,6 +310,28 @@ Deno.serve(async (req) => {
 
         console.log(`${LOG} Delegando para processInboundMessage: ${normalizedPhone}`);
         await processInboundMessage(supabase, normalized);
+
+        // Tipo que a gente nao sabe ler: o payload bruto da Meta nao e persistido em lugar
+        // nenhum (o bloco de observability do message-processor le `rawPayload.message`, que
+        // so existe no formato Baileys do Evolution). Sem isto nao ha como saber depois do
+        // fato o que o cliente mandou — nem pelo banco, nem pelo log.
+        if (normalized.content === UNSUPPORTED_MESSAGE_LABEL) {
+          console.warn(`${LOG} Tipo nao suportado: type=${msg.type} keys=${Object.keys(msg).join(',')}`);
+          const { data: row } = await supabase
+            .from('whatsapp_messages').select('id, metadata')
+            .eq('message_id', msg.id).eq('tenant_id', instance.tenant_id).maybeSingle();
+          if (row) {
+            const base = (row.metadata && typeof row.metadata === 'object') ? row.metadata : {};
+            await supabase.from('whatsapp_messages').update({
+              metadata: {
+                ...base,
+                unsupportedType: msg.type ?? null,
+                unsupportedKeys: Object.keys(msg),
+                ...(Array.isArray(msg.errors) && msg.errors.length > 0 ? { unsupportedErrors: msg.errors } : {}),
+              },
+            }).eq('id', row.id);
+          }
+        }
 
         // Download de midia apos salvar a mensagem
         if (mediaId && accessToken && mimetype) {
