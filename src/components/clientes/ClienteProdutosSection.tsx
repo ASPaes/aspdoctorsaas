@@ -2578,6 +2578,7 @@ function ModuloDialog({
     setSaving(true);
     let novoModuloId: string | null = null;
     let upsellFalhou = false;
+    let somouQuantidade: { antes: number; depois: number } | null = null;
     try {
       const payload: any = {
         quantidade: quantidade || 1,
@@ -2594,15 +2595,42 @@ function ModuloDialog({
           .update(payload).eq("id", edit.id);
         if (error) throw error;
       } else {
-        const { data: novo, error } = await (supabase.from("cliente_produto_modulos" as any) as any).insert({
-          ...payload,
-          tenant_id: tid,
-          cliente_produto_id: clienteProdutoId,
-          modulo_id: moduloId,
-          ativo: true,
-        }).select("id").single();
-        if (error) throw error;
-        novoModuloId = (novo as any)?.id ?? null;
+        // Módulo que o cliente JÁ tem não vira uma segunda linha: soma na
+        // quantidade. É assim que o parceiro modela — uma linha por módulo, com
+        // quantidade (a licença mostra "Usuário Cloud · qtd 2", nunca duas
+        // linhas) — e é o que o botão promete desde que o "+" saiu da tabela.
+        const { data: existente, error: errBusca } = await (supabase
+          .from("cliente_produto_modulos" as any) as any)
+          .select("id, quantidade")
+          .eq("cliente_produto_id", clienteProdutoId)
+          .eq("modulo_id", moduloId)
+          .eq("ativo", true)
+          .maybeSingle();
+        if (errBusca) throw errBusca;
+
+        if (existente) {
+          const antes = Number((existente as any).quantidade) || 1;
+          const novaQtd = antes + (quantidade || 1);
+          // quantidade_manual junto: sem ele a próxima carga do espelho
+          // devolveria a quantidade antiga e o acréscimo sumiria sozinho. O
+          // próprio espelho limpa essa trava quando o OEM confirmar o número.
+          const { error } = await (supabase.from("cliente_produto_modulos" as any) as any)
+            .update({ quantidade: novaQtd, quantidade_manual: novaQtd })
+            .eq("id", (existente as any).id);
+          if (error) throw error;
+          novoModuloId = (existente as any).id;
+          somouQuantidade = { antes, depois: novaQtd };
+        } else {
+          const { data: novo, error } = await (supabase.from("cliente_produto_modulos" as any) as any).insert({
+            ...payload,
+            tenant_id: tid,
+            cliente_produto_id: clienteProdutoId,
+            modulo_id: moduloId,
+            ativo: true,
+          }).select("id").single();
+          if (error) throw error;
+          novoModuloId = (novo as any)?.id ?? null;
+        }
       }
 
       // O upsell é gravado direto, sem perguntar: somar módulo pago É a venda, e
@@ -2648,7 +2676,18 @@ function ModuloDialog({
         }
       }
 
-      if (!upsellFalhou) toast({ title: isEdit ? "Módulo atualizado" : "Módulo adicionado" });
+      if (!upsellFalhou) {
+        toast({
+          title: isEdit
+            ? "Módulo atualizado"
+            : somouQuantidade
+              ? "Quantidade somada"
+              : "Módulo adicionado",
+          description: somouQuantidade
+            ? `O cliente já tinha este módulo: ${somouQuantidade.antes} → ${somouQuantidade.depois}.`
+            : undefined,
+        });
+      }
       onSaved();
       onClose();
     } catch (err: any) {
