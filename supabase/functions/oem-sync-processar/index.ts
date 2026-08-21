@@ -87,6 +87,51 @@ Deno.serve(async (req) => {
     // um módulo não pode esperar os 2 minutos do cron para saber o resultado.
     const filaId = typeof corpo.fila_id === "string" ? corpo.fila_id : null;
 
+    // ------------------------------------------------------------- simular
+    // Mostra o payload que IRIA para a licença, sem gravar nada — nem no
+    // parceiro, nem na fila, nem no log. A rota do parceiro tem `simular` e é
+    // ela que monta o payload de verdade; simular por aqui, remontando à mão,
+    // provaria só que os dois códigos concordam entre si.
+    //
+    // A linha NÃO é reivindicada: simular não pode consumir uma tentativa nem
+    // tirar a linha da fila.
+    if (corpo.simular === true) {
+      if (!filaId) return json({ ok: false, mensagem: "Informe fila_id para simular." }, 400);
+
+      const { data: l, error: errL } = await ds
+        .from("oem_sync_fila")
+        .select("tenant_id, empresa_codigo, filial_codigo, oem_modulo_codigo, quantidade, valor_unitario")
+        .eq("id", filaId)
+        .maybeSingle();
+      if (errL || !l) return json({ ok: false, mensagem: "Linha não encontrada." }, 404);
+
+      const { data: c } = await ds
+        .from("oem_integration")
+        .select("id, api_url")
+        .eq("tenant_id", l.tenant_id)
+        .eq("ativo", true)
+        .limit(1)
+        .maybeSingle();
+      if (!c) return json({ ok: false, mensagem: "Nenhuma conta OEM ativa neste tenant." }, 409);
+      const { data: chave } = await ds.rpc("obter_chave_oem_por_conta", { p_integration_id: c.id });
+      if (!chave) return json({ ok: false, mensagem: "Chave do OEM não encontrada no Vault." }, 409);
+
+      const resp = await fetch(`${String(c.api_url).replace(/\/+$/, "")}/oem-licenca-modulo`, {
+        method: "POST",
+        headers: { "x-api-key": String(chave), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          empresa: l.empresa_codigo,
+          filial: l.filial_codigo,
+          modulo_codigo: l.oem_modulo_codigo,
+          nova_quantidade: Number(l.quantidade ?? 0),
+          ...(l.valor_unitario != null ? { valor_unitario: Number(l.valor_unitario) } : {}),
+          simular: true,
+        }),
+      });
+      const corpoResp = await resp.json().catch(() => null);
+      return json({ ok: resp.ok, simulado: true, http: resp.status, resposta: corpoResp });
+    }
+
     const { data: linhas, error: errC } = await ds.rpc("fn_oem_fila_claim", {
       p_limite: filaId ? 1 : limite,
       p_id: filaId,

@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { AlertTriangle, ChevronDown, ChevronRight, Clock, RefreshCw, RotateCw, Loader2, Play } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Clock, RefreshCw, RotateCw, Loader2, Play, FlaskConical } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 type Item = {
@@ -61,6 +62,8 @@ export default function OemFilaSincronizacaoPanel() {
   const [abertoOk, setAbertoOk] = useState(false);
   const [reprocessando, setReprocessando] = useState<string | null>(null);
   const [rodando, setRodando] = useState(false);
+  const [simulando, setSimulando] = useState<string | null>(null);
+  const [simulacao, setSimulacao] = useState<{ titulo: string; corpo: unknown } | null>(null);
 
   const statusQ = useQuery<Status>({
     queryKey: ["oem-fila-status", tid],
@@ -125,6 +128,24 @@ export default function OemFilaSincronizacaoPanel() {
       toast.error(e?.message ?? "Não deu para reprocessar.");
     } finally {
       setReprocessando(null);
+    }
+  }
+
+  // Pergunta ao parceiro o que ELE faria, sem gravar. A rota do OEM tem
+  // `simular` e é ela que monta o payload de verdade — remontar aqui provaria
+  // só que os dois códigos concordam entre si.
+  async function simular(id: string, titulo: string) {
+    setSimulando(id);
+    try {
+      const { data, error } = await supabase.functions.invoke("oem-sync-processar", {
+        body: { fila_id: id, simular: true },
+      });
+      if (error) throw error;
+      setSimulacao({ titulo, corpo: (data as any)?.resposta ?? data });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Não deu para simular.");
+    } finally {
+      setSimulando(null);
     }
   }
 
@@ -264,6 +285,20 @@ export default function OemFilaSincronizacaoPanel() {
                           : ""}
                       </div>
                     </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                    {i.status !== "ok" && (
+                      <Button
+                        size="sm" variant="ghost" className="gap-1 shrink-0"
+                        onClick={() => simular(i.id, `${i.cliente ?? "—"} · ${ACAO_LABEL[i.acao] ?? i.acao}`)}
+                        disabled={simulando === i.id}
+                        title="Mostra o que seria gravado na licença, sem gravar"
+                      >
+                        {simulando === i.id
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <FlaskConical className="h-3.5 w-3.5" />}
+                        Simular
+                      </Button>
+                    )}
                     {(i.status === "erro" || i.status === "invalido") && (
                       <Button
                         size="sm" variant="outline" className="gap-1 shrink-0"
@@ -276,6 +311,7 @@ export default function OemFilaSincronizacaoPanel() {
                         Tentar de novo
                       </Button>
                     )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -305,6 +341,23 @@ export default function OemFilaSincronizacaoPanel() {
           </>
         )}
       </CardContent>
+
+      {/* O payload cru, sem enfeite: é ele que vai para a licença, e conferir
+          uma versão resumida seria conferir outra coisa. */}
+      <Dialog open={!!simulacao} onOpenChange={(o) => !o && setSimulacao(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Simulação · {simulacao?.titulo}</DialogTitle>
+            <DialogDescription>
+              É isto que seria enviado à licença do parceiro. Nada foi gravado — nem no OEM,
+              nem na ficha, nem na fila.
+            </DialogDescription>
+          </DialogHeader>
+          <pre className="max-h-[60vh] overflow-auto rounded-md border bg-muted/40 p-3 text-xs">
+            {JSON.stringify(simulacao?.corpo ?? {}, null, 2)}
+          </pre>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
