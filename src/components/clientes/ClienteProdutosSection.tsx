@@ -982,11 +982,14 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                               quando não é o mesmo dia — num
                                               lançamento retroativo, ela é o que
                                               explica o número do mês. */}
+                                          {/* Só a data, por decisão do Alexandre. O horário
+                                              existe em cancelado_em desde 21/08/2026 e pode
+                                              voltar aqui a qualquer momento — o registro
+                                              anterior a essa data está todo em 00:00, que é o
+                                              que motivou tirar. */}
                                           {m.cancelado_em && (
                                             <span className="block">
-                                              {new Date(m.cancelado_em).toLocaleString("pt-BR", {
-                                                dateStyle: "short", timeStyle: "short",
-                                              })}
+                                              {new Date(m.cancelado_em).toLocaleDateString("pt-BR")}
                                             </span>
                                           )}
                                           {m.data_inativacao &&
