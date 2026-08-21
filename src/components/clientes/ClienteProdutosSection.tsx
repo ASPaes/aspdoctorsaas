@@ -2564,7 +2564,18 @@ function ModuloDialog({
       // deixar isso numa confirmação opcional era o caminho para o MRR ficar
       // atrás da ficha do cliente. Falha aqui não desfaz o módulo — o módulo já
       // está certo; quem falta é o movimento, e o aviso diz isso.
-      if (!isEdit && (vlrMensal || 0) > 0) {
+      // ...mas SÓ quando a receita não vem dos módulos. Se todos os módulos
+      // ativos do produto têm valor, o gatilho de sincronia já reescreveu a
+      // receita do produto com a soma deles — lançar o movimento por cima
+      // contaria a mesma venda duas vezes. Medido depois de gravar, porque é o
+      // módulo novo que pode mudar essa resposta.
+      const { data: receitaDosModulos } = !isEdit && (vlrMensal || 0) > 0
+        ? await (supabase.rpc as any)("fn_receita_vem_dos_modulos", {
+            p_cliente_produto_id: clienteProdutoId,
+          })
+        : { data: null };
+
+      if (!isEdit && (vlrMensal || 0) > 0 && receitaDosModulos !== true) {
         const qtd = quantidade || 1;
         const nomeModulo = catalogoQuery.data?.find(m => m.id === moduloId)?.nome ?? "módulo";
         const { error: mrrError } = await supabase.from("movimentos_mrr").insert({
