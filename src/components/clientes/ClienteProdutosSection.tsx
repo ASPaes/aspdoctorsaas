@@ -190,6 +190,8 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
   const [motivoModuloId, setMotivoModuloId] = useState<string>("");
   const [dataCancelModulo, setDataCancelModulo] = useState("");
+  const [valorDownsell, setValorDownsell] = useState<number | null>(null);
+  const [downsellTocado, setDownsellTocado] = useState(false);
   const [qtdCancelamento, setQtdCancelamento] = useState(1);
   const [cancelandoModulo, setCancelandoModulo] = useState(false);
   // Cancelar produto é o caminho certo para tirar produto do cliente: a RPC
@@ -513,6 +515,33 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
       }
     },
   });
+
+  // Quanto este módulo soma no MRR HOJE. Não é só o vlr_mensal da linha: venda
+  // feita depois costuma virar movimento, não preço — e foi assim que um
+  // cancelamento passou sem gerar downsell enquanto o upsell continuava valendo.
+  const mrrDoModuloQuery = useQuery<{ quantidade: number; na_linha: number; movimentos: number; total: number } | null>({
+    queryKey: ["mrr_do_modulo", cancelarModulo?.id],
+    enabled: !!cancelarModulo?.id,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("fn_mrr_do_modulo", {
+        p_modulo_linha_id: cancelarModulo!.id,
+      });
+      if (error) throw error;
+      return (data ?? null) as any;
+    },
+  });
+
+  // Sugestão proporcional à quantidade que sai. É convenção, não verdade: o
+  // sistema não sabe qual unidade foi vendida por quanto. Por isso o campo é
+  // editável e a tela mostra a conta.
+  useEffect(() => {
+    if (!cancelarModulo || downsellTocado) return;
+    const m = mrrDoModuloQuery.data;
+    if (!m) return;
+    const qtd = Math.max(Number(m.quantidade) || 1, 1);
+    const proporcional = (Number(m.total) || 0) * (qtdCancelamento / qtd);
+    setValorDownsell(Math.round(proporcional * 100) / 100);
+  }, [cancelarModulo, mrrDoModuloQuery.data, qtdCancelamento, downsellTocado]);
 
   const motivosCancelamentoQuery = useQuery<{ id: number; descricao: string }[]>({
     queryKey: ["motivos_cancelamento", lookupTenantId],
@@ -933,6 +962,8 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                                   setMotivoCancelamento("");
                                                   setMotivoModuloId("");
                                                   setDataCancelModulo(hojeISO());
+                                                  setValorDownsell(null);
+                                                  setDownsellTocado(false);
                                                   setQtdCancelamento(Number(m.quantidade) || 1);
                                                 }}
                                               >
@@ -1196,6 +1227,22 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
             </div>
 
             <div className="space-y-1.5">
+              <Label>Baixa no MRR</Label>
+              <NumericInput value={valorDownsell} onChange={(v) => { setValorDownsell(v); setDownsellTocado(true); }} suffix="R$" />
+              {mrrDoModuloQuery.data && (
+                <p className="text-xs text-muted-foreground">
+                  Este módulo soma <strong>R$ {fmtBRL(mrrDoModuloQuery.data.total)}</strong> no MRR hoje
+                  {Number(mrrDoModuloQuery.data.movimentos) !== 0 && (
+                    <> — R$ {fmtBRL(mrrDoModuloQuery.data.na_linha)} na linha e{" "}
+                    R$ {fmtBRL(mrrDoModuloQuery.data.movimentos)} em movimentos</>
+                  )}
+                  . O valor sugerido é proporcional à quantidade que sai; ajuste se a unidade
+                  cancelada valia outra coisa. Zero não gera movimento.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
               <Label>Observação <span className="text-muted-foreground font-normal">(opcional)</span></Label>
               <Textarea
                 rows={3}
@@ -1368,6 +1415,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                     motivo: motivoCancelamento.trim() || null,
                     motivo_id: motivoModuloId ? Number(motivoModuloId) : null,
                     data: dataCancelModulo || null,
+                    valor_downsell: valorDownsell ?? 0,
                   };
 
                   // A ordem continua a mesma de sempre — OEM primeiro, ficha
@@ -1392,6 +1440,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                       p_motivo: payload.motivo,
                       p_motivo_id: payload.motivo_id,
                       p_data: payload.data,
+                      p_valor_downsell: payload.valor_downsell,
                     });
                     if (error) throw new Error(error.message);
                     toast({ title: "Módulo cancelado", description: detalhe });
