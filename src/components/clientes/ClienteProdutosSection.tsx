@@ -122,7 +122,10 @@ interface ClienteProdutoModulo {
   // unitário pela quantidade inventa um número que ele nunca cobrou.
   vlr_custo_total?: number | null;
   data_ativacao: string | null;
+  // Duas coisas diferentes: `data_inativacao` é a partir de quando o
+  // cancelamento vale; `cancelado_em`, quando alguém o registrou.
   data_inativacao: string | null;
+  cancelado_em?: string | null;
   // A venda do módulo tem dono próprio: módulo somado meses depois costuma ser
   // de outro vendedor/canal que o produto original.
   data_venda?: string | null;
@@ -419,6 +422,39 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     },
   });
 
+  // O downsell dos caminhos que NÃO passam pelo parceiro (inativar módulo
+  // manual e cancelar produto). Mesma regra dos demais: onde a receita já vem
+  // dos módulos, o gatilho de sincronia baixa o valor do produto sozinho e um
+  // movimento aqui contaria a mesma saída duas vezes.
+  const registrarDownsell = async (args: {
+    clienteProdutoId: string; valorDelta: number; custoDelta: number;
+    descricao: string; moduloId?: string | null;
+  }) => {
+    if (args.valorDelta >= 0) return;
+    const { data: dosModulos } = await (supabase.rpc as any)("fn_receita_vem_dos_modulos", {
+      p_cliente_produto_id: args.clienteProdutoId,
+    });
+    if (dosModulos === true) return;
+    const { error } = await supabase.from("movimentos_mrr").insert({
+      tenant_id: tid,
+      cliente_id: clienteId,
+      tipo: "downsell",
+      data_movimento: hojeISO(),
+      valor_delta: args.valorDelta,
+      custo_delta: args.custoDelta,
+      descricao: args.descricao,
+      cliente_produto_modulo_id: args.moduloId ?? null,
+      status: "ativo",
+    } as any);
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Feito, mas o downsell não entrou",
+        description: `${error.message} — registre o movimento à mão em Movimentos MRR.`,
+      });
+    }
+  };
+
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ["cliente_produtos", tid, clienteId] });
     qc.invalidateQueries({ queryKey: ["cliente_produto_modulos", tid, clienteId] });
@@ -538,17 +574,18 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
       setCancelarProduto(null);
       invalidateAll();
       // Só cancelar_contrato grava churn. Quando o produto apenas sai de um
-      // contrato com outros itens, o MRR não registra nada sozinho — daí a
-      // sugestão de downsell, igual ao que a inativação de módulo faz.
+      // contrato com outros itens, o MRR não registra nada sozinho — o
+      // downsell é lançado aqui, sem perguntar. A confirmação com "Pular" era
+      // o caminho para a receita ficar no MRR depois de o cliente parar de
+      // pagar por ela.
       if (!r.contrato_cancelado && (Number(prod.vlr_mensal) || 0) > 0) {
-        setMrrDialog({
-          open: true,
-          tipo: "downsell",
+        await registrarDownsell({
+          clienteProdutoId: prod.id,
           valorDelta: -(Number(prod.vlr_mensal) || 0),
           custoDelta: -(Number(prod.vlr_custo) || 0),
           descricao: `Produto ${prod.produtos?.nome ?? ""} cancelado`,
-          moduloId: null,
         });
+        invalidateAll();
       }
     } catch (e: any) {
       toast({ variant: "destructive", title: "Não deu para cancelar", description: e?.message });
@@ -583,16 +620,17 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     onSuccess: (_, m) => {
       toast({ title: "Módulo atualizado" });
       invalidateAll();
-      // Se foi inativação (estava ativo) e tinha valor mensal, sugerir downsell
+      // Inativou um módulo que tinha receita: o downsell entra sozinho. Só
+      // aparece aqui módulo digitado à mão — o do OEM sai pelo X, que passa
+      // pela fila e lança o movimento do lado do banco.
       if (m.ativo && (Number(m.vlr_mensal) || 0) > 0) {
-        setMrrDialog({
-          open: true,
-          tipo: "downsell",
+        void registrarDownsell({
+          clienteProdutoId: m.cliente_produto_id,
           valorDelta: -((Number(m.vlr_mensal) || 0) * (Number(m.quantidade) || 1)),
           custoDelta: -custoLinhaModulo(m),
           descricao: `Módulo ${m.produto_modulos?.nome ?? ""} inativado`,
           moduloId: m.id,
-        });
+        }).then(invalidateAll);
       }
     },
     onError: (err: any) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
@@ -905,7 +943,30 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                           </Tooltip>
                                         </div>
                                       ) : (
-                                        <span className="text-xs text-muted-foreground">Cancelado</span>
+                                        <div className="text-xs text-muted-foreground leading-tight">
+                                          <span>Cancelado</span>
+                                          {/* Duas datas diferentes, e só uma delas
+                                              costuma interessar: quando foi
+                                              registrado. A vigência só aparece
+                                              quando não é o mesmo dia — num
+                                              lançamento retroativo, ela é o que
+                                              explica o número do mês. */}
+                                          {m.cancelado_em && (
+                                            <span className="block">
+                                              {new Date(m.cancelado_em).toLocaleString("pt-BR", {
+                                                dateStyle: "short", timeStyle: "short",
+                                              })}
+                                            </span>
+                                          )}
+                                          {m.data_inativacao &&
+                                            (!m.cancelado_em ||
+                                              m.data_inativacao !== m.cancelado_em.slice(0, 10)) && (
+                                            <span className="block">
+                                              vigência {new Date(m.data_inativacao + "T00:00:00")
+                                                .toLocaleDateString("pt-BR")}
+                                            </span>
+                                          )}
+                                        </div>
                                       )
                                     ) : (
                                     <div className="flex items-center justify-end gap-0.5">
