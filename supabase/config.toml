@@ -199,6 +199,14 @@ verify_jwt = true
 [functions.oem-espelho-sync]
 verify_jwt = true
 
+# Processa a oem_sync_fila. verify_jwt = FALSE de propósito: quem chama de 2 em
+# 2 minutos é o cron_oem_sync, e o Bearer dele é o segredo do Vault, não um JWT
+# — o gateway recusaria antes de a função rodar. A autenticação é feita por
+# dentro: ou o segredo confere (fn_oem_cron_secret_ok), ou é um JWT de
+# admin/head. Chamada anônima não passa.
+[functions.oem-sync-processar]
+verify_jwt = false
+
 # Cancela um módulo da licença: dá a baixa no OEM (via DoctorOEM) e só então na
 # ficha. Chamada pelo NAVEGADOR com o token da pessoa — é ela que assina o
 # cancelamento no histórico —, por isso verify_jwt = true; a checagem de papel
