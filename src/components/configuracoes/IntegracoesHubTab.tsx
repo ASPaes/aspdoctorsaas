@@ -17,13 +17,13 @@ function tabelaAusente(error: unknown): boolean {
 }
 
 async function carregarStatus(tid: string): Promise<Mapa> {
-  const [omie, hiper, oem, acessofast] = await Promise.all([
+  const [omie, hiper, oem, tenant] = await Promise.all([
     supabase.from("omie_integration").select("ativo").eq("tenant_id", tid),
     (supabase.from("hiper_integration" as any) as any).select("ativo").eq("tenant_id", tid),
     (supabase.from("oem_integration_status" as any) as any).select("ativo").eq("tenant_id", tid),
-    (supabase.from("acessofast_integration" as any) as any)
-      .select("tenant_id")
-      .eq("tenant_id", tid)
+    (supabase.from("tenants" as any) as any)
+      .select("acessofast_enabled")
+      .eq("id", tid)
       .maybeSingle(),
   ]);
 
@@ -48,10 +48,10 @@ async function carregarStatus(tid: string): Promise<Mapa> {
     oem: nOem ? { kind: "conectado", detalhe: nOem > 1 ? `${nOem} contas` : undefined } : { kind: "desconectado" },
   };
 
-  // Deixou de ser flag de contratação: agora é a chave de integração colada pelo
-  // cliente, que é o que amarra a empresa do AcessoFast à empresa daqui.
-  if (acessofast.error && !tabelaAusente(acessofast.error)) throw acessofast.error;
-  mapa.acessofast = acessofast.data ? { kind: "conectado" } : { kind: "desconectado" };
+  if (tenant.error && !tabelaAusente(tenant.error)) throw tenant.error;
+  mapa.acessofast = (tenant.data as { acessofast_enabled?: boolean } | null)?.acessofast_enabled
+    ? { kind: "ativo" }
+    : { kind: "desconectado" };
 
   return mapa;
 }

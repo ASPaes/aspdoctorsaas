@@ -5,6 +5,7 @@ import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages"
 import { ChatHeader } from "./ChatHeader";
 import { ClientAlertBanner } from "./ClientAlertBanner";
 import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
+import { useAcessoFastComposer } from "@/hooks/useAcessoFastComposer";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { DetailsSidebar } from "./DetailsSidebar";
@@ -51,6 +52,12 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   const { status: presenceStatus, isBlocked: presenceBlocked } = useAgentPresence();
   const chatInputRef = useRef<ChatInputHandle>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+
+  // A janelinha do AcessoFast manda as instruções de instalação para o chat.
+  // Escreve no campo; enviar continua sendo ato do operador.
+  useAcessoFastComposer(useCallback((texto: string) => {
+    chatInputRef.current?.insertText(texto);
+  }, []));
 
   // Selection mode
   const [selectionMode, setSelectionMode] = useState(false);

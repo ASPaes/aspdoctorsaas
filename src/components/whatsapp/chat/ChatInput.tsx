@@ -64,7 +64,11 @@ const setDraft = (id: string, mode: ComposerMode, val: string) => {
   } catch { /* noop */ }
 };
 
-export type ChatInputHandle = { handleExternalDrop: (files: FileList | File[]) => void };
+export type ChatInputHandle = {
+  handleExternalDrop: (files: FileList | File[]) => void;
+  /** Escreve no campo (nunca envia). Hoje: o texto que vem da janelinha do AcessoFast. */
+  insertText: (texto: string) => void;
+};
 
 export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled, isGroup, groupJid, instanceId }, ref) {
   const [mode, setMode] = useState<ComposerMode>("message");
@@ -202,6 +206,18 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     handleExternalDrop: (files: FileList | File[]) => {
       const accepted = validateAndAttachFiles(files);
       maybeOpenMediaPreview(accepted);
+    },
+    // Escreve, não envia: quem aperta Enter é a pessoa. Volta para o modo
+    // "message" porque o texto é para o cliente, não nota interna nem rascunho.
+    insertText: (texto: string) => {
+      setMode("message");
+      setMessage((atual) => (atual.trim() ? `${atual.trimEnd()}\n\n${texto}` : texto));
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      });
     },
   }), [mode, attachedFiles]);
 

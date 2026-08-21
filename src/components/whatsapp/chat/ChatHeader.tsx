@@ -822,7 +822,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               />
             )}
 
-            <AcessoFastButton conversationId={conversation.id} tenantId={conversation.tenant_id} />
+            <AcessoFastButton
+              conversationId={conversation.id}
+              tenantId={conversation.tenant_id}
+              cnpj={isLinked ? (linkedCliente as any)?.cnpj_digits : null}
+              nome={linkedClienteName || contact?.name || null}
+            />
 
             <Tooltip>
               <TooltipTrigger asChild>

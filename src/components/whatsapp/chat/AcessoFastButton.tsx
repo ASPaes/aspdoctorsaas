@@ -8,13 +8,17 @@ import { openAcessoFast } from "@/lib/acessofast";
 interface Props {
   conversationId: string;
   tenantId: string | null | undefined;
+  /** CNPJ do cliente vinculado. Com ele a janelinha abre direto nas máquinas. */
+  cnpj?: string | null;
+  /** Nome da empresa vinculada; sem cliente, o nome do contato. */
+  nome?: string | null;
 }
 
 /**
  * Abre a janelinha do AcessoFast já apontada para esta conversa, para acesso
- * remoto na máquina do cliente. Some para tenants sem a flag `acessofast_enabled`.
+ * remoto na máquina do cliente. Some para tenants sem o AcessoFast liberado.
  */
-export function AcessoFastButton({ conversationId, tenantId }: Props) {
+export function AcessoFastButton({ conversationId, tenantId, cnpj, nome }: Props) {
   const { canAccess } = useAcessoFastAccess();
 
   if (!canAccess || !tenantId) return null;
@@ -22,7 +26,7 @@ export function AcessoFastButton({ conversationId, tenantId }: Props) {
   // Sem async/await aqui: o navegador só libera window.open como resposta
   // imediata ao clique. Qualquer espera antes e o popup é bloqueado.
   const handleClick = () => {
-    const win = openAcessoFast(tenantId, conversationId);
+    const win = openAcessoFast(tenantId, conversationId, { cnpj, nome });
     if (!win) {
       toast.error("O navegador bloqueou a janela do AcessoFast. Libere o popup para este site.");
     }

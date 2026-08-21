@@ -3,29 +3,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 /**
- * Libera o botão de acesso remoto (AcessoFast) no chat.
+ * Libera o botão de acesso remoto (AcessoFast) no chat, por tenant.
  *
- * O portão é a integração conectada — a chave que o cliente colou em
- * Configurações → Integrações → AcessoFast. Antes era a flag
- * `tenants.acessofast_enabled`, que dizia "contratou" mas não dizia "está
- * conectado": o botão aparecia mesmo sem credencial nenhuma do outro lado.
- *
- * Sem `is_super_admin` como bypass, de propósito: o super admin simulando um
- * tenant sem integração veria um botão que não resolve nada.
+ * É uma flag de contratação e não uma conexão: a integração não tem credencial.
+ * A janelinha do AcessoFast roda na sessão do próprio técnico e recebe tudo pela
+ * URL — não há chave para guardar nem estado para conectar.
  */
 export function useAcessoFastAccess() {
   const { profile } = useAuth();
   const tenantId = profile?.tenant_id ?? null;
 
   const q = useQuery<boolean>({
-    queryKey: ["acessofast-access", tenantId],
+    queryKey: ["tenant-acessofast-enabled", tenantId],
     enabled: !!tenantId,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await (supabase.from("acessofast_integration" as any) as any)
-        .select("tenant_id").eq("tenant_id", tenantId).maybeSingle();
+      const { data, error } = await (supabase.from("tenants" as any) as any)
+        .select("acessofast_enabled").eq("id", tenantId).maybeSingle();
       if (error) throw error;
-      return !!data;
+      return !!(data as any)?.acessofast_enabled;
     },
   });
 

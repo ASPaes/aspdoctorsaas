@@ -7,7 +7,9 @@
  * descrição e o grupo de negócio; o status vem do banco, medido por integração.
  *
  * `section` é o valor de `?section=` das Configurações. Item sem `section` não é
- * clicável — hoje só o Asaas, que ainda não tem tela.
+ * clicável: ou não tem tela ainda (Asaas) ou não há o que configurar por aqui
+ * (AcessoFast, que é uma flag de contratação por tenant — a integração não tem
+ * credencial: a janelinha recebe tudo pela URL).
  */
 
 export type IntegracaoStatus =
@@ -85,10 +87,6 @@ export const INTEGRACOES_CATALOGO: GrupoIntegracoes[] = [
         id: "acessofast",
         nome: "AcessoFast",
         descricao: "Acesso remoto à máquina do cliente pelo botão Conectar, dentro do chat.",
-        // Sem `resource`: o recurso teria de existir em `resources`, e um recurso
-        // não registrado esconde o card nos 10 tenants com RBAC ligado. Quem pode
-        // conectar é decidido na própria tela e, de verdade, na RPC.
-        section: "integracoes-acessofast",
       },
     ],
   },

@@ -240,7 +240,6 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
             { value: "integracoes-omie", label: "Omie" },
             { value: "integracoes-hiper", label: "Hiper" },
             { value: "integracoes-oem", label: "OEM" },
-            { value: "integracoes-acessofast", label: "AcessoFast" },
           ],
         },
       ],
