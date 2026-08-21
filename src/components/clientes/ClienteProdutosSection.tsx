@@ -2392,12 +2392,12 @@ function ModuloDialog({
     }
   }, [open, edit, produtoDataAtivacao, produtoFuncionarioId, produtoOrigemVendaId]);
 
-  const catalogoQuery = useQuery<{ id: string; nome: string; descricao: string | null }[]>({
+  const catalogoQuery = useQuery<{ id: string; nome: string; descricao: string | null; oem_modulo_codigo: number | null }[]>({
     queryKey: ["catalogo_modulos_produto", tid, produtoId],
     enabled: !!produtoId && open,
     queryFn: async () => {
       const { data, error } = await (supabase.from("produto_modulos" as any) as any)
-        .select("id, nome, descricao")
+        .select("id, nome, descricao, oem_modulo_codigo")
         .eq("produto_id", produtoId)
         .eq("ativo", true)
         .order("nome");
@@ -2464,12 +2464,12 @@ function ModuloDialog({
     );
   }, [vinculosOem, filialOemQuery.data]);
 
-  const precosOemQuery = useQuery<{ modulo_nome: string; valor_unitario: number | null }[]>({
+  const precosOemQuery = useQuery<{ modulo_codigo: number | null; valor_unitario: number | null }[]>({
     queryKey: ["oem-precos-da-coluna", colunaOem?.conta_integration_id, colunaOem?.produto_codigo],
     enabled: open && !!colunaOem,
     queryFn: async () => {
       const { data, error } = await (supabase.from("oem_espelho_modulo_preco" as any) as any)
-        .select("modulo_nome, valor_unitario")
+        .select("modulo_codigo, valor_unitario")
         .eq("conta_integration_id", colunaOem!.conta_integration_id)
         .eq("produto_codigo", colunaOem!.produto_codigo);
       if (error) throw error;
@@ -2477,19 +2477,59 @@ function ModuloDialog({
     },
   });
 
-  // Casa pelo nome normalizado, como fn_norm_nome_modulo faz do lado do banco.
-  const custoOemPorModulo = useMemo(() => {
-    const m = new Map<string, number>();
+  // Casa por CODIGO, nunca por nome. O OEM chama o mesmo modulo de dois jeitos
+  // -- "Licenca PDV" na licenca do cliente e "PDV/Comandas" na grade de precos
+  // -- e casar por texto deixava o modulo mais comum de todos (2.512 licencas)
+  // sem custo, em silencio.
+  const precoDaGradePorCodigo = useMemo(() => {
+    const m = new Map<number, number>();
     for (const linha of precosOemQuery.data ?? []) {
-      m.set(normNomeModulo(linha.modulo_nome), Number(linha.valor_unitario) || 0);
+      if (linha.modulo_codigo != null) m.set(Number(linha.modulo_codigo), Number(linha.valor_unitario) || 0);
     }
     return m;
   }, [precosOemQuery.data]);
 
-  const nomeModuloSelecionado = catalogoQuery.data?.find(m => m.id === moduloId)?.nome ?? "";
-  const custoOem = moduloId && nomeModuloSelecionado
-    ? custoOemPorModulo.get(normNomeModulo(nomeModuloSelecionado))
+  // O que o parceiro cobra DESTE cliente. Vale mais que a tabela: o OEM da
+  // unidade gratis e credito, e ai o preco de lista mentiria.
+  const precoDaLicencaQuery = useQuery<Map<number, number>>({
+    queryKey: ["oem-precos-da-licenca", lookupTid ?? tid, oemCodigoFilial],
+    enabled: open && !!oemCodigoFilial,
+    queryFn: async () => {
+      let q = (supabase.from("oem_espelho_filial" as any) as any)
+        .select("modulos")
+        .eq("filial_codigo", oemCodigoFilial as string)
+        .order("atualizado_em", { ascending: false })
+        .limit(1);
+      const t = lookupTid ?? tid;
+      if (t) q = q.eq("tenant_id", t);
+      const { data, error } = await q;
+      if (error) throw error;
+      const mapa = new Map<number, number>();
+      const lista = ((data ?? [])[0]?.modulos ?? []) as any[];
+      if (Array.isArray(lista)) {
+        for (const m of lista) {
+          if (m?.ativo === false || m?.codigo == null) continue;
+          mapa.set(Number(m.codigo), Number(m.valor_unitario ?? m.valorUnitario ?? 0) || 0);
+        }
+      }
+      return mapa;
+    },
+  });
+
+  const moduloSelecionado = catalogoQuery.data?.find(m => m.id === moduloId);
+  const codigoOemSelecionado = moduloSelecionado?.oem_modulo_codigo ?? null;
+  // Licenca primeiro, tabela como reserva: modulo que o cliente ja tem custa o
+  // que o parceiro cobra dele; modulo novo custa o preco de lista, que e o que
+  // ele vai passar a custar.
+  const custoDaLicenca = codigoOemSelecionado != null
+    ? precoDaLicencaQuery.data?.get(codigoOemSelecionado)
     : undefined;
+  const custoDaGrade = codigoOemSelecionado != null
+    ? precoDaGradePorCodigo.get(codigoOemSelecionado)
+    : undefined;
+  const custoOem = custoDaLicenca ?? custoDaGrade;
+  const fonteDoCusto: "licenca" | "tabela" | null =
+    custoDaLicenca !== undefined ? "licenca" : custoDaGrade !== undefined ? "tabela" : null;
   // Módulo que não está na grade do parceiro continua digitável: pode ser um
   // serviço que só o DoctorSaaS cobra.
   const custoTravadoPeloOem = custoOem !== undefined;
@@ -2652,7 +2692,9 @@ function ModuloDialog({
             <NumericInput value={vlrCusto} onChange={setVlrCusto} suffix="R$" disabled={custoTravadoPeloOem} />
             {custoTravadoPeloOem && (
               <p className="text-xs text-muted-foreground">
-                Custo de tabela do OEM{colunaOem?.produto_nome ? ` · ${colunaOem.produto_nome}` : ""} — não editável aqui.
+                {fonteDoCusto === "licenca"
+                  ? "O que o OEM cobra deste cliente hoje — não editável aqui."
+                  : `Custo de tabela do OEM${colunaOem?.produto_nome ? ` · ${colunaOem.produto_nome}` : ""} — não editável aqui.`}
               </p>
             )}
           </div>
