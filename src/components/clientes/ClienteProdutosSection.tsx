@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   Package, Plus, Pencil, Trash2, ChevronDown, ChevronRight,
-  ExternalLink, Loader2, Puzzle, Percent, AlertTriangle, Paperclip, X, XCircle,
+  ExternalLink, Loader2, Puzzle, Percent, AlertTriangle, Paperclip, X, XCircle, Clock,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -93,6 +93,20 @@ interface ClienteProduto {
   ativo: boolean;
   produtos?: { nome: string } | null;
   fornecedores?: { nome: string } | null;
+}
+
+// Uma escrita esperando o parceiro. Enquanto ela existe, a ficha ainda não
+// mudou — é justamente isso que o selo na tela precisa dizer.
+interface PendenciaOem {
+  fila_id: string;
+  cliente_produto_id: string | null;
+  modulo_linha_id: string | null;
+  modulo_catalogo_id: string | null;
+  modulo: string | null;
+  acao: string;
+  quantidade: number | null;
+  status: string;
+  ultimo_erro: string | null;
 }
 
 interface ClienteProdutoModulo {
@@ -232,6 +246,43 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     });
     return map;
   }, [modulosQuery.data]);
+
+  // O que está esperando o parceiro. Sem isto a pessoa clica em Salvar, não vê
+  // nada mudar na ficha — porque a ficha só muda depois do aceite — e conclui
+  // que falhou. Aí clica de novo.
+  const pendenciasOemQuery = useQuery<PendenciaOem[]>({
+    queryKey: ["oem_pendencias_cliente", clienteId],
+    enabled: !!clienteId,
+    // O processamento é de 2 em 2 minutos; meio minuto de defasagem na tela é
+    // barato e mantém o selo vivo sem virar fonte de carga.
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("fn_oem_pendencias_do_cliente", {
+        p_cliente_id: clienteId,
+      });
+      if (error) throw error;
+      return (data ?? []) as PendenciaOem[];
+    },
+  });
+
+  const pendenciaPorLinha = useMemo(() => {
+    const m = new Map<string, PendenciaOem>();
+    for (const p of pendenciasOemQuery.data ?? []) {
+      if (p.modulo_linha_id) m.set(p.modulo_linha_id, p);
+    }
+    return m;
+  }, [pendenciasOemQuery.data]);
+
+  // Módulo que ainda NÃO existe na ficha, porque o parceiro não confirmou.
+  // Aparece como linha fantasma para o pedido não ficar invisível.
+  const pendenciasNovasPorProduto = useMemo(() => {
+    const map: Record<string, PendenciaOem[]> = {};
+    for (const p of pendenciasOemQuery.data ?? []) {
+      if (p.modulo_linha_id || !p.cliente_produto_id) continue;
+      (map[p.cliente_produto_id] ||= []).push(p);
+    }
+    return map;
+  }, [pendenciasOemQuery.data]);
 
   // ---- Anexos de contrato ----
   const contratoItensQuery = useQuery<{ cliente_produto_id: string; contrato_id: string }[]>({
@@ -376,6 +427,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     qc.invalidateQueries({ queryKey: ["contrato_itens_cliente", tid, clienteId] });
     qc.invalidateQueries({ queryKey: ["contratos_totais_check", tid, clienteId] });
     qc.invalidateQueries({ queryKey: ["has_non_implicit_contratos", tid, clienteId] });
+    qc.invalidateQueries({ queryKey: ["oem_pendencias_cliente", clienteId] });
   };
 
   // ---- Mutations ----
@@ -782,6 +834,24 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                         OEM
                                       </Badge>
                                     )}
+                                    {/* O pedido já foi mandado e a ficha ainda
+                                        não mudou — sem dizer isso, a pessoa
+                                        acha que não salvou e clica de novo. */}
+                                    {pendenciaPorLinha.has(m.id) && (
+                                      <span
+                                        className="ml-2 inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-400"
+                                        title={pendenciaPorLinha.get(m.id)?.ultimo_erro
+                                          ?? "O pedido está na fila. A ficha muda quando o parceiro aceitar."}
+                                      >
+                                        <Clock className="h-3 w-3" />
+                                        {pendenciaPorLinha.get(m.id)?.status === "erro"
+                                          ? "OEM recusou — na fila"
+                                          : `aguardando o parceiro${
+                                              pendenciaPorLinha.get(m.id)?.acao === "quantidade"
+                                                ? ` · para ${pendenciaPorLinha.get(m.id)?.quantidade}`
+                                                : ""}`}
+                                      </span>
+                                    )}
                                   </TableCell>
                                   <TableCell className="text-center">{Number(m.quantidade) || 1}</TableCell>
                                   <TableCell className="text-right">
@@ -851,6 +921,30 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                     </div>
                                     )}
                                   </TableCell>
+                                </TableRow>
+                              ))}
+                              {/* Pedido de módulo NOVO: a linha da ficha só
+                                  nasce depois do aceite, mas o pedido não pode
+                                  ficar invisível até lá. */}
+                              {(pendenciasNovasPorProduto[p.id] ?? []).map((pend) => (
+                                <TableRow key={pend.fila_id} className="opacity-70">
+                                  <TableCell>
+                                    <span className="italic">{pend.modulo ?? "Módulo"}</span>
+                                    <span
+                                      className="ml-2 inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-400"
+                                      title={pend.ultimo_erro ?? "O pedido está na fila. Entra na ficha quando o parceiro aceitar."}
+                                    >
+                                      <Clock className="h-3 w-3" />
+                                      {pend.status === "erro" ? "OEM recusou — na fila" : "aguardando o parceiro"}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-center">{pend.quantidade ?? 1}</TableCell>
+                                  <TableCell className="text-right text-muted-foreground">—</TableCell>
+                                  <TableCell className="text-right text-muted-foreground">—</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-[10px]">Pendente</Badge>
+                                  </TableCell>
+                                  <TableCell />
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -2608,18 +2702,71 @@ function ModuloDialog({
           .maybeSingle();
         if (errBusca) throw errBusca;
 
+        const antes = existente ? Number((existente as any).quantidade) || 1 : 0;
+        const alvo = antes + (quantidade || 1);
+
+        // O parceiro decide antes da ficha. A licença é a verdade: mudar aqui e
+        // torcer para o OEM aceitar é como as duas bases divergem sem ninguém
+        // perceber. Se ele aceitar, o processador termina o serviço — cria a
+        // linha ou sobe a quantidade — e é lá que o upsell nasce.
+        const payloadFila = {
+          vlr_mensal: vlrMensal || 0,
+          vlr_custo: vlrCusto || 0,
+          vlr_ativacao: vlrAtivacao || 0,
+          data_ativacao: dataAt || null,
+          data_venda: dataVenda || null,
+          funcionario_id: funcionarioId ? Number(funcionarioId) : null,
+          origem_venda_id: origemVendaId ? Number(origemVendaId) : null,
+          origem_venda: origensVendaQuery.data?.find(o => String(o.id) === origemVendaId)?.nome ?? null,
+        };
+
+        const { data: filaId, error: errFila } = existente
+          ? await (supabase.rpc as any)("fn_oem_enfileirar", {
+              p_modulo_linha_id: (existente as any).id,
+              p_acao: "quantidade",
+              p_quantidade: alvo,
+              p_payload: payloadFila,
+            })
+          : await (supabase.rpc as any)("fn_oem_enfileirar_novo", {
+              p_cliente_produto_id: clienteProdutoId,
+              p_modulo_id: moduloId,
+              p_quantidade: quantidade || 1,
+              p_payload: payloadFila,
+            });
+        if (errFila) throw new Error(errFila.message);
+
+        if (filaId) {
+          // Enfileirou: pede o processamento na hora para não fazer ninguém
+          // esperar os 2 minutos do cron no caminho feliz.
+          const { data: proc } = await supabase.functions.invoke("oem-sync-processar", {
+            body: { fila_id: filaId },
+          });
+          const r = (proc ?? {}) as { ok_count?: number };
+          if ((r.ok_count ?? 0) > 0) {
+            toast({
+              title: existente ? "Quantidade alterada no OEM e na ficha" : "Módulo ativado no OEM e na ficha",
+              description: existente ? `${antes} → ${alvo}.` : undefined,
+            });
+          } else {
+            toast({
+              title: "Enviado ao OEM — aguardando confirmação",
+              description: "A ficha só muda quando o parceiro aceitar. O andamento está em Integrações › OEM › Fila.",
+            });
+          }
+          onSaved();
+          onClose();
+          return;
+        }
+
+        // Sem licença no parceiro (módulo digitado à mão): grava só aqui, como
+        // sempre foi.
         if (existente) {
-          const antes = Number((existente as any).quantidade) || 1;
-          const novaQtd = antes + (quantidade || 1);
-          // quantidade_manual junto: sem ele a próxima carga do espelho
-          // devolveria a quantidade antiga e o acréscimo sumiria sozinho. O
-          // próprio espelho limpa essa trava quando o OEM confirmar o número.
           const { error } = await (supabase.from("cliente_produto_modulos" as any) as any)
-            .update({ quantidade: novaQtd, quantidade_manual: novaQtd })
+            .update({ quantidade: alvo, quantidade_manual: alvo })
             .eq("id", (existente as any).id);
           if (error) throw error;
           novoModuloId = (existente as any).id;
-          somouQuantidade = { antes, depois: novaQtd };
+          somouQuantidade = { antes, depois: alvo };
         } else {
           const { data: novo, error } = await (supabase.from("cliente_produto_modulos" as any) as any).insert({
             ...payload,
