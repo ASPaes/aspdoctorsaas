@@ -2509,7 +2509,12 @@ function ModuloDialog({
       if (Array.isArray(lista)) {
         for (const m of lista) {
           if (m?.ativo === false || m?.codigo == null) continue;
-          mapa.set(Number(m.codigo), Number(m.valor_unitario ?? m.valorUnitario ?? 0) || 0);
+          const unit = Number(m.valor_unitario ?? m.valorUnitario ?? 0) || 0;
+          const total = Number(m.valor_total ?? m.valorTotal ?? m.total ?? 0) || 0;
+          // Cobrança zero é custo zero. O OEM registra um unitário mesmo na
+          // unidade que ele dá de cortesia — mostrar esse número faria a ficha
+          // cobrar do cliente um custo que o parceiro não cobra de nós.
+          mapa.set(Number(m.codigo), total === 0 ? 0 : unit);
         }
       }
       return mapa;
