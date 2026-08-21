@@ -1206,26 +1206,62 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                 if (!cancelarModulo) return;
                 setCancelandoModulo(true);
                 try {
-                  // Pela edge function, não pelo RPC direto: é ela que dá a
-                  // baixa no OEM antes de mexer na ficha. Chamar o RPC daqui
-                  // cancelaria só de um lado.
-                  const { data, error } = await supabase.functions.invoke("oem-cancelar-modulo", {
-                    body: {
-                      modulo_id: cancelarModulo.id,
-                      quantidade: qtdCancelamento,
-                      motivo: motivoCancelamento.trim() || null,
-                      motivo_id: motivoModuloId ? Number(motivoModuloId) : null,
-                      data: dataCancelModulo || null,
-                    },
+                  const nome = cancelarModulo.produto_modulos?.nome ?? "Módulo";
+                  const detalhe = `${nome} · ${qtdCancelamento} de ${Number(cancelarModulo.quantidade) || 1}.`;
+                  const payload = {
+                    quantidade_cancelar: qtdCancelamento,
+                    motivo: motivoCancelamento.trim() || null,
+                    motivo_id: motivoModuloId ? Number(motivoModuloId) : null,
+                    data: dataCancelModulo || null,
+                  };
+
+                  // A ordem continua a mesma de sempre — OEM primeiro, ficha
+                  // depois —, só que agora ela mora numa linha de fila em vez de
+                  // acontecer dentro deste clique. Recusa do parceiro fica
+                  // escrita em Integrações › OEM › Fila, com o motivo, em vez de
+                  // sumir junto com este aviso.
+                  const { data: filaId, error: errF } = await (supabase.rpc as any)("fn_oem_enfileirar", {
+                    p_modulo_linha_id: cancelarModulo.id,
+                    p_acao: "cancelar",
+                    p_quantidade: qtdCancelamento,
+                    p_payload: payload,
                   });
-                  const r = (data ?? {}) as { ok?: boolean; mensagem?: string; baixa_no_oem?: boolean };
-                  if (error || r.ok === false) {
-                    throw new Error(r.mensagem || error?.message || "Não deu para cancelar.");
+                  if (errF) throw new Error(errF.message);
+
+                  // Módulo digitado à mão não tem licença no parceiro: a fila
+                  // devolve null e o cancelamento é só daqui.
+                  if (!filaId) {
+                    const { error } = await (supabase.rpc as any)("fn_cancelar_modulo_cliente", {
+                      p_id: cancelarModulo.id,
+                      p_quantidade: qtdCancelamento,
+                      p_motivo: payload.motivo,
+                      p_motivo_id: payload.motivo_id,
+                      p_data: payload.data,
+                    });
+                    if (error) throw new Error(error.message);
+                    toast({ title: "Módulo cancelado", description: detalhe });
+                    setCancelarModulo(null);
+                    invalidateAll();
+                    return;
                   }
-                  toast({
-                    title: r.baixa_no_oem ? "Cancelado no OEM e na ficha" : "Módulo cancelado",
-                    description: `${cancelarModulo.produto_modulos?.nome ?? "Módulo"} · ${qtdCancelamento} de ${Number(cancelarModulo.quantidade) || 1}.`,
+
+                  // Enfileirou: pede o processamento agora para não fazer
+                  // ninguém esperar os 2 minutos do cron no caminho feliz.
+                  const { data: proc } = await supabase.functions.invoke("oem-sync-processar", {
+                    body: { fila_id: filaId },
                   });
+                  const r = (proc ?? {}) as { ok_count?: number; erros?: number };
+
+                  if ((r.ok_count ?? 0) > 0) {
+                    toast({ title: "Cancelado no OEM e na ficha", description: detalhe });
+                  } else {
+                    // Nada de "deu erro e acabou": a linha está viva, o motivo
+                    // está escrito e o cron tenta de novo sozinho.
+                    toast({
+                      title: "O OEM não aceitou agora — está na fila",
+                      description: `${detalhe} A ficha só muda quando o parceiro aceitar. O motivo está em Integrações › OEM › Fila.`,
+                    });
+                  }
                   setCancelarModulo(null);
                   invalidateAll();
                 } catch (e: any) {
