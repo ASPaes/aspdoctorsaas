@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Agosto / 2026
 
+### 21/08
+
+- 🆕 **Integrações — OEM** — **Toda alteração enviada à licença do parceiro agora passa por uma fila, e o que falha fica visível com o motivo.** Até aqui a única escrita para o OEM — o cancelamento de módulo — era feita na hora, dentro do clique: se o parceiro recusasse, o motivo aparecia num aviso de tela e sumia; ninguém mais ficava sabendo. Agora existe a aba **Fila**, no mesmo formato da do Omie: a ação entra na fila, um processador roda **de 2 em 2 minutos**, e a linha que não passou fica lá com **o motivo escrito**, o número de tentativas e um botão **Tentar de novo**. O que dá certo continua dando certo na hora — a fila tenta imediatamente e o processador é a rede de segurança. Se o próprio processador parar, a aba avisa em vez de parecer que a fila está vazia.
+
 ### 20/08
 
 - 🆕 **WhatsApp — Acesso remoto** — **Dá para abrir o acesso remoto na máquina do cliente sem sair da conversa.** Antes, atender alguém com problema no computador exigia largar o chat, abrir o painel do AcessoFast em outra aba, procurar o cliente numa lista e só então chegar na máquina. Agora o cabeçalho da conversa tem um botão de **acesso remoto**: um clique abre uma janelinha do AcessoFast já apontada para aquela conversa, com o chat continuando visível atrás. Na primeira vez o técnico diz de qual cliente é a conversa e o AcessoFast lembra daí em diante — nas próximas, vai direto para a lista de computadores. O botão aparece apenas para as empresas que usam o AcessoFast.

@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import OemFilaSincronizacaoPanel from "./OemFilaSincronizacaoPanel";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -395,6 +396,21 @@ export default function OemIntegrationTab() {
     () => new Set(produtosOem.map((p) => String(p.oem_codigo_filial))),
     [produtosOem],
   );
+
+  // Só o número da aba. O painel da fila busca o resto por conta dele — puxar a
+  // lista inteira aqui carregaria a página toda por causa de um badge.
+  const { data: filaParada = 0 } = useQuery({
+    queryKey: ["oem-fila-badge", tid],
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("fn_oem_fila_status", {
+        p_tenant_id: tid ?? null,
+      });
+      if (error) throw error;
+      const s = (data ?? {}) as { erros?: number; invalidos?: number };
+      return (Number(s.erros) || 0) + (Number(s.invalidos) || 0);
+    },
+  });
 
   // Já o CUSTO só soma produto ATIVO — produto cancelado não custa mais nada, e
   // somá-lo faria a tela cobrar do cliente um custo que não existe.
@@ -1169,8 +1185,25 @@ export default function OemIntegrationTab() {
             Custos
             {custos.divergentes > 0 && <Badge variant="secondary">{custos.divergentes}</Badge>}
           </TabsTrigger>
+          <TabsTrigger value="fila" className="gap-1.5">
+            Fila
+            {filaParada > 0 && <Badge variant="destructive">{filaParada}</Badge>}
+          </TabsTrigger>
           <TabsTrigger value="pendencias">Pendências</TabsTrigger>
         </TabsList>
+
+        {/* --------------------------------------------------------------- fila */}
+        <TabsContent value="fila" className="space-y-3">
+          <Explica>
+            Toda alteração que sai daqui para a licença do parceiro passa por esta fila antes.
+            Um processador roda de <strong>2 em 2 minutos</strong> e envia o que está pendente;
+            o que o OEM recusar <strong>fica aqui, com o motivo escrito</strong>, em vez de
+            desaparecer num aviso de tela. Linha parada tem o botão{" "}
+            <strong>Tentar de novo</strong> — use depois de corrigir a causa, senão ela toma a
+            mesma recusa.
+          </Explica>
+          <OemFilaSincronizacaoPanel />
+        </TabsContent>
 
         {/* ------------------------------------------------------------ conexão */}
         <TabsContent value="conexao" className="space-y-4 max-w-3xl">
