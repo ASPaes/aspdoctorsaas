@@ -92,10 +92,16 @@ export default function OemFilaSincronizacaoPanel() {
 
   const itens = listaQ.data ?? [];
   // 'ok' é histórico: mostrar junto com o que precisa de atenção esconderia o
-  // que importa atrás de centenas de linhas que deram certo.
+  // que importa atrás de centenas de linhas que deram certo. Ele fica embaixo,
+  // recolhido — ou aqui em cima, se a pessoa clicar no chip de OK.
   const paraTratar = itens.filter(i => i.status !== "ok");
   const okRecentes = itens.filter(i => i.status === "ok").slice(0, 20);
-  const visiveis = filtro ? paraTratar.filter(i => i.status === filtro) : paraTratar;
+  const visiveis = filtro ? itens.filter(i => i.status === filtro) : paraTratar;
+
+  // Quando a tela foi montada com estes números. É o mesmo carimbo que o painel
+  // do Omie mostra: sem ele, não dá para saber se a lista é de agora ou de meia
+  // hora atrás com a aba aberta esquecida.
+  const geradoEm = statusQ.dataUpdatedAt || listaQ.dataUpdatedAt;
 
   const s = statusQ.data;
   const chips: [string, number][] = s
@@ -148,9 +154,11 @@ export default function OemFilaSincronizacaoPanel() {
           <CardTitle className="text-base flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Fila de sincronização
-            <span className="text-xs font-normal text-muted-foreground">
-              · roda de 2 em 2 minutos
-            </span>
+            {geradoEm > 0 && (
+              <span className="text-xs font-normal text-muted-foreground">
+                · {new Date(geradoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "medium" })}
+              </span>
+            )}
           </CardTitle>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" className="gap-1" onClick={processarAgora} disabled={rodando}>
@@ -197,12 +205,9 @@ export default function OemFilaSincronizacaoPanel() {
                       key={st}
                       type="button"
                       onClick={() => setFiltro(ativo ? null : st)}
-                      disabled={st === "ok"}
                       className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition ${
                         STATUS_STYLE[st] ?? "bg-muted text-foreground border-border"
-                      } ${ativo ? "ring-2 ring-offset-1 ring-primary/40" : "opacity-90 hover:opacity-100"} ${
-                        st === "ok" ? "cursor-default" : ""
-                      }`}
+                      } ${ativo ? "ring-2 ring-offset-1 ring-primary/40" : "opacity-90 hover:opacity-100"}`}
                     >
                       {STATUS_LABEL[st] ?? st}
                       <span className="font-semibold">{Number(qtd).toLocaleString("pt-BR")}</span>
@@ -276,7 +281,9 @@ export default function OemFilaSincronizacaoPanel() {
               </div>
             )}
 
-            {okRecentes.length > 0 && (
+            {/* Com o filtro em OK elas já estão na lista de cima; repetir aqui
+                mostraria a mesma coisa duas vezes na mesma tela. */}
+            {okRecentes.length > 0 && filtro !== "ok" && (
               <Collapsible open={abertoOk} onOpenChange={setAbertoOk}>
                 <CollapsibleTrigger className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                   {abertoOk ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
