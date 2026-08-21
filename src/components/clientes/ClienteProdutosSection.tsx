@@ -103,6 +103,10 @@ interface ClienteProdutoModulo {
   vlr_ativacao: number | null;
   vlr_mensal: number | null;
   vlr_custo: number | null;
+  // Custo TOTAL da linha como o parceiro cobra. O OEM dá unidade grátis e
+  // crédito (2 totens por R$ 25,00; 1 PDV por R$ 0,00), então multiplicar o
+  // unitário pela quantidade inventa um número que ele nunca cobrou.
+  vlr_custo_total?: number | null;
   data_ativacao: string | null;
   data_inativacao: string | null;
   // A venda do módulo tem dono próprio: módulo somado meses depois costuma ser
@@ -136,6 +140,12 @@ const normNomeModulo = (nome: string | null | undefined) =>
 // mostrar "0" ou "∞" aqui daria a impressão de uma margem medida.
 const fmtMarkup = (venda: number, custo: number) =>
   custo > 0 ? `${(venda / custo).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}×` : "—";
+
+// Custo da linha do módulo: o total do parceiro manda; sem ele, multiplica.
+const custoLinhaModulo = (m: { vlr_custo?: number | null; vlr_custo_total?: number | null; quantidade?: number | null }) =>
+  m.vlr_custo_total != null
+    ? Number(m.vlr_custo_total) || 0
+    : (Number(m.vlr_custo) || 0) * (Number(m.quantidade) || 1);
 
 // Data de hoje no fuso local. `toISOString()` devolve UTC: das 21h em diante ele
 // já entrega o dia seguinte, e a venda entraria com data errada.
@@ -527,7 +537,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
           open: true,
           tipo: "downsell",
           valorDelta: -((Number(m.vlr_mensal) || 0) * (Number(m.quantidade) || 1)),
-          custoDelta: -((Number(m.vlr_custo) || 0) * (Number(m.quantidade) || 1)),
+          custoDelta: -custoLinhaModulo(m),
           descricao: `Módulo ${m.produto_modulos?.nome ?? ""} inativado`,
           moduloId: m.id,
         });
@@ -784,9 +794,13 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                   </TableCell>
                                   <TableCell className="text-right">
                                     R$ {fmtBRL(m.vlr_custo)}
-                                    {(Number(m.quantidade) || 1) > 1 && (
+                                    {/* A linha do total aparece sempre que ela não for o unitário —
+                                        inclusive quando o parceiro cobra menos que quantidade ×
+                                        unitário, que é o caso em que o número surpreende. */}
+                                    {custoLinhaModulo(m) !== (Number(m.vlr_custo) || 0) && (
                                       <span className="block text-xs text-muted-foreground">
-                                        = R$ {fmtBRL((Number(m.vlr_custo) || 0) * (Number(m.quantidade) || 1))}
+                                        = R$ {fmtBRL(custoLinhaModulo(m))}
+                                        {m.vlr_custo_total != null && " · OEM"}
                                       </span>
                                     )}
                                   </TableCell>
@@ -1104,7 +1118,8 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
               <span className="block text-xs text-muted-foreground">
                 {Number(cancelarModulo?.quantidade) || 1} contratada(s) ·
                 {" "}mensal R$ {fmtBRL(cancelarModulo?.vlr_mensal)} ·
-                {" "}custo unitário R$ {fmtBRL(cancelarModulo?.vlr_custo)}
+                {" "}custo R$ {fmtBRL(cancelarModulo ? custoLinhaModulo(cancelarModulo) : 0)}
+                {cancelarModulo?.vlr_custo_total != null && " (total cobrado pelo OEM)"}
               </span>
             </div>
 
