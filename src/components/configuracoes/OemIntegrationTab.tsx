@@ -828,6 +828,18 @@ export default function OemIntegrationTab() {
     };
   }, [linhas, filiaisComCodigo, produtosAtivos, statusConf]);
 
+  // Tudo o que a aba Divergências pede decisão sobre, num número só — é ele que
+  // acende o alerta na aba. Os quatro baldes de `semCodigo` entram; `gravados`,
+  // `total` e `foraDeEscopo` não, que são contagem de contexto, não pendência.
+  const totalDivergencias =
+    r.pagandoPorCancelado.length +
+    r.semCliente.length +
+    r.soNoDs.length +
+    r.semCodigo.multiplas.length +
+    r.semCodigo.semProduto.length +
+    r.semCodigo.variosProdutos.length +
+    r.semCodigo.outroMotivo.length;
+
   // ------------------------------------------------------------------ custos
   //
   // Dois custos com o mesmo nome e origens diferentes, e é por isso que a aba
@@ -1252,7 +1264,22 @@ export default function OemIntegrationTab() {
             Sincronização
             {filaParada > 0 && <Badge variant="destructive">{filaParada}</Badge>}
           </TabsTrigger>
-          <TabsTrigger value="pendencias">Divergências</TabsTrigger>
+          <TabsTrigger value="pendencias" className="gap-1.5">
+            {/* Esta aba é a única que ninguém abre por vontade própria: ela só
+                interessa quando tem coisa dentro. O halo pulsando é para não
+                dar para passar batido — e some inteiro quando o número zera,
+                senão vira enfeite e a pessoa aprende a ignorar.
+                `motion-safe` respeita quem desligou animação no sistema; para
+                essas, o ícone e a contagem em vermelho continuam de pé. */}
+            {totalDivergencias > 0 && (
+              <span className="relative flex h-4 w-4 items-center justify-center" aria-hidden="true">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-destructive/50 motion-safe:animate-ping" />
+                <AlertTriangle className="relative h-4 w-4 text-destructive" />
+              </span>
+            )}
+            Divergências
+            {totalDivergencias > 0 && <Badge variant="destructive">{totalDivergencias}</Badge>}
+          </TabsTrigger>
         </TabsList>
 
         {/* --------------------------------------------------------------- fila */}
