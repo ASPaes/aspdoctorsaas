@@ -155,13 +155,14 @@ function Numero({
           <p className="text-sm font-medium mt-1">{rotulo}</p>
           {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
         </div>
-        {/* Encostado na base: o número secundário sobe até a linha do número
-            principal quando o card é curto, e o rótulo fica por cima dele —
-            lido de cima para baixo, é "Contratos ativos DS: 855". */}
+        {/* Espelha a coluna da esquerda linha a linha: o rótulo na altura (e no
+            tamanho) do rótulo principal, o número na do sub. Os dois lados
+            respondem à mesma pergunta — tamanhos diferentes faziam um parecer
+            mais importante que o outro. */}
         {ao_lado && (
           <div className="flex shrink-0 flex-col justify-end text-right" title={ao_lado.title}>
-            <p className="text-[11px] text-muted-foreground leading-tight">{ao_lado.rotulo}</p>
-            <p className="text-lg font-semibold tabular-nums leading-tight mt-0.5">{ao_lado.valor}</p>
+            <p className="text-sm font-medium">{ao_lado.rotulo}</p>
+            <p className="text-xs text-muted-foreground tabular-nums mt-0.5">{ao_lado.valor}</p>
           </div>
         )}
       </div>
@@ -1553,22 +1554,21 @@ export default function OemIntegrationTab() {
                 como multiplicador. Dois markups com denominadores diferentes
                 seriam duas respostas para a mesma pergunta. */}
             <Numero valor={brl(r.receita - r.custo)} rotulo="Margem mensal" tom="bom"
-              sub={`${brl(r.receita)} − ${brl(r.custo)}`}
-              ao_lado={{
-                valor: r.custo > 0 ? (
-                  <span className={r.receita / r.custo < 1
-                    ? "text-destructive"
-                    : "text-emerald-600 dark:text-emerald-400"}>
-                    {num2(r.receita / r.custo)}×
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                ),
-                rotulo: "Markup",
-                title: r.custo > 0
+              // Markup na mesma linha do custo e no mesmo tamanho: ele é a
+              // leitura da conta que está ali (receita ÷ custo), não um segundo
+              // indicador. Régua da aba Custos — custo do OEM no divisor, sempre.
+              sub={
+                <span title={r.custo > 0
                   ? `${brl(r.receita)} ÷ ${brl(r.custo)} (custo do OEM)`
-                  : "Sem custo do OEM — não há como calcular",
-              }} />
+                  : "Sem custo do OEM — não há como calcular o markup"}>
+                  {brl(r.receita)} − {brl(r.custo)} · markup{" "}
+                  {r.custo > 0 ? (
+                    <span className={r.receita / r.custo < 1 ? "text-destructive font-medium" : ""}>
+                      {num2(r.receita / r.custo)}×
+                    </span>
+                  ) : "—"}
+                </span>
+              } />
           </div>
 
           {r.porNome > 0 && (
