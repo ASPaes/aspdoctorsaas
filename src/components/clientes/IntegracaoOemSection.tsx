@@ -1,13 +1,17 @@
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useOemIntegracaoAtiva } from "@/hooks/useOemIntegracaoAtiva";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Cpu, Lock, TrendingDown } from "lucide-react";
 
 // ============================================================================
 // As licenças do OEM deste cliente.
+//
+// Era um card próprio ("Licenças no OEM") logo abaixo do card do Omie; virou seção
+// do card único "Integração", em três linhas: o título com as contagens, os
+// números do mês e a lista de licenças.
 //
 // A mensalidade é do CLIENTE e o custo é da FILIAL: um cliente com três lojas
 // paga uma mensalidade e consome três licenças. Por isso a margem aqui é
@@ -38,18 +42,25 @@ const brl = (v: number | null | undefined) =>
 // — e "infinito" não é informação, então o campo simplesmente não aparece.
 const num2 = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function IntegracaoOemCard({ clienteId }: { clienteId: string }) {
+/**
+ * O que esta seção tem para mostrar — e se tem alguma coisa.
+ *
+ * Quem monta o card "Integração" precisa saber disso ANTES de desenhar o cabeçalho: com o OEM
+ * ligado mas sem licença nem pendência, a seção não se desenha, e um card só com título é pior
+ * do que card nenhum. Como é react-query, chamar o hook nos dois lugares custa uma consulta só.
+ */
+export function useOemDoCliente(clienteId: string) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
-  // Sem conta OEM conectada o card nem existe — não é para aparecer vazio nos
+  // Sem conta OEM conectada a seção nem existe — não é para aparecer vazia nos
   // tenants que não usam a integração.
   const temConta = useOemIntegracaoAtiva();
 
   // A FONTE DA VERDADE DO VÍNCULO É O CÓDIGO NA FICHA DO PRODUTO.
   //
-  // Este card lia reconciliacao_oem por ds_customer_id e listava tudo que
-  // apontava para o cliente. No grupo Bem Docado isso deu 38 licenças numa
-  // ficha só — e, pior, somou o custo do grupo inteiro (R$ 1.028,53) contra a
+  // Isto lia reconciliacao_oem por ds_customer_id e listava tudo que apontava
+  // para o cliente. No grupo Bem Docado isso deu 38 licenças numa ficha só —
+  // e, pior, somou o custo do grupo inteiro (R$ 1.028,53) contra a
   // mensalidade de um cliente (R$ 138,02), inventando uma margem de -R$ 890,51
   // que não existe. Ficha de cliente mostrando prejuízo falso é pior que ficha
   // sem informação nenhuma.
@@ -103,35 +114,53 @@ export default function IntegracaoOemCard({ clienteId }: { clienteId: string }) 
     },
   });
 
-  if (!tid || temConta !== true) return null;
-
+  const ativo = !!tid && temConta === true;
   // Vínculo indefinido: o de/para aponta para cá, mas nenhuma licença foi
   // confirmada. Dizer isso é mais útil do que listar 38 palpites.
-  if (codigos.length === 0) {
-    if (!pendentes) return null;
+  const indefinido = ativo && codigos.length === 0 && pendentes > 0;
+
+  return {
+    licencas: licencas as Licenca[],
+    pendentes,
+    indefinido,
+    visivel: ativo && (licencas.length > 0 || indefinido),
+  };
+}
+
+export default function IntegracaoOemSection({ clienteId }: { clienteId: string }) {
+  const { licencas, pendentes, indefinido, visivel } = useOemDoCliente(clienteId);
+
+  if (!visivel) return null;
+
+  const cabecalho = (extra?: ReactNode) => (
+    <div className="flex flex-wrap items-center gap-2 mb-2.5">
+      <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
+      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        OEM
+      </span>
+      {extra}
+    </div>
+  );
+
+  if (indefinido) {
     return (
-      <Card className="border-amber-500/40">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Cpu className="h-4 w-4" /> Licenças no OEM
-            <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-500/40">
-              vínculo indefinido
-            </Badge>
-          </CardTitle>
-          <CardDescription>
-            {pendentes === 1
-              ? "Uma licença do OEM aponta para este cliente, mas o vínculo não foi confirmado."
-              : `${pendentes} licenças do OEM apontam para este cliente — o casamento automático é por CNPJ e, num grupo que repete o CNPJ, ele aponta todas para o mesmo cadastro.`}{" "}
-            Enquanto isso não for resolvido em <strong>Configurações › Integrações › OEM ›
-            Pendências</strong>, nenhuma delas é dada como deste cliente, e nenhum custo é
-            atribuído a ele aqui.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <section className="px-6 py-4">
+        {cabecalho(
+          <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-500/40">
+            vínculo indefinido
+          </Badge>,
+        )}
+        <p className="text-sm text-muted-foreground">
+          {pendentes === 1
+            ? "Uma licença do OEM aponta para este cliente, mas o vínculo não foi confirmado."
+            : `${pendentes} licenças do OEM apontam para este cliente. O casamento automático é por CNPJ e, num grupo que repete o CNPJ, ele aponta todas para o mesmo cadastro.`}{" "}
+          Enquanto isso não for resolvido em <strong>Configurações › Integrações › OEM ›
+          Pendências</strong>, nenhuma delas é dada como deste cliente, e nenhum custo é
+          atribuído a ele aqui.
+        </p>
+      </section>
     );
   }
-
-  if (licencas.length === 0) return null;
 
   const ativas = licencas.filter((l) => l.status_oem === "Ativo");
   const custo = ativas.reduce((a, l) => a + Number(l.custo_oem || 0), 0);
@@ -143,59 +172,65 @@ export default function IntegracaoOemCard({ clienteId }: { clienteId: string }) 
   const bloqueadas = ativas.filter((l) => l.bloqueado_oem).length;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Cpu className="h-4 w-4" /> Licenças no OEM
-          <Badge variant="secondary">{licencas.length}</Badge>
+    <section className="px-6 py-4">
+      {/* Linha 1: o que é e quantas são. */}
+      {cabecalho(
+        <>
+          <Badge variant="secondary">
+            {licencas.length} licença{licencas.length > 1 ? "s" : ""}
+          </Badge>
           {bloqueadas > 0 && (
             <Badge variant="destructive" className="gap-1">
               <Lock className="h-3 w-3" /> {bloqueadas} bloqueada{bloqueadas > 1 ? "s" : ""}
             </Badge>
           )}
-        </CardTitle>
-        <CardDescription className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <span>Custo das ativas: <strong className="tabular-nums">{brl(custo)}</strong></span>
-          <span>Mensalidade: <strong className="tabular-nums">{brl(mensalidade)}</strong></span>
-          <span className={margem < 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}>
-            Margem: <strong className="tabular-nums">{brl(margem)}</strong>
-            {margem < 0 && <TrendingDown className="inline h-3.5 w-3.5 ml-1" />}
+        </>,
+      )}
+
+      {/* Linha 2: o dinheiro. Um ponto menor e mais junto que o resto porque agora divide a
+          largura do card com a coluna do Omie — em text-sm com gap-4 os quatro números não cabiam
+          na metade e o "Markup" caía sozinho numa segunda linha. */}
+      <div className="text-[13px] text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span>Custo das ativas: <strong className="tabular-nums">{brl(custo)}</strong></span>
+        <span>Mensalidade: <strong className="tabular-nums">{brl(mensalidade)}</strong></span>
+        <span className={margem < 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}>
+          Margem: <strong className="tabular-nums">{brl(margem)}</strong>
+          {margem < 0 && <TrendingDown className="inline h-3.5 w-3.5 ml-1" />}
+        </span>
+        {markup !== null && (
+          <span
+            className={markup < 1 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}
+            title={`${brl(mensalidade)} ÷ ${brl(custo)}`}
+          >
+            Markup: <strong className="tabular-nums">{num2(markup)}</strong>
           </span>
-          {markup !== null && (
-            <span
-              className={markup < 1 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}
-              title={`${brl(mensalidade)} ÷ ${brl(custo)}`}
-            >
-              Markup: <strong className="tabular-nums">{num2(markup)}</strong>
-            </span>
-          )}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="divide-y border-t">
-          {licencas.map((l) => (
-            <div key={l.id} className="flex items-center gap-3 px-6 py-2.5 text-sm">
-              <div className="min-w-0 flex-1">
-                <p className="truncate">{l.razao_oem ?? `Filial ${l.filial_codigo}`}</p>
-                <p className="text-xs text-muted-foreground">
-                  filial {l.filial_codigo} · grupo {l.empresa_codigo}
-                  {/* `status_usuario = 'vinculado'` também é o que a
-                      sincronização grava no casamento automático — o que separa
-                      a decisão humana é o carimbo de quem e quando. */}
-                  {l.resolvido_em && " · vinculada à mão"}
-                </p>
-              </div>
-              {l.bloqueado_oem && <Badge variant="destructive" className="text-xs">bloqueada</Badge>}
-              <Badge variant={l.status_oem === "Ativo" ? "secondary" : "outline"} className="text-xs">
-                {l.status_oem ?? "—"}
-              </Badge>
-              <span className="tabular-nums text-muted-foreground w-24 text-right">
-                {l.status_oem === "Ativo" ? brl(l.custo_oem) : "—"}
-              </span>
+        )}
+      </div>
+
+      {/* Linha 3: as licenças, uma por linha. */}
+      <div className="mt-3 rounded-md border divide-y">
+        {licencas.map((l) => (
+          <div key={l.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+            <div className="min-w-0 flex-1">
+              <p className="truncate">{l.razao_oem ?? `Filial ${l.filial_codigo}`}</p>
+              <p className="text-xs text-muted-foreground">
+                filial {l.filial_codigo} · grupo {l.empresa_codigo}
+                {/* `status_usuario = 'vinculado'` também é o que a
+                    sincronização grava no casamento automático — o que separa
+                    a decisão humana é o carimbo de quem e quando. */}
+                {l.resolvido_em && " · vinculada à mão"}
+              </p>
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+            {l.bloqueado_oem && <Badge variant="destructive" className="text-xs">bloqueada</Badge>}
+            <Badge variant={l.status_oem === "Ativo" ? "secondary" : "outline"} className="text-xs">
+              {l.status_oem ?? "—"}
+            </Badge>
+            <span className="tabular-nums text-muted-foreground w-24 text-right">
+              {l.status_oem === "Ativo" ? brl(l.custo_oem) : "—"}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useOmieContaDoCliente } from "@/hooks/useOmieContaDoCliente";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Cloud } from "lucide-react";
 import EnviarOmieComPreviaButton, {
@@ -13,6 +12,10 @@ interface Props {
   clienteId: string;
 }
 
+// Era um card próprio ("Integração Omie"); virou seção do card único "Integração", que reúne Omie
+// e OEM. O selo de sincronizado desceu para debaixo do valor: no canto direito ele disputava a
+// linha com o título e sobrava um vão no meio.
+//
 // O botão (dry_run → confirmação → criar) saiu daqui para EnviarOmieComPreviaButton: o diálogo de
 // fim do cadastro de produto promete a mesma pré-visualização e precisava do mesmo botão.
 interface ContratoAtivo extends ContratoParaEnvioOmie {
@@ -23,7 +26,7 @@ interface ContratoAtivo extends ContratoParaEnvioOmie {
 const brl = (v: any) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v ?? 0));
 
-export default function IntegracaoOmieCard({ clienteId }: Props) {
+export default function IntegracaoOmieSection({ clienteId }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
   // A conta Omie vem da UNIDADE DO CLIENTE, não do tenant: com duas contas, o .maybeSingle()
@@ -81,33 +84,30 @@ export default function IntegracaoOmieCard({ clienteId }: Props) {
   const contratos = contratosQuery.data ?? [];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Cloud className="h-5 w-5" />
-          Integração Omie
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {contratosQuery.isLoading ? (
-          <div className="text-sm text-muted-foreground">Carregando contratos...</div>
-        ) : contratos.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
-            Este cliente não possui contratos ativos para enviar ao Omie.
+    <section className="px-6 py-4">
+      <div className="flex items-center gap-2 mb-2.5">
+        <Cloud className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Omie
+        </span>
+      </div>
+
+      {contratosQuery.isLoading ? (
+        <div className="text-sm text-muted-foreground">Carregando contratos...</div>
+      ) : contratos.length === 0 ? (
+        <div className="text-sm text-muted-foreground">
+          Este cliente não possui contratos ativos para enviar ao Omie.
+        </div>
+      ) : contratos.length === 1 ? (
+        <div className="text-sm min-w-0 space-y-1">
+          <div className="font-medium">Contrato Nº {contratos[0].numero ?? "—"}</div>
+          <div className="text-muted-foreground text-xs">
+            {brl(contratos[0].vlr_total_mensal)}/mês
+            {contratos[0].modelos_contrato?.nome
+              ? ` · ${contratos[0].modelos_contrato.nome}`
+              : ""}
           </div>
-        ) : contratos.length === 1 ? (
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="text-sm min-w-0">
-              <div className="font-medium">
-                Contrato Nº {contratos[0].numero ?? "—"}
-              </div>
-              <div className="text-muted-foreground text-xs">
-                {brl(contratos[0].vlr_total_mensal)}/mês
-                {contratos[0].modelos_contrato?.nome
-                  ? ` · ${contratos[0].modelos_contrato.nome}`
-                  : ""}
-              </div>
-            </div>
+          <div className="pt-0.5">
             <EnviarOmieComPreviaButton
               tenantId={tid}
               contrato={contratos[0]}
@@ -115,23 +115,20 @@ export default function IntegracaoOmieCard({ clienteId }: Props) {
               onEnviado={() => contratosQuery.refetch()}
             />
           </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="text-xs text-muted-foreground">
-              Este cliente possui {contratos.length} contratos ativos. Escolha qual enviar:
-            </div>
-            {contratos.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center justify-between gap-3 border rounded-md p-3 flex-wrap"
-              >
-                <div className="text-sm min-w-0">
-                  <div className="font-medium font-mono">Nº {c.numero ?? "—"}</div>
-                  <div className="text-muted-foreground text-xs flex items-center gap-2">
-                    <Badge variant="secondary">{brl(c.vlr_total_mensal)}/mês</Badge>
-                    {c.modelos_contrato?.nome && <span>{c.modelos_contrato.nome}</span>}
-                  </div>
-                </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="text-xs text-muted-foreground">
+            Este cliente possui {contratos.length} contratos ativos. Escolha qual enviar:
+          </div>
+          {contratos.map((c) => (
+            <div key={c.id} className="border rounded-md p-3 text-sm min-w-0 space-y-1">
+              <div className="font-medium font-mono">Nº {c.numero ?? "—"}</div>
+              <div className="text-muted-foreground text-xs flex items-center gap-2">
+                <Badge variant="secondary">{brl(c.vlr_total_mensal)}/mês</Badge>
+                {c.modelos_contrato?.nome && <span>{c.modelos_contrato.nome}</span>}
+              </div>
+              <div className="pt-0.5">
                 <EnviarOmieComPreviaButton
                   tenantId={tid}
                   contrato={c}
@@ -139,10 +136,10 @@ export default function IntegracaoOmieCard({ clienteId }: Props) {
                   onEnviado={() => contratosQuery.refetch()}
                 />
               </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

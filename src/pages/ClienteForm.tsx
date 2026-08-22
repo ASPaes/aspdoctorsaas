@@ -40,9 +40,7 @@ import FiliaisSection from "@/components/clientes/FiliaisSection";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import ClienteProdutosSection from "@/components/clientes/ClienteProdutosSection";
 import ClienteContratosSection from "@/components/clientes/ClienteContratosSection";
-import IntegracaoOmieCard from "@/components/clientes/IntegracaoOmieCard";
-import IntegracaoOemCard from "@/components/clientes/IntegracaoOemCard";
-import OmieIntegrationLogCard from "@/components/clientes/OmieIntegrationLogCard";
+import IntegracaoCard from "@/components/clientes/IntegracaoCard";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
 import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
 import DeleteClienteDialog from "@/components/clientes/DeleteClienteDialog";
@@ -786,11 +784,7 @@ export default function ClienteForm() {
             <ClienteContratosSection clienteId={id} />
           )}
 
-          {isEditing && id && <IntegracaoOmieCard clienteId={id} />}
-
-          {isEditing && id && <IntegracaoOemCard clienteId={id} />}
-
-          {isEditing && id && <OmieIntegrationLogCard clienteId={id} />}
+          {isEditing && id && <IntegracaoCard clienteId={id} />}
 
           {isEditing && id && (
             <FinanceiroCard

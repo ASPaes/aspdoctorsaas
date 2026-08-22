@@ -3,8 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useOmieContaDoCliente } from "@/hooks/useOmieContaDoCliente";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -222,21 +228,26 @@ function VinculoDetalhe({ log }: { log: LogItem }) {
   );
 }
 
-export default function OmieIntegrationLogCard({ clienteId }: Props) {
+/**
+ * O histórico de envios ao Omie, em modal.
+ *
+ * Era o terceiro card empilhado na ficha do cliente ("Histórico de envios"), com 320px de lista
+ * aberta o tempo todo. Virou um botão no cabeçalho do card "Integração": a ficha ficou legível e a
+ * `omie-integration-call` só é chamada quando alguém abre o histórico, em vez de a cada abertura
+ * de ficha de cliente de tenant com Omie.
+ */
+function HistoricoConteudo({ clienteId, aberto }: Props & { aberto: boolean }) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [filtro, setFiltro] = useState<FiltroTipo>("todos");
 
-  // Só toca a integração Omie se ela estiver ativa neste tenant — igual ao IntegracaoOmieCard.
-  // Sem isso, a EF omie-integration-call responde 400 e o card quebra em tenant sem Omie.
   // A conta Omie vem da UNIDADE DO CLIENTE, não do tenant: com duas contas, o .maybeSingle()
-  // por tenant erra ("multiple rows returned"), a query falha e o card some da tela.
+  // por tenant erra ("multiple rows returned"), a query falha e o histórico some da tela.
   const contaOmieQuery = useOmieContaDoCliente(clienteId);
-  const integracaoAtivaQuery = { data: contaOmieQuery.data?.ativo === true, isLoading: contaOmieQuery.isLoading };
-  const omieAtivo = integracaoAtivaQuery.data === true;
+  const omieAtivo = contaOmieQuery.data?.ativo === true;
 
   const dadosQuery = useQuery<OmieDadosLog>({
     queryKey: ["cliente-omie-dados-log", tid, clienteId],
-    enabled: !!tid && !!clienteId && omieAtivo,
+    enabled: aberto && !!tid && !!clienteId && omieAtivo,
     queryFn: async () => {
       let q = (supabase.from("contratos") as any)
         .select("id")
@@ -283,7 +294,7 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
       dadosQuery.data?.codigoClienteOmie,
       dadosQuery.data?.codigosContratoOmie,
     ],
-    enabled: !!tid && !!clienteId && omieAtivo && !!dadosQuery.data,
+    enabled: aberto && !!tid && !!clienteId && omieAtivo && !!dadosQuery.data,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
         body: {
@@ -330,34 +341,25 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
     });
   }, [sortedLogs, filtro]);
 
-  // Integração inativa (ou ainda carregando o status): não renderiza o card nem chama a EF.
-  if (!tid || !omieAtivo) return null;
-
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <CardTitle className="flex items-center gap-2">
-            <History className="h-5 w-5" />
-            Histórico de envios
-          </CardTitle>
-          {sortedLogs.length > 0 && (
-            <Select value={filtro} onValueChange={(v) => setFiltro(v as FiltroTipo)}>
-              <SelectTrigger className="w-[180px] h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Tudo</SelectItem>
-                <SelectItem value="enviados">Enviados</SelectItem>
-                <SelectItem value="nao_enviados">Não enviados</SelectItem>
-                <SelectItem value="falhas">Falhas</SelectItem>
-                <SelectItem value="vinculos">Vínculos</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
+    <>
+      <div className="flex items-center justify-end">
+        {sortedLogs.length > 0 && (
+          <Select value={filtro} onValueChange={(v) => setFiltro(v as FiltroTipo)}>
+            <SelectTrigger className="w-[180px] h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Tudo</SelectItem>
+              <SelectItem value="enviados">Enviados</SelectItem>
+              <SelectItem value="nao_enviados">Não enviados</SelectItem>
+              <SelectItem value="falhas">Falhas</SelectItem>
+              <SelectItem value="vinculos">Vínculos</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+      <div className="mt-3">
         {dadosQuery.isLoading || logsQuery.isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-10 w-full" />
@@ -377,7 +379,7 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
             Nenhum registro neste filtro.
           </div>
         ) : (
-          <ScrollArea className="h-[320px] pr-3">
+          <ScrollArea className="h-[min(60vh,520px)] pr-3">
             <div className="space-y-3">
               {filteredLogs.map((log, idx) => {
                 const { icon: StatusIcon, badge, label } = statusConfig(log.status);
@@ -433,7 +435,42 @@ export default function OmieIntegrationLogCard({ clienteId }: Props) {
             </div>
           </ScrollArea>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </>
+  );
+}
+
+/**
+ * O botão que abre o histórico. Some junto com a integração: sem conta Omie que atenda este
+ * cliente não há o que listar.
+ */
+export default function OmieHistoricoEnviosButton({ clienteId }: Props) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const [aberto, setAberto] = useState(false);
+  const contaOmieQuery = useOmieContaDoCliente(clienteId);
+
+  if (!tid || contaOmieQuery.data?.ativo !== true) return null;
+
+  return (
+    <>
+      <Button type="button" variant="outline" size="sm" onClick={() => setAberto(true)}>
+        <History className="h-4 w-4 sm:mr-2" />
+        <span className="hidden sm:inline">Histórico de envios</span>
+      </Button>
+
+      <Dialog open={aberto} onOpenChange={setAberto}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Histórico de envios
+            </DialogTitle>
+          </DialogHeader>
+          {/* Montado só com o modal aberto: assim as consultas nascem junto com ele e o estado do
+              filtro volta ao padrão a cada abertura. */}
+          {aberto && <HistoricoConteudo clienteId={clienteId} aberto={aberto} />}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
