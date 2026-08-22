@@ -804,9 +804,6 @@ export default function OemIntegrationTab() {
       // Conferência: o vínculo está feito, mas algo deixou de bater. CNPJ vem
       // primeiro porque é o sinal forte — nome divergente é o normal entre um
       // sistema que guarda loja e outro que guarda razão social.
-      // Vínculo achado por nome merece outro olhar: ele existe porque o OEM
-      // mandou o CNPJ do grupo e não o da loja.
-      porNome: linhas.filter((l) => l.criterio_match === "nome" && l.ds_customer_id).length,
       // Cliente cancelado sai da conferência mesmo quando o usuário escolhe
       // "Todas": o seletor é sobre o status da LICENÇA, não sobre reabrir
       // cadastro morto.
@@ -1570,33 +1567,6 @@ export default function OemIntegrationTab() {
                 </span>
               } />
           </div>
-
-          {r.porNome > 0 && (
-            <Explica>
-              <strong>{r.porNome}</strong> licenças foram casadas <strong>pelo nome</strong>, e não
-              pelo CNPJ. Isso acontece quando o OEM manda o CNPJ do <strong>grupo</strong> em toda
-              filial em vez do da loja — medido no grupo 8201 (Bem Docado): 23 filiais, um CNPJ só.
-              Nesses casos o CNPJ não distingue uma loja da outra e quem desempata é o nome. Vale
-              conferir por amostragem antes de confiar nos números delas.
-            </Explica>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Como o vínculo é feito</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground space-y-2">
-              <p>
-                O casamento é por CNPJ, mas o vínculo é por <strong>filial</strong> — cada filial
-                é uma licença com custo próprio. Quando o CNPJ tem um cliente só, o vínculo nasce
-                pronto. Quando tem mais de um, a filial vai para <strong>Escolher candidato</strong>.
-              </p>
-              <p>
-                Decisões tomadas à mão são preservadas quando o espelho é atualizado — ninguém
-                precisa escolher duas vezes.
-              </p>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* ---------------------------------------------------------- escolher */}
