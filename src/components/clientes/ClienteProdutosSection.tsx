@@ -1151,7 +1151,6 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         lookupTid={lookupTenantId}
         onClose={() => setModuloDialog({ open: false })}
         onSaved={invalidateAll}
-        produtoDataAtivacao={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.data_ativacao ?? null}
         produtoFuncionarioId={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.funcionario_id ?? null}
         produtoOrigemVendaId={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.origem_venda_id ?? null}
         oemCodigoFilial={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.oem_codigo_filial ?? null}
@@ -2544,7 +2543,7 @@ function ProdutoDialog({
 // ============ Modulo Dialog ============
 function ModuloDialog({
   open, edit, clienteProdutoId, produtoId, tid, lookupTid, clienteId, onClose, onSaved,
-  produtoDataAtivacao, produtoFuncionarioId, produtoOrigemVendaId, oemCodigoFilial,
+  produtoFuncionarioId, produtoOrigemVendaId, oemCodigoFilial,
 }: {
   open: boolean;
   edit: ClienteProdutoModulo | null;
@@ -2557,7 +2556,6 @@ function ModuloDialog({
   clienteId: string;
   onClose: () => void;
   onSaved: () => void;
-  produtoDataAtivacao?: string | null;
   produtoFuncionarioId?: number | null;
   produtoOrigemVendaId?: number | null;
   oemCodigoFilial?: string | null;
@@ -2581,7 +2579,9 @@ function ModuloDialog({
       setVlrMensal(edit?.vlr_mensal ?? 0);
       setVlrCusto(edit?.vlr_custo ?? 0);
       setVlrAtivacao(edit?.vlr_ativacao ?? 0);
-      setDataAt(edit?.data_ativacao ?? produtoDataAtivacao ?? "");
+      // Módulo novo ativa hoje: herdar a data do produto datava a ativação no
+      // passado, e o módulo entrava valendo antes de ter sido vendido.
+      setDataAt(edit ? (edit.data_ativacao ?? "") : hojeISO());
       // Módulo novo é venda de hoje, e vendedor/origem herdam do produto — quem
       // vendeu o produto é quem costuma somar o módulo depois. Na edição, nada
       // é inventado: mostra o que está gravado.
@@ -2597,7 +2597,7 @@ function ModuloDialog({
           : (produtoOrigemVendaId ? String(produtoOrigemVendaId) : "")
       );
     }
-  }, [open, edit, produtoDataAtivacao, produtoFuncionarioId, produtoOrigemVendaId]);
+  }, [open, edit, produtoFuncionarioId, produtoOrigemVendaId]);
 
   const catalogoQuery = useQuery<{ id: string; nome: string; descricao: string | null; oem_modulo_codigo: number | null }[]>({
     queryKey: ["catalogo_modulos_produto", tid, produtoId],
