@@ -885,12 +885,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               </Tooltip>
             )}
 
-            {/* Atalhos dos interruptores que antes só existiam em Detalhes */}
-            <ChatQuickRuleToggles
-              conversationId={conversation.id}
-              contactId={contact?.id ?? null}
-              isGroup={isGroupConv}
-            />
+            {/* Atalho do interruptor de inatividade, que fora daqui só existe em Detalhes */}
+            <ChatQuickRuleToggles conversationId={conversation.id} />
 
             <Tooltip>
               <TooltipTrigger asChild>
