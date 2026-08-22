@@ -166,6 +166,33 @@ const custoLinhaModulo = (m: { vlr_custo?: number | null; vlr_custo_total?: numb
 
 // Data de hoje no fuso local. `toISOString()` devolve UTC: das 21h em diante ele
 // já entrega o dia seguinte, e a venda entraria com data errada.
+// Selo do pedido na fila do OEM. `invalido` é o único que NÃO anda sozinho:
+// ninguém vai tentar de novo, e a ficha nunca vai mudar sem alguém agir. Ele sai
+// em vermelho de propósito — o âmbar dos outros dois diz "espere", que aqui
+// seria mentira.
+const seloPendencia = (p: { status: string; acao?: string; quantidade?: number | null; ultimo_erro?: string | null }) => {
+  if (p.status === "invalido") {
+    return {
+      texto: "parado na fila — precisa de você",
+      classe: "border-destructive/40 bg-destructive/10 text-destructive",
+      title: p.ultimo_erro ?? "O pedido não foi ao parceiro e não será repetido sozinho.",
+    };
+  }
+  const espera = "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400";
+  if (p.status === "erro") {
+    return {
+      texto: "OEM recusou — na fila",
+      classe: espera,
+      title: p.ultimo_erro ?? "O parceiro recusou. A fila tenta de novo.",
+    };
+  }
+  return {
+    texto: `aguardando o parceiro${p.acao === "quantidade" ? ` · para ${p.quantidade}` : ""}`,
+    classe: espera,
+    title: p.ultimo_erro ?? "O pedido está na fila. A ficha muda quando o parceiro aceitar.",
+  };
+};
+
 const hojeISO = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -904,21 +931,18 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                     {/* O pedido já foi mandado e a ficha ainda
                                         não mudou — sem dizer isso, a pessoa
                                         acha que não salvou e clica de novo. */}
-                                    {pendenciaPorLinha.has(m.id) && (
-                                      <span
-                                        className="ml-2 inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-400"
-                                        title={pendenciaPorLinha.get(m.id)?.ultimo_erro
-                                          ?? "O pedido está na fila. A ficha muda quando o parceiro aceitar."}
-                                      >
-                                        <Clock className="h-3 w-3" />
-                                        {pendenciaPorLinha.get(m.id)?.status === "erro"
-                                          ? "OEM recusou — na fila"
-                                          : `aguardando o parceiro${
-                                              pendenciaPorLinha.get(m.id)?.acao === "quantidade"
-                                                ? ` · para ${pendenciaPorLinha.get(m.id)?.quantidade}`
-                                                : ""}`}
-                                      </span>
-                                    )}
+                                    {pendenciaPorLinha.has(m.id) && (() => {
+                                      const selo = seloPendencia(pendenciaPorLinha.get(m.id)!);
+                                      return (
+                                        <span
+                                          className={`ml-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${selo.classe}`}
+                                          title={selo.title}
+                                        >
+                                          <Clock className="h-3 w-3" />
+                                          {selo.texto}
+                                        </span>
+                                      );
+                                    })()}
                                   </TableCell>
                                   <TableCell className="text-center">{Number(m.quantidade) || 1}</TableCell>
                                   <TableCell className="text-right">
@@ -1021,27 +1045,35 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                               {/* Pedido de módulo NOVO: a linha da ficha só
                                   nasce depois do aceite, mas o pedido não pode
                                   ficar invisível até lá. */}
-                              {(pendenciasNovasPorProduto[p.id] ?? []).map((pend) => (
-                                <TableRow key={pend.fila_id} className="opacity-70">
-                                  <TableCell>
-                                    <span className="italic">{pend.modulo ?? "Módulo"}</span>
-                                    <span
-                                      className="ml-2 inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-400"
-                                      title={pend.ultimo_erro ?? "O pedido está na fila. Entra na ficha quando o parceiro aceitar."}
-                                    >
-                                      <Clock className="h-3 w-3" />
-                                      {pend.status === "erro" ? "OEM recusou — na fila" : "aguardando o parceiro"}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="text-center">{pend.quantidade ?? 1}</TableCell>
-                                  <TableCell className="text-right text-muted-foreground">—</TableCell>
-                                  <TableCell className="text-right text-muted-foreground">—</TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline" className="text-[10px]">Pendente</Badge>
-                                  </TableCell>
-                                  <TableCell />
-                                </TableRow>
-                              ))}
+                              {(pendenciasNovasPorProduto[p.id] ?? []).map((pend) => {
+                                const selo = seloPendencia(pend);
+                                return (
+                                  <TableRow key={pend.fila_id} className="opacity-70">
+                                    <TableCell>
+                                      <span className="italic">{pend.modulo ?? "Módulo"}</span>
+                                      <span
+                                        className={`ml-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${selo.classe}`}
+                                        title={selo.title}
+                                      >
+                                        <Clock className="h-3 w-3" />
+                                        {selo.texto}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="text-center">{pend.quantidade ?? 1}</TableCell>
+                                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                                    <TableCell>
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-[10px] ${pend.status === "invalido" ? "border-destructive/40 text-destructive" : ""}`}
+                                      >
+                                        {pend.status === "invalido" ? "Parado" : "Pendente"}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell />
+                                  </TableRow>
+                                );
+                              })}
                             </TableBody>
                           </Table>
                         )}
@@ -2854,11 +2886,20 @@ function ModuloDialog({
           const { data: proc } = await supabase.functions.invoke("oem-sync-processar", {
             body: { fila_id: filaId },
           });
-          const r = (proc ?? {}) as { ok_count?: number };
+          const r = (proc ?? {}) as { ok_count?: number; erros?: number };
           if ((r.ok_count ?? 0) > 0) {
             toast({
               title: existente ? "Quantidade alterada no OEM e na ficha" : "Módulo ativado no OEM e na ficha",
               description: existente ? `${antes} → ${alvo}.` : undefined,
+            });
+          } else if ((r.erros ?? 0) > 0) {
+            // O parceiro recusou, ou faltou dado para chamá-lo. Anunciar
+            // "aguardando confirmação" aqui era o silêncio de sempre com outra
+            // roupa: nada está a caminho, o pedido está parado esperando gente.
+            toast({
+              variant: "destructive",
+              title: "Não foi ao OEM — o pedido ficou parado na fila",
+              description: "O módulo NÃO entrou na ficha. O motivo está no selo da linha e em Integrações › OEM › Fila.",
             });
           } else {
             toast({
@@ -2869,6 +2910,16 @@ function ModuloDialog({
           onSaved();
           onClose();
           return;
+        }
+
+        // Produto COM licença no parceiro nunca grava direto: o único NULL
+        // legítimo é o de quem não tem licença. Se veio NULL aqui, o pedido não
+        // entrou na fila e gravar na ficha faria as duas bases divergirem em
+        // silêncio — que é exatamente o defeito que a fila existe para impedir.
+        if (oemCodigoFilial) {
+          throw new Error(
+            "Este produto tem licença no OEM e o pedido não entrou na fila. Nada foi gravado — avise o suporte.",
+          );
         }
 
         // Sem licença no parceiro (módulo digitado à mão): grava só aqui, como
