@@ -45,7 +45,8 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Plus, XCircle, TrendingUp, TrendingDown, ArrowUpDown, AlertCircle, DollarSign } from 'lucide-react';
+import { Loader2, Plus, XCircle, TrendingUp, TrendingDown, ArrowUpDown, AlertCircle, DollarSign, Lock } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface MovimentoMrr {
@@ -65,7 +66,20 @@ interface MovimentoMrr {
   status: string;
   inativado_em: string | null;
   inativado_por_id: number | null;
+  // Preenchido quando o movimento nasceu de um módulo da ficha do cliente —
+  // upsell na adição, downsell no cancelamento. É o que trava o desativar.
+  cliente_produto_modulo_id: string | null;
 }
+
+// Movimento que acompanha um módulo não se desfaz por aqui: quem manda é a
+// ficha. Desativar o upsell deixaria de contar uma receita que o cliente
+// continua pagando; desativar o downsell devolveria ao MRR um valor que ele
+// deixou de pagar — nos dois casos o número passa a divergir do que o cliente
+// tem contratado, e nada na ficha diz que isso aconteceu.
+const motivoDoModulo = (tipo: string) =>
+  tipo === 'downsell'
+    ? 'Este movimento nasceu do cancelamento de um módulo, na aba Produtos do cliente. Ele acompanha o módulo: desativá-lo aqui devolveria ao MRR um valor que o cliente não paga mais. Se o cancelamento foi engano, resolva pelo módulo, na ficha.'
+    : 'Este movimento nasceu da adição de um módulo, na aba Produtos do cliente. Ele acompanha o módulo: desativá-lo aqui tiraria do MRR uma receita que o cliente continua pagando. Para desfazer a venda, cancele o módulo na ficha — o downsell entra sozinho.';
 
 interface MovimentosMrrModalProps {
   open: boolean;
@@ -454,6 +468,11 @@ export function MovimentosMrrModal({
     if (movimento.status === 'inativo') return;
     if (movimento.estornado_por) return;
     if (movimento.estorno_de) return;
+    // O cadeado já esconde o botão; isto é para o caminho que ninguém previu.
+    if (movimento.cliente_produto_modulo_id) {
+      toast.info(motivoDoModulo(movimento.tipo));
+      return;
+    }
     setDeactivateConfirm({ open: true, movimento });
   };
 
@@ -793,6 +812,7 @@ export function MovimentosMrrModal({
                     const isEstornado = !!m.estornado_por;
                     const isEstorno = !!m.estorno_de;
                     const isVendaAvulsa = m.tipo === 'venda_avulsa';
+                    const veioDeModulo = !!m.cliente_produto_modulo_id;
                     const valorExibido = isVendaAvulsa ? (m.valor_venda_avulsa || 0) : m.valor_delta;
 
                     return (
@@ -831,16 +851,36 @@ export function MovimentosMrrModal({
                         </TableCell>
                         <TableCell className="text-right">
                           {!isInativo && !isEstornado && !isEstorno && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDeactivateClick(m)}
-                              disabled={saving}
-                              title="Desativar movimento"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </Button>
+                            veioDeModulo ? (
+                              // No lugar do X, o cadeado — e o motivo à mão, no
+                              // hover e no clique (que é o que sobra no celular).
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => toast.info(motivoDoModulo(m.tipo))}
+                                    className="text-muted-foreground hover:text-foreground"
+                                  >
+                                    <Lock className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  {motivoDoModulo(m.tipo)}
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeactivateClick(m)}
+                                disabled={saving}
+                                title="Desativar movimento"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            )
                           )}
                         </TableCell>
                       </TableRow>
@@ -853,6 +893,10 @@ export function MovimentosMrrModal({
 
           <div className="text-xs text-muted-foreground mt-4">
             <p>* Movimentos são imutáveis. Para remover um valor do MRR, desative o movimento (será contabilizado como churn).</p>
+            <p className="mt-1">
+              * Movimento com <Lock className="inline h-3 w-3 align-[-2px]" /> nasceu de um módulo do cliente e acompanha
+              a ficha — quem muda esse valor é o módulo, na aba Produtos.
+            </p>
           </div>
         </DialogContent>
       </Dialog>
