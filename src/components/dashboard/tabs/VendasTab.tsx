@@ -133,7 +133,10 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
   // Deltas
   const novosD = computeDelta(metrics.novosClientes, metrics.prevNovosClientes, false, 'abs');
   const newMrrD = computeDelta(metrics.newMrr, metrics.prevNewMrr);
-  const ativacaoD = computeDelta(metrics.receitaAtivacao, metrics.prevTotalImplantacao);
+  // Compara com o mesmo escopo do mês anterior: prevTotalImplantacao é só a
+  // implantação do cliente novo e deixaria a variação errada agora que o KPI
+  // também soma a ativação dos movimentos.
+  const ativacaoD = computeDelta(metrics.receitaAtivacao, metrics.prevReceitaAtivacao);
   const mrrAdicionado = metrics.newMrr + metrics.upsellMrr + metrics.crossSellMrr;
   const prevMrrAdicionado = (metrics.prevNewMrr ?? 0) + (metrics.prevUpsellMrr ?? 0) + (metrics.prevCrossSellMrr ?? 0);
   const mrrAddD = computeDelta(mrrAdicionado, metrics.prevNewMrr != null ? prevMrrAdicionado : null);

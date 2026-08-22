@@ -380,9 +380,9 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   },
   receita_ativacao: {
     title: "Receita de Ativação",
-    definition: "Soma dos valores de setup/implantação cobrados dos novos clientes.",
-    why_it_matters: "Receita pontual que ajuda a cobrir custos de aquisição. Não é recorrente.",
-    formula: "Σ valor_ativacao dos novos clientes no período",
+    definition: "Todo setup/implantação cobrado no período: o dos novos clientes mais o lançado em movimentos de MRR (upsell e cross-sell com taxa de ativação).",
+    why_it_matters: "Receita pontual que ajuda a cobrir custos de aquisição. Não é recorrente — por isso fica fora do MRR.",
+    formula: "Σ valor_ativacao dos novos clientes + Σ vlr_ativacao dos movimentos do período",
   },
   mrr_adicionado: {
     title: "MRR Adicionado",

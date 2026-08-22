@@ -3681,6 +3681,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["movimento_mrr_tipo"]
           valor_delta: number
           valor_venda_avulsa: number | null
+          vlr_ativacao: number
         }
         Insert: {
           cliente_id: string
@@ -3705,6 +3706,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["movimento_mrr_tipo"]
           valor_delta?: number
           valor_venda_avulsa?: number | null
+          vlr_ativacao?: number
         }
         Update: {
           cliente_id?: string
@@ -3729,6 +3731,7 @@ export type Database = {
           tipo?: Database["public"]["Enums"]["movimento_mrr_tipo"]
           valor_delta?: number
           valor_venda_avulsa?: number | null
+          vlr_ativacao?: number
         }
         Relationships: [
           {
@@ -10992,6 +10995,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["movimento_mrr_tipo"] | null
           valor_delta: number | null
           valor_venda_avulsa: number | null
+          vlr_ativacao: number | null
         }
         Relationships: [
           {

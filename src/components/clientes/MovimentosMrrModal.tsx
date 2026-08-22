@@ -45,7 +45,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Plus, XCircle, TrendingUp, TrendingDown, ArrowUpDown, AlertCircle, DollarSign, Lock } from 'lucide-react';
+import { Loader2, Plus, XCircle, TrendingUp, TrendingDown, ArrowUpDown, AlertCircle, DollarSign, Lock, Rocket } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
@@ -66,6 +66,9 @@ interface MovimentoMrr {
   status: string;
   inativado_em: string | null;
   inativado_por_id: number | null;
+  // Taxa de setup lançada junto do movimento. Cobrança única: não entra no MRR
+  // e conta como faturamento no mês da `data_movimento`.
+  vlr_ativacao: number | null;
   // Preenchido quando o movimento nasceu de um módulo da ficha do cliente —
   // upsell na adição, downsell no cancelamento. É o que trava o desativar.
   cliente_produto_modulo_id: string | null;
@@ -80,6 +83,10 @@ const motivoDoModulo = (tipo: string) =>
   tipo === 'downsell'
     ? 'Este movimento nasceu do cancelamento de um módulo, na aba Produtos do cliente. Ele acompanha o módulo: desativá-lo aqui devolveria ao MRR um valor que o cliente não paga mais. Se o cancelamento foi engano, resolva pelo módulo, na ficha.'
     : 'Este movimento nasceu da adição de um módulo, na aba Produtos do cliente. Ele acompanha o módulo: desativá-lo aqui tiraria do MRR uma receita que o cliente continua pagando. Para desfazer a venda, cancele o módulo na ficha — o downsell entra sozinho.';
+
+// Ativação é taxa de setup de venda nova. Downsell é redução de receita e Venda
+// Avulsa já É um valor único — nos dois o campo não teria o que significar.
+const TIPOS_COM_ATIVACAO = new Set(['upsell', 'cross_sell']);
 
 interface MovimentosMrrModalProps {
   open: boolean;
@@ -227,6 +234,7 @@ export function MovimentosMrrModal({
   const [valorDelta, setValorDelta] = useState('');
   const [custoDelta, setCustoDelta] = useState('');
   const [valorVendaAvulsa, setValorVendaAvulsa] = useState('');
+  const [valorAtivacao, setValorAtivacao] = useState('');
   const [origemVenda, setOrigemVenda] = useState('');
   const [descricao, setDescricao] = useState('');
   const [funcionarioId, setFuncionarioId] = useState<string>('');
@@ -292,7 +300,7 @@ export function MovimentosMrrModal({
   }, [showAddForm, open]);
 
   // Debounce-save draft while add form is open and dirty
-  const formSnapshot = JSON.stringify({ tipo, dataMovimento, valorDelta, custoDelta, valorVendaAvulsa, origemVenda, descricao, funcionarioId });
+  const formSnapshot = JSON.stringify({ tipo, dataMovimento, valorDelta, custoDelta, valorVendaAvulsa, valorAtivacao, origemVenda, descricao, funcionarioId });
   useEffect(() => {
     if (!open || !showAddForm || !formIsDirty.current) return;
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
@@ -318,6 +326,7 @@ export function MovimentosMrrModal({
         if (d.valorDelta !== undefined) setValorDelta(d.valorDelta);
         if (d.custoDelta !== undefined) setCustoDelta(d.custoDelta);
         if (d.valorVendaAvulsa !== undefined) setValorVendaAvulsa(d.valorVendaAvulsa);
+        if (d.valorAtivacao !== undefined) setValorAtivacao(d.valorAtivacao);
         if (d.origemVenda !== undefined) setOrigemVenda(d.origemVenda);
         if (d.descricao !== undefined) setDescricao(d.descricao);
         if (d.funcionarioId !== undefined) setFuncionarioId(d.funcionarioId);
@@ -376,6 +385,17 @@ export function MovimentosMrrModal({
   const totalCustoCrossSell = crossSellItems.reduce((sum, m) => sum + (m.custo_delta || 0), 0);
   const totalCustoDownsell = downsellItems.reduce((sum, m) => sum + Math.abs(m.custo_delta || 0), 0);
 
+  // Ativação lançada nos movimentos — cobrança única. Fica fora de mrrAjustado e
+  // de qualquer total acima: nenhuma linha do MRR a enxerga.
+  // Movimento inativado ou estornado é lançamento DESFEITO, então a ativação dele
+  // sai junto. (Regra diferente da do módulo cancelado, onde a cobrança já tinha
+  // acontecido de verdade e por isso continua somando.)
+  const movimentosComAtivacao = movimentos.filter(
+    (m) => m.status === 'ativo' && !m.estornado_por && !m.estorno_de && Number(m.vlr_ativacao) > 0
+  );
+  const totalAtivacao = movimentosComAtivacao.reduce((sum, m) => sum + (Number(m.vlr_ativacao) || 0), 0);
+  const qtdAtivacao = movimentosComAtivacao.length;
+
   const getFuncionarioNome = (id: number | null) => {
     if (!id) return '-';
     return funcionarios.find(f => f.id === id)?.nome || '-';
@@ -387,6 +407,7 @@ export function MovimentosMrrModal({
     setValorDelta('');
     setCustoDelta('');
     setValorVendaAvulsa('');
+    setValorAtivacao('');
     setOrigemVenda('');
     setDescricao('');
     setFuncionarioId('');
@@ -445,6 +466,12 @@ export function MovimentosMrrModal({
         insertData.valor_delta = valor;
         insertData.custo_delta = custo;
       }
+
+      // Cobrança única, à parte do valor_delta. Só upsell/cross-sell têm o campo;
+      // nos demais o zero explícito impede que um rascunho antigo vaze o valor.
+      insertData.vlr_ativacao = TIPOS_COM_ATIVACAO.has(tipo)
+        ? Math.abs(parseFloat(valorAtivacao) || 0)
+        : 0;
 
       const { error } = await supabase
         .from('movimentos_mrr')
@@ -520,7 +547,7 @@ export function MovimentosMrrModal({
           </DialogHeader>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-4">
             <Card>
               <CardHeader className="py-2 px-3">
                 <CardTitle className="text-xs font-medium text-muted-foreground">MRR Base</CardTitle>
@@ -576,6 +603,18 @@ export function MovimentosMrrModal({
                 <p className="text-lg font-bold text-purple-600">{formatCurrency(totalVendasAvulsas)}</p>
                 <p className="text-[10px] text-muted-foreground leading-tight">{qtdVendasAvulsas} {qtdVendasAvulsas === 1 ? 'movimento' : 'movimentos'}</p>
                 <p className="text-xs text-muted-foreground">Não afeta MRR</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="py-2 px-3">
+                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <Rocket className="h-3 w-3 text-amber-500" /> Ativação
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="py-1 px-3">
+                <p className="text-lg font-bold text-amber-500">{formatCurrency(totalAtivacao)}</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">{qtdAtivacao} {qtdAtivacao === 1 ? 'movimento' : 'movimentos'}</p>
+                <p className="text-muted-foreground text-[9px]">Não afeta MRR</p>
               </CardContent>
             </Card>
             <Card>
@@ -743,7 +782,10 @@ export function MovimentosMrrModal({
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className={cn(
+                    "grid grid-cols-1 gap-4",
+                    TIPOS_COM_ATIVACAO.has(tipo) ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"
+                  )}>
                     <div className="space-y-2">
                       <Label>Valor MRR (R$) *</Label>
                       <Input type="number" step="0.01" min="0.01" placeholder="Ex: 500.00" value={valorDelta} onChange={(e) => { setValorDelta(e.target.value); formIsDirty.current = true; }} />
@@ -751,6 +793,15 @@ export function MovimentosMrrModal({
                         {tipo === 'downsell' ? 'Valor será subtraído do MRR' : 'Valor será somado ao MRR'}
                       </p>
                     </div>
+                    {TIPOS_COM_ATIVACAO.has(tipo) && (
+                      <div className="space-y-2">
+                        <Label>Valor Ativação (R$)</Label>
+                        <Input type="number" step="0.01" min="0" placeholder="Ex: 1500.00" value={valorAtivacao} onChange={(e) => { setValorAtivacao(e.target.value); formIsDirty.current = true; }} />
+                        <p className="text-xs text-muted-foreground">
+                          Cobrança única (setup). Não entra no MRR — vai para o faturamento do mês do movimento.
+                        </p>
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label>Custo (R$)</Label>
                       <Input type="number" step="0.01" min="0" placeholder="Ex: 200.00" value={custoDelta} onChange={(e) => { setCustoDelta(e.target.value); formIsDirty.current = true; }} />
@@ -830,6 +881,13 @@ export function MovimentosMrrModal({
                           isVendaAvulsa ? "text-purple-600" : valorExibido > 0 ? "text-green-600" : "text-red-600"
                         )}>
                           {isVendaAvulsa ? '' : valorExibido > 0 ? '+' : ''}{formatCurrency(valorExibido)}
+                          {Number(m.vlr_ativacao) > 0 && (
+                            // Fora do valor, não somado a ele: o MRR da linha continua
+                            // sendo só o valor_delta.
+                            <span className="block text-[10px] font-normal text-amber-500">
+                              Ativação {formatCurrency(Number(m.vlr_ativacao))}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="text-sm">
                           {getFuncionarioNome(m.funcionario_id)}
@@ -893,6 +951,10 @@ export function MovimentosMrrModal({
 
           <div className="text-xs text-muted-foreground mt-4">
             <p>* Movimentos são imutáveis. Para remover um valor do MRR, desative o movimento (será contabilizado como churn).</p>
+            <p className="mt-1">
+              * <span className="text-amber-500">Ativação</span> é cobrança única: não entra no MRR e conta como
+              faturamento no mês do movimento (Receita de Ativação, no painel de Vendas).
+            </p>
             <p className="mt-1">
               * Movimento com <Lock className="inline h-3 w-3 align-[-2px]" /> nasceu de um módulo do cliente e acompanha
               a ficha — quem muda esse valor é o módulo, na aba Produtos.

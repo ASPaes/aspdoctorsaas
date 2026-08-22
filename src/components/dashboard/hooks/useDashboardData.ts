@@ -15,6 +15,7 @@ const defaultMetrics: KPIMetrics = {
   novosClientes: 0, newMrr: 0, totalImplantacao: 0,
   prevNovosClientes: null, prevNewMrr: null, prevTotalImplantacao: null, prevUpsellMrr: null, prevCrossSellMrr: null,
   netNewMrr: 0, nrr: 0, grr: 0, cacPayback: 0, margemContribuicao: 0, concentracaoTop10: 0, receitaAtivacao: 0,
+  prevReceitaAtivacao: null,
   upsellMrr: 0, crossSellMrr: 0, downsellMrr: 0, reajusteMrr: 0, mrrAjustado: 0,
   reativacaoMrr: 0, reativacoesQtd: 0,
   funcionariosRanking: [], quickRatio: 0, revenuePerFuncionario: 0,
@@ -123,7 +124,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         .eq('ativo', true)));
       const movimentosPeriodoPromise = fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
-        .select('tipo, valor_delta, cliente_id, data_movimento, descricao')
+        .select('tipo, valor_delta, vlr_ativacao, cliente_id, data_movimento, descricao')
         .gte('data_movimento', periodoInicioStr)
         .lte('data_movimento', periodoFimStr)
         .eq('status', 'ativo')
@@ -140,7 +141,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       });
       const todosMovimentosAtivosPromise = fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
-        .select('cliente_id, valor_delta, data_movimento, tipo')
+        .select('cliente_id, valor_delta, vlr_ativacao, data_movimento, tipo')
         .in('tipo', [...MRR_MOV_TIPOS])
         .eq('status', 'ativo')
         .is('estornado_por', null)
@@ -160,7 +161,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       });
       const prevMovimentosPromise = fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
-        .select('tipo, valor_delta, cliente_id')
+        .select('tipo, valor_delta, vlr_ativacao, cliente_id')
         .gte('data_movimento', __prevMonthStartParallel)
         .lte('data_movimento', __prevMonthEndParallel)
         .eq('status', 'ativo')
@@ -314,6 +315,9 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
 
       // 7. Movimentos MRR
       let upsellMrr = 0, crossSellMrr = 0, downsellMrr = 0, reajusteMrr = 0;
+      // Setup cobrado em movimento de MRR. Somado à parte de tudo que é recorrente:
+      // é cobrança única e não pode encostar em upsell/cross-sell/Net New.
+      let ativacaoMovimentos = 0;
 
       const movimentosPeriodo = await movimentosPeriodoPromise;
 
@@ -330,6 +334,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       movimentosPeriodo?.forEach(m => {
         // Skip movements from clients outside the filter scope
         if (needsClientFilter && !allClientesFiltered.has(m.cliente_id)) return;
+        ativacaoMovimentos += Number(m.vlr_ativacao) || 0;
         if (m.tipo === 'upsell') upsellMrr += Number(m.valor_delta) || 0;
         else if (m.tipo === 'cross_sell') crossSellMrr += Number(m.valor_delta) || 0;
         else if (m.tipo === 'reajuste') reajusteMrr += Number(m.valor_delta) || 0;
@@ -459,11 +464,12 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       // Build prev month client set for filtering
       const prevClientesFiltered = new Set((prevNovos || []).map(c => c.id));
       // Also need prev month active clients for proper filtering
-      let prevUpsellMrr = 0, prevCrossSellMrr = 0;
+      let prevUpsellMrr = 0, prevCrossSellMrr = 0, prevAtivacaoMovimentos = 0;
       prevMovimentos?.forEach(m => {
         // For prev month, filter by same fornecedor/unidade logic using allClientesFiltered
         // (which includes all clients matching the filters)
         if (needsClientFilter && !allClientesFiltered.has(m.cliente_id)) return;
+        prevAtivacaoMovimentos += Number(m.vlr_ativacao) || 0;
         if (m.tipo === 'upsell') prevUpsellMrr += Number(m.valor_delta) || 0;
         else if (m.tipo === 'cross_sell') prevCrossSellMrr += Number(m.valor_delta) || 0;
       });
@@ -478,9 +484,14 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         clientesInicioCount, mrrInicio,
         novosClientes: novosCount, newMrr, totalImplantacao,
         prevNovosClientes, prevNewMrr, prevTotalImplantacao,
+        prevReceitaAtivacao: prevTotalImplantacao + prevAtivacaoMovimentos,
         prevUpsellMrr: prevUpsellMrr || null, prevCrossSellMrr: prevCrossSellMrr || null,
         netNewMrr, nrr, grr, cacPayback, margemContribuicao, concentracaoTop10,
-        receitaAtivacao: totalImplantacao,
+        // Total Implantação e Setup Médio continuam sendo só a implantação do
+        // CLIENTE NOVO — Setup Médio é essa soma ÷ novos clientes, e jogar aí o
+        // upsell de cliente antigo inventaria média. Receita de Ativação é o
+        // total cobrado de setup no período, venha de onde vier.
+        receitaAtivacao: totalImplantacao + ativacaoMovimentos,
         upsellMrr, crossSellMrr, downsellMrr, reajusteMrr, mrrAjustado: mrrTotalAtual,
         reativacaoMrr, reativacoesQtd,
         funcionariosRanking, quickRatio, revenuePerFuncionario,
@@ -500,6 +511,27 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
 
       // All clients for time series (no period filter) — usa fetchAllRows para evitar limite de 1000 do PostgREST
       const allClientes = await allClientesPromise;
+
+      // Ativação lançada em movimento, por mês — a outra metade do faturamento
+      // one-time. Não dá para tirar de `novosNoMes` como a do produto: upsell e
+      // cross-sell acontecem em cliente que já existe, então o valor cai num mês
+      // em que o cliente não é novo e nunca seria contado.
+      // A população é o filtro de unidade/fornecedor, e não "ativo no mês": setup
+      // já faturado não deixa de ter sido faturado porque o cliente cancelou depois.
+      const clientesNoFiltroSeries = new Set(
+        (allClientes || [])
+          .filter(c => (!filters.unidadeBaseId || c.unidade_base_id === filters.unidadeBaseId)
+                    && (!fornecedorClientIds || fornecedorClientIds.has(c.id)))
+          .map(c => c.id)
+      );
+      const ativacaoMovPorMes: Record<string, number> = {};
+      (todosMovimentosAtivos || []).forEach((m: any) => {
+        const v = Number(m.vlr_ativacao) || 0;
+        if (!v || !m.data_movimento) return;
+        if (!clientesNoFiltroSeries.has(m.cliente_id)) return;
+        const ym = String(m.data_movimento).slice(0, 7);
+        ativacaoMovPorMes[ym] = (ativacaoMovPorMes[ym] || 0) + v;
+      });
 
       const mrrEvolution: typeof timeSeries.mrrEvolution = [];
       const faturamentoEvolution: typeof timeSeries.faturamentoEvolution = [];
@@ -566,8 +598,10 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         });
         mrrEvolution.push(mrrPoint as any);
 
-        // Faturamento = MRR + ativações dos novos clientes cadastrados naquele mês
-        const ativacoesMes = novosNoMes.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0);
+        // Faturamento = MRR + ativações do mês: a dos clientes vendidos nele mais a
+        // lançada em movimentos de MRR com data naquele mês.
+        const ativacoesMes = novosNoMes.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0)
+          + (ativacaoMovPorMes[m.yearMonth] || 0);
         // Guarda as duas parcelas: o tooltip abre a composição (recorrente x ativação, que é one-time).
         // Sem isso o mês corrente parece um tombo — ele só ainda não tem ativação nenhuma.
         faturamentoEvolution.push({

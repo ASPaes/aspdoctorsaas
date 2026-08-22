@@ -26,6 +26,7 @@ interface MovimentoMrr {
   valor_delta: number;
   custo_delta: number;
   valor_venda_avulsa: number | null;
+  vlr_ativacao: number | null;
   status: string;
   estorno_de: string | null;
   estornado_por: string | null;
@@ -115,7 +116,7 @@ export default function FinanceiroCard({
       if (!clienteId) return null;
       const { data, error } = await supabase
         .from("movimentos_mrr")
-        .select("tipo, valor_delta, custo_delta, valor_venda_avulsa, status, estorno_de, estornado_por")
+        .select("tipo, valor_delta, custo_delta, valor_venda_avulsa, vlr_ativacao, status, estorno_de, estornado_por")
         .eq("cliente_id", clienteId);
       if (error) throw error;
       return data as unknown as MovimentoMrr[];
@@ -168,6 +169,13 @@ export default function FinanceiroCard({
     (m) => m.status === "ativo" && m.tipo === "venda_avulsa"
   );
   const totalVendasAvulsas = vendasAvulsas.reduce((s, m) => s + (m.valor_venda_avulsa || 0), 0);
+
+  // Ativação lançada em movimento de MRR (upsell/cross-sell com setup). É a mesma
+  // natureza da ativação do produto — cobrança única — e por isso entra no mesmo
+  // total da ficha. Movimento inativado/estornado é lançamento desfeito e sai.
+  const totalAtivacaoMovimentos = (movimentos ?? [])
+    .filter((m) => m.status === "ativo" && !m.estornado_por && !m.estorno_de)
+    .reduce((s, m) => s + (Number(m.vlr_ativacao) || 0), 0);
 
   const totalUpsell = movimentosAtivos
     .filter((m) => m.tipo === "upsell")
@@ -357,15 +365,22 @@ export default function FinanceiroCard({
           </div>
         </div>
 
-        {(totalAtivacao ?? 0) > 0 && (
+        {(totalAtivacao ?? 0) + totalAtivacaoMovimentos > 0 && (
           <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 flex items-center justify-between">
             <div>
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
-                Total Ativação (produtos)
+                Total Ativação
               </p>
               <p className="text-lg font-bold mt-0.5 text-amber-500">
-                {fmt(totalAtivacao ?? 0)}
+                {fmt((totalAtivacao ?? 0) + totalAtivacaoMovimentos)}
               </p>
+              {/* A composição só aparece quando há as duas parcelas — com uma só,
+                  repetir o número de cima seria ruído. */}
+              {totalAtivacaoMovimentos > 0 && (totalAtivacao ?? 0) > 0 && (
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Produtos {fmt(totalAtivacao ?? 0)} · Movimentos {fmt(totalAtivacaoMovimentos)}
+                </p>
+              )}
             </div>
           </div>
         )}

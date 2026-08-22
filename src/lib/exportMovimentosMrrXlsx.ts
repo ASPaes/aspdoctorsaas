@@ -61,6 +61,7 @@ export function exportMovimentosMrrXlsx(params: {
     "Nome Fantasia",
     "CNPJ",
     "Valor (R$)",
+    "Ativação (R$)",
     "Custo Delta (R$)",
     "Funcionário",
     "Fornecedor",
@@ -80,6 +81,9 @@ export function exportMovimentosMrrXlsx(params: {
       cli?.fantasia ?? "",
       cli?.cnpj ?? "",
       numCellAlways(valor) ?? "",
+      // Coluna própria: ativação é cobrança única e somá-la ao Valor faria a
+      // planilha totalizar MRR com one-time.
+      numCell(m.vlr_ativacao) ?? "",
       numCell(m.custo_delta) ?? "",
       m.funcionario_id ? (funcMap[m.funcionario_id] ?? "") : "",
       // fornecedor_efetivo é o que a tela filtra e o que fornecedorMap indexa;
@@ -99,6 +103,7 @@ export function exportMovimentosMrrXlsx(params: {
     { wch: 28 },  // Nome Fantasia
     { wch: 20 },  // CNPJ
     { wch: 14 },  // Valor
+    { wch: 14 },  // Ativação
     { wch: 14 },  // Custo Delta
     { wch: 20 },  // Funcionário
     { wch: 20 },  // Fornecedor

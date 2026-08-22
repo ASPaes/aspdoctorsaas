@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, ShoppingCart, DollarSign, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, UserMinus, ArrowUpCircle, Download } from "lucide-react";
+import { TrendingUp, TrendingDown, ShoppingCart, DollarSign, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, UserMinus, ArrowUpCircle, Download, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
 import { MultiSelectFilter } from "@/components/atendimento/MultiSelectFilter";
@@ -107,7 +107,7 @@ export default function MovimentosMrrTab() {
       const data = await fetchAllRows<any>(() => {
         let q = supabase
           .from("vw_movimentos_mrr" as any)
-          .select("id, tipo, valor_delta, custo_delta, valor_venda_avulsa, data_movimento, descricao, status, estornado_por, estorno_de, cliente_id, funcionario_id, fornecedor_efetivo, origem_venda, criado_em, cliente_razao_social, cliente_nome_fantasia, funcionario_nome")
+          .select("id, tipo, valor_delta, custo_delta, valor_venda_avulsa, vlr_ativacao, data_movimento, descricao, status, estornado_por, estorno_de, cliente_id, funcionario_id, fornecedor_efetivo, origem_venda, criado_em, cliente_razao_social, cliente_nome_fantasia, funcionario_nome")
           .eq("status", "ativo")
           .is("estornado_por", null)
           .is("estorno_de", null)
@@ -247,8 +247,11 @@ export default function MovimentosMrrTab() {
     const reactivation = items.filter(m => m.tipo === "reactivation").reduce((s, m) => s + (Number(m.valor_delta) || 0), 0);
     const reajuste = items.filter(m => m.tipo === "reajuste").reduce((s, m) => s + (Number(m.valor_delta) || 0), 0);
     const churn = items.filter(m => m.tipo === "churn").reduce((s, m) => s + Math.abs(Number(m.valor_delta) || 0), 0);
+    // Cobrança única lançada junto do movimento. Somada à parte de todos os
+    // acima: não é MRR e não pode entrar em nenhum deles.
+    const ativacao = items.reduce((s, m) => s + (Number(m.vlr_ativacao) || 0), 0);
     const qtdTotal = items.length;
-    return { upsell, crossSell, downsell, vendaAvulsa, reactivation, reajuste, churn, qtdTotal };
+    return { upsell, crossSell, downsell, vendaAvulsa, reactivation, reajuste, churn, ativacao, qtdTotal };
   }, [movimentos]);
 
   // Sorted data
@@ -352,7 +355,7 @@ export default function MovimentosMrrTab() {
 
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-9 gap-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-xs font-medium text-muted-foreground">Upsell</CardTitle>
@@ -372,6 +375,17 @@ export default function MovimentosMrrTab() {
           <CardContent>
             {isLoading ? <Skeleton className="h-6 w-20" /> : (
               <p className="text-lg font-bold text-blue-700 dark:text-blue-400">+{fmt.format(totals.crossSell)}</p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Ativação</CardTitle>
+            <Rocket className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-6 w-20" /> : (
+              <p className="text-lg font-bold text-amber-600 dark:text-amber-400">{fmt.format(totals.ativacao)}</p>
             )}
           </CardContent>
         </Card>
@@ -509,6 +523,11 @@ export default function MovimentosMrrTab() {
                     {m.tipo === "venda_avulsa"
                       ? fmt.format(Number(m.valor_venda_avulsa) || 0)
                       : fmt.format(Number(m.valor_delta) || 0)}
+                    {Number(m.vlr_ativacao) > 0 && (
+                      <span className="block text-[10px] font-normal text-amber-600 dark:text-amber-400">
+                        Ativação {fmt.format(Number(m.vlr_ativacao))}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {Number(m.custo_delta) ? fmt.format(Number(m.custo_delta)) : "—"}

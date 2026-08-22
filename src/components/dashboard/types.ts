@@ -46,6 +46,7 @@ export interface KPIMetrics {
   prevNovosClientes: number | null;
   prevNewMrr: number | null;
   prevTotalImplantacao: number | null;
+  prevReceitaAtivacao: number | null;
   prevUpsellMrr: number | null;
   prevCrossSellMrr: number | null;
 
