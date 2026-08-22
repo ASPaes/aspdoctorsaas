@@ -149,16 +149,19 @@ function Numero({
     : "";
   return (
     <div className="rounded-lg border bg-card p-4">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-stretch justify-between gap-3">
         <div className="min-w-0">
           <p className={`text-2xl font-semibold tabular-nums ${cor}`}>{valor}</p>
           <p className="text-sm font-medium mt-1">{rotulo}</p>
           {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
         </div>
+        {/* Encostado na base: o número secundário sobe até a linha do número
+            principal quando o card é curto, e o rótulo fica por cima dele —
+            lido de cima para baixo, é "Contratos ativos DS: 855". */}
         {ao_lado && (
-          <div className="shrink-0 text-right" title={ao_lado.title}>
-            <p className="text-lg font-semibold tabular-nums leading-7">{ao_lado.valor}</p>
-            <p className="text-[11px] text-muted-foreground mt-1 leading-tight">{ao_lado.rotulo}</p>
+          <div className="flex shrink-0 flex-col justify-end text-right" title={ao_lado.title}>
+            <p className="text-[11px] text-muted-foreground leading-tight">{ao_lado.rotulo}</p>
+            <p className="text-lg font-semibold tabular-nums leading-tight mt-0.5">{ao_lado.valor}</p>
           </div>
         )}
       </div>
