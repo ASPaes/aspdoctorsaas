@@ -798,7 +798,7 @@ export function MovimentosMrrModal({
                         <Label>Valor Ativação (R$)</Label>
                         <Input type="number" step="0.01" min="0" placeholder="Ex: 1500.00" value={valorAtivacao} onChange={(e) => { setValorAtivacao(e.target.value); formIsDirty.current = true; }} />
                         <p className="text-xs text-muted-foreground">
-                          Cobrança única (setup). Não entra no MRR — vai para o faturamento do mês do movimento.
+                          Cobrança única (setup). Não entra no MRR vai para o faturamento do mês do movimento.
                         </p>
                       </div>
                     )}
