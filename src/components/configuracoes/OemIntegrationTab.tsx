@@ -1272,13 +1272,19 @@ export default function OemIntegrationTab() {
                 `motion-safe` respeita quem desligou animação no sistema; para
                 essas, o ícone e a contagem em vermelho continuam de pé. */}
             {totalDivergencias > 0 && (
-              <span className="relative flex h-4 w-4 items-center justify-center" aria-hidden="true">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-destructive/50 motion-safe:animate-ping" />
-                <AlertTriangle className="relative h-4 w-4 text-destructive" />
+              <span className="relative flex h-5 w-5 items-center justify-center" aria-hidden="true">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400/50 motion-safe:animate-ping" />
+                <AlertTriangle className="relative h-5 w-5 text-amber-400" />
               </span>
             )}
             Divergências
-            {totalDivergencias > 0 && <Badge variant="destructive">{totalDivergencias}</Badge>}
+            {/* O aviso é o alerta; o número é o detalhe dele. Em tamanho cheio o
+                vermelho puxava o olho primeiro e invertia essa ordem. */}
+            {totalDivergencias > 0 && (
+              <Badge variant="destructive" className="px-1.5 py-0 text-[10px] leading-4">
+                {totalDivergencias}
+              </Badge>
+            )}
           </TabsTrigger>
         </TabsList>
 
