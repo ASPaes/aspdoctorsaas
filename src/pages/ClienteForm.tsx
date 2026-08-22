@@ -32,6 +32,7 @@ import { ArrowLeft, Loader2, Building2, FileText, XCircle, ChevronLeft, ChevronR
 import EditarCancelamentoDialog from "@/components/clientes/EditarCancelamentoDialog";
 import { MovimentosMrrModal } from "@/components/clientes/MovimentosMrrModal";
 import DadosClienteTab from "@/components/clientes/DadosClienteTab";
+import ParametrosAtendimentoSection from "@/components/clientes/ParametrosAtendimentoSection";
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
 import FinanceiroTab from "@/components/clientes/FinanceiroTab";
 import FinanceiroCard from "@/components/clientes/FinanceiroCard";
@@ -130,6 +131,7 @@ const clienteSchema = z.object({
   complemento: z.string().nullable(),
   bairro: z.string().nullable(),
   dia_vencimento_mrr: z.number().nullable(),
+  operador_responsavel_id: z.string().nullable(),
 });
 
 // Razão Social é obrigatória só no cadastro novo — clientes antigos com o campo
@@ -360,6 +362,7 @@ export default function ClienteForm() {
       matriz_id: null,
       cep: null, endereco: null, numero: null, complemento: null, bairro: null,
       dia_vencimento_mrr: null,
+      operador_responsavel_id: null,
     },
   });
 
@@ -511,6 +514,7 @@ export default function ClienteForm() {
       complemento: (c as any).complemento ?? null,
       bairro: (c as any).bairro ?? null,
       dia_vencimento_mrr: (c as any).dia_vencimento_mrr ?? null,
+      operador_responsavel_id: (c as any).operador_responsavel_id ?? null,
     });
     // Clear any stale draft after loading DB data — user hasn't edited yet
     clearDraft();
@@ -559,7 +563,7 @@ export default function ClienteForm() {
           "contato_nome","contato_cpf","contato_fone","contato_aniversario",
           "unidade_base_id","matriz_id",
           "cep","endereco","numero","complemento","bairro",
-          "dia_vencimento_mrr",
+          "dia_vencimento_mrr","operador_responsavel_id",
         ] as const;
         const updatePayload: Record<string, any> = {};
         for (const k of ALLOWED_UPDATE_COLS) {
@@ -584,7 +588,7 @@ export default function ClienteForm() {
           "contato_nome","contato_cpf","contato_fone","contato_aniversario",
           "unidade_base_id","matriz_id",
           "cep","endereco","numero","complemento","bairro",
-          "dia_vencimento_mrr",
+          "dia_vencimento_mrr","operador_responsavel_id",
         ] as const;
         const insertPayload: Record<string, any> = {};
         for (const k of ALLOWED_INSERT_COLS) {
@@ -753,6 +757,9 @@ export default function ClienteForm() {
               />
             </CardContent>
           </Card>
+
+          {/* Card: Parametros de atendimento */}
+          <ParametrosAtendimentoSection form={form} />
 
           {isEditing && id && (
             <div id="cliente-produtos-section">

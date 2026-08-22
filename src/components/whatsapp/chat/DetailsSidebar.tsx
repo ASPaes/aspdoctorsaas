@@ -40,6 +40,7 @@ import { useWhatsAppActions } from "../hooks/useWhatsAppActions";
 import { useKBDraft } from "../hooks/useKBDraft";
 import { TopicBadges } from "./TopicBadges";
 import { ClienteLinkCard } from "./ClienteLinkCard";
+import { OperadorResponsavelCard } from "./OperadorResponsavelCard";
 import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
 import { useRelevantAttendance } from "../hooks/useRelevantAttendance";
 import { useInactivityHold } from "../hooks/useInactivityHold";
@@ -248,6 +249,11 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             isAttendanceClosed={isRelevantClosed}
             isAdminOrHead={isAdminOrHead}
           />
+
+          {/* --- 3b. Operador responsavel --- */}
+          {!isGroup && (
+            <OperadorResponsavelCard contactId={contact?.id ?? null} canEdit={!!isAdminOrHead} />
+          )}
 
           {/* ─── 4. Histórico do Contato ─── */}
           <Button

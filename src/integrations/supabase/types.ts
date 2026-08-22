@@ -1593,6 +1593,7 @@ export type Database = {
           observacao_cliente: string | null
           observacao_negociacao: string | null
           observacao_reativacao: string | null
+          operador_responsavel_id: string | null
           origem_venda_id: number | null
           produto_id: number | null
           razao_social: string | null
@@ -1656,6 +1657,7 @@ export type Database = {
           observacao_cliente?: string | null
           observacao_negociacao?: string | null
           observacao_reativacao?: string | null
+          operador_responsavel_id?: string | null
           origem_venda_id?: number | null
           produto_id?: number | null
           razao_social?: string | null
@@ -1719,6 +1721,7 @@ export type Database = {
           observacao_cliente?: string | null
           observacao_negociacao?: string | null
           observacao_reativacao?: string | null
+          operador_responsavel_id?: string | null
           origem_venda_id?: number | null
           produto_id?: number | null
           razao_social?: string | null
@@ -2048,6 +2051,7 @@ export type Database = {
           created_at: string
           custo_fixo_percentual: number
           group_require_ticket_on_close: boolean
+          group_send_attendance_notices: boolean
           id: number
           imposto_percentual: number
           notification_defaults: Json
@@ -2123,6 +2127,7 @@ export type Database = {
           created_at?: string
           custo_fixo_percentual?: number
           group_require_ticket_on_close?: boolean
+          group_send_attendance_notices?: boolean
           id?: number
           imposto_percentual?: number
           notification_defaults?: Json
@@ -2198,6 +2203,7 @@ export type Database = {
           created_at?: string
           custo_fixo_percentual?: number
           group_require_ticket_on_close?: boolean
+          group_send_attendance_notices?: boolean
           id?: number
           imposto_percentual?: number
           notification_defaults?: Json
@@ -10164,6 +10170,7 @@ export type Database = {
           is_group: boolean
           name: string | null
           notes: string | null
+          operador_responsavel_id: string | null
           phone_number: string
           picture_synced_at: string | null
           profile_picture_url: string | null
@@ -10183,6 +10190,7 @@ export type Database = {
           is_group?: boolean
           name?: string | null
           notes?: string | null
+          operador_responsavel_id?: string | null
           phone_number: string
           picture_synced_at?: string | null
           profile_picture_url?: string | null
@@ -10202,6 +10210,7 @@ export type Database = {
           is_group?: boolean
           name?: string | null
           notes?: string | null
+          operador_responsavel_id?: string | null
           phone_number?: string
           picture_synced_at?: string | null
           profile_picture_url?: string | null
@@ -13488,6 +13497,10 @@ export type Database = {
         Args: { p_slug: string; p_tenant_id: string }
         Returns: string
       }
+      fn_operador_responsavel_do_contato: {
+        Args: { p_contact_id: string; p_tenant_id: string }
+        Returns: string
+      }
       fn_process_ura_timeouts: { Args: never; Returns: Json }
       fn_receita_vem_dos_modulos: {
         Args: { p_cliente_produto_id: string }
@@ -13506,6 +13519,10 @@ export type Database = {
       fn_seed_onboarding_phases: {
         Args: { p_tenant_id: string }
         Returns: undefined
+      }
+      fn_setor_do_operador: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: string
       }
       fn_snapshot_onboarding_phase: {
         Args: {
