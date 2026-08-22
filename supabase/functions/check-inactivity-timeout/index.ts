@@ -82,6 +82,30 @@ function getLastActivityIso(att: AttendanceRow): string {
   return candidates.reduce((max, cur) => (cur > max ? cur : max));
 }
 
+// Grupos: gate do aviso automatico de encerramento. Coluna NOT NULL DEFAULT true
+// em configuracoes, entao so devolve false com desligamento explicito do tenant.
+// Falha de leitura mantem o comportamento historico (envia) — o atendimento fecha
+// de qualquer jeito, o que a flag controla e apenas a mensagem no grupo.
+// Duplicado aqui de proposito: por em _shared obrigaria um deploy de todas as
+// functions (ver CLAUDE.md).
+async function groupNoticesEnabled(supabase: any, tenantId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from("configuracoes")
+      .select("group_send_attendance_notices")
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    if (error) {
+      console.error(`${LOG} erro ao ler group_send_attendance_notices:`, error);
+      return true;
+    }
+    return data?.group_send_attendance_notices !== false;
+  } catch (err) {
+    console.error(`${LOG} falha ao ler group_send_attendance_notices:`, err);
+    return true;
+  }
+}
+
 async function buildSendContext(
   supabase: any,
   tenantId: string,
@@ -395,6 +419,13 @@ async function closeAttendance(
   if (!result?.success) {
     log("RPC retornou falha", result);
     return "skipped";
+  }
+
+  // Grupo com os avisos desligados: o atendimento ja fechou acima, so a mensagem
+  // no grupo e suprimida.
+  if (built && att.is_group === true && !(await groupNoticesEnabled(supabase, att.tenant_id))) {
+    log("aviso de encerramento suprimido: grupo com group_send_attendance_notices=false");
+    return "closed";
   }
 
   if (built) {

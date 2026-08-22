@@ -198,6 +198,25 @@ export const useWhatsAppActions = () => {
 
           const effSkipCsat = skipCsat;
 
+          // Grupos: o tenant pode desligar os avisos de abertura e encerramento
+          // (configuracoes.group_send_attendance_notices). A leitura acontece aqui, e
+          // não só na edge function, para a nota interna do chat não anunciar uma
+          // mensagem de encerramento que o grupo nunca recebeu. Falha de leitura
+          // mantém o comportamento historico (envia).
+          let groupNoticesEnabled = true;
+          if (isGroup === true) {
+            const { data: groupCfg, error: groupCfgErr } = await (supabase.from('configuracoes' as any) as any)
+              .select('group_send_attendance_notices')
+              .eq('tenant_id', activeAtt.tenant_id)
+              .maybeSingle();
+            if (groupCfgErr) {
+              console.error('[closeConversation] Erro ao ler group_send_attendance_notices:', groupCfgErr);
+            } else {
+              groupNoticesEnabled = (groupCfg as any)?.group_send_attendance_notices !== false;
+            }
+          }
+          const suppressClosureMessage = skipClosureMessage === true || !groupNoticesEnabled;
+
           const closureType = skipClosureMessage
             ? 'silent'
             : effSkipCsat
@@ -290,7 +309,7 @@ export const useWhatsAppActions = () => {
               }
 
               // Only send closure message immediately if CSAT is NOT enabled
-              if (!csatEnabled && !skipClosureMessage) {
+              if (!csatEnabled && !suppressClosureMessage) {
                 try {
                   const closureText = `✅ Atendimento *${activeAtt.attendance_code}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. 😊`;
                   await supabase.functions.invoke('send-whatsapp-message', {
@@ -299,6 +318,9 @@ export const useWhatsAppActions = () => {
                       content: closureText,
                       messageType: 'text',
                       systemMessage: true,
+                      // Em grupo a edge function reconfere a flag do tenant; é o
+                      // backstop para o caso de a leitura acima ter falhado.
+                      attendanceNotice: isGroup === true,
                     },
                   });
                 } catch (sendErr) {
@@ -316,6 +338,8 @@ export const useWhatsAppActions = () => {
 
                 const internalText = skipClosureMessage
                   ? `🔇 Atendimento encerrado sem envio de mensagem ao cliente.`
+                  : !groupNoticesEnabled && !csatEnabled
+                  ? `🔇 Atendimento encerrado sem aviso no grupo (avisos desligados nas configurações de grupos).`
                   : effSkipCsat
                   ? `💬 Atendimento encerrado com mensagem de encerramento (sem CSAT).`
                   : `✅ Atendimento encerrado com pesquisa CSAT enviada ao cliente.`;

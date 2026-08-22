@@ -362,6 +362,35 @@ async function sendAndPersistAutoMessage(
   }).eq('id', conversationId);
 }
 
+// Grupos: gate do aviso de encerramento. Coluna NOT NULL DEFAULT true em
+// configuracoes, entao so devolve false com desligamento explicito do tenant.
+// Falha de leitura mantem o comportamento historico (envia). Duplicado de
+// proposito: por em _shared obrigaria um deploy de todas as functions (CLAUDE.md).
+async function groupNoticesDisabled(supabase: any, conversationId: string, tenantId: string): Promise<boolean> {
+  try {
+    const { data: conv } = await supabase
+      .from('whatsapp_conversations')
+      .select('is_group')
+      .eq('id', conversationId)
+      .maybeSingle();
+    if (conv?.is_group !== true) return false;
+
+    const { data, error } = await supabase
+      .from('configuracoes')
+      .select('group_send_attendance_notices')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (error) {
+      console.error(`[${FUNCTION_NAME}] erro ao ler group_send_attendance_notices:`, error);
+      return false;
+    }
+    return data?.group_send_attendance_notices === false;
+  } catch (err) {
+    console.error(`[${FUNCTION_NAME}] falha ao ler group_send_attendance_notices:`, err);
+    return false;
+  }
+}
+
 async function sendDeferredClosureMessage(
   supabase: any,
   instanceCtx: InstanceContext,
@@ -371,6 +400,12 @@ async function sendDeferredClosureMessage(
   attendanceCode: string
 ): Promise<void> {
   try {
+    // Grupo com os avisos desligados: o atendimento ja fechou, so a mensagem some.
+    if (await groupNoticesDisabled(supabase, conversationId, tenantId)) {
+      console.log(`[${FUNCTION_NAME}] aviso de encerramento suprimido: grupo com group_send_attendance_notices=false conv=${conversationId}`);
+      return;
+    }
+
     const nowIso = new Date().toISOString();
 
     // Send closure message to customer

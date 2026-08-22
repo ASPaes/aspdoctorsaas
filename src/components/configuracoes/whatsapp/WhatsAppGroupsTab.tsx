@@ -44,6 +44,14 @@ interface WhatsAppGroup {
   department_id?: string | null;
 }
 
+interface GroupAttendanceConfig {
+  group_require_ticket_on_close?: boolean;
+  /** Avisos "Atendimento X iniciado/encerrado" dentro do grupo. Coluna nasce true. */
+  group_send_attendance_notices?: boolean;
+}
+
+type GroupConfigField = keyof GroupAttendanceConfig;
+
 const NO_DEPARTMENT = "__none__";
 
 export default function WhatsAppGroupsTab() {
@@ -92,18 +100,18 @@ export default function WhatsAppGroupsTab() {
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.from("configuracoes" as any) as any)
-        .select("group_require_ticket_on_close")
+        .select("group_require_ticket_on_close, group_send_attendance_notices")
         .eq("tenant_id", tid)
         .maybeSingle();
       if (error) throw error;
-      return data as { group_require_ticket_on_close?: boolean } | null;
+      return data as GroupAttendanceConfig | null;
     },
   });
 
-  const updateGroupRequireTicketMutation = useMutation({
-    mutationFn: async (value: boolean) => {
+  const updateGroupConfigMutation = useMutation({
+    mutationFn: async ({ field, value }: { field: GroupConfigField; value: boolean }) => {
       const { error } = await (supabase.from("configuracoes" as any) as any)
-        .update({ group_require_ticket_on_close: value, updated_at: new Date().toISOString() })
+        .update({ [field]: value, updated_at: new Date().toISOString() })
         .eq("tenant_id", tid);
       if (error) throw error;
     },
@@ -115,6 +123,9 @@ export default function WhatsAppGroupsTab() {
       toast.error(err?.message || "Erro ao atualizar configuração");
     },
   });
+
+  const isSavingConfig = (field: GroupConfigField) =>
+    updateGroupConfigMutation.isPending && updateGroupConfigMutation.variables?.field === field;
 
   const syncMutation = useMutation({
     mutationFn: async () => {
@@ -297,8 +308,8 @@ export default function WhatsAppGroupsTab() {
             </CardDescription>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-start justify-between gap-4">
+        <CardContent className="divide-y divide-border">
+          <div className="flex items-start justify-between gap-4 pb-4">
             <div className="space-y-0.5">
               <div className="text-sm font-medium">
                 Ticket obrigatório ao encerrar atendimento
@@ -310,8 +321,32 @@ export default function WhatsAppGroupsTab() {
             </div>
             <Switch
               checked={!!groupAttendanceConfig?.group_require_ticket_on_close}
-              onCheckedChange={(checked) => updateGroupRequireTicketMutation.mutate(checked)}
-              disabled={updateGroupRequireTicketMutation.isPending || !tid}
+              onCheckedChange={(checked) =>
+                updateGroupConfigMutation.mutate({ field: "group_require_ticket_on_close", value: checked })
+              }
+              disabled={isSavingConfig("group_require_ticket_on_close") || !tid}
+            />
+          </div>
+
+          <div className="flex items-start justify-between gap-4 pt-4">
+            <div className="space-y-0.5">
+              <div className="text-sm font-medium">
+                Avisar início e encerramento no grupo
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Ao iniciar e ao encerrar um atendimento, o grupo recebe uma mensagem automática com o
+                código do atendimento. Desligado, o atendimento abre e fecha em silêncio para os
+                participantes. Não afeta conversas individuais.
+              </div>
+            </div>
+            <Switch
+              // Coluna NOT NULL DEFAULT true: a leitura só cai para "ligado" quando
+              // o tenant ainda não tem linha em configuracoes.
+              checked={groupAttendanceConfig?.group_send_attendance_notices !== false}
+              onCheckedChange={(checked) =>
+                updateGroupConfigMutation.mutate({ field: "group_send_attendance_notices", value: checked })
+              }
+              disabled={isSavingConfig("group_send_attendance_notices") || !tid}
             />
           </div>
         </CardContent>

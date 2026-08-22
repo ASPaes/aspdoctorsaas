@@ -21,6 +21,33 @@ interface SendMessageRequest {
   instanceId?: string; // NEW: optional instance override for cross-instance conversations
   systemMessage?: boolean; // Skip attendance logic (used for closure/system notifications)
   mentionEveryone?: boolean; // @todos — marca todos os participantes do grupo (Evolution only)
+  // Aviso automático de abertura/encerramento de atendimento. Em GRUPO ele só sai
+  // se configuracoes.group_send_attendance_notices estiver ligado; em 1:1 o campo
+  // não muda nada. Quem envia a abertura manual é o ChatHeader, e a mensagem de
+  // encerramento sai do useWhatsAppActions.
+  attendanceNotice?: boolean;
+}
+
+// Grupos: gate único dos avisos "Atendimento X iniciado/encerrado". Coluna
+// NOT NULL DEFAULT true — só devolve false com desligamento explícito do tenant.
+// Erro de leitura mantém o comportamento histórico (envia), para uma falha de
+// consulta não sumir com o aviso sem ninguém ter pedido.
+async function groupNoticesEnabled(supabase: any, tenantId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('configuracoes')
+      .select('group_send_attendance_notices')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (error) {
+      console.error('[send-whatsapp-message][group] erro ao ler group_send_attendance_notices:', error);
+      return true;
+    }
+    return data?.group_send_attendance_notices !== false;
+  } catch (err) {
+    console.error('[send-whatsapp-message][group] falha ao ler group_send_attendance_notices:', err);
+    return true;
+  }
 }
 
 // Rate limit do @todos por grupo. O dialog de confirmação já é a trava
@@ -306,6 +333,16 @@ Deno.serve(async (req) => {
     const destinationNumber = isGroupConv
       ? (conversation.group_jid || contact.phone_number)
       : getDestinationNumber(contact.phone_number);
+
+    // Aviso de atendimento em grupo com a chave do tenant desligada: sai antes de
+    // qualquer envio ou persistência, para o grupo não ver a mensagem nem o chat
+    // registrar uma bolha de sistema que ninguém recebeu.
+    if (body.attendanceNotice === true && isGroupConv && !(await groupNoticesEnabled(supabase, tenantId))) {
+      console.log(`[send-whatsapp-message][group] aviso de atendimento suprimido (flag do tenant ${tenantId} desligada) conv=${body.conversationId}`);
+      return new Response(JSON.stringify({ success: true, skipped: 'group_attendance_notices_disabled' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     const wantsMentionEveryone = body.mentionEveryone === true;
 
@@ -594,32 +631,38 @@ Deno.serve(async (req) => {
             const rpcRes = rpcData as any;
             if (rpcRes?.success) {
               console.log(`[send-whatsapp-message][group] Attendance started att=${rpcRes.attendance_id} code=${rpcRes.attendance_code}`);
-              try {
-                const preNow = new Date();
-                const openingText = `\u{2705} Atendimento *${rpcRes.attendance_code}* iniciado.`;
-                const openResult = await adapter.send(secrets, instanceData, {
-                  to: destinationNumber,
-                  messageType: 'text',
-                  content: openingText,
-                });
-                const openMsgId = openResult.messageId;
-                const openTimestamp = new Date(preNow.getTime() - 1000).toISOString();
-                await supabase.from('whatsapp_messages').upsert({
-                  conversation_id: body.conversationId,
-                  remote_jid: destinationNumber,
-                  message_id: openMsgId,
-                  content: openingText,
-                  message_type: 'system',
-                  is_from_me: true,
-                  // nasce 'pending': idem à abertura em 1:1
-                  status: 'pending',
-                  timestamp: openTimestamp,
-                  tenant_id: tenantId,
-                  metadata: { system: true, attendance_event: 'opened', attendance_id: rpcRes.attendance_id },
-                }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true });
-                console.log(`[send-whatsapp-message][group] Opening notification sent for att=${rpcRes.attendance_id}`);
-              } catch (openErr) {
-                console.error('[send-whatsapp-message][group] Error sending opening notification:', openErr);
+              // O atendimento abre de qualquer jeito; a flag decide só o aviso ao grupo.
+              const noticesOn = await groupNoticesEnabled(supabase, tenantId);
+              if (!noticesOn) {
+                console.log(`[send-whatsapp-message][group] aviso de abertura suprimido (flag do tenant ${tenantId} desligada) att=${rpcRes.attendance_id}`);
+              } else {
+                try {
+                  const preNow = new Date();
+                  const openingText = `\u{2705} Atendimento *${rpcRes.attendance_code}* iniciado.`;
+                  const openResult = await adapter.send(secrets, instanceData, {
+                    to: destinationNumber,
+                    messageType: 'text',
+                    content: openingText,
+                  });
+                  const openMsgId = openResult.messageId;
+                  const openTimestamp = new Date(preNow.getTime() - 1000).toISOString();
+                  await supabase.from('whatsapp_messages').upsert({
+                    conversation_id: body.conversationId,
+                    remote_jid: destinationNumber,
+                    message_id: openMsgId,
+                    content: openingText,
+                    message_type: 'system',
+                    is_from_me: true,
+                    // nasce 'pending': idem à abertura em 1:1
+                    status: 'pending',
+                    timestamp: openTimestamp,
+                    tenant_id: tenantId,
+                    metadata: { system: true, attendance_event: 'opened', attendance_id: rpcRes.attendance_id },
+                  }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true });
+                  console.log(`[send-whatsapp-message][group] Opening notification sent for att=${rpcRes.attendance_id}`);
+                } catch (openErr) {
+                  console.error('[send-whatsapp-message][group] Error sending opening notification:', openErr);
+                }
               }
             } else {
               console.log(`[send-whatsapp-message][group] Not opened: ${rpcRes?.error ?? 'unknown'}`);

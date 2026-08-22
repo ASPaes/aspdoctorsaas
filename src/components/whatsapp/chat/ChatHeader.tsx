@@ -338,6 +338,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               content: `\u2705 Atendimento *${res.attendance_code}* iniciado.`,
               messageType: 'text',
               systemMessage: true,
+              // Quem decide se o grupo recebe este aviso \u00e9 a edge function, lendo
+              // configuracoes.group_send_attendance_notices. O atendimento j\u00e1 abriu
+              // acima e n\u00e3o depende do envio.
+              attendanceNotice: true,
             },
           }).catch((e) => console.error('[ChatHeader][group] opening notify error:', e));
         } catch (e) {
