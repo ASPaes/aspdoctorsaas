@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeMessage, upsertInfinite, patchInfinite, type Message, type MsgPages } from './useWhatsAppMessages';
 import { patchConversationInCache, isConversationInCache, outgoingMediaPreview } from './conversationsCache';
+import { precisaConverterParaWhatsApp, converterImagemParaJpeg } from '@/lib/whatsappImageFormat';
 
 interface SendMessageParams {
   conversationId: string;
@@ -27,23 +28,36 @@ export const useWhatsAppSend = () => {
     mutationFn: async (params: SendMessageParams) => {
       let storagePath: string | undefined;
       let mediaSizeBytes: number | undefined;
+      let mimeEnvio = params.mediaMimetype || params.file?.type;
+      let nomeEnvio = params.fileName || params.file?.name;
 
       // Upload direto ao Storage para anexos (não passa base64 pela Edge Function)
       if (params.file && params.messageType !== 'text') {
-        const mime = params.file.type || 'application/octet-stream';
+        // AVIF/HEIC são recusados pelo provedor DEPOIS do upload, com uma frase
+        // que não é nossa. Convertendo aqui — e não na hora de anexar — a espera
+        // acontece com a bolha otimista já na tela em 'sending', porque o
+        // onMutate roda antes do mutationFn. Para quem envia, é o envio normal.
+        let arquivo = params.file;
+        if (precisaConverterParaWhatsApp(arquivo.type)) {
+          arquivo = await converterImagemParaJpeg(arquivo);
+          mimeEnvio = arquivo.type;
+          nomeEnvio = arquivo.name;
+        }
+
+        const mime = arquivo.type || 'application/octet-stream';
         const { data: urlData, error: urlErr } = await supabase.functions.invoke('get-media-upload-url', {
-          body: { conversationId: params.conversationId, mediaMimetype: mime, fileName: params.file.name },
+          body: { conversationId: params.conversationId, mediaMimetype: mime, fileName: arquivo.name },
         });
         if (urlErr) throw new Error(urlErr.message || 'Falha ao preparar upload');
         if (!urlData?.path || !urlData?.token) throw new Error(urlData?.error || 'Falha ao preparar upload');
 
         const { error: upErr } = await supabase.storage
           .from('whatsapp-media')
-          .uploadToSignedUrl(urlData.path, urlData.token, params.file, { contentType: mime });
+          .uploadToSignedUrl(urlData.path, urlData.token, arquivo, { contentType: mime });
         if (upErr) throw new Error(upErr.message || 'Falha no upload do arquivo');
 
         storagePath = urlData.path;
-        mediaSizeBytes = params.file.size;
+        mediaSizeBytes = arquivo.size;
       }
 
       const sendBody = {
@@ -53,8 +67,8 @@ export const useWhatsAppSend = () => {
         mediaUrl: params.mediaUrl,
         mediaBase64: params.mediaBase64,
         storagePath,
-        mediaMimetype: params.mediaMimetype || params.file?.type,
-        fileName: params.fileName || params.file?.name,
+        mediaMimetype: mimeEnvio,
+        fileName: nomeEnvio,
         mediaSizeBytes,
         quotedMessageId: params.quotedMessageId,
         instanceId: params.instanceId,
@@ -146,7 +160,11 @@ export const useWhatsAppSend = () => {
       // Rate limit: a mensagem NUNCA foi enviada — o servidor recusou.
       // Marcar como 'failed' é enganoso (sugere falha de entrega e oferece retry).
       // O ChatInput já restaura o texto no input, então some com a bolha otimista.
-      if ((err as any)?.rateLimited === true && context?.tempId) {
+      //
+      // Formato não suportado é o mesmo caso: nada subiu, e reenviar o mesmo
+      // AVIF/HEIC vai falhar de novo. O toast do ChatInput diz o que fazer.
+      const semRetry = (err as any)?.rateLimited === true || (err as any)?.formatoNaoSuportado === true;
+      if (semRetry && context?.tempId) {
         queryClient.setQueryData<MsgPages>(
           ['whatsapp', 'messages', newMessage.conversationId],
           (old) => {
