@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { UseFormReturn } from "react-hook-form";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormField, FormItem, FormLabel, FormControl, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,6 +18,30 @@ interface Props {
 export default function ParametrosAtendimentoSection({ form }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { data: operadores = [], isLoading } = useOperadoresAtendimento(tid);
+  const [aberto, setAberto] = useState(false);
+
+  // O nome vai no botão de propósito: fechado, o card esconderia justamente a
+  // informação que muda o roteamento do cliente.
+  const operadorId = form.watch("operador_responsavel_id");
+  const operadorNome = operadores.find((o) => o.user_id === operadorId)?.nome ?? null;
+
+  if (!aberto) {
+    return (
+      <div className="flex justify-center">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setAberto(true)}
+          className="text-xs text-muted-foreground"
+        >
+          <Headset className="h-3 w-3 mr-1" />
+          Ver parâmetros de atendimento
+          {operadorNome ? ` (operador: ${operadorNome})` : ""}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <Card>
