@@ -128,9 +128,20 @@ function combina(q: string, campos: (string | null | undefined)[]) {
 // Colunas ordenáveis da aba Custos.
 type CustoSort = "cliente" | "cnpj" | "custo_ds" | "mensalidade" | "markup" | "custo_oem" | "diferenca";
 
+/**
+ * `ao lado` é um segundo número no mesmo card — o contraponto do principal
+ * (contratos daqui × licenças do OEM, markup × margem). Fica na coluna da
+ * direita, na altura do número grande: embaixo ele lia como rodapé do card, e
+ * a pergunta que ele responde é a mesma linha de raciocínio do número da
+ * esquerda, não uma nota de pé.
+ */
 function Numero({
-  valor, rotulo, sub, tom = "normal",
-}: { valor: string; rotulo: string; sub?: React.ReactNode; tom?: "normal" | "bom" | "alerta" | "ruim" }) {
+  valor, rotulo, sub, tom = "normal", ao_lado,
+}: {
+  valor: string; rotulo: string; sub?: React.ReactNode;
+  tom?: "normal" | "bom" | "alerta" | "ruim";
+  ao_lado?: { valor: React.ReactNode; rotulo: string; title?: string };
+}) {
   const cor =
     tom === "bom" ? "text-emerald-600 dark:text-emerald-400"
     : tom === "alerta" ? "text-amber-600 dark:text-amber-400"
@@ -138,9 +149,19 @@ function Numero({
     : "";
   return (
     <div className="rounded-lg border bg-card p-4">
-      <p className={`text-2xl font-semibold tabular-nums ${cor}`}>{valor}</p>
-      <p className="text-sm font-medium mt-1">{rotulo}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className={`text-2xl font-semibold tabular-nums ${cor}`}>{valor}</p>
+          <p className="text-sm font-medium mt-1">{rotulo}</p>
+          {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+        </div>
+        {ao_lado && (
+          <div className="shrink-0 text-right" title={ao_lado.title}>
+            <p className="text-lg font-semibold tabular-nums leading-7">{ao_lado.valor}</p>
+            <p className="text-[11px] text-muted-foreground mt-1 leading-tight">{ao_lado.rotulo}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1502,62 +1523,49 @@ export default function OemIntegrationTab() {
             <Numero
               valor={String(r.filiais)}
               rotulo="Filiais no OEM"
-              sub={
-                <>
-                  {r.ativas} ativas
-                  {/* O contraponto do lado daqui. Fica no mesmo card porque a
-                      pergunta é uma só: o que o OEM cobra tem contrato aqui? */}
-                  <span className="mt-1.5 block border-t border-border/60 pt-1.5">
-                    {produtosOemIds.length === 0 ? (
-                      "nenhum produto vinculado ao OEM — sem contrato a comparar"
-                    ) : contratosOemCarregando ? (
-                      "contando contratos ativos no DoctorSaaS…"
-                    ) : contratosOem == null ? (
-                      "não foi possível contar os contratos do DoctorSaaS"
-                    ) : (
-                      <span
-                        title="Contratos com status ativo que têm item de um produto vinculado ao OEM, nas unidades desta conta. Este número é do DoctorSaaS, ao vivo — não vem do espelho."
-                      >
-                        <span className="font-medium text-foreground tabular-nums">
-                          {contratosOem.toLocaleString("pt-BR")}
-                        </span>{" "}
-                        contratos ativos no DoctorSaaS
-                      </span>
-                    )}
-                  </span>
-                </>
-              }
+              sub={`${r.ativas} ativas`}
+              // O contraponto do lado daqui, na mesma altura das filiais: a
+              // pergunta é uma só — o que o OEM cobra tem contrato aqui?
+              ao_lado={{
+                valor:
+                  produtosOemIds.length === 0 || contratosOem == null
+                    ? <span className="text-muted-foreground">—</span>
+                    : contratosOem.toLocaleString("pt-BR"),
+                rotulo: "Contratos ativos DS",
+                title:
+                  produtosOemIds.length === 0
+                    ? "Nenhum produto do DoctorSaaS está vinculado ao OEM — sem isso não há contrato a comparar."
+                    : contratosOemCarregando
+                    ? "Contando…"
+                    : contratosOem == null
+                    ? "Não foi possível contar os contratos do DoctorSaaS."
+                    : "Contratos com status ativo que têm item de um produto vinculado ao OEM, nas unidades desta conta. Este número é do DoctorSaaS, ao vivo — não vem do espelho.",
+              }}
             />
             <Numero valor={String(r.vinculadas)} rotulo="Vinculadas automaticamente" tom="bom"
               sub={r.ativas ? `${((r.vinculadas / r.ativas) * 100).toFixed(1)}% das ativas` : undefined} />
             <Numero valor={String(r.escolher.length)} rotulo="Aguardando escolha"
               tom={r.escolher.length ? "alerta" : "bom"} sub="CNPJ com mais de um cliente" />
+            {/* Markup na mesma régua da aba Custos: mensalidade ÷ custo do OEM,
+                como multiplicador. Dois markups com denominadores diferentes
+                seriam duas respostas para a mesma pergunta. */}
             <Numero valor={brl(r.receita - r.custo)} rotulo="Margem mensal" tom="bom"
-              sub={
-                <>
-                  {brl(r.receita)} − {brl(r.custo)}
-                  {/* Mesmo markup da aba Custos: mensalidade ÷ custo do OEM,
-                      como multiplicador. Dois markups com denominadores
-                      diferentes seriam duas respostas para a mesma pergunta. */}
-                  <span className="mt-1.5 block border-t border-border/60 pt-1.5">
-                    markup{" "}
-                    {r.custo > 0 ? (
-                      <span
-                        className={`font-medium tabular-nums ${
-                          r.receita / r.custo < 1
-                            ? "text-destructive"
-                            : "text-emerald-600 dark:text-emerald-400"
-                        }`}
-                        title={`${brl(r.receita)} ÷ ${brl(r.custo)} (custo do OEM)`}
-                      >
-                        {num2(r.receita / r.custo)}×
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
+              sub={`${brl(r.receita)} − ${brl(r.custo)}`}
+              ao_lado={{
+                valor: r.custo > 0 ? (
+                  <span className={r.receita / r.custo < 1
+                    ? "text-destructive"
+                    : "text-emerald-600 dark:text-emerald-400"}>
+                    {num2(r.receita / r.custo)}×
                   </span>
-                </>
-              } />
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                ),
+                rotulo: "Markup",
+                title: r.custo > 0
+                  ? `${brl(r.receita)} ÷ ${brl(r.custo)} (custo do OEM)`
+                  : "Sem custo do OEM — não há como calcular",
+              }} />
           </div>
 
           {r.porNome > 0 && (
