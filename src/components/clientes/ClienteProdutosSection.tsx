@@ -258,6 +258,16 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
 
   const produtoIds = useMemo(() => (produtosQuery.data ?? []).map(p => p.id), [produtosQuery.data]);
 
+  // Produto do cliente que tem licença no parceiro. É esta resposta — e não a
+  // `origem` da linha do módulo — que decide se uma mexida pode ser gravada
+  // aqui ou tem de passar pela fila: módulo digitado à mão dentro de uma licença
+  // existe no OEM do mesmo jeito, e era justamente ele que ninguém sincronizava.
+  const temLicencaOem = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of produtosQuery.data ?? []) if (p.oem_codigo_filial) s.add(p.id);
+    return (clienteProdutoId: string) => s.has(clienteProdutoId);
+  }, [produtosQuery.data]);
+
   const modulosQuery = useQuery<ClienteProdutoModulo[]>({
     queryKey: ["cliente_produto_modulos", tid, clienteId, produtoIds.join(",")],
     enabled: produtoIds.length > 0,
@@ -969,13 +979,32 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                     <Badge variant={m.ativo ? "default" : "secondary"}>{m.ativo ? "Ativo" : "Inativo"}</Badge>
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    {m.origem === "oem" ? (
+                                    {m.origem === "oem" || temLicencaOem(m.cliente_produto_id) ? (
                                       // Só o cancelamento: editar valor ou
                                       // excluir seria desfeito na próxima carga
                                       // do espelho. O cancelamento, não — ele
                                       // trava a linha (`cancelado_manual`).
+                                      //
+                                      // Módulo digitado à mão dentro de uma
+                                      // licença cai aqui também: inativar e
+                                      // excluir sumiam com ele daqui e o
+                                      // deixavam vivo no parceiro. Sai pelo
+                                      // cancelamento, que passa pela fila.
                                       m.ativo ? (
                                         <div className="flex items-center justify-end gap-0.5">
+                                          {m.origem !== "oem" && (
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button
+                                                  type="button" variant="ghost" size="icon" className="h-7 w-7"
+                                                  onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: m })}
+                                                >
+                                                  <Pencil className="h-3.5 w-3.5" />
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>Editar — mudança de quantidade vai ao OEM pela fila</TooltipContent>
+                                            </Tooltip>
+                                          )}
                                           <Tooltip>
                                             <TooltipTrigger asChild>
                                               <Button
@@ -1465,8 +1494,18 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                   });
                   if (errF) throw new Error(errF.message);
 
-                  // Módulo digitado à mão não tem licença no parceiro: a fila
-                  // devolve null e o cancelamento é só daqui.
+                  // Produto COM licença nunca cancela direto: o único null
+                  // legítimo é o de quem não tem licença nenhuma. Baixar aqui um
+                  // módulo que continua vivo no parceiro é a divergência que a
+                  // fila existe para impedir.
+                  if (!filaId && temLicencaOem(cancelarModulo.cliente_produto_id)) {
+                    throw new Error(
+                      "Este produto tem licença no OEM e o cancelamento não entrou na fila. Nada foi cancelado — avise o suporte.",
+                    );
+                  }
+
+                  // Sem licença no parceiro: a fila devolve null e o
+                  // cancelamento é só daqui.
                   if (!filaId) {
                     const { error } = await (supabase.rpc as any)("fn_cancelar_modulo_cliente", {
                       p_id: cancelarModulo.id,
@@ -2830,6 +2869,67 @@ function ModuloDialog({
         origem_venda_id: origemVendaId ? Number(origemVendaId) : null,
       };
       if (isEdit && edit) {
+        // Quantidade é a única coisa desta tela que o parceiro precisa saber, e
+        // era gravada aqui direto: mudar de 2 para 5 no lápis alterava a ficha e
+        // deixava a licença em 2. Ela agora segue o mesmo caminho do botão de
+        // adicionar — o parceiro decide, a ficha muda depois. O resto (valores,
+        // datas, vendedor) é só nosso e grava na hora.
+        const qtdAntes = Number(edit.quantidade) || 1;
+        const qtdNova = quantidade || 1;
+        const mudouQtd = qtdNova !== qtdAntes;
+        const { quantidade: _fora, ...localOnly } = payload;
+
+        // Diminuir por aqui seria um cancelamento parcial sem motivo e sem
+        // downsell: o parceiro baixaria a licença e o MRR continuaria cobrando o
+        // que o cliente deixou de ter. Quem faz isso é o X, que pergunta as duas
+        // coisas.
+        if (mudouQtd && qtdNova < qtdAntes && oemCodigoFilial) {
+          throw new Error(
+            "Para reduzir a quantidade use o cancelamento (X) — é ele que registra o motivo e a baixa no MRR.",
+          );
+        }
+
+        if (mudouQtd && oemCodigoFilial) {
+          const { data: filaId, error: errFila } = await (supabase.rpc as any)("fn_oem_enfileirar", {
+            p_modulo_linha_id: edit.id,
+            p_acao: "quantidade",
+            p_quantidade: qtdNova,
+            p_payload: { ...payload, quantidade_alvo: qtdNova },
+          });
+          if (errFila) throw new Error(errFila.message);
+          if (!filaId) {
+            throw new Error(
+              "Este produto tem licença no OEM e o pedido não entrou na fila. Nada foi gravado — avise o suporte.",
+            );
+          }
+
+          const { error } = await (supabase.from("cliente_produto_modulos" as any) as any)
+            .update(localOnly).eq("id", edit.id);
+          if (error) throw error;
+
+          const { data: proc } = await supabase.functions.invoke("oem-sync-processar", {
+            body: { fila_id: filaId },
+          });
+          const r = (proc ?? {}) as { ok_count?: number; erros?: number };
+          if ((r.ok_count ?? 0) > 0) {
+            toast({ title: "Módulo atualizado no OEM e na ficha", description: `${qtdAntes} → ${qtdNova}.` });
+          } else if ((r.erros ?? 0) > 0) {
+            toast({
+              variant: "destructive",
+              title: "A quantidade não foi ao OEM — o pedido ficou parado na fila",
+              description: `Segue ${qtdAntes} na ficha. O motivo está no selo da linha e em Integrações › OEM › Fila.`,
+            });
+          } else {
+            toast({
+              title: "Enviado ao OEM — aguardando confirmação",
+              description: `A quantidade muda para ${qtdNova} quando o parceiro aceitar.`,
+            });
+          }
+          onSaved();
+          onClose();
+          return;
+        }
+
         const { error } = await (supabase.from("cliente_produto_modulos" as any) as any)
           .update(payload).eq("id", edit.id);
         if (error) throw error;
