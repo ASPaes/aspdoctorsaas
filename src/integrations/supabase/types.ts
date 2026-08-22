@@ -39,6 +39,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      _bkp_close_look_20260818: {
+        Row: {
+          att_assigned_old: string | null
+          att_status_old: string | null
+          attendance_code: string | null
+          attendance_id: string | null
+          conv_assigned_old: string | null
+          conv_status_old: string | null
+          conversation_id: string | null
+          department_id: string | null
+          last_message_at: string | null
+          snapshot_at: string | null
+        }
+        Insert: {
+          att_assigned_old?: string | null
+          att_status_old?: string | null
+          attendance_code?: string | null
+          attendance_id?: string | null
+          conv_assigned_old?: string | null
+          conv_status_old?: string | null
+          conversation_id?: string | null
+          department_id?: string | null
+          last_message_at?: string | null
+          snapshot_at?: string | null
+        }
+        Update: {
+          att_assigned_old?: string | null
+          att_status_old?: string | null
+          attendance_code?: string | null
+          attendance_id?: string | null
+          conv_assigned_old?: string | null
+          conv_status_old?: string | null
+          conversation_id?: string | null
+          department_id?: string | null
+          last_message_at?: string | null
+          snapshot_at?: string | null
+        }
+        Relationships: []
+      }
       _bkp_consysa_owner_fone_20260727: {
         Row: {
           id: string | null
@@ -131,6 +170,47 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      acessofast_integration: {
+        Row: {
+          chave_hash: string
+          chave_prefixo: string
+          conectado_em: string
+          conectado_por: string | null
+          id: string
+          tenant_id: string
+          ultimo_status: string
+          ultimo_uso_at: string | null
+        }
+        Insert: {
+          chave_hash: string
+          chave_prefixo: string
+          conectado_em?: string
+          conectado_por?: string | null
+          id?: string
+          tenant_id: string
+          ultimo_status?: string
+          ultimo_uso_at?: string | null
+        }
+        Update: {
+          chave_hash?: string
+          chave_prefixo?: string
+          conectado_em?: string
+          conectado_por?: string | null
+          id?: string
+          tenant_id?: string
+          ultimo_status?: string
+          ultimo_uso_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "acessofast_integration_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_alert_config: {
         Row: {
@@ -785,6 +865,36 @@ export type Database = {
           },
         ]
       }
+      chat_media_purge_runs: {
+        Row: {
+          arquivos: number
+          bytes: number
+          detalhe: string | null
+          erros: number
+          finished_at: string | null
+          id: string
+          started_at: string
+        }
+        Insert: {
+          arquivos?: number
+          bytes?: number
+          detalhe?: string | null
+          erros?: number
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+        }
+        Update: {
+          arquivos?: number
+          bytes?: number
+          detalhe?: string | null
+          erros?: number
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+        }
+        Relationships: []
+      }
       cidades: {
         Row: {
           codigo_ibge: string | null
@@ -1089,50 +1199,137 @@ export type Database = {
           },
         ]
       }
-      cliente_produto_modulos: {
+      cliente_produto_modulo_eventos: {
         Row: {
-          ativo: boolean
+          acao: string
           cliente_produto_id: string
           created_at: string
-          data_ativacao: string | null
-          data_inativacao: string | null
           id: string
-          modulo_id: string
-          quantidade: number
+          modulo_id: string | null
+          modulo_nome: string
+          motivo: string | null
+          origem: string
+          quantidade: number | null
           tenant_id: string
-          updated_at: string
-          vlr_ativacao: number | null
+          usuario_id: string | null
+          usuario_nome: string | null
           vlr_custo: number | null
           vlr_mensal: number | null
         }
         Insert: {
-          ativo?: boolean
+          acao: string
           cliente_produto_id: string
           created_at?: string
-          data_ativacao?: string | null
-          data_inativacao?: string | null
           id?: string
-          modulo_id: string
-          quantidade?: number
+          modulo_id?: string | null
+          modulo_nome: string
+          motivo?: string | null
+          origem?: string
+          quantidade?: number | null
           tenant_id: string
-          updated_at?: string
-          vlr_ativacao?: number | null
+          usuario_id?: string | null
+          usuario_nome?: string | null
           vlr_custo?: number | null
           vlr_mensal?: number | null
         }
         Update: {
+          acao?: string
+          cliente_produto_id?: string
+          created_at?: string
+          id?: string
+          modulo_id?: string | null
+          modulo_nome?: string
+          motivo?: string | null
+          origem?: string
+          quantidade?: number | null
+          tenant_id?: string
+          usuario_id?: string | null
+          usuario_nome?: string | null
+          vlr_custo?: number | null
+          vlr_mensal?: number | null
+        }
+        Relationships: []
+      }
+      cliente_produto_modulos: {
+        Row: {
+          ativo: boolean
+          cancelado_em: string | null
+          cancelado_manual: boolean
+          cancelado_por: string | null
+          cancelamento_motivo: string | null
+          cliente_produto_id: string
+          created_at: string
+          data_ativacao: string | null
+          data_inativacao: string | null
+          data_venda: string | null
+          funcionario_id: number | null
+          id: string
+          modulo_id: string
+          motivo_cancelamento_id: number | null
+          oem_modulo_codigo: number | null
+          origem: string
+          origem_venda_id: number | null
+          quantidade: number
+          quantidade_manual: number | null
+          tenant_id: string
+          updated_at: string
+          vlr_ativacao: number | null
+          vlr_custo: number | null
+          vlr_custo_total: number | null
+          vlr_mensal: number | null
+        }
+        Insert: {
           ativo?: boolean
+          cancelado_em?: string | null
+          cancelado_manual?: boolean
+          cancelado_por?: string | null
+          cancelamento_motivo?: string | null
+          cliente_produto_id: string
+          created_at?: string
+          data_ativacao?: string | null
+          data_inativacao?: string | null
+          data_venda?: string | null
+          funcionario_id?: number | null
+          id?: string
+          modulo_id: string
+          motivo_cancelamento_id?: number | null
+          oem_modulo_codigo?: number | null
+          origem?: string
+          origem_venda_id?: number | null
+          quantidade?: number
+          quantidade_manual?: number | null
+          tenant_id: string
+          updated_at?: string
+          vlr_ativacao?: number | null
+          vlr_custo?: number | null
+          vlr_custo_total?: number | null
+          vlr_mensal?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          cancelado_em?: string | null
+          cancelado_manual?: boolean
+          cancelado_por?: string | null
+          cancelamento_motivo?: string | null
           cliente_produto_id?: string
           created_at?: string
           data_ativacao?: string | null
           data_inativacao?: string | null
+          data_venda?: string | null
+          funcionario_id?: number | null
           id?: string
           modulo_id?: string
+          motivo_cancelamento_id?: number | null
+          oem_modulo_codigo?: number | null
+          origem?: string
+          origem_venda_id?: number | null
           quantidade?: number
+          quantidade_manual?: number | null
           tenant_id?: string
           updated_at?: string
           vlr_ativacao?: number | null
           vlr_custo?: number | null
+          vlr_custo_total?: number | null
           vlr_mensal?: number | null
         }
         Relationships: [
@@ -1144,10 +1341,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cliente_produto_modulos_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "cliente_produto_modulos_modulo_id_fkey"
             columns: ["modulo_id"]
             isOneToOne: false
             referencedRelation: "produto_modulos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produto_modulos_motivo_cancelamento_id_fkey"
+            columns: ["motivo_cancelamento_id"]
+            isOneToOne: false
+            referencedRelation: "motivos_cancelamento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produto_modulos_origem_venda_id_fkey"
+            columns: ["origem_venda_id"]
+            isOneToOne: false
+            referencedRelation: "origens_venda"
             referencedColumns: ["id"]
           },
           {
@@ -1179,6 +1397,8 @@ export type Database = {
           link_portal_fornecedor: string | null
           modelo_contrato_id: number | null
           observacoes_contratuais: string | null
+          oem_codigo_filial: string | null
+          oem_codigo_grupo: string | null
           origem_venda_id: number | null
           prazo_meses: number | null
           produto_id: number
@@ -1208,6 +1428,8 @@ export type Database = {
           link_portal_fornecedor?: string | null
           modelo_contrato_id?: number | null
           observacoes_contratuais?: string | null
+          oem_codigo_filial?: string | null
+          oem_codigo_grupo?: string | null
           origem_venda_id?: number | null
           prazo_meses?: number | null
           produto_id: number
@@ -1237,6 +1459,8 @@ export type Database = {
           link_portal_fornecedor?: string | null
           modelo_contrato_id?: number | null
           observacoes_contratuais?: string | null
+          oem_codigo_filial?: string | null
+          oem_codigo_grupo?: string | null
           origem_venda_id?: number | null
           prazo_meses?: number | null
           produto_id?: number
@@ -4223,6 +4447,533 @@ export type Database = {
           },
         ]
       }
+      oem_baixa_modulo_log: {
+        Row: {
+          cliente_produto_id: string | null
+          created_at: string
+          empresa_codigo: string | null
+          filial_codigo: string | null
+          http: number | null
+          id: string
+          modulo_id: string | null
+          nova_quantidade: number | null
+          oem_modulo_codigo: number | null
+          ok: boolean
+          quantidade_pedida: number | null
+          resposta: Json | null
+          simulado: boolean
+          tenant_id: string
+          usuario_id: string | null
+        }
+        Insert: {
+          cliente_produto_id?: string | null
+          created_at?: string
+          empresa_codigo?: string | null
+          filial_codigo?: string | null
+          http?: number | null
+          id?: string
+          modulo_id?: string | null
+          nova_quantidade?: number | null
+          oem_modulo_codigo?: number | null
+          ok: boolean
+          quantidade_pedida?: number | null
+          resposta?: Json | null
+          simulado?: boolean
+          tenant_id: string
+          usuario_id?: string | null
+        }
+        Update: {
+          cliente_produto_id?: string | null
+          created_at?: string
+          empresa_codigo?: string | null
+          filial_codigo?: string | null
+          http?: number | null
+          id?: string
+          modulo_id?: string | null
+          nova_quantidade?: number | null
+          oem_modulo_codigo?: number | null
+          ok?: boolean
+          quantidade_pedida?: number | null
+          resposta?: Json | null
+          simulado?: boolean
+          tenant_id?: string
+          usuario_id?: string | null
+        }
+        Relationships: []
+      }
+      oem_espelho_filial: {
+        Row: {
+          atualizado_em: string
+          bloqueado: boolean
+          cnpj_norm: string | null
+          cnpj_oem: string | null
+          conta_integration_id: string | null
+          custo_total: number | null
+          empresa_codigo: string
+          filial_codigo: string
+          grupo_economico: string | null
+          id: string
+          last_sync_oem: string | null
+          modulos: Json | null
+          nome_fantasia: string | null
+          numero_filiais: number | null
+          produto_principal: string | null
+          qtd_comandas: number | null
+          qtd_pdv: number | null
+          razao_social: string | null
+          status: string | null
+          tenant_id: string
+          usuarios_adicionais: number | null
+        }
+        Insert: {
+          atualizado_em?: string
+          bloqueado?: boolean
+          cnpj_norm?: string | null
+          cnpj_oem?: string | null
+          conta_integration_id?: string | null
+          custo_total?: number | null
+          empresa_codigo: string
+          filial_codigo: string
+          grupo_economico?: string | null
+          id?: string
+          last_sync_oem?: string | null
+          modulos?: Json | null
+          nome_fantasia?: string | null
+          numero_filiais?: number | null
+          produto_principal?: string | null
+          qtd_comandas?: number | null
+          qtd_pdv?: number | null
+          razao_social?: string | null
+          status?: string | null
+          tenant_id: string
+          usuarios_adicionais?: number | null
+        }
+        Update: {
+          atualizado_em?: string
+          bloqueado?: boolean
+          cnpj_norm?: string | null
+          cnpj_oem?: string | null
+          conta_integration_id?: string | null
+          custo_total?: number | null
+          empresa_codigo?: string
+          filial_codigo?: string
+          grupo_economico?: string | null
+          id?: string
+          last_sync_oem?: string | null
+          modulos?: Json | null
+          nome_fantasia?: string | null
+          numero_filiais?: number | null
+          produto_principal?: string | null
+          qtd_comandas?: number | null
+          qtd_pdv?: number | null
+          razao_social?: string | null
+          status?: string | null
+          tenant_id?: string
+          usuarios_adicionais?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_espelho_conta_fk"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "oem_integration"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_espelho_conta_fk"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "oem_integration_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_espelho_filial_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oem_espelho_modulo_preco: {
+        Row: {
+          atualizado_em: string
+          conta_integration_id: string
+          id: string
+          modulo_codigo: number
+          modulo_nome: string
+          produto_codigo: string
+          produto_nome: string
+          quantidade: number | null
+          tenant_id: string
+          valor_total: number | null
+          valor_unitario: number | null
+        }
+        Insert: {
+          atualizado_em?: string
+          conta_integration_id: string
+          id?: string
+          modulo_codigo: number
+          modulo_nome: string
+          produto_codigo: string
+          produto_nome: string
+          quantidade?: number | null
+          tenant_id: string
+          valor_total?: number | null
+          valor_unitario?: number | null
+        }
+        Update: {
+          atualizado_em?: string
+          conta_integration_id?: string
+          id?: string
+          modulo_codigo?: number
+          modulo_nome?: string
+          produto_codigo?: string
+          produto_nome?: string
+          quantidade?: number | null
+          tenant_id?: string
+          valor_total?: number | null
+          valor_unitario?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_espelho_modulo_preco_conta_integration_id_fkey"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "oem_integration"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_espelho_modulo_preco_conta_integration_id_fkey"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "oem_integration_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_espelho_modulo_preco_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oem_integration: {
+        Row: {
+          api_url: string
+          ativo: boolean
+          chave_prefixo: string | null
+          criado_em: string
+          criado_por: string | null
+          id: string
+          tenant_id: string
+          ultimo_status: string
+          ultimo_sync_em: string | null
+          ultimo_sync_msg: string | null
+          ultimo_sync_status: string | null
+          ultimo_teste_at: string | null
+          unidades_base_ids: number[] | null
+          vault_secret_id: string | null
+        }
+        Insert: {
+          api_url?: string
+          ativo?: boolean
+          chave_prefixo?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          tenant_id: string
+          ultimo_status?: string
+          ultimo_sync_em?: string | null
+          ultimo_sync_msg?: string | null
+          ultimo_sync_status?: string | null
+          ultimo_teste_at?: string | null
+          unidades_base_ids?: number[] | null
+          vault_secret_id?: string | null
+        }
+        Update: {
+          api_url?: string
+          ativo?: boolean
+          chave_prefixo?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          tenant_id?: string
+          ultimo_status?: string
+          ultimo_sync_em?: string | null
+          ultimo_sync_msg?: string | null
+          ultimo_sync_status?: string | null
+          ultimo_teste_at?: string | null
+          unidades_base_ids?: number[] | null
+          vault_secret_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_integration_v2_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oem_preco_modulo_historico: {
+        Row: {
+          conta_integration_id: string
+          evento: string
+          id: string
+          modulo_codigo: number
+          modulo_nome: string
+          ocorrido_em: string
+          produto_codigo: string
+          produto_nome: string
+          tenant_id: string
+          valor_anterior: number | null
+          valor_novo: number | null
+          variacao: number | null
+        }
+        Insert: {
+          conta_integration_id: string
+          evento: string
+          id?: string
+          modulo_codigo: number
+          modulo_nome: string
+          ocorrido_em?: string
+          produto_codigo: string
+          produto_nome: string
+          tenant_id: string
+          valor_anterior?: number | null
+          valor_novo?: number | null
+          variacao?: number | null
+        }
+        Update: {
+          conta_integration_id?: string
+          evento?: string
+          id?: string
+          modulo_codigo?: number
+          modulo_nome?: string
+          ocorrido_em?: string
+          produto_codigo?: string
+          produto_nome?: string
+          tenant_id?: string
+          valor_anterior?: number | null
+          valor_novo?: number | null
+          variacao?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_preco_modulo_historico_conta_integration_id_fkey"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "oem_integration"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_preco_modulo_historico_conta_integration_id_fkey"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "oem_integration_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_preco_modulo_historico_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oem_produto_vinculo: {
+        Row: {
+          atualizado_em: string
+          conta_integration_id: string
+          criado_em: string
+          criado_por: string | null
+          id: string
+          produto_codigo: string
+          produto_id: number
+          produto_nome: string | null
+          tenant_id: string
+          ultimo_upgrade_em: string | null
+          ultimo_upgrade_resumo: Json | null
+        }
+        Insert: {
+          atualizado_em?: string
+          conta_integration_id: string
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          produto_codigo: string
+          produto_id: number
+          produto_nome?: string | null
+          tenant_id: string
+          ultimo_upgrade_em?: string | null
+          ultimo_upgrade_resumo?: Json | null
+        }
+        Update: {
+          atualizado_em?: string
+          conta_integration_id?: string
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          produto_codigo?: string
+          produto_id?: number
+          produto_nome?: string | null
+          tenant_id?: string
+          ultimo_upgrade_em?: string | null
+          ultimo_upgrade_resumo?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_produto_vinculo_conta_integration_id_fkey"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "oem_integration"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_produto_vinculo_conta_integration_id_fkey"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "oem_integration_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_produto_vinculo_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_produto_vinculo_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oem_sync_fila: {
+        Row: {
+          acao: string
+          cliente_produto_id: string | null
+          conta_integration_id: string | null
+          empresa_codigo: string | null
+          enfileirado_em: string
+          filial_codigo: string | null
+          http: number | null
+          id: string
+          modulo_catalogo_id: string | null
+          modulo_linha_id: string | null
+          oem_modulo_codigo: number | null
+          payload: Json | null
+          processado_em: string | null
+          proxima_tentativa_em: string
+          quantidade: number | null
+          resposta: Json | null
+          status: string
+          tenant_id: string
+          tentativas: number
+          ultimo_erro: string | null
+          usuario_id: string | null
+          valor_unitario: number | null
+        }
+        Insert: {
+          acao: string
+          cliente_produto_id?: string | null
+          conta_integration_id?: string | null
+          empresa_codigo?: string | null
+          enfileirado_em?: string
+          filial_codigo?: string | null
+          http?: number | null
+          id?: string
+          modulo_catalogo_id?: string | null
+          modulo_linha_id?: string | null
+          oem_modulo_codigo?: number | null
+          payload?: Json | null
+          processado_em?: string | null
+          proxima_tentativa_em?: string
+          quantidade?: number | null
+          resposta?: Json | null
+          status?: string
+          tenant_id: string
+          tentativas?: number
+          ultimo_erro?: string | null
+          usuario_id?: string | null
+          valor_unitario?: number | null
+        }
+        Update: {
+          acao?: string
+          cliente_produto_id?: string | null
+          conta_integration_id?: string | null
+          empresa_codigo?: string | null
+          enfileirado_em?: string
+          filial_codigo?: string | null
+          http?: number | null
+          id?: string
+          modulo_catalogo_id?: string | null
+          modulo_linha_id?: string | null
+          oem_modulo_codigo?: number | null
+          payload?: Json | null
+          processado_em?: string | null
+          proxima_tentativa_em?: string
+          quantidade?: number | null
+          resposta?: Json | null
+          status?: string
+          tenant_id?: string
+          tentativas?: number
+          ultimo_erro?: string | null
+          usuario_id?: string | null
+          valor_unitario?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_sync_fila_cliente_produto_id_fkey"
+            columns: ["cliente_produto_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_sync_fila_conta_integration_id_fkey"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "oem_integration"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_sync_fila_conta_integration_id_fkey"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "oem_integration_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_sync_fila_modulo_catalogo_id_fkey"
+            columns: ["modulo_catalogo_id"]
+            isOneToOne: false
+            referencedRelation: "produto_modulos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_sync_fila_modulo_linha_id_fkey"
+            columns: ["modulo_linha_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_produto_modulos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_sync_fila_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       omie_espelho_cadastro: {
         Row: {
           atualizado_em: string
@@ -4871,6 +5622,7 @@ export type Database = {
           journey_id: string
           nome: string
           origem: string
+          position: number
           produto_modulo_id: string | null
           tenant_id: string
         }
@@ -4880,6 +5632,7 @@ export type Database = {
           journey_id: string
           nome: string
           origem?: string
+          position?: number
           produto_modulo_id?: string | null
           tenant_id: string
         }
@@ -4889,6 +5642,7 @@ export type Database = {
           journey_id?: string
           nome?: string
           origem?: string
+          position?: number
           produto_modulo_id?: string | null
           tenant_id?: string
         }
@@ -6384,6 +7138,7 @@ export type Database = {
           id: string
           margem_percentual: number | null
           nome: string
+          oem_modulo_codigo: number | null
           produto_id: number
           tenant_id: string
           updated_at: string
@@ -6397,6 +7152,7 @@ export type Database = {
           id?: string
           margem_percentual?: number | null
           nome: string
+          oem_modulo_codigo?: number | null
           produto_id: number
           tenant_id: string
           updated_at?: string
@@ -6410,6 +7166,7 @@ export type Database = {
           id?: string
           margem_percentual?: number | null
           nome?: string
+          oem_modulo_codigo?: number | null
           produto_id?: number
           tenant_id?: string
           updated_at?: string
@@ -6877,6 +7634,138 @@ export type Database = {
             columns: ["conta_integration_id"]
             isOneToOne: false
             referencedRelation: "omie_integration"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reconciliacao_oem: {
+        Row: {
+          acao_sugerida: string | null
+          bloqueado_oem: boolean | null
+          cancelado_ds: boolean | null
+          candidato_escolhido: string | null
+          cnpj_ds: string | null
+          cnpj_norm: string | null
+          conta_integration_id: string | null
+          criterio_match: string | null
+          custo_oem: number | null
+          divergencias: string[] | null
+          ds_customer_id: string | null
+          empresa_codigo: string | null
+          estado_match: string | null
+          filial_codigo: string | null
+          gerado_em: string
+          id: string
+          margem: number | null
+          mensalidade_ds: number | null
+          observacao: string | null
+          qtd_candidatos_ds: number
+          razao_ds: string | null
+          razao_oem: string | null
+          razao_social_ds: string | null
+          razao_social_oem: string | null
+          resolvido_em: string | null
+          resolvido_por: string | null
+          status_oem: string | null
+          status_usuario: string
+          tenant_id: string
+        }
+        Insert: {
+          acao_sugerida?: string | null
+          bloqueado_oem?: boolean | null
+          cancelado_ds?: boolean | null
+          candidato_escolhido?: string | null
+          cnpj_ds?: string | null
+          cnpj_norm?: string | null
+          conta_integration_id?: string | null
+          criterio_match?: string | null
+          custo_oem?: number | null
+          divergencias?: string[] | null
+          ds_customer_id?: string | null
+          empresa_codigo?: string | null
+          estado_match?: string | null
+          filial_codigo?: string | null
+          gerado_em?: string
+          id?: string
+          margem?: number | null
+          mensalidade_ds?: number | null
+          observacao?: string | null
+          qtd_candidatos_ds?: number
+          razao_ds?: string | null
+          razao_oem?: string | null
+          razao_social_ds?: string | null
+          razao_social_oem?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          status_oem?: string | null
+          status_usuario?: string
+          tenant_id: string
+        }
+        Update: {
+          acao_sugerida?: string | null
+          bloqueado_oem?: boolean | null
+          cancelado_ds?: boolean | null
+          candidato_escolhido?: string | null
+          cnpj_ds?: string | null
+          cnpj_norm?: string | null
+          conta_integration_id?: string | null
+          criterio_match?: string | null
+          custo_oem?: number | null
+          divergencias?: string[] | null
+          ds_customer_id?: string | null
+          empresa_codigo?: string | null
+          estado_match?: string | null
+          filial_codigo?: string | null
+          gerado_em?: string
+          id?: string
+          margem?: number | null
+          mensalidade_ds?: number | null
+          observacao?: string | null
+          qtd_candidatos_ds?: number
+          razao_ds?: string | null
+          razao_oem?: string | null
+          razao_social_ds?: string | null
+          razao_social_oem?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          status_oem?: string | null
+          status_usuario?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliacao_oem_conta_fk"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "oem_integration"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_oem_conta_fk"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "oem_integration_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_oem_ds_customer_id_fkey"
+            columns: ["ds_customer_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_oem_ds_customer_id_fkey"
+            columns: ["ds_customer_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliacao_oem_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -7871,6 +8760,8 @@ export type Database = {
           inactivity_warning_before_minutes: number | null
           is_active: boolean
           is_default_fallback: boolean
+          media_retention_days: number
+          media_retention_enabled: boolean
           name: string
           requires_ticket_on_close: boolean
           show_in_ura: boolean
@@ -7904,6 +8795,8 @@ export type Database = {
           inactivity_warning_before_minutes?: number | null
           is_active?: boolean
           is_default_fallback?: boolean
+          media_retention_days?: number
+          media_retention_enabled?: boolean
           name: string
           requires_ticket_on_close?: boolean
           show_in_ura?: boolean
@@ -7937,6 +8830,8 @@ export type Database = {
           inactivity_warning_before_minutes?: number | null
           is_active?: boolean
           is_default_fallback?: boolean
+          media_retention_days?: number
+          media_retention_enabled?: boolean
           name?: string
           requires_ticket_on_close?: boolean
           show_in_ura?: boolean
@@ -8800,6 +9695,7 @@ export type Database = {
       }
       tenants: {
         Row: {
+          acessofast_enabled: boolean
           cnpj: string | null
           created_at: string
           id: string
@@ -8812,6 +9708,7 @@ export type Database = {
           trial_ends_at: string | null
         }
         Insert: {
+          acessofast_enabled?: boolean
           cnpj?: string | null
           created_at?: string
           id?: string
@@ -8824,6 +9721,7 @@ export type Database = {
           trial_ends_at?: string | null
         }
         Update: {
+          acessofast_enabled?: boolean
           cnpj?: string | null
           created_at?: string
           id?: string
@@ -10155,6 +11053,38 @@ export type Database = {
           },
         ]
       }
+      whatsapp_media_downloads: {
+        Row: {
+          downloaded_at: string
+          id: string
+          message_id: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          downloaded_at?: string
+          id?: string
+          message_id: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          downloaded_at?: string
+          id?: string
+          message_id?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_media_downloads_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_message_edit_history: {
         Row: {
           conversation_id: string
@@ -10228,6 +11158,7 @@ export type Database = {
           media_kind: string | null
           media_mimetype: string | null
           media_path: string | null
+          media_purged_at: string | null
           media_size_bytes: number | null
           media_url: string | null
           mentions: Json | null
@@ -10269,6 +11200,7 @@ export type Database = {
           media_kind?: string | null
           media_mimetype?: string | null
           media_path?: string | null
+          media_purged_at?: string | null
           media_size_bytes?: number | null
           media_url?: string | null
           mentions?: Json | null
@@ -10310,6 +11242,7 @@ export type Database = {
           media_kind?: string | null
           media_mimetype?: string | null
           media_path?: string | null
+          media_purged_at?: string | null
           media_size_bytes?: number | null
           media_url?: string | null
           mentions?: Json | null
@@ -10788,6 +11721,59 @@ export type Database = {
         }
         Relationships: []
       }
+      oem_integration_status: {
+        Row: {
+          api_url: string | null
+          ativo: boolean | null
+          chave_prefixo: string | null
+          criado_em: string | null
+          id: string | null
+          tenant_id: string | null
+          ultimo_status: string | null
+          ultimo_sync_em: string | null
+          ultimo_sync_msg: string | null
+          ultimo_sync_status: string | null
+          ultimo_teste_at: string | null
+          unidades_base_ids: number[] | null
+        }
+        Insert: {
+          api_url?: string | null
+          ativo?: boolean | null
+          chave_prefixo?: string | null
+          criado_em?: string | null
+          id?: string | null
+          tenant_id?: string | null
+          ultimo_status?: string | null
+          ultimo_sync_em?: string | null
+          ultimo_sync_msg?: string | null
+          ultimo_sync_status?: string | null
+          ultimo_teste_at?: string | null
+          unidades_base_ids?: number[] | null
+        }
+        Update: {
+          api_url?: string | null
+          ativo?: boolean | null
+          chave_prefixo?: string | null
+          criado_em?: string | null
+          id?: string | null
+          tenant_id?: string | null
+          ultimo_status?: string | null
+          ultimo_sync_em?: string | null
+          ultimo_sync_msg?: string | null
+          ultimo_sync_status?: string | null
+          ultimo_teste_at?: string | null
+          unidades_base_ids?: number[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_integration_v2_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_whatsapp_conversations_state: {
         Row: {
           agent_alert_due_at: string | null
@@ -10810,6 +11796,8 @@ export type Database = {
           last_message_preview: string | null
           opened_out_of_hours: boolean | null
           opened_out_of_hours_at: string | null
+          scheduled_at: string | null
+          scheduled_until: string | null
           tenant_id: string | null
           unread_count: number | null
         }
@@ -11516,6 +12504,18 @@ export type Database = {
         Returns: undefined
       }
       accept_invite: { Args: { p_token: string }; Returns: undefined }
+      acessofast_chave_hash: { Args: { p_chave: string }; Returns: string }
+      acessofast_conectar: {
+        Args: { p_chave: string; p_tenant_id: string }
+        Returns: {
+          chave_prefixo: string
+          conectado_em: string
+        }[]
+      }
+      acessofast_desconectar: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
+      }
       add_ticket_attachment:
         | {
             Args: {
@@ -11554,6 +12554,7 @@ export type Database = {
         Args: {
           p_cliente_id: string
           p_confirm?: boolean
+          p_forcar?: boolean
           p_incluir_chat?: boolean
           p_mode: string
           p_target_id?: string
@@ -11656,6 +12657,10 @@ export type Database = {
       attach_attendance_to_ticket: {
         Args: { p_attendance_id: string; p_nota?: string }
         Returns: string
+      }
+      atualizar_custo_ds_oem: {
+        Args: { p_filiais?: string[]; p_tenant_id: string }
+        Returns: Json
       }
       atualizar_reajuste_item: {
         Args: {
@@ -11787,6 +12792,8 @@ export type Database = {
           p_attendance_id: string
           p_category_id: string
           p_department_id?: string
+          p_horario_fim?: string
+          p_horario_inicio?: string
           p_observacao_agente?: string
           p_observacao_ia?: string
           p_produto_id: number
@@ -11847,6 +12854,8 @@ export type Database = {
           p_attendance_id: string
           p_category_id: string
           p_department_id?: string
+          p_horario_fim?: string
+          p_horario_inicio?: string
           p_observacao_agente?: string
           p_observacao_ia?: string
           p_produto_id: number
@@ -11889,6 +12898,7 @@ export type Database = {
           p_descricao?: string
           p_go_live_previsto?: string
           p_implantador_user_id?: string
+          p_pipeline_id?: string
           p_produto_id?: number
           p_tenant_id: string
           p_unidade_base_id?: number
@@ -11959,6 +12969,8 @@ export type Database = {
         }[]
       }
       cron_anexo_omie: { Args: never; Returns: undefined }
+      cron_oem_espelho: { Args: never; Returns: undefined }
+      cron_oem_sync: { Args: never; Returns: undefined }
       cron_recon_espelho: { Args: never; Returns: undefined }
       cron_verificar_anterior: {
         Args: { p_jobname: string }
@@ -12003,6 +13015,10 @@ export type Database = {
         Args: { p_participant_id: string }
         Returns: Json
       }
+      desvincular_filial_oem: {
+        Args: { p_recon_id: string }
+        Returns: undefined
+      }
       dismiss_conversation_notifications: {
         Args: { p_conversation_id: string }
         Returns: number
@@ -12042,6 +13058,7 @@ export type Database = {
         Args: { p_tenant_id: string }
         Returns: string
       }
+      fn_acting_user: { Args: never; Returns: string }
       fn_add_business_days: {
         Args: {
           p_days: number
@@ -12051,9 +13068,17 @@ export type Database = {
         }
         Returns: string
       }
+      fn_agent_clock_start: {
+        Args: { p_awaiting_since: string; p_scheduled_until: string }
+        Returns: string
+      }
       fn_assign_conversation_if_ready: {
         Args: { p_conversation_id: string }
         Returns: Json
+      }
+      fn_ativacao_dos_modulos: {
+        Args: { p_cliente_produto_id: string }
+        Returns: number
       }
       fn_auto_offline_stale_agents: { Args: never; Returns: Json }
       fn_business_due_at: {
@@ -12065,6 +13090,46 @@ export type Database = {
         }
         Returns: string
       }
+      fn_cancelar_modulo_aplicar: {
+        Args: {
+          p_data?: string
+          p_id: string
+          p_motivo?: string
+          p_motivo_id?: number
+          p_quantidade?: number
+          p_valor_downsell?: number
+        }
+        Returns: Json
+      }
+      fn_cancelar_modulo_cliente: {
+        Args: {
+          p_data?: string
+          p_id: string
+          p_motivo?: string
+          p_motivo_id?: number
+          p_quantidade?: number
+          p_valor_downsell?: number
+        }
+        Returns: Json
+      }
+      fn_chat_media_purge_confirmar: {
+        Args: { p_ids: string[] }
+        Returns: {
+          arquivos: number
+          bytes: number
+        }[]
+      }
+      fn_chat_media_purge_lote: {
+        Args: { p_limit?: number }
+        Returns: {
+          department_id: string
+          media_path: string
+          media_size_bytes: number
+          message_id: string
+          retention_days: number
+          tenant_id: string
+        }[]
+      }
       fn_check_acceptance_timeouts: { Args: never; Returns: Json }
       fn_close_attendance_atomic: {
         Args: {
@@ -12075,6 +13140,16 @@ export type Database = {
         Returns: Json
       }
       fn_close_attendances_no_agent_response: { Args: never; Returns: Json }
+      fn_close_ura_selfservice: {
+        Args: { p_limit?: number }
+        Returns: {
+          attendance_code: string
+          attendance_id: string
+          conversation_id: string
+          mensagem: string
+          tenant_id: string
+        }[]
+      }
       fn_cnpj_enrich_tick: { Args: { p_batch?: number }; Returns: Json }
       fn_cohort_logos: {
         Args: {
@@ -12174,6 +13249,10 @@ export type Database = {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: number
       }
+      fn_current_chat_count_individual: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: number
+      }
       fn_custo_cliente_em: {
         Args: { p_cliente: string; p_data: string; p_tenant: string }
         Returns: number
@@ -12193,6 +13272,7 @@ export type Database = {
           fixed: number
         }[]
       }
+      fn_fone_omie: { Args: { p_raw: string }; Returns: Json }
       fn_instance_traffic: {
         Args: { p_minutes?: number }
         Returns: {
@@ -12205,6 +13285,7 @@ export type Database = {
       fn_journey_go_live: {
         Args: {
           p_department_id?: string
+          p_from_phase_id?: string
           p_produto_id: number
           p_start: string
           p_tenant_id: string
@@ -12215,6 +13296,12 @@ export type Database = {
         Args: { p_cliente: string; p_data: string; p_tenant: string }
         Returns: number
       }
+      fn_mrr_do_modulo: { Args: { p_modulo_linha_id: string }; Returns: Json }
+      fn_mrr_por_cliente_em: {
+        Args: { p_data?: string; p_tenant: string }
+        Returns: Json
+      }
+      fn_norm_nome_modulo: { Args: { p_nome: string }; Returns: string }
       fn_notify_awaiting_agent: { Args: never; Returns: Json }
       fn_notify_user: {
         Args: {
@@ -12229,6 +13316,83 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      fn_oem_cron_secret_ok: { Args: { p_token: string }; Returns: boolean }
+      fn_oem_enfileirar: {
+        Args: {
+          p_acao: string
+          p_modulo_linha_id: string
+          p_payload?: Json
+          p_quantidade?: number
+        }
+        Returns: string
+      }
+      fn_oem_enfileirar_novo: {
+        Args: {
+          p_cliente_produto_id: string
+          p_modulo_id: string
+          p_payload?: Json
+          p_quantidade: number
+        }
+        Returns: string
+      }
+      fn_oem_espelhar_modulos_no_contrato: {
+        Args: { p_filial_codigo: string; p_modulos: Json; p_tenant_id: string }
+        Returns: Json
+      }
+      fn_oem_fila_aplicar: { Args: { p_id: string }; Returns: Json }
+      fn_oem_fila_claim: {
+        Args: { p_id?: string; p_limite?: number }
+        Returns: {
+          acao: string
+          cliente_produto_id: string | null
+          conta_integration_id: string | null
+          empresa_codigo: string | null
+          enfileirado_em: string
+          filial_codigo: string | null
+          http: number | null
+          id: string
+          modulo_catalogo_id: string | null
+          modulo_linha_id: string | null
+          oem_modulo_codigo: number | null
+          payload: Json | null
+          processado_em: string | null
+          proxima_tentativa_em: string
+          quantidade: number | null
+          resposta: Json | null
+          status: string
+          tenant_id: string
+          tentativas: number
+          ultimo_erro: string | null
+          usuario_id: string | null
+          valor_unitario: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "oem_sync_fila"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      fn_oem_fila_listar: {
+        Args: { p_limite?: number; p_tenant_id?: string }
+        Returns: Json
+      }
+      fn_oem_fila_reprocessar: { Args: { p_id: string }; Returns: Json }
+      fn_oem_fila_status: { Args: { p_tenant_id?: string }; Returns: Json }
+      fn_oem_pendencias_do_cliente: {
+        Args: { p_cliente_id: string }
+        Returns: Json
+      }
+      fn_oem_vincular_produto: {
+        Args: {
+          p_conta_integration_id: string
+          p_produto_codigo: string
+          p_produto_ids: number[]
+          p_somente_com_valor?: boolean
+          p_upgrade?: boolean
+        }
+        Returns: Json
       }
       fn_omie_alertar_vinculo_ambiguo: { Args: never; Returns: undefined }
       fn_omie_notificar_falha: {
@@ -12283,7 +13447,11 @@ export type Database = {
         Returns: Json
       }
       fn_onb_trilho_sla_min: {
-        Args: { p_produto_id?: number; p_tenant_id: string }
+        Args: {
+          p_from_phase_id?: string
+          p_produto_id?: number
+          p_tenant_id: string
+        }
         Returns: number
       }
       fn_onb_util_min: {
@@ -12321,6 +13489,10 @@ export type Database = {
         Returns: string
       }
       fn_process_ura_timeouts: { Args: never; Returns: Json }
+      fn_receita_vem_dos_modulos: {
+        Args: { p_cliente_produto_id: string }
+        Returns: boolean
+      }
       fn_retry_waiting_conversations: { Args: never; Returns: Json }
       fn_schedule_group_syncs: { Args: never; Returns: undefined }
       fn_seed_onboarding_acompanhamento_pipeline: {
@@ -12340,6 +13512,10 @@ export type Database = {
           p_fase: Database["public"]["Enums"]["onb_fase"]
           p_journey_id: string
         }
+        Returns: undefined
+      }
+      fn_sync_ativacao_no_contrato: {
+        Args: { p_cliente_produto_id: string }
         Returns: undefined
       }
       fn_sync_member_for_funcionario: {
@@ -12594,8 +13770,10 @@ export type Database = {
           p_date_from: string
           p_date_to: string
           p_department_id?: string
+          p_instance_id?: string
           p_is_group?: boolean
           p_resolucao?: string
+          p_search?: string
           p_sentiment_filter?: string
           p_status?: string
           p_tenant_id?: string
@@ -13303,6 +14481,10 @@ export type Database = {
           token: string
         }[]
       }
+      ignorar_filial_oem: {
+        Args: { p_observacao?: string; p_recon_id: string }
+        Returns: undefined
+      }
       import_clientes_produtos_batch: { Args: { p_rows: Json }; Returns: Json }
       import_service_catalog_template: {
         Args: {
@@ -13480,6 +14662,10 @@ export type Database = {
         }
         Returns: Json
       }
+      obter_chave_oem_por_conta: {
+        Args: { p_integration_id: string }
+        Returns: string
+      }
       obter_chave_omie:
         | { Args: { p_tenant_id?: string }; Returns: string }
         | {
@@ -13497,6 +14683,11 @@ export type Database = {
             Returns: string
           }
       obter_segredo_cron_espelho: { Args: never; Returns: string }
+      oem_gravar_codigos_em_lote: { Args: { p_conta: string }; Returns: number }
+      oem_gravar_codigos_no_produto: {
+        Args: { p_cliente_id: string; p_filial: string; p_grupo: string }
+        Returns: number
+      }
       omie_fila_descartar: { Args: { p_fila_id: string }; Returns: Json }
       omie_fila_reprocessar: { Args: { p_fila_id: string }; Returns: Json }
       omie_fila_status:
@@ -13522,6 +14713,7 @@ export type Database = {
         }
         Returns: string
       }
+      pode_decidir_oem: { Args: { p_tenant_id: string }; Returns: boolean }
       preparar_reajuste: {
         Args: {
           p_percentual: number
@@ -13707,6 +14899,15 @@ export type Database = {
             Args: { p_conta_integration_id: string; p_tenant_id: string }
             Returns: number
           }
+      salvar_chave_oem: {
+        Args: {
+          p_api_url?: string
+          p_chave: string
+          p_tenant_id: string
+          p_unidades: number[]
+        }
+        Returns: string
+      }
       salvar_data_corte_omie: {
         Args: { p_data: string; p_tenant_id: string }
         Returns: string
@@ -14198,6 +15399,10 @@ export type Database = {
       vault_get_secret_id_by_name: { Args: { p_name: string }; Returns: string }
       vault_update_secret: {
         Args: { p_id: string; p_secret: string }
+        Returns: undefined
+      }
+      vincular_filial_oem: {
+        Args: { p_cliente_id: string; p_recon_id: string }
         Returns: undefined
       }
       wa_check_conversation_availability: {
