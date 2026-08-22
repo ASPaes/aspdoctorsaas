@@ -127,12 +127,26 @@ export default function FinanceiroCard({
     queryKey: ["cliente_produtos_ativacao", clienteId],
     queryFn: async () => {
       if (!clienteId) return 0;
+      // O embed traz a ativação dos módulos junto. Módulo com taxa de ativação
+      // é cobrança única igual à do produto e vai para o mesmo item do
+      // contrato — deixar de fora aqui faria a ficha mostrar menos do que o
+      // contrato cobra. Sem filtro de `ativo` nos módulos, pela mesma razão que
+      // a vw_clientes_financeiro não filtra: o que já foi cobrado não volta.
       const { data, error } = await (supabase.from("cliente_produtos" as any) as any)
-        .select("vlr_ativacao")
+        .select("vlr_ativacao, cliente_produto_modulos(vlr_ativacao)")
         .eq("cliente_id", clienteId)
         .eq("ativo", true);
       if (error) return 0;
-      return (data ?? []).reduce((s: number, p: any) => s + (Number(p.vlr_ativacao) || 0), 0);
+      return (data ?? []).reduce(
+        (s: number, p: any) =>
+          s +
+          (Number(p.vlr_ativacao) || 0) +
+          (p.cliente_produto_modulos ?? []).reduce(
+            (sm: number, m: any) => sm + (Number(m.vlr_ativacao) || 0),
+            0
+          ),
+        0
+      );
     },
     enabled: !!clienteId,
   });
