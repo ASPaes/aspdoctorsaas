@@ -215,7 +215,7 @@ export default function OemFilaSincronizacaoPanel() {
               <Alert className="border-amber-500/50 text-amber-900 dark:text-amber-200 [&>svg]:text-amber-600">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  O processador não roda desde {dataHora(s.cron_ultima)} — a fila não está andando.
+                  O processador não roda desde {dataHora(s.cron_ultima)}. A fila não está andando.
                 </AlertDescription>
               </Alert>
             )}
@@ -352,7 +352,7 @@ export default function OemFilaSincronizacaoPanel() {
           <DialogHeader>
             <DialogTitle>Simulação · {simulacao?.titulo}</DialogTitle>
             <DialogDescription>
-              É isto que seria enviado à licença do parceiro. Nada foi gravado — nem no OEM,
+              É isto que seria enviado à licença do parceiro. Nada foi gravado: nem no OEM,
               nem na ficha, nem na fila.
             </DialogDescription>
           </DialogHeader>

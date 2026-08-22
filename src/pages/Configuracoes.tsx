@@ -108,7 +108,7 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   integracoes: { breadcrumb: ["Integrações"], title: "Integrações", description: "Sistemas conectados ao DoctorSaaS. Clique numa integração para configurar a conexão." },
   "integracoes-omie": { breadcrumb: ["Integrações", "Omie"], title: "Omie", description: "Conecte o sistema ao Omie para sincronizar clientes e contratos." },
   "integracoes-hiper": { breadcrumb: ["Integrações", "Hiper"], title: "Hiper", description: "Conecte o sistema ao PortalHiper para sincronizar a carteira de clientes." },
-  "integracoes-oem": { breadcrumb: ["Integrações", "OEM"], title: "OEM", description: "Licenças do PDV Legal/TabletCloud: vínculo com clientes, margem e pendências." },
+  "integracoes-oem": { breadcrumb: ["Integrações", "OEM"], title: "OEM", description: "Licenças do PDV Legal/TabletCloud: vínculo com clientes, custo e divergências." },
 };
 
 

@@ -20,7 +20,7 @@ import {
 import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
   Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
-  ArrowUpDown, ArrowUp, ArrowDown, DownloadCloud, Boxes, Plus,
+  ArrowUpDown, ArrowUp, ArrowDown, Boxes, Plus,
 } from "lucide-react";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
@@ -196,85 +196,6 @@ function Origem({ lado }: { lado: "oem" | "ds" }) {
   );
 }
 
-// Divergência tem que mostrar os DOIS lados na mesma linha. Dizer "CNPJ
-// divergente" sem dizer contra o quê obriga a abrir duas telas para entender.
-function LinhaConferencia({
-  l, onTrocar, onDesfazer, desfazendo,
-}: {
-  l: Recon;
-  onTrocar: (l: Recon) => void;
-  onDesfazer: (id: string) => void;
-  desfazendo: string | null;
-}) {
-  const difNome = l.divergencias?.includes("nome");
-  const difCnpj = l.divergencias?.includes("cnpj");
-  const cor = (dif?: boolean) => (dif ? "text-destructive font-medium" : "text-muted-foreground");
-  return (
-    <div className="px-4 py-3 text-sm space-y-1.5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
-          filial {l.filial_codigo} · grupo {l.empresa_codigo}
-          {l.status_oem && ` · ${l.status_oem}`}
-        </p>
-        {/* A saída na própria linha: mostrar o problema e mandar procurar o
-            mesmo registro em outra aba é meia funcionalidade. */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <Button size="sm" variant="secondary" onClick={() => onTrocar(l)}>
-            Trocar cliente
-          </Button>
-          <Button size="sm" variant="ghost" className="gap-1.5"
-            disabled={desfazendo === l.id} onClick={() => onDesfazer(l.id)}>
-            {desfazendo === l.id
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              : <Undo2 className="h-3.5 w-3.5" />}
-            Desfazer
-          </Button>
-        </div>
-      </div>
-      <div className="grid gap-x-4 gap-y-1 sm:grid-cols-[5.5rem_1fr_1fr] items-baseline">
-        {/* Razão social, que é o par comparado — e não nome fantasia, que é o
-            que a linha mostrava antes e fazia duas strings iguais na tela
-            aparecerem como divergentes. */}
-        <span className="text-xs text-muted-foreground">Razão social</span>
-        <span className={`truncate ${cor(difNome)}`}>
-          <span className="text-sky-600 dark:text-sky-400 text-xs mr-1.5">OEM</span>
-          {l.razao_social_oem ?? "—"}
-        </span>
-        <span className={`truncate ${cor(difNome)}`}>
-          <span className="text-emerald-600 dark:text-emerald-400 text-xs mr-1.5">DS</span>
-          {l.razao_social_ds ?? "—"}
-        </span>
-
-        {/* Fantasia entra só como referência: é por ela que se reconhece a loja,
-            mas não é ela que decide a divergência. */}
-        {(l.razao_oem || l.razao_ds) && (
-          <>
-            <span className="text-xs text-muted-foreground">Fantasia</span>
-            <span className="truncate text-muted-foreground text-xs">
-              <span className="text-sky-600 dark:text-sky-400 mr-1.5">OEM</span>
-              {l.razao_oem ?? "—"}
-            </span>
-            <span className="truncate text-muted-foreground text-xs">
-              <span className="text-emerald-600 dark:text-emerald-400 mr-1.5">DS</span>
-              {l.razao_ds ?? "—"}
-            </span>
-          </>
-        )}
-
-        <span className="text-xs text-muted-foreground">CNPJ</span>
-        <span className={`tabular-nums ${cor(difCnpj)}`}>
-          <span className="text-sky-600 dark:text-sky-400 text-xs mr-1.5">OEM</span>
-          {l.cnpj_norm ?? "—"}
-        </span>
-        <span className={`tabular-nums ${cor(difCnpj)}`}>
-          <span className="text-emerald-600 dark:text-emerald-400 text-xs mr-1.5">DS</span>
-          {l.cnpj_ds ?? "—"}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 // Contar não resolve: com 342 casos, o número sozinho não diz em qual cliente
 // mexer. A lista é o que transforma o diagnóstico em trabalho.
 function ListaSemCodigo({
@@ -320,7 +241,7 @@ function ListaSemCodigo({
       </div>
       {itens.length > TETO && (
         <p className="border-t px-3 py-2 text-xs text-muted-foreground">
-          Mostrando {TETO} de {itens.length} — use a busca acima para chegar num caso específico.
+          Mostrando {TETO} de {itens.length}. Use a busca acima para chegar num caso específico.
         </p>
       )}
     </div>
@@ -333,7 +254,6 @@ export default function OemIntegrationTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const navigate = useNavigate();
   const [sincronizando, setSincronizando] = useState(false);
-  const [busca, setBusca] = useState("");
   const [contaSel, setContaSel] = useState<string | null>(null);
   const [novaUnidade, setNovaUnidade] = useState<string>("");
   const [novaChave, setNovaChave] = useState("");
@@ -341,21 +261,21 @@ export default function OemIntegrationTab() {
   const [escolhendo, setEscolhendo] = useState<LinhaRecon | null>(null);
   const [desfazendo, setDesfazendo] = useState<string | null>(null);
   const [confirmando, setConfirmando] = useState<string | null>(null);
-  const [pagina, setPagina] = useState(0);
   const [buscaCusto, setBuscaCusto] = useState("");
   const [paginaCusto, setPaginaCusto] = useState(0);
   const [custoSort, setCustoSort] = useState<CustoSort>("cliente");
   // Qual linha está gravando (o código da filial), e se o lote foi confirmado.
   const [atualizandoDs, setAtualizandoDs] = useState<string | null>(null);
-  const [confirmandoLote, setConfirmandoLote] = useState(false);
   // Seleção por CLIENTE (o id), não por linha da página: ela sobrevive a
   // paginar, ordenar e buscar, que é o que a pessoa espera de um checkbox.
-  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   // "A corrigir" e "Em dia" em vez de "divergente" e "conferido": o primeiro par
   // diz o que fazer, o segundo só descreve o estado — e "conferido" sugeriria
   // que alguém conferiu, quando o que houve foi o valor bater com o do OEM.
   const [filtroCusto, setFiltroCusto] = useState<"todos" | "corrigir" | "emdia">("todos");
   const [custoDir, setCustoDir] = useState<"asc" | "desc">("asc");
+  // Controlado para que os atalhos "Resolver em Divergências" das abas de
+  // resumo consigam levar a pessoa até onde a decisão acontece.
+  const [aba, setAba] = useState("visao");
   // Licença desativada não cobra, então divergência nela é ruído na maior parte
   // do tempo. A tela abre em "Ativo" e o usuário amplia se quiser.
   const [statusConf, setStatusConf] = useState<"Ativo" | "Desativado" | "todos">("Ativo");
@@ -828,17 +748,6 @@ export default function OemIntegrationTab() {
     };
   }, [linhas, filiaisComCodigo, produtosAtivos, statusConf]);
 
-  // Tudo o que a aba Divergências pede decisão sobre, num número só — é ele que
-  // acende o alerta na aba. Os quatro baldes de `semCodigo` entram; `gravados`,
-  // `total` e `foraDeEscopo` não, que são contagem de contexto, não pendência.
-  const totalDivergencias =
-    r.pagandoPorCancelado.length +
-    r.semCliente.length +
-    r.soNoDs.length +
-    r.semCodigo.multiplas.length +
-    r.semCodigo.semProduto.length +
-    r.semCodigo.variosProdutos.length +
-    r.semCodigo.outroMotivo.length;
 
   // ------------------------------------------------------------------ custos
   //
@@ -921,6 +830,162 @@ export default function OemIntegrationTab() {
     };
   }, [linhas, filiaisComCodigo, custoDsPorFilial]);
 
+  // ------------------------------------------------------- Divergências
+  // Uma linha por CLIENTE, e dentro dela tudo o que está errado com ele —
+  // venha de onde vier. Antes, o mesmo cliente aparecia em Conferência pelo
+  // CNPJ, em Custos pelo valor e em Margem pelo prejuízo, e quem resolvia
+  // precisava percorrer três abas para descobrir que era o mesmo problema.
+  //
+  // As outras abas continuam existindo, mas viraram RESUMO: os números e o que
+  // é ação de massa (atualizar custo em lote) ficam lá; a decisão caso a caso
+  // acontece só aqui.
+  const divergencias = useMemo(() => {
+    type Item = {
+      chave: string;
+      tipo: string;
+      rotulo: string;
+      detalhe: React.ReactNode;
+      grave: boolean;
+      linha?: Recon;
+      custo?: (typeof custos.lista)[number];
+    };
+    const porCliente = new Map<string, {
+      id: string; nome: string; cnpj: string | null; itens: Item[]; decisoes: Recon[];
+    }>();
+
+    const doCliente = (id: string, nome: string, cnpj: string | null) => {
+      let c = porCliente.get(id);
+      if (!c) { c = { id, nome, cnpj, itens: [], decisoes: [] }; porCliente.set(id, c); }
+      // O primeiro nome não-vazio vence: algumas linhas de recon vêm só com a
+      // razão do OEM, e o cliente ficaria "—" por acaso da ordem.
+      if ((c.nome === "—" || !c.nome) && nome) c.nome = nome;
+      if (!c.cnpj && cnpj) c.cnpj = cnpj;
+      return c;
+    };
+    const nomeDe = (l: Recon) => l.razao_ds ?? l.razao_oem ?? "—";
+
+    for (const l of r.divCnpj) {
+      if (!l.ds_customer_id) continue;
+      doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? null).itens.push({
+        chave: `cnpj:${l.id}`, tipo: "cnpj", grave: true, linha: l,
+        rotulo: "CNPJ diferente dos dois lados",
+        detalhe: <>OEM <strong>{l.cnpj_norm ?? "—"}</strong> · DoctorSaaS <strong>{l.cnpj_ds ?? "—"}</strong> · filial {l.filial_codigo}</>,
+      });
+    }
+    for (const l of r.divNome) {
+      if (!l.ds_customer_id) continue;
+      doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? null).itens.push({
+        chave: `nome:${l.id}`, tipo: "nome", grave: false, linha: l,
+        rotulo: "Só o nome diferente",
+        detalhe: <>OEM <strong>{l.razao_oem ?? "—"}</strong> · DoctorSaaS <strong>{l.razao_ds ?? "—"}</strong></>,
+      });
+    }
+    for (const c of custos.lista) {
+      if (!c.divergente) continue;
+      doCliente(c.id, c.cliente, c.cnpj).itens.push({
+        chave: `custo:${c.id}`, tipo: "custo", grave: false, custo: c,
+        rotulo: "Custo da ficha diferente do que o OEM cobra",
+        detalhe: <>ficha {brl(c.custo_ds)} · OEM {brl(c.custo_oem)} · diferença{" "}
+          <strong className={c.diferenca > 0 ? "text-amber-500" : "text-destructive"}>
+            {c.diferenca > 0 ? "+" : ""}{brl(c.diferenca)}
+          </strong></>,
+      });
+    }
+    for (const n of r.negativas) {
+      doCliente(n.id, n.razao_ds ?? n.razao_oem ?? "—", null).itens.push({
+        chave: `margem:${n.id}`, tipo: "margem", grave: true,
+        rotulo: "Custa mais do que paga",
+        detalhe: <>mensalidade {brl(n.mensalidade_ds)} · custo {brl(n.custo_oem)} ·{" "}
+          <strong className="text-destructive">{brl(n.margem)}</strong>/mês</>,
+      });
+    }
+    for (const l of r.pagandoPorCancelado) {
+      if (!l.ds_customer_id) continue;
+      doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? l.cnpj_norm ?? null).itens.push({
+        chave: `cancelado:${l.id}`, tipo: "licenca_cancelado", grave: true, linha: l,
+        rotulo: "Licença OEM ativa de cliente cancelado no DS",
+        detalhe: <>filial {l.filial_codigo} · grupo {l.empresa_codigo} · custo{" "}
+          <strong className="text-destructive">{brl(Number(l.custo_oem || 0))}</strong>/mês.
+          A desativação é pedida no portal do OEM</>,
+      });
+    }
+    for (const l of r.soNoDs) {
+      if (!l.ds_customer_id) continue;
+      doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? null).itens.push({
+        chave: `semlic:${l.id}`, tipo: "sem_licenca", grave: false, linha: l,
+        rotulo: "Cliente sem licença no OEM",
+        detalhe: <>mensalidade {brl(Number(l.mensalidade_ds || 0))}. Pode ser de outro produto,
+          e nesse caso não é erro</>,
+      });
+    }
+    const motivos: [Recon[], string, string][] = [
+      [r.semCodigo.multiplas, "multiplas", "mais de uma filial para o mesmo cliente"],
+      [r.semCodigo.semProduto, "sem_produto", "o cliente não tem produto ativo onde gravar"],
+      [r.semCodigo.variosProdutos, "varios_produtos", "mais de um produto ativo, e não dá para saber em qual gravar"],
+      [r.semCodigo.outroMotivo, "outro", "outro motivo"],
+    ];
+    for (const [lista, sufixo, porque] of motivos) {
+      for (const l of lista) {
+        if (!l.ds_customer_id) continue;
+        doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? null).itens.push({
+          chave: `semcod:${sufixo}:${l.id}`, tipo: "sem_codigo", grave: false, linha: l,
+          rotulo: "Vínculo sem o código na ficha",
+          detalhe: <>filial {l.filial_codigo} · {porque}</>,
+        });
+      }
+    }
+
+    // Vínculo decidido à mão não é divergência — é o histórico da decisão, com
+    // o caminho de volta. Mora na linha do cliente como todo o resto (é dele
+    // que se trata), mas NÃO conta no selo nem no alerta da aba: contar coisa
+    // já resolvida como pendência é o alarme que ensina a ignorar.
+    for (const l of r.decididas) {
+      if (!l.ds_customer_id) continue;
+      doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? l.cnpj_norm ?? null).decisoes.push(l);
+    }
+
+    // Só entra quem tem algo ERRADO. Vínculo escolhido à mão está resolvido, e
+    // um cliente cuja única linha é essa não tem o que decidir — aparecer aqui
+    // o faria parecer problema. A decisão continua visível, mas só dentro de um
+    // cliente que já esteja na lista por outro motivo.
+    const lista = [...porCliente.values()].filter((c) => c.itens.length > 0).sort((a, b) => {
+      const ga = a.itens.filter((i) => i.grave).length;
+      const gb = b.itens.filter((i) => i.grave).length;
+      if (ga !== gb) return gb - ga;
+      if (a.itens.length !== b.itens.length) return b.itens.length - a.itens.length;
+      return a.nome.localeCompare(b.nome, "pt-BR");
+    });
+
+    // Licença que ainda não é de ninguém não tem cliente para entrar embaixo.
+    // Fica num bloco próprio em vez de virar um cliente inventado.
+    const semDono = [
+      ...r.escolher.map((l) => ({ l, escolher: true })),
+      ...r.semCliente
+        .filter((l) => !r.escolher.some((e) => e.id === l.id))
+        .map((l) => ({ l, escolher: false })),
+    ];
+
+    return {
+      lista,
+      semDono,
+      total: lista.reduce((a, c) => a + c.itens.length, 0) + semDono.length,
+    };
+  }, [r, custos]);
+
+  // É este número que acende o alerta na aba.
+  const totalDivergencias = divergencias.total;
+
+  const [clienteAberto, setClienteAberto] = useState<string | null>(null);
+  // Recolhido por padrão: são mais de cem licenças, e abertas elas empurram a
+  // lista de clientes — que é o assunto da aba — para fora da primeira tela.
+  const [semDonoAberto, setSemDonoAberto] = useState(false);
+  const [buscaDiv, setBuscaDiv] = useState("");
+  const divergenciasVisiveis = useMemo(() => {
+    const q = buscaDiv.trim().toLowerCase();
+    if (!q) return divergencias.lista;
+    return divergencias.lista.filter((c) => combina(q, [c.nome, c.cnpj]));
+  }, [divergencias.lista, buscaDiv]);
+
   const custosVisiveis = useMemo(() => {
     const q = buscaCusto.trim().toLowerCase();
     const porEstado = filtroCusto === "todos"
@@ -953,52 +1018,6 @@ export default function OemIntegrationTab() {
       return dir * (na - nb);
     });
   }, [custos.lista, buscaCusto, filtroCusto, custoSort, custoDir]);
-
-  // O lote é EXATAMENTE o que está marcado — nunca "todos os elegíveis". Com
-  // busca ativa, mandar a base inteira gravaria em centenas de clientes que a
-  // pessoa nem está vendo.
-  const alvoLote = useMemo(() => {
-    const marcados = custos.lista.filter((c) => selecionados.has(c.id));
-    return {
-      filiais: marcados.flatMap((c) => c.filiais),
-      quantidade: marcados.length,
-      // Marcado mas já igual ao OEM não vira escrita; dizer isso na confirmação
-      // evita o "cliquei em 40 e ele diz que atualizou 12".
-      aGravar: marcados.filter((c) => c.divergente).length,
-    };
-  }, [custos.lista, selecionados]);
-
-  // O checkbox do cabeçalho age sobre a LISTA FILTRADA inteira, não só sobre a
-  // página: quem busca por um CNPJ e marca o topo quer aqueles, todos.
-  //
-  // SÓ O QUE ESTÁ DIVERGENTE É SELECIONÁVEL. Cliente com o custo já igual ao do
-  // OEM não tem o que gravar, e deixá-lo entrar no lote inflava a contagem do
-  // botão: "Atualizar 40 selecionados" que na prática escrevia em 12. A lista
-  // de marcáveis é esta, e ela manda no cabeçalho e na linha.
-  const idsVisiveis = useMemo(
-    () => custosVisiveis.filter((c) => c.divergente).map((c) => c.id),
-    [custosVisiveis],
-  );
-  const marcadosVisiveis = idsVisiveis.filter((id) => selecionados.has(id)).length;
-  const todosVisiveisMarcados = idsVisiveis.length > 0 && marcadosVisiveis === idsVisiveis.length;
-
-  function alternarTodosVisiveis(marcar: boolean) {
-    setSelecionados((atual) => {
-      const proximo = new Set(atual);
-      for (const id of idsVisiveis) {
-        if (marcar) proximo.add(id); else proximo.delete(id);
-      }
-      return proximo;
-    });
-  }
-
-  function alternarUm(id: string, marcar: boolean) {
-    setSelecionados((atual) => {
-      const proximo = new Set(atual);
-      if (marcar) proximo.add(id); else proximo.delete(id);
-      return proximo;
-    });
-  }
 
   const totalPaginasCusto = Math.max(1, Math.ceil(custosVisiveis.length / POR_PAGINA));
   const paginaCustoAtual = Math.min(paginaCusto, totalPaginasCusto - 1);
@@ -1044,7 +1063,6 @@ export default function OemIntegrationTab() {
           : r.atualizados ? rotulo : "Os valores já estavam iguais aos do OEM.",
       });
       queryClient.invalidateQueries({ queryKey: ["oem-codigos-gravados", tid] });
-      setSelecionados(new Set());
     } catch (e: any) {
       toast({ title: "Não deu para atualizar", description: e?.message ?? "Erro", variant: "destructive" });
     } finally {
@@ -1159,23 +1177,6 @@ export default function OemIntegrationTab() {
     }
   }
 
-  const filtra = (lista: Recon[]) => {
-    const q = busca.trim().toLowerCase();
-    if (!q) return lista;
-    return lista.filter((l) =>
-      combina(q, [l.razao_oem, l.razao_ds, l.cnpj_norm, l.cnpj_ds, l.filial_codigo, l.empresa_codigo]));
-  };
-
-  // Paginação da fila de decisão. É lista client-side (o fetchAllRows já trouxe
-  // tudo), então paginar aqui é só fatiar — mas sem isso a tela cortava em 100
-  // e as demais simplesmente não existiam para quem não soubesse buscar.
-  const escolherFiltrado = filtra(r.escolher);
-  const totalPaginas = Math.max(1, Math.ceil(escolherFiltrado.length / POR_PAGINA));
-  // Decidir a última filial da última página encolhe a lista debaixo dos pés:
-  // sem o clamp, a tela ficaria numa página que não existe mais, vazia.
-  const paginaAtual = Math.min(pagina, totalPaginas - 1);
-  const inicio = paginaAtual * POR_PAGINA;
-  const escolherPagina = escolherFiltrado.slice(inicio, inicio + POR_PAGINA);
 
   if (!tid) {
     return <p className="text-sm text-muted-foreground">Selecione uma empresa para ver a integração.</p>;
@@ -1190,7 +1191,7 @@ export default function OemIntegrationTab() {
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Plug className="h-5 w-5" /> OEM — PDV Legal / TabletCloud
+              <Plug className="h-5 w-5" /> OEM · PDV Legal / TabletCloud
             </CardTitle>
             <CardDescription>
               O espelho é alimentado pelo DoctorOEM, que sincroniza com a API do OEM a cada 6h.
@@ -1204,12 +1205,12 @@ export default function OemIntegrationTab() {
               <span className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                 <span className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-sky-500" />
-                  <span className="text-sky-600 dark:text-sky-400">OEM</span> — a licença e o que
+                  <span className="text-sky-600 dark:text-sky-400">OEM</span>: a licença e o que
                   ela <strong>custa</strong>
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span className="text-emerald-600 dark:text-emerald-400">DoctorSaaS</span> — o
+                  <span className="text-emerald-600 dark:text-emerald-400">DoctorSaaS</span>: o
                   cliente e a <strong>mensalidade</strong> que ele paga
                 </span>
               </span>
@@ -1237,25 +1238,13 @@ export default function OemIntegrationTab() {
         </CardHeader>
       </Card>
 
-      <Tabs defaultValue="visao" className="w-full">
+      <Tabs value={aba} onValueChange={setAba} className="w-full">
         <TabsList>
           <TabsTrigger value="conexao">Conexão</TabsTrigger>
           <TabsTrigger value="modulos" className="gap-1.5">
             <Boxes className="h-3.5 w-3.5" /> Módulos
           </TabsTrigger>
           <TabsTrigger value="visao">Visão geral</TabsTrigger>
-          <TabsTrigger value="escolher" className="gap-1.5">
-            Escolher candidato
-            {r.escolher.length > 0 && <Badge variant="secondary">{r.escolher.length}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="conferencia" className="gap-1.5">
-            Conferência
-            {r.divCnpj.length > 0 && <Badge variant="destructive">{r.divCnpj.length}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="margem" className="gap-1.5">
-            Margem
-            {r.negativas.length > 0 && <Badge variant="destructive">{r.negativas.length}</Badge>}
-          </TabsTrigger>
           <TabsTrigger value="custos" className="gap-1.5">
             Custos
             {custos.divergentes > 0 && <Badge variant="secondary">{custos.divergentes}</Badge>}
@@ -1292,10 +1281,10 @@ export default function OemIntegrationTab() {
         <TabsContent value="fila" className="space-y-3">
           <Explica>
             Toda alteração que sai daqui para a licença do parceiro passa por esta fila antes.
-            Um processador roda de <strong>2 em 2 minutos</strong> e envia o que está pendente;
-            o que o OEM recusar <strong>fica aqui, com o motivo escrito</strong>, em vez de
+            Um processador roda de <strong>2 em 2 minutos</strong> e envia o que está pendente.
+            O que o OEM recusar <strong>fica aqui, com o motivo escrito</strong>, em vez de
             desaparecer num aviso de tela. Linha parada tem o botão{" "}
-            <strong>Tentar de novo</strong> — use depois de corrigir a causa, senão ela toma a
+            <strong>Tentar de novo</strong>: use depois de corrigir a causa, senão ela toma a
             mesma recusa.
           </Explica>
           <OemFilaSincronizacaoPanel />
@@ -1305,10 +1294,10 @@ export default function OemIntegrationTab() {
         <TabsContent value="conexao" className="space-y-4 max-w-3xl">
           <Explica>
             É aqui que o DoctorSaaS aprende de qual empresa do <strong>DoctorOEM</strong> vêm as
-            filiais. A chave é gerada lá, no Nexus Hub, e colada aqui — <strong>uma conta por
-            unidade base</strong>, como no Omie, para que as filiais de uma unidade não se
-            misturem com os clientes de outra. Quem fala com a API do OEM é o DoctorOEM; o
-            DoctorSaaS só recebe a cópia.
+            filiais. A chave é gerada lá, no Nexus Hub, e colada aqui. É{" "}
+            <strong>uma conta por unidade base</strong>, como no Omie, para que as filiais de uma
+            unidade não se misturem com os clientes de outra. Quem fala com a API do OEM é o
+            DoctorOEM; o DoctorSaaS só recebe a cópia.
           </Explica>
           <Card>
             <CardHeader>
@@ -1317,7 +1306,7 @@ export default function OemIntegrationTab() {
               </CardTitle>
               <CardDescription>
                 Uma conta por unidade base, como no Omie. A chave é gerada no{' '}
-                <strong>Nexus Hub</strong> e colada aqui — é ela que diz de qual empresa do
+                <strong>Nexus Hub</strong> e colada aqui. É ela que diz de qual empresa do
                 DoctorOEM vêm as filiais.
               </CardDescription>
             </CardHeader>
@@ -1385,7 +1374,7 @@ export default function OemIntegrationTab() {
                   {salvando ? 'Salvando…' : 'Conectar'}
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  A chave vai para o cofre do banco. Nem esta tela consegue lê-la de volta —
+                  A chave vai para o cofre do banco. Nem esta tela consegue lê-la de volta:
                   para trocar, gere outra no Nexus Hub e cole aqui.
                 </p>
               </div>
@@ -1399,13 +1388,13 @@ export default function OemIntegrationTab() {
             A <strong>tabela de preços</strong> da sua conta no OEM: quanto{" "}
             <strong>cada módulo custa</strong> em cada produto do catálogo. É a mesma grade de{" "}
             <strong>Dados da empresa › Regras comerciais</strong> do portal, e vem{" "}
-            <strong>por conta conectada</strong> — cada unidade tem a sua. Isto é preço de{" "}
+            <strong>por conta conectada</strong>, cada unidade com a sua. Isto é preço de{" "}
             <strong>tabela</strong>, não o que um cliente paga: a licença de cada filial pode ter
-            valor negociado, e é ela que aparece nas abas Custos e Margem.
+            valor negociado, e é ela que aparece na aba Custos.
             <br />
             No topo de cada coluna dá para <strong>vincular o produto do OEM a um produto
             cadastrado no DoctorSaaS</strong> e, se você quiser, trazer os módulos daquela coluna
-            para dentro dele — o custo de cada módulo vem do preço de tabela.
+            para dentro dele, com o custo de cada um saindo deste preço de tabela.
           </Explica>
 
           <Card>
@@ -1419,7 +1408,7 @@ export default function OemIntegrationTab() {
                     ? <>Lida do OEM em{" "}
                         <strong>
                           {new Date(grade.atualizado).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
-                        </strong>{" "}— atualiza junto com o espelho.</>
+                        </strong>{" "}(atualiza junto com o espelho).</>
                     : "A grade chega no próximo Atualizar espelho."}
                 </CardDescription>
               </div>
@@ -1453,7 +1442,7 @@ export default function OemIntegrationTab() {
               ) : grade.modulos.length === 0 ? (
                 <p className="px-6 py-8 text-sm text-muted-foreground text-center">
                   Nenhuma tabela de preços carregada ainda. Clique em{" "}
-                  <strong>Atualizar espelho</strong> — ela vem junto com as filiais.
+                  <strong>Atualizar espelho</strong>: ela vem junto com as filiais.
                 </p>
               ) : modulosVisiveis.length === 0 ? (
                 <p className="px-6 py-8 text-sm text-muted-foreground text-center">
@@ -1550,8 +1539,9 @@ export default function OemIntegrationTab() {
         <TabsContent value="visao" className="space-y-4">
           <Explica>
             O resumo do cruzamento entre as <strong>licenças do OEM</strong> e os{" "}
-            <strong>clientes do DoctorSaaS</strong>. Nada aqui é editável — é o retrato do que a
-            última atualização do espelho encontrou.
+            <strong>clientes do DoctorSaaS</strong>. Nada aqui é editável: é o retrato do que a
+            última atualização do espelho encontrou. O que precisa de decisão fica na aba{" "}
+            <strong>Divergências</strong>, cliente por cliente.
           </Explica>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Numero
@@ -1568,18 +1558,21 @@ export default function OemIntegrationTab() {
                 rotulo: "Contratos ativos DS",
                 title:
                   produtosOemIds.length === 0
-                    ? "Nenhum produto do DoctorSaaS está vinculado ao OEM — sem isso não há contrato a comparar."
+                    ? "Nenhum produto do DoctorSaaS está vinculado ao OEM, e sem isso não há contrato a comparar."
                     : contratosOemCarregando
                     ? "Contando…"
                     : contratosOem == null
                     ? "Não foi possível contar os contratos do DoctorSaaS."
-                    : "Contratos com status ativo que têm item de um produto vinculado ao OEM, nas unidades desta conta. Este número é do DoctorSaaS, ao vivo — não vem do espelho.",
+                    : "Contratos com status ativo que têm item de um produto vinculado ao OEM, nas unidades desta conta. Este número é do DoctorSaaS, ao vivo, e não vem do espelho.",
               }}
             />
             <Numero valor={String(r.vinculadas)} rotulo="Vinculadas automaticamente" tom="bom"
               sub={r.ativas ? `${((r.vinculadas / r.ativas) * 100).toFixed(1)}% das ativas` : undefined} />
+            {/* O número ficou; a lista mudou de aba. Sem dizer para onde, quem
+                lê aqui sai procurando a aba que deixou de existir. */}
             <Numero valor={String(r.escolher.length)} rotulo="Aguardando escolha"
-              tom={r.escolher.length ? "alerta" : "bom"} sub="CNPJ com mais de um cliente" />
+              tom={r.escolher.length ? "alerta" : "bom"}
+              sub={r.escolher.length ? "CNPJ com mais de um cliente. Resolva em Divergências" : "CNPJ com mais de um cliente"} />
             {/* Markup na mesma régua da aba Custos: mensalidade ÷ custo do OEM,
                 como multiplicador. Dois markups com denominadores diferentes
                 seriam duas respostas para a mesma pergunta. */}
@@ -1590,7 +1583,7 @@ export default function OemIntegrationTab() {
               sub={
                 <span title={r.custo > 0
                   ? `${brl(r.receita)} ÷ ${brl(r.custo)} (custo do OEM)`
-                  : "Sem custo do OEM — não há como calcular o markup"}>
+                  : "Sem custo do OEM, não há como calcular o markup"}>
                   {brl(r.receita)} − {brl(r.custo)} · markup{" "}
                   {r.custo > 0 ? (
                     <span className={r.receita / r.custo < 1 ? "text-destructive font-medium" : ""}>
@@ -1602,363 +1595,28 @@ export default function OemIntegrationTab() {
           </div>
         </TabsContent>
 
-        {/* ---------------------------------------------------------- escolher */}
-        <TabsContent value="escolher" className="space-y-3">
-          <Explica>
-            Cada linha aqui é uma <strong>filial do OEM</strong> — uma licença — cujo CNPJ tem
-            mais de um cliente cadastrado no DoctorSaaS. A máquina não desempata sozinha, então
-            ela para e pergunta. <strong>Escolher</strong> abre a lista de{" "}
-            <strong>clientes do DoctorSaaS</strong> para você dizer qual deles é o dono daquela
-            licença. Sua decisão fica gravada e sobrevive às próximas atualizações do espelho.
-            Só entram aqui licenças <strong>ativas</strong> no OEM de clientes <strong>não
-            cancelados</strong> — desativado não cobra, e cadastro cancelado não vira vínculo.
-          </Explica>
-          <div className="relative max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar por nome, CNPJ ou código" className="pl-8"
-              value={busca}
-              // Buscar com a página 3 aberta mostraria "nenhum resultado" tendo
-              // resultado na 1 — toda busca volta para o começo.
-              onChange={(e) => { setBusca(e.target.value); setPagina(0); }} />
-          </div>
-          {r.escolher.length === 0 ? (
-            <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
-              Nenhuma filial aguardando escolha.
-            </CardContent></Card>
-          ) : (
-            <div className="rounded-md border">
-              <div className="flex items-center gap-3 border-b bg-muted/50 px-3 py-2 text-xs font-medium">
-                <span className="w-4 shrink-0" />
-                <span className="min-w-0 flex-1 text-sky-600 dark:text-sky-400">
-                  Filial no OEM
-                </span>
-                <span className="w-28 text-center text-emerald-600 dark:text-emerald-400">
-                  Candidatos
-                </span>
-                <span className="w-28 text-right text-sky-600 dark:text-sky-400">
-                  Custo
-                </span>
-                <span className="w-[86px] shrink-0" />
-              </div>
-              <div className="divide-y">
-                {escolherPagina.map((l) => (
-                  <div key={l.id} className="flex items-center gap-3 p-3 text-sm">
-                    <HelpCircle className="h-4 w-4 text-amber-500 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{l.razao_oem}</p>
-                      <p className="text-xs text-muted-foreground">
-                        filial {l.filial_codigo} · grupo {l.empresa_codigo} · CNPJ {l.cnpj_norm}
-                      </p>
-                      {/* Sem isto, a filial travada pela regra 1:1 aparece com
-                          "1 candidatos" e nenhuma pista de por que não casou. */}
-                      {l.observacao && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400">{l.observacao}</p>
-                      )}
-                    </div>
-                    <span className="w-28 text-center">
-                      <Badge variant="outline">{l.qtd_candidatos_ds} candidatos</Badge>
-                    </span>
-                    <span className="tabular-nums text-muted-foreground w-28 text-right">
-                      {brl(l.custo_oem)}
-                    </span>
-                    <Button size="sm" variant="secondary" className="w-[86px]"
-                      onClick={() => setEscolhendo(l)}>
-                      Escolher
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {escolherFiltrado.length > POR_PAGINA && (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-muted-foreground tabular-nums">
-                {inicio + 1}–{Math.min(inicio + POR_PAGINA, escolherFiltrado.length)} de{" "}
-                {escolherFiltrado.length}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-1"
-                  disabled={paginaAtual === 0} onClick={() => setPagina(paginaAtual - 1)}>
-                  <ChevronLeft className="h-4 w-4" /> Anterior
-                </Button>
-                <span className="text-xs text-muted-foreground tabular-nums px-1">
-                  {paginaAtual + 1} / {totalPaginas}
-                </span>
-                <Button variant="outline" size="sm" className="gap-1"
-                  disabled={paginaAtual >= totalPaginas - 1} onClick={() => setPagina(paginaAtual + 1)}>
-                  Próxima <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Decidido à mão — sem o caminho de volta, um clique errado vira
-              vínculo permanente: a sincronização preserva a escolha errada
-              exatamente como preservaria a certa. */}
-          {r.decididas.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  {r.decididas.length} decisões tomadas à mão
-                </CardTitle>
-                <CardDescription>
-                  Filial no OEM → cliente no DoctorSaaS. Sobrevivem às próximas sincronizações;
-                  desfazer devolve a filial ao casamento automático.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0 max-h-80 overflow-y-auto">
-                <div className="divide-y">
-                  {filtra(r.decididas).map((l) => (
-                    <div key={l.id} className="flex items-center gap-3 px-6 py-2.5 text-sm">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate flex items-center gap-1.5">
-                          <Origem lado="oem" /> {l.razao_oem ?? l.razao_ds}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {l.status_usuario === "ignorado"
-                            ? "ignorada — não vira cliente"
-                            : `→ cliente ${l.razao_ds ?? "removido"}`}
-                          {l.filial_codigo && ` · filial ${l.filial_codigo}`}
-                          {l.resolvido_em &&
-                            ` · ${new Date(l.resolvido_em).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`}
-                        </p>
-                      </div>
-                      <Badge variant={l.status_usuario === "ignorado" ? "outline" : "secondary"}>
-                        {l.status_usuario}
-                      </Badge>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="gap-1.5"
-                        disabled={desfazendo === l.id}
-                        onClick={() => desvincular(l.id)}
-                      >
-                        {desfazendo === l.id
-                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          : <Undo2 className="h-3.5 w-3.5" />}
-                        Desfazer
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        {/* ------------------------------------------------------- conferência */}
-        <TabsContent value="conferencia" className="space-y-3">
-          <Explica>
-            Aqui não se decide vínculo — ele já está feito. A partir do momento em que o par
-            <strong> grupo · filial</strong> foi gravado na ficha do cliente, é ele que segura a
-            ligação, e não o CNPJ. A cada atualização do espelho os outros dois campos são
-            comparados dos dois lados, e o que deixou de bater aparece aqui.{" "}
-            <strong>Divergência é aviso, não desvínculo</strong> — nada é desfeito sozinho, e por
-            isso cada linha traz as duas saídas: <strong>Trocar cliente</strong>, quando o vínculo
-            está no cadastro errado, e <strong>Desfazer</strong>, que devolve a filial à fila de
-            escolha. Se o certo for corrigir o cadastro (num dos dois sistemas), não mexa aqui — a
-            próxima atualização do espelho tira a linha desta lista sozinha.
-          </Explica>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Numero valor={String(r.confereOk)} rotulo="Conferem" tom="bom"
-              sub="nome e CNPJ batendo" />
-            <Numero valor={String(r.divCnpj.length)} rotulo="CNPJ divergente"
-              tom={r.divCnpj.length ? "ruim" : "bom"} sub="sinal forte — provável vínculo errado" />
-            <Numero valor={String(r.divNome.length)} rotulo="Só o nome divergente"
-              tom="normal" sub="CNPJ bate — é diferença de cadastro" />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative max-w-sm flex-1 min-w-[16rem]">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar por nome, CNPJ ou código" className="pl-8"
-                value={busca} onChange={(e) => { setBusca(e.target.value); setPagina(0); }} />
-            </div>
-            {/* Licença desativada não cobra — divergência nela raramente é o que
-                se quer olhar. A tela abre em Ativo e amplia sob demanda. */}
-            <div className="inline-flex rounded-md border p-0.5">
-              {([
-                ["Ativo", "Ativas"],
-                ["Desativado", "Desativadas"],
-                ["todos", "Todas"],
-              ] as const).map(([v, rot]) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setStatusConf(v)}
-                  className={`px-3 py-1.5 text-sm rounded transition-colors ${
-                    statusConf === v
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {rot}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {r.divCnpj.length === 0 && r.divNome.length === 0 ? (
-            <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
-              Nada divergindo{statusConf !== "todos" &&
-                <> entre as licenças <strong>{statusConf === "Ativo" ? "ativas" : "desativadas"}</strong></>}.
-              {statusConf !== "todos" && " Experimente “Todas”."} Se você ainda não clicou em{" "}
-              <strong>Atualizar espelho</strong> depois de gravar os códigos, a conferência ainda
-              não rodou nenhuma vez.
-            </CardContent></Card>
-          ) : (
-            <>
-              {r.divCnpj.length > 0 && (
-                <Card className="border-destructive/40">
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2 text-destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      {r.divCnpj.length} com CNPJ diferente dos dois lados
-                    </CardTitle>
-                    <CardDescription>
-                      O código diz que esta licença é deste cliente, mas os CNPJs não são o mesmo.
-                      Ou o cadastro mudou de um lado só, ou o vínculo está no cliente errado —
-                      neste caso, desfaça em <strong>Escolher candidato</strong> e refaça.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="divide-y border-t max-h-96 overflow-y-auto">
-                      {filtra(r.divCnpj).map((l) => (
-                        <LinhaConferencia key={l.id} l={l} onTrocar={setEscolhendo}
-                          onDesfazer={desvincular} desfazendo={desfazendo} />
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {r.divNome.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">
-                      {r.divNome.length} com só o nome diferente
-                    </CardTitle>
-                    <CardDescription>
-                      CNPJ bate, então o vínculo está certo — aqui é diferença de cadastro. A
-                      comparação cruza <strong>razão social e nome fantasia dos dois lados</strong>:
-                      basta um nome bater com um nome para não acusar nada, e acento, caixa,
-                      pontuação e sufixo (LTDA, ME, EPP) são ignorados. O que sobra são nomes
-                      genuinamente diferentes.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="divide-y border-t max-h-96 overflow-y-auto">
-                      {filtra(r.divNome).map((l) => (
-                        <LinhaConferencia key={l.id} l={l} onTrocar={setEscolhendo}
-                          onDesfazer={desvincular} desfazendo={desfazendo} />
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          )}
-        </TabsContent>
-
-        {/* ------------------------------------------------------------ margem */}
-        <TabsContent value="margem" className="space-y-3">
-          <Explica>
-            <strong>Receita</strong> é a soma das mensalidades no DoctorSaaS — o que os clientes
-            pagam. <strong>Custo</strong> é a soma das licenças ativas no OEM — o que a operação
-            paga. A mensalidade é do <strong>cliente</strong> e o custo é da <strong>filial</strong>:
-            um cliente com três lojas paga uma mensalidade e consome três licenças, então a
-            mensalidade entra uma vez por cliente e o custo, uma vez por licença. Diferente da
-            conferência do Omie, aqui os dois números <strong>têm</strong> que ser diferentes — a
-            diferença é o resultado, não um erro. Licença desativada não entra: desativado não
-            cobra, bloqueado cobra.
-          </Explica>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Numero valor={brl(r.receita)} rotulo="Receita — mensalidades (DoctorSaaS)"
-              sub={`${r.clientesComPar} clientes ativos`} />
-            <Numero valor={brl(r.custo)} rotulo="Custo — licenças ativas (OEM)"
-              sub={`${r.comPar.length} licenças`} />
-            <Numero valor={brl(r.receita - r.custo)} rotulo="Margem — receita menos custo" tom="bom" />
-          </div>
-
-          {r.negativas.length > 0 && (
-            <Card className="border-destructive/40">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2 text-destructive">
-                  <TrendingDown className="h-4 w-4" />
-                  {r.negativas.length} cliente(s) custando mais do que pagam
-                </CardTitle>
-                <CardDescription>
-                  A licença no OEM sai mais caro que a mensalidade cobrada. Pode ser acordo
-                  comercial — ou cadastro incompleto. Só entram aqui os clientes com{" "}
-                  <strong>vínculo confirmado</strong>: sem isso, um cadastro que recebeu as
-                  licenças de um grupo inteiro apareceria devendo centenas de reais por
-                  atribuição, não por prejuízo.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="flex items-center gap-3 border-y bg-muted/50 px-6 py-2 text-xs font-medium">
-                  <span className="min-w-0 flex-1 text-emerald-600 dark:text-emerald-400">
-                    Cliente
-                  </span>
-                  <span className="w-28 text-right text-sky-600 dark:text-sky-400">
-                    Custo
-                  </span>
-                  <span className="w-28 text-right text-emerald-600 dark:text-emerald-400">
-                    Mensalidade
-                  </span>
-                  <span className="w-24 text-right">Margem</span>
-                </div>
-                <div className="divide-y">
-                  {r.negativas.map((l) => (
-                    <div key={l.id} className="flex items-center gap-3 px-6 py-2.5 text-sm">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{l.razao_ds ?? l.razao_oem}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {l.filiais === 1 ? "1 licença confirmada" : `${l.filiais} licenças confirmadas`} no OEM
-                          {l.naoConfirmadas > 0 &&
-                            ` · ${l.naoConfirmadas} sem confirmação, fora desta conta`}
-                        </p>
-                      </div>
-                      <span className="tabular-nums text-muted-foreground w-28 text-right">
-                        {brl(l.custo_oem)}
-                      </span>
-                      <span className="tabular-nums text-muted-foreground w-28 text-right">
-                        {brl(l.mensalidade_ds)}
-                      </span>
-                      <span className="tabular-nums font-medium text-destructive w-24 text-right">
-                        {brl(l.margem)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
         {/* ------------------------------------------------------------ custos */}
         <TabsContent value="custos" className="space-y-3">
           <Explica>
             Os dois custos da mesma licença, lado a lado. O <strong>Custo DS</strong> é o valor
             digitado na ficha do produto, dentro do DoctorSaaS; o <strong>Custo OEM</strong> é o
-            que a licença cobra de fato. Onde os dois divergem, quem está desatualizado é o
-            cadastro daqui — e é isso que o botão <strong>Atualizar DS</strong> vai resolver,
-            trazendo o valor do OEM para a ficha. A <strong>Diferença DS</strong> é{" "}
-            <strong>Custo DS − Custo OEM</strong>, e o sinal é a informação: com{" "}
-            <strong>+</strong>, o cadastro daqui está cobrando custo acima do que a licença cobra
-            e a margem real é <em>melhor</em> do que a ficha mostra; com <strong>−</strong>, está
-            abaixo e a margem real é <em>pior</em>. A <strong>Mensalidade DS</strong> é o
-            <strong> MRR atual</strong> do cliente — a base já com os movimentos vigentes
-            (upsell, cross-sell, downsell e reajuste) —, o mesmo número que a ficha dele mostra
-            em <em>MRR Atual</em>. O <strong>Markup</strong> é essa mensalidade dividida pelo{" "}
-            <strong>Custo OEM</strong>: quantas vezes o que o cliente paga cobre o que a licença
-            custa. O divisor é sempre o do OEM, aqui e na ficha do cliente, porque
-            é ele o valor correto — então, num cliente com Custo DS desatualizado, a conta do
-            markup não fecha com o número da coluna ao lado, e é o Custo DS que está errado. Só
-            entram os clientes com <strong>vínculo confirmado</strong> e licença ativa — sem
-            confirmação, o custo seria atribuído no chute.
+            que a licença cobra de fato. Esta aba é <strong>só leitura</strong>: onde os dois
+            divergem, quem está desatualizado é o cadastro daqui, e a correção acontece na aba{" "}
+            <strong>Divergências</strong>, junto do resto do que aquele cliente tem para resolver.
+            <br /><br />
+            A <strong>Diferença DS</strong> é <strong>Custo DS menos Custo OEM</strong>, e o sinal
+            é a informação: com <strong>+</strong>, o cadastro daqui está cobrando custo acima do
+            que a licença cobra e a margem real é <em>melhor</em> do que a ficha mostra; com{" "}
+            <strong>−</strong>, está abaixo e a margem real é <em>pior</em>. A{" "}
+            <strong>Mensalidade DS</strong> é o <strong>MRR atual</strong> do cliente, a base já
+            com os movimentos vigentes (upsell, cross-sell, downsell e reajuste), o mesmo número
+            que a ficha dele mostra em <em>MRR Atual</em>. O <strong>Markup</strong> é essa
+            mensalidade dividida pelo <strong>Custo OEM</strong>: quantas vezes o que o cliente
+            paga cobre o que a licença custa. O divisor é sempre o do OEM, aqui e na ficha do
+            cliente, porque é ele o valor correto. Num cliente com Custo DS desatualizado, então,
+            a conta do markup não fecha com o número da coluna ao lado, e quem está errado é o
+            Custo DS. Só entram os clientes com <strong>vínculo confirmado</strong> e licença
+            ativa: sem confirmação, o custo seria atribuído no chute.
           </Explica>
 
           <Card>
@@ -1987,22 +1645,19 @@ export default function OemIntegrationTab() {
                   )}
                 </CardDescription>
               </div>
-              {/* Escrever custo em muitas fichas de uma vez pede confirmação
-                  explícita — e o número de fichas afetadas vai nela. Sem nada
-                  marcado o botão não tem alvo, então fica desligado. */}
-              <Button
-                variant="outline"
-                className="gap-2 shrink-0"
-                disabled={atualizandoDs !== null || alvoLote.quantidade === 0}
-                onClick={() => setConfirmandoLote(true)}
-              >
-                {atualizandoDs === "__lote__"
-                  ? <Loader2 className="h-4 w-4 animate-spin" />
-                  : <DownloadCloud className="h-4 w-4" />}
-                {alvoLote.quantidade > 0
-                  ? `Atualizar ${alvoLote.quantidade} selecionado${alvoLote.quantidade > 1 ? "s" : ""}`
-                  : "Atualizar selecionados"}
-              </Button>
+              {/* Corrigir saiu daqui — tabela é retrato, e o mesmo cliente que
+                  está com o custo velho costuma ter outras coisas erradas junto.
+                  O atalho leva para onde tudo dele aparece na mesma linha. */}
+              {custos.divergentes > 0 && (
+                <Button
+                  variant="outline"
+                  className="gap-2 shrink-0"
+                  onClick={() => { setBuscaDiv(""); setAba("pendencias"); }}
+                >
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  Corrigir em Divergências
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               <div className="px-6 pb-3 flex flex-wrap items-center gap-3">
@@ -2015,13 +1670,13 @@ export default function OemIntegrationTab() {
                     onChange={(e) => { setBuscaCusto(e.target.value); setPaginaCusto(0); }}
                   />
                 </div>
-                {/* Mesmo controle da Conferência. O contador vai no rótulo: o
-                    tamanho da fila é a informação, não um detalhe. */}
+                {/* "A corrigir" saiu: corrigir é assunto de Divergências, e um
+                    balde aqui que só serve para olhar convidava a agir no lugar
+                    errado. Sobrou o recorte de leitura. */}
                 <div className="inline-flex rounded-md border p-0.5">
                   {([
                     ["todos", "Todos", custos.lista.length],
-                    ["corrigir", "A corrigir", custos.divergentes],
-                    ["emdia", "Em dia", custos.emDia],
+                    ["emdia", "Sem diferença", custos.emDia],
                   ] as const).map(([v, rot, n]) => (
                     <button
                       key={v}
@@ -2042,21 +1697,6 @@ export default function OemIntegrationTab() {
               <div className="overflow-x-auto">
                 <div className="min-w-[1064px]">
                   <div className="flex items-center gap-3 border-y bg-muted/50 px-6 py-2 text-xs font-medium text-muted-foreground">
-                    {/* Sem nada a corrigir na lista (filtro "Em dia", ou tudo
-                        já igual ao OEM) não há o que marcar — o checkbox fica
-                        desligado em vez de virar clique que não faz nada. */}
-                    <Checkbox
-                      className="shrink-0"
-                      disabled={idsVisiveis.length === 0}
-                      checked={todosVisiveisMarcados ? true : marcadosVisiveis > 0 ? "indeterminate" : false}
-                      onCheckedChange={(v) => alternarTodosVisiveis(v === true)}
-                      aria-label="Marcar todos os clientes a corrigir da lista"
-                      title={idsVisiveis.length === 0
-                        ? "Nenhum cliente desta lista precisa de atualização"
-                        : todosVisiveisMarcados
-                          ? "Desmarcar todos os da lista"
-                          : `Marcar os ${idsVisiveis.length} clientes a corrigir desta lista`}
-                    />
                     {thCusto("cliente", "Cliente", "min-w-0 flex-1")}
                     {thCusto("cnpj", "CNPJ/CPF", "w-40 shrink-0")}
                     {thCusto("custo_ds", <span className="text-emerald-600 dark:text-emerald-400">Custo DS</span>, "w-28 shrink-0", true)}
@@ -2072,7 +1712,7 @@ export default function OemIntegrationTab() {
                       {custos.lista.length === 0
                         ? "Nenhum cliente com vínculo confirmado e licença ativa nesta conta."
                         : filtroCusto === "corrigir" && custos.divergentes === 0
-                          ? "Nenhum cliente a corrigir — todos os custos estão iguais aos do OEM."
+                          ? "Nenhum cliente a corrigir: todos os custos estão iguais aos do OEM."
                           : buscaCusto.trim()
                             ? "Nenhum cliente encontrado para esta busca."
                             : "Nenhum cliente neste filtro."}
@@ -2080,27 +1720,7 @@ export default function OemIntegrationTab() {
                   ) : (
                     <div className="divide-y">
                       {custosPagina.map((c) => (
-                        <div
-                          key={c.id}
-                          className={`flex items-center gap-3 px-6 py-2.5 text-sm ${
-                            selecionados.has(c.id) ? "bg-primary/5" : ""
-                          }`}
-                        >
-                          {/* Cliente em dia não tem caixa de seleção: não há o
-                              que gravar nele, e deixá-lo marcável fazia o botão
-                              prometer atualizações que não aconteceriam. O
-                              espaço continua ocupado para as colunas não
-                              dançarem de uma linha para a outra. */}
-                          {c.divergente ? (
-                            <Checkbox
-                              className="shrink-0"
-                              checked={selecionados.has(c.id)}
-                              onCheckedChange={(v) => alternarUm(c.id, v === true)}
-                              aria-label={`Marcar ${c.cliente}`}
-                            />
-                          ) : (
-                            <span className="h-4 w-4 shrink-0" aria-hidden="true" />
-                          )}
+                        <div key={c.id} className="flex items-center gap-3 px-6 py-2.5 text-sm">
                           <div className="min-w-0 flex-1">
                             <p className="font-medium truncate">{c.cliente}</p>
                             <p className="text-xs text-muted-foreground truncate">
@@ -2132,7 +1752,7 @@ export default function OemIntegrationTab() {
                               : "text-emerald-600 dark:text-emerald-400"
                             }`}
                             title={c.markup == null
-                              ? "Licença sem custo no OEM — não há como calcular"
+                              ? "Licença sem custo no OEM, não há como calcular"
                               : `${brl(c.mensalidade)} ÷ ${brl(c.custo_oem)} (custo do OEM)`}
                           >
                             {c.markup == null ? "—" : num2(c.markup)}
@@ -2162,22 +1782,25 @@ export default function OemIntegrationTab() {
                               ? brl(0)
                               : c.diferenca > 0 ? `+${brl(c.diferenca)}` : brl(c.diferenca)}
                           </span>
+                          {/* Corrigir caso a caso saiu daqui: esta aba virou o
+                              retrato dos dois custos lado a lado, e a correção
+                              acontece em Divergências, junto do resto do que
+                              aquele cliente tem de errado. O lote continua no
+                              topo — ação de massa não cabe na linha de um
+                              cliente só. */}
                           <span className="w-36 shrink-0 flex justify-end">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1.5"
-                              disabled={atualizandoDs !== null || !c.divergente}
-                              title={c.divergente
-                                ? `Gravar ${brl(c.custo_oem)} no custo do produto deste cliente`
-                                : "O custo daqui já é igual ao do OEM"}
-                              onClick={() => atualizarCustoDs(c.filiais, c.cliente, c.id)}
-                            >
-                              {atualizandoDs === c.id
-                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                : <DownloadCloud className="h-3.5 w-3.5" />}
-                              Atualizar DS
-                            </Button>
+                            {c.divergente && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1.5"
+                                title="Abrir este cliente na aba Divergências"
+                                onClick={() => { setBuscaDiv(c.cliente); setAba("pendencias"); }}
+                              >
+                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                                Corrigir
+                              </Button>
+                            )}
                           </span>
                         </div>
                       ))}
@@ -2207,329 +1830,240 @@ export default function OemIntegrationTab() {
           </Card>
         </TabsContent>
 
-        <AlertDialog open={confirmandoLote} onOpenChange={setConfirmandoLote}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>
-                {alvoLote.aGravar > 0
-                  ? `Atualizar o custo de ${alvoLote.aGravar} cliente(s)?`
-                  : `Nenhum dos ${alvoLote.quantidade} marcados precisa de atualização`}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                O custo cadastrado aqui será substituído pelo que o OEM cobra na fatura,
-                em todos os clientes com valor diferente. Isso muda a margem que aparece
-                na ficha de cada um deles. Não há desfazer — o valor anterior não fica
-                guardado em lugar nenhum.
-                <br /><br />
-                {alvoLote.quantidade > alvoLote.aGravar && (
-                  <><br /><br />Dos <strong>{alvoLote.quantidade} marcados</strong>,{" "}
-                  {alvoLote.quantidade - alvoLote.aGravar} já {alvoLote.quantidade - alvoLote.aGravar === 1
-                    ? "está igual ao OEM e não será tocado" : "estão iguais ao OEM e não serão tocados"}.</>
-                )}
-                <br /><br />
-                Licença sem custo no OEM e cliente com mais de um produto ativo são
-                <strong> deixados de fora</strong>, e a tela diz quantos foram.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => atualizarCustoDs(
-                  alvoLote.filiais,
-                  `${alvoLote.quantidade} cliente(s) selecionado(s)`,
-                  "__lote__",
-                )}
-              >
-                Atualizar selecionados
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
         {/* -------------------------------------------------------- pendências */}
         <TabsContent value="pendencias" className="space-y-3">
           <Explica>
-            Tudo nesta aba trata só do que está <strong>vivo dos dois lados</strong>: licença ativa
-            no OEM e cliente não cancelado no DoctorSaaS. Desativado não cobra, e cadastro
-            cancelado não vira vínculo — pedir decisão sobre eles seria trabalho que não muda nada.
-            A exceção é <strong>licença ativa em cliente cancelado</strong>: não é vínculo a
-            fazer, é dinheiro saindo, e por isso tem card próprio logo abaixo — que aparece
-            também quando o número é zero, porque zero ali é o que se quer ver.
+            Uma linha por <strong>cliente</strong>. Clique na seta e ela abre uma linha para cada
+            coisa que está divergindo nele: CNPJ, nome, custo, margem, licença sem código. Cada
+            uma traz ao lado o botão que resolve aquele caso. É aqui que <strong>toda</strong>{" "}
+            correção acontece: as outras abas mostram os números, esta é onde se decide.
             <br /><br />
-            Os dois lados que não se encontraram. À esquerda, <strong>licenças do OEM</strong> que
-            estão sendo cobradas e não têm cliente correspondente no DoctorSaaS — o valor é o
-            custo da licença. À direita, <strong>clientes do DoctorSaaS</strong> que não têm
-            licença nenhuma no OEM — o valor é a mensalidade que eles pagam. Podem ser de outro
-            produto, e nesse caso não é erro.
+            Só entra o que está <strong>vivo dos dois lados</strong>: licença ativa no OEM e
+            cliente não cancelado. A exceção é <strong>licença ativa de cliente cancelado no
+            DS</strong>, que não é vínculo a fazer: é dinheiro saindo, e por isso continua na
+            lista.
           </Explica>
-          {/* Dinheiro, não cadastro: vem antes de tudo nesta aba.
-              E aparece SEMPRE, inclusive zerado — "nenhum" é a resposta que se
-              quer ver aqui, e um card que some quando está tudo bem deixa quem
-              procura sem saber se está tudo bem ou se a tela quebrou. */}
-          {r.pagandoPorCancelado.length === 0 ? (
-            <Card className="border-emerald-500/40">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Nenhuma licença ativa em cliente cancelado
-                </CardTitle>
-                <CardDescription>
-                  Não há licença sendo cobrada no OEM para cliente que já cancelou no DoctorSaaS —
-                  o vazamento mais caro que esta integração consegue enxergar está zerado. Se
-                  aparecer alguma, ela entra aqui com o custo mensal somado.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          ) : (
-            <Card className="border-destructive/50">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2 text-destructive">
-                  <TrendingDown className="h-4 w-4" />
-                  {r.pagandoPorCancelado.length} licenças ativas de clientes cancelados —{" "}
-                  {brl(r.pagandoPorCancelado.reduce((a, l) => a + Number(l.custo_oem || 0), 0))}/mês
-                </CardTitle>
-                <CardDescription>
-                  A licença continua <strong>ativa e sendo cobrada no OEM</strong>, mas o cliente
-                  está <strong>cancelado no DoctorSaaS</strong> — receita zero, custo cheio. Aqui
-                  não há vínculo a fazer: a saída é <strong>pedir a desativação no portal do
-                  OEM</strong>. O DoctorSaaS não escreve no OEM, então isso é feito lá e some desta
-                  lista na próxima atualização do espelho.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y border-t max-h-96 overflow-y-auto">
-                  {filtra(r.pagandoPorCancelado).map((l) => (
-                    <div key={l.id} className="flex items-center gap-3 px-6 py-2.5 text-sm">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{l.razao_oem ?? l.razao_ds}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          filial {l.filial_codigo} · grupo {l.empresa_codigo}
-                          {l.razao_ds && <> · cliente {l.razao_ds}</>}
-                        </p>
-                      </div>
-                      <span className="tabular-nums font-medium text-destructive w-24 text-right">
-                        {brl(l.custo_oem)}
-                      </span>
-                      <Button size="sm" variant="ghost" className="gap-1.5 shrink-0"
-                        disabled={!l.ds_customer_id}
-                        onClick={() => navigate(`/clientes/${l.ds_customer_id}`)}>
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        Abrir ficha
-                      </Button>
-                    </div>
-                  ))}
+
+          {/* Licença que ainda não é de ninguém: não tem cliente para entrar
+              embaixo, e inventar um só para uniformizar esconderia que ela
+              ainda não foi decidida. Recolhido por padrão — são mais de cem, e
+              aberto ele empurrava a lista de clientes para fora da tela. */}
+          {divergencias.semDono.length > 0 && (
+            <Card className="border-amber-500/40">
+              <button
+                type="button"
+                onClick={() => setSemDonoAberto((v) => !v)}
+                className="flex w-full items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
+              >
+                <ChevronRight
+                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${semDonoAberto ? "rotate-90" : ""}`}
+                />
+                <HelpCircle className="h-4 w-4 shrink-0 text-amber-500" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-amber-500">
+                    {divergencias.semDono.length} licenças sem cliente no DoctorSaaS
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Ativas e sendo cobradas no OEM, e nenhum cadastro daqui é o dono delas ·{" "}
+                    {brl(divergencias.semDono.reduce((a, { l }) => a + Number(l.custo_oem || 0), 0))}/mês
+                  </p>
                 </div>
-              </CardContent>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {semDonoAberto ? "recolher" : "ver lista"}
+                </span>
+              </button>
+              {semDonoAberto && (
+                <CardContent className="p-0">
+                  <div className="divide-y border-t max-h-80 overflow-y-auto">
+                    {divergencias.semDono.map(({ l, escolher }) => (
+                      <div key={l.id} className="flex items-center gap-3 p-3 text-sm">
+                        <HelpCircle className="h-4 w-4 shrink-0 text-amber-500" />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">{l.razao_oem ?? "—"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            filial {l.filial_codigo} · grupo {l.empresa_codigo} · CNPJ {l.cnpj_norm}
+                            {escolher && l.qtd_candidatos_ds
+                              ? ` · ${l.qtd_candidatos_ds} candidatos` : ""}
+                          </p>
+                          {l.observacao && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">{l.observacao}</p>
+                          )}
+                        </div>
+                        <span className="tabular-nums text-muted-foreground w-24 text-right shrink-0">
+                          {brl(Number(l.custo_oem || 0))}
+                        </span>
+                        <Button size="sm" variant="secondary" className="gap-1.5 shrink-0"
+                          onClick={() => setEscolhendo(l)}>
+                          <Link2 className="h-3.5 w-3.5" /> Escolher cliente
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              )}
             </Card>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  {r.semCliente.length} filiais ativas sem cliente
-                </CardTitle>
-                <CardDescription className="flex items-center gap-1.5">
-                  <Origem lado="oem" /> valor = custo da licença
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0 max-h-80 overflow-y-auto">
-                <div className="divide-y">
-                  {r.semCliente.map((l) => (
-                    <div key={l.id} className="flex items-center gap-3 px-6 py-2 text-sm">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate">{l.razao_oem}</p>
-                        <p className="text-xs text-muted-foreground">filial {l.filial_codigo} · CNPJ {l.cnpj_norm}</p>
-                      </div>
-                      <span className="tabular-nums text-muted-foreground">{brl(l.custo_oem)}</span>
-                      {/* Não casou por CNPJ, mas o cliente pode existir com
-                          outro CNPJ — a busca livre do diálogo resolve. */}
-                      <Button size="sm" variant="ghost" onClick={() => setEscolhendo(l)}>
-                        Vincular
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Link2 className="h-4 w-4 text-muted-foreground" />
-                  {r.soNoDs.length} clientes ativos sem licença
-                </CardTitle>
-                <CardDescription className="flex items-center gap-1.5">
-                  <Origem lado="ds" /> valor = mensalidade do cliente
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0 max-h-80 overflow-y-auto">
-                <div className="divide-y">
-                  {/* Corte de 200 para não montar milhares de linhas de DOM.
-                      Cortar em silêncio é que não pode: o rodapé diz quantas
-                      ficaram de fora. */}
-                  {r.soNoDs.slice(0, 200).map((l) => (
-                    <div key={l.id} className="flex items-center gap-3 px-6 py-2 text-sm">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate">{l.razao_ds}</p>
-                        <p className="text-xs text-muted-foreground">CNPJ {l.cnpj_norm ?? "—"}</p>
-                      </div>
-                      <span className="tabular-nums text-muted-foreground">{brl(l.mensalidade_ds)}</span>
-                    </div>
-                  ))}
-                </div>
-                {r.soNoDs.length > 200 && (
-                  <p className="border-t px-6 py-2 text-xs text-muted-foreground">
-                    Mostrando os 200 primeiros — outros {r.soNoDs.length - 200} não estão nesta lista.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* O código do OEM só chega à ficha do cliente quando o cadastro
-              comporta. O que não chegou é buraco de cadastro, e some da vista
-              se ficar só no relatório de quem rodou a migration. */}
-          {/* Zerado, este card VIRA a boa notícia em vez de sumir. Card que
-              desaparece quando está tudo certo é indistinguível de tela
-              quebrada — foi o que fez o Alexandre perguntar "os demais
-              sumiram, por quê?" depois de a trava 1:1 esvaziar os baldes. */}
-          {r.semCodigo.multiplas.length === 0 && r.semCodigo.semProduto.length === 0
-            && r.semCodigo.variosProdutos.length === 0 && r.semCodigo.outroMotivo.length === 0 ? (
-            <Card className="border-emerald-500/40">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Todos os vínculos gravaram o código na ficha do cliente
-                </CardTitle>
-                <CardDescription>
-                  Os {r.semCodigo.gravados} vínculos em escopo têm o par grupo · filial gravado no
-                  produto do cliente — é essa chave que segura a ligação quando o CNPJ muda de um
-                  lado. O que ainda precisa de gente está em <strong>Escolher candidato</strong>,
-                  não aqui.
-                  {r.semCodigo.foraDeEscopo > 0 && (
-                    <> Outros <strong>{r.semCodigo.foraDeEscopo}</strong> ficam de fora da conta:
-                    licenças desativadas no OEM ou de clientes cancelados.</>
-                  )}
-                </CardDescription>
-              </CardHeader>
-            </Card>
+          {divergencias.lista.length === 0 ? (
+            <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
+              Nenhum cliente com divergência. Se você ainda não clicou em{" "}
+              <strong>Atualizar espelho</strong> depois de gravar os códigos, a conferência ainda
+              não rodou nenhuma vez.
+            </CardContent></Card>
           ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  {r.semCodigo.total - r.semCodigo.gravados} licenças vinculadas sem código na
-                  ficha do cliente
-                </CardTitle>
-                <CardDescription>
-                  {r.semCodigo.gravados} de {r.semCodigo.total} vínculos já gravaram o par
-                  grupo · filial no produto do cliente. Os demais não gravaram por um destes dois
-                  motivos — em nenhum dos dois o sistema deve escolher sozinho.
-                  {r.semCodigo.foraDeEscopo > 0 && (
-                    <> Outros <strong>{r.semCodigo.foraDeEscopo}</strong> ficaram de fora da conta:
-                    são licenças desativadas no OEM ou de clientes cancelados no DoctorSaaS, e não
-                    se pede vínculo para cadastro morto — desativado não cobra.</>
-                  )}
-                </CardDescription>
-                <div className="pt-2">
-                  <div className="relative max-w-sm">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Buscar por nome, CNPJ ou código" className="pl-8"
-                      value={busca} onChange={(e) => { setBusca(e.target.value); setPagina(0); }} />
-                  </div>
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative max-w-sm flex-1 min-w-[16rem]">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Buscar cliente por nome ou CNPJ" className="pl-8"
+                    value={buscaDiv} onChange={(e) => setBuscaDiv(e.target.value)} />
                 </div>
-              </CardHeader>
-              <CardContent className="grid gap-3 lg:grid-cols-2">
-                <ListaSemCodigo
-                  titulo="Mais de uma filial no mesmo cliente"
-                  itens={filtra(r.semCodigo.multiplas)}
-                  total={r.semCodigo.multiplas.length}
-                  acao={(l) => (
-                    <div className="flex items-center gap-1.5">
-                      <Button size="sm" variant="secondary" className="gap-1.5"
-                        disabled={confirmando === l.id} onClick={() => confirmar(l)}>
-                        {confirmando === l.id
-                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          : <CheckCircle2 className="h-3.5 w-3.5" />}
-                        É esta
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setEscolhendo(l)}>
-                        Outro cliente
-                      </Button>
+                <p className="text-sm text-muted-foreground">
+                  <strong>{divergenciasVisiveis.length}</strong> clientes ·{" "}
+                  <strong>{divergenciasVisiveis.reduce((a, c) => a + c.itens.length, 0)}</strong>{" "}
+                  divergências
+                </p>
+              </div>
+
+              <div className="rounded-md border divide-y">
+                {divergenciasVisiveis.map((c) => {
+                  const aberto = clienteAberto === c.id;
+                  const graves = c.itens.filter((i) => i.grave).length;
+                  return (
+                    <div key={c.id}>
+                      <button
+                        type="button"
+                        // A linha inteira abre: mirar a seta de 16px é o tipo de
+                        // precisão que não se pede a quem está com pressa.
+                        onClick={() => setClienteAberto(aberto ? null : c.id)}
+                        className="flex w-full items-center gap-3 p-3 text-left text-sm hover:bg-muted/50 transition-colors"
+                      >
+                        <ChevronRight
+                          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${aberto ? "rotate-90" : ""}`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">{c.nome}</p>
+                          {c.cnpj && <p className="text-xs text-muted-foreground">CNPJ {c.cnpj}</p>}
+                        </div>
+                        {graves > 0 && (
+                          <Badge variant="destructive" className="shrink-0">
+                            {graves} grave{graves > 1 ? "s" : ""}
+                          </Badge>
+                        )}
+                        {c.itens.length > 0 && (
+                          <Badge variant="outline" className="shrink-0">
+                            {c.itens.length} divergência{c.itens.length > 1 ? "s" : ""}
+                          </Badge>
+                        )}
+                        {/* Decisão não é pendência: entra com selo próprio, em
+                            verde, para não somar ao que ainda precisa de gente. */}
+                        {c.decisoes.length > 0 && (
+                          <Badge variant="outline" className="shrink-0 border-emerald-600/40 text-emerald-600 dark:text-emerald-500">
+                            {c.decisoes.length} decidida{c.decisoes.length > 1 ? "s" : ""} à mão
+                          </Badge>
+                        )}
+                      </button>
+
+                      {aberto && (
+                        <div className="divide-y border-t bg-muted/20">
+                          {c.itens.map((i) => (
+                            <div key={i.chave} className="flex items-start gap-3 py-2.5 pl-10 pr-3 text-sm">
+                              <AlertTriangle
+                                className={`h-4 w-4 shrink-0 mt-0.5 ${i.grave ? "text-destructive" : "text-amber-500"}`}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium">{i.rotulo}</p>
+                                <p className="text-xs text-muted-foreground">{i.detalhe}</p>
+                              </div>
+                              <div className="shrink-0 flex items-center gap-1.5">
+                                {/* Cada divergência tem UM caminho de saída, e é
+                                    ele que vira botão. Onde a saída é fora do
+                                    sistema — desativar a licença no portal do
+                                    OEM — o botão leva à ficha, que é de onde a
+                                    pessoa tira o número da filial. */}
+                                {i.tipo === "custo" && i.custo && (
+                                  <Button size="sm" variant="secondary" className="gap-1.5"
+                                    disabled={atualizandoDs === i.custo.id}
+                                    onClick={() => atualizarCustoDs(i.custo!.filiais, i.custo!.cliente, i.custo!.id)}>
+                                    {atualizandoDs === i.custo.id
+                                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      : <RefreshCw className="h-3.5 w-3.5" />}
+                                    Ajustar custo
+                                  </Button>
+                                )}
+                                {(i.tipo === "cnpj" || i.tipo === "nome") && i.linha && (
+                                  <>
+                                    <Button size="sm" variant="secondary" className="gap-1.5"
+                                      onClick={() => setEscolhendo(i.linha!)}>
+                                      <Link2 className="h-3.5 w-3.5" /> Trocar cliente
+                                    </Button>
+                                    <Button size="sm" variant="ghost"
+                                      disabled={desfazendo === i.linha.id}
+                                      onClick={() => desvincular(i.linha!.id)}>
+                                      {desfazendo === i.linha.id
+                                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        : "Desfazer"}
+                                    </Button>
+                                  </>
+                                )}
+                                {i.tipo === "sem_codigo" && i.linha && (
+                                  <Button size="sm" variant="secondary" className="gap-1.5"
+                                    onClick={() => navigate(`/clientes/${c.id}`)}>
+                                    <ExternalLink className="h-3.5 w-3.5" /> Ajustar na ficha
+                                  </Button>
+                                )}
+                                {(i.tipo === "margem" || i.tipo === "sem_licenca"
+                                  || i.tipo === "licenca_cancelado") && (
+                                  <Button size="sm" variant="ghost" className="gap-1.5"
+                                    onClick={() => navigate(`/clientes/${c.id}`)}>
+                                    <ExternalLink className="h-3.5 w-3.5" /> Abrir ficha
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+
+                          {/* O vínculo que alguém escolheu à mão. Fica aqui pelo
+                              Desfazer: sem o caminho de volta, um clique errado
+                              vira vínculo permanente — a sincronização preserva
+                              a escolha errada exatamente como preservaria a
+                              certa. */}
+                          {c.decisoes.map((l) => (
+                            <div key={`dec:${l.id}`} className="flex items-start gap-3 py-2.5 pl-10 pr-3 text-sm">
+                              <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium">
+                                  {l.status_usuario === "ignorado"
+                                    ? "Licença ignorada à mão, não vira cliente"
+                                    : "Vínculo escolhido à mão"}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {l.razao_oem ?? "—"}
+                                  {l.filial_codigo && ` · filial ${l.filial_codigo}`}
+                                  {l.resolvido_em &&
+                                    ` · ${new Date(l.resolvido_em).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`}
+                                  {" · sobrevive às próximas sincronizações"}
+                                </p>
+                              </div>
+                              <Button
+                                size="sm" variant="ghost" className="gap-1.5 shrink-0"
+                                disabled={desfazendo === l.id}
+                                onClick={() => desvincular(l.id)}
+                              >
+                                {desfazendo === l.id
+                                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  : <Undo2 className="h-3.5 w-3.5" />}
+                                Desfazer
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                  explica={<>
-                    A regra é <strong>1 filial = 1 cliente</strong>. Aqui várias licenças apontam
-                    para o mesmo cadastro, então gravar o código escolheria uma no chute. Ou faltam
-                    cadastros de cliente, ou o casamento automático por CNPJ errou. O caminho é
-                    criar o cadastro que falta e vincular cada filial ao seu.
-                  </>}
-                />
-                <ListaSemCodigo
-                  titulo="Cliente sem produto ativo"
-                  itens={filtra(r.semCodigo.semProduto)}
-                  total={r.semCodigo.semProduto.length}
-                  // Aqui não há o que decidir nesta tela: falta lançar o produto
-                  // na ficha. O botão leva para lá em vez de fingir uma ação.
-                  acao={(l) => (
-                    <Button size="sm" variant="secondary" className="gap-1.5"
-                      disabled={!l.ds_customer_id}
-                      onClick={() => navigate(`/clientes/${l.ds_customer_id}`)}>
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      Abrir ficha
-                    </Button>
-                  )}
-                  explica={<>
-                    A licença é cobrada no OEM, mas o cliente não tem nenhuma linha de produto
-                    ativa no DoctorSaaS — não há onde gravar o código, nem de onde sair o custo. O
-                    caminho é lançar o produto na ficha do cliente; o código entra na próxima
-                    atualização do espelho.
-                  </>}
-                />
-                {r.semCodigo.variosProdutos.length > 0 && (
-                  <ListaSemCodigo
-                    titulo="Cliente com mais de um produto ativo"
-                    itens={filtra(r.semCodigo.variosProdutos)}
-                    total={r.semCodigo.variosProdutos.length}
-                    acao={(l) => (
-                      <Button size="sm" variant="secondary" className="gap-1.5"
-                        disabled={!l.ds_customer_id}
-                        onClick={() => navigate(`/clientes/${l.ds_customer_id}`)}>
-                        <ExternalLink className="h-3.5 w-3.5" /> Abrir ficha
-                      </Button>
-                    )}
-                    explica={<>
-                      O cliente tem mais de uma linha de produto ativa e não dá para saber em qual
-                      gravar o código. O caminho é inativar o produto que não vale mais, ou dizer
-                      qual é o do OEM abrindo a ficha.
-                    </>}
-                  />
-                )}
-                {r.semCodigo.outroMotivo.length > 0 && (
-                  <ListaSemCodigo
-                    titulo="Ainda não gravado"
-                    itens={filtra(r.semCodigo.outroMotivo)}
-                    total={r.semCodigo.outroMotivo.length}
-                    acao={(l) => (
-                      <Button size="sm" variant="secondary" className="gap-1.5"
-                        disabled={confirmando === l.id} onClick={() => confirmar(l)}>
-                        {confirmando === l.id
-                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          : <CheckCircle2 className="h-3.5 w-3.5" />}
-                        Gravar agora
-                      </Button>
-                    )}
-                    explica={<>
-                      Vínculo único e cliente com um produto ativo — não há impedimento nenhum. São
-                      vínculos criados depois do último “Atualizar espelho”: o código entra sozinho
-                      na próxima carga, e o botão adianta caso a caso.
-                    </>}
-                  />
-                )}
-              </CardContent>
-            </Card>
+                  );
+                })}
+              </div>
+            </>
           )}
         </TabsContent>
       </Tabs>

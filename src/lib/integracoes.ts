@@ -49,7 +49,7 @@ export const INTEGRACOES_CATALOGO: GrupoIntegracoes[] = [
       {
         id: "oem",
         nome: "PDV Legal (OEM)",
-        descricao: "Licenças do PDV Legal/TabletCloud: vínculo com clientes, margem e pendências.",
+        descricao: "Licenças do PDV Legal/TabletCloud: vínculo com clientes, custo e divergências.",
         section: "integracoes-oem",
         resource: "cfg.integracoes_omie",
       },
