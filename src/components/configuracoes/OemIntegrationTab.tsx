@@ -130,7 +130,7 @@ type CustoSort = "cliente" | "cnpj" | "custo_ds" | "mensalidade" | "markup" | "c
 
 function Numero({
   valor, rotulo, sub, tom = "normal",
-}: { valor: string; rotulo: string; sub?: string; tom?: "normal" | "bom" | "alerta" | "ruim" }) {
+}: { valor: string; rotulo: string; sub?: React.ReactNode; tom?: "normal" | "bom" | "alerta" | "ruim" }) {
   const cor =
     tom === "bom" ? "text-emerald-600 dark:text-emerald-400"
     : tom === "alerta" ? "text-amber-600 dark:text-amber-400"
@@ -525,6 +525,47 @@ export default function OemIntegrationTab() {
     () => new Map(produtosDs.map((p) => [p.id, p.nome])),
     [produtosDs],
   );
+
+  // Os produtos do DoctorSaaS que representam a licença do OEM. Sem vínculo
+  // não há o que comparar — e é por isso que a contagem abaixo fica desligada
+  // em vez de mostrar zero, que se leria como "nenhum contrato".
+  const produtosOemIds = useMemo(
+    () => [...new Set(vinculos.map((v) => v.produto_id))],
+    [vinculos],
+  );
+
+  // CONTRATOS ATIVOS DO LADO DAQUI, na mesma régua das licenças ativas do OEM.
+  //
+  // Só conta contrato que tenha item de um produto vinculado ao OEM: contar
+  // todo contrato do cliente somaria o sistema fiscal de quem também tem PDV, e
+  // o número deixaria de ser comparável com as filiais ativas — que é a única
+  // razão de ele estar nesse card.
+  //
+  // A conta é feita no servidor (`head` + count exato): são ~3.700 contratos e
+  // trazer as linhas para contar no navegador seria egress por nada. O `!inner`
+  // não duplica o contrato que tem dois itens do mesmo produto — verificado no
+  // PostgREST local com um contrato de 2 itens: veio 1.
+  const { data: contratosOem, isLoading: contratosOemCarregando } = useQuery({
+    queryKey: ["oem-contratos-ativos-ds", tid, conta?.id, produtosOemIds.join(",")],
+    enabled: !!tid && produtosOemIds.length > 0,
+    queryFn: async () => {
+      let q = (supabase.from("contratos" as any) as any)
+        .select(
+          "id, contrato_itens!inner(cliente_produtos!inner(produto_id)), clientes!inner(unidade_base_id)",
+          { count: "exact", head: true },
+        )
+        .eq("tenant_id", tid)
+        .eq("status", "ativo")
+        .in("contrato_itens.cliente_produtos.produto_id", produtosOemIds);
+      // Conta com unidade definida enxerga só as unidades dela — o mesmo
+      // recorte que separa as filiais de uma conta das da outra.
+      const unidadesDaConta = conta?.unidades_base_ids ?? [];
+      if (unidadesDaConta.length) q = q.in("clientes.unidade_base_id", unidadesDaConta);
+      const { count, error } = await q;
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
 
   // Monta a grade módulo × produto, que é como o portal mostra e como se lê a
   // regra comercial: a mesma linha (o módulo) custa diferente em cada coluna
@@ -1458,13 +1499,65 @@ export default function OemIntegrationTab() {
             última atualização do espelho encontrou.
           </Explica>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Numero valor={String(r.filiais)} rotulo="Filiais no OEM" sub={`${r.ativas} ativas`} />
+            <Numero
+              valor={String(r.filiais)}
+              rotulo="Filiais no OEM"
+              sub={
+                <>
+                  {r.ativas} ativas
+                  {/* O contraponto do lado daqui. Fica no mesmo card porque a
+                      pergunta é uma só: o que o OEM cobra tem contrato aqui? */}
+                  <span className="mt-1.5 block border-t border-border/60 pt-1.5">
+                    {produtosOemIds.length === 0 ? (
+                      "nenhum produto vinculado ao OEM — sem contrato a comparar"
+                    ) : contratosOemCarregando ? (
+                      "contando contratos ativos no DoctorSaaS…"
+                    ) : contratosOem == null ? (
+                      "não foi possível contar os contratos do DoctorSaaS"
+                    ) : (
+                      <span
+                        title="Contratos com status ativo que têm item de um produto vinculado ao OEM, nas unidades desta conta. Este número é do DoctorSaaS, ao vivo — não vem do espelho."
+                      >
+                        <span className="font-medium text-foreground tabular-nums">
+                          {contratosOem.toLocaleString("pt-BR")}
+                        </span>{" "}
+                        contratos ativos no DoctorSaaS
+                      </span>
+                    )}
+                  </span>
+                </>
+              }
+            />
             <Numero valor={String(r.vinculadas)} rotulo="Vinculadas automaticamente" tom="bom"
               sub={r.ativas ? `${((r.vinculadas / r.ativas) * 100).toFixed(1)}% das ativas` : undefined} />
             <Numero valor={String(r.escolher.length)} rotulo="Aguardando escolha"
               tom={r.escolher.length ? "alerta" : "bom"} sub="CNPJ com mais de um cliente" />
             <Numero valor={brl(r.receita - r.custo)} rotulo="Margem mensal" tom="bom"
-              sub={`${brl(r.receita)} − ${brl(r.custo)}`} />
+              sub={
+                <>
+                  {brl(r.receita)} − {brl(r.custo)}
+                  {/* Mesmo markup da aba Custos: mensalidade ÷ custo do OEM,
+                      como multiplicador. Dois markups com denominadores
+                      diferentes seriam duas respostas para a mesma pergunta. */}
+                  <span className="mt-1.5 block border-t border-border/60 pt-1.5">
+                    markup{" "}
+                    {r.custo > 0 ? (
+                      <span
+                        className={`font-medium tabular-nums ${
+                          r.receita / r.custo < 1
+                            ? "text-destructive"
+                            : "text-emerald-600 dark:text-emerald-400"
+                        }`}
+                        title={`${brl(r.receita)} ÷ ${brl(r.custo)} (custo do OEM)`}
+                      >
+                        {num2(r.receita / r.custo)}×
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </span>
+                </>
+              } />
           </div>
 
           {r.porNome > 0 && (
