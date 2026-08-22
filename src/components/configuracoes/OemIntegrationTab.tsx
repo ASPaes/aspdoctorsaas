@@ -20,7 +20,7 @@ import {
 import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
   Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
-  ArrowUpDown, ArrowUp, ArrowDown, Boxes, Plus,
+  ArrowUpDown, ArrowUp, ArrowDown, Boxes, Plus, CalendarClock,
 } from "lucide-react";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
@@ -69,7 +69,16 @@ type Recon = {
   // Como o vínculo foi achado: codigo (confirmado na ficha) · cnpj · nome
   // (o CNPJ era do grupo e não desempata).
   criterio_match: string | null;
+  // Quando o OEM já agendou a baixa da licença (o "Desativa em: 31/08/2026" do
+  // portal). Null = sem baixa marcada.
+  desativa_em: string | null;
 };
+
+// Hoje em São Paulo, no mesmo formato do `date` do Postgres — assim a
+// comparação é string contra string, sem fuso no meio. `new Date(...)` em cima
+// de "2026-08-31" seria lido como UTC e, no horário de Brasília, viraria dia 30.
+const hojeSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+const dataBR = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
 
 // Uma célula da tabela de preços do parceiro: quanto o módulo custa naquele
 // produto do catálogo. Não tem cliente dentro — é preço de tabela, e é o que
@@ -408,7 +417,7 @@ export default function OemIntegrationTab() {
             "bloqueado_oem, ds_customer_id, razao_ds, mensalidade_ds, cancelado_ds, " +
             "qtd_candidatos_ds, estado_match, acao_sugerida, status_usuario, margem, " +
             "observacao, resolvido_em, cnpj_ds, divergencias, " +
-            "razao_social_oem, razao_social_ds, criterio_match",
+            "razao_social_oem, razao_social_ds, criterio_match, desativa_em",
           )
           .eq("conta_integration_id", conta!.id),
       ),
@@ -618,6 +627,19 @@ export default function OemIntegrationTab() {
     // bloqueado cobra), então também não há custo a reconciliar.
     const vivo = (l: Recon) => l.status_oem === "Ativo" && !l.cancelado_ds;
 
+    // BAIXA JÁ MARCADA NO OEM. Cancelar lá não desliga na hora: a licença fica
+    // ativa até o último dia do mês. Enquanto a data não chega, "ativa no OEM e
+    // cancelada aqui" é o estado CERTO dos dois lados, não uma divergência.
+    // Medido em 22/08/2026: os 13 alertas desse tipo eram todos assim.
+    //
+    // Comparar com hoje, e não guardar um "está ok", é o que faz o alerta
+    // voltar sozinho: passada a data, se o OEM desativou a licença sai das
+    // ativas; se alguém reativou, a data fica no passado e o alarme acende de
+    // novo no dia 1º, sem ninguém precisar rodar nada.
+    const hoje = hojeSP();
+    const baixaMarcada = (l: Recon) =>
+      l.desativa_em && l.desativa_em >= hoje ? l.desativa_em : null;
+
     const ativas = linhas.filter((l) => l.status_oem === "Ativo");
     const comPar = ativas.filter(
       (l) => l.ds_customer_id && l.mensalidade_ds != null && l.custo_oem != null && !l.cancelado_ds,
@@ -679,8 +701,21 @@ export default function OemIntegrationTab() {
       // mais. Ficou fora das listas de decisão pela regra de escopo, e sem um
       // lugar próprio sumiria de vista justamente o caso que custa caro.
       pagandoPorCancelado: ativas
-        .filter((l) => l.filial_codigo && l.cancelado_ds === true)
+        .filter((l) => l.filial_codigo && l.cancelado_ds === true && !baixaMarcada(l))
         .sort((a, b) => Number(b.custo_oem || 0) - Number(a.custo_oem || 0)),
+      // Cancelado aqui e baixa já agendada lá: está tudo certo, e por isso sai
+      // das divergências. Continua visível num bloco próprio porque ainda é
+      // dinheiro saindo até a data — quem confere precisa saber quanto e até
+      // quando, sem que isso vire alarme vermelho.
+      baixaProgramada: ativas
+        .filter((l) => l.filial_codigo && l.cancelado_ds === true && baixaMarcada(l))
+        .sort((a, b) => String(a.desativa_em).localeCompare(String(b.desativa_em))),
+      // O CASO INVERSO, que ninguém via: o OEM vai desligar a licença e o
+      // cliente está ativo aqui, pagando. Ou o cancelamento foi feito só lá, ou
+      // a licença vai cair na cara do cliente. Medido em 22/08/2026: 8 filiais.
+      desativaComClienteAtivo: ativas
+        .filter((l) => l.filial_codigo && l.ds_customer_id && !l.cancelado_ds && baixaMarcada(l))
+        .sort((a, b) => String(a.desativa_em).localeCompare(String(b.desativa_em))),
       semCliente: ativas.filter((l) => l.estado_match === "SO_NO_OEM" && l.status_usuario === "novo"),
       soNoDs: linhas.filter((l) => l.estado_match === "SO_NO_DS" && !l.cancelado_ds),
       // Vínculo existe mas o código não chegou à ficha do cliente. São dois
@@ -909,6 +944,17 @@ export default function OemIntegrationTab() {
           A desativação é pedida no portal do OEM</>,
       });
     }
+    for (const l of r.desativaComClienteAtivo) {
+      if (!l.ds_customer_id) continue;
+      doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? l.cnpj_norm ?? null).itens.push({
+        chave: `desativa:${l.id}`, tipo: "desativa_ativo", grave: true, linha: l,
+        rotulo: "OEM vai desativar a licença, e o cliente está ativo aqui",
+        detalhe: <>filial {l.filial_codigo} · sai em{" "}
+          <strong className="text-destructive">{dataBR(l.desativa_em!)}</strong> ·
+          mensalidade {brl(Number(l.mensalidade_ds || 0))}. Ou o cancelamento foi feito só no
+          OEM, ou o cliente vai perder o sistema na data</>,
+      });
+    }
     for (const l of r.soNoDs) {
       if (!l.ds_customer_id) continue;
       doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? null).itens.push({
@@ -968,6 +1014,9 @@ export default function OemIntegrationTab() {
     return {
       lista,
       semDono,
+      // Fora do `total` de propósito: baixa combinada não é pendência, e contar
+      // coisa resolvida no selo da aba é o alarme que ensina a ignorar a tela.
+      programadas: r.baixaProgramada,
       total: lista.reduce((a, c) => a + c.itens.length, 0) + semDono.length,
     };
   }, [r, custos]);
@@ -979,6 +1028,7 @@ export default function OemIntegrationTab() {
   // Recolhido por padrão: são mais de cem licenças, e abertas elas empurram a
   // lista de clientes — que é o assunto da aba — para fora da primeira tela.
   const [semDonoAberto, setSemDonoAberto] = useState(false);
+  const [programadasAberto, setProgramadasAberto] = useState(false);
   const [buscaDiv, setBuscaDiv] = useState("");
   const divergenciasVisiveis = useMemo(() => {
     const q = buscaDiv.trim().toLowerCase();
@@ -1841,7 +1891,9 @@ export default function OemIntegrationTab() {
             Só entra o que está <strong>vivo dos dois lados</strong>: licença ativa no OEM e
             cliente não cancelado. A exceção é <strong>licença ativa de cliente cancelado no
             DS</strong>, que não é vínculo a fazer: é dinheiro saindo, e por isso continua na
-            lista.
+            lista. Se a baixa já estiver <strong>agendada no OEM</strong>, ela sai daqui e vai
+            para o bloco de desativações programadas: até a data, ativa lá e cancelada aqui é o
+            estado certo.
           </Explica>
 
           {/* Licença que ainda não é de ninguém: não tem cliente para entrar
@@ -1896,6 +1948,64 @@ export default function OemIntegrationTab() {
                           onClick={() => setEscolhendo(l)}>
                           <Link2 className="h-3.5 w-3.5" /> Escolher cliente
                         </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )}
+
+          {/* Cancelamento que já foi feito nos dois lados e só espera a data do
+              OEM. Não é alarme — é o extrato do que ainda vai ser cobrado até
+              a baixa cair. Fica em cinza e fora do selo da aba de propósito. */}
+          {divergencias.programadas.length > 0 && (
+            <Card>
+              <button
+                type="button"
+                onClick={() => setProgramadasAberto((v) => !v)}
+                className="flex w-full items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
+              >
+                <ChevronRight
+                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${programadasAberto ? "rotate-90" : ""}`}
+                />
+                <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">
+                    {divergencias.programadas.length} licença{divergencias.programadas.length > 1 ? "s" : ""}{" "}
+                    com desativação já programada no OEM
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Cancelado aqui e baixa já agendada lá: está certo, e segue cobrando até a data ·{" "}
+                    {brl(divergencias.programadas.reduce((a, l) => a + Number(l.custo_oem || 0), 0))}/mês
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {programadasAberto ? "recolher" : "ver lista"}
+                </span>
+              </button>
+              {programadasAberto && (
+                <CardContent className="p-0">
+                  <div className="divide-y border-t max-h-80 overflow-y-auto">
+                    {divergencias.programadas.map((l) => (
+                      <div key={l.id} className="flex items-center gap-3 p-3 text-sm">
+                        <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">{l.razao_ds ?? l.razao_oem ?? "—"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            filial {l.filial_codigo} · grupo {l.empresa_codigo} · desativa em{" "}
+                            <strong>{dataBR(l.desativa_em!)}</strong>
+                          </p>
+                        </div>
+                        <span className="tabular-nums text-muted-foreground w-24 text-right shrink-0">
+                          {brl(Number(l.custo_oem || 0))}
+                        </span>
+                        {l.ds_customer_id && (
+                          <Button size="sm" variant="ghost" className="gap-1.5 shrink-0"
+                            onClick={() => navigate(`/clientes/${l.ds_customer_id}`)}>
+                            <ExternalLink className="h-3.5 w-3.5" /> Abrir ficha
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -2013,7 +2123,8 @@ export default function OemIntegrationTab() {
                                   </Button>
                                 )}
                                 {(i.tipo === "margem" || i.tipo === "sem_licenca"
-                                  || i.tipo === "licenca_cancelado") && (
+                                  || i.tipo === "licenca_cancelado"
+                                  || i.tipo === "desativa_ativo") && (
                                   <Button size="sm" variant="ghost" className="gap-1.5"
                                     onClick={() => navigate(`/clientes/${c.id}`)}>
                                     <ExternalLink className="h-3.5 w-3.5" /> Abrir ficha
