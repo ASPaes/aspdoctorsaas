@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { processInboundMessage } from '../_shared/message-processor.ts';
-import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets, UNSUPPORTED_MESSAGE_LABEL } from '../_shared/message-types.ts';
+import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets } from '../_shared/message-types.ts';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
 import { applyDeliveryStatus } from '../_shared/apply-delivery-status.ts';
 import { normalizeBRPhone } from '../_shared/phone.ts';
@@ -11,6 +11,17 @@ const corsHeaders = {
 };
 
 const LOG = '[meta-webhook]';
+
+// Rotulo do que a Cloud API se recusa a entregar. Deliberadamente diferente do
+// UNSUPPORTED_MESSAGE_LABEL do _shared: aqui a gente sabe QUEM recusou (a Meta) e da
+// um norte do que provavelmente era, senao o atendente fica so com 'nao suportada' e
+// nenhuma acao possivel. Mora aqui, e nao no _shared, porque mexer la deploya todas.
+// Sem numeracao e sem 'escolha uma opcao': isLikelyThirdPartyURA leria o rotulo como
+// menu de URA de terceiro e mudaria o fluxo do atendimento.
+const META_UNSUPPORTED_LABEL =
+  '\u{1F4CE} Mensagem n\u{E3}o suportada pelo WhatsApp Oficial\n' +
+  'O cliente enviou algo que a API da Meta n\u{E3}o entrega \u{2014} visualiza\u{E7}\u{E3}o \u{FA}nica, ' +
+  'enquete, localiza\u{E7}\u{E3}o ao vivo ou recurso novo do app. Pe\u{E7}a para ele reenviar de outro jeito.';
 
 // === Validacao de assinatura X-Hub-Signature-256 ===
 async function verifyMetaSignature(rawBody: string, signatureHeader: string | null, appSecret: string): Promise<boolean> {
@@ -54,9 +65,9 @@ function mapMessageType(msg: any): NormalizedInboundMessage['messageType'] {
 // porque todo tipo fora da lista caia no `return '';` do final. A evolution-webhook ja
 // resolve isso ha tempos com UNSUPPORTED_MESSAGE_LABEL.
 function extractContent(msg: any): string {
-  if (!msg) return UNSUPPORTED_MESSAGE_LABEL;
+  if (!msg) return META_UNSUPPORTED_LABEL;
   const t = msg.type;
-  if (t === 'text') return msg.text?.body || UNSUPPORTED_MESSAGE_LABEL;
+  if (t === 'text') return msg.text?.body || META_UNSUPPORTED_LABEL;
   if (t === 'image') return msg.image?.caption || '\u{1F4F7} Imagem';
   if (t === 'video') return msg.video?.caption || '\u{1F3A5} V\u{ED}deo';
   if (t === 'audio') return '\u{1F3B5} \u{C1}udio';
@@ -64,7 +75,7 @@ function extractContent(msg: any): string {
   if (t === 'sticker') return '\u{1F3A8} Sticker';
   if (t === 'contacts') { const c = msg.contacts?.length || 0; return `\u{1F464} ${c} contato${c !== 1 ? 's' : ''}`; }
   if (t === 'location') return `\u{1F4CD} Localiza\u{E7}\u{E3}o: ${msg.location?.latitude},${msg.location?.longitude}`;
-  if (t === 'reaction') return msg.reaction?.emoji || UNSUPPORTED_MESSAGE_LABEL;
+  if (t === 'reaction') return msg.reaction?.emoji || META_UNSUPPORTED_LABEL;
   // Resposta interativa: o texto E a escolha do cliente, nao um rotulo.
   if (t === 'interactive') {
     const i = msg.interactive || {};
@@ -76,7 +87,7 @@ function extractContent(msg: any): string {
   if (t === 'system') return msg.system?.body || '\u{2699}\u{FE0F} Evento do WhatsApp';
   // `unsupported`, `request_welcome` e qualquer tipo novo da Meta caem aqui: o rotulo
   // aparece no chat e o tipo real vai para metadata logo apos o insert (ver processMessage).
-  return UNSUPPORTED_MESSAGE_LABEL;
+  return META_UNSUPPORTED_LABEL;
 }
 
 // === Extract media metadata ===
@@ -315,7 +326,7 @@ Deno.serve(async (req) => {
         // nenhum (o bloco de observability do message-processor le `rawPayload.message`, que
         // so existe no formato Baileys do Evolution). Sem isto nao ha como saber depois do
         // fato o que o cliente mandou — nem pelo banco, nem pelo log.
-        if (normalized.content === UNSUPPORTED_MESSAGE_LABEL) {
+        if (normalized.content === META_UNSUPPORTED_LABEL) {
           console.warn(`${LOG} Tipo nao suportado: type=${msg.type} keys=${Object.keys(msg).join(',')}`);
           const { data: row } = await supabase
             .from('whatsapp_messages').select('id, metadata')
