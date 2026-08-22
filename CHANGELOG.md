@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Agosto / 2026
 
+### 22/08
+
+- 🔧 **Clientes — Módulos** — **Módulo novo já vem com a data de ativação de hoje.** Ao adicionar um módulo, a data de ativação vinha preenchida com a data do produto — muitas vezes anos atrás —, e o módulo entrava valendo desde antes de ter sido vendido. Agora o campo abre com o **dia de hoje**, e continua editável se a ativação foi combinada para outra data. Na edição de um módulo já existente nada muda: continua mostrando a data que está gravada.
+
 ### 21/08
 
 - ⬆️ **Integrações — OEM** — **A Visão geral agora mostra o markup e quantos contratos ativos existem aqui.** O card de licenças ganhou o contraponto do lado do DoctorSaaS: **quantos contratos ativos** temos de produtos vinculados ao OEM, nas unidades daquela conta — é com esse número que a quantidade de licenças ativas faz sentido ser comparada. E a **Margem mensal** passou a mostrar o **markup** (quantas vezes a mensalidade cobre o custo da licença, ex.: *4,04×*), na mesma régua da aba Custos, em verde acima de 1× e vermelho abaixo. Um detalhe que a tela agora explica ao passar o mouse: a contagem de contratos é lida **na hora**, enquanto o resto da aba é o retrato da última atualização do espelho.
