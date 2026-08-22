@@ -47,6 +47,12 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Plus, XCircle, TrendingUp, TrendingDown, ArrowUpDown, AlertCircle, DollarSign, Lock, Rocket } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+// O `TooltipContent` do projeto não é portalizado: o balão nasce dentro da
+// árvore do gatilho e some no `overflow` da tabela e deste diálogo. Envolver com
+// o Portal do Radix leva ele para o fim do body, onde nada o recorta. Fica só
+// aqui de propósito — mexer no componente base mudaria os 38 arquivos que usam
+// tooltip, e não é isso que esta correção se propõe a fazer.
+import { Portal as TooltipPortal } from '@radix-ui/react-tooltip';
 import { cn } from '@/lib/utils';
 
 interface MovimentoMrr {
@@ -923,9 +929,21 @@ export function MovimentosMrrModal({
                                     <Lock className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent className="max-w-xs">
-                                  {motivoDoModulo(m.tipo)}
-                                </TooltipContent>
+                                {/* Abre para a esquerda: o cadeado é a última
+                                    coluna da tabela, e para cima ou para o lado
+                                    direito o balão nasce contra a borda. O
+                                    `collisionPadding` garante a folga quando
+                                    nem à esquerda couber. */}
+                                <TooltipPortal>
+                                  <TooltipContent
+                                    side="left"
+                                    align="center"
+                                    collisionPadding={16}
+                                    className="max-w-xs text-left leading-snug"
+                                  >
+                                    {motivoDoModulo(m.tipo)}
+                                  </TooltipContent>
+                                </TooltipPortal>
                               </Tooltip>
                             ) : (
                               <Button
