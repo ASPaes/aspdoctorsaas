@@ -22,6 +22,7 @@ type Evento = {
   quantidade: number | null;
   origem: string;
   usuario_nome: string | null;
+  usuario_id: string | null;
   motivo: string | null;
   created_at: string;
 };
@@ -52,7 +53,7 @@ export default function HistoricoModulosProduto({ clienteProdutoId }: { clienteP
     enabled: aberto,
     queryFn: async () => {
       const { data, error } = await (supabase.from("cliente_produto_modulo_eventos" as any) as any)
-        .select("id, modulo_nome, acao, quantidade, origem, usuario_nome, motivo, created_at")
+        .select("id, modulo_nome, acao, quantidade, origem, usuario_nome, usuario_id, motivo, created_at")
         .eq("cliente_produto_id", clienteProdutoId)
         .order("created_at", { ascending: false })
         .limit(300);
@@ -113,14 +114,18 @@ export default function HistoricoModulosProduto({ clienteProdutoId }: { clienteP
                         {quando(e.created_at)}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {/* Sem usuário e origem OEM não é lacuna: foi a
-                            sincronização, e dizer "—" faria parecer que alguém
-                            mexeu sem deixar rastro. */}
+                        {/* "Sincronização OEM" é só para o que a máquina fez
+                            sozinha — a carga do espelho. Evento com dono, mesmo
+                            sem nome resolvido, teve gente por trás: dizer que
+                            foi a sincronização mentia sobre quem mexeu na
+                            licença de um cliente. */}
                         {e.usuario_nome
                           ? e.usuario_nome
-                          : e.origem === "oem"
-                            ? "Sincronização OEM"
-                            : "—"}
+                          : e.usuario_id
+                            ? "Usuário sem nome cadastrado"
+                            : e.origem === "oem"
+                              ? "Sincronização OEM"
+                              : "—"}
                       </TableCell>
                       {/* Motivo é opcional e só existe em cancelamento: a
                           coluna fica vazia no resto em vez de repetir traço. */}
