@@ -1505,7 +1505,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                   // A ordem continua a mesma de sempre — OEM primeiro, ficha
                   // depois —, só que agora ela mora numa linha de fila em vez de
                   // acontecer dentro deste clique. Recusa do parceiro fica
-                  // escrita em Integrações › OEM › Fila, com o motivo, em vez de
+                  // escrita em Integrações › OEM › Sincronização, com o motivo, em vez de
                   // sumir junto com este aviso.
                   const { data: filaId, error: errF } = await (supabase.rpc as any)("fn_oem_enfileirar", {
                     p_modulo_linha_id: cancelarModulo.id,
@@ -1557,7 +1557,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                     // está escrito e o cron tenta de novo sozinho.
                     toast({
                       title: "O OEM não aceitou agora — está na fila",
-                      description: `${detalhe} A ficha só muda quando o parceiro aceitar. O motivo está em Integrações › OEM › Fila.`,
+                      description: `${detalhe} A ficha só muda quando o parceiro aceitar. O motivo está em Integrações › OEM › Sincronização.`,
                     });
                   }
                   setCancelarModulo(null);
@@ -2938,7 +2938,7 @@ function ModuloDialog({
             toast({
               variant: "destructive",
               title: "A quantidade não foi ao OEM — o pedido ficou parado na fila",
-              description: `Segue ${qtdAntes} na ficha. O motivo está no selo da linha e em Integrações › OEM › Fila.`,
+              description: `Segue ${qtdAntes} na ficha. O motivo está no selo da linha e em Integrações › OEM › Sincronização.`,
             });
           } else {
             toast({
@@ -3026,12 +3026,12 @@ function ModuloDialog({
             toast({
               variant: "destructive",
               title: "Não foi ao OEM — o pedido ficou parado na fila",
-              description: "O módulo NÃO entrou na ficha. O motivo está no selo da linha e em Integrações › OEM › Fila.",
+              description: "O módulo NÃO entrou na ficha. O motivo está no selo da linha e em Integrações › OEM › Sincronização.",
             });
           } else {
             toast({
               title: "Enviado ao OEM — aguardando confirmação",
-              description: "A ficha só muda quando o parceiro aceitar. O andamento está em Integrações › OEM › Fila.",
+              description: "A ficha só muda quando o parceiro aceitar. O andamento está em Integrações › OEM › Sincronização.",
             });
           }
           onSaved();

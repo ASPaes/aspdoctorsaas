@@ -1249,10 +1249,10 @@ export default function OemIntegrationTab() {
             {custos.divergentes > 0 && <Badge variant="secondary">{custos.divergentes}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="fila" className="gap-1.5">
-            Fila
+            Sincronização
             {filaParada > 0 && <Badge variant="destructive">{filaParada}</Badge>}
           </TabsTrigger>
-          <TabsTrigger value="pendencias">Pendências</TabsTrigger>
+          <TabsTrigger value="pendencias">Divergências</TabsTrigger>
         </TabsList>
 
         {/* --------------------------------------------------------------- fila */}
