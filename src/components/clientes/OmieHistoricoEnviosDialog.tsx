@@ -343,7 +343,7 @@ function HistoricoConteudo({ clienteId, aberto }: Props & { aberto: boolean }) {
 
   return (
     <>
-      <div className="flex items-center justify-end">
+      <div className="flex shrink-0 items-center justify-end">
         {sortedLogs.length > 0 && (
           <Select value={filtro} onValueChange={(v) => setFiltro(v as FiltroTipo)}>
             <SelectTrigger className="w-[180px] h-8 text-xs">
@@ -359,7 +359,7 @@ function HistoricoConteudo({ clienteId, aberto }: Props & { aberto: boolean }) {
           </Select>
         )}
       </div>
-      <div className="mt-3">
+      <div className="min-h-0 flex-1 overflow-hidden">
         {dadosQuery.isLoading || logsQuery.isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-10 w-full" />
@@ -379,7 +379,7 @@ function HistoricoConteudo({ clienteId, aberto }: Props & { aberto: boolean }) {
             Nenhum registro neste filtro.
           </div>
         ) : (
-          <ScrollArea className="h-[min(60vh,520px)] pr-3">
+          <ScrollArea className="h-full pr-3">
             <div className="space-y-3">
               {filteredLogs.map((log, idx) => {
                 const { icon: StatusIcon, badge, label } = statusConfig(log.status);
@@ -459,8 +459,18 @@ export default function OmieHistoricoEnviosButton({ clienteId }: Props) {
       </Button>
 
       <Dialog open={aberto} onOpenChange={setAberto}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        {/*
+          O DialogContent do projeto é `overflow-y-auto` com teto de altura. Com a lista dentro
+          dele, o modal inteiro virava um segundo rolável — e, como o Radix leva o foco para o
+          primeiro campo ao abrir (o filtro), o navegador rolava até lá e o título sumia para fora
+          da tela. Aqui o modal não rola: ele é uma coluna com teto de altura e só a lista rola.
+          O foco fica no próprio diálogo (Esc e Tab seguem funcionando) em vez de no filtro.
+        */}
+        <DialogContent
+          className="max-w-2xl max-h-[85dvh] flex flex-col overflow-hidden"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
               Histórico de envios
