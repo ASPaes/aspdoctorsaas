@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 22/08
 
+- ⬆️ **WhatsApp — Atendimento** — **O atalho de *Tirar regras do chat* saiu do topo da conversa.** Ele ficava no meio dos ícones do cabeçalho, a um clique de distância, e desligar as regras de um número é decisão que não combina com clique de passagem — vale para todas as conversas daquele contato, em qualquer instância. O interruptor continua onde sempre esteve, em **Detalhes**, com a explicação do que ele desliga ao lado. No cabeçalho fica só o atalho de **Não encerrar por inatividade**, que vale apenas para o atendimento aberto.
+
 - 🔧 **Clientes — Módulos** — **Módulo novo já vem com a data de ativação de hoje.** Ao adicionar um módulo, a data de ativação vinha preenchida com a data do produto — muitas vezes anos atrás —, e o módulo entrava valendo desde antes de ter sido vendido. Agora o campo abre com o **dia de hoje**, e continua editável se a ativação foi combinada para outra data. Na edição de um módulo já existente nada muda: continua mostrando a data que está gravada.
 
 ### 21/08
