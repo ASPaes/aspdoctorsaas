@@ -1332,9 +1332,12 @@ async function markHumanFallback(supabase: any, attendanceId: string): Promise<v
   await supabase.from('support_attendances').update({ ura_human_fallback: true, updated_at: new Date().toISOString() }).eq('id', attendanceId);
 }
 
-export async function sendUraWelcome(supabase: any, ctx: SendContext, conversationId: string, contactId: string, tenantId: string, attendanceId: string, supportConfig: any, attendanceCode?: string): Promise<void> {
+export async function sendUraWelcome(supabase: any, ctx: SendContext, conversationId: string, contactId: string, tenantId: string, attendanceId: string, supportConfig: any, attendanceCode?: string, skipMenu: boolean = false): Promise<void> {
   try {
-    const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
+    // skipMenu: o atendimento já tem dono/setor (operador responsável do cliente ou
+    // do contato). Cai no mesmo caminho de quem está com a URA desligada — sem
+    // menu, mas com a mensagem de boas-vindas do setor, que continua fazendo sentido.
+    const uraEnabled = !skipMenu && (supportConfig.support_ura_enabled ?? supportConfig.ura_enabled);
 
     if (!uraEnabled) {
       // URA off: verificar se o setor tem mensagem de boas-vindas
@@ -1574,11 +1577,15 @@ export async function ensureAttendanceForIncomingMessage(supabase: any, conversa
       return;
     }
     const newStatus = skipUra ? 'in_progress' : 'waiting';
-    const { data: newAtt, error } = await supabase.from('support_attendances').insert({ tenant_id: tenantId, conversation_id: conversationId, contact_id: contactId, status: newStatus, opened_at: nowIso, ...(skipUra ? { assumed_at: nowIso } : {}), created_from: 'customer' }).select('id, attendance_code').single();
+    // ura_state volta do INSERT porque quem decide se o menu ainda faz sentido é o
+    // banco: contato com operador responsável (fn_operador_responsavel_apply) já
+    // nasce com o dono/setor definidos e carimba 'skipped'. Perguntar o setor
+    // depois disso só atrasaria o cliente e poderia jogar o chat em outro lugar.
+    const { data: newAtt, error } = await supabase.from('support_attendances').insert({ tenant_id: tenantId, conversation_id: conversationId, contact_id: contactId, status: newStatus, opened_at: nowIso, ...(skipUra ? { assumed_at: nowIso } : {}), created_from: 'customer' }).select('id, attendance_code, ura_state').single();
     if (error) { console.error('[processor] Error creating attendance:', error); return; }
     insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened').catch(() => {});
     clearAfterHoursFlag(supabase, conversationId).catch(() => {});
-    if (!skipUra && ctx) sendUraWelcome(supabase, ctx, conversationId, contactId, tenantId, newAtt.id, supportConfig, newAtt.attendance_code).catch(() => {});
+    if (!skipUra && ctx) sendUraWelcome(supabase, ctx, conversationId, contactId, tenantId, newAtt.id, supportConfig, newAtt.attendance_code, newAtt.ura_state === 'skipped').catch(() => {});
   } catch (err) { console.error('[processor] Error in ensureAttendanceForIncomingMessage:', err); }
 }
 
