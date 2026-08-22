@@ -706,7 +706,17 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   const ativos = (produtosQuery.data ?? []).filter(p => p.ativo);
   const totalMensal = ativos.reduce((s, p) => s + (Number(p.vlr_mensal) || 0), 0);
   const totalCusto = ativos.reduce((s, p) => s + (Number(p.vlr_custo) || 0), 0);
-  const totalAtivacao = ativos.reduce((s, p) => s + (Number(p.vlr_ativacao) || 0), 0);
+  // A ativação do módulo entra junto com a do produto, porque no contrato ela
+  // vai para o MESMO item: a integração do Omie recusa contrato com mais de um
+  // item, então módulo não ganha linha própria. Sem somar aqui, o painel de
+  // conferência logo abaixo acusaria divergência com o contrato sem ter uma.
+  const totalAtivacao = ativos.reduce(
+    (s, p) =>
+      s +
+      (Number(p.vlr_ativacao) || 0) +
+      (modulosByProduto[p.id] ?? []).reduce((sm, m) => sm + (Number(m.vlr_ativacao) || 0), 0),
+    0
+  );
 
   const { data: contratosInfo } = useQuery({
     queryKey: ["contratos_totais_check", tid, clienteId],
@@ -953,6 +963,14 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                         </span>
                                       );
                                     })()}
+                                    {/* Cobrança única, fora da mensalidade: some no
+                                        total de ativação do produto e no contrato,
+                                        e não encosta no MRR. */}
+                                    {Number(m.vlr_ativacao) > 0 && (
+                                      <span className="block text-xs text-amber-500">
+                                        Ativação: R$ {fmtBRL(m.vlr_ativacao)}
+                                      </span>
+                                    )}
                                   </TableCell>
                                   <TableCell className="text-center">{Number(m.quantidade) || 1}</TableCell>
                                   <TableCell className="text-right">
@@ -1165,7 +1183,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                   {totalAtivacao > 0 && (
                     <>
                       <div>
-                        <span className="text-muted-foreground">Ativação produtos:</span> R$ {fmtBRL(totalAtivacao)}
+                        <span className="text-muted-foreground">Ativação produtos + módulos:</span> R$ {fmtBRL(totalAtivacao)}
                       </div>
                       <div>
                         <span className="text-muted-foreground">Ativação contratos:</span> R$ {fmtBRL(ct.totalAtivacao)}
@@ -1231,7 +1249,10 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
             vlr_mensal: Number(m.vlr_mensal) || 0,
             vlr_custo: Number(m.vlr_custo) || 0,
             ativo: m.ativo,
+            oem_modulo_codigo: m.oem_modulo_codigo ?? null,
           }))}
+        produtoId={produtosQuery.data?.find(p => p.id === reajusteDialog.clienteProdutoId)?.produto_id ?? null}
+        temLicencaOem={!!reajusteDialog.clienteProdutoId && temLicencaOem(reajusteDialog.clienteProdutoId)}
         tenantId={tid}
         clienteId={clienteId}
         onSuccess={invalidateAll}
@@ -2940,7 +2961,7 @@ function ModuloDialog({
         // linhas) — e é o que o botão promete desde que o "+" saiu da tabela.
         const { data: existente, error: errBusca } = await (supabase
           .from("cliente_produto_modulos" as any) as any)
-          .select("id, quantidade")
+          .select("id, quantidade, vlr_ativacao")
           .eq("cliente_produto_id", clienteProdutoId)
           .eq("modulo_id", moduloId)
           .eq("ativo", true)
@@ -2963,6 +2984,12 @@ function ModuloDialog({
           funcionario_id: funcionarioId ? Number(funcionarioId) : null,
           origem_venda_id: origemVendaId ? Number(origemVendaId) : null,
           origem_venda: origensVendaQuery.data?.find(o => String(o.id) === origemVendaId)?.nome ?? null,
+          // Módulo que o cliente já tem não cria linha: a ativação digitada é
+          // cobrança NOVA e soma na linha existente. Chave separada de propósito
+          // — o lápis também enfileira `quantidade`, mas já grava vlr_ativacao
+          // direto, e somar lá dobraria o valor. Ver a migration
+          // 20260822173000_ativacao_ao_somar_quantidade_de_modulo.sql.
+          vlr_ativacao_somar: vlrAtivacao || 0,
         };
 
         const { data: filaId, error: errFila } = existente
@@ -3026,7 +3053,14 @@ function ModuloDialog({
         // sempre foi.
         if (existente) {
           const { error } = await (supabase.from("cliente_produto_modulos" as any) as any)
-            .update({ quantidade: alvo, quantidade_manual: alvo })
+            .update({
+              quantidade: alvo,
+              quantidade_manual: alvo,
+              // Mesma regra do caminho da fila: ativação digitada aqui é
+              // cobrança nova e soma na linha, em vez de ser descartada.
+              vlr_ativacao:
+                (Number((existente as any).vlr_ativacao) || 0) + (Number(vlrAtivacao) || 0),
+            })
             .eq("id", (existente as any).id);
           if (error) throw error;
           novoModuloId = (existente as any).id;
@@ -3202,6 +3236,14 @@ function ModuloDialog({
               {"  ·  "}
               Markup: <span className="text-muted-foreground">{fmtMarkup(Number(vlrMensal) || 0, Number(vlrCusto) || 0)}</span>
             </span>
+            {/* Fora do "(qtd ×)" de propósito: ativação é cobrança única da
+                linha, não preço por unidade — é o que o rótulo do campo diz. */}
+            {(Number(vlrAtivacao) || 0) > 0 && (
+              <span className="w-full text-xs text-amber-500">
+                Ativação (cobrança única): R$ {fmtBRL(Number(vlrAtivacao) || 0)} — entra no total de ativação do
+                contrato, não na mensalidade nem no MRR.
+              </span>
+            )}
           </div>
         </div>
         <DialogFooter>
