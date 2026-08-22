@@ -36,6 +36,39 @@ const json = (corpo: unknown, status = 200) =>
 
 const digitos = (s: unknown) => String(s ?? "").replace(/\D/g, "");
 
+/**
+ * Quando o OEM já agendou a baixa da licença.
+ *
+ * Cancelar no portal do OEM não desliga nada na hora: a licença fica ATIVA até
+ * o último dia do mês e só depois vira "Desativado". Nenhuma das rotas de
+ * status conta isso — a listagem devolve só `ativo: true` e o detalhe do
+ * pdvlegal só `status: "AT"`. A data existe em UM lugar: a `datavalidade` de
+ * cada módulo, que vem junto no `modulos_ativos`.
+ *
+ * MAIOR data entre os módulos ATIVOS, porque é ela que diz até quando a
+ * licença existe: se um módulo vence em 31/08 e outro em 30/09, a licença
+ * ainda está de pé em setembro.
+ *
+ * Só olha módulo ativo: inativo vem com `datavalidade: null` de qualquer jeito,
+ * e módulo cancelado no meio do caminho não deve marcar a licença inteira.
+ *
+ * 2099 é sentinela de "sem prazo" (3 filiais em 22/08/2026). Tratar como data
+ * real marcaria a licença como programada para daqui a 73 anos; devolver null
+ * mantém o alerta de pé, que é o lado seguro do erro.
+ */
+function desativacaoProgramada(modulos: unknown): string | null {
+  if (!Array.isArray(modulos)) return null;
+  let maior: string | null = null;
+  for (const m of modulos as Record<string, unknown>[]) {
+    if (!m || m.ativo !== true) continue;
+    const d = typeof m.datavalidade === "string" ? m.datavalidade.slice(0, 10) : null;
+    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+    if (d >= "2099-01-01") return null;
+    if (!maior || d > maior) maior = d;
+  }
+  return maior;
+}
+
 // Comparar nome cru marcaria quase tudo como divergente: acento, caixa,
 // pontuação e sufixo societário mudam sem que a empresa seja outra. O que sobra
 // depois disso é diferença de verdade — "FILIAL 1" contra "Padaria do João" —,
@@ -224,6 +257,7 @@ Deno.serve(async (req) => {
         custo_total: f.custo_total, qtd_pdv: f.qtd_pdv, qtd_comandas: f.qtd_comandas,
         usuarios_adicionais: f.usuarios_adicionais, numero_filiais: f.numero_filiais,
         modulos: f.modulos_ativos, last_sync_oem: f.last_sync,
+        desativa_em: desativacaoProgramada(f.modulos_ativos),
         atualizado_em: new Date().toISOString(),
       }));
 
@@ -499,6 +533,9 @@ Deno.serve(async (req) => {
           cnpj_norm: l.cnpj_norm, empresa_codigo: l.empresa_codigo,
           filial_codigo: l.filial_codigo, razao_oem: l.nome_fantasia,
           custo_oem: l.custo_total, status_oem: l.status, bloqueado_oem: l.bloqueado,
+          // A data vai junto para a tela não precisar abrir o jsonb de módulos
+          // de 2.500 filiais só para saber se a baixa já está marcada.
+          desativa_em: l.desativa_em,
           ds_customer_id: alvo?.id ?? null,
           razao_ds: cli?.nome_fantasia ?? cli?.razao_social ?? null,
           cnpj_ds: cnpjDs,
