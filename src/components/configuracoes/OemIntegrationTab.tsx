@@ -1015,8 +1015,8 @@ export default function OemIntegrationTab() {
       doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? null).itens.push({
         chave: `semlic:${l.id}`, tipo: "sem_licenca", grave: false, linha: l,
         rotulo: "Cliente sem licença no OEM",
-        detalhe: <>mensalidade {brl(Number(l.mensalidade_ds || 0))}. Pode ser de outro produto,
-          e nesse caso não é erro</>,
+        detalhe: <>mensalidade {brl(Number(l.mensalidade_ds || 0))}. Ele tem produto do parceiro
+          na ficha, mas nenhuma filial casou com ele</>,
       });
     }
     const motivos: [Recon[], string, string][] = [
@@ -2033,6 +2033,11 @@ export default function OemIntegrationTab() {
             lista. Se a baixa já estiver <strong>agendada no OEM</strong>, ela sai daqui e vai
             para o bloco de desativações programadas: até a data, ativa lá e cancelada aqui é o
             estado certo.
+            <br /><br />
+            Cliente de <strong>outro fornecedor não entra</strong>: quem não tem na ficha nenhum
+            produto vinculado ao OEM nunca vai ter licença lá, e pedir decisão por ele seria
+            trabalho que não muda nada. Os produtos que contam são os vinculados na aba{" "}
+            <strong>Módulos</strong>.
           </Explica>
 
           {/* Licença que ainda não é de ninguém: não tem cliente para entrar
