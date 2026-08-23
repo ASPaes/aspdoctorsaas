@@ -74,6 +74,19 @@ type Recon = {
   desativa_em: string | null;
 };
 
+// Um reajuste do parceiro, já agregado pela view: módulo, de → para, no dia,
+// com quantos clientes pegaram e quanto isso mexeu no custo por mês.
+type MudancaCusto = {
+  modulo_id: string | null;
+  modulo_nome: string;
+  dia: string;
+  valor_anterior: number | null;
+  valor_novo: number | null;
+  clientes: number;
+  variacao_mensal: number | null;
+  ocorrido_em: string;
+};
+
 // Hoje em São Paulo, no mesmo formato do `date` do Postgres — assim a
 // comparação é string contra string, sem fuso no meio. `new Date(...)` em cima
 // de "2026-08-31" seria lido como UTC e, no horário de Brasília, viraria dia 30.
@@ -458,6 +471,32 @@ export default function OemIntegrationTab() {
   // O de-para produto do OEM ↔ produto do DoctorSaaS. É ele que transforma a
   // grade em cadastro: sem vínculo, a coluna é só preço de tabela. Vem POR
   // CONTA, igual à grade — a mesma unidade que tem a chave tem o vínculo.
+  // Reajuste que o parceiro aplicou: o custo do módulo já foi trocado em todos
+  // os clientes pela carga do espelho, e esta lista é o aviso de que isso
+  // aconteceu. Uma linha por módulo × valor × dia — um reajuste de "Licença
+  // PDV" mexe em centenas de clientes e não pode virar centenas de linhas.
+  const { data: mudancasCusto = [] } = useQuery({
+    queryKey: ["oem-mudancas-custo", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("v_oem_mudanca_custo_modulo" as any) as any)
+        .select("modulo_id, modulo_nome, dia, valor_anterior, valor_novo, clientes, variacao_mensal, ocorrido_em")
+        .eq("tenant_id", tid)
+        .order("ocorrido_em", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? []) as MudancaCusto[];
+    },
+  });
+
+  // O selo da aba conta só o que é NOVIDADE. Mudança de meses atrás continua na
+  // lista, mas não pode manter a aba marcada para sempre — selo permanente é
+  // selo que ninguém mais enxerga.
+  const mudancasRecentes = useMemo(() => {
+    const limite = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+    return mudancasCusto.filter((m) => String(m.dia) >= limite);
+  }, [mudancasCusto]);
+
   const { data: vinculos = [] } = useQuery({
     queryKey: ["oem-vinculos-produto", conta?.id],
     enabled: !!conta?.id,
@@ -1326,6 +1365,11 @@ export default function OemIntegrationTab() {
           <TabsTrigger value="conexao">Conexão</TabsTrigger>
           <TabsTrigger value="modulos" className="gap-1.5" disabled={semConta} title={travada}>
             <Boxes className="h-3.5 w-3.5" /> Módulos
+            {mudancasRecentes.length > 0 && (
+              <Badge variant="secondary" title="Preços que o OEM mudou nos últimos 30 dias">
+                {mudancasRecentes.length}
+              </Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="visao" disabled={semConta} title={travada}>Visão geral</TabsTrigger>
           <TabsTrigger value="custos" className="gap-1.5" disabled={semConta} title={travada}>
@@ -1479,6 +1523,50 @@ export default function OemIntegrationTab() {
             cadastrado no DoctorSaaS</strong> e, se você quiser, trazer os módulos daquela coluna
             para dentro dele, com o custo de cada um saindo deste preço de tabela.
           </Explica>
+
+          {/* O reajuste do parceiro já foi aplicado sozinho em todos os
+              clientes quando o espelho atualizou — este bloco é para isso não
+              acontecer em silêncio. É custo: o que o cliente paga não muda
+              aqui, o repasse continua sendo decisão de gente. */}
+          {mudancasCusto.length > 0 && (
+            <Card className="border-sky-500/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <TrendingDown className="h-4 w-4 text-sky-500" />
+                  O OEM mudou o preço destes módulos
+                </CardTitle>
+                <CardDescription>
+                  O custo já foi ajustado em todos os clientes que têm o módulo, na carga do
+                  espelho. A <strong>mensalidade não muda</strong>: repassar aumento é decisão
+                  sua, cliente a cliente.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y border-t max-h-72 overflow-y-auto">
+                  {mudancasCusto.map((m) => {
+                    const variacao = Number(m.variacao_mensal || 0);
+                    const subiu = Number(m.valor_novo || 0) > Number(m.valor_anterior || 0);
+                    return (
+                      <div key={`${m.modulo_id}:${m.dia}:${m.valor_novo}`}
+                        className="flex items-center gap-3 p-3 text-sm">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">{m.modulo_nome}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {brl(Number(m.valor_anterior || 0))} → <strong>{brl(Number(m.valor_novo || 0))}</strong>
+                            {" "}por licença · {m.clientes} cliente{m.clientes > 1 ? "s" : ""} ·{" "}
+                            {dataBR(String(m.dia))}
+                          </p>
+                        </div>
+                        <span className={`tabular-nums shrink-0 font-medium ${subiu ? "text-destructive" : "text-emerald-600 dark:text-emerald-500"}`}>
+                          {variacao > 0 ? "+" : ""}{brl(variacao)}/mês
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="flex flex-row items-start justify-between gap-4">

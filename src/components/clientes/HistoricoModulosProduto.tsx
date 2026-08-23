@@ -25,7 +25,14 @@ type Evento = {
   usuario_id: string | null;
   motivo: string | null;
   created_at: string;
+  // Só o evento de preço usa o par: é ele que diz de quanto para quanto o
+  // parceiro mudou o custo daquele módulo.
+  vlr_custo: number | null;
+  vlr_custo_anterior: number | null;
 };
+
+const brl = (v: number) =>
+  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 // Rótulo e cor por ação. "cancelado" e "removido" são coisas diferentes e a
 // tela não pode juntar: o primeiro saiu de circulação e continua na ficha, o
@@ -36,6 +43,9 @@ const ACOES: Record<string, { texto: string; classe: string }> = {
   cancelado:  { texto: "Cancelado",  classe: "bg-amber-500/15 text-amber-500 hover:bg-amber-500/20" },
   removido:   { texto: "Removido",   classe: "bg-red-500/15 text-red-500 hover:bg-red-500/20" },
   quantidade: { texto: "Quantidade", classe: "bg-sky-500/15 text-sky-500 hover:bg-sky-500/20" },
+  // O parceiro reajustou o custo e a carga do espelho trocou o valor aqui.
+  // Não é venda: a mensalidade do cliente não muda por causa disto.
+  preco:      { texto: "Preço do OEM", classe: "bg-violet-500/15 text-violet-500 hover:bg-violet-500/20" },
 };
 
 const quando = (iso: string) =>
@@ -53,7 +63,7 @@ export default function HistoricoModulosProduto({ clienteProdutoId }: { clienteP
     enabled: aberto,
     queryFn: async () => {
       const { data, error } = await (supabase.from("cliente_produto_modulo_eventos" as any) as any)
-        .select("id, modulo_nome, acao, quantidade, origem, usuario_nome, usuario_id, motivo, created_at")
+        .select("id, modulo_nome, acao, quantidade, origem, usuario_nome, usuario_id, motivo, created_at, vlr_custo, vlr_custo_anterior")
         .eq("cliente_produto_id", clienteProdutoId)
         .order("created_at", { ascending: false })
         .limit(300);
@@ -106,7 +116,14 @@ export default function HistoricoModulosProduto({ clienteProdutoId }: { clienteP
                           {a.texto}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-medium">{e.modulo_nome}</TableCell>
+                      <TableCell className="font-medium">
+                        {e.modulo_nome}
+                        {e.acao === "preco" && (
+                          <span className="block text-xs font-normal text-muted-foreground tabular-nums">
+                            {brl(Number(e.vlr_custo_anterior || 0))} → {brl(Number(e.vlr_custo || 0))} por licença
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-center tabular-nums">
                         {e.quantidade ?? "—"}
                       </TableCell>
