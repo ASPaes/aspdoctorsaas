@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { subscribeSharedChannel } from "@/lib/realtimeChannelPool";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { usePresenceRow } from "@/hooks/usePresenceRow";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
@@ -34,8 +35,18 @@ export interface QueueAlertState {
  *
  * Escopo: montado uma vez no AppLayout, então vale em QUALQUER tela — o problema
  * do DEM-0203 é exatamente o atendente não estar olhando o Chat. O setor segue o
- * `DepartmentFilterContext` (operador comum fica preso ao setor dele; admin/head
- * em "Todos" ouve o tenant inteiro), a mesma regra da lista de conversas.
+ * `DepartmentFilterContext`, a mesma regra da lista de conversas.
+ *
+ * ALERTA DE FILA EXIGE SETOR EM FOCO. Sem isto, quem não tem setor no cadastro
+ * (`funcionarios.department_id` NULL) recebia o toast da fila do TENANT INTEIRO
+ * em qualquer tela do sistema: `useAllowedDepartments` devolve lista vazia para
+ * ele, o contexto cai em `selectedDepartmentId = null`, o RPC roda sem
+ * `p_department_id` e conta tudo. Era o financeiro levando bip da fila do
+ * suporte no meio do cadastro de cliente.
+ *
+ * Vale também para quem está em "Todos os setores": ali o número é visão de
+ * supervisão, não fila de trabalho de ninguém. Quem quiser ser alertado escolhe
+ * o setor no seletor — e admin/head já nasce no setor do próprio cadastro.
  *
  * Custo: nenhuma query nova. Reusa a queryKey de `usePillCounts`, então quando o
  * Chat está aberto os dois observadores dividem o mesmo cache e o mesmo RPC.
@@ -56,8 +67,16 @@ export function useQueueAlert(): QueueAlertState {
   // usuário do financeiro em cada sessão.
   const hasChatAccess = !permsLoading && can("nav.chat", "view");
 
-  const { data } = usePillCounts({ refetchInterval: IDLE_POLL_MS, enabled: hasChatAccess });
-  const waiting = hasChatAccess ? data?.waiting?.total ?? null : null;
+  // A fila alertada é a de UM setor. `selectedDepartmentId` null significa
+  // "Todos" — seja por escolha do gestor, seja porque o usuário não tem setor
+  // no cadastro. Nos dois casos não há fila que seja dele para cobrar.
+  const { selectedDepartmentId, isLoading: deptLoading } = useDepartmentFilter();
+  const hasQueueScope = !deptLoading && !!selectedDepartmentId;
+
+  const alertEnabled = hasChatAccess && hasQueueScope;
+
+  const { data } = usePillCounts({ refetchInterval: IDLE_POLL_MS, enabled: alertEnabled });
+  const waiting = alertEnabled ? data?.waiting?.total ?? null : null;
 
   const [justArrived, setJustArrived] = useState(false);
 
@@ -98,7 +117,7 @@ export function useQueueAlert(): QueueAlertState {
   // `att-rt-${tid}` (de useAttendanceStatus) faria este handler nunca registrar
   // quando o Chat montasse primeiro.
   useEffect(() => {
-    if (!tid || !hasChatAccess) return;
+    if (!tid || !alertEnabled) return;
     return subscribeSharedChannel(`queue-alert-${tid}`, (channel) => {
       let timer: ReturnType<typeof setTimeout> | null = null;
       const invalidate = () => {
@@ -120,7 +139,16 @@ export function useQueueAlert(): QueueAlertState {
         invalidate
       );
     });
-  }, [tid, hasChatAccess, queryClient]);
+  }, [tid, alertEnabled, queryClient]);
+
+  // Troca de setor recomeça a contagem. O `prevWaitingRef` guarda o número do
+  // setor ANTERIOR; sem zerar, o gestor que sai de um setor com 1 na fila para
+  // outro com 4 leva um "3 clientes entraram na fila" que nunca aconteceu.
+  useEffect(() => {
+    prevWaitingRef.current = null;
+    episodeStartedAtRef.current = null;
+    reminderDoneRef.current = false;
+  }, [selectedDepartmentId, tid]);
 
   // Detecção da borda de subida.
   useEffect(() => {
