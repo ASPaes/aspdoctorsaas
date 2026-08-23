@@ -1527,21 +1527,39 @@ export default function OemIntegrationTab() {
           {/* O reajuste do parceiro já foi aplicado sozinho em todos os
               clientes quando o espelho atualizou — este bloco é para isso não
               acontecer em silêncio. É custo: o que o cliente paga não muda
-              aqui, o repasse continua sendo decisão de gente. */}
-          {mudancasCusto.length > 0 && (
-            <Card className="border-sky-500/40">
+              aqui, o repasse continua sendo decisão de gente.
+
+              Aparece SEMPRE, inclusive vazio. Some quando não há reajuste era
+              pior do que parece: quem abre a aba não descobre que o sistema
+              vigia isso, e quem sabia que a vigilância existe não consegue
+              distinguir "nada mudou" de "quebrou". O vazio diz desde quando
+              está olhando, que é a única coisa que ele tem a dizer. */}
+          {(
+            <Card className={mudancasCusto.length > 0 ? "border-sky-500/40" : undefined}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <TrendingDown className="h-4 w-4 text-sky-500" />
-                  O OEM mudou o preço destes módulos
+                  {mudancasCusto.length > 0
+                    ? "O OEM mudou o preço destes módulos"
+                    : "Mudanças de preço do OEM"}
                 </CardTitle>
                 <CardDescription>
-                  O custo já foi ajustado em todos os clientes que têm o módulo, na carga do
-                  espelho. A <strong>mensalidade não muda</strong>: repassar aumento é decisão
-                  sua, cliente a cliente.
+                  Quando o parceiro reajusta um módulo, o custo é ajustado sozinho em todos os
+                  clientes que o têm, na carga do espelho, e o que mudou aparece aqui. A{" "}
+                  <strong>mensalidade não muda</strong>: repassar aumento é decisão sua, cliente
+                  a cliente.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
+                {mudancasCusto.length === 0 && (
+                  <p className="border-t px-6 py-4 text-sm text-muted-foreground">
+                    Nenhum reajuste até agora. O acompanhamento começou em{" "}
+                    <strong>23/08/2026</strong>: da próxima vez que o OEM mexer no preço de um
+                    módulo, ele aparece aqui com o valor antigo, o novo e quantos clientes
+                    pegaram o ajuste. O que mudou antes dessa data não tem como ser recuperado,
+                    porque não era registrado.
+                  </p>
+                )}
                 <div className="divide-y border-t max-h-72 overflow-y-auto">
                   {mudancasCusto.map((m) => {
                     const variacao = Number(m.variacao_mensal || 0);
