@@ -406,6 +406,22 @@ export default function OemIntegrationTab() {
     (c.unidades_base_ids ?? []).map((u) => unidades.find((x) => x.id === u)?.nome ?? `Unidade ${u}`)
       .join(", ") || "Todas as unidades";
 
+  // Sem chave, todo número desta tela é zero — e zero aqui LÊ como diagnóstico
+  // ("este tenant não tem licença nenhuma") quando na verdade é falta de
+  // cadastro. As outras abas ficam travadas até a chave existir.
+  //
+  // `erroContas` fica de fora de propósito: falha de leitura não é ausência de
+  // conta. Foi assim que "Nenhuma conta conectada ainda" já apareceu com conta
+  // conectada, quando faltava a policy — dizer "sem chave" ali seria repetir o
+  // mesmo engano com outra roupa.
+  const semConta = !erroContas && contas.length === 0;
+  // Derivado em vez de efeito: com a aba travada não existe o instante entre
+  // "abriu em Visão geral" e "o efeito corrigiu", que pisca a tela vazia.
+  const abaEfetiva = semConta ? "conexao" : aba;
+  const travada = semConta
+    ? "Conecte uma chave do OEM em Conexão para liberar esta aba"
+    : undefined;
+
   // São ~3.000 linhas: acima do teto de 1000 do PostgREST, então fetchAllRows.
   const { data: linhas = [], isLoading } = useQuery({
     queryKey: ["oem-recon", conta?.id],
@@ -1288,22 +1304,39 @@ export default function OemIntegrationTab() {
         </CardHeader>
       </Card>
 
-      <Tabs value={aba} onValueChange={setAba} className="w-full">
+      {/* Dizer por que as abas estão apagadas. Sem isto, aba desabilitada
+          parece falta de permissão, e a pessoa vai pedir acesso a alguém em vez
+          de colar a chave que está na mão dela. */}
+      {semConta && (
+        <Card className="border-amber-500/40">
+          <CardContent className="flex flex-wrap items-center gap-3 py-4 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+            <p className="min-w-0 flex-1 text-muted-foreground">
+              <strong className="text-foreground">Nenhuma chave do OEM conectada nesta empresa.</strong>{" "}
+              As outras abas ficam fechadas até existir uma: sem a chave não há espelho, e todo
+              número delas seria zero, o que pareceria &quot;não há licenças&quot; em vez de
+              &quot;falta configurar&quot;. Cole a chave abaixo, em <strong>Conexão</strong>.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <Tabs value={abaEfetiva} onValueChange={setAba} className="w-full">
         <TabsList>
           <TabsTrigger value="conexao">Conexão</TabsTrigger>
-          <TabsTrigger value="modulos" className="gap-1.5">
+          <TabsTrigger value="modulos" className="gap-1.5" disabled={semConta} title={travada}>
             <Boxes className="h-3.5 w-3.5" /> Módulos
           </TabsTrigger>
-          <TabsTrigger value="visao">Visão geral</TabsTrigger>
-          <TabsTrigger value="custos" className="gap-1.5">
+          <TabsTrigger value="visao" disabled={semConta} title={travada}>Visão geral</TabsTrigger>
+          <TabsTrigger value="custos" className="gap-1.5" disabled={semConta} title={travada}>
             Custos
             {custos.divergentes > 0 && <Badge variant="secondary">{custos.divergentes}</Badge>}
           </TabsTrigger>
-          <TabsTrigger value="fila" className="gap-1.5">
+          <TabsTrigger value="fila" className="gap-1.5" disabled={semConta} title={travada}>
             Sincronização
             {filaParada > 0 && <Badge variant="destructive">{filaParada}</Badge>}
           </TabsTrigger>
-          <TabsTrigger value="pendencias" className="gap-1.5">
+          <TabsTrigger value="pendencias" className="gap-1.5" disabled={semConta} title={travada}>
             {/* Esta aba é a única que ninguém abre por vontade própria: ela só
                 interessa quando tem coisa dentro. O halo pulsando é para não
                 dar para passar batido — e some inteiro quando o número zera,
