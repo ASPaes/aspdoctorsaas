@@ -389,6 +389,41 @@ Deno.serve(async (req) => {
         for (const v of vinculados) porCodigo.set(String(v.oem_codigo_filial), v.cliente_id);
       }
 
+      // --------------- 3c. quem pode ter licença aqui: o cliente do PARCEIRO
+      //
+      // "Cliente sem licença no OEM" só quer dizer alguma coisa para quem vende
+      // o produto do parceiro. A Digi Office também revende Gula Menu, e esse
+      // cliente nunca vai ter licença no OEM. Medido em 23/08/2026: dos 107 da
+      // lista, 50 eram Gula — metade do alarme apontando para o que não é erro.
+      // Exemplo: A PADOCA, cujo único produto ativo é o Gula.
+      //
+      // O critério é o VÍNCULO DE PRODUTO, não `cliente_produtos.fornecedor_id`:
+      // a tabela de fornecedores tem SEIS cadastros diferentes chamados "PDV
+      // Legal" (ids 13, 25, 28, 34, 36, 41), então casar por fornecedor erraria
+      // por duplicidade de cadastro. O vínculo é decidido dentro da própria
+      // integração, na aba Módulos, e é o que a conta afirma sobre si mesma.
+      const doParceiro = new Set<string>();
+      let temVinculoDeProduto = false;
+      {
+        const vinc = await lerTudo<{ produto_id: number }>((a, b) =>
+          ds.from("oem_produto_vinculo").select("produto_id")
+            .eq("conta_integration_id", conta.id).order("produto_id").range(a, b));
+        const produtosDoOem = new Set(vinc.map((v) => Number(v.produto_id)));
+        temVinculoDeProduto = produtosDoOem.size > 0;
+
+        if (temVinculoDeProduto) {
+          const cps = await lerTudo<{ cliente_id: string; produto_id: number; ativo: boolean }>(
+            (a, b) => ds.from("cliente_produtos")
+              .select("cliente_id, produto_id, ativo")
+              .eq("tenant_id", conta.tenant_id)
+              .order("cliente_id").range(a, b));
+          for (const cp of cps) {
+            if (cp.ativo === false) continue;
+            if (produtosDoOem.has(Number(cp.produto_id))) doParceiro.add(cp.cliente_id);
+          }
+        }
+      }
+
       // ---------------------- 4. preserva as decisões humanas já tomadas
       //
       // O filtro é `resolvido_em is not null`, e NÃO `status_usuario <> 'novo'`.
@@ -559,6 +594,10 @@ Deno.serve(async (req) => {
       // quem está sendo cobrado sem licença.
       for (const c of clientes) {
         if (comFilial.has(c.id)) continue;
+        // Cliente de outro fornecedor não é pendência do OEM (ver 3c). Sem
+        // vínculo de produto nenhum a conta não sabe quem é dela, e aí a regra
+        // não vale: filtrar tudo esvaziaria a lista de uma conta recém ligada.
+        if (temVinculoDeProduto && !doParceiro.has(c.id)) continue;
         const k = c.cnpj_digits || digitos(c.cnpj);
         if (k && linhas.some((l) => l.cnpj_norm === k)) continue;
         recon.push({
