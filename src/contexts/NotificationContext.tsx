@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast as sonnerToast } from "sonner";
 import { ChatToast } from "@/components/notifications/ChatToast";
+import { AlertaToast } from "@/components/notifications/AlertaToast";
 import { updateFaviconBadge } from "@/utils/notifications/favicon";
 
 const SOUND_URL =
@@ -134,6 +135,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const settingsRef = useRef<NotificationSettings>(DEFAULT_SETTINGS);
   const locationRef = useRef(location);
   locationRef.current = location;
+  // Mesmo motivo dos outros refs: o handler de realtime é um useCallback com
+  // dependências estáveis, então ele guardaria o `uid` do PRIMEIRO render — que é
+  // undefined, porque a sessão ainda não resolveu. Lido por ref, ele é sempre o
+  // usuário de agora, e o alerta dirigido acha o dono.
+  const uidRef = useRef(uid);
+  uidRef.current = uid;
 
   // Load settings via RPC
   const { data: settingsData } = useQuery<NotificationSettings>({
@@ -253,6 +260,24 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         return;
       }
 
+      // CASO ALERTA DIRIGIDO: falha de fila de integração é problema do tenant e
+      // aparece no sino de todo admin — mas o toast é de quem MANDOU FAZER, que é
+      // quem está com a tela aberta esperando aquilo funcionar. Sem isto, um módulo
+      // que uma pessoa mandou cancelar acendia toast em todos os admins ao mesmo
+      // tempo, e nenhum deles sabia de quem era a ação.
+      //
+      // O sinal é a chave `toast_somente_para` no metadata, e não a categoria do
+      // evento: assim o frontend não precisa carregar o catálogo de eventos para
+      // decidir se toca um toast. Chave ausente = todo o resto do sistema, chat
+      // inclusive, onde nada muda. Chave presente com null = ninguém (é o caso do
+      // watchdog: fila que não anda não é culpa de ninguém em particular, e às 3h
+      // da manhã ela não deve acordar tela nenhuma).
+      const alvoToast = (notif.metadata as any)?.toast_somente_para;
+      const dirigido = !!notif.metadata && "toast_somente_para" in (notif.metadata as any);
+      if (dirigido && alvoToast !== uidRef.current) {
+        return;
+      }
+
       let mode: AlertMode;
       if (!isVisible) {
         mode = s.alert_background;
@@ -297,18 +322,31 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const toastId = notifConvId ? `conv-${notifConvId}` : `notif-${notif.id}`;
 
         sonnerToast.custom(
-          (id) => (
-            <ChatToast
-              title={notif.title}
-              body={notif.body || ""}
-              unreadCount={Number((notif.metadata as any)?.unread_count ?? 1)}
-              onOpen={() => {
-                sonnerToast.dismiss(id);
-                abrir();
-              }}
-              onDismiss={() => sonnerToast.dismiss(id)}
-            />
-          ),
+          (id) =>
+            // Alerta dirigido tem cara de alerta, não de mensagem de chat: mesmo
+            // triângulo âmbar do sino e da aba Integrações.
+            dirigido ? (
+              <AlertaToast
+                title={notif.title}
+                body={notif.body || ""}
+                onOpen={() => {
+                  sonnerToast.dismiss(id);
+                  abrir();
+                }}
+                onDismiss={() => sonnerToast.dismiss(id)}
+              />
+            ) : (
+              <ChatToast
+                title={notif.title}
+                body={notif.body || ""}
+                unreadCount={Number((notif.metadata as any)?.unread_count ?? 1)}
+                onOpen={() => {
+                  sonnerToast.dismiss(id);
+                  abrir();
+                }}
+                onDismiss={() => sonnerToast.dismiss(id)}
+              />
+            ),
           { id: toastId, duration: 5000 },
         );
       }
