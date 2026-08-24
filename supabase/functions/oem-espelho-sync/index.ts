@@ -435,12 +435,26 @@ Deno.serve(async (req) => {
       //
       // Só existe decisão humana onde alguém carimbou quem e quando — é o que
       // as RPCs vincular/ignorar/desvincular gravam.
+      //
+      // `ignoradas` entra no mesmo balde: marcar "está certo assim" é decisão
+      // humana como qualquer outra, e sem ser copiada ela duraria até a próxima
+      // carga — seis horas. Por isso o filtro deixou de ser só `resolvido_em`:
+      // ignorar não resolve o vínculo, não carimba resolvido_em, e a linha
+      // ficaria de fora.
       const antigas = await lerTudo<any>((a, b) =>
         ds.from("reconciliacao_oem")
-          .select("filial_codigo, ds_customer_id, candidato_escolhido, status_usuario, observacao, resolvido_em, resolvido_por")
-          .eq("conta_integration_id", conta.id).not("resolvido_em", "is", null).range(a, b));
+          .select("filial_codigo, ds_customer_id, candidato_escolhido, status_usuario, observacao, resolvido_em, resolvido_por, ignoradas")
+          .eq("conta_integration_id", conta.id)
+          .or("resolvido_em.not.is.null,ignoradas.not.is.null")
+          .range(a, b));
       const decidido = new Map<string, any>();
-      for (const d of antigas) if (d.filial_codigo) decidido.set(String(d.filial_codigo), d);
+      // Linha sem filial (o cliente que não tem licença nenhuma) não tem código
+      // para servir de chave: para ela, quem identifica é o cliente.
+      const decididoPorCliente = new Map<string, any>();
+      for (const d of antigas) {
+        if (d.filial_codigo) decidido.set(String(d.filial_codigo), d);
+        else if (d.ds_customer_id) decididoPorCliente.set(String(d.ds_customer_id), d);
+      }
 
       // ------------------------------------------------ 5. monta o de/para
       await ds.from("reconciliacao_oem").delete().eq("conta_integration_id", conta.id);
@@ -587,6 +601,7 @@ Deno.serve(async (req) => {
           candidato_escolhido: anterior?.candidato_escolhido ?? null,
           resolvido_em: anterior?.resolvido_em ?? null,
           resolvido_por: anterior?.resolvido_por ?? null,
+          ignoradas: anterior?.ignoradas ?? null,
         });
       }
 
@@ -611,6 +626,7 @@ Deno.serve(async (req) => {
           qtd_candidatos_ds: 0, estado_match: "SO_NO_DS",
           acao_sugerida: c.cancelado ? "fora_do_escopo" : "sem_licenca",
           status_usuario: "novo",
+          ignoradas: decididoPorCliente.get(c.id)?.ignoradas ?? null,
         });
       }
 
