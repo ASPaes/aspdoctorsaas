@@ -77,14 +77,23 @@ type Recon = {
   ignoradas: Record<string, string> | null;
 };
 
-// Um reajuste do parceiro, já agregado pela view: módulo, de → para, no dia,
-// com quantos clientes pegaram e quanto isso mexeu no custo por mês.
+// Uma mudança no que o OEM cobra, já agregada pela view: módulo, de → para,
+// no dia, com quantos clientes foram atingidos e quanto mexeu no custo por mês.
+//
+// Vem em dois sabores, e é o `so_total` que separa os dois. Quando o preço por
+// licença muda, o par a mostrar é o unitário. Quando só o total muda (a
+// cortesia do parceiro que acabou, o crédito que saiu), o unitário fica igual
+// dos dois lados e "R$ 32,50 → R$ 32,50" não explicaria nada: aí o par é o
+// total cobrado.
 type MudancaCusto = {
   modulo_id: string | null;
   modulo_nome: string;
   dia: string;
   valor_anterior: number | null;
   valor_novo: number | null;
+  so_total: boolean | null;
+  total_anterior: number | null;
+  total_novo: number | null;
   clientes: number;
   variacao_mensal: number | null;
   ocorrido_em: string;
@@ -511,16 +520,16 @@ export default function OemIntegrationTab() {
   // O de-para produto do OEM ↔ produto do DoctorSaaS. É ele que transforma a
   // grade em cadastro: sem vínculo, a coluna é só preço de tabela. Vem POR
   // CONTA, igual à grade — a mesma unidade que tem a chave tem o vínculo.
-  // Reajuste que o parceiro aplicou: o custo do módulo já foi trocado em todos
-  // os clientes pela carga do espelho, e esta lista é o aviso de que isso
-  // aconteceu. Uma linha por módulo × valor × dia — um reajuste de "Licença
-  // PDV" mexe em centenas de clientes e não pode virar centenas de linhas.
+  // O que o OEM passou a cobrar de licenças que JÁ existem. Reajuste de tabela
+  // não entra aqui: ele vale para cliente novo e não alcança quem já tem o
+  // módulo. Uma linha por módulo × valor × dia, porque uma mudança que atinge
+  // centenas de clientes não pode virar centenas de linhas.
   const { data: mudancasCusto = [] } = useQuery({
     queryKey: ["oem-mudancas-custo", tid, conta?.id],
     enabled: !!tid && !!conta,
     queryFn: async () => {
       let q = (supabase.from("v_oem_mudanca_custo_modulo" as any) as any)
-        .select("modulo_id, modulo_nome, dia, valor_anterior, valor_novo, clientes, variacao_mensal, ocorrido_em")
+        .select("modulo_id, modulo_nome, dia, valor_anterior, valor_novo, so_total, total_anterior, total_novo, clientes, variacao_mensal, ocorrido_em")
         .eq("tenant_id", tid);
       // A aba inteira é da unidade desta conta: com duas contas conectadas, uma
       // não pode ver o reajuste que atingiu os clientes da outra. O mesmo
@@ -1868,15 +1877,22 @@ export default function OemIntegrationTab() {
                 <div className="divide-y border-t max-h-72 overflow-y-auto">
                   {mudancasCusto.map((m) => {
                     const variacao = Number(m.variacao_mensal || 0);
-                    const subiu = Number(m.valor_novo || 0) > Number(m.valor_anterior || 0);
+                    // A cor sai da variação, não do unitário: quando só o total
+                    // muda, os dois unitários são iguais e a linha ficaria
+                    // verde mesmo com o custo subindo.
+                    const subiu = variacao > 0;
+                    const soTotal = m.so_total === true;
+                    const de = Number((soTotal ? m.total_anterior : m.valor_anterior) || 0);
+                    const para = Number((soTotal ? m.total_novo : m.valor_novo) || 0);
                     return (
-                      <div key={`${m.modulo_id}:${m.dia}:${m.valor_novo}`}
+                      <div key={`${m.modulo_id}:${m.dia}:${m.valor_anterior}:${m.valor_novo}`}
                         className="flex items-center gap-3 p-3 text-sm">
                         <div className="min-w-0 flex-1">
                           <p className="font-medium truncate">{m.modulo_nome}</p>
                           <p className="text-xs text-muted-foreground">
-                            {brl(Number(m.valor_anterior || 0))} → <strong>{brl(Number(m.valor_novo || 0))}</strong>
-                            {" "}por licença · {m.clientes} cliente{m.clientes > 1 ? "s" : ""} ·{" "}
+                            {brl(de)} → <strong>{brl(para)}</strong>
+                            {" "}{soTotal ? "no total cobrado" : "por licença"} ·{" "}
+                            {m.clientes} cliente{m.clientes > 1 ? "s" : ""} ·{" "}
                             {dataBR(String(m.dia))}
                           </p>
                         </div>
