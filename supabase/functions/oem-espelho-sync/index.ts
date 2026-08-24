@@ -284,10 +284,13 @@ Deno.serve(async (req) => {
       // Lê o TENANT INTEIRO e filtra por unidade aqui dentro, em vez de filtrar
       // no banco, porque as duas coisas têm alcances diferentes:
       //
-      //   - o CASAMENTO por CNPJ/nome só pode olhar os clientes das unidades
-      //     desta conta, senão uma unidade puxaria a filial de outra;
-      //   - a BUSCA POR ID alcança o tenant inteiro, porque o vínculo por
-      //     código já foi decidido e pode apontar para cliente de outra unidade.
+      //   - o CASAMENTO só pode olhar os clientes das unidades desta conta,
+      //     senão uma unidade puxaria a filial de outra. Desde 24/08/2026 isso
+      //     vale também para o vínculo por CÓDIGO: "já foi decidido" não torna
+      //     o cliente de outra unidade parte desta conta, e três deles (todos
+      //     da unidade 10) estavam somando R$ 891 na margem da unidade 6;
+      //   - a BUSCA POR ID continua alcançando o tenant inteiro, e só ela: é o
+      //     que preenche nome, CNPJ e mensalidade de uma linha já existente.
       //
       // Filtrando no banco, esses ficavam de fora e a linha saía com
       // mensalidade, CNPJ e "cancelado" NULOS — 3 clientes assim em 18/08/2026,
@@ -444,7 +447,15 @@ Deno.serve(async (req) => {
             .eq("tenant_id", conta.tenant_id)
             .not("oem_codigo_filial", "is", null)
             .order("cliente_id").range(a, b));
+        // A conta é de UMA unidade base, e isso vale também para o vínculo por
+        // código. Até 24/08/2026 esta busca alcançava o tenant inteiro, com o
+        // argumento de que o código já tinha sido decidido — o efeito foi
+        // FLORICULTURA VITRINE DAS FLORES, DISTRIBUIDORA DE BEBIDAS PAULO VI e
+        // ESPONTANEO BAR E RESTAURANTE, os três da unidade 10, entrando na
+        // conta da unidade 6 e somando R$ 891 na margem dela.
+        const daUnidade = new Set(clientes.map((c) => c.id));
         for (const v of vinculados) {
+          if (!daUnidade.has(v.cliente_id)) continue;
           // Código gravado num produto que não é do OEM não vale como vínculo:
           // foi assim que 8 clientes do Gula Menu entraram na conta do parceiro.
           // A ficha continua com o número até alguém limpar; a conciliação
