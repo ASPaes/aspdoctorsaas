@@ -16,6 +16,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import OemFilaSincronizacaoPanel from "./OemFilaSincronizacaoPanel";
+import EscolherLicencaOemDialog from "./EscolherLicencaOemDialog";
 import { useAbaNaUrl } from "@/hooks/useDeepLinkIntegracao";
 import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
@@ -285,6 +286,10 @@ export default function OemIntegrationTab() {
   const [escolhendo, setEscolhendo] = useState<LinhaRecon | null>(null);
   const [desfazendo, setDesfazendo] = useState<string | null>(null);
   const [ignorandoChave, setIgnorandoChave] = useState<string | null>(null);
+  // O cliente que está procurando a própria licença no OEM (a divergência
+  // "Cliente sem licença"). Guarda id e nome porque o diálogo mostra o nome nos
+  // dois lados da troca de vínculo.
+  const [procurandoLicenca, setProcurandoLicenca] = useState<{ id: string; nome: string } | null>(null);
   // Ignorar é decisão silenciosa: some da lista e o alerta não volta enquanto o
   // dado for o mesmo. Por isso passa por confirmação, com o apontamento inteiro
   // na frente de quem decide — a mesma coisa que a dica do botão diz, só que
@@ -1175,6 +1180,18 @@ export default function OemIntegrationTab() {
         <Button size="sm" variant="secondary" className="gap-1.5"
           onClick={() => navigate(`/clientes/${clienteId}`)}>
           <ExternalLink className="h-3.5 w-3.5" /> Ajustar na ficha
+        </Button>
+      )}
+      {/* "Cliente sem licença" é a única divergência cuja saída é escolher uma
+          LICENÇA, e não um cliente: nem Ignorar nem Abrir ficha resolvem, porque
+          a ficha não diz qual filial do OEM é a dele. */}
+      {i.tipo === "sem_licenca" && (
+        <Button size="sm" variant="secondary" className="gap-1.5"
+          onClick={() => setProcurandoLicenca({
+            id: clienteId,
+            nome: i.linha?.razao_ds ?? i.linha?.razao_oem ?? "este cliente",
+          })}>
+          <Boxes className="h-3.5 w-3.5" /> Licenças OEM
         </Button>
       )}
       {(i.tipo === "margem" || i.tipo === "sem_licenca"
@@ -2580,6 +2597,17 @@ export default function OemIntegrationTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EscolherLicencaOemDialog
+        cliente={procurandoLicenca}
+        // A lista sai do que a aba já carregou: só as linhas que são licença de
+        // verdade (as sem filial são clientes sem licença, o oposto do que se
+        // procura aqui).
+        licencas={linhas.filter((l) => l.filial_codigo)}
+        aberto={!!procurandoLicenca}
+        onOpenChange={(v) => { if (!v) setProcurandoLicenca(null); }}
+        onDecidido={recarregarRecon}
+      />
 
       <EscolherClienteOemDialog
         linha={escolhendo}
