@@ -1860,12 +1860,10 @@ export default function OemIntegrationTab() {
               <CardContent className="p-0">
                 {mudancasCusto.length === 0 && (
                   <p className="border-t px-6 py-4 text-sm text-muted-foreground">
-                    Nenhuma mudança até agora, que é o esperado: reajuste de tabela não alcança
-                    quem já é cliente. O acompanhamento começou em <strong>23/08/2026</strong> e
-                    serve para o caso incomum, quando o OEM muda o que cobra de uma licença que já
-                    existe: aparece aqui o valor antigo, o novo e quantos clientes foram
-                    atingidos. O que mudou antes dessa data não tem como ser recuperado, porque
-                    não era registrado.
+                    Nenhuma mudança até agora, que é o esperado. Este quadro é o vigia da regra:
+                    reajuste de tabela não alcança quem já é cliente, então o que aparecer aqui é
+                    o OEM mudando o que cobra de uma licença que já existe. Acompanhando desde{" "}
+                    <strong>23/08/2026</strong>.
                   </p>
                 )}
                 <div className="divide-y border-t max-h-72 overflow-y-auto">
@@ -2040,11 +2038,15 @@ export default function OemIntegrationTab() {
             última atualização do espelho encontrou. O que precisa de decisão fica na aba{" "}
             <strong>Divergências</strong>, cliente por cliente.
           </Explica>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {/* O total de filiais (2.572) somava as desativadas — número que
+                não responde a pergunta nenhuma da aba e ainda empurrava o
+                rótulo para três linhas. O que vale é o que está ATIVO, porque é
+                o que cobra. */}
             <Numero
-              valor={String(r.filiais)}
-              rotulo="Filiais no OEM"
-              sub={`${r.ativas} ativas`}
+              valor={String(r.ativas)}
+              rotulo="Filiais ativas no OEM"
+              sub={`${r.filiais} no total, com as desativadas`}
               // O contraponto do lado daqui, na mesma altura das filiais: a
               // pergunta é uma só — o que o OEM cobra tem contrato aqui?
               ao_lado={{
@@ -2073,21 +2075,14 @@ export default function OemIntegrationTab() {
             {/* Markup na mesma régua da aba Custos: mensalidade ÷ custo do OEM,
                 como multiplicador. Dois markups com denominadores diferentes
                 seriam duas respostas para a mesma pergunta. */}
-            <Numero valor={brl(r.receita - r.custo)} rotulo="Margem mensal" tom="bom"
+            <Numero valor={brl(r.receita - r.custo)} rotulo="Margem Bruta" tom="bom"
               // Markup na mesma linha do custo e no mesmo tamanho: ele é a
               // leitura da conta que está ali (receita ÷ custo), não um segundo
               // indicador. Régua da aba Custos — custo do OEM no divisor, sempre.
               sub={
                 <>
-                  <span title={r.custo > 0
-                    ? `${brl(r.receita)} ÷ ${brl(r.custo)} (custo do OEM)`
-                    : "Sem custo do OEM, não há como calcular o markup"}>
-                    {brl(r.receita)} − {brl(r.custo)} · markup{" "}
-                    {r.custo > 0 ? (
-                      <span className={r.receita / r.custo < 1 ? "text-destructive font-medium" : ""}>
-                        {num2(r.receita / r.custo)}×
-                      </span>
-                    ) : "—"}
+                  <span title={`${brl(r.receita)} de mensalidade menos ${brl(r.custo)} de custo das licenças`}>
+                    {brl(r.receita)} − {brl(r.custo)}
                   </span>
                   {/* De QUEM é essa receita e de QUANDO. Sem isso, o número é
                       comparado com o do dashboard e a diferença parece erro:
@@ -2099,6 +2094,24 @@ export default function OemIntegrationTab() {
                   </span>
                 </>
               } />
+
+            {/* Markup em card próprio, e não como rodapé da margem: ele é a
+                leitura mais rápida da saúde da operação (quantas vezes a
+                mensalidade cobre o custo do parceiro) e, espremido numa linha
+                de texto, era o número que ninguém lia. Abaixo de 1× a operação
+                paga para trabalhar, e por isso ele fica vermelho. */}
+            <Numero
+              valor={r.custo > 0 ? `${num2(r.receita / r.custo)}×` : "—"}
+              rotulo="Markup"
+              tom={r.custo > 0 ? (r.receita / r.custo < 1 ? "ruim" : "bom") : "normal"}
+              sub={
+                <span title="Mensalidade dos clientes ÷ custo das licenças no OEM">
+                  {r.custo > 0
+                    ? <>{brl(r.receita)} ÷ {brl(r.custo)}</>
+                    : "Sem custo do OEM, não há como calcular"}
+                </span>
+              }
+            />
           </div>
         </TabsContent>
 
