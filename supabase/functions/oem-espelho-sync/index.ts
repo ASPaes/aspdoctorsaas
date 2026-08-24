@@ -45,12 +45,21 @@ const digitos = (s: unknown) => String(s ?? "").replace(/\D/g, "");
  * pdvlegal só `status: "AT"`. A data existe em UM lugar: a `datavalidade` de
  * cada módulo, que vem junto no `modulos_ativos`.
  *
- * MAIOR data entre os módulos ATIVOS, porque é ela que diz até quando a
- * licença existe: se um módulo vence em 31/08 e outro em 30/09, a licença
- * ainda está de pé em setembro.
+ * TODOS OS MÓDULOS ATIVOS PRECISAM TER DATA. A licença só cai quando não sobra
+ * nada de pé; enquanto um módulo ativo estiver sem prazo, o que vence é aquele
+ * módulo, não a licença.
  *
- * Só olha módulo ativo: inativo vem com `datavalidade: null` de qualquer jeito,
- * e módulo cancelado no meio do caminho não deve marcar a licença inteira.
+ * Corrigido em 24/08/2026, com o CAMPINA VERDE na mão: a versão anterior pegava
+ * a maior data entre os módulos ativos e IGNORAVA os sem data — o cliente
+ * cancelou o iFood, o módulo ficou com validade 31/08, e a tela anunciou que a
+ * LICENÇA seria desativada. Medido na base: de 24 licenças marcadas, 7 eram
+ * disso (Licença PDV, Delivery e iFood vencendo sozinhos), e cinco delas ainda
+ * apareciam no alerta "o OEM vai desativar e o cliente está ativo aqui".
+ *
+ * Entre as que sobram, a data é a MAIOR: se um módulo vence em 31/08 e outro em
+ * 30/09, a licença ainda está de pé em setembro.
+ *
+ * Só olha módulo ativo: inativo vem com `datavalidade: null` de qualquer jeito.
  *
  * 2099 é sentinela de "sem prazo" (3 filiais em 22/08/2026). Tratar como data
  * real marcaria a licença como programada para daqui a 73 anos; devolver null
@@ -58,11 +67,14 @@ const digitos = (s: unknown) => String(s ?? "").replace(/\D/g, "");
  */
 function desativacaoProgramada(modulos: unknown): string | null {
   if (!Array.isArray(modulos)) return null;
+  const ativos = (modulos as Record<string, unknown>[]).filter((m) => m && m.ativo === true);
+  if (!ativos.length) return null;
+
   let maior: string | null = null;
-  for (const m of modulos as Record<string, unknown>[]) {
-    if (!m || m.ativo !== true) continue;
+  for (const m of ativos) {
     const d = typeof m.datavalidade === "string" ? m.datavalidade.slice(0, 10) : null;
-    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+    // Um único módulo ativo sem prazo já basta: a licença continua viva.
+    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
     if (d >= "2099-01-01") return null;
     if (!maior || d > maior) maior = d;
   }
