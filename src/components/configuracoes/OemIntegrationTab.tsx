@@ -263,8 +263,16 @@ function ListaSemCodigo({
         {itens.slice(0, TETO).map((l) => (
           <div key={l.id} className="flex items-center gap-3 px-3 py-2 text-sm">
             <div className="min-w-0 flex-1">
-              <p className="truncate">{l.razao_ds ?? l.razao_oem ?? "—"}</p>
-              <p className="text-xs text-muted-foreground truncate">
+              {/* Nome cortado em tela estreita não distingue dois clientes que
+                  começam igual. O title devolve o inteiro sem alargar a
+                  coluna. */}
+              <p className="truncate" title={l.razao_ds ?? l.razao_oem ?? undefined}>
+                {l.razao_ds ?? l.razao_oem ?? "—"}
+              </p>
+              <p
+                className="text-xs text-muted-foreground truncate"
+                title={`OEM ${l.razao_oem ?? "—"} · filial ${l.filial_codigo} · grupo ${l.empresa_codigo}`}
+              >
                 <span className="text-sky-600 dark:text-sky-400">OEM</span> {l.razao_oem} · filial{" "}
                 {l.filial_codigo} · grupo {l.empresa_codigo}
               </p>
@@ -394,9 +402,13 @@ export default function OemIntegrationTab() {
       fetchAllRows<{
         oem_codigo_filial: string; cliente_id: string; produto_id: number;
         vlr_custo: number | null; ativo: boolean;
+        // O nome vem junto porque a divergência do código em produto de outro
+        // fornecedor tira o cliente da reconciliação: sem ele aqui, a linha
+        // aparecia com "—" no lugar do nome.
+        clientes?: { nome_fantasia: string | null; razao_social: string | null } | null;
       }>(() => {
         let q = (supabase.from("cliente_produtos" as any) as any)
-          .select("oem_codigo_filial, cliente_id, produto_id, vlr_custo, ativo, clientes!inner(unidade_base_id)")
+          .select("oem_codigo_filial, cliente_id, produto_id, vlr_custo, ativo, clientes!inner(unidade_base_id, nome_fantasia, razao_social)")
           .eq("tenant_id", tid)
           .not("oem_codigo_filial", "is", null);
         // A aba é da unidade desta conta: o custo digitado na ficha de um
@@ -736,13 +748,18 @@ export default function OemIntegrationTab() {
   // Legal: R$ 4.891 e 8 clientes. Não dá para escolher um lado e ficar quieto —
   // ou a licença é dele e o produto está errado, ou o código foi para a linha
   // errada. Os dois casos são cadastro a consertar, e agora a aba diz qual.
+  type CodigoErrado = { filial: string; produto: number; nome: string };
   const codigoEmProdutoDeOutro = useMemo(() => {
-    if (!produtosOemIds.length) return new Map<string, { filial: string; produto: number }>();
+    const m = new Map<string, CodigoErrado>();
+    if (!produtosOemIds.length) return m;
     const doOem = new Set(produtosOemIds.map(Number));
-    const m = new Map<string, { filial: string; produto: number }>();
     for (const p of produtosOem) {
       if (!p.oem_codigo_filial || doOem.has(Number(p.produto_id))) continue;
-      m.set(p.cliente_id, { filial: String(p.oem_codigo_filial), produto: Number(p.produto_id) });
+      m.set(p.cliente_id, {
+        filial: String(p.oem_codigo_filial),
+        produto: Number(p.produto_id),
+        nome: p.clientes?.nome_fantasia || p.clientes?.razao_social || "(cliente sem nome)",
+      });
     }
     return m;
   }, [produtosOem, produtosOemIds]);
@@ -1141,7 +1158,10 @@ export default function OemIntegrationTab() {
     for (const [clienteId, info] of codigoEmProdutoDeOutro) {
       const l = linhas.find((x) => x.ds_customer_id === clienteId);
       const nomeProduto = produtosDs.find((p) => p.id === info.produto)?.nome ?? `produto ${info.produto}`;
-      doCliente(clienteId, l ? nomeDe(l) : "—", l?.cnpj_ds ?? l?.cnpj_norm ?? null).itens.push({
+      // O nome sai do próprio cadastro: este cliente não está na reconciliação
+      // (é justamente por não ser do parceiro), então `nomeDe(l)` não tem o que
+      // ler e a linha aparecia sem identificação nenhuma.
+      doCliente(clienteId, info.nome, l?.cnpj_ds ?? l?.cnpj_norm ?? null).itens.push({
         chave: `prodoutro:${clienteId}`, tipo: "codigo_produto_errado", grave: true, linha: l,
         assinatura: `${info.filial}|${info.produto}`,
         rotulo: "Código da licença gravado num produto de outro fornecedor",
@@ -1285,11 +1305,11 @@ export default function OemIntegrationTab() {
           código do OEM não deveria estar nele. Ignorar deixaria a receita de
           outra empresa dentro da conta do OEM, e abrir a ficha só mostra o
           problema. A saída é tirar o código. */}
-      {i.tipo === "codigo_produto_errado" && i.linha && (
+      {i.tipo === "codigo_produto_errado" && (
         <Button size="sm" variant="secondary" className="gap-1.5"
-          disabled={desfazendo === i.linha.id}
-          onClick={() => desvincular(i.linha!.id)}>
-          {desfazendo === i.linha.id
+          disabled={desfazendo === clienteId}
+          onClick={() => removerCodigoDaFicha(clienteId)}>
+          {desfazendo === clienteId
             ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
             : <Undo2 className="h-3.5 w-3.5" />}
           Remover vínculo
@@ -1567,6 +1587,30 @@ export default function OemIntegrationTab() {
       });
     } finally {
       setIgnorandoChave(null);
+    }
+  }
+
+  // Tira o código da ficha sem passar pela reconciliação. Este caso não tem
+  // linha lá: o cliente não é do parceiro, e é exatamente por isso que ele
+  // deixou de casar com filial nenhuma. Sem esta saída, a única coisa que a
+  // tela oferecia era Ignorar — esconder em vez de resolver.
+  async function removerCodigoDaFicha(clienteId: string) {
+    setDesfazendo(clienteId);
+    try {
+      const { error } = await (supabase as any).rpc("oem_remover_codigo_filial", {
+        p_cliente_id: clienteId,
+      });
+      if (error) throw error;
+      toast({
+        title: "Código removido da ficha",
+        description: "O cliente deixa de aparecer como dono daquela licença do OEM.",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["oem-codigos-gravados", tid] });
+      await recarregarRecon();
+    } catch (e: any) {
+      toast({ title: "Não deu para remover", description: e?.message ?? String(e), variant: "destructive" });
+    } finally {
+      setDesfazendo(null);
     }
   }
 
@@ -1888,7 +1932,7 @@ export default function OemIntegrationTab() {
                       <div key={`${m.modulo_id}:${m.dia}:${m.valor_anterior}:${m.valor_novo}`}
                         className="flex items-center gap-3 p-3 text-sm">
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium truncate">{m.modulo_nome}</p>
+                          <p className="font-medium truncate" title={m.modulo_nome}>{m.modulo_nome}</p>
                           <p className="text-xs text-muted-foreground">
                             {brl(de)} → <strong>{brl(para)}</strong>
                             {" "}{soTotal ? "no total cobrado" : "por licença"} ·{" "}
@@ -2017,7 +2061,7 @@ export default function OemIntegrationTab() {
                       {modulosVisiveis.map((m) => (
                         <tr key={m.codigo}>
                           <td className="sticky left-0 z-10 bg-card px-6 py-2 font-medium">
-                            <span className="truncate">{m.nome}</span>
+                            <span className="truncate" title={m.nome}>{m.nome}</span>
                             <span className="ml-2 font-mono text-xs text-muted-foreground">#{m.codigo}</span>
                           </td>
                           {grade.produtos.map((p) => {
@@ -2255,9 +2299,19 @@ export default function OemIntegrationTab() {
                     <div className="divide-y">
                       {custosPagina.map((c) => (
                         <div key={c.id} className="flex items-center gap-3 px-6 py-2.5 text-sm">
+                          {/* O nome corta em tela estreita, e "ACAI D..." não
+                              distingue dois clientes que começam igual. O
+                              title devolve o nome inteiro sem alargar a
+                              coluna, que é o que sustenta o alinhamento das
+                              outras seis. A linha das filiais leva o mesmo
+                              tratamento: cliente com muitas filiais tem a
+                              lista cortada pelo mesmo motivo. */}
                           <div className="min-w-0 flex-1">
-                            <p className="font-medium truncate">{c.cliente}</p>
-                            <p className="text-xs text-muted-foreground truncate">
+                            <p className="font-medium truncate" title={c.cliente}>{c.cliente}</p>
+                            <p
+                              className="text-xs text-muted-foreground truncate"
+                              title={c.filiais.length === 1 ? undefined : c.filiais.join(", ")}
+                            >
                               {c.filiais.length === 1
                                 ? `filial ${c.filiais[0]}`
                                 : `${c.filiais.length} filiais: ${c.filiais.join(", ")}`}
@@ -2420,7 +2474,7 @@ export default function OemIntegrationTab() {
                       <div key={l.id} className="flex items-center gap-3 p-3 text-sm">
                         <HelpCircle className="h-4 w-4 shrink-0 text-amber-500" />
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium truncate">{l.razao_oem ?? "—"}</p>
+                          <p className="font-medium truncate" title={l.razao_oem ?? undefined}>{l.razao_oem ?? "—"}</p>
                           <p className="text-xs text-muted-foreground">
                             filial {l.filial_codigo} · grupo {l.empresa_codigo} · CNPJ {l.cnpj_norm}
                             {escolher && l.qtd_candidatos_ds
@@ -2481,7 +2535,7 @@ export default function OemIntegrationTab() {
                       <div key={`ign:${item.chave}`} className="flex items-start gap-3 p-3 text-sm">
                         <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium truncate">{cliente}</p>
+                          <p className="font-medium truncate" title={cliente}>{cliente}</p>
                           <p className="text-xs text-muted-foreground">
                             {item.rotulo} · {item.detalhe}
                           </p>
@@ -2548,7 +2602,9 @@ export default function OemIntegrationTab() {
                       <div key={l.id} className="flex items-center gap-3 p-3 text-sm">
                         <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium truncate">{l.razao_ds ?? l.razao_oem ?? "—"}</p>
+                          <p className="font-medium truncate" title={l.razao_ds ?? l.razao_oem ?? undefined}>
+                            {l.razao_ds ?? l.razao_oem ?? "—"}
+                          </p>
                           <p className="text-xs text-muted-foreground">
                             filial {l.filial_codigo} · grupo {l.empresa_codigo} · desativa em{" "}
                             <strong>{dataBR(l.desativa_em!)}</strong>
@@ -2609,7 +2665,7 @@ export default function OemIntegrationTab() {
                           className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${aberto ? "rotate-90" : ""}`}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium truncate">{c.nome}</p>
+                          <p className="font-medium truncate" title={c.nome}>{c.nome}</p>
                           {c.cnpj && <p className="text-xs text-muted-foreground">CNPJ {c.cnpj}</p>}
                         </div>
                         {graves > 0 && (
