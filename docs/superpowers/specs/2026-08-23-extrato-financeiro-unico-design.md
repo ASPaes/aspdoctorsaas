@@ -121,21 +121,25 @@ Divergência medida em 23/08/2026, mesmo instante, mesmos clientes ativos:
 | D2 | **Porta única de escrita.** Toda mudança financeira passa por uma RPC que grava extrato + estado na mesma transação. | Alexandre |
 | D3 | **Backfill completo com prova.** O extrato passa a conter o passado inteiro. Sem corte de data. | Alexandre |
 | D4 | **Cada lançamento carrega dois valores** — recorrente e pontual — no mesmo registro. | Alexandre (correção sobre a proposta inicial) |
-| D5 | **O contrato NÃO é excluído.** Sai da tela, fica no modelo. | Claude, aceito |
+| D5 | **O contrato NÃO é excluído.** Sai da tela, vira vínculo de faturamento. Mas o **reajuste deixa de ser dele** e passa para o produto (§6). | Claude, revisado após objeção do Alexandre |
 | D6 | **MRR atual = saldo do extrato.** `cliente_produtos.vlr_mensal` vira valor contratado de referência. | Alexandre |
 | D7 | **Downsell não toca no produto.** Ajuste só por lançamento. | Alexandre |
 | D8 | `certificado_a1_vendas` migra por último, depois que o livro provar que funciona. | Claude, aceito |
 
 ### Por que o contrato fica (D5)
 
-O desenho original pedia excluí-lo. 97% dos contratos são `is_implicit = true` (3.986 de 4.105 ativos), sem arquivo anexado — parecem burocracia. Mas ele é a chave de roteamento de quatro coisas vivas:
+O desenho original pedia excluí-lo. 97% dos contratos são `is_implicit = true` (3.986 de 4.105 ativos), sem arquivo anexado — parecem burocracia. Objeção levantada pelo Alexandre em 23/08: a data do próximo reajuste vive nele, e o reajuste é por produto, não por contrato. **A objeção procede e mudou o desenho** (§6) — mas não a ponto de excluir a entidade.
 
-- **Omie**: `enfileirar_sync_omie(contrato_id, origem)` — todo sync é por contrato. `montar_payload_contrato_omie(p_contrato_id, …)`.
-- **Reajuste**: `reajuste_contratos`.
+O que o contrato ainda carrega depois de perder o reajuste:
+
+- **Omie**: `enfileirar_sync_omie(contrato_id, origem)`, `montar_payload_contrato_omie(p_contrato_id, …)`, `omie_sync_fila.contrato_id`.
 - **Cancelamento**: `cancelado_em`, `motivo_cancelamento`, `contrato_eventos`.
-- **Vencimento**: `dia_vencimento` (1.486 preenchidos).
+- **Faturamento**: `dia_vencimento` (1.486 preenchidos), `forma_pagamento_mensalidade_id`.
+- **Documentos**: `contrato_anexos`, `modelo_contrato_id` (que também é o portão do sync — `modelos_contrato.sincroniza_omie`).
 
-Excluir não simplifica — arranca o identificador que o ERP usa. **Ele sai da UI de cadastro e vira container técnico.** Os 141 contratos não implícitos ganham uma aba "Documentos".
+**O argumento decisivo:** `reconciliacao_cadastro` tem **1.015 contratos já espelhados com `ds_contract_id`**. O ID do contrato não é chave só nossa — está gravado dentro do ERP do cliente. Excluir a entidade exige re-vincular 1.015 registros no Omie, com risco de faturamento errado, para ganhar zero em usabilidade (a tela some de qualquer jeito).
+
+**Posição:** ele deixa de ser conceito de negócio e vira **vínculo de faturamento** — invisível no cadastro. Os 141 contratos não implícitos ganham uma aba "Documentos". Se o Alexandre ainda quiser excluí-lo, isso vira um projeto próprio, com plano de re-vinculação do Omie, e não entra aqui.
 
 ### O que o Omie já suporta (verificado)
 
@@ -286,40 +290,105 @@ Sem o conferidor, voltam a existir duas verdades — que é exatamente o problem
 
 ---
 
-## 6. Risco nº 1 — as duas listas negras
+## 6. O reajuste passa a ser do produto
 
-Adicionar `venda_nova` ao enum **duplica o MRR** em qualquer leitor que some produto + lançamento sem excluí-lo.
+Levantado pelo Alexandre em 23/08. Regra de negócio que **não estava no código**:
 
-| Leitor | Filtro | Efeito com `venda_nova` |
+> Cliente com PDV Legal (R$ 300/mês) e Ponto Eletrônico (R$ 130/mês). O reajuste incide **só sobre o PDV Legal**. O Ponto Eletrônico não reajusta.
+
+### 6.1. A data já existe no produto — e não diverge
+
+`cliente_produtos.data_proximo_reajuste` já existe e é atualizada pelo `aplicar_reajuste` junto com a do contrato. Conferidos os 4.056 pares contrato↔produto ativos em 23/08:
+
+| | Pares |
+|---|---|
+| Iguais | **3.040** |
+| **Divergentes** | **0** |
+| Só no contrato | 792 |
+| Só no produto | 1 |
+| Ambos nulos | 223 |
+
+Migrar a data para o produto é backfill de **792 linhas, sem nenhum conflito a resolver**. É a parte fácil.
+
+### 6.2. Mas a data não é o problema — a base é
+
+`preparar_reajuste` seleciona por `contratos.data_proximo_reajuste` e depois **bifurca**:
+
+```
+se o cliente tem 1 contrato ativo  → base = MRR INTEIRO do cliente
+                                     (Σ cliente_produtos ativos + Σ movimentos)
+se tem mais de um contrato         → base = só os produtos daquele contrato
+```
+
+Com 1 contrato — **99% dos casos** — o reajuste incide sobre tudo que o cliente paga. No exemplo acima: base 430,00, reajuste sobre 430,00. Exatamente o que a regra proíbe.
+
+**Ainda não causou dano:** dos 266 reajustes aplicados, **0** incidiram sobre cliente com mais de um produto ativo. E hoje só **7 clientes na base inteira** têm mais de um produto ativo (Delvale 1, ASP 1, Athuz 1, Consysa 1, Liberty 3). O defeito é latente — dá para corrigir antes de aparecer, e é por isso que ele entra neste plano em vez de virar bug depois.
+
+### 6.3. O desenho
+
+| Item | Antes | Depois |
 |---|---|---|
-| `fn_mrr_cliente_em` | `tipo IN (...)` lista branca | ignora — seguro |
-| `get_mrr_bridge` | `tipo IN (...)` lista branca | ignora — seguro |
-| `src/lib/mrrRuler.ts` (`MRR_MOV_TIPOS`) | lista branca | ignora — seguro |
-| **`calcular_mrr_cliente`** | `tipo NOT IN ('venda_avulsa','churn','reactivation')` | **soma. Duplica.** |
-| **`trg_valor_enfileirar_omie`** | mesma lista negra | **soma. Manda o dobro para o Omie.** |
+| Onde mora a data | `contratos.data_proximo_reajuste` (autoridade) + `cliente_produtos` (cópia) | **`cliente_produtos.data_proximo_reajuste` (autoridade)**. A do contrato vira derivada — `MIN()` dos produtos — só para o Omie. |
+| Quem é elegível | contrato com data na janela | **produto** com data na janela |
+| Base do cálculo | MRR inteiro do cliente (1 contrato) | **saldo do extrato daquele produto** — `venda_nova + upsell + downsell + reajuste` filtrados por `cliente_produto_id` |
+| Granularidade de `reajuste_contratos` | 1 linha por contrato | 1 linha por **produto** (a tabela ganha `cliente_produto_id`; o nome fica) |
+| Movimento gerado | `reajuste` com `contrato_id` | `reajuste` com `contrato_id` **e `cliente_produto_id`** |
+| Produto isento | não existe | flag `reajusta` em `cliente_produtos` (default `true`) — é o que deixa o Ponto Eletrônico de fora sem depender de data nula |
 
-`calcular_mrr_cliente` é o que alimenta `montar_payload_contrato_omie`. No dia em que o enum ganhar `venda_nova`, o ERP do cliente recebe o dobro.
+**Por que a base por produto só funciona depois da fase 4:** hoje não existe `venda_nova`, então o extrato não sabe quanto vale cada produto isoladamente — o valor está em `cliente_produtos.vlr_mensal`. Enquanto o backfill não rodar, a base por produto seria `vlr_mensal + movimentos vinculados àquele produto`, e só 4 de 372 movimentos têm vínculo (§1.4). **Por isso o reajuste por produto entra na fase 5, não antes.**
 
-**Converter essas duas para lista branca é a fase 1, isolada, antes de qualquer outra coisa.**
+### 6.4. O que o Omie precisa continuar recebendo
+
+`montar_payload_contrato_omie` envia `vigencia_final = contratos.data_proximo_reajuste`, e recusa o envio se a data estiver vencida. Com a autoridade no produto, a do contrato passa a ser mantida como `MIN(data_proximo_reajuste)` dos produtos ativos do contrato — a mais próxima manda, que é o comportamento conservador (o Omie renova a vigência antes, nunca depois).
+
+Enquanto o Omie só suportar 1 produto por contrato, `MIN()` e "a data do produto" são a mesma coisa.
 
 ---
 
-## 7. Fases
+## 7. Risco nº 1 — as listas negras
+
+Adicionar `venda_nova` ao enum **duplica o MRR** em qualquer leitor que some produto + lançamento sem excluí-lo.
+
+Varredura completa das funções que leem `movimentos_mrr` (23/08/2026):
+
+**Lista negra — `tipo NOT IN ('venda_avulsa','churn','reactivation')`. Somam `venda_nova` sozinhas:**
+
+| Função | Consequência |
+|---|---|
+| **`calcular_mrr_cliente`** | Alimenta `montar_payload_contrato_omie` → **o ERP do cliente recebe o dobro.** |
+| **`trg_valor_enfileirar_omie`** | Enfileira o valor dobrado. |
+| **`preparar_reajuste`** | **Reajuste calculado sobre o dobro da base.** Dinheiro cobrado errado do cliente final. |
+
+**Lista branca — ignoram `venda_nova`, seguras:** `fn_mrr_cliente_em`, `fn_mrr_do_modulo`, `get_mrr_bridge`, `get_mrr_monthly_snapshots`, `fn_cohort_revenue`, `get_cancelamentos_breakdown`, `get_carteira_serie_uf`, `theo_kpis_janela`, `cancelar_contrato`, e `src/lib/mrrRuler.ts` (`MRR_MOV_TIPOS`).
+
+**Sem filtro de tipo — auditar antes da fase 2:** `build_management_digest_block` (relatório gerencial do Théo), `admin_delete_cliente`, `preview_delete_cliente`, `editar_cancelamento`, `fn_oem_espelhar_modulos_no_contrato`. As quatro últimas operam por cliente e não somam MRR; `build_management_digest_block` soma e precisa ser conferida linha a linha.
+
+`preparar_reajuste` é o pior dos três: os outros dois erram um número de tela ou de integração, este **erra o valor que o cliente final passa a pagar**.
+
+**Converter os três para lista branca é a fase 1, isolada, antes de qualquer outra coisa.**
+
+---
+
+## 8. Fases
 
 Cada fase é publicável e reversível sozinha.
 
 | # | Fase | Muda número na tela? |
 |---|---|---|
-| 1 | Listas negras → brancas em `calcular_mrr_cliente` e `trg_valor_enfileirar_omie` | Não |
-| 2 | Colunas novas + `categorias_receita` + `valor_pontual` consolidando `vlr_ativacao` / `valor_venda_avulsa` | Não (aditivo) |
+| 1 | Listas negras → brancas nas **três** funções (`calcular_mrr_cliente`, `trg_valor_enfileirar_omie`, `preparar_reajuste`) + auditoria de `build_management_digest_block` | Não |
+| 2 | Colunas novas + `categorias_receita` + `valor_pontual` consolidando `vlr_ativacao` / `valor_venda_avulsa` + flag `cliente_produtos.reajusta` | Não (aditivo) |
 | 3 | `registrar_movimento_receita` + `estornar_movimento` + `REVOKE` da escrita direta + telas migradas | Não |
-| 4 | Backfill de `venda_nova` e churn total + relatório de paridade | Não (extrato ainda não é lido) |
-| 5 | `fn_mrr_saldo_em` + `fn_mrr_extrato` + troca das 6 abas, **uma por vez** | **Sim** — aprovação por aba |
+| 4 | Backfill de `venda_nova` e churn total + backfill dos 792 `data_proximo_reajuste` no produto + relatório de paridade | Não (extrato ainda não é lido) |
+| 5 | `fn_mrr_saldo_em` + `fn_mrr_extrato` + troca das 6 abas, **uma por vez** + **reajuste por produto** (§6.3) | **Sim** — aprovação por aba |
 | 6 | `certificado_a1_vendas` migra para o livro | Sim, na aba Vendas |
 
 ### Fase 1 — detalhe
 
-Trocar o `NOT IN` por `IN ('upsell','cross_sell','downsell','reajuste')` nas duas funções. Prova: `calcular_mrr_cliente` de todos os clientes ativos dos 3 maiores tenants antes e depois — **diferença tem de ser exatamente 0,00** (o enum ainda não tem `venda_nova`).
+Trocar o `NOT IN` por `IN ('upsell','cross_sell','downsell','reajuste')` nas três funções.
+
+Prova, em duas partes:
+1. `calcular_mrr_cliente` de todos os clientes ativos dos 3 maiores tenants, antes e depois — **diferença exatamente 0,00** (o enum ainda não tem `venda_nova`, então o `NOT IN` e o `IN` cobrem o mesmo conjunto hoje).
+2. `preparar_reajuste` em modo simulação sobre a última janela aplicada — `vlr_mensal_antes` de cada linha idêntico ao que ficou gravado em `reajuste_contratos`.
 
 ### Fase 3 — a porta única
 
@@ -372,17 +441,26 @@ Ordem sugerida, da menor exposição para a maior:
 5. **Vendas** — `useVendasExtras.ts` (ganha `valor_pontual`)
 6. **Crescimento** — `get_mrr_bridge` reescrita **sem** `mov_de_quem_saiu` e `churn_parcial`, que deixam de existir
 
-Também na fase 5: `fn_mrr_por_cliente_em` para de usar `clientes.mensalidade`. `src/lib/mrrRuler.ts` deixa de precisar somar base + ajuste — vira leitura direta do saldo.
+Também na fase 5:
+
+- `fn_mrr_por_cliente_em` para de usar `clientes.mensalidade`.
+- `src/lib/mrrRuler.ts` deixa de somar base + ajuste — vira leitura direta do saldo.
+- **Reajuste por produto** (§6.3): `preparar_reajuste` passa a selecionar por `cliente_produtos.data_proximo_reajuste`, respeitar a flag `reajusta` e calcular a base pelo saldo daquele produto. `reajuste_contratos` ganha `cliente_produto_id`. A bifurcação "1 contrato → MRR inteiro" **deixa de existir**.
+  Prova obrigatória: rodar em simulação sobre os 7 clientes multi-produto e conferir manualmente, um por um, que só o produto certo foi incluído.
+  `contratos.data_proximo_reajuste` passa a ser mantida como `MIN()` dos produtos ativos, só para o Omie (§6.4).
 
 **Cada aba entrega um relatório antes/depois por tenant e por mês. Sem aprovação do Alexandre, não vai.**
 
 ---
 
-## 8. Riscos
+## 9. Riscos
 
 | Risco | Mitigação |
 |---|---|
 | `venda_nova` duplicar o MRR no Omie | Fase 1 isolada, antes de tudo. Prova de diferença 0,00. |
+| **`venda_nova` dobrar a base do reajuste** — dinheiro cobrado errado do cliente final | Fase 1 cobre `preparar_reajuste`. É o pior dos três casos de lista negra. |
+| Reajuste por produto mudar o valor de quem já tem data marcada | Só entra na fase 5, depois do backfill. Simulação obrigatória sobre os 7 clientes multi-produto. |
+| `contratos.data_proximo_reajuste` desatualizar e travar o Omie | Mantida como `MIN()` dos produtos; `montar_payload_contrato_omie` já recusa data vencida — o erro aparece, não passa silencioso. |
 | Backfill enfileirar 4.990 contratos no Omie | Gatilho desabilitado na transação / filtro por `origem_registro`. |
 | `ADD VALUE` no enum é irreversível | Sem rollback. Só entra depois da fase 1 aprovada. |
 | Escrita direta sobreviver ao `REVOKE` | Inventário das 17 funções + 11 arquivos acima. `REVOKE` só na última etapa da fase 3. |
@@ -394,10 +472,11 @@ Também na fase 5: `fn_mrr_por_cliente_em` para de usar `clientes.mensalidade`. 
 
 ---
 
-## 9. Fora de escopo
+## 10. Fora de escopo
 
 - Suporte a múltiplos produtos/contratos por cliente no Omie (limitação pré-existente).
 - Recorrência não mensal (anual, trimestral, por consumo).
 - Separação receita bruta × repasse de fornecedor no mesmo lançamento.
 - Renomear a tabela `movimentos_mrr`.
-- Excluir a entidade contrato.
+- **Excluir a entidade contrato.** Fica registrado como pedido do Alexandre, adiado com motivo (§2, D5): 1.015 `ds_contract_id` já espelhados no Omie. Se voltar à mesa, é projeto próprio com plano de re-vinculação do ERP.
+- Índice de reajuste (IGPM/IPCA) por produto. `contratos.indice_reajuste` existe e é exibido/editável em `ClienteContratosSection.tsx`, mas **não entra no cálculo** — `preparar_reajuste` recebe o percentual por parâmetro. Continua assim.
