@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAtendimentoChats, useAtendimentoChatsTimeline } from "./useAtendimentoChats";
+import { ChatsListaDialog } from "./ChatsListaDialog";
 
 const CLOSE_OPTS: { v: string; label: string }[] = [
   { v: "manual", label: "Manual" },
@@ -173,6 +174,7 @@ export function ChatsTab() {
   const [hasTicket, setHasTicket] = useState<"all" | "with" | "without">("all");
   const [sentiments, setSentiments] = useState<string[]>([]);
   const [resolucoes, setResolucoes] = useState<string[]>([]);
+  const [verLista, setVerLista] = useState(false);
   const { data, isLoading, isError, error } = useAtendimentoChats({ closedReasons, hasTicket, sentiments, resolucoes });
 
   const { data: timeline } = useAtendimentoChatsTimeline();
@@ -296,10 +298,27 @@ export function ChatsTab() {
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-            <div className="rounded-lg border border-border bg-card p-4">
+            {/* Único card clicável da fileira: abre a lista que forma o número.
+                Fica como <button> e não KPICardEnhanced para não desalinhar dos
+                outros quatro, que são cards simples. */}
+            <button
+              type="button"
+              onClick={data.total > 0 ? () => setVerLista(true) : undefined}
+              disabled={data.total === 0}
+              aria-label={data.total > 0 ? `Ver os ${data.total} atendimentos` : undefined}
+              className={cn(
+                "rounded-lg border border-border bg-card p-4 text-left transition-colors",
+                data.total > 0 && "hover:border-primary/40 hover:bg-muted/30",
+              )}
+            >
               <p className="text-xs text-muted-foreground">Total de Atendimentos</p>
               <p className="text-2xl font-semibold tabular-nums">{data.total.toLocaleString("pt-BR")}</p>
-            </div>
+              {data.total > 0 && (
+                <p className="mt-1 text-xs font-medium text-primary">
+                  Ver os {data.total.toLocaleString("pt-BR")} atendimentos →
+                </p>
+              )}
+            </button>
             <div className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs text-muted-foreground">CSAT médio</p>
               <p className="text-2xl font-semibold tabular-nums">{data.csat.media !== null ? data.csat.media.toFixed(2) : "—"}</p>
@@ -433,6 +452,15 @@ export function ChatsTab() {
           </div>
         </>
       )}
+
+      <ChatsListaDialog
+        open={verLista}
+        onOpenChange={setVerLista}
+        closedReasons={closedReasons}
+        hasTicket={hasTicket}
+        sentiments={sentiments}
+        resolucoes={resolucoes}
+      />
     </div>
   );
 }
