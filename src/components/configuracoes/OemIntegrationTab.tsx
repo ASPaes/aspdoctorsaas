@@ -356,6 +356,13 @@ export default function OemIntegrationTab() {
     enabled: !!tid,
   });
 
+  // A conta escolhida sobe para cá porque as queries abaixo dependem dela: a
+  // aba inteira é da unidade desta conta, e não do tenant.
+  const conta = useMemo(
+    () => contas.find((c) => c.id === contaSel) ?? contas[0] ?? null,
+    [contas, contaSel],
+  );
+
   const { data: unidades = [] } = useQuery({
     queryKey: ["oem-unidades", tid],
     queryFn: async () => {
@@ -373,15 +380,22 @@ export default function OemIntegrationTab() {
   // produto) — é ele que a aba Custos compara com o que a licença cobra de fato
   // no OEM. Uma query só: o código da filial e o custo moram na mesma linha.
   const { data: produtosOem = [] } = useQuery({
-    queryKey: ["oem-codigos-gravados", tid],
+    queryKey: ["oem-codigos-gravados", tid, conta?.id],
     enabled: !!tid,
     queryFn: () =>
-      fetchAllRows<{ oem_codigo_filial: string; cliente_id: string; vlr_custo: number | null; ativo: boolean }>(() =>
-        (supabase.from("cliente_produtos" as any) as any)
-          .select("oem_codigo_filial, cliente_id, vlr_custo, ativo")
+      fetchAllRows<{ oem_codigo_filial: string; cliente_id: string; vlr_custo: number | null; ativo: boolean }>(() => {
+        let q = (supabase.from("cliente_produtos" as any) as any)
+          .select("oem_codigo_filial, cliente_id, vlr_custo, ativo, clientes!inner(unidade_base_id)")
           .eq("tenant_id", tid)
-          .not("oem_codigo_filial", "is", null),
-      ),
+          .not("oem_codigo_filial", "is", null);
+        // A aba é da unidade desta conta: o custo digitado na ficha de um
+        // cliente de outra unidade não tem o que fazer aqui, e o código de
+        // filial de outra conta poderia até casar por acaso com uma filial
+        // desta e dar vínculo confirmado onde não há.
+        const unidadesDaConta = conta?.unidades_base_ids ?? [];
+        if (unidadesDaConta.length) q = q.in("clientes.unidade_base_id", unidadesDaConta);
+        return q;
+      }),
   });
 
   // O conjunto de filiais com código gravado continua contando TODO produto,
@@ -439,10 +453,6 @@ export default function OemIntegrationTab() {
     },
   });
 
-  const conta = useMemo(
-    () => contas.find((c) => c.id === contaSel) ?? contas[0] ?? null,
-    [contas, contaSel],
-  );
   const rotulo = (c: Conta) =>
     (c.unidades_base_ids ?? []).map((u) => unidades.find((x) => x.id === u)?.nome ?? `Unidade ${u}`)
       .join(", ") || "Todas as unidades";
@@ -504,14 +514,18 @@ export default function OemIntegrationTab() {
   // aconteceu. Uma linha por módulo × valor × dia — um reajuste de "Licença
   // PDV" mexe em centenas de clientes e não pode virar centenas de linhas.
   const { data: mudancasCusto = [] } = useQuery({
-    queryKey: ["oem-mudancas-custo", tid],
-    enabled: !!tid,
+    queryKey: ["oem-mudancas-custo", tid, conta?.id],
+    enabled: !!tid && !!conta,
     queryFn: async () => {
-      const { data, error } = await (supabase.from("v_oem_mudanca_custo_modulo" as any) as any)
+      let q = (supabase.from("v_oem_mudanca_custo_modulo" as any) as any)
         .select("modulo_id, modulo_nome, dia, valor_anterior, valor_novo, clientes, variacao_mensal, ocorrido_em")
-        .eq("tenant_id", tid)
-        .order("ocorrido_em", { ascending: false })
-        .limit(50);
+        .eq("tenant_id", tid);
+      // A aba inteira é da unidade desta conta: com duas contas conectadas, uma
+      // não pode ver o reajuste que atingiu os clientes da outra. O mesmo
+      // recorte da contagem de contratos e da reconciliação.
+      const unidadesDaConta = conta?.unidades_base_ids ?? [];
+      if (unidadesDaConta.length) q = q.in("unidade_base_id", unidadesDaConta);
+      const { data, error } = await q.order("ocorrido_em", { ascending: false }).limit(50);
       if (error) throw error;
       return (data ?? []) as MudancaCusto[];
     },
@@ -682,17 +696,20 @@ export default function OemIntegrationTab() {
   }
 
   const { data: ultimaCarga } = useQuery({
-    queryKey: ["oem-espelho-ultima", tid],
+    // Por CONTA: com duas conectadas, a data da carga de uma não pode aparecer
+    // no cabeçalho da outra — é ela que diz se o que está na tela é fresco.
+    queryKey: ["oem-espelho-ultima", tid, conta?.id],
     queryFn: async () => {
       const { data } = await (supabase.from("oem_espelho_filial" as any) as any)
         .select("atualizado_em, last_sync_oem")
         .eq("tenant_id", tid)
+        .eq("conta_integration_id", conta!.id)
         .order("atualizado_em", { ascending: false })
         .limit(1)
         .maybeSingle();
       return data as { atualizado_em: string; last_sync_oem: string | null } | null;
     },
-    enabled: !!tid,
+    enabled: !!tid && !!conta,
   });
 
   const r = useMemo(() => {
