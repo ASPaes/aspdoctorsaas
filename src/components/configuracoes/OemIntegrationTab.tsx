@@ -1273,6 +1273,20 @@ export default function OemIntegrationTab() {
           Ajustar custo
         </Button>
       )}
+      {/* Aqui não há vínculo a preservar: o produto é de outro fornecedor, e o
+          código do OEM não deveria estar nele. Ignorar deixaria a receita de
+          outra empresa dentro da conta do OEM, e abrir a ficha só mostra o
+          problema. A saída é tirar o código. */}
+      {i.tipo === "codigo_produto_errado" && i.linha && (
+        <Button size="sm" variant="secondary" className="gap-1.5"
+          disabled={desfazendo === i.linha.id}
+          onClick={() => desvincular(i.linha!.id)}>
+          {desfazendo === i.linha.id
+            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : <Undo2 className="h-3.5 w-3.5" />}
+          Remover vínculo
+        </Button>
+      )}
       {(i.tipo === "cnpj" || i.tipo === "nome") && i.linha && (
         <>
           <Button size="sm" variant="secondary" className="gap-1.5"
@@ -1307,8 +1321,7 @@ export default function OemIntegrationTab() {
         </Button>
       )}
       {(i.tipo === "margem" || i.tipo === "sem_licenca" || i.tipo === "escolher_licenca"
-        || i.tipo === "licenca_cancelado" || i.tipo === "desativa_ativo"
-        || i.tipo === "codigo_produto_errado") && (
+        || i.tipo === "licenca_cancelado" || i.tipo === "desativa_ativo") && (
         <Button size="sm" variant="ghost" className="gap-1.5"
           onClick={() => navigate(`/clientes/${clienteId}`)}>
           <ExternalLink className="h-3.5 w-3.5" /> Abrir ficha
