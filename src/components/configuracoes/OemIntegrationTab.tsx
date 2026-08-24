@@ -12,12 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import OemFilaSincronizacaoPanel from "./OemFilaSincronizacaoPanel";
 import { useAbaNaUrl } from "@/hooks/useDeepLinkIntegracao";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
   Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
@@ -1136,6 +1135,58 @@ export default function OemIntegrationTab() {
   // É este número que acende o alerta na aba.
   const totalDivergencias = divergencias.total;
 
+  // Cada divergência tem UM caminho de saída, e é ele que vira botão. Onde a
+  // saída é fora do sistema — desativar a licença no portal do OEM — o botão
+  // leva à ficha, que é de onde a pessoa tira o número da filial.
+  //
+  // Mora numa função porque os mesmos botões aparecem em dois lugares: na fila
+  // e no bloco do que foi marcado como certo. Quem volta atrás precisa das
+  // mesmas saídas de quem nunca decidiu — duplicar o JSX faria as duas listas
+  // divergirem no primeiro botão novo.
+  type ItemDivergencia = (typeof divergencias)["lista"][number]["itens"][number];
+  const acoesDaDivergencia = (i: ItemDivergencia, clienteId: string) => (
+    <>
+      {i.tipo === "custo" && i.custo && (
+        <Button size="sm" variant="secondary" className="gap-1.5"
+          disabled={atualizandoDs === i.custo.id}
+          onClick={() => atualizarCustoDs(i.custo!.filiais, i.custo!.cliente, i.custo!.id)}>
+          {atualizandoDs === i.custo.id
+            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : <RefreshCw className="h-3.5 w-3.5" />}
+          Ajustar custo
+        </Button>
+      )}
+      {(i.tipo === "cnpj" || i.tipo === "nome") && i.linha && (
+        <>
+          <Button size="sm" variant="secondary" className="gap-1.5"
+            onClick={() => setEscolhendo(i.linha!)}>
+            <Link2 className="h-3.5 w-3.5" /> Trocar cliente
+          </Button>
+          <Button size="sm" variant="ghost"
+            disabled={desfazendo === i.linha.id}
+            onClick={() => desvincular(i.linha!.id)}>
+            {desfazendo === i.linha.id
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : "Desfazer"}
+          </Button>
+        </>
+      )}
+      {i.tipo === "sem_codigo" && i.linha && (
+        <Button size="sm" variant="secondary" className="gap-1.5"
+          onClick={() => navigate(`/clientes/${clienteId}`)}>
+          <ExternalLink className="h-3.5 w-3.5" /> Ajustar na ficha
+        </Button>
+      )}
+      {(i.tipo === "margem" || i.tipo === "sem_licenca"
+        || i.tipo === "licenca_cancelado" || i.tipo === "desativa_ativo") && (
+        <Button size="sm" variant="ghost" className="gap-1.5"
+          onClick={() => navigate(`/clientes/${clienteId}`)}>
+          <ExternalLink className="h-3.5 w-3.5" /> Abrir ficha
+        </Button>
+      )}
+    </>
+  );
+
   const [clienteAberto, setClienteAberto] = useState<string | null>(null);
   // Recolhido por padrão: são mais de cem licenças, e abertas elas empurram a
   // lista de clientes — que é o assunto da aba — para fora da primeira tela.
@@ -2200,6 +2251,74 @@ export default function OemIntegrationTab() {
             </Card>
           )}
 
+          {/* O que alguém já disse que está certo. Fica recolhido e fora do
+              selo da aba: não é pendência. Mas fica VISÍVEL, porque decisão
+              escondida é decisão que ninguém revisa — e daqui sai o caminho de
+              volta para quem clicou sem querer. */}
+          {divergencias.ignorados.length > 0 && (
+            <Card>
+              <button
+                type="button"
+                onClick={() => setIgnoradosAberto((v) => !v)}
+                className="flex w-full items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
+              >
+                <ChevronRight
+                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${ignoradosAberto ? "rotate-90" : ""}`}
+                />
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">
+                    {divergencias.ignorados.length} divergência{divergencias.ignorados.length > 1 ? "s" : ""}{" "}
+                    marcada{divergencias.ignorados.length > 1 ? "s" : ""} como certa{divergencias.ignorados.length > 1 ? "s" : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    O vínculo vale e o apontamento foi aceito. Se o valor comparado mudar, a
+                    divergência volta sozinha para a lista.
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {ignoradosAberto ? "recolher" : "ver lista"}
+                </span>
+              </button>
+              {ignoradosAberto && (
+                <CardContent className="p-0">
+                  <div className="divide-y border-t max-h-80 overflow-y-auto">
+                    {divergencias.ignorados.map(({ cliente, clienteId, item }) => (
+                      <div key={`ign:${item.chave}`} className="flex items-start gap-3 p-3 text-sm">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">{cliente}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.rotulo} · {item.detalhe}
+                          </p>
+                        </div>
+                        <div className="shrink-0 flex items-center gap-1.5">
+                          <Button
+                            size="sm" variant="secondary" className="gap-1.5"
+                            disabled={ignorandoChave === item.chave}
+                            onClick={() => marcarIgnorada(
+                              item.chave, item.tipo, item.assinatura,
+                              item.linha?.id ?? null, clienteId, true,
+                            )}
+                          >
+                            {ignorandoChave === item.chave
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <Undo2 className="h-3.5 w-3.5" />}
+                            Voltar para a fila de divergências
+                          </Button>
+                          {/* As mesmas saídas de quem está na fila: quem abre
+                              este bloco pode querer resolver na hora, sem ter
+                              de devolver o item para a lista primeiro. */}
+                          {acoesDaDivergencia(item, clienteId)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )}
+
           {/* Cancelamento que já foi feito nos dois lados e só espera a data do
               OEM. Não é alarme — é o extrato do que ainda vai ser cobrado até
               a baixa cair. Fica em cinza e fora do selo da aba de propósito. */}
@@ -2250,68 +2369,6 @@ export default function OemIntegrationTab() {
                             <ExternalLink className="h-3.5 w-3.5" /> Abrir ficha
                           </Button>
                         )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-          )}
-
-          {/* O que alguém já disse que está certo. Fica recolhido e fora do
-              selo da aba: não é pendência. Mas fica VISÍVEL, porque decisão
-              escondida é decisão que ninguém revisa — e daqui sai o caminho de
-              volta para quem clicou sem querer. */}
-          {divergencias.ignorados.length > 0 && (
-            <Card>
-              <button
-                type="button"
-                onClick={() => setIgnoradosAberto((v) => !v)}
-                className="flex w-full items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
-              >
-                <ChevronRight
-                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${ignoradosAberto ? "rotate-90" : ""}`}
-                />
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">
-                    {divergencias.ignorados.length} divergência{divergencias.ignorados.length > 1 ? "s" : ""}{" "}
-                    marcada{divergencias.ignorados.length > 1 ? "s" : ""} como certa{divergencias.ignorados.length > 1 ? "s" : ""}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    O vínculo vale e o apontamento foi aceito. Se o valor comparado mudar, a
-                    divergência volta sozinha para a lista.
-                  </p>
-                </div>
-                <span className="text-xs text-muted-foreground shrink-0">
-                  {ignoradosAberto ? "recolher" : "ver lista"}
-                </span>
-              </button>
-              {ignoradosAberto && (
-                <CardContent className="p-0">
-                  <div className="divide-y border-t max-h-80 overflow-y-auto">
-                    {divergencias.ignorados.map(({ cliente, clienteId, item }) => (
-                      <div key={`ign:${item.chave}`} className="flex items-start gap-3 p-3 text-sm">
-                        <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium truncate">{cliente}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {item.rotulo} · {item.detalhe}
-                          </p>
-                        </div>
-                        <Button
-                          size="sm" variant="ghost" className="gap-1.5 shrink-0"
-                          disabled={ignorandoChave === item.chave}
-                          onClick={() => marcarIgnorada(
-                            item.chave, item.tipo, item.assinatura,
-                            item.linha?.id ?? null, clienteId, true,
-                          )}
-                        >
-                          {ignorandoChave === item.chave
-                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            : <Undo2 className="h-3.5 w-3.5" />}
-                          Voltar a mostrar
-                        </Button>
                       </div>
                     ))}
                   </div>
@@ -2417,45 +2474,7 @@ export default function OemIntegrationTab() {
                                     sistema — desativar a licença no portal do
                                     OEM — o botão leva à ficha, que é de onde a
                                     pessoa tira o número da filial. */}
-                                {i.tipo === "custo" && i.custo && (
-                                  <Button size="sm" variant="secondary" className="gap-1.5"
-                                    disabled={atualizandoDs === i.custo.id}
-                                    onClick={() => atualizarCustoDs(i.custo!.filiais, i.custo!.cliente, i.custo!.id)}>
-                                    {atualizandoDs === i.custo.id
-                                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                      : <RefreshCw className="h-3.5 w-3.5" />}
-                                    Ajustar custo
-                                  </Button>
-                                )}
-                                {(i.tipo === "cnpj" || i.tipo === "nome") && i.linha && (
-                                  <>
-                                    <Button size="sm" variant="secondary" className="gap-1.5"
-                                      onClick={() => setEscolhendo(i.linha!)}>
-                                      <Link2 className="h-3.5 w-3.5" /> Trocar cliente
-                                    </Button>
-                                    <Button size="sm" variant="ghost"
-                                      disabled={desfazendo === i.linha.id}
-                                      onClick={() => desvincular(i.linha!.id)}>
-                                      {desfazendo === i.linha.id
-                                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                        : "Desfazer"}
-                                    </Button>
-                                  </>
-                                )}
-                                {i.tipo === "sem_codigo" && i.linha && (
-                                  <Button size="sm" variant="secondary" className="gap-1.5"
-                                    onClick={() => navigate(`/clientes/${c.id}`)}>
-                                    <ExternalLink className="h-3.5 w-3.5" /> Ajustar na ficha
-                                  </Button>
-                                )}
-                                {(i.tipo === "margem" || i.tipo === "sem_licenca"
-                                  || i.tipo === "licenca_cancelado"
-                                  || i.tipo === "desativa_ativo") && (
-                                  <Button size="sm" variant="ghost" className="gap-1.5"
-                                    onClick={() => navigate(`/clientes/${c.id}`)}>
-                                    <ExternalLink className="h-3.5 w-3.5" /> Abrir ficha
-                                  </Button>
-                                )}
+                                {acoesDaDivergencia(i, c.id)}
                               </div>
                             </div>
                           ))}
@@ -2509,14 +2528,19 @@ export default function OemIntegrationTab() {
           vez de dizerem "OK/Cancelar": quem lê depressa precisa entender pelo
           botão o que vai acontecer, e "manter na lista" é exatamente o que o
           não fazer significa aqui. */}
-      <AlertDialog
+      <Dialog
         open={!!confirmarIgnorar}
-        onOpenChange={(v) => { if (!v) setConfirmarIgnorar(null); }}
+        onOpenChange={(v) => { if (!v && !ignorandoChave) setConfirmarIgnorar(null); }}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Está certo assim?</AlertDialogTitle>
-            <AlertDialogDescription asChild>
+        {/* Dialog comum, e não AlertDialog: o AlertDialog ignora clique fora de
+            propósito, para que confirmação destrutiva não seja dispensada sem
+            querer. Aqui a decisão é reversível — o item volta pelo bloco de
+            marcadas como certas — e prender a pessoa em dois botões incomoda
+            mais do que protege. */}
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Está certo assim?</DialogTitle>
+            <DialogDescription asChild>
               <div className="space-y-3">
                 <div className="rounded border p-2 text-sm">
                   <div className="font-medium">{confirmarIgnorar?.rotulo}</div>
@@ -2532,14 +2556,19 @@ export default function OemIntegrationTab() {
                   volta quando quiser, pelo bloco de divergências marcadas como certas.
                 </p>
               </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={!!ignorandoChave}>Não, manter na lista</AlertDialogCancel>
-            <AlertDialogAction
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
               disabled={!!ignorandoChave}
-              onClick={(e) => {
-                e.preventDefault();
+              onClick={() => setConfirmarIgnorar(null)}
+            >
+              Não, manter na lista
+            </Button>
+            <Button
+              disabled={!!ignorandoChave}
+              onClick={() => {
                 const alvo = confirmarIgnorar;
                 if (!alvo) return;
                 setConfirmarIgnorar(null);
@@ -2547,10 +2576,10 @@ export default function OemIntegrationTab() {
               }}
             >
               {ignorandoChave ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sim, está certo"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <EscolherClienteOemDialog
         linha={escolhendo}
