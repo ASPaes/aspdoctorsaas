@@ -186,17 +186,16 @@ function Numero({
           <p className="text-sm font-medium mt-1">{rotulo}</p>
           {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
         </div>
-        {/* Espelha a coluna da esquerda linha a linha: o rótulo na altura (e no
-            tamanho) do rótulo principal, o número na do sub. Os dois lados
-            respondem à mesma pergunta — tamanhos diferentes faziam um parecer
-            mais importante que o outro. */}
-        {/* text-left, e não right: o número alinhado pela direita ficava com o
-            primeiro dígito no meio do rótulo, quebrando a régua vertical que
-            todos os outros cards seguem — número e rótulo começam juntos. */}
+        {/* Espelha a coluna da esquerda com o MESMO peso: número grande em cima,
+            rótulo embaixo. Os dois lados respondem à mesma pergunta — o que o
+            OEM cobra tem contrato aqui? —, e tamanhos diferentes faziam um
+            parecer mais importante que o outro.
+            text-left, e não right: alinhado pela direita, o primeiro dígito
+            caía no meio do rótulo e quebrava a régua vertical dos outros. */}
         {ao_lado && (
-          <div className="flex shrink-0 flex-col justify-end text-left" title={ao_lado.title}>
-            <p className="text-sm font-medium">{ao_lado.rotulo}</p>
-            <p className="text-xs text-muted-foreground tabular-nums mt-0.5">{ao_lado.valor}</p>
+          <div className="flex shrink-0 flex-col text-left" title={ao_lado.title}>
+            <p className="text-2xl font-semibold tabular-nums">{ao_lado.valor}</p>
+            <p className="text-sm font-medium mt-1">{ao_lado.rotulo}</p>
           </div>
         )}
       </div>
@@ -2046,7 +2045,6 @@ export default function OemIntegrationTab() {
             <Numero
               valor={String(r.ativas)}
               rotulo="Filiais ativas no OEM"
-              sub={`${r.filiais} no total, com as desativadas`}
               // O contraponto do lado daqui, na mesma altura das filiais: a
               // pergunta é uma só — o que o OEM cobra tem contrato aqui?
               ao_lado={{
