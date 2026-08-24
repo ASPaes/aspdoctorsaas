@@ -1816,12 +1816,24 @@ export default function OemIntegrationTab() {
             No topo de cada coluna dá para <strong>vincular o produto do OEM a um produto
             cadastrado no DoctorSaaS</strong> e, se você quiser, trazer os módulos daquela coluna
             para dentro dele, com o custo de cada um saindo deste preço de tabela.
+            <br />
+            Quando o OEM reajusta esta tabela, o novo valor entra <strong>só aqui e na lista de
+            módulos do produto</strong>, para valer nos <strong>próximos</strong> clientes. Quem
+            já tem o módulo <strong>não é alterado</strong>: continua com o valor que o parceiro
+            cobra da licença dele.
           </Explica>
 
-          {/* O reajuste do parceiro já foi aplicado sozinho em todos os
-              clientes quando o espelho atualizou — este bloco é para isso não
-              acontecer em silêncio. É custo: o que o cliente paga não muda
-              aqui, o repasse continua sendo decisão de gente.
+          {/* NÃO é o reajuste da tabela chegando nos clientes. Reajuste de
+              tabela vale só para módulo novo (regra do OEM, ratificada pelo
+              Alexandre em 24/08/2026), e nada no DS aplica preço de lista em
+              quem já tem o módulo: o espelho grava o valor da própria licença,
+              e o diálogo de adicionar módulo usa licença primeiro e tabela só
+              como reserva.
+
+              O que aparece aqui é o outro caso, esse sim real: o OEM passou a
+              cobrar outro valor DAQUELE cliente (fim de cortesia, renegociação,
+              mudança no faturamento). É custo, e o que o cliente paga não muda
+              aqui: o repasse continua sendo decisão de gente.
 
               Aparece SEMPRE, inclusive vazio. Some quando não há reajuste era
               pior do que parece: quem abre a aba não descobre que o sistema
@@ -1834,24 +1846,26 @@ export default function OemIntegrationTab() {
                 <CardTitle className="text-base flex items-center gap-2">
                   <TrendingDown className="h-4 w-4 text-sky-500" />
                   {mudancasCusto.length > 0
-                    ? "O OEM mudou o preço destes módulos"
-                    : "Mudanças de preço do OEM"}
+                    ? "O OEM passou a cobrar outro valor por estes módulos"
+                    : "Mudanças no custo cobrado pelo OEM"}
                 </CardTitle>
                 <CardDescription>
-                  Quando o parceiro reajusta um módulo, o custo é ajustado sozinho em todos os
-                  clientes que o têm, na carga do espelho, e o que mudou aparece aqui. A{" "}
-                  <strong>mensalidade não muda</strong>: repassar aumento é decisão sua, cliente
-                  a cliente.
+                  Reajuste da tabela acima <strong>não</strong> mexe em cliente nenhum: vale para
+                  os próximos. O que aparece aqui é quando o OEM passa a cobrar{" "}
+                  <strong>outro valor de um cliente que já tem o módulo</strong>, o que a carga do
+                  espelho traz da licença dele. A <strong>mensalidade nunca muda</strong>:
+                  repassar aumento é decisão sua, cliente a cliente.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 {mudancasCusto.length === 0 && (
                   <p className="border-t px-6 py-4 text-sm text-muted-foreground">
-                    Nenhum reajuste até agora. O acompanhamento começou em{" "}
-                    <strong>23/08/2026</strong>: da próxima vez que o OEM mexer no preço de um
-                    módulo, ele aparece aqui com o valor antigo, o novo e quantos clientes
-                    pegaram o ajuste. O que mudou antes dessa data não tem como ser recuperado,
-                    porque não era registrado.
+                    Nenhuma mudança até agora, que é o esperado: reajuste de tabela não alcança
+                    quem já é cliente. O acompanhamento começou em <strong>23/08/2026</strong> e
+                    serve para o caso incomum, quando o OEM muda o que cobra de uma licença que já
+                    existe: aparece aqui o valor antigo, o novo e quantos clientes foram
+                    atingidos. O que mudou antes dessa data não tem como ser recuperado, porque
+                    não era registrado.
                   </p>
                 )}
                 <div className="divide-y border-t max-h-72 overflow-y-auto">
