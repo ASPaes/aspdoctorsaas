@@ -94,6 +94,12 @@ type MudancaCusto = {
 // comparação é string contra string, sem fuso no meio. `new Date(...)` em cima
 // de "2026-08-31" seria lido como UTC e, no horário de Brasília, viraria dia 30.
 const hojeSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+// O MRR é foto do mês corrente, do dia 1 ao último: não é acumulado de período
+// nenhum. Dizer qual mês é evita a leitura de que ali há soma de meses.
+const mesReferencia = () =>
+  new Date().toLocaleDateString("pt-BR", {
+    timeZone: "America/Sao_Paulo", month: "long", year: "numeric",
+  });
 const dataBR = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
 
 // Uma célula da tabela de preços do parceiro: quanto o módulo custa naquele
@@ -184,8 +190,11 @@ function Numero({
             tamanho) do rótulo principal, o número na do sub. Os dois lados
             respondem à mesma pergunta — tamanhos diferentes faziam um parecer
             mais importante que o outro. */}
+        {/* text-left, e não right: o número alinhado pela direita ficava com o
+            primeiro dígito no meio do rótulo, quebrando a régua vertical que
+            todos os outros cards seguem — número e rótulo começam juntos. */}
         {ao_lado && (
-          <div className="flex shrink-0 flex-col justify-end text-right" title={ao_lado.title}>
+          <div className="flex shrink-0 flex-col justify-end text-left" title={ao_lado.title}>
             <p className="text-sm font-medium">{ao_lado.rotulo}</p>
             <p className="text-xs text-muted-foreground tabular-nums mt-0.5">{ao_lado.valor}</p>
           </div>
@@ -847,12 +856,35 @@ export default function OemIntegrationTab() {
       ).length,
       comPar,
       clientesComPar: porCliente.size,
-      // A mensalidade é do CLIENTE e o custo é da FILIAL. Somar mensalidade_ds
-      // linha a linha contava a receita uma vez por filial: um cliente com 3
-      // licenças aparecia valendo o triplo, e a margem saía inflada no mesmo
-      // tanto. A receita é somada uma vez por cliente; o custo, por filial.
-      receita: [...porCliente.values()].reduce((a, m) => a + m, 0),
-      custo: comPar.reduce((a, l) => a + Number(l.custo_oem || 0), 0),
+      // RECEITA DA OPERAÇÃO, e não a dos pares casados.
+      //
+      // Até 23/08/2026 a margem somava só quem tinha licença ATIVA vinculada e
+      // custo conhecido: 726 clientes, R$ 281 mil. Ficavam de fora os que têm
+      // produto do parceiro mas nenhuma filial casada e os de licença
+      // desativada — 131 clientes e R$ 30 mil na conta da Digi Office. Eles
+      // pagam, então a receita é deles também; a conta certa é "o que a
+      // operação do parceiro rende aqui menos o que ela custa lá".
+      //
+      // A mensalidade é do CLIENTE e o custo é da FILIAL: a receita entra uma
+      // vez por cliente (um cliente com 3 licenças não vale o triplo) e o custo
+      // soma todas as licenças ativas.
+      //
+      // O recorte de quem entra já vem pronto do espelho: a reconciliação só
+      // tem cliente das unidades desta conta e com produto vinculado ao OEM.
+      // Por isso este número NÃO bate com o dashboard filtrado por fornecedor,
+      // que soma o tenant inteiro — lá entram unidades que não têm conta OEM.
+      receita: (() => {
+        const porCli = new Map<string, number>();
+        for (const l of linhas) {
+          if (!l.ds_customer_id || l.cancelado_ds || l.mensalidade_ds == null) continue;
+          porCli.set(l.ds_customer_id, Number(l.mensalidade_ds));
+        }
+        return [...porCli.values()].reduce((a, m) => a + m, 0);
+      })(),
+      clientesDaConta: new Set(
+        linhas.filter((l) => l.ds_customer_id && !l.cancelado_ds).map((l) => l.ds_customer_id),
+      ).size,
+      custo: ativas.reduce((a, l) => a + Number(l.custo_oem || 0), 0),
       negativas: porClienteNeg,
     };
   }, [linhas, filiaisComCodigo, produtosAtivos, statusConf]);
@@ -1938,16 +1970,26 @@ export default function OemIntegrationTab() {
               // leitura da conta que está ali (receita ÷ custo), não um segundo
               // indicador. Régua da aba Custos — custo do OEM no divisor, sempre.
               sub={
-                <span title={r.custo > 0
-                  ? `${brl(r.receita)} ÷ ${brl(r.custo)} (custo do OEM)`
-                  : "Sem custo do OEM, não há como calcular o markup"}>
-                  {brl(r.receita)} − {brl(r.custo)} · markup{" "}
-                  {r.custo > 0 ? (
-                    <span className={r.receita / r.custo < 1 ? "text-destructive font-medium" : ""}>
-                      {num2(r.receita / r.custo)}×
-                    </span>
-                  ) : "—"}
-                </span>
+                <>
+                  <span title={r.custo > 0
+                    ? `${brl(r.receita)} ÷ ${brl(r.custo)} (custo do OEM)`
+                    : "Sem custo do OEM, não há como calcular o markup"}>
+                    {brl(r.receita)} − {brl(r.custo)} · markup{" "}
+                    {r.custo > 0 ? (
+                      <span className={r.receita / r.custo < 1 ? "text-destructive font-medium" : ""}>
+                        {num2(r.receita / r.custo)}×
+                      </span>
+                    ) : "—"}
+                  </span>
+                  {/* De QUEM é essa receita e de QUANDO. Sem isso, o número é
+                      comparado com o do dashboard e a diferença parece erro:
+                      lá o filtro por fornecedor soma o tenant inteiro, aqui
+                      entram só as unidades desta conta. */}
+                  <span className="block mt-0.5">
+                    {r.clientesDaConta} clientes com produto do OEM nesta conta ·{" "}
+                    {mesReferencia()}
+                  </span>
+                </>
               } />
           </div>
         </TabsContent>
