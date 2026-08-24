@@ -109,8 +109,14 @@ export function ChatsListaDialog({
                             </span>
                           )}
                           {i.plantao && (
-                            <span className="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 text-[11px] font-medium text-accent-foreground">
-                              plantão
+                            // Mostra QUANDO houve trabalho fora do expediente, não só que
+                            // houve: um atendimento pode abrir 16h de uma sexta (dentro) e
+                            // o plantão acontecer na quinta seguinte às 21h20.
+                            <span
+                              className="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 text-[11px] font-medium text-accent-foreground"
+                              title={i.plantao_em ? `Trabalho fora do expediente em ${fmtData(i.plantao_em)}` : undefined}
+                            >
+                              {i.plantao_em ? `plantão · ${fmtData(i.plantao_em)}` : "plantão"}
                             </span>
                           )}
                         </div>

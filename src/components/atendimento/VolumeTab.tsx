@@ -80,14 +80,53 @@ export function VolumeTab() {
 
           {/* Heatmap */}
           <div className="rounded-lg border border-border bg-card p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <h3 className="text-sm font-semibold">Mapa de Calor — hora × dia</h3>
-              <KpiHelpPopover kpiKey="atendimento_heatmap" />
+            {/* O eixo muda com o filtro de Horário: em "Só plantão" o mapa passa a
+                usar a hora do trabalho fora do expediente, e não a de abertura.
+                Sem dizer isso na tela, um atendimento aberto sexta 16h cujo
+                plantão foi na quinta 21h20 se lia como "plantão na sexta". */}
+            <div className="mb-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold">
+                  {data.heatmap_eixo === "plantao"
+                    ? "Mapa de Calor — quando houve plantão"
+                    : "Mapa de Calor — hora × dia"}
+                </h3>
+                <KpiHelpPopover kpiKey="atendimento_heatmap" />
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {data.heatmap_eixo === "plantao"
+                  ? "Hora em que houve trabalho fora do expediente — não a hora de abertura do atendimento."
+                  : "Hora de abertura do atendimento (horário de Brasília)."}
+              </p>
             </div>
             {(() => {
               const max = Math.max(1, ...data.heatmap.map((c) => c.qtd));
               const lookup = new Map<string, number>();
-              data.heatmap.forEach((c) => lookup.set(`${c.dow}-${c.hora}`, c.qtd));
+              const detalhes = new Map<string, typeof data.heatmap[number]["detalhes"]>();
+              data.heatmap.forEach((c) => {
+                lookup.set(`${c.dow}-${c.hora}`, c.qtd);
+                detalhes.set(`${c.dow}-${c.hora}`, c.detalhes);
+              });
+
+              // A célula é por HORA, mas a tolerância do plantão é de 30 min: um
+              // plantão às 18:32 cai no balde "18" e parece dia de trabalho. E
+              // cada setor fecha num horário — o Onboarding às 17:00 na sexta, o
+              // Suporte às 22:00 no sábado. Sem hora:minuto e setor, a célula não
+              // se explica.
+              const tituloCelula = (d: number, h: number, label: string, q: number) => {
+                const base = `${label} ${h}h — ${q} atendimento(s)`;
+                const det = detalhes.get(`${d}-${h}`);
+                if (!det || det.length === 0) return base;
+                const linhas = det.map((x) =>
+                  [x.hora, x.setor, x.fecha ? `fecha ${x.fecha}` : null]
+                    .filter(Boolean)
+                    .join(" · "),
+                );
+                const resto = q - det.length;
+                return [base, ...linhas, resto > 0 ? `+${resto}` : null]
+                  .filter(Boolean)
+                  .join("\n");
+              };
               return (
                 <div className="overflow-x-auto">
                   <div className="inline-block min-w-full">
@@ -114,7 +153,7 @@ export function VolumeTab() {
                                   background:
                                     q > 0 ? `hsl(var(--primary) / ${alpha})` : "transparent",
                                 }}
-                                title={`${label} ${h}h — ${q} atendimento(s)`}
+                                title={tituloCelula(d, h, label, q)}
                               />
                             );
                           })}

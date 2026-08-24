@@ -1195,15 +1195,20 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   // ── Atendimento — Volume ──
   atendimento_volume_total: {
     title: "Total no Período",
-    definition: "Total de atendimentos abertos no período selecionado.",
-    why_it_matters: "Volume bruto de demanda — base para dimensionar equipe e ler o heatmap.",
+    definition:
+      "Todos os atendimentos abertos no período, sem exclusão — inclusive os que o cliente nunca respondeu e os iniciados pela equipe. É o mesmo total da aba Chats.",
+    why_it_matters:
+      "Volume bruto de demanda — base para dimensionar equipe e ler o mapa de calor. Até 24/08/2026 este card descontava os atendimentos sem mensagem do cliente e ficava menor que o da aba Chats; agora os dois contam a mesma coisa.",
     formula: "COUNT de atendimentos abertos no período",
   },
   atendimento_heatmap: {
     title: "Mapa de Calor (hora × dia)",
-    definition: "Volume de aberturas por hora do dia e dia da semana (horário de Brasília).",
-    why_it_matters: "Mostra os picos de demanda — onde escalar gente e onde há folga.",
-    formula: "contagem de aberturas agrupada por dia da semana e hora local",
+    definition:
+      "Por padrão, volume de ABERTURAS por hora e dia da semana (horário de Brasília). Com o filtro Horário em “Só plantão”, o mapa troca de eixo e passa a mostrar a hora em que houve trabalho fora do expediente.",
+    why_it_matters:
+      "No modo normal mostra os picos de demanda — onde escalar gente. No modo plantão responde outra pergunta: quando a equipe está trabalhando fora de hora. São coisas diferentes: um atendimento pode abrir às 16h de uma sexta e o plantão dele acontecer na quinta seguinte, às 21h.",
+    formula:
+      "contagem agrupada por dia da semana e hora local — de opened_at, ou de plantao_em quando o filtro é “Só plantão”",
   },
   atendimento_novos_recorrentes: {
     title: "Novos vs Recorrentes",

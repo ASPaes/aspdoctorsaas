@@ -23,6 +23,8 @@ export interface ChatListaItem {
   resolucao: string | null;
   csat_score: number | null;
   plantao: boolean;
+  /** Primeiro instante de trabalho fora do expediente. NULL quando não houve. */
+  plantao_em: string | null;
   is_group: boolean;
   duracao_seg: number;
 }
@@ -116,6 +118,7 @@ export function useAtendimentoChatsLista(opts: {
           resolucao: i.resolucao ?? null,
           csat_score: i.csat_score === null || i.csat_score === undefined ? null : Number(i.csat_score),
           plantao: !!i.plantao,
+          plantao_em: i.plantao_em ?? null,
           is_group: !!i.is_group,
           duracao_seg: Number(i.duracao_seg ?? 0),
         })),

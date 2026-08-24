@@ -5,12 +5,16 @@ import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 
 export interface CanalRow { canal: string; qtd: number; }
-export interface HeatCell { dow: number; hora: number; qtd: number; }
+/** Detalhe por atendimento da célula — só vem no modo plantão. */
+export interface HeatDetalhe { hora: string; setor: string | null; fecha: string | null; }
+export interface HeatCell { dow: number; hora: number; qtd: number; detalhes: HeatDetalhe[] | null; }
 export interface MotivoRow { tag: string; qtd: number; }
 export interface AtendimentoVolume {
   total: number; novos: number; recorrentes: number;
   proativo: number; reativo: number;
   canais: CanalRow[]; heatmap: HeatCell[];
+  /** 'plantao' = o mapa está por hora do trabalho fora do expediente; 'abertura' = por hora de abertura. */
+  heatmap_eixo: 'abertura' | 'plantao';
   top_motivos: MotivoRow[]; motivos_cobertura: number | null;
 }
 
@@ -45,7 +49,17 @@ export function useAtendimentoVolume() {
         proativo: Number(d.proativo ?? 0),
         reativo: Number(d.reativo ?? 0),
         canais: ((d.canais ?? []) as any[]).map((r) => ({ canal: String(r.canal), qtd: Number(r.qtd ?? 0) })),
-        heatmap: ((d.heatmap ?? []) as any[]).map((r) => ({ dow: Number(r.dow), hora: Number(r.hora), qtd: Number(r.qtd ?? 0) })),
+        heatmap: ((d.heatmap ?? []) as any[]).map((r) => ({
+          dow: Number(r.dow), hora: Number(r.hora), qtd: Number(r.qtd ?? 0),
+          detalhes: Array.isArray(r.detalhes)
+            ? (r.detalhes as any[]).map((x) => ({
+                hora: String(x.hora ?? ""),
+                setor: x.setor ?? null,
+                fecha: x.fecha ?? null,
+              }))
+            : null,
+        })),
+        heatmap_eixo: d.heatmap_eixo === "plantao" ? "plantao" : "abertura",
         top_motivos: ((d.top_motivos ?? []) as any[]).map((r) => ({ tag: String(r.tag), qtd: Number(r.qtd ?? 0) })),
         motivos_cobertura: num(d.motivos_cobertura),
       } as AtendimentoVolume;
