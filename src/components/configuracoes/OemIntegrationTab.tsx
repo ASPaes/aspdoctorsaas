@@ -383,9 +383,12 @@ export default function OemIntegrationTab() {
     queryKey: ["oem-codigos-gravados", tid, conta?.id],
     enabled: !!tid,
     queryFn: () =>
-      fetchAllRows<{ oem_codigo_filial: string; cliente_id: string; vlr_custo: number | null; ativo: boolean }>(() => {
+      fetchAllRows<{
+        oem_codigo_filial: string; cliente_id: string; produto_id: number;
+        vlr_custo: number | null; ativo: boolean;
+      }>(() => {
         let q = (supabase.from("cliente_produtos" as any) as any)
-          .select("oem_codigo_filial, cliente_id, vlr_custo, ativo, clientes!inner(unidade_base_id)")
+          .select("oem_codigo_filial, cliente_id, produto_id, vlr_custo, ativo, clientes!inner(unidade_base_id)")
           .eq("tenant_id", tid)
           .not("oem_codigo_filial", "is", null);
         // A aba é da unidade desta conta: o custo digitado na ficha de um
@@ -711,6 +714,30 @@ export default function OemIntegrationTab() {
     },
     enabled: !!tid && !!conta,
   });
+
+  // O CÓDIGO DA LICENÇA NO PRODUTO ERRADO.
+  //
+  // O vínculo por código é o mais forte que existe aqui: se a ficha diz que o
+  // cliente é da filial 22043, ele casa com ela. Só que o código pode ter sido
+  // gravado num produto que não é do parceiro — e aí o cliente entra na conta
+  // do OEM com a receita de um produto de outra empresa.
+  //
+  // Medido em 24/08/2026: 8 clientes (ZOOM ZOOM BAR, a rede PASTELANDIA…) com o
+  // código do OEM no produto "Gula", do fornecedor Gula Menu, R$ 500 cada. São
+  // eles, e só eles, a diferença entre esta aba e o Dashboard filtrado por PDV
+  // Legal: R$ 4.891 e 8 clientes. Não dá para escolher um lado e ficar quieto —
+  // ou a licença é dele e o produto está errado, ou o código foi para a linha
+  // errada. Os dois casos são cadastro a consertar, e agora a aba diz qual.
+  const codigoEmProdutoDeOutro = useMemo(() => {
+    if (!produtosOemIds.length) return new Map<string, { filial: string; produto: number }>();
+    const doOem = new Set(produtosOemIds.map(Number));
+    const m = new Map<string, { filial: string; produto: number }>();
+    for (const p of produtosOem) {
+      if (!p.oem_codigo_filial || doOem.has(Number(p.produto_id))) continue;
+      m.set(p.cliente_id, { filial: String(p.oem_codigo_filial), produto: Number(p.produto_id) });
+    }
+    return m;
+  }, [produtosOem, produtosOemIds]);
 
   const r = useMemo(() => {
     // Só a conferência respeita este filtro: as outras abas têm semânticas
@@ -1101,6 +1128,20 @@ export default function OemIntegrationTab() {
           OEM, ou o cliente vai perder o sistema na data</>,
       });
     }
+    // O código da licença gravado num produto que não é do parceiro. Grave: é
+    // ele que faz a receita de outro fornecedor entrar na conta do OEM.
+    for (const [clienteId, info] of codigoEmProdutoDeOutro) {
+      const l = linhas.find((x) => x.ds_customer_id === clienteId);
+      const nomeProduto = produtosDs.find((p) => p.id === info.produto)?.nome ?? `produto ${info.produto}`;
+      doCliente(clienteId, l ? nomeDe(l) : "—", l?.cnpj_ds ?? l?.cnpj_norm ?? null).itens.push({
+        chave: `prodoutro:${clienteId}`, tipo: "codigo_produto_errado", grave: true, linha: l,
+        assinatura: `${info.filial}|${info.produto}`,
+        rotulo: "Código da licença gravado num produto de outro fornecedor",
+        detalhe: <>filial {info.filial} está no produto <strong>{nomeProduto}</strong>, que não é
+          do OEM. Ou a licença é de outro produto do cliente, ou o produto está com o
+          fornecedor errado</>,
+      });
+    }
     for (const l of r.escolherLicenca) {
       if (!l.ds_customer_id) continue;
       doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? l.cnpj_norm ?? null).itens.push({
@@ -1206,7 +1247,7 @@ export default function OemIntegrationTab() {
       programadas: r.baixaProgramada,
       total: lista.reduce((a, c) => a + c.itens.length, 0) + semDono.length,
     };
-  }, [r, custos]);
+  }, [r, custos, codigoEmProdutoDeOutro, linhas, produtosDs]);
 
   // É este número que acende o alerta na aba.
   const totalDivergencias = divergencias.total;
@@ -1266,7 +1307,8 @@ export default function OemIntegrationTab() {
         </Button>
       )}
       {(i.tipo === "margem" || i.tipo === "sem_licenca" || i.tipo === "escolher_licenca"
-        || i.tipo === "licenca_cancelado" || i.tipo === "desativa_ativo") && (
+        || i.tipo === "licenca_cancelado" || i.tipo === "desativa_ativo"
+        || i.tipo === "codigo_produto_errado") && (
         <Button size="sm" variant="ghost" className="gap-1.5"
           onClick={() => navigate(`/clientes/${clienteId}`)}>
           <ExternalLink className="h-3.5 w-3.5" /> Abrir ficha
