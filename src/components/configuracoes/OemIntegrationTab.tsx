@@ -817,7 +817,18 @@ export default function OemIntegrationTab() {
         .filter((l) => l.filial_codigo && l.ds_customer_id && !l.cancelado_ds && baixaMarcada(l))
         .sort((a, b) => String(a.desativa_em).localeCompare(String(b.desativa_em))),
       semCliente: ativas.filter((l) => l.estado_match === "SO_NO_OEM" && l.status_usuario === "novo"),
-      soNoDs: linhas.filter((l) => l.estado_match === "SO_NO_DS" && !l.cancelado_ds),
+      // Cliente que NÃO tem licença nenhuma no OEM.
+      soNoDs: linhas.filter(
+        (l) => l.estado_match === "SO_NO_DS" && !l.cancelado_ds
+          && l.acao_sugerida !== "escolher_licenca",
+      ),
+      // Cliente que TEM licença — mais de uma, com o mesmo CNPJ — e ninguém
+      // escolheu qual é a dele. Dizer "sem licença" aqui seria falso, e a saída
+      // é outra: escolher entre as que existem.
+      escolherLicenca: linhas.filter(
+        (l) => l.estado_match === "SO_NO_DS" && !l.cancelado_ds
+          && l.acao_sugerida === "escolher_licenca",
+      ),
       // Vínculo existe mas o código não chegou à ficha do cliente. São dois
       // motivos distintos, e a saída de cada um é diferente:
       //   - o mesmo cliente recebeu mais de uma filial → falta cadastro de
@@ -1090,6 +1101,17 @@ export default function OemIntegrationTab() {
           OEM, ou o cliente vai perder o sistema na data</>,
       });
     }
+    for (const l of r.escolherLicenca) {
+      if (!l.ds_customer_id) continue;
+      doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? l.cnpj_norm ?? null).itens.push({
+        chave: `esclic:${l.id}`, tipo: "escolher_licenca", grave: false, linha: l,
+        assinatura: `escolher_licenca|${l.qtd_candidatos_ds}`,
+        rotulo: "Falta escolher qual licença do OEM é deste cliente",
+        detalhe: <>o CNPJ dele tem <strong>{l.qtd_candidatos_ds}</strong> licenças no OEM ·
+          mensalidade {brl(Number(l.mensalidade_ds || 0))}. Enquanto ninguém escolhe, o custo
+          da licença não entra na ficha</>,
+      });
+    }
     for (const l of r.soNoDs) {
       if (!l.ds_customer_id) continue;
       doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? null).itens.push({
@@ -1234,7 +1256,7 @@ export default function OemIntegrationTab() {
       {/* "Cliente sem licença" é a única divergência cuja saída é escolher uma
           LICENÇA, e não um cliente: nem Ignorar nem Abrir ficha resolvem, porque
           a ficha não diz qual filial do OEM é a dele. */}
-      {i.tipo === "sem_licenca" && (
+      {(i.tipo === "sem_licenca" || i.tipo === "escolher_licenca") && (
         <Button size="sm" variant="secondary" className="gap-1.5"
           onClick={() => setProcurandoLicenca({
             id: clienteId,
@@ -1243,7 +1265,7 @@ export default function OemIntegrationTab() {
           <Boxes className="h-3.5 w-3.5" /> Licenças OEM
         </Button>
       )}
-      {(i.tipo === "margem" || i.tipo === "sem_licenca"
+      {(i.tipo === "margem" || i.tipo === "sem_licenca" || i.tipo === "escolher_licenca"
         || i.tipo === "licenca_cancelado" || i.tipo === "desativa_ativo") && (
         <Button size="sm" variant="ghost" className="gap-1.5"
           onClick={() => navigate(`/clientes/${clienteId}`)}>

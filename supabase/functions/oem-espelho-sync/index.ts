@@ -614,7 +614,21 @@ Deno.serve(async (req) => {
         // não vale: filtrar tudo esvaziaria a lista de uma conta recém ligada.
         if (temVinculoDeProduto && !doParceiro.has(c.id)) continue;
         const k = c.cnpj_digits || digitos(c.cnpj);
-        if (k && linhas.some((l) => l.cnpj_norm === k)) continue;
+        // ATÉ 23/08/2026 ESTE CLIENTE SUMIA. O corte era `continue` quando
+        // existia filial com o mesmo CNPJ: a ideia era não dizer "sem licença"
+        // de quem tem uma. Só que o cliente saía da reconciliação INTEIRA — e,
+        // com ela, da receita da aba.
+        //
+        // Medido na Digi Office: 58 clientes, R$ 20 mil de mensalidade, todos
+        // com o mesmo desenho — o CNPJ tem DUAS filiais no OEM (RESERVA BAMBU,
+        // ROUTE EMPORIUM, BERNINI…), a máquina não sabe qual é a dele e as duas
+        // ficam em "escolher_candidato". Do lado da licença o caso aparecia; do
+        // lado do cliente, não, e a margem da conta saía R$ 20 mil menor.
+        //
+        // Agora ele entra com ação PRÓPRIA: não é "sem licença" (ele tem, e
+        // mais de uma), é "falta escolher qual". A tela troca o rótulo e o
+        // botão por isso.
+        const filiaisDoCnpj = k ? linhas.filter((l) => l.cnpj_norm === k).length : 0;
         recon.push({
           tenant_id: conta.tenant_id, conta_integration_id: conta.id,
           cnpj_norm: k || null, ds_customer_id: c.id,
@@ -623,8 +637,13 @@ Deno.serve(async (req) => {
           // Cliente sem filial não tem o que escolher — marcá-lo como
           // "escolher_candidato" enchia a fila de decisão com centenas de
           // linhas sem filial e sem candidato nenhum.
-          qtd_candidatos_ds: 0, estado_match: "SO_NO_DS",
-          acao_sugerida: c.cancelado ? "fora_do_escopo" : "sem_licenca",
+          // O número aqui é de LICENÇAS candidatas, não de clientes: é ele que
+          // a tela usa para dizer "2 licenças com este CNPJ".
+          qtd_candidatos_ds: filiaisDoCnpj,
+          estado_match: "SO_NO_DS",
+          acao_sugerida: c.cancelado
+            ? "fora_do_escopo"
+            : filiaisDoCnpj > 0 ? "escolher_licenca" : "sem_licenca",
           status_usuario: "novo",
           ignoradas: decididoPorCliente.get(c.id)?.ignoradas ?? null,
         });
