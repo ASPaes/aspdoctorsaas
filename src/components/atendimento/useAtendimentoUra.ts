@@ -21,9 +21,10 @@ export interface AtendimentoUra {
 export function useAtendimentoUra() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
-  const { dateRange, departmentId } = useAtendimentoFilter();
+  const { dateRange, departmentId, plantao } = useAtendimentoFilter();
+  const pPlantao = plantao === "all" ? null : plantao;
   return useQuery<AtendimentoUra>({
-    queryKey: ["atendimento-ura", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId],
+    queryKey: ["atendimento-ura", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, plantao],
     enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -33,6 +34,7 @@ export function useAtendimentoUra() {
         p_date_to: dateRange.to.toISOString(),
         p_unidade_base_id: selectedUnidadeId ?? null,
         p_department_id: departmentId ?? null,
+        p_plantao: pPlantao,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;

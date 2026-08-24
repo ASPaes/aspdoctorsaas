@@ -25,6 +25,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 let tipoAtendimento: "all" | "group" | "individual" = "all";
 let agentId: string | null = null;
+let plantao: "all" | "plantao" | "comercial" = "all";
 
 vi.mock("@/contexts/TenantFilterContext", () => ({
   useTenantFilter: () => ({ effectiveTenantId: TID }),
@@ -38,6 +39,7 @@ vi.mock("@/contexts/AtendimentoFilterContext", () => ({
     departmentId: null,
     agentId,
     tipoAtendimento,
+    plantao,
   }),
 }));
 
@@ -141,6 +143,7 @@ describe("useAtendimentoNaoAtendidos", () => {
       p_unidade_base_id: null,
       p_agent_id: null,
       p_is_group: null,
+      p_plantao: null,
     });
   });
 

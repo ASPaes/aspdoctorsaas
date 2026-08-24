@@ -21,8 +21,9 @@ export function useAtendimentoVelocidadeTimeline(
 ) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
-  const { dateRange, departmentId, agentId, tipoAtendimento } = useAtendimentoFilter();
+  const { dateRange, departmentId, agentId, tipoAtendimento, plantao } = useAtendimentoFilter();
   const pIsGroup = tipoAtendimento === 'all' ? null : tipoAtendimento === 'group';
+  const pPlantao = plantao === 'all' ? null : plantao;
   return useQuery<VelocidadeTimelinePoint[]>({
     queryKey: [
       "atendimento-velocidade-timeline",
@@ -35,6 +36,7 @@ export function useAtendimentoVelocidadeTimeline(
       departmentId,
       agentId,
       tipoAtendimento,
+      plantao,
     ],
     enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
@@ -49,6 +51,7 @@ export function useAtendimentoVelocidadeTimeline(
         p_department_id: departmentId ?? null,
         p_agent_id: agentId ?? null,
         p_is_group: pIsGroup,
+        p_plantao: pPlantao,
       });
       if (error) throw error;
       const num = (v: any) => (v === null || v === undefined ? null : Number(v));

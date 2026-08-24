@@ -19,18 +19,25 @@ import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoR
 import { MultiSelectFilter } from "@/components/atendimento/MultiSelectFilter";
 
 const ALL = "__all__";
-// `plantao` só entra na aba cuja RPC já aceita p_plantao. As demais recebem a
-// flag conforme forem migradas — mostrar o filtro antes disso daria um select
-// que não filtra nada.
+// `plantao` só entra na aba cuja RPC já aceita p_plantao.
+//
+// Ficam de fora, e não por esquecimento:
+//   tempo-real — mostra a fila ABERTA agora, e a classificação de plantão só é
+//                gravada no fechamento. Tudo apareceria como comercial.
+//   clientes   — o score de risco soma chats + tickets. Os tickets vêm de
+//                support_tickets, com mecanismo de horário próprio; filtrar só
+//                a metade de chats deixaria "interações" misturando uma parte
+//                filtrada com outra inteira e o risco sairia errado.
+//   taxonomia / backlog — não leem support_attendances.
 type FiltroConfig = { date: boolean; setor: boolean; agente: boolean; cliente?: boolean; tipo?: boolean; plantao?: boolean };
 const FILTROS_POR_ABA: Record<string, FiltroConfig> = {
   "tempo-real": { date: false, setor: false, agente: false, tipo: true },
   velocidade: { date: true, setor: true, agente: true, tipo: true, plantao: true },
-  agentes:    { date: true, setor: true, agente: true, tipo: true },
-  satisfacao: { date: true, setor: true, agente: true, tipo: true },
-  volume:     { date: true, setor: true, agente: true, tipo: true },
-  ura:        { date: true, setor: true, agente: false },
-  chats:      { date: true, setor: true, agente: true, cliente: true, tipo: true },
+  agentes:    { date: true, setor: true, agente: true, tipo: true, plantao: true },
+  satisfacao: { date: true, setor: true, agente: true, tipo: true, plantao: true },
+  volume:     { date: true, setor: true, agente: true, tipo: true, plantao: true },
+  ura:        { date: true, setor: true, agente: false, plantao: true },
+  chats:      { date: true, setor: true, agente: true, cliente: true, tipo: true, plantao: true },
   taxonomia:  { date: true, setor: true, agente: true, cliente: true },
   backlog:    { date: true, setor: true, agente: true, cliente: true },
   clientes:   { date: true, setor: false, agente: false, cliente: true },
