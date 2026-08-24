@@ -331,8 +331,65 @@ Deno.serve(async (req) => {
       const mensalidadeDe = (c: ClienteDs | null | undefined) =>
         (c ? (mrrAtual.get(c.id) ?? c.mensalidade ?? null) : null);
 
+      // --------------- 3c. quem pode ter licença aqui: o cliente do PARCEIRO
+      //
+      // "Cliente sem licença no OEM" só quer dizer alguma coisa para quem vende
+      // o produto do parceiro. A Digi Office também revende Gula Menu, e esse
+      // cliente nunca vai ter licença no OEM. Medido em 23/08/2026: dos 107 da
+      // lista, 50 eram Gula — metade do alarme apontando para o que não é erro.
+      // Exemplo: A PADOCA, cujo único produto ativo é o Gula.
+      //
+      // O critério é o VÍNCULO DE PRODUTO, não `cliente_produtos.fornecedor_id`:
+      // a tabela de fornecedores tem SEIS cadastros diferentes chamados "PDV
+      // Legal" (ids 13, 25, 28, 34, 36, 41), então casar por fornecedor erraria
+      // por duplicidade de cadastro. O vínculo é decidido dentro da própria
+      // integração, na aba Módulos, e é o que a conta afirma sobre si mesma.
+      const doParceiro = new Set<string>();
+      // O conjunto AMPLO inclui produto do OEM inativo. Ele é o que decide quem
+      // pode CASAR com uma filial: 318 dos vínculos de hoje são cliente
+      // cancelado cujo produto do OEM foi inativado no cancelamento — cortá-los
+      // deixaria 318 licenças órfãs e apagaria o histórico da conta.
+      const doParceiroAmplo = new Set<string>();
+      let temVinculoDeProduto = false;
+      {
+        const vinc = await lerTudo<{ produto_id: number }>((a, b) =>
+          ds.from("oem_produto_vinculo").select("produto_id")
+            .eq("conta_integration_id", conta.id).order("produto_id").range(a, b));
+        const produtosDoOem = new Set(vinc.map((v) => Number(v.produto_id)));
+        temVinculoDeProduto = produtosDoOem.size > 0;
+
+        if (temVinculoDeProduto) {
+          const cps = await lerTudo<{ cliente_id: string; produto_id: number; ativo: boolean }>(
+            (a, b) => ds.from("cliente_produtos")
+              .select("cliente_id, produto_id, ativo")
+              .eq("tenant_id", conta.tenant_id)
+              .order("cliente_id").range(a, b));
+          for (const cp of cps) {
+            if (!produtosDoOem.has(Number(cp.produto_id))) continue;
+            doParceiroAmplo.add(cp.cliente_id);
+            if (cp.ativo !== false) doParceiro.add(cp.cliente_id);
+          }
+        }
+      }
+
+      // SÓ CLIENTE DO PARCEIRO ENTRA NO CASAMENTO AUTOMÁTICO.
+      //
+      // Tirar o código da ficha não bastava: quem não é do OEM voltava a casar
+      // por CNPJ ou por nome na carga seguinte. Foi o que aconteceu em
+      // 24/08/2026 com ZOOM ZOOM BAR, CANJA e a rede PASTELANDIA — os 8 têm
+      // produto "Gula", do fornecedor Gula Menu, e nenhuma licença do OEM é
+      // deles; ainda assim casavam, e a receita deles entrava na margem da aba.
+      //
+      // Medido na mesma base: dos 1.071 vínculos com cliente, 326 são de gente
+      // sem produto do OEM ativo — mas 318 desses são cliente CANCELADO cujo
+      // produto foi inativado junto, e esses continuam valendo (é o histórico
+      // da conta). Sobram exatamente os 8. Por isso o corte usa o conjunto
+      // amplo, que aceita produto inativo.
+      const podeCasar = (c: ClienteDs) => !temVinculoDeProduto || doParceiroAmplo.has(c.id);
+
       const porCnpj = new Map<string, ClienteDs[]>();
       for (const c of clientes) {
+        if (!podeCasar(c)) continue;
         const k = c.cnpj_digits || digitos(c.cnpj);
         if (!k) continue;
         if (!porCnpj.has(k)) porCnpj.set(k, []);
@@ -361,6 +418,7 @@ Deno.serve(async (req) => {
       // DoctorSaaS às vezes guarda a mesma coisa na fantasia, às vezes na razão.
       const porNome = new Map<string, ClienteDs[]>();
       for (const c of clientes) {
+        if (!podeCasar(c)) continue;
         for (const n of [c.nome_fantasia, c.razao_social]) {
           const k = normNome(n);
           if (!k) continue;
@@ -380,47 +438,19 @@ Deno.serve(async (req) => {
       // vem ANTES do casamento por CNPJ e antes até da decisão manual antiga.
       const porCodigo = new Map<string, string>();
       {
-        const vinculados = await lerTudo<{ cliente_id: string; oem_codigo_filial: string }>(
+        const vinculados = await lerTudo<{ cliente_id: string; oem_codigo_filial: string; produto_id: number }>(
           (a, b) => ds.from("cliente_produtos")
-            .select("cliente_id, oem_codigo_filial")
+            .select("cliente_id, oem_codigo_filial, produto_id")
             .eq("tenant_id", conta.tenant_id)
             .not("oem_codigo_filial", "is", null)
             .order("cliente_id").range(a, b));
-        for (const v of vinculados) porCodigo.set(String(v.oem_codigo_filial), v.cliente_id);
-      }
-
-      // --------------- 3c. quem pode ter licença aqui: o cliente do PARCEIRO
-      //
-      // "Cliente sem licença no OEM" só quer dizer alguma coisa para quem vende
-      // o produto do parceiro. A Digi Office também revende Gula Menu, e esse
-      // cliente nunca vai ter licença no OEM. Medido em 23/08/2026: dos 107 da
-      // lista, 50 eram Gula — metade do alarme apontando para o que não é erro.
-      // Exemplo: A PADOCA, cujo único produto ativo é o Gula.
-      //
-      // O critério é o VÍNCULO DE PRODUTO, não `cliente_produtos.fornecedor_id`:
-      // a tabela de fornecedores tem SEIS cadastros diferentes chamados "PDV
-      // Legal" (ids 13, 25, 28, 34, 36, 41), então casar por fornecedor erraria
-      // por duplicidade de cadastro. O vínculo é decidido dentro da própria
-      // integração, na aba Módulos, e é o que a conta afirma sobre si mesma.
-      const doParceiro = new Set<string>();
-      let temVinculoDeProduto = false;
-      {
-        const vinc = await lerTudo<{ produto_id: number }>((a, b) =>
-          ds.from("oem_produto_vinculo").select("produto_id")
-            .eq("conta_integration_id", conta.id).order("produto_id").range(a, b));
-        const produtosDoOem = new Set(vinc.map((v) => Number(v.produto_id)));
-        temVinculoDeProduto = produtosDoOem.size > 0;
-
-        if (temVinculoDeProduto) {
-          const cps = await lerTudo<{ cliente_id: string; produto_id: number; ativo: boolean }>(
-            (a, b) => ds.from("cliente_produtos")
-              .select("cliente_id, produto_id, ativo")
-              .eq("tenant_id", conta.tenant_id)
-              .order("cliente_id").range(a, b));
-          for (const cp of cps) {
-            if (cp.ativo === false) continue;
-            if (produtosDoOem.has(Number(cp.produto_id))) doParceiro.add(cp.cliente_id);
-          }
+        for (const v of vinculados) {
+          // Código gravado num produto que não é do OEM não vale como vínculo:
+          // foi assim que 8 clientes do Gula Menu entraram na conta do parceiro.
+          // A ficha continua com o número até alguém limpar; a conciliação
+          // deixa de acreditar nele.
+          if (temVinculoDeProduto && !doParceiroAmplo.has(v.cliente_id)) continue;
+          porCodigo.set(String(v.oem_codigo_filial), v.cliente_id);
         }
       }
 
