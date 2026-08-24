@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OemFilaSincronizacaoPanel from "./OemFilaSincronizacaoPanel";
+import { useAbaNaUrl } from "@/hooks/useDeepLinkIntegracao";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -285,6 +286,15 @@ export default function OemIntegrationTab() {
   const [escolhendo, setEscolhendo] = useState<LinhaRecon | null>(null);
   const [desfazendo, setDesfazendo] = useState<string | null>(null);
   const [ignorandoChave, setIgnorandoChave] = useState<string | null>(null);
+  // Ignorar é decisão silenciosa: some da lista e o alerta não volta enquanto o
+  // dado for o mesmo. Por isso passa por confirmação, com o apontamento inteiro
+  // na frente de quem decide — a mesma coisa que a dica do botão diz, só que
+  // agora com o de/para do caso concreto.
+  const [confirmarIgnorar, setConfirmarIgnorar] = useState<{
+    chave: string; tipo: string; assinatura: string;
+    reconId: string | null; clienteId: string;
+    rotulo: string; detalhe: React.ReactNode;
+  } | null>(null);
   const [confirmando, setConfirmando] = useState<string | null>(null);
   const [buscaCusto, setBuscaCusto] = useState("");
   const [paginaCusto, setPaginaCusto] = useState(0);
@@ -300,7 +310,9 @@ export default function OemIntegrationTab() {
   const [custoDir, setCustoDir] = useState<"asc" | "desc">("asc");
   // Controlado para que os atalhos "Resolver em Divergências" das abas de
   // resumo consigam levar a pessoa até onde a decisão acontece.
-  const [aba, setAba] = useState("visao");
+  // Na URL (e não em useState) desde 23/08/2026: é assim que a notificação de
+  // fila parada abre direto na aba Fila, na linha que travou.
+  const [aba, setAba] = useAbaNaUrl("visao");
   // Licença desativada não cobra, então divergência nela é ruído na maior parte
   // do tempo. A tela abre em "Ativo" e o usuário amplia se quiser.
   const [statusConf, setStatusConf] = useState<"Ativo" | "Desativado" | "todos">("Ativo");
@@ -2389,10 +2401,11 @@ export default function OemIntegrationTab() {
                                   size="sm" variant="ghost" className="gap-1.5"
                                   title="Está certo assim: tirar da lista sem mexer no vínculo"
                                   disabled={ignorandoChave === i.chave}
-                                  onClick={() => marcarIgnorada(
-                                    i.chave, i.tipo, i.assinatura,
-                                    i.linha?.id ?? null, c.id,
-                                  )}
+                                  onClick={() => setConfirmarIgnorar({
+                                    chave: i.chave, tipo: i.tipo, assinatura: i.assinatura,
+                                    reconId: i.linha?.id ?? null, clienteId: c.id,
+                                    rotulo: i.rotulo, detalhe: i.detalhe,
+                                  })}
                                 >
                                   {ignorandoChave === i.chave
                                     ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -2491,6 +2504,53 @@ export default function OemIntegrationTab() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Confirmação do Ignorar. Os botões respondem à pergunta do título em
+          vez de dizerem "OK/Cancelar": quem lê depressa precisa entender pelo
+          botão o que vai acontecer, e "manter na lista" é exatamente o que o
+          não fazer significa aqui. */}
+      <AlertDialog
+        open={!!confirmarIgnorar}
+        onOpenChange={(v) => { if (!v) setConfirmarIgnorar(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Está certo assim?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="rounded border p-2 text-sm">
+                  <div className="font-medium">{confirmarIgnorar?.rotulo}</div>
+                  <div className="text-xs text-muted-foreground">{confirmarIgnorar?.detalhe}</div>
+                </div>
+                <p className="text-sm">
+                  Isso <strong>tira o aviso da lista sem mexer no vínculo</strong>: o cliente
+                  continua ligado à mesma licença do OEM, e nada é enviado ao parceiro.
+                </p>
+                <p className="text-sm">
+                  Fica guardado <strong>o que você está aceitando</strong>. Se o valor comparado
+                  mudar depois, o aviso volta sozinho para a lista. Você também pode trazê-lo de
+                  volta quando quiser, pelo bloco de divergências marcadas como certas.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!ignorandoChave}>Não, manter na lista</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!!ignorandoChave}
+              onClick={(e) => {
+                e.preventDefault();
+                const alvo = confirmarIgnorar;
+                if (!alvo) return;
+                setConfirmarIgnorar(null);
+                marcarIgnorada(alvo.chave, alvo.tipo, alvo.assinatura, alvo.reconId, alvo.clienteId);
+              }}
+            >
+              {ignorandoChave ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sim, está certo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <EscolherClienteOemDialog
         linha={escolhendo}
