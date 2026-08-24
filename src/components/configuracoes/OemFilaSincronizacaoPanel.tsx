@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { AlertTriangle, ChevronDown, ChevronRight, Clock, RefreshCw, RotateCw, Loader2, Play, FlaskConical } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useLinhaDestacada, CLASSE_DESTAQUE } from "@/hooks/useDeepLinkIntegracao";
 
 type Item = {
   id: string;
@@ -99,7 +100,19 @@ export default function OemFilaSincronizacaoPanel() {
   // recolhido — ou aqui em cima, se a pessoa clicar no chip de OK.
   const paraTratar = itens.filter(i => i.status !== "ok");
   const okRecentes = itens.filter(i => i.status === "ok").slice(0, 20);
-  const visiveis = filtro ? itens.filter(i => i.status === filtro) : paraTratar;
+
+  // Linha apontada pela notificação (?fila=<id>).
+  const { destacarId, refDestaque } = useLinhaDestacada(!listaQ.isLoading);
+  const destacada = destacarId ? itens.find(i => i.id === destacarId) : undefined;
+
+  const visiveis = (() => {
+    const base = filtro ? itens.filter(i => i.status === filtro) : paraTratar;
+    // Quem chegou aqui por notificação tem que ver A linha, não a lista. Se ela
+    // caiu fora do recorte da tela (já virou 'ok', ou há um filtro ligado), ela
+    // sobe para o topo em vez de o clique terminar numa tela sem resposta.
+    if (!destacada || base.some(i => i.id === destacada.id)) return base;
+    return [destacada, ...base];
+  })();
 
   // Quando a tela foi montada com estes números. É o mesmo carimbo que o painel
   // do Omie mostra: sem ele, não dá para saber se a lista é de agora ou de meia
@@ -220,6 +233,18 @@ export default function OemFilaSincronizacaoPanel() {
               </Alert>
             )}
 
+            {/* Clique de notificação que não achou a linha. Dizer isso é melhor do
+                que abrir a lista inteira e deixar a pessoa procurando o que já saiu. */}
+            {destacarId && !destacada && (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  A linha apontada pelo aviso não está mais aqui. Ou ela já foi processada e saiu da
+                  fila, ou foi descartada.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {chips.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {chips.map(([st, qtd]) => {
@@ -253,7 +278,13 @@ export default function OemFilaSincronizacaoPanel() {
             ) : (
               <div className="space-y-2">
                 {visiveis.map((i) => (
-                  <div key={i.id} className="rounded-lg border p-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div
+                    key={i.id}
+                    ref={i.id === destacarId ? refDestaque : undefined}
+                    className={`rounded-lg border p-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between ${
+                      i.id === destacarId ? CLASSE_DESTAQUE : ""
+                    }`}
+                  >
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium truncate">{i.cliente ?? "—"}</span>

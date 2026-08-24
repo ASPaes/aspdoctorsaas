@@ -11,6 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { AlertTriangle, ChevronDown, ChevronRight, RefreshCw, Clock, Pause, TestTube2, ExternalLink, RotateCw, Loader2, Trash2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { useLinhaDestacada, CLASSE_DESTAQUE } from "@/hooks/useDeepLinkIntegracao";
 
 type ReprocessarResp = {
   ok?: boolean;
@@ -532,10 +533,19 @@ export default function OmieFilaSincronizacaoPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [temAtivo]);
 
+  // Linha apontada pela notificação (?fila=<id>).
+  const { destacarId, refDestaque } = useLinhaDestacada(!query.isLoading);
+  const destacada = destacarId ? itens.find((i) => i.fila_id === destacarId) : undefined;
+
   const itensFiltrados = useMemo(() => {
-    if (!filtroStatus) return itens;
-    return itens.filter((i) => (i.status || "").toLowerCase() === filtroStatus);
-  }, [itens, filtroStatus]);
+    const base = filtroStatus
+      ? itens.filter((i) => (i.status || "").toLowerCase() === filtroStatus)
+      : itens;
+    // Quem chegou por notificação tem que ver A linha, não a lista: se o filtro
+    // ligado a esconder, ela sobe para o topo.
+    if (!destacada || base.some((i) => i.fila_id === destacada.fila_id)) return base;
+    return [destacada, ...base];
+  }, [itens, filtroStatus, destacada]);
 
   // Erro de permissão / falha
   if (query.isError) {
@@ -639,6 +649,18 @@ export default function OmieFilaSincronizacaoPanel({
               </Alert>
             )}
 
+            {/* Clique de notificação que não achou a linha. Dizer isso é melhor do
+                que abrir a lista inteira e deixar a pessoa procurando o que já saiu. */}
+            {destacarId && !destacada && (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  A linha apontada pelo aviso não está mais aqui. Ou ela já foi processada e saiu da
+                  fila, ou é de outra conta Omie: confira o seletor de conta no topo da tela.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Resumo (chips) */}
             {resumoEntries.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -692,7 +714,10 @@ export default function OmieFilaSincronizacaoPanel({
                   return (
                     <div
                       key={item.fila_id ?? i}
-                      className="rounded-lg border p-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"
+                      ref={item.fila_id && item.fila_id === destacarId ? refDestaque : undefined}
+                      className={`rounded-lg border p-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between ${
+                        item.fila_id && item.fila_id === destacarId ? CLASSE_DESTAQUE : ""
+                      }`}
                     >
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">

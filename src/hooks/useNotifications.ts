@@ -48,17 +48,25 @@ export function useNotifications() {
     },
   });
 
-  // System event type keys
-  const { data: eventTypeKeys = [] } = useQuery({
-    queryKey: ["notification-event-type-keys"],
+  // Tipos de evento do sistema, com a categoria — é ela que decide a aba.
+  // Ler a categoria do banco (e não uma lista de chaves no código) faz evento novo
+  // de integração cair na aba certa sem precisar de deploy de frontend.
+  const { data: eventTypes = [] } = useQuery<{ key: string; categoria: string }[]>({
+    queryKey: ["notification-event-types"],
     staleTime: Infinity,
     queryFn: async () => {
       const { data, error } = await (supabase.from("notification_event_types" as any) as any)
-        .select("key");
+        .select("key, categoria");
       if (error) throw error;
-      return (data ?? []).map((r: any) => r.key as string);
+      return (data ?? []).map((r: any) => ({ key: r.key as string, categoria: r.categoria as string }));
     },
   });
+
+  const eventTypeKeys = useMemo(() => new Set(eventTypes.map((e) => e.key)), [eventTypes]);
+  const integrationKeys = useMemo(
+    () => new Set(eventTypes.filter((e) => e.categoria === "integracao").map((e) => e.key)),
+    [eventTypes]
+  );
 
   // Notification list (last 50)
   const { data: notifications = [], isLoading } = useQuery<NotificationItem[]>({
@@ -88,12 +96,19 @@ export function useNotifications() {
   });
 
   // Partition notifications
+  const integrationNotifications = useMemo(
+    () => notifications.filter((n) => integrationKeys.has(n.notification.type)),
+    [notifications, integrationKeys]
+  );
   const systemNotifications = useMemo(
-    () => notifications.filter((n) => eventTypeKeys.includes(n.notification.type)),
-    [notifications, eventTypeKeys]
+    () =>
+      notifications.filter(
+        (n) => eventTypeKeys.has(n.notification.type) && !integrationKeys.has(n.notification.type)
+      ),
+    [notifications, eventTypeKeys, integrationKeys]
   );
   const operationNotifications = useMemo(
-    () => notifications.filter((n) => !eventTypeKeys.includes(n.notification.type)),
+    () => notifications.filter((n) => !eventTypeKeys.has(n.notification.type)),
     [notifications, eventTypeKeys]
   );
   const systemUnreadCount = useMemo(
@@ -103,6 +118,10 @@ export function useNotifications() {
   const operationUnreadCount = useMemo(
     () => operationNotifications.filter((n) => n.read_at === null).length,
     [operationNotifications]
+  );
+  const integrationUnreadCount = useMemo(
+    () => integrationNotifications.filter((n) => n.read_at === null).length,
+    [integrationNotifications]
   );
 
   // Realtime subscription
@@ -188,8 +207,10 @@ export function useNotifications() {
     notifications,
     systemNotifications,
     operationNotifications,
+    integrationNotifications,
     systemUnreadCount,
     operationUnreadCount,
+    integrationUnreadCount,
     isLoading,
     markRead: markReadMutation.mutate,
     dismiss: dismissMutation.mutate,

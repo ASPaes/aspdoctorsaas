@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OmieVinculosTab from "./OmieVinculosTab";
 import OmiePadroesTab from "./OmiePadroesTab";
 import OmieConferenciaTab from "./OmieConferenciaTab";
+import { useAbaNaUrl } from "@/hooks/useDeepLinkIntegracao";
 import OmieEscolherCandidatoTab from "./OmieEscolherCandidatoTab";
 import { OmieContaProvider, type OmieConta } from "./OmieContaContext";
 
@@ -58,7 +59,9 @@ export default function OmieIntegrationTab() {
   const [trocando, setTrocando] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>("conexao");
+  // Na URL (e não em useState) desde 23/08/2026: é assim que a notificação de fila
+  // parada abre direto na Conferência, onde mora o painel da fila.
+  const [activeTab, setActiveTab] = useAbaNaUrl("conexao");
   const [selecionado, setSelecionado] = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,7 +73,9 @@ export default function OmieIntegrationTab() {
     };
     window.addEventListener("omie-goto-tab", handler as EventListener);
     return () => window.removeEventListener("omie-goto-tab", handler as EventListener);
-  }, []);
+    // setActiveTab agora fecha sobre a URL corrente: sem ele nas dependências, o
+    // ouvinte guardaria uma versão velha e escreveria por cima de outros params.
+  }, [setActiveTab]);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["omie_contas", tid],
