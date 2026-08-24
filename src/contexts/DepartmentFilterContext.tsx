@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useMemo, useCallback, useEffect } from "react";
+import { createContext, useContext, useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useAllowedDepartments, type AllowedDepartment } from "@/hooks/useAllowedDepartments";
 import { useDepartmentInstances } from "@/components/whatsapp/hooks/useSupportDepartments";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
@@ -9,8 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 const LEGACY_STORAGE_KEY = "whatsapp-selected-department";
 
 // A escolha manual de admin/head vale para a SESSÃO, não para sempre: ao entrar no
-// sistema o setor volta a ser o do cadastro (funcionarios.department_id). Por isso
-// sessionStorage, e por usuário.
+// sistema o setor volta ao padrão do papel (admin/super admin → "Todos"; head → o
+// setor do cadastro, funcionarios.department_id). Por isso sessionStorage, e por usuário.
 const sessionKeyFor = (userId?: string | null) =>
   `whatsapp-selected-department:${userId ?? "anon"}`;
 
@@ -33,6 +33,9 @@ const DepartmentFilterContext = createContext<DepartmentFilterContextValue | und
 export function DepartmentFilterProvider({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+  // Admin e super admin enxergam a operação inteira: abrem em "Todos os setores".
+  // Head continua abrindo no setor do próprio cadastro — ele gerencia um setor.
+  const opensOnAllDepartments = profile?.role === "admin" || !!profile?.is_super_admin;
 
   const userId = profile?.user_id ?? null;
   const sessionKey = sessionKeyFor(userId);
@@ -69,8 +72,9 @@ export function DepartmentFilterProvider({ children }: { children: React.ReactNo
     }
 
     if (canSeeAllDepartments) {
-      // Admin/head: o padrão ao entrar é o setor do próprio cadastro
+      // Head: o padrão ao entrar é o setor do próprio cadastro
       // (funcionarios.department_id) — o mesmo campo que já trava o operador.
+      // Admin/super admin: o padrão é "Todos os setores".
       // Uma troca feita nesta sessão tem precedência; ao logar de novo, volta ao padrão.
       let stored: string | null = null;
       try {
@@ -81,10 +85,14 @@ export function DepartmentFilterProvider({ children }: { children: React.ReactNo
         setSelectedDepartmentIdRaw(null);
       } else if (stored && departments.find((d) => d.id === stored)) {
         setSelectedDepartmentIdRaw(stored);
-      } else if (userDepartmentId && departments.find((d) => d.id === userDepartmentId)) {
+      } else if (
+        !opensOnAllDepartments &&
+        userDepartmentId &&
+        departments.find((d) => d.id === userDepartmentId)
+      ) {
         setSelectedDepartmentIdRaw(userDepartmentId);
       } else {
-        // Sem setor no cadastro: continua caindo em "Todos", como antes.
+        // Admin/super admin, ou head sem setor no cadastro: "Todos".
         setSelectedDepartmentIdRaw(null);
       }
     } else {
@@ -97,10 +105,20 @@ export function DepartmentFilterProvider({ children }: { children: React.ReactNo
       }
     }
     setDefaultApplied(true);
-  }, [userDepartmentId, userDeptLoading, departments, isLoading, defaultApplied, canSeeAllDepartments, sessionKey]);
+  }, [userDepartmentId, userDeptLoading, departments, isLoading, defaultApplied, canSeeAllDepartments, opensOnAllDepartments, sessionKey]);
 
   // Troca de usuário na mesma aba (logout/login) tem que reaplicar o padrão do novo.
+  // O primeiro disparo é ignorado de propósito: no mount ele roda DEPOIS do efeito
+  // acima e apagaria o padrão que ele acabou de aplicar (acontece quando os dados
+  // já vêm do cache do react-query e tudo resolve no mesmo render).
+  const lastUserIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
+    if (lastUserIdRef.current === undefined) {
+      lastUserIdRef.current = userId;
+      return;
+    }
+    if (lastUserIdRef.current === userId) return;
+    lastUserIdRef.current = userId;
     setDefaultApplied(false);
     setSelectedDepartmentIdRaw(null);
   }, [userId]);
