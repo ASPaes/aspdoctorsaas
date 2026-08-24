@@ -72,6 +72,8 @@ type Recon = {
   // Quando o OEM já agendou a baixa da licença (o "Desativa em: 31/08/2026" do
   // portal). Null = sem baixa marcada.
   desativa_em: string | null;
+  // Divergências que alguém marcou como certas: {tipo: assinatura aceita}.
+  ignoradas: Record<string, string> | null;
 };
 
 // Um reajuste do parceiro, já agregado pela view: módulo, de → para, no dia,
@@ -282,6 +284,7 @@ export default function OemIntegrationTab() {
   const [salvando, setSalvando] = useState(false);
   const [escolhendo, setEscolhendo] = useState<LinhaRecon | null>(null);
   const [desfazendo, setDesfazendo] = useState<string | null>(null);
+  const [ignorandoChave, setIgnorandoChave] = useState<string | null>(null);
   const [confirmando, setConfirmando] = useState<string | null>(null);
   const [buscaCusto, setBuscaCusto] = useState("");
   const [paginaCusto, setPaginaCusto] = useState(0);
@@ -446,7 +449,7 @@ export default function OemIntegrationTab() {
             "bloqueado_oem, ds_customer_id, razao_ds, mensalidade_ds, cancelado_ds, " +
             "qtd_candidatos_ds, estado_match, acao_sugerida, status_usuario, margem, " +
             "observacao, resolvido_em, cnpj_ds, divergencias, " +
-            "razao_social_oem, razao_social_ds, criterio_match, desativa_em",
+            "razao_social_oem, razao_social_ds, criterio_match, desativa_em, ignoradas",
           )
           .eq("conta_integration_id", conta!.id),
       ),
@@ -938,14 +941,20 @@ export default function OemIntegrationTab() {
       grave: boolean;
       linha?: Recon;
       custo?: (typeof custos.lista)[number];
+      // O que exatamente está sendo apontado. É isto que fica guardado quando
+      // alguém clica em Ignorar: o item só continua escondido enquanto os
+      // valores comparados forem os mesmos. Mudou o nome, o custo ou a data, a
+      // divergência volta em vez de ficar calada para sempre.
+      assinatura: string;
     };
     const porCliente = new Map<string, {
-      id: string; nome: string; cnpj: string | null; itens: Item[]; decisoes: Recon[];
+      id: string; nome: string; cnpj: string | null;
+      itens: Item[]; ignorados: Item[]; decisoes: Recon[];
     }>();
 
     const doCliente = (id: string, nome: string, cnpj: string | null) => {
       let c = porCliente.get(id);
-      if (!c) { c = { id, nome, cnpj, itens: [], decisoes: [] }; porCliente.set(id, c); }
+      if (!c) { c = { id, nome, cnpj, itens: [], ignorados: [], decisoes: [] }; porCliente.set(id, c); }
       // O primeiro nome não-vazio vence: algumas linhas de recon vêm só com a
       // razão do OEM, e o cliente ficaria "—" por acaso da ordem.
       if ((c.nome === "—" || !c.nome) && nome) c.nome = nome;
@@ -958,6 +967,7 @@ export default function OemIntegrationTab() {
       if (!l.ds_customer_id) continue;
       doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? null).itens.push({
         chave: `cnpj:${l.id}`, tipo: "cnpj", grave: true, linha: l,
+        assinatura: `${l.cnpj_norm ?? ""}|${l.cnpj_ds ?? ""}|${l.filial_codigo ?? ""}`,
         rotulo: "CNPJ diferente dos dois lados",
         detalhe: <>OEM <strong>{l.cnpj_norm ?? "—"}</strong> · DoctorSaaS <strong>{l.cnpj_ds ?? "—"}</strong> · filial {l.filial_codigo}</>,
       });
@@ -966,6 +976,7 @@ export default function OemIntegrationTab() {
       if (!l.ds_customer_id) continue;
       doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? null).itens.push({
         chave: `nome:${l.id}`, tipo: "nome", grave: false, linha: l,
+        assinatura: `${l.razao_oem ?? ""}|${l.razao_ds ?? ""}|${l.filial_codigo ?? ""}`,
         rotulo: "Só o nome diferente",
         detalhe: <>OEM <strong>{l.razao_oem ?? "—"}</strong> · DoctorSaaS <strong>{l.razao_ds ?? "—"}</strong></>,
       });
@@ -974,6 +985,7 @@ export default function OemIntegrationTab() {
       if (!c.divergente) continue;
       doCliente(c.id, c.cliente, c.cnpj).itens.push({
         chave: `custo:${c.id}`, tipo: "custo", grave: false, custo: c,
+        assinatura: `${c.custo_ds}|${c.custo_oem}`,
         rotulo: "Custo da ficha diferente do que o OEM cobra",
         detalhe: <>ficha {brl(c.custo_ds)} · OEM {brl(c.custo_oem)} · diferença{" "}
           <strong className={c.diferenca > 0 ? "text-amber-500" : "text-destructive"}>
@@ -984,6 +996,7 @@ export default function OemIntegrationTab() {
     for (const n of r.negativas) {
       doCliente(n.id, n.razao_ds ?? n.razao_oem ?? "—", null).itens.push({
         chave: `margem:${n.id}`, tipo: "margem", grave: true,
+        assinatura: `${n.mensalidade_ds}|${n.custo_oem}`,
         rotulo: "Custa mais do que paga",
         detalhe: <>mensalidade {brl(n.mensalidade_ds)} · custo {brl(n.custo_oem)} ·{" "}
           <strong className="text-destructive">{brl(n.margem)}</strong>/mês</>,
@@ -993,6 +1006,7 @@ export default function OemIntegrationTab() {
       if (!l.ds_customer_id) continue;
       doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? l.cnpj_norm ?? null).itens.push({
         chave: `cancelado:${l.id}`, tipo: "licenca_cancelado", grave: true, linha: l,
+        assinatura: `${l.filial_codigo ?? ""}|${l.custo_oem ?? ""}`,
         rotulo: "Licença OEM ativa de cliente cancelado no DS",
         detalhe: <>filial {l.filial_codigo} · grupo {l.empresa_codigo} · custo{" "}
           <strong className="text-destructive">{brl(Number(l.custo_oem || 0))}</strong>/mês.
@@ -1003,6 +1017,7 @@ export default function OemIntegrationTab() {
       if (!l.ds_customer_id) continue;
       doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? l.cnpj_norm ?? null).itens.push({
         chave: `desativa:${l.id}`, tipo: "desativa_ativo", grave: true, linha: l,
+        assinatura: `${l.filial_codigo ?? ""}|${l.desativa_em ?? ""}`,
         rotulo: "OEM vai desativar a licença, e o cliente está ativo aqui",
         detalhe: <>filial {l.filial_codigo} · sai em{" "}
           <strong className="text-destructive">{dataBR(l.desativa_em!)}</strong> ·
@@ -1014,6 +1029,7 @@ export default function OemIntegrationTab() {
       if (!l.ds_customer_id) continue;
       doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? null).itens.push({
         chave: `semlic:${l.id}`, tipo: "sem_licenca", grave: false, linha: l,
+        assinatura: "sem_licenca",
         rotulo: "Cliente sem licença no OEM",
         detalhe: <>mensalidade {brl(Number(l.mensalidade_ds || 0))}. Ele tem produto do parceiro
           na ficha, mas nenhuma filial casou com ele</>,
@@ -1030,6 +1046,7 @@ export default function OemIntegrationTab() {
         if (!l.ds_customer_id) continue;
         doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? null).itens.push({
           chave: `semcod:${sufixo}:${l.id}`, tipo: "sem_codigo", grave: false, linha: l,
+          assinatura: `${l.filial_codigo ?? ""}|${sufixo}`,
           rotulo: "Vínculo sem o código na ficha",
           detalhe: <>filial {l.filial_codigo} · {porque}</>,
         });
@@ -1043,6 +1060,27 @@ export default function OemIntegrationTab() {
     for (const l of r.decididas) {
       if (!l.ds_customer_id) continue;
       doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? l.cnpj_norm ?? null).decisoes.push(l);
+    }
+
+    // "Está certo assim": o que alguém já conferiu sai da lista de pendências e
+    // vai para o balde do próprio cliente, de onde dá para trazer de volta. A
+    // comparação é com a ASSINATURA, não com o tipo: se o nome, o custo ou a
+    // data mudaram depois do clique, é outra divergência e ela reaparece.
+    const ignoradasDoCliente = new Map<string, Record<string, string>>();
+    for (const l of linhas) {
+      if (!l.ds_customer_id || !l.ignoradas) continue;
+      const atual = ignoradasDoCliente.get(l.ds_customer_id) ?? {};
+      ignoradasDoCliente.set(l.ds_customer_id, { ...atual, ...l.ignoradas });
+    }
+    for (const c of porCliente.values()) {
+      const marcas = ignoradasDoCliente.get(c.id);
+      if (!marcas) continue;
+      const visiveis: Item[] = [];
+      for (const i of c.itens) {
+        if (marcas[i.tipo] === i.assinatura) c.ignorados.push(i);
+        else visiveis.push(i);
+      }
+      c.itens = visiveis;
     }
 
     // Só entra quem tem algo ERRADO. Vínculo escolhido à mão está resolvido, e
@@ -1066,9 +1104,16 @@ export default function OemIntegrationTab() {
         .map((l) => ({ l, escolher: false })),
     ];
 
+    // As marcadas como certas vivem num bloco só, e não dentro de cada cliente:
+    // cliente cuja única pendência foi ignorada sai da lista, e o caminho de
+    // volta precisa existir mesmo assim.
+    const ignorados = [...porCliente.values()]
+      .flatMap((c) => c.ignorados.map((i) => ({ cliente: c.nome, clienteId: c.id, item: i })));
+
     return {
       lista,
       semDono,
+      ignorados,
       // Fora do `total` de propósito: baixa combinada não é pendência, e contar
       // coisa resolvida no selo da aba é o alarme que ensina a ignorar a tela.
       programadas: r.baixaProgramada,
@@ -1084,6 +1129,7 @@ export default function OemIntegrationTab() {
   // lista de clientes — que é o assunto da aba — para fora da primeira tela.
   const [semDonoAberto, setSemDonoAberto] = useState(false);
   const [programadasAberto, setProgramadasAberto] = useState(false);
+  const [ignoradosAberto, setIgnoradosAberto] = useState(false);
   const [buscaDiv, setBuscaDiv] = useState("");
   const divergenciasVisiveis = useMemo(() => {
     const q = buscaDiv.trim().toLowerCase();
@@ -1265,6 +1311,48 @@ export default function OemIntegrationTab() {
       toast({ title: "Não deu para confirmar", description: e?.message ?? "Erro", variant: "destructive" });
     } finally {
       setConfirmando(null);
+    }
+  }
+
+  // ---------------------------------------------------------------- ignorar
+  //
+  // O terceiro caminho, que faltava na linha da divergência. "Trocar cliente" e
+  // "Desfazer" partem do princípio de que o vínculo está errado; quando ele
+  // está certo e só o dado é escrito diferente dos dois lados (o OEM guarda
+  // "ACAISE BV 2", a ficha guarda "ACAI-SE BV 2"), nenhum dos dois serve e a
+  // divergência ficava na lista para sempre.
+  async function marcarIgnorada(
+    chave: string, tipo: string, assinatura: string,
+    reconId: string | null, clienteId: string | null, voltar = false,
+  ) {
+    setIgnorandoChave(chave);
+    try {
+      // Divergência de linha manda o id dela; a que é do cliente inteiro
+      // (custo, margem) manda cliente + conta, e a marca vai em todas as
+      // linhas dele.
+      const args = reconId
+        ? { p_recon_id: reconId, p_cliente_id: null, p_conta: null }
+        : { p_recon_id: null, p_cliente_id: clienteId, p_conta: conta?.id ?? null };
+      const { error } = await (supabase as any).rpc(
+        voltar ? "oem_reexibir_divergencia" : "oem_ignorar_divergencia",
+        voltar ? { p_tipo: tipo, ...args } : { p_tipo: tipo, p_assinatura: assinatura, ...args },
+      );
+      if (error) throw error;
+      toast({
+        title: voltar ? "Divergência de volta na lista" : "Marcada como certa",
+        description: voltar
+          ? "Ela volta a aparecer para ser decidida."
+          : "O vínculo continua valendo. Se o que está sendo comparado mudar, ela aparece de novo.",
+      });
+      await recarregarRecon();
+    } catch (e: any) {
+      toast({
+        title: "Não deu para salvar",
+        description: e?.message ?? String(e),
+        variant: "destructive",
+      });
+    } finally {
+      setIgnorandoChave(null);
     }
   }
 
@@ -2158,6 +2246,68 @@ export default function OemIntegrationTab() {
             </Card>
           )}
 
+          {/* O que alguém já disse que está certo. Fica recolhido e fora do
+              selo da aba: não é pendência. Mas fica VISÍVEL, porque decisão
+              escondida é decisão que ninguém revisa — e daqui sai o caminho de
+              volta para quem clicou sem querer. */}
+          {divergencias.ignorados.length > 0 && (
+            <Card>
+              <button
+                type="button"
+                onClick={() => setIgnoradosAberto((v) => !v)}
+                className="flex w-full items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
+              >
+                <ChevronRight
+                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${ignoradosAberto ? "rotate-90" : ""}`}
+                />
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">
+                    {divergencias.ignorados.length} divergência{divergencias.ignorados.length > 1 ? "s" : ""}{" "}
+                    marcada{divergencias.ignorados.length > 1 ? "s" : ""} como certa{divergencias.ignorados.length > 1 ? "s" : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    O vínculo vale e o apontamento foi aceito. Se o valor comparado mudar, a
+                    divergência volta sozinha para a lista.
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {ignoradosAberto ? "recolher" : "ver lista"}
+                </span>
+              </button>
+              {ignoradosAberto && (
+                <CardContent className="p-0">
+                  <div className="divide-y border-t max-h-80 overflow-y-auto">
+                    {divergencias.ignorados.map(({ cliente, clienteId, item }) => (
+                      <div key={`ign:${item.chave}`} className="flex items-start gap-3 p-3 text-sm">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">{cliente}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.rotulo} · {item.detalhe}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm" variant="ghost" className="gap-1.5 shrink-0"
+                          disabled={ignorandoChave === item.chave}
+                          onClick={() => marcarIgnorada(
+                            item.chave, item.tipo, item.assinatura,
+                            item.linha?.id ?? null, clienteId, true,
+                          )}
+                        >
+                          {ignorandoChave === item.chave
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <Undo2 className="h-3.5 w-3.5" />}
+                          Voltar a mostrar
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )}
+
           {divergencias.lista.length === 0 ? (
             <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
               Nenhum cliente com divergência. Se você ainda não clicou em{" "}
@@ -2230,6 +2380,25 @@ export default function OemIntegrationTab() {
                                 <p className="text-xs text-muted-foreground">{i.detalhe}</p>
                               </div>
                               <div className="shrink-0 flex items-center gap-1.5">
+                                {/* Vale para TODA divergência: às vezes o
+                                    apontamento está certo e a situação também
+                                    (o OEM escreve o nome de um jeito, a ficha de
+                                    outro). Sem esta saída, a linha nunca sairia
+                                    da lista. */}
+                                <Button
+                                  size="sm" variant="ghost" className="gap-1.5"
+                                  title="Está certo assim: tirar da lista sem mexer no vínculo"
+                                  disabled={ignorandoChave === i.chave}
+                                  onClick={() => marcarIgnorada(
+                                    i.chave, i.tipo, i.assinatura,
+                                    i.linha?.id ?? null, c.id,
+                                  )}
+                                >
+                                  {ignorandoChave === i.chave
+                                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                  Ignorar
+                                </Button>
                                 {/* Cada divergência tem UM caminho de saída, e é
                                     ele que vira botão. Onde a saída é fora do
                                     sistema — desativar a licença no portal do
