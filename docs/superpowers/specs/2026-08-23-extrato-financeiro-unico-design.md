@@ -121,25 +121,44 @@ Divergência medida em 23/08/2026, mesmo instante, mesmos clientes ativos:
 | D2 | **Porta única de escrita.** Toda mudança financeira passa por uma RPC que grava extrato + estado na mesma transação. | Alexandre |
 | D3 | **Backfill completo com prova.** O extrato passa a conter o passado inteiro. Sem corte de data. | Alexandre |
 | D4 | **Cada lançamento carrega dois valores** — recorrente e pontual — no mesmo registro. | Alexandre (correção sobre a proposta inicial) |
-| D5 | **O contrato NÃO é excluído.** Sai da tela, vira vínculo de faturamento. Mas o **reajuste deixa de ser dele** e passa para o produto (§6). | Claude, revisado após objeção do Alexandre |
+| D5 | **O contrato é fundido no produto — na fase 7, depois das outras seis.** O reajuste sai dele já na fase 5 (§6). | Alexandre. Claude recuou de duas objeções erradas; ver abaixo. |
 | D6 | **MRR atual = saldo do extrato.** `cliente_produtos.vlr_mensal` vira valor contratado de referência. | Alexandre |
 | D7 | **Downsell não toca no produto.** Ajuste só por lançamento. | Alexandre |
 | D8 | `certificado_a1_vendas` migra por último, depois que o livro provar que funciona. | Claude, aceito |
 
-### Por que o contrato fica (D5)
+### O contrato é fundido no produto (D5) — e o registro de duas objeções erradas
 
-O desenho original pedia excluí-lo. 97% dos contratos são `is_implicit = true` (3.986 de 4.105 ativos), sem arquivo anexado — parecem burocracia. Objeção levantada pelo Alexandre em 23/08: a data do próximo reajuste vive nele, e o reajuste é por produto, não por contrato. **A objeção procede e mudou o desenho** (§6) — mas não a ponto de excluir a entidade.
+O desenho original do Alexandre pedia excluir o contrato. Claude objetou duas vezes. **As duas objeções caíram contra o dado, e ficam registradas para não voltarem.**
 
-O que o contrato ainda carrega depois de perder o reajuste:
+| Objeção de Claude | O que o dado mostrou |
+|---|---|
+| "`ds_contract_id` já está gravado no ERP do cliente (1.015 registros); excluir exige re-vincular tudo no Omie." | **Errada.** O *valor* do UUID viaja para uma coluna nova em `cliente_produtos`. O payload continua enviando o mesmo `ds_contract_id`. O Omie não percebe. Zero re-vinculação. |
+| "Os 141 contratos não implícitos guardam documento; ganham uma aba Documentos." | **Errada.** `arquivo_url`, `link_assinatura` e `assinado_em`: **0 linhas**. `contrato_pai_id`: **0**. Fidelidade ou multa rescisória: **1**. Os campos que fazem um contrato ser contrato estão vazios. |
 
-- **Omie**: `enfileirar_sync_omie(contrato_id, origem)`, `montar_payload_contrato_omie(p_contrato_id, …)`, `omie_sync_fila.contrato_id`.
-- **Cancelamento**: `cancelado_em`, `motivo_cancelamento`, `contrato_eventos`.
-- **Faturamento**: `dia_vencimento` (1.486 preenchidos), `forma_pagamento_mensalidade_id`.
-- **Documentos**: `contrato_anexos`, `modelo_contrato_id` (que também é o portão do sync — `modelos_contrato.sincroniza_omie`).
+**A premissa do Alexandre se confirma:**
 
-**O argumento decisivo:** `reconciliacao_cadastro` tem **1.015 contratos já espelhados com `ds_contract_id`**. O ID do contrato não é chave só nossa — está gravado dentro do ERP do cliente. Excluir a entidade exige re-vincular 1.015 registros no Omie, com risco de faturamento errado, para ganhar zero em usabilidade (a tela some de qualquer jeito).
+| | |
+|---|---|
+| Contratos com mais de 1 item | **1** (de 5.000) |
+| Produtos em mais de 1 contrato | **0** |
+| Contratos órfãos / produtos sem contrato | 71 / 60 |
 
-**Posição:** ele deixa de ser conceito de negócio e vira **vínculo de faturamento** — invisível no cadastro. Os 141 contratos não implícitos ganham uma aba "Documentos". Se o Alexandre ainda quiser excluí-lo, isso vira um projeto próprio, com plano de re-vinculação do Omie, e não entra aqui.
+E a duplicação que ele temia **já existe**: `cliente_produtos` já carrega 13 campos do contrato — `data_venda`, `data_fim`, `prazo_meses`, `dia_vencimento`, `modelo_contrato_id`, `recorrencia`, `funcionario_id`, `origem_venda_id`, as duas formas de pagamento, `observacoes_contratuais`, `vlr_ativacao`, `vlr_mensal`. O diálogo "Editar Contrato" edita uma cópia.
+
+Divergência entre as duas cópias, nos 4.930 pares (23/08):
+
+| Campo | Divergentes |
+|---|---|
+| recorrência | 73 |
+| consultor (`funcionario_id`) | 72 |
+| `data_venda` / `modelo_contrato_id` | 71 |
+| `data_fim` | 24 |
+| `dia_vencimento` / forma pgto mensalidade | 4 |
+| `prazo_meses` / `origem_venda_id` | 2 |
+
+~1,5%. Resolvível caso a caso, não em massa.
+
+**Por que na fase 7 e não agora:** este plano se apoia em provar número por número, aba por aba (§5, §8). Rodar a fusão junto com a troca do motor de MRR significa que, quando um valor se mexer, não dá para saber qual das duas mudanças causou — perde-se o próprio mecanismo de segurança. Além disso, as fases 1–6 já **preparam** a fusão: o §6 tira o reajuste do contrato (a função mais complicada dele) e o extrato passa a ter `cliente_produto_id`.
 
 ### O que o Omie já suporta (verificado)
 
@@ -381,6 +400,7 @@ Cada fase é publicável e reversível sozinha.
 | 4 | Backfill de `venda_nova` e churn total + backfill dos 792 `data_proximo_reajuste` no produto + relatório de paridade | Não (extrato ainda não é lido) |
 | 5 | `fn_mrr_saldo_em` + `fn_mrr_extrato` + troca das 6 abas, **uma por vez** + **reajuste por produto** (§6.3) | **Sim** — aprovação por aba |
 | 6 | `certificado_a1_vendas` migra para o livro | Sim, na aba Vendas |
+| 7 | **Fusão contrato → produto.** `contratos` e `contrato_itens` deixam de ser usadas. | Não deve mudar. Se mudar, é bug. |
 
 ### Fase 1 — detalhe
 
@@ -451,6 +471,32 @@ Também na fase 5:
 
 **Cada aba entrega um relatório antes/depois por tenant e por mês. Sem aprovação do Alexandre, não vai.**
 
+### Fase 7 — fusão contrato → produto
+
+Só começa com as fases 1–6 publicadas e provadas. Pedido do Alexandre (§2, D5).
+
+**Princípio que torna a fusão barata:** `cliente_produtos` ganha a coluna `omie_ds_contract_id uuid` e recebe **o valor do `contratos.id` atual, sem alterar**. O payload do Omie continua enviando o mesmo `ds_contract_id`, e `ds-omie-contrato-alterar` — que vive no projeto **DoctorOMIE (`vqrytdntynxuqozehals`), fora deste repo** — não precisa de nenhuma alteração. Se o UUID mudar de valor, essa premissa cai e a fase vira outro projeto.
+
+**Mapa de campos:**
+
+| Campo em `contratos` | Destino |
+|---|---|
+| `id` | `cliente_produtos.omie_ds_contract_id` (mesmo valor) |
+| `numero` (CT-AAAA-NNNN) | `cliente_produtos.numero_contrato` — é visível ao usuário, precisa sobreviver |
+| `data_venda`, `data_fim`, `prazo_meses`, `dia_vencimento`, `modelo_contrato_id`, `recorrencia`, `funcionario_id`, `origem_venda_id`, `forma_pagamento_ativacao_id`, `forma_pagamento_mensalidade_id`, `observacoes` | **já existem no produto** — resolver as ~250 divergências antes, campo a campo |
+| `data_proximo_reajuste` | já migrado na fase 4 |
+| `vlr_total_mensal`, `vlr_total_ativacao` | derivados do extrato desde a fase 5; não migram |
+| `status`, `cancelado_em`, `motivo_cancelamento` | `cliente_produtos.ativo` / `data_cancelamento` + o motivo (coluna nova) |
+| `tipo`, `contrato_pai_id`, `fidelidade_meses`, `multa_rescisoria_pct`, `indice_reajuste`, `link_assinatura`, `arquivo_*`, `assinado_em`, `is_implicit` | **não migram** — 0 ou 1 linha preenchida em cada |
+
+**Ponteiros a reapontar (~4.450 linhas):** `movimentos_mrr.contrato_id` 1.175 · `contrato_eventos` 1.169 · `reconciliacao_cadastro.ds_contract_id` 1.015 · `reajuste_contratos` 707 · `omie_sync_fila` 325 · `contrato_anexos` 62.
+
+**Superfície de código:** 30 RPCs tocam `contratos`, 15 tocam `contrato_itens`, 7 tocam `contrato_eventos` (51 funções citam contrato). No front, 57 arquivos / 104 ocorrências. Nas edge functions, 18 citam contrato — **todas as do Omie e da reconciliação estão no repo** (a auditoria de 23/08 encontrou só 5 prod-only, todas de WhatsApp: `backfill-contact-pictures`, `fetch-evolution-history`, `fetch-zapi-history`, `reconnect-whatsapp-instance`, `sync-contact-picture`).
+
+**Ponto de atenção próprio:** `clientes.cancelado` é derivado de `contratos.status` por `trg_derive_cancelado_on_contrato`. Passa a derivar de `cliente_produtos.ativo`. Mexer nisso errado marca cliente ativo como cancelado — e `fn_sync_cliente_mensalidade` para de recalcular quem está marcado como cancelado. É a mudança mais perigosa da fase.
+
+**Critério de saída:** as tabelas `contratos` e `contrato_itens` ficam sem leitor. Não são dropadas na mesma entrega — ficam congeladas um ciclo, para rollback.
+
 ---
 
 ## 9. Riscos
@@ -461,6 +507,9 @@ Também na fase 5:
 | **`venda_nova` dobrar a base do reajuste** — dinheiro cobrado errado do cliente final | Fase 1 cobre `preparar_reajuste`. É o pior dos três casos de lista negra. |
 | Reajuste por produto mudar o valor de quem já tem data marcada | Só entra na fase 5, depois do backfill. Simulação obrigatória sobre os 7 clientes multi-produto. |
 | `contratos.data_proximo_reajuste` desatualizar e travar o Omie | Mantida como `MIN()` dos produtos; `montar_payload_contrato_omie` já recusa data vencida — o erro aparece, não passa silencioso. |
+| **Fase 7: `omie_ds_contract_id` mudar de valor** | Premissa inegociável: o UUID viaja, não é regerado. `ds-omie-contrato-alterar` está em outro projeto Supabase (DoctorOMIE) e fora deste repo — se ele precisar mudar, a fase 7 vira projeto próprio. |
+| **Fase 7: `clientes.cancelado` derivar errado** | Passa a vir de `cliente_produtos.ativo`. Erro aqui marca cliente ativo como cancelado e trava `fn_sync_cliente_mensalidade`. Exige contagem antes/depois igual, por tenant. |
+| **Fase 7: escolher a cópia errada nas ~250 divergências** | Resolver campo a campo antes da fusão, não por regra genérica. Não existe "a coluna certa" — existe a linha certa. |
 | Backfill enfileirar 4.990 contratos no Omie | Gatilho desabilitado na transação / filtro por `origem_registro`. |
 | `ADD VALUE` no enum é irreversível | Sem rollback. Só entra depois da fase 1 aprovada. |
 | Escrita direta sobreviver ao `REVOKE` | Inventário das 17 funções + 11 arquivos acima. `REVOKE` só na última etapa da fase 3. |
@@ -478,5 +527,5 @@ Também na fase 5:
 - Recorrência não mensal (anual, trimestral, por consumo).
 - Separação receita bruta × repasse de fornecedor no mesmo lançamento.
 - Renomear a tabela `movimentos_mrr`.
-- **Excluir a entidade contrato.** Fica registrado como pedido do Alexandre, adiado com motivo (§2, D5): 1.015 `ds_contract_id` já espelhados no Omie. Se voltar à mesa, é projeto próprio com plano de re-vinculação do ERP.
+- ~~Excluir a entidade contrato.~~ **Saiu daqui — virou a fase 7** (§8) por decisão do Alexandre em 23/08.
 - Índice de reajuste (IGPM/IPCA) por produto. `contratos.indice_reajuste` existe e é exibido/editável em `ClienteContratosSection.tsx`, mas **não entra no cálculo** — `preparar_reajuste` recebe o percentual por parâmetro. Continua assim.
