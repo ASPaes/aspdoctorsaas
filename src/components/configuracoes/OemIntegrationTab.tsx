@@ -1365,11 +1365,47 @@ export default function OemIntegrationTab() {
   const [programadasAberto, setProgramadasAberto] = useState(false);
   const [ignoradosAberto, setIgnoradosAberto] = useState(false);
   const [buscaDiv, setBuscaDiv] = useState("");
+  const [tipoDiv, setTipoDiv] = useState("todos");
+
+  // Os tipos que REALMENTE estão na lista, com quantos clientes cada um pega.
+  // Sai dos próprios itens em vez de uma lista fixa: tipo que ninguém tem hoje
+  // não vira opção morta no seletor, e tipo novo aparece sozinho no dia em que
+  // a primeira linha dele existir.
+  const tiposDiv = useMemo(() => {
+    const m = new Map<string, { rotulo: string; itens: number; clientes: number }>();
+    for (const c of divergencias.lista) {
+      const jaContou = new Set<string>();
+      for (const i of c.itens) {
+        const at = m.get(i.tipo) ?? { rotulo: i.rotulo, itens: 0, clientes: 0 };
+        at.itens += 1;
+        if (!jaContou.has(i.tipo)) { at.clientes += 1; jaContou.add(i.tipo); }
+        m.set(i.tipo, at);
+      }
+    }
+    return [...m.entries()]
+      .map(([tipo, v]) => ({ tipo, ...v }))
+      .sort((a, b) => b.itens - a.itens || a.rotulo.localeCompare(b.rotulo, "pt-BR"));
+  }, [divergencias.lista]);
+
+  // O tipo escolhido pode DEIXAR de existir: basta corrigir a última linha
+  // dele. Sem isto o filtro ficaria preso num tipo vazio e a tela pareceria
+  // quebrada — cai em "todos" sozinho.
+  const tipoAtivo = tiposDiv.some((t) => t.tipo === tipoDiv) ? tipoDiv : "todos";
+
   const divergenciasVisiveis = useMemo(() => {
     const q = buscaDiv.trim().toLowerCase();
-    if (!q) return divergencias.lista;
-    return divergencias.lista.filter((c) => combina(q, [c.nome, c.cnpj]));
-  }, [divergencias.lista, buscaDiv]);
+    // Filtrar por tipo recorta TAMBÉM os itens de dentro do cliente, não só
+    // quais clientes aparecem: com "CNPJ diferente" escolhido, um cliente que
+    // também tem custo divergente mostraria "2 divergências" e abriria com uma
+    // linha que não é a filtrada.
+    const base = tipoAtivo === "todos"
+      ? divergencias.lista
+      : divergencias.lista
+          .map((c) => ({ ...c, itens: c.itens.filter((i) => i.tipo === tipoAtivo) }))
+          .filter((c) => c.itens.length > 0);
+    if (!q) return base;
+    return base.filter((c) => combina(q, [c.nome, c.cnpj]));
+  }, [divergencias.lista, buscaDiv, tipoAtivo]);
 
   const custosVisiveis = useMemo(() => {
     const q = buscaCusto.trim().toLowerCase();
@@ -2641,6 +2677,22 @@ export default function OemIntegrationTab() {
                   <Input placeholder="Buscar cliente por nome ou CNPJ" className="pl-8"
                     value={buscaDiv} onChange={(e) => setBuscaDiv(e.target.value)} />
                 </div>
+                {/* Seletor e não pills: são até dez tipos, com rótulo de frase
+                    inteira ("Licença OEM ativa de cliente cancelado no DS").
+                    Em pills eles quebrariam em três linhas e empurrariam a
+                    lista, que é o assunto da aba, para fora da primeira tela. */}
+                <select
+                  className="h-10 rounded-md border bg-background px-3 text-sm max-w-full"
+                  value={tipoAtivo}
+                  onChange={(e) => { setTipoDiv(e.target.value); setClienteAberto(null); }}
+                >
+                  <option value="todos">
+                    Todos os tipos ({divergencias.lista.reduce((a, c) => a + c.itens.length, 0)})
+                  </option>
+                  {tiposDiv.map((t) => (
+                    <option key={t.tipo} value={t.tipo}>{t.rotulo} ({t.itens})</option>
+                  ))}
+                </select>
                 <p className="text-sm text-muted-foreground">
                   <strong>{divergenciasVisiveis.length}</strong> clientes ·{" "}
                   <strong>{divergenciasVisiveis.reduce((a, c) => a + c.itens.length, 0)}</strong>{" "}
@@ -2649,6 +2701,19 @@ export default function OemIntegrationTab() {
               </div>
 
               <div className="rounded-md border divide-y">
+                {/* A lista inteira vazia já tem aviso próprio, lá em cima. Este
+                    é o outro vazio, que o filtro por tipo tornou comum: a borda
+                    sozinha na tela parece tela quebrada. */}
+                {divergenciasVisiveis.length === 0 && (
+                  <p className="px-6 py-8 text-center text-sm text-muted-foreground">
+                    Nenhum cliente com esse recorte.{" "}
+                    {tipoAtivo !== "todos" && buscaDiv.trim()
+                      ? "Tente limpar a busca ou escolher Todos os tipos."
+                      : tipoAtivo !== "todos"
+                        ? "Escolha Todos os tipos para ver a lista inteira."
+                        : "Tente outro nome ou CNPJ."}
+                  </p>
+                )}
                 {divergenciasVisiveis.map((c) => {
                   const aberto = clienteAberto === c.id;
                   const graves = c.itens.filter((i) => i.grave).length;
