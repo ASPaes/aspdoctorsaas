@@ -7,9 +7,9 @@
  * descrição e o grupo de negócio; o status vem do banco, medido por integração.
  *
  * `section` é o valor de `?section=` das Configurações. Item sem `section` não é
- * clicável: ou não tem tela ainda (Asaas) ou não há o que configurar por aqui
+ * clicável: ou não tem tela ainda (Asaas) ou se resolve na própria linha
  * (AcessoFast, que é uma flag de contratação por tenant — a integração não tem
- * credencial: a janelinha recebe tudo pela URL).
+ * credencial: a janelinha recebe tudo pela URL, então não há tela para abrir).
  */
 
 export type IntegracaoStatus =
@@ -29,6 +29,12 @@ export interface Integracao {
   section?: string;
   /** Recurso RBAC. Sem permissão de `view`, o item não aparece. */
   resource?: string;
+  /**
+   * A contratação se resolve aqui mesmo, com um liga/desliga na linha. É o caso
+   * do AcessoFast: não há credencial para pedir nem tela para abrir, só a flag
+   * do tenant. Quem não pode contratar continua vendo o selo.
+   */
+  toggleavel?: boolean;
   /**
    * Status que não se mede: vale sempre e ignora o que vier do banco. É o caso
    * do que ainda não existe — perguntar ao banco por uma integração sem tabela
@@ -87,6 +93,7 @@ export const INTEGRACOES_CATALOGO: GrupoIntegracoes[] = [
         id: "acessofast",
         nome: "AcessoFast",
         descricao: "Acesso remoto à máquina do cliente pelo botão Conectar, dentro do chat.",
+        toggleavel: true,
       },
     ],
   },

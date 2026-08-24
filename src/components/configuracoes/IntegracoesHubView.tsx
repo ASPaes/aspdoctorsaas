@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
 import { labelStatus, type GrupoMontado, type IntegracaoId, type IntegracaoStatus } from "@/lib/integracoes";
 
 import logoOmie from "@/assets/integracoes/omie.png";
@@ -55,9 +56,16 @@ function StatusPill({ status }: { status: IntegracaoStatus }) {
 interface Props {
   grupos: GrupoMontado[];
   onSelect: (section: string) => void;
+  /**
+   * Só chega preenchido para quem pode contratar (admin do tenant ou super
+   * admin). Sem isso, a integração `toggleavel` cai no selo de leitura.
+   */
+  onToggle?: (id: IntegracaoId, ativar: boolean) => void;
+  /** Integração com a gravação em curso: a chave trava até o banco responder. */
+  salvando?: IntegracaoId | null;
 }
 
-export function IntegracoesHubView({ grupos, onSelect }: Props) {
+export function IntegracoesHubView({ grupos, onSelect, onToggle, salvando }: Props) {
   return (
     <div className="space-y-6">
       {grupos.map((grupo) => (
@@ -67,6 +75,7 @@ export function IntegracoesHubView({ grupos, onSelect }: Props) {
           </h3>
           <div className="rounded-lg border overflow-hidden bg-card shadow-sm">
             {grupo.itens.map((item, i) => {
+              const alternavel = !!item.toggleavel && !!onToggle;
               const conteudo = (
                 <>
                   <Logo id={item.id} nome={item.nome} />
@@ -74,7 +83,20 @@ export function IntegracoesHubView({ grupos, onSelect }: Props) {
                     <div className="text-sm font-medium">{item.nome}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">{item.descricao}</div>
                   </div>
-                  <StatusPill status={item.status} />
+                  {alternavel ? (
+                    <Switch
+                      data-testid={`integracao-${item.id}-switch`}
+                      checked={item.status.kind === "ativo"}
+                      // Enquanto o status não chegou, a chave mostraria "desligado"
+                      // e um clique gravaria em cima de um valor que ninguém leu.
+                      disabled={item.status.kind === "carregando" || salvando === item.id}
+                      onCheckedChange={(v) => onToggle!(item.id, v)}
+                      aria-label={`Ativar ${item.nome}`}
+                      className="flex-shrink-0"
+                    />
+                  ) : (
+                    <StatusPill status={item.status} />
+                  )}
                 </>
               );
 

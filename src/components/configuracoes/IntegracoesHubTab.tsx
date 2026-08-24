@@ -1,7 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useToast } from "@/hooks/use-toast";
 import { buildIntegracoesGroups, type IntegracaoId, type IntegracaoStatus } from "@/lib/integracoes";
 import { IntegracoesHubView } from "./IntegracoesHubView";
 
@@ -66,13 +69,51 @@ export default function IntegracoesHubTab({
   onSelectSection: (section: string) => void;
 }) {
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { profile } = useAuth();
   const { can, rbacEnabled } = usePermissions();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [salvando, setSalvando] = useState<IntegracaoId | null>(null);
 
   const { data, isLoading, error } = useQuery<Mapa>({
     queryKey: ["integracoes-status", tid],
     enabled: !!tid,
     staleTime: 60 * 1000,
     queryFn: () => carregarStatus(tid as string),
+  });
+
+  /**
+   * Contratar é decisão de quem responde pela empresa. A RPC repete a checagem —
+   * esconder o controle não protege nada: a policy de `tenants` é uma só, `ALL`
+   * para qualquer membro ativo, e um UPDATE direto passaria.
+   */
+  const podeContratar = profile?.is_super_admin === true || profile?.role === "admin";
+
+  const alternar = useMutation({
+    mutationFn: async ({ id, ativar }: { id: IntegracaoId; ativar: boolean }) => {
+      if (id !== "acessofast" || !tid) return;
+      const { error } = await (supabase.rpc as any)("set_acessofast_enabled", {
+        p_tenant_id: tid,
+        p_enabled: ativar,
+      });
+      if (error) throw error;
+    },
+    onMutate: ({ id }) => setSalvando(id),
+    onSettled: () => setSalvando(null),
+    onSuccess: (_r, { ativar }) => {
+      // O botão do chat lê a flag por outra query — sem invalidar as duas, o
+      // técnico só veria a mudança no próximo F5.
+      queryClient.invalidateQueries({ queryKey: ["integracoes-status"] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-acessofast-enabled"] });
+      toast({
+        title: ativar ? "AcessoFast ativado" : "AcessoFast desativado",
+        description: ativar
+          ? "O botão Conectar já aparece nos atendimentos."
+          : "O botão Conectar saiu dos atendimentos.",
+      });
+    },
+    onError: (err: Error) =>
+      toast({ title: "Não foi possível salvar", description: err.message, variant: "destructive" }),
   });
 
   // Sem RBAC ligado, quem chegou até as Configurações já é admin.
@@ -90,7 +131,12 @@ export default function IntegracoesHubTab({
           Não foi possível ler o status das integrações: {(error as Error).message}
         </p>
       )}
-      <IntegracoesHubView grupos={grupos} onSelect={onSelectSection} />
+      <IntegracoesHubView
+        grupos={grupos}
+        onSelect={onSelectSection}
+        onToggle={podeContratar ? (id, ativar) => alternar.mutate({ id, ativar }) : undefined}
+        salvando={salvando}
+      />
     </div>
   );
 }

@@ -78,6 +78,50 @@ describe("IntegracoesHubView", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it("quem pode contratar vê um liga/desliga no lugar do selo do AcessoFast", () => {
+    const grupos = buildIntegracoesGroups({ acessofast: { kind: "ativo" } }, tudo);
+    render(<IntegracoesHubView grupos={grupos} onSelect={() => {}} onToggle={() => {}} />);
+
+    const chave = container.querySelector<HTMLElement>('[data-testid="integracao-acessofast-switch"]');
+    expect(chave).not.toBeNull();
+    expect(chave!.getAttribute("aria-checked")).toBe("true");
+    // O selo sairia redundante ao lado da chave.
+    expect(linha("acessofast").textContent).not.toContain("Ativo");
+  });
+
+  it("sem permissão de contratar, o AcessoFast continua sendo só o selo", () => {
+    const grupos = buildIntegracoesGroups({ acessofast: { kind: "ativo" } }, tudo);
+    render(<IntegracoesHubView grupos={grupos} onSelect={() => {}} />);
+
+    expect(container.querySelector('[data-testid="integracao-acessofast-switch"]')).toBeNull();
+    expect(linha("acessofast").textContent).toContain("Ativo");
+  });
+
+  it("virar a chave avisa com o valor novo", () => {
+    const onToggle = vi.fn();
+    const grupos = buildIntegracoesGroups({ acessofast: { kind: "desconectado" } }, tudo);
+    render(<IntegracoesHubView grupos={grupos} onSelect={() => {}} onToggle={onToggle} />);
+
+    act(() => container.querySelector<HTMLElement>('[data-testid="integracao-acessofast-switch"]')!.click());
+    expect(onToggle).toHaveBeenCalledWith("acessofast", true);
+  });
+
+  it("a chave trava enquanto salva e enquanto o status não chegou", () => {
+    const salvando = buildIntegracoesGroups({ acessofast: { kind: "ativo" } }, tudo);
+    render(
+      <IntegracoesHubView grupos={salvando} onSelect={() => {}} onToggle={() => {}} salvando="acessofast" />,
+    );
+    expect(
+      container.querySelector<HTMLButtonElement>('[data-testid="integracao-acessofast-switch"]')!.disabled,
+    ).toBe(true);
+
+    const carregando = buildIntegracoesGroups({ acessofast: { kind: "carregando" } }, tudo);
+    render(<IntegracoesHubView grupos={carregando} onSelect={() => {}} onToggle={() => {}} />);
+    expect(
+      container.querySelector<HTMLButtonElement>('[data-testid="integracao-acessofast-switch"]')!.disabled,
+    ).toBe(true);
+  });
+
   it("integração sem permissão não é renderizada", () => {
     const grupos = buildIntegracoesGroups({}, (r) => r === "cfg.integracoes_hiper");
     render(<IntegracoesHubView grupos={grupos} onSelect={() => {}} />);
