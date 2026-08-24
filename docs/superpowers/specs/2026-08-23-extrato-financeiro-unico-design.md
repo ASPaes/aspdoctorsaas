@@ -156,7 +156,7 @@ Divergência entre as duas cópias, nos 4.930 pares (23/08):
 | `dia_vencimento` / forma pgto mensalidade | 4 |
 | `prazo_meses` / `origem_venda_id` | 2 |
 
-~1,5%. Resolvível caso a caso, não em massa.
+**168 pares** (3,41%) divergem em pelo menos um campo, somando **323 ocorrências**. Resolvível caso a caso, não em massa.
 
 **Por que na fase 7 e não agora:** este plano se apoia em provar número por número, aba por aba (§5, §8). Rodar a fusão junto com a troca do motor de MRR significa que, quando um valor se mexer, não dá para saber qual das duas mudanças causou — perde-se o próprio mecanismo de segurança. Além disso, as fases 1–6 já **preparam** a fusão: o §6 tira o reajuste do contrato (a função mais complicada dele) e o extrato passa a ter `cliente_produto_id`.
 
@@ -483,7 +483,7 @@ Só começa com as fases 1–6 publicadas e provadas. Pedido do Alexandre (§2, 
 |---|---|
 | `id` | `cliente_produtos.omie_ds_contract_id` (mesmo valor) |
 | `numero` (CT-AAAA-NNNN) | `cliente_produtos.numero_contrato` — é visível ao usuário, precisa sobreviver |
-| `data_venda`, `data_fim`, `prazo_meses`, `dia_vencimento`, `modelo_contrato_id`, `recorrencia`, `funcionario_id`, `origem_venda_id`, `forma_pagamento_ativacao_id`, `forma_pagamento_mensalidade_id`, `observacoes` | **já existem no produto** — resolver as ~250 divergências antes, campo a campo |
+| `data_venda`, `data_fim`, `prazo_meses`, `dia_vencimento`, `modelo_contrato_id`, `recorrencia`, `funcionario_id`, `origem_venda_id`, `forma_pagamento_ativacao_id`, `forma_pagamento_mensalidade_id`, `observacoes` | **já existem no produto** — resolver as 323 ocorrências (168 pares) antes, campo a campo |
 | `data_proximo_reajuste` | já migrado na fase 4 |
 | `vlr_total_mensal`, `vlr_total_ativacao` | derivados do extrato desde a fase 5; não migram |
 | `status`, `cancelado_em`, `motivo_cancelamento` | `cliente_produtos.ativo` / `data_cancelamento` + o motivo (coluna nova) |
@@ -509,7 +509,7 @@ Só começa com as fases 1–6 publicadas e provadas. Pedido do Alexandre (§2, 
 | `contratos.data_proximo_reajuste` desatualizar e travar o Omie | Mantida como `MIN()` dos produtos; `montar_payload_contrato_omie` já recusa data vencida — o erro aparece, não passa silencioso. |
 | **Fase 7: `omie_ds_contract_id` mudar de valor** | Premissa inegociável: o UUID viaja, não é regerado. `ds-omie-contrato-alterar` está em outro projeto Supabase (DoctorOMIE) e fora deste repo — se ele precisar mudar, a fase 7 vira projeto próprio. |
 | **Fase 7: `clientes.cancelado` derivar errado** | Passa a vir de `cliente_produtos.ativo`. Erro aqui marca cliente ativo como cancelado e trava `fn_sync_cliente_mensalidade`. Exige contagem antes/depois igual, por tenant. |
-| **Fase 7: escolher a cópia errada nas ~250 divergências** | Resolver campo a campo antes da fusão, não por regra genérica. Não existe "a coluna certa" — existe a linha certa. |
+| **Fase 7: escolher a cópia errada nas 323 divergências (168 pares)** | Resolver campo a campo antes da fusão, não por regra genérica. Não existe "a coluna certa" — existe a linha certa. |
 | Backfill enfileirar 4.990 contratos no Omie | Gatilho desabilitado na transação / filtro por `origem_registro`. |
 | `ADD VALUE` no enum é irreversível | Sem rollback. Só entra depois da fase 1 aprovada. |
 | Escrita direta sobreviver ao `REVOKE` | Inventário das 17 funções + 11 arquivos acima. `REVOKE` só na última etapa da fase 3. |
