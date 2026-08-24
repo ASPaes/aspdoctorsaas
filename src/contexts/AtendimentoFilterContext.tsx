@@ -16,6 +16,13 @@ export interface FiltroOpcoes {
 
 export type TipoAtendimento = 'all' | 'individual' | 'group';
 
+/**
+ * Plantão = houve trabalho de agente fora do expediente do tenant/setor.
+ * A classificação vem da coluna support_attendances.plantao, gravada no
+ * fechamento; o front só escolhe o recorte.
+ */
+export type FiltroPlantao = 'all' | 'plantao' | 'comercial';
+
 interface AtendimentoFilterContextType {
   dateRange: AtendimentoDateRange;
   setDateRange: (r: AtendimentoDateRange) => void;
@@ -25,6 +32,10 @@ interface AtendimentoFilterContextType {
   setAgentId: (id: string | null) => void;
   tipoAtendimento: TipoAtendimento;
   setTipoAtendimento: (t: TipoAtendimento) => void;
+  plantao: FiltroPlantao;
+  setPlantao: (p: FiltroPlantao) => void;
+  /** Tenant (ou algum setor dele) tem expediente configurado. Sem isso não existe plantão. */
+  temHorarioConfigurado: boolean;
   segmentoIds: number[]; setSegmentoIds: (ids: number[]) => void;
   areaIds: number[]; setAreaIds: (ids: number[]) => void;
   estadoIds: number[]; setEstadoIds: (ids: number[]) => void;
@@ -53,6 +64,9 @@ const AtendimentoFilterContext = createContext<AtendimentoFilterContextType>({
   setAgentId: () => {},
   tipoAtendimento: 'all',
   setTipoAtendimento: () => {},
+  plantao: 'all',
+  setPlantao: () => {},
+  temHorarioConfigurado: false,
   segmentoIds: [], setSegmentoIds: () => {},
   areaIds: [], setAreaIds: () => {},
   estadoIds: [], setEstadoIds: () => {},
@@ -71,6 +85,7 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento>('all');
+  const [plantao, setPlantao] = useState<FiltroPlantao>('all');
   const [segmentoIds, setSegmentoIds] = useState<number[]>([]);
   const [areaIds, setAreaIds] = useState<number[]>([]);
   const [estadoIds, setEstadoIds] = useState<number[]>([]);
@@ -83,9 +98,36 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
     setDepartmentId(null);
     setAgentId(null);
     setDateRange(defaultRange());
+    setPlantao('all');
     setSegmentoIds([]); setAreaIds([]); setEstadoIds([]);
     setCidadeIds([]); setFornecedorIds([]); setProdutoIds([]);
   }, [tid]);
+
+  // Expediente configurado no tenant OU em qualquer setor dele. É o mesmo
+  // critério de is_within_business_hours: sem isso, nada é plantão e o filtro
+  // não deve nem aparecer na tela.
+  const { data: temHorarioConfigurado = false } = useQuery({
+    queryKey: ["atendimento_filtro_horario", tid],
+    enabled: !!tid,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const [cfg, dept] = await Promise.all([
+        (supabase.from("configuracoes" as any) as any)
+          .select("business_hours_enabled").eq("tenant_id", tid).maybeSingle(),
+        (supabase.from("support_departments" as any) as any)
+          .select("id").eq("tenant_id", tid).eq("business_hours_enabled", true).limit(1),
+      ]);
+      if (cfg.error) throw cfg.error;
+      if (dept.error) throw dept.error;
+      return !!cfg.data?.business_hours_enabled || ((dept.data ?? []).length > 0);
+    },
+  });
+
+  // Tenant sem expediente não pode ficar preso num recorte de plantão que a
+  // tela não mostra mais — o filtro sumiria e os números seguiriam filtrados.
+  useEffect(() => {
+    if (!temHorarioConfigurado) setPlantao('all');
+  }, [temHorarioConfigurado]);
 
   const { data: setores = [], isLoading: loadingSet } = useQuery({
     queryKey: ["atendimento_filtro_setores", tid],
@@ -141,6 +183,7 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
       departmentId, setDepartmentId,
       agentId, setAgentId,
       tipoAtendimento, setTipoAtendimento,
+      plantao, setPlantao, temHorarioConfigurado,
       segmentoIds, setSegmentoIds,
       areaIds, setAreaIds,
       estadoIds, setEstadoIds,
@@ -150,7 +193,7 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
       setores, agentes, opcoes,
       isLoading: loadingSet || loadingAg || loadingOpc,
     }),
-    [dateRange, departmentId, agentId, tipoAtendimento, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, setores, agentes, opcoes, loadingSet, loadingAg, loadingOpc]
+    [dateRange, departmentId, agentId, tipoAtendimento, plantao, temHorarioConfigurado, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, setores, agentes, opcoes, loadingSet, loadingAg, loadingOpc]
   );
 
   return (

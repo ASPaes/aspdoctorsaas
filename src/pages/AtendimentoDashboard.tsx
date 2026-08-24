@@ -19,10 +19,13 @@ import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoR
 import { MultiSelectFilter } from "@/components/atendimento/MultiSelectFilter";
 
 const ALL = "__all__";
-type FiltroConfig = { date: boolean; setor: boolean; agente: boolean; cliente?: boolean; tipo?: boolean };
+// `plantao` só entra na aba cuja RPC já aceita p_plantao. As demais recebem a
+// flag conforme forem migradas — mostrar o filtro antes disso daria um select
+// que não filtra nada.
+type FiltroConfig = { date: boolean; setor: boolean; agente: boolean; cliente?: boolean; tipo?: boolean; plantao?: boolean };
 const FILTROS_POR_ABA: Record<string, FiltroConfig> = {
   "tempo-real": { date: false, setor: false, agente: false, tipo: true },
-  velocidade: { date: true, setor: true, agente: true, tipo: true },
+  velocidade: { date: true, setor: true, agente: true, tipo: true, plantao: true },
   agentes:    { date: true, setor: true, agente: true, tipo: true },
   satisfacao: { date: true, setor: true, agente: true, tipo: true },
   volume:     { date: true, setor: true, agente: true, tipo: true },
@@ -52,6 +55,9 @@ function FiltrosGlobais({ cfg }: { cfg: FiltroConfig }) {
     setAgentId,
     tipoAtendimento,
     setTipoAtendimento,
+    plantao,
+    setPlantao,
+    temHorarioConfigurado,
     setores,
     agentes,
     opcoes,
@@ -116,6 +122,18 @@ function FiltrosGlobais({ cfg }: { cfg: FiltroConfig }) {
             <SelectItem value="all">Todos os tipos</SelectItem>
             <SelectItem value="individual">Individual</SelectItem>
             <SelectItem value="group">Grupos</SelectItem>
+          </SelectContent>
+        </Select>
+      )}
+      {cfg.plantao && temHorarioConfigurado && (
+        <Select value={plantao} onValueChange={(v) => setPlantao(v as any)}>
+          <SelectTrigger className="w-[190px]">
+            <SelectValue placeholder="Horário" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os horários</SelectItem>
+            <SelectItem value="plantao">Só plantão</SelectItem>
+            <SelectItem value="comercial">Só horário comercial</SelectItem>
           </SelectContent>
         </Select>
       )}
