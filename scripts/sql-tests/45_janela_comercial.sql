@@ -89,4 +89,58 @@ BEGIN
   RAISE NOTICE 'OK: task 2';
 END $$;
 
+DO $$
+DECLARE
+  v_tenant uuid;
+BEGIN
+  SELECT tenant_id INTO v_tenant FROM public.configuracoes LIMIT 1;
+
+  UPDATE public.configuracoes SET
+    horario_comercial_enabled = true,
+    business_hours_timezone   = 'America/Sao_Paulo',
+    horario_comercial = jsonb_build_object(
+      'mon', jsonb_build_object('active', true, 'slots', jsonb_build_array(
+               jsonb_build_object('start','08:00','end','12:00'),
+               jsonb_build_object('start','13:30','end','18:00'))),
+      'fri', jsonb_build_object('active', true, 'slots', jsonb_build_array(jsonb_build_object('start','09:00','end','17:00'))),
+      'sat', jsonb_build_object('active', false, 'slots', jsonb_build_array(jsonb_build_object('start','09:00','end','18:00'))))
+  WHERE tenant_id = v_tenant;
+
+  -- Almoço NÃO é plantão: a tolerância vale sobre a janela do dia (08:00-18:00).
+  IF public.fn_instante_fora_comercial(v_tenant, '2026-08-24 12:45-03'::timestamptz) THEN
+    RAISE EXCEPTION 'FALHOU: 12:45 de segunda (almoço) marcou plantão';
+  END IF;
+
+  -- Tolerância de 5 min na borda de fechamento.
+  IF public.fn_instante_fora_comercial(v_tenant, '2026-08-24 18:04-03'::timestamptz) THEN
+    RAISE EXCEPTION 'FALHOU: 18:04 deveria estar dentro da tolerância de 5 min';
+  END IF;
+  IF NOT public.fn_instante_fora_comercial(v_tenant, '2026-08-24 18:06-03'::timestamptz) THEN
+    RAISE EXCEPTION 'FALHOU: 18:06 deveria ser plantão';
+  END IF;
+
+  -- Sexta fecha 17:00: 17:30 é plantão na sexta e não é na segunda.
+  IF NOT public.fn_instante_fora_comercial(v_tenant, '2026-08-28 17:30-03'::timestamptz) THEN
+    RAISE EXCEPTION 'FALHOU: sexta 17:30 deveria ser plantão';
+  END IF;
+  IF public.fn_instante_fora_comercial(v_tenant, '2026-08-24 17:30-03'::timestamptz) THEN
+    RAISE EXCEPTION 'FALHOU: segunda 17:30 não é plantão';
+  END IF;
+
+  -- Dia inativo: tudo é plantão.
+  IF NOT public.fn_instante_fora_comercial(v_tenant, '2026-08-29 15:00-03'::timestamptz) THEN
+    RAISE EXCEPTION 'FALHOU: sábado 15:00 deveria ser plantão';
+  END IF;
+
+  -- Clamp: janela colada na meia-noite não pode dar a volta e marcar o dia inteiro.
+  UPDATE public.configuracoes SET horario_comercial = jsonb_build_object(
+    'mon', jsonb_build_object('active', true, 'slots', jsonb_build_array(jsonb_build_object('start','00:10','end','23:45'))))
+  WHERE tenant_id = v_tenant;
+  IF public.fn_instante_fora_comercial(v_tenant, '2026-08-24 12:00-03'::timestamptz, 30) THEN
+    RAISE EXCEPTION 'FALHOU clamp: meio-dia virou plantão numa janela 00:10-23:45';
+  END IF;
+
+  RAISE NOTICE 'OK: task 3';
+END $$;
+
 ROLLBACK;
