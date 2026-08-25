@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -17,28 +16,16 @@ import { Save, Loader2, Clock, Bot, Phone, X, Plus } from "lucide-react";
 import { formatBRPhone, maskBRPhoneLive } from "@/lib/phoneBR";
 import BusinessHoursExceptionsSection from "./BusinessHoursExceptionsSection";
 import BusinessHoursHolidayTemplateSection from "./BusinessHoursHolidayTemplateSection";
-
-// ─── Types ───────────────────────────────────────────────────────
-interface TimeSlot {
-  start: string;
-  end: string;
-}
-
-interface DaySchedule {
-  active: boolean;
-  slots: TimeSlot[];
-}
-
-type BusinessHours = Record<string, DaySchedule>;
-
-const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
-const DAY_LABELS: Record<string, string> = {
-  mon: "Segunda", tue: "Terça", wed: "Quarta", thu: "Quinta",
-  fri: "Sexta", sat: "Sábado", sun: "Domingo",
-};
-
-const DEFAULT_SLOT: TimeSlot = { start: "08:00", end: "18:00" };
-const DEFAULT_DAY: DaySchedule = { active: false, slots: [{ ...DEFAULT_SLOT }] };
+import {
+  WeeklyScheduleGrid,
+  DAY_KEYS,
+  DEFAULT_SLOT,
+  DEFAULT_DAY,
+  parseBusinessHours,
+  validateSchedule,
+  cleanSchedule,
+  type BusinessHours,
+} from "./WeeklyScheduleGrid";
 
 const TIMEZONES = [
   "America/Sao_Paulo", "America/Manaus", "America/Belem", "America/Bahia",
@@ -47,35 +34,6 @@ const TIMEZONES = [
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────
-/** Parse business_hours JSON with backward compat for old {start,end,active} format */
-function parseBusinessHours(raw: unknown): BusinessHours {
-  const obj = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
-  const result: BusinessHours = {};
-  for (const key of DAY_KEYS) {
-    const day = obj[key];
-    if (day && typeof day === "object") {
-      const d = day as Record<string, unknown>;
-      const active = !!d.active;
-      // New format with slots array
-      if (Array.isArray(d.slots) && d.slots.length > 0) {
-        const slots = (d.slots as Record<string, unknown>[]).map((s) => ({
-          start: typeof s.start === "string" ? s.start : "08:00",
-          end: typeof s.end === "string" ? s.end : "18:00",
-        }));
-        result[key] = { active, slots };
-      } else if (typeof d.start === "string" && typeof d.end === "string") {
-        // Backward compat: old {start, end, active} format → convert to slots
-        result[key] = { active, slots: [{ start: d.start, end: d.end }] };
-      } else {
-        result[key] = { active, slots: [{ ...DEFAULT_SLOT }] };
-      }
-    } else {
-      result[key] = { active: false, slots: [{ ...DEFAULT_SLOT }] };
-    }
-  }
-  return result;
-}
-
 function parseKeywords(raw: unknown): string[] {
   if (Array.isArray(raw)) return raw.filter((k) => typeof k === "string" && k.trim());
   return [];
@@ -252,40 +210,6 @@ export default function HorarioPlantaoTab() {
   const saveAI = useSectionSave("IA fora do horário");
   const saveOC = useSectionSave("Plantão");
 
-  // ── Day schedule helpers ──
-  const updateDayActive = useCallback((day: string, active: boolean) => {
-    setBhSchedule((prev) => ({
-      ...prev,
-      [day]: { ...prev[day], active },
-    }));
-  }, []);
-
-  const updateSlot = useCallback((day: string, slotIndex: number, field: keyof TimeSlot, value: string) => {
-    setBhSchedule((prev) => {
-      const dayData = prev[day];
-      const newSlots = [...dayData.slots];
-      newSlots[slotIndex] = { ...newSlots[slotIndex], [field]: value };
-      return { ...prev, [day]: { ...dayData, slots: newSlots } };
-    });
-  }, []);
-
-  const addSlot = useCallback((day: string) => {
-    setBhSchedule((prev) => {
-      const dayData = prev[day];
-      if (dayData.slots.length >= 2) return prev; // Max 2 slots
-      return { ...prev, [day]: { ...dayData, slots: [...dayData.slots, { start: "13:00", end: "18:00" }] } };
-    });
-  }, []);
-
-  const removeSlot = useCallback((day: string, slotIndex: number) => {
-    setBhSchedule((prev) => {
-      const dayData = prev[day];
-      if (dayData.slots.length <= 1) return prev; // Keep at least 1
-      const newSlots = dayData.slots.filter((_, i) => i !== slotIndex);
-      return { ...prev, [day]: { ...dayData, slots: newSlots } };
-    });
-  }, []);
-
   // ── Keyword helpers ──
   const addKeyword = useCallback(() => {
     const kw = newKeyword.trim().toLowerCase();
@@ -298,46 +222,20 @@ export default function HorarioPlantaoTab() {
     setOcKeywords((prev) => prev.filter((k) => k !== kw));
   }, []);
 
-  // ── Validation helpers ──
-  const validateSlots = useCallback((): string | null => {
-    for (const day of DAY_KEYS) {
-      const d = bhSchedule[day];
-      if (!d.active) continue;
-      for (let i = 0; i < d.slots.length; i++) {
-        const s = d.slots[i];
-        if (s.start && s.end && s.start >= s.end) {
-          return `${DAY_LABELS[day]}, Turno ${i + 1}: início deve ser antes do fim.`;
-        }
-      }
-      if (d.slots.length === 2) {
-        const [a, b] = d.slots;
-        if (a.end && b.start && a.end > b.start) {
-          return `${DAY_LABELS[day]}: turnos se sobrepõem (Turno 1 termina ${a.end}, Turno 2 inicia ${b.start}).`;
-        }
-      }
-    }
-    return null;
-  }, [bhSchedule]);
-
   // ── Save handlers ──
   const handleSaveBH = async () => {
-    const err = validateSlots();
+    const err = validateSchedule(bhSchedule);
     if (err) {
       toast({ title: "Erro de validação", description: err, variant: "destructive" });
       return;
     }
-    const cleanSchedule: BusinessHours = {};
-    for (const day of DAY_KEYS) {
-      const d = bhSchedule[day];
-      const validSlots = d.slots.filter((s) => s.start && s.end);
-      cleanSchedule[day] = { active: d.active, slots: validSlots.length > 0 ? validSlots : [{ ...DEFAULT_SLOT }] };
-    }
+    const cleaned = cleanSchedule(bhSchedule);
 
     if (selectedContext === "global") {
       saveBH.mutate({
         business_hours_enabled: bhEnabled,
         business_hours_timezone: bhTimezone,
-        business_hours: cleanSchedule,
+        business_hours: cleaned,
         business_hours_message: bhMessage || null,
         business_hours_outside_prompt: bhOutsidePrompt || null,
       });
@@ -347,7 +245,7 @@ export default function HorarioPlantaoTab() {
         const { error } = await (supabase.from("support_departments" as any) as any)
           .update({
             business_hours_enabled: bhEnabled,
-            business_hours: cleanSchedule,
+            business_hours: cleaned,
             business_hours_message: bhMessage || null,
           })
           .eq("id", selectedContext);
@@ -520,69 +418,7 @@ export default function HorarioPlantaoTab() {
                 {/* Day grid */}
                 <div className="space-y-2">
                   <Label>Grade semanal</Label>
-                  <div className="rounded-lg border divide-y">
-                    {DAY_KEYS.map((day) => {
-                      const s = bhSchedule[day];
-                      return (
-                        <div key={day} className="px-3 py-2 space-y-1">
-                          <div className="flex items-center gap-3">
-                            <Checkbox
-                              checked={s.active}
-                              onCheckedChange={(v) => updateDayActive(day, !!v)}
-                              id={`day-${day}`}
-                            />
-                            <Label htmlFor={`day-${day}`} className="w-20 text-sm font-medium">
-                              {DAY_LABELS[day]}
-                            </Label>
-                            {s.active && s.slots.length < 2 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="ml-auto h-7 text-xs"
-                                onClick={() => addSlot(day)}
-                              >
-                                <Plus className="h-3 w-3 mr-1" />
-                                Intervalo
-                              </Button>
-                            )}
-                          </div>
-                          {s.active && s.slots.map((slot, idx) => (
-                            <div key={idx} className="flex items-center gap-2 ml-8">
-                              <span className="text-xs text-muted-foreground w-14 shrink-0">
-                                Turno {idx + 1}
-                              </span>
-                              <Input
-                                type="time"
-                                value={slot.start}
-                                onChange={(e) => updateSlot(day, idx, "start", e.target.value)}
-                                className="w-28"
-                              />
-                              <span className="text-muted-foreground text-sm">às</span>
-                              <Input
-                                type="time"
-                                value={slot.end}
-                                onChange={(e) => updateSlot(day, idx, "end", e.target.value)}
-                                className="w-28"
-                              />
-                              {s.slots.length > 1 && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-destructive"
-                                  onClick={() => removeSlot(day, idx)}
-                                  title="Remover turno"
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <WeeklyScheduleGrid value={bhSchedule} onChange={setBhSchedule} idPrefix="bh" />
                   <BusinessHoursHolidayTemplateSection />
                 </div>
 
