@@ -38,6 +38,7 @@ import {
   ExternalLink, Loader2, Puzzle, Percent, AlertTriangle, Paperclip, X, XCircle, Clock,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -202,6 +203,12 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const oemAtivo = useOemIntegracaoAtiva();
   const qc = useQueryClient();
+  // Escrever módulo do cliente é permissão de pessoa, não de papel: na Digi
+  // Office ela vale para duas pessoas, e uma delas é head. Cobre a coluna de
+  // ações inteira da linha do módulo — sem isso, quem não pode cancelar pelo X
+  // ainda tirava o módulo pela lixeira e pelo Inativar, que ficam ali do lado.
+  const { can } = usePermissions();
+  const podeEscreverModulo = can("clientes.modulos", "view");
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [produtoDialog, setProdutoDialog] = useState<{ open: boolean; edit?: ClienteProduto | null }>({ open: false });
@@ -905,9 +912,11 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                           quem quer somar um módulo tinha que rolar a lista
                           inteira para achar o botão. */}
                       <div className="flex flex-wrap gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: null })}>
-                          <Plus className="h-4 w-4 mr-1" /> <Puzzle className="h-4 w-4 mr-1" /> Adicionar Módulo
-                        </Button>
+                        {podeEscreverModulo && (
+                          <Button type="button" variant="outline" size="sm" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: null })}>
+                            <Plus className="h-4 w-4 mr-1" /> <Puzzle className="h-4 w-4 mr-1" /> Adicionar Módulo
+                          </Button>
+                        )}
                         <Button
                           type="button" variant="outline" size="sm"
                           onClick={() => setReajusteDialog({ open: true, clienteProdutoId: p.id, produtoNome: p.produtos?.nome ?? '' })}
@@ -1009,6 +1018,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                       // deixavam vivo no parceiro. Sai pelo
                                       // cancelamento, que passa pela fila.
                                       m.ativo ? (
+                                        podeEscreverModulo && (
                                         <div className="flex items-center justify-end gap-0.5">
                                           {m.origem !== "oem" && (
                                             <Tooltip>
@@ -1044,6 +1054,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                             <TooltipContent>Cancelamento de módulo</TooltipContent>
                                           </Tooltip>
                                         </div>
+                                        )
                                       ) : (
                                         <div className="text-xs text-muted-foreground leading-tight">
                                           <span>Cancelado</span>
@@ -1073,7 +1084,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                           )}
                                         </div>
                                       )
-                                    ) : (
+                                    ) : podeEscreverModulo ? (
                                     <div className="flex items-center justify-end gap-0.5">
                                       <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: m })}>
                                         <Pencil className="h-3.5 w-3.5" />
@@ -1085,7 +1096,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                         <Trash2 className="h-3.5 w-3.5" />
                                       </Button>
                                     </div>
-                                    )}
+                                    ) : null}
                                   </TableCell>
                                 </TableRow>
                               ))}

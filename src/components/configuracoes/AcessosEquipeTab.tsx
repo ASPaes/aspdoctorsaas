@@ -76,6 +76,7 @@ import {
   Mail,
   Link2,
   Building2,
+  Puzzle,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -118,6 +119,11 @@ interface Funcionario {
   ativo: boolean;
   department_id: string | null;
 }
+
+// Escrever módulo do cliente não cabe em papel: na Digi Office são duas pessoas,
+// uma admin e uma head, e os outros 3 admins ficam de fora. Por isso a exceção é
+// por usuário, em user_permissions, que vence o papel.
+const RESOURCE_MODULOS = "clientes.modulos";
 
 const accessEquipeQueryKeys = {
   users: (tenantId?: string) => ["tenant-access-users", tenantId] as const,
@@ -364,6 +370,89 @@ function UnidadesCell({
   );
 }
 
+function ModulosCell({
+  user,
+  liberado,
+  onSave,
+  isPending,
+}: {
+  user: AccessUser;
+  liberado: boolean;
+  onSave: (next: boolean) => void;
+  isPending: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [marcado, setMarcado] = useState(liberado);
+
+  useEffect(() => {
+    if (open) setMarcado(liberado);
+  }, [open, liberado]);
+
+  if (user.is_super_admin) {
+    return (
+      <Badge variant="outline" className="text-xs opacity-60">
+        Liberado
+      </Badge>
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={
+            liberado
+              ? "h-8 text-sm gap-1.5 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+              : "h-8 text-sm gap-1.5 text-muted-foreground"
+          }
+        >
+          <Puzzle className="h-3.5 w-3.5" />
+          {liberado ? "Liberado" : "Bloqueado"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-3 space-y-3" align="start">
+        <div className="text-sm font-medium">Módulos do cliente</div>
+        <div className="flex items-start gap-2">
+          <Checkbox
+            id={`u-${user.user_id}-mod`}
+            checked={marcado}
+            onCheckedChange={(c) => setMarcado(c === true)}
+            className="mt-0.5"
+          />
+          <Label
+            htmlFor={`u-${user.user_id}-mod`}
+            className="text-sm font-normal cursor-pointer leading-snug"
+          >
+            Pode adicionar e cancelar módulos
+            <span className="block text-xs text-muted-foreground mt-1">
+              Vale no card Produtos &amp; Módulos, dentro da ficha de qualquer cliente. Sem
+              isso a pessoa continua vendo a lista, as quantidades e os valores.
+            </span>
+          </Label>
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={isPending}>
+            Cancelar
+          </Button>
+          <Button
+            size="sm"
+            disabled={isPending || marcado === liberado}
+            onClick={() => {
+              onSave(marcado);
+              setOpen(false);
+            }}
+          >
+            {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
+            Salvar
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // ========== Main Component ==========
 
 
@@ -562,6 +651,60 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
   });
 
 
+
+  // Permissão de mexer em módulo, por usuário. A célula mostra o valor EFETIVO:
+  // linha da pessoa, senão o do papel neste tenant, senão o padrão global. Isso
+  // importa porque fora da Digi Office o padrão do papel é liberado, e mostrar
+  // "Bloqueado" só porque não existe linha seria mentira.
+  const { data: modulosPerm } = useQuery<{
+    defaults: Record<string, boolean>;
+    byUser: Map<string, boolean>;
+  }>({
+    queryKey: ["tenant-user-permissions", tenantId, RESOURCE_MODULOS],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const [globalRes, tenantRes, userRes] = await Promise.all([
+        (supabase.from("role_permissions" as any) as any)
+          .select("role, can_view")
+          .eq("resource_key", RESOURCE_MODULOS),
+        (supabase.from("tenant_role_permissions" as any) as any)
+          .select("role, can_view")
+          .eq("resource_key", RESOURCE_MODULOS)
+          .eq("tenant_id", tenantId!),
+        (supabase.from("user_permissions" as any) as any)
+          .select("user_id, can_view")
+          .eq("resource_key", RESOURCE_MODULOS)
+          .eq("tenant_id", tenantId!),
+      ]);
+      if (globalRes.error) throw globalRes.error;
+      if (tenantRes.error) throw tenantRes.error;
+      if (userRes.error) throw userRes.error;
+
+      const defaults: Record<string, boolean> = {};
+      ((globalRes.data ?? []) as Array<{ role: string; can_view: boolean }>).forEach((row) => {
+        defaults[row.role] = !!row.can_view;
+      });
+      ((tenantRes.data ?? []) as Array<{ role: string; can_view: boolean }>).forEach((row) => {
+        defaults[row.role] = !!row.can_view;
+      });
+
+      const byUser = new Map<string, boolean>();
+      ((userRes.data ?? []) as Array<{ user_id: string; can_view: boolean | null }>).forEach(
+        (row) => {
+          if (row.can_view !== null) byUser.set(row.user_id, row.can_view);
+        }
+      );
+
+      return { defaults, byUser };
+    },
+  });
+
+  const moduloLiberado = (u: AccessUser) => {
+    if (u.is_super_admin) return true;
+    const daPessoa = modulosPerm?.byUser.get(u.user_id);
+    if (daPessoa !== undefined) return daPessoa;
+    return modulosPerm?.defaults[u.role] ?? false;
+  };
 
   // Fetch active funcionários for invite — filter by tenant
   const { data: funcionarios = [] } = useQuery<Funcionario[]>({
@@ -817,6 +960,42 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
       void queryClient.invalidateQueries({ queryKey: ["tenant-profile-unidades", tenantId] });
       sonnerToast.success("Acesso de unidade atualizado.");
+    },
+    onError: (err: any) => sonnerToast.error(err.message),
+  });
+
+  // Grava linha explícita sempre, nos dois sentidos: o que está na tela passa a
+  // ser o que vale, sem depender do padrão do papel mudar debaixo.
+  const setModulosPermMutation = useMutation({
+    mutationFn: async ({ userId, liberado }: { userId: string; liberado: boolean }) => {
+      const { error } = await (supabase.from("user_permissions" as any) as any).upsert(
+        {
+          tenant_id: tenantId!,
+          user_id: userId,
+          resource_key: RESOURCE_MODULOS,
+          can_view: liberado,
+          can_insert: liberado,
+          can_update: liberado,
+          can_delete: liberado,
+          updated_at: new Date().toISOString(),
+          updated_by: profile?.user_id ?? null,
+        },
+        { onConflict: "user_id,resource_key" }
+      );
+      if (error) throw error;
+    },
+    onSuccess: (_data, vars) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["tenant-user-permissions", tenantId, RESOURCE_MODULOS],
+      });
+      // Mudou a própria permissão: o cache de permissões da sessão precisa cair,
+      // senão a tela do cliente continua com o estado antigo por 5 minutos.
+      if (vars.userId === profile?.user_id) {
+        void queryClient.invalidateQueries({ queryKey: ["my-permissions"] });
+      }
+      sonnerToast.success(
+        vars.liberado ? "Liberado para mexer em módulos." : "Bloqueado para mexer em módulos."
+      );
     },
     onError: (err: any) => sonnerToast.error(err.message),
   });
@@ -1185,6 +1364,18 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                           </Tooltip>
                         </TooltipProvider>
                       </TableHead>
+                      <TableHead>
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger className="cursor-help">Módulos</TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              Quem pode adicionar e cancelar módulos na ficha do cliente. É por
+                              pessoa, não por papel. Quem não tem continua vendo a lista e os
+                              valores.
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableHead>
                     </>
                   )}
                 </TableRow>
@@ -1369,6 +1560,16 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                                     onError: (err: any) => sonnerToast.error(err.message),
                                   }
                                 )
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <ModulosCell
+                              user={u}
+                              liberado={moduloLiberado(u)}
+                              isPending={setModulosPermMutation.isPending}
+                              onSave={(next) =>
+                                setModulosPermMutation.mutate({ userId: u.user_id, liberado: next })
                               }
                             />
                           </TableCell>
