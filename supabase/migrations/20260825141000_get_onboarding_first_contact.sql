@@ -33,7 +33,12 @@ AS $fn$
          b.distribuido_em,
          fc.primeiro_contato_em,
          EXTRACT(epoch FROM (fc.primeiro_contato_em - b.distribuido_em)) / 60 AS minutos_corridos,
-         fn_onb_util_min(b.distribuido_em, fc.primeiro_contato_em, b.tenant_id, b.sla_dept_onb_id) AS minutos_uteis
+         -- fn_onb_util_min devolve 0 (nao NULL) quando o fim e NULL. Sem este CASE,
+         -- jornada que NUNCA teve contato entraria na media como "contato em 0 min"
+         -- e a cobertura daria sempre 100%.
+         CASE WHEN fc.primeiro_contato_em IS NULL THEN NULL
+              ELSE fn_onb_util_min(b.distribuido_em, fc.primeiro_contato_em, b.tenant_id, b.sla_dept_onb_id)
+         END AS minutos_uteis
     FROM base b
     LEFT JOIN LATERAL (
       SELECT min(m."timestamp") AS primeiro_contato_em

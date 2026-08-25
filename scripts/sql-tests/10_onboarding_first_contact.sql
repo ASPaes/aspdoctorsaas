@@ -17,6 +17,7 @@ DECLARE
   v_com_contato int;
   v_negativos int;
   v_vazamento int;
+  v_uteis_medidos int;
 BEGIN
   -- O tenant do teste é o que TEM jornada. Escolher por nome pega o ASP, que tem
   -- onboarding habilitado e zero jornadas — e o teste passaria medindo o nada.
@@ -39,12 +40,22 @@ BEGIN
   -- A guarda tem que barrar o tenant alheio mesmo com a função sendo SECURITY DEFINER.
   SELECT count(*) INTO v_vazamento FROM public.get_onboarding_first_contact(v_outro);
 
+  -- REGRESSÃO: fn_onb_util_min devolve 0 quando o fim é NULL. Se minutos_uteis for
+  -- medido em jornada sem contato, a média conta "contato em 0 min" e a cobertura dá
+  -- 100% sempre. Os dois contadores TÊM que bater.
+  SELECT count(*) INTO v_uteis_medidos
+    FROM public.get_onboarding_first_contact(v_tenant) WHERE minutos_uteis IS NOT NULL;
+  IF v_uteis_medidos <> v_com_contato THEN
+    RAISE EXCEPTION 'SMOKE_FALHOU|minutos_uteis medido em % linhas mas so % tem contato - fn_onb_util_min esta devolvendo 0 em vez de NULL',
+      v_uteis_medidos, v_com_contato;
+  END IF;
+
   IF v_linhas = 0 THEN
     RAISE EXCEPTION 'SMOKE_FALHOU|a funcao devolveu ZERO linhas para o tenant % (usuario %) - guarda barrando ou tenant sem jornada', v_tenant, v_user;
   END IF;
 
-  RAISE EXCEPTION 'SMOKE_OK|linhas=% com_contato=% negativos=% vazamento_cross_tenant=%',
-    v_linhas, v_com_contato, v_negativos, v_vazamento;
+  RAISE EXCEPTION 'SMOKE_OK|linhas=% com_contato=% uteis_medidos=% negativos=% vazamento_cross_tenant=%',
+    v_linhas, v_com_contato, v_uteis_medidos, v_negativos, v_vazamento;
 END $$;
 
 ROLLBACK;
