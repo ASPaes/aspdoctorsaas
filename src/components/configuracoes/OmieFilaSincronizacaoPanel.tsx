@@ -150,8 +150,9 @@ function ReprocessarButton({
 }
 
 /**
- * Tira da fila uma linha que não tem o que corrigir: contrato apagado no DoctorSaaS, ou alteração
- * que envelheceu e não será reenviada. Nada foi escrito no Omie nesses casos — é limpeza.
+ * Tira da fila uma linha que não tem o que corrigir: contrato apagado no DoctorSaaS, alteração
+ * que envelheceu e não será reenviada, ou contrato sem de/para que não vai ao Omie (`ignorado`).
+ * Nada foi escrito no Omie nesses casos — é limpeza.
  * O gate de quais linhas podem sair mora na RPC, não aqui.
  */
 function DescartarButton({ filaId, onDone }: { filaId: string; onDone: () => void }) {
@@ -449,17 +450,30 @@ function diagnosticar(item: FilaItem): Diagnostico {
     };
   }
 
+  /**
+   * `ignorado` = o contrato não tem de/para no OMIE, então o worker parou ANTES de escrever
+   * qualquer coisa lá. São dois desfechos legítimos, e a tela oferecia só um:
+   *
+   *   - o contrato deve ir ao OMIE  -> vincular/criar e Reprocessar;
+   *   - o contrato NÃO deve ir      -> a linha é lixo e tem que sair da fila.
+   *
+   * Sem o Descartar, o segundo caso não tinha saída nenhuma: Reprocessar devolve `sem_depara`
+   * para sempre e a linha fica vermelha no painel eternamente. A `omie_fila_descartar` já aceita
+   * `status = 'ignorado'` desde que foi escrita (é uma das 3 condições do gate) — o que faltava
+   * era a tela pedir.
+   */
   if (status === "ignorado") {
     return {
       titulo: "Contrato ainda não vinculado ao OMIE",
       aconteceu:
-        "A fila automática só altera contrato que já existe no OMIE — ela nunca cria. Nada foi escrito.",
+        "A fila automática só altera contrato que já existe no OMIE. Ela nunca cria. Nada foi escrito.",
       passos: [
-        "Resolva o vínculo na Conferência.",
-        "Depois clique em Reprocessar.",
+        'Se este contrato deve ir ao OMIE: resolva o vínculo na Conferência (ou use "Enviar ao Omie" na tela do cliente) e depois clique em Reprocessar.',
+        "Se ele não deve ir ao OMIE: descarte a linha. Nada foi escrito lá, é só limpeza de fila.",
       ],
       destinoConferencia: "escolher_candidato",
       podeReprocessar: true,
+      descartavel: true,
     };
   }
 
