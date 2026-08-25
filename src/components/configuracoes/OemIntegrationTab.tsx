@@ -25,7 +25,7 @@ import { useAbaNaUrl } from "@/hooks/useDeepLinkIntegracao";
 import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
   Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
-  ArrowUpDown, ArrowUp, ArrowDown, Boxes, Plus, CalendarClock, ArrowDownToLine,
+  ArrowUpDown, ArrowUp, ArrowDown, Boxes, Plus, CalendarClock, ArrowDownToLine, ArrowUpFromLine,
 } from "lucide-react";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
@@ -317,7 +317,9 @@ export default function OemIntegrationTab() {
   // Qual divergência de cadastro está esperando confirmação para receber o
   // valor do parceiro. Fica com os irmãos, e não junto da função lá embaixo:
   // quem lê acoesDaDivergencia precisa achar o estado antes dela.
-  const [trazendo, setTrazendo] = useState<{ linha: Recon; campo: "nome" | "cnpj" } | null>(null);
+  const [trazendo, setTrazendo] = useState<
+    { linha: Recon; campo: "nome" | "cnpj"; destino: "ds" | "oem" } | null
+  >(null);
   const [trazendoAgora, setTrazendoAgora] = useState(false);
   const [ignorandoChave, setIgnorandoChave] = useState<string | null>(null);
   // O cliente que está procurando a própria licença no OEM (a divergência
@@ -1334,10 +1336,21 @@ export default function OemIntegrationTab() {
           devolve: é trabalho no DoctorOEM, não um botão a mais aqui. */}
       {(i.tipo === "cnpj" || i.tipo === "nome") && i.linha && (
         <>
-          <Button size="sm" variant="secondary" className="gap-1.5"
-            onClick={() => setTrazendo({ linha: i.linha!, campo: i.tipo === "cnpj" ? "cnpj" : "nome" })}>
-            <ArrowDownToLine className="h-3.5 w-3.5" /> Atualizar no DoctorSaaS
-          </Button>
+          {/* Par, e não dois botões soltos: a linha já tem Trocar cliente,
+              Desfazer e Ignorar, e mais dois botões de texto longo quebrariam
+              em duas fileiras. Assim a escolha aparece como o que ela é — uma
+              direção, não duas ações diferentes. */}
+          <div className="inline-flex shrink-0 items-center gap-0.5 rounded-md border p-0.5">
+            <span className="px-1.5 text-xs text-muted-foreground">Atualizar em</span>
+            <Button size="sm" variant="ghost" className="h-7 gap-1 px-2"
+              onClick={() => setTrazendo({ linha: i.linha!, campo: i.tipo === "cnpj" ? "cnpj" : "nome", destino: "ds" })}>
+              <ArrowDownToLine className="h-3.5 w-3.5" /> DoctorSaaS
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 gap-1 px-2"
+              onClick={() => setTrazendo({ linha: i.linha!, campo: i.tipo === "cnpj" ? "cnpj" : "nome", destino: "oem" })}>
+              <ArrowUpFromLine className="h-3.5 w-3.5" /> OEM
+            </Button>
+          </div>
           <Button size="sm" variant="secondary" className="gap-1.5"
             onClick={() => setEscolhendo(i.linha!)}>
             <Link2 className="h-3.5 w-3.5" /> Trocar cliente
@@ -1679,12 +1692,42 @@ export default function OemIntegrationTab() {
     if (!trazendo) return;
     setTrazendoAgora(true);
     try {
+      const campo = trazendo.campo === "cnpj" ? "CNPJ" : "Nome";
+
+      // Sentido ficha -> parceiro. Passa por edge function porque a chave do
+      // DoctorOEM não pode chegar ao navegador, e o valor enviado é lido do
+      // banco lá dentro: a tela manda só qual linha e qual campo.
+      if (trazendo.destino === "oem") {
+        const { data, error } = await supabase.functions.invoke("oem-atualizar-cadastro-licenca", {
+          body: { recon_id: trazendo.linha.id, campo: trazendo.campo },
+        });
+        // Recusa do parceiro volta como erro HTTP, e o corpo tem o motivo —
+        // que é a parte útil. Sem isto a tela diria só "Edge Function returned
+        // a non-2xx status code".
+        const detalhe = (error as any)?.context?.body ?? null;
+        let mensagem: string | null = null;
+        if (detalhe) {
+          try { mensagem = JSON.parse(typeof detalhe === "string" ? detalhe : await new Response(detalhe).text())?.mensagem ?? null; }
+          catch { mensagem = null; }
+        }
+        if (error) throw new Error(mensagem ?? error.message);
+        if (data?.ok === false) throw new Error(data?.mensagem ?? "O OEM recusou a alteração.");
+        toast({
+          title: data?.sem_mudanca ? `${campo} já estava igual no OEM` : `${campo} atualizado no OEM`,
+          description: data?.sem_mudanca
+            ? "O parceiro já estava com esse valor. Nada foi enviado."
+            : "A licença no OEM recebeu o valor da ficha. A divergência sai da lista na próxima carga do espelho.",
+        });
+        setTrazendo(null);
+        await recarregarRecon();
+        return;
+      }
+
       const { data, error } = await (supabase as any).rpc("oem_trazer_cadastro_do_parceiro", {
         p_recon_id: trazendo.linha.id,
         p_campo: trazendo.campo,
       });
       if (error) throw error;
-      const campo = trazendo.campo === "cnpj" ? "CNPJ" : "Nome";
       toast({
         title: data?.sem_mudanca ? `${campo} já estava igual` : `${campo} atualizado na ficha`,
         description: data?.sem_mudanca
@@ -2977,34 +3020,68 @@ export default function OemIntegrationTab() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {trazendo?.campo === "cnpj" ? "Usar o CNPJ do OEM nesta ficha?" : "Usar o nome do OEM nesta ficha?"}
+              {trazendo?.destino === "oem"
+                ? (trazendo?.campo === "cnpj" ? "Mandar o CNPJ da ficha para o OEM?" : "Mandar o nome da ficha para o OEM?")
+                : (trazendo?.campo === "cnpj" ? "Usar o CNPJ do OEM nesta ficha?" : "Usar o nome do OEM nesta ficha?")}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
+                {/* De → para na direção escolhida. Mostrar sempre "ficha → OEM"
+                    obrigaria a pessoa a traduzir mentalmente qual lado muda. */}
                 <div className="rounded-md border p-3 text-sm">
-                  <p className="text-muted-foreground text-xs">Está na ficha hoje</p>
-                  <p className="font-medium">
-                    {trazendo?.campo === "cnpj"
-                      ? (trazendo?.linha.cnpj_ds ? doc(trazendo.linha.cnpj_ds) : "— sem CNPJ —")
-                      : (trazendo?.linha.razao_ds ?? "— sem nome —")}
+                  <p className="text-muted-foreground text-xs">
+                    {trazendo?.destino === "oem" ? "Está no OEM hoje" : "Está na ficha hoje"}
                   </p>
-                  <p className="mt-2 text-muted-foreground text-xs">Passa a ser (valor do OEM)</p>
+                  <p className="font-medium">
+                    {trazendo?.destino === "oem"
+                      ? (trazendo?.campo === "cnpj"
+                          ? (trazendo?.linha.cnpj_norm ? doc(trazendo.linha.cnpj_norm) : "— sem CNPJ —")
+                          : (trazendo?.linha.razao_oem ?? "— sem nome —"))
+                      : (trazendo?.campo === "cnpj"
+                          ? (trazendo?.linha.cnpj_ds ? doc(trazendo.linha.cnpj_ds) : "— sem CNPJ —")
+                          : (trazendo?.linha.razao_ds ?? "— sem nome —"))}
+                  </p>
+                  <p className="mt-2 text-muted-foreground text-xs">
+                    {trazendo?.destino === "oem" ? "Passa a ser (valor da ficha)" : "Passa a ser (valor do OEM)"}
+                  </p>
                   <p className="font-medium text-sky-600 dark:text-sky-400">
-                    {trazendo?.campo === "cnpj"
-                      ? (trazendo?.linha.cnpj_norm ? doc(trazendo.linha.cnpj_norm) : "—")
-                      : (trazendo?.linha.razao_oem ?? "—")}
+                    {trazendo?.destino === "oem"
+                      ? (trazendo?.campo === "cnpj"
+                          ? (trazendo?.linha.cnpj_ds ? doc(trazendo.linha.cnpj_ds) : "—")
+                          : (trazendo?.linha.razao_ds ?? "—"))
+                      : (trazendo?.campo === "cnpj"
+                          ? (trazendo?.linha.cnpj_norm ? doc(trazendo.linha.cnpj_norm) : "—")
+                          : (trazendo?.linha.razao_oem ?? "—"))}
                   </p>
                 </div>
-                <p>
-                  Isto muda o <strong>cadastro do cliente</strong>, não só esta tela. Se ele tiver{" "}
-                  <strong>contrato ativo</strong> e o Omie estiver ligado, a alteração entra na{" "}
-                  <strong>fila do Omie</strong> no mesmo movimento.
-                </p>
-                {trazendo?.campo === "cnpj" && (
-                  <p>
-                    Só faça isso se a licença for mesmo deste cliente. Quando o CNPJ difere porque a
-                    licença é <strong>de outro cliente</strong>, o caminho é <strong>Trocar cliente</strong>.
-                  </p>
+                {trazendo?.destino === "oem" ? (
+                  <>
+                    <p>
+                      Isto escreve no <strong>sistema do parceiro</strong>. A licença é gravada
+                      inteira; o DoctorSaaS não muda, porque a ficha já está com o valor certo.
+                    </p>
+                    {trazendo?.campo === "cnpj" && (
+                      <p>
+                        É por este documento que o OEM <strong>fatura</strong>. Só mande se o cliente
+                        realmente trocou de CNPJ. Se quem está errado é a nossa ficha, use{" "}
+                        <strong>DoctorSaaS</strong>.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p>
+                      Isto muda o <strong>cadastro do cliente</strong>, não só esta tela. Se ele tiver{" "}
+                      <strong>contrato ativo</strong> e o Omie estiver ligado, a alteração entra na{" "}
+                      <strong>fila do Omie</strong> no mesmo movimento.
+                    </p>
+                    {trazendo?.campo === "cnpj" && (
+                      <p>
+                        Só faça isso se a licença for mesmo deste cliente. Quando o CNPJ difere porque a
+                        licença é <strong>de outro cliente</strong>, o caminho é <strong>Trocar cliente</strong>.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </AlertDialogDescription>
@@ -3017,7 +3094,7 @@ export default function OemIntegrationTab() {
             >
               {trazendoAgora
                 ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Atualizando…</>
-                : "Atualizar na ficha"}
+                : trazendo?.destino === "oem" ? "Atualizar no OEM" : "Atualizar na ficha"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
