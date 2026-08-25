@@ -8,25 +8,25 @@ import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from "@/components/ui/command";
 
-export interface FilterOption {
-  id: number;
+export interface FilterOption<T extends string | number = string | number> {
+  id: T;
   nome: string;
 }
 
-interface MultiSelectFilterProps {
+interface MultiSelectFilterProps<T extends string | number> {
   label: string;
-  options: FilterOption[];
-  selected: number[];
-  onChange: (ids: number[]) => void;
+  options: FilterOption<T>[];
+  selected: T[];
+  onChange: (ids: T[]) => void;
   className?: string;
   /** Placeholder da busca. Default: `Buscar {label}...` — útil quando o label é dinâmico ("3 selecionado(s)"). */
   searchPlaceholder?: string;
 }
 
-export function MultiSelectFilter({ label, options, selected, onChange, className, searchPlaceholder }: MultiSelectFilterProps) {
+export function MultiSelectFilter<T extends string | number>({ label, options, selected, onChange, className, searchPlaceholder }: MultiSelectFilterProps<T>) {
   const [open, setOpen] = useState(false);
 
-  const toggle = (id: number) => {
+  const toggle = (id: T) => {
     if (selected.includes(id)) onChange(selected.filter((x) => x !== id));
     else onChange([...selected, id]);
   };
