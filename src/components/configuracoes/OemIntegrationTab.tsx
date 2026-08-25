@@ -2797,9 +2797,20 @@ export default function OemIntegrationTab() {
                         <div key={`impl:${l.id}`} className="flex items-center gap-3 p-3 text-sm">
                           <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
                           <div className="min-w-0 flex-1">
-                            <p className="font-medium truncate" title={nome}>{nome}</p>
+                            {/* CNPJ ao lado do nome, e não na linha de baixo: é
+                                por ele que se reconhece a loja quando dois
+                                clientes têm nome parecido. `shrink-0` para o
+                                documento nunca ser o cortado — quem trunca é o
+                                nome, que tem o title inteiro. */}
+                            <div className="flex min-w-0 items-baseline gap-2">
+                              <p className="font-medium truncate" title={nome}>{nome}</p>
+                              {l.cnpj_ds && (
+                                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                                  {doc(l.cnpj_ds)}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-muted-foreground">
-                              {l.cnpj_ds ? <>CNPJ {doc(l.cnpj_ds)} · </> : null}
                               cadastrado {quando} ·{" "}
                               mensalidade {brl(Number(l.mensalidade_ds || 0))}
                             </p>
@@ -2949,8 +2960,19 @@ export default function OemIntegrationTab() {
                           className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${aberto ? "rotate-90" : ""}`}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium truncate" title={c.nome}>{c.nome}</p>
-                          {c.cnpj && <p className="text-xs text-muted-foreground">CNPJ {c.cnpj}</p>}
+                          {/* Mesmo desenho do bloco de clientes novos, e o
+                              documento agora sai pelo `doc`: aqui ele vinha cru
+                              (67500507000185), formatado logo abaixo na linha da
+                              divergência, e o mesmo número aparecia de dois
+                              jeitos na mesma tela. */}
+                          <div className="flex min-w-0 items-baseline gap-2">
+                            <p className="font-medium truncate" title={c.nome}>{c.nome}</p>
+                            {c.cnpj && (
+                              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                                {doc(c.cnpj)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {graves > 0 && (
                           <Badge variant="destructive" className="shrink-0">
