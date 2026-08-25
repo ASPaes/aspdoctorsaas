@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   pct, separarJornadas, contarSituacao, desfechoTreino, agregarTreinos,
-  agregarPorResponsavel,
-  type JourneyLite, type TreinoLite, type LinhaAtribuicao,
+  agregarPorResponsavel, mediaTempo, coorteConcluidas, coorteImplantacao, minutosEntre,
+  type JourneyLite, type TreinoLite, type LinhaAtribuicao, type JourneyTempo,
 } from "./dashMetrics";
 
 /** Espelha a Digi Office em 02/08/2026: 22 em andamento, 15 não iniciadas, 8 canceladas, 4 concluídas. */
@@ -315,5 +315,66 @@ describe("agregarPorResponsavel", () => {
 
   it("devolve vazio sem linhas", () => {
     expect(agregarPorResponsavel([], slaPorEtapa)).toEqual([]);
+  });
+});
+
+/* ---------- tempo de entrega ---------- */
+
+describe("mediaTempo", () => {
+  it("ignora nulos no numerador mas conta no denominador", () => {
+    expect(mediaTempo([10, null, 20, null])).toEqual({ media: 15, n: 2, total: 4 });
+  });
+  it("devolve media nula quando nada foi medido", () => {
+    expect(mediaTempo([null, null])).toEqual({ media: null, n: 0, total: 2 });
+  });
+  it("devolve media nula na lista vazia", () => {
+    expect(mediaTempo([])).toEqual({ media: null, n: 0, total: 0 });
+  });
+});
+
+describe("coorteConcluidas", () => {
+  const jornadas: JourneyTempo[] = [
+    { journey_id: "j1", situacao: "concluido", aberta_em: "2026-06-20T12:00:00Z", concluido_em: "2026-07-05T12:00:00Z" },
+    { journey_id: "j2", situacao: "concluido", aberta_em: "2026-07-01T12:00:00Z", concluido_em: "2026-08-02T12:00:00Z" },
+    { journey_id: "j3", situacao: "em_andamento", aberta_em: "2026-07-02T12:00:00Z", concluido_em: null },
+    { journey_id: "j4", situacao: "cancelado", aberta_em: "2026-07-03T12:00:00Z", concluido_em: "2026-07-10T12:00:00Z" },
+  ];
+  const JULHO_C = { from: new Date("2026-07-01T00:00:00"), to: new Date("2026-07-31T00:00:00") };
+
+  it("é coorte de CONCLUSÃO, não de abertura: j1 abriu em junho e entra", () => {
+    expect(coorteConcluidas(jornadas, JULHO_C).map((x) => x.journey_id)).toEqual(["j1"]);
+  });
+  it("exclui jornada aberta e jornada cancelada", () => {
+    const ids = coorteConcluidas(jornadas, JULHO_C).map((x) => x.journey_id);
+    expect(ids).not.toContain("j3");
+    expect(ids).not.toContain("j4");
+  });
+  it("exclui conclusão fora da janela", () => {
+    expect(coorteConcluidas(jornadas, JULHO_C).map((x) => x.journey_id)).not.toContain("j2");
+  });
+});
+
+describe("coorteImplantacao", () => {
+  const JULHO_I = { from: new Date("2026-07-01T00:00:00"), to: new Date("2026-07-31T00:00:00") };
+  const jornadas: JourneyTempo[] = [
+    { journey_id: "i1", situacao: "concluido", aberta_em: null, concluido_em: null,
+      implantacao_iniciada_em: "2026-07-02T12:00:00Z", implantacao_concluida_em: "2026-07-08T12:00:00Z" },
+    { journey_id: "i2", situacao: "em_andamento", aberta_em: null, concluido_em: null,
+      implantacao_iniciada_em: "2026-07-02T12:00:00Z", implantacao_concluida_em: null },
+    { journey_id: "i3", situacao: "concluido", aberta_em: null, concluido_em: null,
+      implantacao_iniciada_em: null, implantacao_concluida_em: "2026-07-09T12:00:00Z" },
+  ];
+  it("exige os DOIS carimbos", () => {
+    expect(coorteImplantacao(jornadas, JULHO_I).map((x) => x.journey_id)).toEqual(["i1"]);
+  });
+});
+
+describe("minutosEntre", () => {
+  it("mede em minutos", () => {
+    expect(minutosEntre("2026-07-01T00:00:00Z", "2026-07-01T02:30:00Z")).toBe(150);
+  });
+  it("devolve null se faltar um carimbo", () => {
+    expect(minutosEntre(null, "2026-07-01T02:30:00Z")).toBeNull();
+    expect(minutosEntre("2026-07-01T00:00:00Z", null)).toBeNull();
   });
 });

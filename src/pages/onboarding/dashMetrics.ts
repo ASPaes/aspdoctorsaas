@@ -239,3 +239,64 @@ export function agregarPorResponsavel(
     .map(([userId, v]) => ({ userId, ...v, pctNoPrazo: pct(v.dentroDoSla, v.count) }))
     .sort((a, b) => b.count - a.count);
 }
+
+/* ---------- tempo de entrega ---------- */
+
+export interface JourneyTempo {
+  journey_id: string;
+  situacao: string | null;
+  aberta_em: string | null;
+  concluido_em: string | null;
+  implantacao_iniciada_em?: string | null;
+  implantacao_concluida_em?: string | null;
+}
+
+export interface MediaTempo {
+  /** Média dos valores medidos. `null` quando nada foi medido. */
+  media: number | null;
+  /** Quantos entraram na média. */
+  n: number;
+  /** Quantos estavam na coorte — o denominador honesto. */
+  total: number;
+}
+
+/** `null` conta no denominador e fica fora do numerador: não medido não é zero. */
+export function mediaTempo(valores: Array<number | null>): MediaTempo {
+  const medidos = valores.filter((v): v is number => v != null);
+  return {
+    media: medidos.length ? medidos.reduce((s, v) => s + v, 0) / medidos.length : null,
+    n: medidos.length,
+    total: valores.length,
+  };
+}
+
+function dentroDaJanela(iso: string | null | undefined, range: { from: Date; to: Date }): boolean {
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  return t >= range.from.getTime() && t <= fimDoDia(range.to);
+}
+
+/**
+ * Coorte de CONCLUSÃO — jornadas que terminaram dentro da janela.
+ *
+ * Diferente do `periodo` de `separarJornadas`, que é sobreposição de intervalos e
+ * inclui jornada ainda aberta. As duas regras convivem de propósito: o resto do
+ * painel responde "como está o SLA agora" e precisa da jornada aberta; "quanto
+ * levou" só jornada terminada responde.
+ */
+export function coorteConcluidas<T extends JourneyTempo>(journeys: T[], range: { from: Date; to: Date }): T[] {
+  return journeys.filter((j) => j.situacao !== "cancelado" && dentroDaJanela(j.concluido_em, range));
+}
+
+/** Coorte de implantação: precisa dos DOIS carimbos, e o de fim dentro da janela. */
+export function coorteImplantacao<T extends JourneyTempo>(journeys: T[], range: { from: Date; to: Date }): T[] {
+  return journeys.filter(
+    (j) => j.situacao !== "cancelado" && !!j.implantacao_iniciada_em && dentroDaJanela(j.implantacao_concluida_em, range),
+  );
+}
+
+/** Minutos corridos entre dois carimbos. `null` se faltar algum. */
+export function minutosEntre(de: string | null | undefined, ate: string | null | undefined): number | null {
+  if (!de || !ate) return null;
+  return (new Date(ate).getTime() - new Date(de).getTime()) / 60000;
+}

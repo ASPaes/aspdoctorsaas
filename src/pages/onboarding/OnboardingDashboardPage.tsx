@@ -21,6 +21,7 @@ import OnboardingSlaOverview from "./OnboardingSlaOverview";
 import SituacaoAgoraBand from "./SituacaoAgoraBand";
 import KpiCard from "./KpiCard";
 import OnboardingDashFilterBar from "./OnboardingDashFilterBar";
+import TempoDeEntregaSection from "./TempoDeEntregaSection";
 import { useOnboardingDashFilters } from "./useOnboardingDashFilters";
 import { pct, separarJornadas, contarSituacao, agregarTreinos, desfechoTreino } from "./dashMetrics";
 
@@ -421,6 +422,17 @@ export default function OnboardingDashboardPage() {
 
           {/* SLA — visão corrido vs. efetivo (total, pipeline, etapa, área) */}
           <OnboardingSlaOverview journeys={periodo} tenantId={effectiveTenantId} />
+
+          {/* Tempo de entrega. Usa `ativas`, não `periodo`: a coorte destes cards é a
+              data de CONCLUSÃO, e `periodo` já recortou por sobreposição de abertura —
+              com ele, jornada aberta antes da janela e terminada dentro dela sumiria,
+              que é exatamente o caso que o card quer contar. */}
+          <TempoDeEntregaSection
+            journeys={ativas}
+            tenantId={effectiveTenantId}
+            dateRange={dateRange}
+            allowedJourneyIds={allowedJourneyIds}
+          />
 
           {/* KPI Row 1b: PDV + previsto/realizado */}
           <section>
