@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Clock, CheckCircle2, Pause, TrendingUp } from "lucide-react";
+import { agregarPorResponsavel, type LinhaAtribuicao } from "./dashMetrics";
 import { formatMinUtil as formatMin, formatMinCal } from "./slaFormat";
 
 /**
@@ -111,7 +112,10 @@ function ComplianceRow({ label, v }: { label: string; v: number }) {
   );
 }
 
-function ComplianceCard({ name, badge, meta, npC, npE, ct, et }: { name: string; badge?: string; meta: string; npC: number; npE: number; ct: string; et: string }) {
+/** `npE` é opcional: a aba "Por Responsável" tem UMA medida de prazo (etapa em minutos
+ *  úteis contra o SLA da etapa), não a dupla bruto/efetivo das outras abas. Repetir o
+ *  mesmo número nas duas linhas seria mentira visual. */
+function ComplianceCard({ name, badge, meta, npC, npE, ct, et, onClick }: { name: string; badge?: string; meta: string; npC: number; npE?: number; ct: string; et: string; onClick?: () => void }) {
   const dot = compliance(npC);
   return (
     <div className="rounded-lg border border-border bg-card p-4">
@@ -125,8 +129,8 @@ function ComplianceCard({ name, badge, meta, npC, npE, ct, et }: { name: string;
       <div className="text-[11px] text-muted-foreground mt-1">{meta}</div>
       <div className="h-px bg-border my-3" />
       <div className="flex flex-col gap-2">
-        <ComplianceRow label="No prazo · bruto" v={npC} />
-        <ComplianceRow label="No prazo · efetivo" v={npE} />
+        <ComplianceRow label={npE == null ? "No prazo" : "No prazo · bruto"} v={npC} />
+        {npE != null && <ComplianceRow label="No prazo · efetivo" v={npE} />}
       </div>
       <div className="h-px bg-border my-3" />
       <div className="flex items-center justify-between text-[11.5px] text-muted-foreground">
@@ -385,6 +389,51 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
       .sort((a, b) => b.count - a.count);
   }, [journeys, journeyPhases, areaDim]);
 
+  /** Passagens por etapa já carimbadas com quem era responsável na ENTRADA da etapa. */
+  const atribuicaoQ = useQuery({
+    queryKey: ["onb-sla-stage-attribution", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () =>
+      fetchAllRows<LinhaAtribuicao>(() =>
+        (supabase.from("vw_onboarding_stage_attribution" as any) as any)
+          .select("journey_id, stage_id, responsavel_user_id, duracao_util_minutos, duracao_minutos")
+          .eq("tenant_id", tenantId!),
+      ),
+  });
+
+  const slaPorEtapa = useMemo(() => {
+    const m: Record<string, number | null> = {};
+    (stagesQ.data ?? []).forEach((st: any) => { m[st.id] = st.sla_minutos; });
+    return m;
+  }, [stagesQ.data]);
+
+  const responsavelAgg = useMemo(() => {
+    const allowed = new Set(journeys.map((j) => j.journey_id));
+    const linhas = (atribuicaoQ.data ?? []).filter((l) => allowed.has(l.journey_id));
+    return agregarPorResponsavel(linhas, slaPorEtapa);
+  }, [journeys, atribuicaoQ.data, slaPorEtapa]);
+
+  const respIds = useMemo(
+    () => responsavelAgg.map((r) => r.userId).filter(Boolean) as string[],
+    [responsavelAgg],
+  );
+
+  const respNomesQ = useQuery({
+    queryKey: ["onb-sla-resp-nomes", respIds.join(",")],
+    enabled: respIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, funcionarios:funcionario_id(nome)")
+        .in("user_id", respIds);
+      if (error) throw error;
+      const m: Record<string, string> = {};
+      (data ?? []).forEach((pf: any) => { if (pf.funcionarios?.nome) m[pf.user_id] = pf.funcionarios.nome; });
+      return m;
+    },
+  });
+  const respNomes = respNomesQ.data ?? {};
+
   // Por etapa (histórico de etapas concluídas)
   const etapaAgg = useMemo(() => {
     const allowed = new Set(journeys.map((j) => j.journey_id));
@@ -449,6 +498,9 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
             <TabsTrigger value="etapa" className="gap-1.5">
               Por Etapa <span className="text-[10px] rounded-full bg-border px-1.5 leading-4">{etapaAgg.length}</span>
             </TabsTrigger>
+            <TabsTrigger value="responsavel" className="gap-1.5">
+              Por Responsável <span className="text-[10px] rounded-full bg-border px-1.5 leading-4">{responsavelAgg.length}</span>
+            </TabsTrigger>
             <TabsTrigger value="area" className="gap-1.5">
               Por Área <span className="text-[10px] rounded-full bg-border px-1.5 leading-4">{areaAgg.length}</span>
             </TabsTrigger>
@@ -480,6 +532,29 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {etapaAgg.map((e) => (
                   <EtapaCard key={e.id} name={e.nome} pipe={e.pipeNome} sla={e.sla} ct={e.ct} et={e.et} ePct={e.ePct} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Responsável */}
+          <TabsContent value="responsavel">
+            <p className="text-[11px] text-muted-foreground mb-2">
+              Etapas concluídas com SLA definido, atribuídas a quem era responsável na entrada da etapa.
+            </p>
+            {responsavelAgg.length === 0 ? (
+              <EmptyNote>Nenhuma etapa concluída com SLA definido para atribuir.</EmptyNote>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {responsavelAgg.map((r) => (
+                  <ComplianceCard
+                    key={r.userId ?? "__sem__"}
+                    name={r.userId ? (respNomes[r.userId] ?? "—") : "— sem responsável"}
+                    meta={`${r.count} ${r.count === 1 ? "etapa" : "etapas"} com SLA`}
+                    npC={r.pctNoPrazo}
+                    ct={formatMinCal(r.sumCal / r.count)}
+                    et={formatMin(r.sumUtil / r.count)}
+                  />
                 ))}
               </div>
             )}
