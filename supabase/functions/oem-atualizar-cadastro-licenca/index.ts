@@ -185,6 +185,27 @@ Deno.serve(async (req) => {
       }, 502);
     }
 
+    // A MESMA fotografia desatualizada que mordeu do outro lado (ver a migration
+    // 20260825120000): a aba lê `reconciliacao_oem`, não o parceiro. Sem isto a
+    // linha continuaria na tela com o nome antigo até a próxima carga, logo
+    // depois de a tela dizer que atualizou.
+    //
+    // Só o NOME. `cnpj_norm` é o documento do parceiro E chave de match em meia
+    // dúzia de consultas; e aqui, ao contrário do lado DS, o valor não foi
+    // relido do OEM — foi o que mandamos e ele aceitou. Trocar uma chave com
+    // base nisso é apostar. Para CNPJ, quem confirma é a próxima carga.
+    if (!simular && campo === "nome" && respostaOem?.sem_mudanca !== true) {
+      await ds.from("reconciliacao_oem")
+        .update({ razao_oem: valorNovo })
+        .eq("tenant_id", linha.tenant_id)
+        .eq("filial_codigo", linha.filial_codigo);
+      // O array sai por RPC: PostgREST não tem array_remove, e ler-modificar-
+      // gravar aqui abriria corrida com a carga do espelho.
+      await ds.rpc("oem_tirar_divergencia_da_linha", {
+        p_recon_id: linha.id, p_tipo: "nome",
+      });
+    }
+
     return json({
       ok: true,
       simulado: simular,
