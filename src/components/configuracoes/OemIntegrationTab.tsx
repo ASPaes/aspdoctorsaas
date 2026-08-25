@@ -26,6 +26,7 @@ import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
   Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
   ArrowUpDown, ArrowUp, ArrowDown, Boxes, Plus, CalendarClock, ArrowDownToLine, ArrowUpFromLine,
+  Clock,
 } from "lucide-react";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
@@ -1068,6 +1069,29 @@ export default function OemIntegrationTab() {
   // CNPJ, em Custos pelo valor e em Margem pelo prejuízo, e quem resolvia
   // precisava percorrer três abas para descobrir que era o mesmo problema.
   //
+  // Cliente cadastrado agora não tem licença no OEM porque a implantação ainda
+  // está acontecendo. Isso não é divergência: é o estado normal de quem acabou
+  // de entrar. Sem esta janela, todo cliente novo nascia dentro da lista de
+  // pendências e empurrava para baixo o que de fato precisa de decisão.
+  //
+  // 30 dias é o prazo em que a implantação normalmente termina. Passado ele, o
+  // cliente volta para a lista principal sozinho — o que é o ponto: a espera
+  // tem fim, e cliente esquecido volta a aparecer.
+  const JANELA_IMPLANTACAO_DIAS = 30;
+  const { data: clientesNovos } = useQuery({
+    queryKey: ["oem-clientes-novos", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const desde = new Date(Date.now() - JANELA_IMPLANTACAO_DIAS * 86400000).toISOString();
+      const linhas = await fetchAllRows<{ id: string; created_at: string }>(() =>
+        (supabase.from("clientes") as any)
+          .select("id, created_at")
+          .eq("tenant_id", tid)
+          .gte("created_at", desde));
+      return new Map(linhas.map((l) => [l.id, l.created_at]));
+    },
+  });
+
   // As outras abas continuam existindo, mas viraram RESUMO: os números e o que
   // é ação de massa (atualizar custo em lote) ficam lá; a decisão caso a caso
   // acontece só aqui.
@@ -1090,6 +1114,8 @@ export default function OemIntegrationTab() {
       id: string; nome: string; cnpj: string | null;
       itens: Item[]; ignorados: Item[]; decisoes: Recon[];
     }>();
+    // Clientes novos ainda sem licença no OEM. Lista própria, fora da fila.
+    const emImplantacao: { l: Recon; criadoEm: string }[] = [];
 
     const doCliente = (id: string, nome: string, cnpj: string | null) => {
       let c = porCliente.get(id);
@@ -1194,6 +1220,14 @@ export default function OemIntegrationTab() {
     }
     for (const l of r.soNoDs) {
       if (!l.ds_customer_id) continue;
+      // Recém-cadastrado sai da fila e vai para o balde de implantação. O
+      // `continue` vem ANTES do doCliente: entrar no mapa criaria o cliente na
+      // lista principal, e ele só sumiria de lá por não ter sobrado item.
+      const criadoEm = clientesNovos?.get(l.ds_customer_id);
+      if (criadoEm) {
+        emImplantacao.push({ l, criadoEm });
+        continue;
+      }
       doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? null).itens.push({
         chave: `semlic:${l.id}`, tipo: "sem_licenca", grave: false, linha: l,
         assinatura: "sem_licenca",
@@ -1284,9 +1318,12 @@ export default function OemIntegrationTab() {
       // Fora do `total` de propósito: baixa combinada não é pendência, e contar
       // coisa resolvida no selo da aba é o alarme que ensina a ignorar a tela.
       programadas: r.baixaProgramada,
+      // Idem: implantação em andamento não é pendência. Do mais antigo para o
+      // mais novo, que é a ordem de quem está perto de sair da janela.
+      emImplantacao: emImplantacao.sort((a, b) => a.criadoEm.localeCompare(b.criadoEm)),
       total: lista.reduce((a, c) => a + c.itens.length, 0) + semDono.length,
     };
-  }, [r, custos, codigoEmProdutoDeOutro, linhas, produtosDs]);
+  }, [r, custos, codigoEmProdutoDeOutro, linhas, produtosDs, clientesNovos]);
 
   // É este número que acende o alerta na aba.
   const totalDivergencias = divergencias.total;
@@ -1397,6 +1434,7 @@ export default function OemIntegrationTab() {
   // lista de clientes — que é o assunto da aba — para fora da primeira tela.
   const [semDonoAberto, setSemDonoAberto] = useState(false);
   const [programadasAberto, setProgramadasAberto] = useState(false);
+  const [implantacaoAberto, setImplantacaoAberto] = useState(false);
   const [ignoradosAberto, setIgnoradosAberto] = useState(false);
   const [buscaDiv, setBuscaDiv] = useState("");
   const [tipoDiv, setTipoDiv] = useState("todos");
@@ -2697,6 +2735,73 @@ export default function OemIntegrationTab() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )}
+
+          {/* Cliente que entrou agora e ainda não tem licença lá. Recolhido e
+              fora do selo: é implantação acontecendo, não pendência de decisão.
+              O bloco existe para que "ainda não" não vire "ninguém viu" — e o
+              prazo de 30 dias devolve o cliente para a fila sozinho. */}
+          {divergencias.emImplantacao.length > 0 && (
+            <Card>
+              <button
+                type="button"
+                onClick={() => setImplantacaoAberto((v) => !v)}
+                className="flex w-full items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
+              >
+                <ChevronRight
+                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${implantacaoAberto ? "rotate-90" : ""}`}
+                />
+                <Clock className="h-4 w-4 shrink-0 text-sky-500" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">
+                    {divergencias.emImplantacao.length} cliente{divergencias.emImplantacao.length > 1 ? "s" : ""} novo{divergencias.emImplantacao.length > 1 ? "s" : ""}{" "}
+                    ainda sem licença no OEM
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Cadastrados nos últimos {JANELA_IMPLANTACAO_DIAS} dias. Enquanto a implantação
+                    acontece, isso é esperado, e por isso eles não entram na lista de baixo. Passado
+                    o prazo, voltam para lá sozinhos.
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {implantacaoAberto ? "recolher" : "ver lista"}
+                </span>
+              </button>
+              {implantacaoAberto && (
+                <CardContent className="p-0">
+                  <div className="divide-y border-t max-h-80 overflow-y-auto">
+                    {divergencias.emImplantacao.map(({ l, criadoEm }) => {
+                      // Dia cheio, não fração: "criado há 3 dias" é o que a
+                      // pessoa diria, e 2,7 dias não ajuda ninguém.
+                      const dias = Math.floor((Date.now() - new Date(criadoEm).getTime()) / 86400000);
+                      const nome = l.razao_ds ?? l.razao_oem ?? "—";
+                      return (
+                        <div key={`impl:${l.id}`} className="flex items-center gap-3 p-3 text-sm">
+                          <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium truncate" title={nome}>{nome}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {l.cnpj_ds ? <>CNPJ {doc(l.cnpj_ds)} · </> : null}
+                              cadastrado {dias === 0 ? "hoje" : dias === 1 ? "ontem" : `há ${dias} dias`} ·
+                              {" "}mensalidade {brl(Number(l.mensalidade_ds || 0))}
+                            </p>
+                          </div>
+                          {/* A mesma saída do "Cliente sem licença": quem já
+                              sabe qual filial é dele resolve daqui, sem esperar
+                              o prazo acabar. */}
+                          {l.ds_customer_id && (
+                            <Button size="sm" variant="secondary" className="gap-1.5 shrink-0"
+                              onClick={() => setProcurandoLicenca({ id: l.ds_customer_id!, nome })}>
+                              <Boxes className="h-3.5 w-3.5" /> Licenças OEM
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               )}
