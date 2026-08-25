@@ -131,6 +131,15 @@ describe("montarJornadasPorPipeline", () => {
   });
 });
 
+describe("somarColunas", () => {
+  it("deixa a coluna de conclusão de fora quando pedida em `exceto`", () => {
+    const mapa = { "st-1": [1, 2], "st-2": [3], [ONB_DONE_COL_ID]: [4, 5, 6] };
+
+    expect(somarColunas(mapa)).toBe(6);
+    expect(somarColunas(mapa, [ONB_DONE_COL_ID])).toBe(3);
+  });
+});
+
 describe("contarTicketsImplantacao", () => {
   const pipelineDaJornada = (id: string) => (id.startsWith("gula") ? GULA : PDV);
 
@@ -183,6 +192,18 @@ describe("contarTicketsImplantacao", () => {
     expect(totais[PDV]).toBe(1);
     expect(totais[GULA]).toBe(1);
     expect(totais["pipe-vazio"]).toBe(0);
+  });
+
+  it("não conta o ticket que já deu go-live — ele está na coluna de conclusão", () => {
+    const totais = contarTicketsImplantacao({
+      treinos: [{ journey_id: "pdv-a" }, { journey_id: "pdv-b" }],
+      jornadasSemTreino: [{ journey_id: "pdv-c" }],
+      pipelineIds: [PDV, GULA],
+      pipelineDaJornada,
+      concluida: (id) => id === "pdv-b" || id === "pdv-c",
+    });
+
+    expect(totais[PDV]).toBe(1);
   });
 
   it("jornada sem passagem por esta fase não é atribuída a ninguém", () => {

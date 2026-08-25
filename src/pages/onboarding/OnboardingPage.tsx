@@ -696,8 +696,11 @@ export default function OnboardingPage() {
     [journeysByStagePorPipeline, selectedPipelineId],
   );
 
-  /** Total de TICKETS de cada pipeline, com os filtros ativos.
-   *  No Onboarding o cartão É o ticket, então bate com a soma das colunas.
+  /** Total de TICKETS EM ANDAMENTO de cada pipeline, com os filtros ativos.
+   *  A coluna de conclusão fica DE FORA nas duas fases (decisão do owner, 25/08): ela
+   *  guarda 30 dias de encerrados e sozinha respondia por 61 dos 86 do Onboarding PDV —
+   *  o total não dizia mais nada sobre o que a equipe tem para tocar.
+   *  No Onboarding o cartão É o ticket, então bate com a soma das colunas ABERTAS.
    *  Na Implantação o cartão é o treinamento: um ticket com 3 treinos ocupa 3 colunas, e
    *  somar cartão diria 73 onde existem 44 clientes. Por isso o ticket conta uma vez só —
    *  o número ao lado do pipeline é menor que a soma dos badges das colunas de propósito.
@@ -711,12 +714,16 @@ export default function OnboardingPage() {
         jornadasSemTreino: jornadasSemTreinoNaFase,
         pipelineIds,
         pipelineDaJornada,
+        // Mesma regra que manda o cartão para a coluna "Implantação concluída".
+        concluida: (journeyId) => !!goLivePorJornada[journeyId],
       });
     }
     const out: Record<string, number> = {};
-    pipelineIds.forEach((pid) => (out[pid] = somarColunas(journeysByStagePorPipeline[pid])));
+    pipelineIds.forEach(
+      (pid) => (out[pid] = somarColunas(journeysByStagePorPipeline[pid], [ONB_DONE_COL_ID])),
+    );
     return out;
-  }, [isAcompanhamento, isImplantacao, pipelines, treinosNaFase, jornadasSemTreinoNaFase, journeysByStagePorPipeline, phasesByJourney, phaseId]);
+  }, [isAcompanhamento, isImplantacao, pipelines, treinosNaFase, jornadasSemTreinoNaFase, goLivePorJornada, journeysByStagePorPipeline, phasesByJourney, phaseId]);
 
   /** O quadro de Acompanhamento busca os próprios tickets — o total dele só pode vir de lá. */
   const [totalAcompanhamento, setTotalAcompanhamento] = useState(0);
@@ -890,7 +897,7 @@ export default function OnboardingPage() {
           {pipelines.length <= 1 && totalFaseAtual !== null && (
             <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
               <span className="text-muted-foreground/40 mr-2">·</span>
-              {totalFaseAtual} {totalFaseAtual === 1 ? "ticket" : "tickets"}
+              {totalFaseAtual} {totalFaseAtual === 1 ? "ticket" : "tickets"} em andamento
             </span>
           )}
         </div>
@@ -925,14 +932,16 @@ export default function OnboardingPage() {
                 <button
                   key={p.id}
                   onClick={() => selectPipeline(p.id)}
-                  title={total === null ? undefined : `${total} ${total === 1 ? "ticket" : "tickets"} com os filtros atuais`}
+                  title={total === null ? undefined : `${total} ${total === 1 ? "ticket" : "tickets"} em andamento com os filtros atuais (concluídos não entram)`}
                   className={`inline-flex items-center px-3 py-1 text-xs rounded ${ativo ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
                 >
                   {p.nome}
                   {total !== null && (
                     <span
                       className={`ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-4 px-1 rounded text-[10px] font-medium tabular-nums ${
-                        ativo ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
+                        // Sólido no ativo: o /20 sobre o verde do primary deixava o número
+                        // quase invisível — o usuário reportou "camuflado no verde".
+                        ativo ? "bg-primary-foreground text-primary" : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {total}

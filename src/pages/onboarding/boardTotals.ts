@@ -107,10 +107,22 @@ export function montarJornadasPorPipeline<T extends JornadaNoQuadro>({
   return out;
 }
 
-/** Soma as colunas de um pipeline. No Onboarding, 1 cartão = 1 ticket. */
-export function somarColunas(mapa: Record<string, unknown[]> | undefined): number {
+/**
+ * Soma as colunas de um pipeline. No Onboarding, 1 cartão = 1 ticket.
+ *
+ * `exceto` existe para o total do pipeline deixar a coluna de conclusão de fora: o número
+ * ao lado do nome é "o que ainda está em andamento", e com 61 concluídos dentro de 86 ele
+ * não dizia nada sobre a operação do dia.
+ */
+export function somarColunas(
+  mapa: Record<string, unknown[]> | undefined,
+  exceto: string[] = [],
+): number {
   if (!mapa) return 0;
-  return Object.values(mapa).reduce((acc, arr) => acc + arr.length, 0);
+  return Object.entries(mapa).reduce(
+    (acc, [id, arr]) => (exceto.includes(id) ? acc : acc + arr.length),
+    0,
+  );
 }
 
 /**
@@ -125,16 +137,20 @@ export function contarTicketsImplantacao({
   jornadasSemTreino,
   pipelineIds,
   pipelineDaJornada,
+  concluida,
 }: {
   treinos: { journey_id: string }[];
   jornadasSemTreino: { journey_id: string }[];
   pipelineIds: string[];
   pipelineDaJornada: (journeyId: string) => string | null;
+  /** Quem já deu go-live está na coluna de conclusão e fica de fora do total. */
+  concluida?: (journeyId: string) => boolean;
 }): Record<string, number> {
   const vistos: Record<string, Set<string>> = {};
   pipelineIds.forEach((pid) => (vistos[pid] = new Set()));
 
   const marcar = (journeyId: string) => {
+    if (concluida?.(journeyId)) return;
     const pid = pipelineDaJornada(journeyId);
     if (!pid || !vistos[pid]) return;
     vistos[pid].add(journeyId);
