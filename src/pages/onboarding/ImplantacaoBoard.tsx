@@ -226,12 +226,12 @@ function GrupoTicketCard({
               draggable={arrastavel}
               onDragStart={arrastavel ? (e) => { e.stopPropagation(); onDragStartFilho!(e, f); } : undefined}
               onDragEnd={arrastavel ? onDragEndFilho : undefined}
-              className={`flex items-center gap-1.5 text-[10px] text-muted-foreground ${
+              className={`flex items-center gap-1.5 min-w-0 text-[10px] text-muted-foreground ${
                 arrastavel ? "cursor-grab active:cursor-grabbing" : ""
               } ${draggingId === f.training_id ? "opacity-40" : ""}`}
             >
               <span className="font-mono text-foreground font-medium shrink-0">-{f.sub_seq ?? "?"}</span>
-              <span className={`truncate ${f.status === "cancelado" ? "line-through" : ""}`}>
+              <span className={`truncate min-w-0 ${f.status === "cancelado" ? "line-through" : ""}`}>
                 {f.titulo}
                 {f.conduzido_por_nome ? ` · ${f.conduzido_por_nome}` : ""}
               </span>
@@ -534,7 +534,7 @@ export default function ImplantacaoBoard({
                               title={`Treino agendado${t.conduzido_por_nome ? ` · ${t.conduzido_por_nome}` : ""}`}
                             >
                               <GraduationCap className="h-3 w-3 shrink-0" />
-                              <span className="truncate">
+                              <span className="truncate min-w-0">
                                 Treino {formatTrainingDateTime(t.agendado_para)}
                                 {t.conduzido_por_nome ? ` · ${t.conduzido_por_nome}` : ""}
                               </span>
@@ -606,8 +606,8 @@ export default function ImplantacaoBoard({
                           {t.parent_ticket_code && (
                             <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-dashed border-border text-[10px] text-muted-foreground">
                               <Ticket className="h-3 w-3 shrink-0" />
-                              <span className="font-mono text-foreground/90 truncate">{t.parent_ticket_code}</span>
-                              {t.demand_type_nome && <span className="truncate">· {t.demand_type_nome}</span>}
+                              <span className="font-mono text-foreground/90 shrink-0">{t.parent_ticket_code}</span>
+                              {t.demand_type_nome && <span className="truncate min-w-0">· {t.demand_type_nome}</span>}
                             </div>
                           )}
 
