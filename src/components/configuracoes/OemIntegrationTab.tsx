@@ -1220,6 +1220,10 @@ export default function OemIntegrationTab() {
     }
     for (const l of r.soNoDs) {
       if (!l.ds_customer_id) continue;
+      // Mesmo motivo do bloco de implantação: nestas linhas o CNPJ do cliente
+      // mora em cnpj_norm. Sem a reserva, "Cliente sem licença no OEM" aparecia
+      // na lista sem documento nenhum.
+      const cnpjDoCliente = l.cnpj_ds ?? l.cnpj_norm ?? null;
       // Recém-cadastrado sai da fila e vai para o balde de implantação. O
       // `continue` vem ANTES do doCliente: entrar no mapa criaria o cliente na
       // lista principal, e ele só sumiria de lá por não ter sobrado item.
@@ -1228,7 +1232,7 @@ export default function OemIntegrationTab() {
         emImplantacao.push({ l, criadoEm });
         continue;
       }
-      doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? null).itens.push({
+      doCliente(l.ds_customer_id, nomeDe(l), cnpjDoCliente).itens.push({
         chave: `semlic:${l.id}`, tipo: "sem_licenca", grave: false, linha: l,
         assinatura: "sem_licenca",
         rotulo: "Cliente sem licença no OEM",
@@ -2804,9 +2808,15 @@ export default function OemIntegrationTab() {
                                 nome, que tem o title inteiro. */}
                             <div className="flex min-w-0 items-baseline gap-2">
                               <p className="font-medium truncate" title={nome}>{nome}</p>
-                              {l.cnpj_ds && (
+                              {/* `cnpj_norm` como reserva NÃO é misturar os dois
+                                  lados: em linha SO_NO_DS (cliente que não casou
+                                  com filial nenhuma) a carga grava o CNPJ DO
+                                  CLIENTE em cnpj_norm e deixa cnpj_ds nulo. Ler
+                                  só cnpj_ds era o motivo de o documento não
+                                  aparecer para ninguém deste bloco. */}
+                              {(l.cnpj_ds ?? l.cnpj_norm) && (
                                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                                  {doc(l.cnpj_ds)}
+                                  {doc(l.cnpj_ds ?? l.cnpj_norm)}
                                 </span>
                               )}
                             </div>
