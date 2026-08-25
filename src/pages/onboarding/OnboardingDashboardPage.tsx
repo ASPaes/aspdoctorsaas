@@ -9,6 +9,7 @@ import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   Loader2, CheckCircle2, AlertTriangle, UserCheck, GraduationCap,
@@ -19,6 +20,8 @@ import { startOfMonth, endOfMonth } from "date-fns";
 import OnboardingSlaOverview from "./OnboardingSlaOverview";
 import SituacaoAgoraBand from "./SituacaoAgoraBand";
 import KpiCard from "./KpiCard";
+import OnboardingDashFilterBar from "./OnboardingDashFilterBar";
+import { useOnboardingDashFilters } from "./useOnboardingDashFilters";
 import { pct, separarJornadas, contarSituacao, agregarTreinos, desfechoTreino } from "./dashMetrics";
 
 interface JourneyRow {
@@ -33,6 +36,12 @@ interface JourneyRow {
   concluido_em: string | null;
 
   demand_type_nome: string | null;
+  demand_type_id: string | null;
+  responsavel_user_id: string | null;
+  responsavel_nome: string | null;
+  ticket_id: string | null;
+  implantacao_iniciada_em: string | null;
+  implantacao_concluida_em: string | null;
   setor_nome: string | null;
   sla_total_corrido_min: number | null;
   sla_total_pausado_min: number | null;
@@ -84,7 +93,7 @@ export default function OnboardingDashboardPage() {
     queryFn: async () => {
       const rows = await fetchAllRows<JourneyRow>(() => {
         let q = (supabase.from("vw_onboarding_journeys" as any) as any)
-          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, concluido_em, aberta_em, demand_type_nome, setor_nome, sla_total_corrido_min, sla_total_pausado_min, sla_total_util_min")
+          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, concluido_em, aberta_em, demand_type_nome, demand_type_id, responsavel_user_id, responsavel_nome, ticket_id, implantacao_iniciada_em, implantacao_concluida_em, setor_nome, sla_total_corrido_min, sla_total_pausado_min, sla_total_util_min")
           .eq("tenant_id", effectiveTenantId);
         if (selectedUnidadeIds.length > 0) q = q.in("cliente_unidade_id", selectedUnidadeIds);
         return q;
@@ -140,13 +149,22 @@ export default function OnboardingDashboardPage() {
 
   const journeys = useMemo(() => journeysQ.data ?? [], [journeysQ.data]);
 
-  /** Canceladas ficam fora de tudo. Só a faixa "Situação agora" usa `journeys` inteiro. */
-  const { ativas, periodo } = useMemo(
-    () => separarJornadas(journeys, dateRange),
-    [journeys, dateRange],
+  const dashFilters = useOnboardingDashFilters(journeys, effectiveTenantId, canAccess);
+
+  /** O filtro entra ANTES de tudo: `ativas` e `allowedJourneyIds` derivam daqui, e é
+   *  por isso que treinos, pausas e retornos obedecem ao filtro sem mudança própria. */
+  const journeysFiltradas = useMemo(
+    () => (dashFilters.ativo ? journeys.filter((j) => dashFilters.allowedByFilter.has(j.journey_id)) : journeys),
+    [journeys, dashFilters.ativo, dashFilters.allowedByFilter],
   );
 
-  const contagem = useMemo(() => contarSituacao(journeys), [journeys]);
+  /** Canceladas ficam fora de tudo. Só a faixa "Situação agora" usa a lista inteira. */
+  const { ativas, periodo } = useMemo(
+    () => separarJornadas(journeysFiltradas, dateRange),
+    [journeysFiltradas, dateRange],
+  );
+
+  const contagem = useMemo(() => contarSituacao(journeysFiltradas), [journeysFiltradas]);
 
   /** Allowlist de treinos/pausas/retornos: SEM canceladas, mas SEM recorte por
    *  abertura — esses três já filtram pela data do próprio evento. Usar `periodo`
@@ -367,12 +385,21 @@ export default function OnboardingDashboardPage() {
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 overflow-y-auto">
-      <div className="flex items-center justify-between gap-3 p-4 border-b border-border bg-background sticky top-0 z-10">
-        <div>
-          <h1 className="text-lg font-semibold">Dashboard de Onboarding</h1>
-          <p className="text-xs text-muted-foreground">SLA de jornadas e performance por implantador</p>
+      <div className="p-4 border-b border-border bg-background sticky top-0 z-10 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-lg font-semibold">Dashboard de Onboarding</h1>
+            <p className="text-xs text-muted-foreground">SLA de jornadas e performance por implantador</p>
+          </div>
+          <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} align="end" />
         </div>
-        <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} align="end" />
+        <OnboardingDashFilterBar
+          filtro={dashFilters.filtro}
+          setFiltro={dashFilters.setFiltro}
+          limpar={dashFilters.limpar}
+          ativo={dashFilters.ativo}
+          opcoes={dashFilters.opcoes}
+        />
       </div>
 
       {loading ? (
@@ -381,6 +408,15 @@ export default function OnboardingDashboardPage() {
         </div>
       ) : (
         <div className="p-4 space-y-5">
+          {dashFilters.ativo && journeysFiltradas.length === 0 && (
+            <div className="rounded-lg border border-border bg-card p-6 text-center">
+              <p className="text-sm font-medium">Nenhuma jornada bate com os filtros.</p>
+              <Button variant="link" size="sm" onClick={dashFilters.limpar}>
+                Limpar filtros
+              </Button>
+            </div>
+          )}
+
           <SituacaoAgoraBand contagem={contagem} />
 
           {/* SLA — visão corrido vs. efetivo (total, pipeline, etapa, área) */}
