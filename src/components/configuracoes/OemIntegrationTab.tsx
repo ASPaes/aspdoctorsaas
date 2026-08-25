@@ -26,7 +26,7 @@ import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
   Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
   ArrowUpDown, ArrowUp, ArrowDown, Boxes, Plus, CalendarClock, ArrowDownToLine, ArrowUpFromLine,
-  Clock,
+  Clock, Copy, Check,
 } from "lucide-react";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
@@ -156,6 +156,56 @@ const doc = (v: string | null | undefined) => {
   if (d.length === 14) return maskCNPJ(d);
   return d;
 };
+
+// O documento da linha, clicável para copiar.
+//
+// `span` com role, e NÃO `button`: na lista de divergências ele vive dentro do
+// botão que expande o cliente, e button dentro de button é HTML inválido — o
+// React remonta a árvore e o clique de fora para de funcionar.
+//
+// `stopPropagation` no clique e no teclado pelo mesmo motivo: sem ele, copiar o
+// CNPJ abriria (ou fecharia) o cliente junto, que é o oposto do que a pessoa
+// pediu ao mirar no número.
+//
+// Copia só os DÍGITOS. É o que se cola no portal do OEM, no Omie e na busca
+// desta própria aba; a máscara fica na tela, para leitura.
+function CnpjCopiavel({ valor }: { valor: string | null | undefined }) {
+  const [copiado, setCopiado] = useState(false);
+  const digitos = String(valor ?? "").replace(/\D/g, "");
+  if (!digitos) return null;
+
+  const copiar = () => {
+    navigator.clipboard?.writeText(digitos)
+      .then(() => {
+        setCopiado(true);
+        // Volta ao ícone normal sozinho: um "copiado" permanente na tela vira
+        // ruído na próxima vez que a pessoa olhar a mesma linha.
+        window.setTimeout(() => setCopiado(false), 1500);
+      })
+      .catch(() => {/* navegador sem permissão de área de transferência */});
+  };
+
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      title={copiado ? "Copiado" : `Copiar ${digitos}`}
+      onClick={(e) => { e.stopPropagation(); copiar(); }}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        e.stopPropagation();
+        copiar();
+      }}
+      className="shrink-0 -mx-1 inline-flex cursor-pointer items-center gap-1 rounded px-1 text-xs tabular-nums text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+    >
+      {doc(digitos)}
+      {copiado
+        ? <Check className="h-3 w-3 text-emerald-500" />
+        : <Copy className="h-3 w-3 opacity-40" />}
+    </span>
+  );
+}
 
 // Busca que aceita o documento como ele aparece na TELA. As duas bases guardam
 // CNPJ só com dígitos, e a tela mostra com máscara: quem copiava o número do
@@ -2814,11 +2864,7 @@ export default function OemIntegrationTab() {
                                   CLIENTE em cnpj_norm e deixa cnpj_ds nulo. Ler
                                   só cnpj_ds era o motivo de o documento não
                                   aparecer para ninguém deste bloco. */}
-                              {(l.cnpj_ds ?? l.cnpj_norm) && (
-                                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                                  {doc(l.cnpj_ds ?? l.cnpj_norm)}
-                                </span>
-                              )}
+                              <CnpjCopiavel valor={l.cnpj_ds ?? l.cnpj_norm} />
                             </div>
                             <p className="text-xs text-muted-foreground">
                               cadastrado {quando} ·{" "}
@@ -2977,11 +3023,7 @@ export default function OemIntegrationTab() {
                               jeitos na mesma tela. */}
                           <div className="flex min-w-0 items-baseline gap-2">
                             <p className="font-medium truncate" title={c.nome}>{c.nome}</p>
-                            {c.cnpj && (
-                              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                                {doc(c.cnpj)}
-                              </span>
-                            )}
+                            <CnpjCopiavel valor={c.cnpj} />
                           </div>
                         </div>
                         {graves > 0 && (
