@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Clock, CheckCircle2, Pause, TrendingUp } from "lucide-react";
 import { agregarPorResponsavel, type LinhaAtribuicao } from "./dashMetrics";
+import DrilldownSheet, { type LinhaDrilldown } from "./DrilldownSheet";
+import type { JourneyNomes } from "./useJourneyNames";
 import { formatMinUtil as formatMin, formatMinCal } from "./slaFormat";
 
 /**
@@ -52,6 +54,8 @@ interface PhaseRow {
 export interface SlaJourneyRow {
   journey_id: string | null;
   concluido_em: string | null;
+  cliente_id: string | null;
+  responsavel_nome: string | null;
   demand_type_nome: string | null;
   setor_nome: string | null;
   sla_total_corrido_min: number | null;
@@ -61,6 +65,43 @@ export interface SlaJourneyRow {
 
 function pct(n: number, d: number): number {
   return d ? Math.round((n / d) * 1000) / 10 : 0;
+}
+
+/** Props que transformam um card em botão acessível. Um lugar só, quatro cards. */
+function clicavel(onClick?: () => void) {
+  if (!onClick) return {};
+  return {
+    role: "button",
+    tabIndex: 0,
+    onClick,
+    onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onClick();
+      }
+    },
+  };
+}
+
+const CLICAVEL_CLS =
+  "cursor-pointer hover:border-foreground/30 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+/** Uma linha de drill-down a partir do que cada agregação já tem em mãos. */
+function linhaDrill(
+  journeyId: string,
+  nomes: { cliente: (id: string) => string; responsavel: (id: string) => string },
+  util: number | null,
+  cal: number | null,
+  alvo: number | null,
+): LinhaDrilldown {
+  return {
+    journeyId,
+    cliente: nomes.cliente(journeyId),
+    responsavel: nomes.responsavel(journeyId),
+    util,
+    cal,
+    pctSla: alvo && alvo > 0 ? Math.round(((util ?? 0) / alvo) * 100) : null,
+  };
 }
 
 type Tone = "success" | "warning" | "danger" | "info" | "default";
@@ -118,7 +159,7 @@ function ComplianceRow({ label, v }: { label: string; v: number }) {
 function ComplianceCard({ name, badge, meta, npC, npE, ct, et, onClick }: { name: string; badge?: string; meta: string; npC: number; npE?: number; ct: string; et: string; onClick?: () => void }) {
   const dot = compliance(npC);
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
+    <div className={cn("rounded-lg border border-border bg-card p-4 transition-colors", onClick && CLICAVEL_CLS)} {...clicavel(onClick)}>
       <div className="flex items-start justify-between gap-2">
         <div className="text-sm font-semibold flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full shrink-0 ${statusBg[dot]}`} />
@@ -143,12 +184,12 @@ function ComplianceCard({ name, badge, meta, npC, npE, ct, et, onClick }: { name
   );
 }
 
-function EtapaCard({ name, pipe, sla, ct, et, ePct }: { name: string; pipe: string; sla: string; ct: string; et: string; ePct: number }) {
+function EtapaCard({ name, pipe, sla, ct, et, ePct, onClick }: { name: string; pipe: string; sla: string; ct: string; et: string; ePct: number; onClick?: () => void }) {
   const eS = consumo(ePct);
   const SC = 1.3; // escala 0..130% do SLA → largura total
   const efeW = Math.min(ePct, 130) / SC;
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
+    <div className={cn("rounded-lg border border-border bg-card p-4 transition-colors", onClick && CLICAVEL_CLS)} {...clicavel(onClick)}>
       <div className="flex items-start justify-between gap-2">
         <div className="text-sm font-semibold flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full shrink-0 ${statusBg[eS]}`} />
@@ -182,8 +223,10 @@ function EmptyNote({ children }: { children: React.ReactNode }) {
 
 /* ---------- componente ---------- */
 
-export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys: SlaJourneyRow[]; tenantId: string | null }) {
+export default function OnboardingSlaOverview({ journeys, tenantId, nomes }: { journeys: SlaJourneyRow[]; tenantId: string | null; nomes: JourneyNomes }) {
   const [areaDim, setAreaDim] = useState<"demanda" | "setor">("demanda");
+  const [drill, setDrill] = useState<{ titulo: string; regra: string; linhas: LinhaDrilldown[]; unidade: "util" | "cal" } | null>(null);
+
 
   const pipelinesQ = useQuery({
     queryKey: ["onb-sla-pipelines", tenantId],
@@ -330,6 +373,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
   // Por pipeline
   const pipelineAgg = useMemo(() => {
     const m = new Map<string, { count: number; sumC: number; sumE: number; withinC: number; withinE: number }>();
+    const porPipeline = new Map<string, LinhaDrilldown[]>();
     journeys.forEach((j) => {
       journeyPhases(j).forEach((ph) => {
         const cur = m.get(ph.pipelineId) ?? { count: 0, sumC: 0, sumE: 0, withinC: 0, withinE: 0 };
@@ -339,6 +383,9 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
         if (ph.bruto <= ph.target) cur.withinC++;
         if (ph.efetivo <= ph.target) cur.withinE++;
         m.set(ph.pipelineId, cur);
+        const arrP = porPipeline.get(ph.pipelineId) ?? [];
+        arrP.push(linhaDrill(j.journey_id!, nomes, ph.efetivo, ph.bruto, ph.target));
+        porPipeline.set(ph.pipelineId, arrP);
       });
     });
     return (pipelinesQ.data ?? [])
@@ -355,14 +402,16 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
           ct: formatMin(v.sumC / v.count),
           et: formatMin(v.sumE / v.count),
           target: formatMin(p.sla_total_minutos),
+          linhas: porPipeline.get(p.id) ?? [],
         };
       })
       .sort((a, b) => a.fase.localeCompare(b.fase) || a.nome.localeCompare(b.nome));
-  }, [journeys, journeyPhases, pipelinesQ.data]);
+  }, [journeys, journeyPhases, pipelinesQ.data, nomes]);
 
   // Por área (tipo de demanda / setor)
   const areaAgg = useMemo(() => {
     const m = new Map<string, { count: number; okC: number; okE: number; sumC: number; sumE: number }>();
+    const porArea = new Map<string, LinhaDrilldown[]>();
     journeys.forEach((j) => {
       const phases = journeyPhases(j);
       if (!phases.length) return;
@@ -376,6 +425,16 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
       cur.sumE += j.sla_total_util_min ?? 0;
       cur.sumC += (j.sla_total_util_min ?? 0) + (j.sla_total_pausado_min ?? 0);
       m.set(key, cur);
+      // Alvo `null`: a área não tem SLA próprio — ele vive no pipeline. A coluna
+      // "% SLA" fica "—" em vez de inventar um denominador.
+      const arrA = porArea.get(key) ?? [];
+      arrA.push(linhaDrill(
+        j.journey_id!, nomes,
+        j.sla_total_util_min ?? null,
+        (j.sla_total_util_min ?? 0) + (j.sla_total_pausado_min ?? 0),
+        null,
+      ));
+      porArea.set(key, arrA);
     });
     return Array.from(m.entries())
       .map(([key, v]) => ({
@@ -385,9 +444,10 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
         npE: pct(v.okE, v.count),
         ct: formatMin(v.sumC / v.count),
         et: formatMin(v.sumE / v.count),
+        linhas: porArea.get(key) ?? [],
       }))
       .sort((a, b) => b.count - a.count);
-  }, [journeys, journeyPhases, areaDim]);
+  }, [journeys, journeyPhases, areaDim, nomes]);
 
   /** Passagens por etapa já carimbadas com quem era responsável na ENTRADA da etapa. */
   const atribuicaoQ = useQuery({
@@ -412,6 +472,23 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
     const linhas = (atribuicaoQ.data ?? []).filter((l) => allowed.has(l.journey_id));
     return agregarPorResponsavel(linhas, slaPorEtapa);
   }, [journeys, atribuicaoQ.data, slaPorEtapa]);
+
+  /** MESMO filtro de `agregarPorResponsavel` (etapa sem SLA fica de fora). Se divergir,
+   *  o rodapé do painel divide por um N diferente do card e o número não bate — é
+   *  exatamente o que o drill-down existe para evitar. */
+  const linhasPorResponsavel = useMemo(() => {
+    const allowed = new Set(journeys.map((j) => j.journey_id));
+    const m = new Map<string | null, LinhaDrilldown[]>();
+    (atribuicaoQ.data ?? []).forEach((l) => {
+      if (!allowed.has(l.journey_id)) return;
+      const alvo = slaPorEtapa[l.stage_id];
+      if (!alvo || alvo <= 0) return;
+      const arr = m.get(l.responsavel_user_id) ?? [];
+      arr.push(linhaDrill(l.journey_id, nomes, l.duracao_util_minutos, l.duracao_minutos, alvo));
+      m.set(l.responsavel_user_id, arr);
+    });
+    return m;
+  }, [journeys, atribuicaoQ.data, slaPorEtapa, nomes]);
 
   const respIds = useMemo(
     () => responsavelAgg.map((r) => r.userId).filter(Boolean) as string[],
@@ -438,6 +515,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
   const etapaAgg = useMemo(() => {
     const allowed = new Set(journeys.map((j) => j.journey_id));
     const m = new Map<string, { count: number; sumC: number; sumE: number }>();
+    const porEtapa = new Map<string, LinhaDrilldown[]>();
     // Etapa de Implantação só recebe movimento de treino; as demais, só de jornada.
     // Concatenar não duplica nada.
     [...(historyQ.data ?? []), ...(trainingHistoryQ.data ?? [])].forEach((h) => {
@@ -451,6 +529,9 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
       cur.sumC += c;
       cur.sumE += e;
       m.set(h.stage_id, cur);
+      const arrE = porEtapa.get(h.stage_id) ?? [];
+      arrE.push(linhaDrill(h.journey_id, nomes, h.duracao_util_minutos, h.duracao_minutos, st.sla_minutos));
+      porEtapa.set(h.stage_id, arrE);
     });
     return Array.from(m.entries())
       .map(([id, v]) => {
@@ -468,10 +549,11 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
           ePct: Math.round((avgE / st.sla_minutos!) * 100),
           pipePos: pipe?.position ?? 0,
           stagePos: st.position,
+          linhas: porEtapa.get(id) ?? [],
         };
       })
       .sort((a, b) => a.pipePos - b.pipePos || a.stagePos - b.stagePos);
-  }, [journeys, historyQ.data, trainingHistoryQ.data, stageMap, pipeMap]);
+  }, [journeys, historyQ.data, trainingHistoryQ.data, stageMap, pipeMap, nomes]);
 
   return (
     <>
@@ -514,7 +596,16 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {pipelineAgg.map((p) => (
-                  <ComplianceCard key={p.id} name={p.nome} badge={p.fase} meta={`${p.count} ${p.count === 1 ? "jornada" : "jornadas"} · SLA ${p.target}`} npC={p.npC} npE={p.npE} ct={p.ct} et={p.et} />
+                  <ComplianceCard
+                    key={p.id} name={p.nome} badge={p.fase}
+                    meta={`${p.count} ${p.count === 1 ? "jornada" : "jornadas"} · SLA ${p.target}`}
+                    npC={p.npC} npE={p.npE} ct={p.ct} et={p.et}
+                    onClick={p.linhas.length ? () => setDrill({
+                      titulo: `${p.nome} · ${p.fase}`,
+                      regra: `Média do tempo por fase das ${p.count} passagens por este pipeline. Alvo do pipeline: ${p.target}.`,
+                      linhas: p.linhas, unidade: "util",
+                    }) : undefined}
+                  />
                 ))}
               </div>
             )}
@@ -531,7 +622,15 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {etapaAgg.map((e) => (
-                  <EtapaCard key={e.id} name={e.nome} pipe={e.pipeNome} sla={e.sla} ct={e.ct} et={e.et} ePct={e.ePct} />
+                  <EtapaCard
+                    key={e.id} name={e.nome} pipe={e.pipeNome} sla={e.sla}
+                    ct={e.ct} et={e.et} ePct={e.ePct}
+                    onClick={e.linhas.length ? () => setDrill({
+                      titulo: `${e.nome} · ${e.pipeNome}`,
+                      regra: `Média do tempo de expediente das ${e.linhas.length} passagens por esta etapa no recorte atual. Alvo da etapa: ${e.sla}.`,
+                      linhas: e.linhas, unidade: "util",
+                    }) : undefined}
+                  />
                 ))}
               </div>
             )}
@@ -554,6 +653,11 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
                     npC={r.pctNoPrazo}
                     ct={formatMinCal(r.sumCal / r.count)}
                     et={formatMin(r.sumUtil / r.count)}
+                    onClick={() => setDrill({
+                      titulo: r.userId ? (respNomes[r.userId] ?? "—") : "— sem responsável",
+                      regra: `Média do tempo de expediente das ${r.count} etapas com SLA definido atribuídas a esta pessoa na ENTRADA da etapa. Etapa que atravessou uma transferência conta para quem começou.`,
+                      linhas: linhasPorResponsavel.get(r.userId) ?? [], unidade: "util",
+                    })}
                   />
                 ))}
               </div>
@@ -584,13 +688,31 @@ export default function OnboardingSlaOverview({ journeys, tenantId }: { journeys
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {areaAgg.map((a) => (
-                  <ComplianceCard key={a.key} name={a.key} meta={`${a.count} ${a.count === 1 ? "jornada" : "jornadas"}`} npC={a.npC} npE={a.npE} ct={a.ct} et={a.et} />
+                  <ComplianceCard
+                    key={a.key} name={a.key}
+                    meta={`${a.count} ${a.count === 1 ? "jornada" : "jornadas"}`}
+                    npC={a.npC} npE={a.npE} ct={a.ct} et={a.et}
+                    onClick={a.linhas.length ? () => setDrill({
+                      titulo: a.key,
+                      regra: `Média do tempo total das ${a.count} jornadas classificadas como ${a.key}. A área não tem SLA próprio — o alvo vive no pipeline.`,
+                      linhas: a.linhas, unidade: "util",
+                    }) : undefined}
+                  />
                 ))}
               </div>
             )}
           </TabsContent>
         </Tabs>
       </section>
+
+      <DrilldownSheet
+        open={drill != null}
+        onOpenChange={(v) => { if (!v) setDrill(null); }}
+        titulo={drill?.titulo ?? ""}
+        regra={drill?.regra ?? ""}
+        linhas={drill?.linhas ?? []}
+        unidade={drill?.unidade ?? "util"}
+      />
     </>
   );
 }

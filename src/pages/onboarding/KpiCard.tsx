@@ -1,12 +1,17 @@
+import type { KeyboardEvent } from "react";
+import { cn } from "@/lib/utils";
+
 export type KpiTone = "default" | "success" | "warning" | "danger" | "info";
 export type KpiSubTone = "success" | "warning" | "danger" | "muted";
 
 export default function KpiCard({
-  icon: Icon, label, value, sub, tone = "default", subTone,
+  icon: Icon, label, value, sub, tone = "default", subTone, onClick,
 }: {
   icon: any; label: string; value: string; sub?: string;
   tone?: KpiTone;
   subTone?: KpiSubTone;
+  /** Quando presente, o card vira botão e abre o drill-down. */
+  onClick?: () => void;
 }) {
   const toneClass: Record<string, string> = {
     default: "text-foreground",
@@ -22,7 +27,26 @@ export default function KpiCard({
     muted: "text-muted-foreground",
   };
   return (
-    <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-1.5">
+    <div
+      className={cn(
+        "rounded-lg border border-border bg-card p-4 flex flex-col gap-1.5 transition-colors",
+        onClick &&
+          "cursor-pointer hover:border-foreground/30 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      )}
+      {...(onClick
+        ? {
+            role: "button",
+            tabIndex: 0,
+            onClick,
+            onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            },
+          }
+        : {})}
+    >
       <div className="flex items-center justify-between">
         <span className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">{label}</span>
         <Icon className={`h-4 w-4 ${toneClass[tone]}`} />

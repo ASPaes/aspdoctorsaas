@@ -22,6 +22,7 @@ import SituacaoAgoraBand from "./SituacaoAgoraBand";
 import KpiCard from "./KpiCard";
 import OnboardingDashFilterBar from "./OnboardingDashFilterBar";
 import TempoDeEntregaSection from "./TempoDeEntregaSection";
+import { useJourneyNames } from "./useJourneyNames";
 import { useOnboardingDashFilters } from "./useOnboardingDashFilters";
 import { pct, separarJornadas, contarSituacao, agregarTreinos, desfechoTreino } from "./dashMetrics";
 
@@ -38,6 +39,7 @@ interface JourneyRow {
 
   demand_type_nome: string | null;
   demand_type_id: string | null;
+  cliente_id: string | null;
   responsavel_user_id: string | null;
   responsavel_nome: string | null;
   ticket_id: string | null;
@@ -94,7 +96,7 @@ export default function OnboardingDashboardPage() {
     queryFn: async () => {
       const rows = await fetchAllRows<JourneyRow>(() => {
         let q = (supabase.from("vw_onboarding_journeys" as any) as any)
-          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, concluido_em, aberta_em, demand_type_nome, demand_type_id, responsavel_user_id, responsavel_nome, ticket_id, implantacao_iniciada_em, implantacao_concluida_em, setor_nome, sla_total_corrido_min, sla_total_pausado_min, sla_total_util_min")
+          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, cliente_id, concluido_em, aberta_em, demand_type_nome, demand_type_id, responsavel_user_id, responsavel_nome, ticket_id, implantacao_iniciada_em, implantacao_concluida_em, setor_nome, sla_total_corrido_min, sla_total_pausado_min, sla_total_util_min")
           .eq("tenant_id", effectiveTenantId);
         if (selectedUnidadeIds.length > 0) q = q.in("cliente_unidade_id", selectedUnidadeIds);
         return q;
@@ -151,6 +153,9 @@ export default function OnboardingDashboardPage() {
   const journeys = useMemo(() => journeysQ.data ?? [], [journeysQ.data]);
 
   const dashFilters = useOnboardingDashFilters(journeys, effectiveTenantId, canAccess);
+
+  /** Um mapa só de nomes para os dois blocos que abrem drill-down. */
+  const nomes = useJourneyNames(journeys);
 
   /** O filtro entra ANTES de tudo: `ativas` e `allowedJourneyIds` derivam daqui, e é
    *  por isso que treinos, pausas e retornos obedecem ao filtro sem mudança própria. */
@@ -421,7 +426,7 @@ export default function OnboardingDashboardPage() {
           <SituacaoAgoraBand contagem={contagem} />
 
           {/* SLA — visão corrido vs. efetivo (total, pipeline, etapa, área) */}
-          <OnboardingSlaOverview journeys={periodo} tenantId={effectiveTenantId} />
+          <OnboardingSlaOverview journeys={periodo} tenantId={effectiveTenantId} nomes={nomes} />
 
           {/* Tempo de entrega. Usa `ativas`, não `periodo`: a coorte destes cards é a
               data de CONCLUSÃO, e `periodo` já recortou por sobreposição de abertura —
@@ -432,6 +437,7 @@ export default function OnboardingDashboardPage() {
             tenantId={effectiveTenantId}
             dateRange={dateRange}
             allowedJourneyIds={allowedJourneyIds}
+            nomes={nomes}
           />
 
           {/* KPI Row 1b: PDV + previsto/realizado */}
