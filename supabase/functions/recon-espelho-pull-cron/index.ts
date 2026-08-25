@@ -59,11 +59,20 @@ const PISO_DELETE = 0.90; // upserted precisa cobrir >=90% do que ja existia; se
 // O bridge roda a cada 10 min, entao 60 min = 6 passadas perdidas e 120 min = 12.
 const ERRO_PERSISTENTE_MIN = 60;
 const SEM_SYNC_MIN = 120;
+// v7 (24/08/2026): SO ALARMA A ENTIDADE QUE O DOCTORSAAS CONSOME.
+//   O `saude` do snapshot devolve TODAS as linhas de omie_sync_state daquele tenant, e o
+//   DoctorOMIE le 4 entidades do Omie por conta propria. `ordens_servico` e `contas_receber`
+//   nao aparecem em nenhuma query, tabela ou tela do DS -- eram rotulo e nada mais. Alarmar
+//   por elas treina a ignorar o sino, que e o oposto do que a v5 veio fazer: em 24/08 um
+//   alerta de "contas a receber parada" ocupou o topo da lista enquanto contratos da DIGIUP,
+//   parado ha 25h, ficava embaixo.
+//
+//   ESTE MAPA E A FONTE UNICA: quem nao esta aqui nao alarma. De proposito nao existe uma
+//   segunda lista de "entidades permitidas" para sair de sincronia com os rotulos. Se um dia
+//   o DS passar a ler contas a receber, a linha volta para ca e o alarme acompanha sozinho.
 const ROTULO_ENTIDADE = {
   clientes: "clientes",
-  contratos: "contratos",
-  ordens_servico: "ordens de servico",
-  contas_receber: "contas a receber"
+  contratos: "contratos"
 };
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -246,6 +255,9 @@ Deno.serve(async (req)=>{
         const agora = Date.now();
         const minutos = (iso)=>iso ? Math.round((agora - new Date(iso).getTime()) / 60000) : null;
         for (const s of saudeConta){
+          // Entidade que o DS nao le: ela parar nao atrasa nada deste lado. Ver o mapa acima.
+          const rotulo = ROTULO_ENTIDADE[s.entidade];
+          if (!rotulo) continue;
           const idadeErro = minutos(s.updated_at);
           const idadeSync = minutos(s.last_sync_at);
           let motivo = null;
@@ -254,7 +266,6 @@ Deno.serve(async (req)=>{
           else if (idadeSync === null) motivo = "nunca sincronizou";
           else if (idadeSync >= SEM_SYNC_MIN) motivo = `sem sincronizar ha ${idadeSync} min`;
           if (!motivo) continue;
-          const rotulo = ROTULO_ENTIDADE[s.entidade] ?? s.entidade;
           // p_tenant_id e o tenant do DOCTORSAAS (t.tenant_id). O tenant_id que vem dentro de
           // `saude` e o do DoctorOMIE -- usar aquele entregaria o alerta para o tenant errado.
           const { error: nErr } = await service.rpc("notify_event", {
