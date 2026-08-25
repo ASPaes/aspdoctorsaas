@@ -159,13 +159,13 @@ function EtapaCard({ name, pipe, sla, ct, et, ePct }: { name: string; pipe: stri
         <span className="absolute -top-0.5 -bottom-0.5 w-0.5 bg-destructive" style={{ left: "76.9%" }} />
       </div>
       <div className="flex items-center justify-between text-[11.5px]">
-        <span className="text-muted-foreground">Expediente</span>
+        <span className="text-muted-foreground">Tempo médio · expediente</span>
         <span>
           <b className={`font-semibold ${statusTxt[eS]}`}>{et}</b> · {ePct}%
         </span>
       </div>
       <div className="flex items-center justify-between text-[11.5px] mt-1">
-        <span className="text-muted-foreground">Calendário</span>
+        <span className="text-muted-foreground">Tempo médio · calendário</span>
         <span className="text-muted-foreground">{ct}</span>
       </div>
     </div>
