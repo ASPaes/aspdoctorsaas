@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -1842,6 +1842,118 @@ export default function OemIntegrationTab() {
     }
   }
 
+  // ------------------------------------------------------------- em lote
+  //
+  // Só nome e CNPJ entram: são as duas divergências que têm um valor certo de
+  // um lado e errado do outro. As demais pedem decisão caso a caso (qual
+  // licença é dele, o que fazer com a que está sobrando) e não existe "aplicar
+  // em todos" que faça sentido.
+  //
+  // A seleção guarda recon_id -> campo, e não só o id: com o filtro em "Todos
+  // os tipos" a mesma leva pode ter nome e CNPJ misturados, e cada item precisa
+  // ir para o seu lado.
+  const [selecao, setSelecao] = useState<Map<string, "nome" | "cnpj">>(new Map());
+  const [loteDestino, setLoteDestino] = useState<"ds" | "oem" | null>(null);
+  const [loteAndando, setLoteAndando] = useState(false);
+  const [loteFeitos, setLoteFeitos] = useState(0);
+  const [loteFalhas, setLoteFalhas] = useState<{ nome: string; motivo: string }[]>([]);
+  const [loteResumo, setLoteResumo] = useState<{ ok: number; total: number } | null>(null);
+  // Parada pedida pela pessoa. Ref e não estado: o loop lê isso a cada volta, e
+  // um estado só chegaria nele no próximo render.
+  const pararLote = useRef(false);
+
+  const elegiveisDoCliente = (c: (typeof divergencias)["lista"][number]) =>
+    c.itens.filter((i) => (i.tipo === "nome" || i.tipo === "cnpj") && i.linha);
+
+  const elegiveisVisiveis = useMemo(
+    () => divergenciasVisiveis.flatMap((c) => c.itens.filter((i) => (i.tipo === "nome" || i.tipo === "cnpj") && i.linha)),
+    [divergenciasVisiveis],
+  );
+
+  const nomePorRecon = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of divergenciasVisiveis) {
+      for (const i of elegiveisDoCliente(c)) m.set(i.linha!.id, c.nome);
+    }
+    return m;
+  }, [divergenciasVisiveis]);
+
+  function alternarCliente(c: (typeof divergencias)["lista"][number]) {
+    const itens = elegiveisDoCliente(c);
+    if (!itens.length) return;
+    setSelecao((antes) => {
+      const nova = new Map(antes);
+      const todosJa = itens.every((i) => nova.has(i.linha!.id));
+      for (const i of itens) {
+        if (todosJa) nova.delete(i.linha!.id);
+        else nova.set(i.linha!.id, i.tipo === "cnpj" ? "cnpj" : "nome");
+      }
+      return nova;
+    });
+  }
+
+  // "Selecionar todos" é todos os VISÍVEIS: com um tipo escolhido no filtro ou
+  // uma busca ativa, marcar o que está fora da tela seria escolher por quem
+  // está olhando.
+  function alternarTodosVisiveis() {
+    const itens = divergenciasVisiveis.flatMap(elegiveisDoCliente);
+    if (!itens.length) return;
+    setSelecao((antes) => {
+      const todosJa = itens.every((i) => antes.has(i.linha!.id));
+      if (todosJa) return new Map();
+      const nova = new Map(antes);
+      for (const i of itens) nova.set(i.linha!.id, i.tipo === "cnpj" ? "cnpj" : "nome");
+      return nova;
+    });
+  }
+
+  // Um por um, e não uma chamada só: no OEM cada licença é um ler-modificar-
+  // gravar no parceiro, e uma edge function que fizesse 92 delas estouraria o
+  // tempo limite no meio, sem dizer quais já tinham ido. Aqui a tela mostra o
+  // progresso, dá para parar, e o que já foi está feito.
+  async function rodarLote(destino: "ds" | "oem") {
+    const itens = [...selecao.entries()];
+    if (!itens.length) return;
+    pararLote.current = false;
+    setLoteAndando(true);
+    setLoteFeitos(0);
+    setLoteFalhas([]);
+    const falhas: { nome: string; motivo: string }[] = [];
+    let ok = 0;
+
+    for (const [reconId, campo] of itens) {
+      if (pararLote.current) break;
+      const nome = nomePorRecon.get(reconId) ?? "cliente";
+      try {
+        if (destino === "oem") {
+          const { data, error } = await supabase.functions.invoke("oem-atualizar-cadastro-licenca", {
+            body: { recon_id: reconId, campo },
+          });
+          if (error) throw new Error(error.message);
+          if (data?.ok === false) throw new Error(String(data?.mensagem ?? "o OEM recusou"));
+        } else {
+          const { error } = await (supabase as any).rpc("oem_trazer_cadastro_do_parceiro", {
+            p_recon_id: reconId, p_campo: campo,
+          });
+          if (error) throw new Error(error.message);
+        }
+        ok += 1;
+      } catch (e: any) {
+        // A falha de um não para os outros: numa leva de 92, um CNPJ que já é
+        // de outro cliente não pode impedir os 91 que estão certos.
+        falhas.push({ nome, motivo: e?.message ?? String(e) });
+      }
+      setLoteFeitos((n) => n + 1);
+    }
+
+    setLoteAndando(false);
+    setLoteDestino(null);
+    setLoteFalhas(falhas);
+    setLoteResumo({ ok, total: itens.length });
+    setSelecao(new Map());
+    await recarregarRecon();
+  }
+
   async function desvincular(id: string) {
     setDesfazendo(id);
     try {
@@ -2970,7 +3082,10 @@ export default function OemIntegrationTab() {
                 <select
                   className="h-10 rounded-md border bg-background px-3 text-sm max-w-full"
                   value={tipoAtivo}
-                  onChange={(e) => { setTipoDiv(e.target.value); setClienteAberto(null); }}
+                  // A selecao morre junto: trocar de tipo muda a natureza do
+                  // lote, e "92 selecionados" continuando na tela depois de
+                  // pular de nome para CNPJ e um lote disparado no escuro.
+                  onChange={(e) => { setTipoDiv(e.target.value); setClienteAberto(null); setSelecao(new Map()); }}
                 >
                   <option value="todos">
                     Todos os tipos ({divergencias.lista.reduce((a, c) => a + c.itens.length, 0)})
@@ -2985,6 +3100,43 @@ export default function OemIntegrationTab() {
                   divergências
                 </p>
               </div>
+
+              {/* Seleção em massa. Só aparece quando há o que selecionar: nome e
+                  CNPJ são as únicas divergências com um valor certo de um lado e
+                  errado do outro. "Qual licença é dele" não tem lote possível. */}
+              {elegiveisVisiveis.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={elegiveisVisiveis.every((i) => selecao.has(i.linha!.id))}
+                      onCheckedChange={alternarTodosVisiveis}
+                    />
+                    Selecionar todos os {elegiveisVisiveis.length} desta lista
+                  </label>
+                  {selecao.size > 0 && (
+                    <>
+                      <span className="text-sm text-muted-foreground">
+                        <strong className="text-foreground">{selecao.size}</strong> selecionado{selecao.size > 1 ? "s" : ""}
+                      </span>
+                      <div className="inline-flex items-center gap-0.5 rounded-md border bg-background p-0.5">
+                        <span className="px-1.5 text-xs text-muted-foreground">Atualizar em</span>
+                        <Button size="sm" variant="ghost" className="h-7 gap-1 px-2"
+                          onClick={() => setLoteDestino("ds")}>
+                          <ArrowDownToLine className="h-3.5 w-3.5" /> DoctorSaaS
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 gap-1 px-2"
+                          onClick={() => setLoteDestino("oem")}>
+                          <ArrowUpFromLine className="h-3.5 w-3.5" /> OEM
+                        </Button>
+                      </div>
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground"
+                        onClick={() => setSelecao(new Map())}>
+                        Limpar
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
 
               <div className="rounded-md border divide-y">
                 {/* A lista inteira vazia já tem aviso próprio, lá em cima. Este
@@ -3003,47 +3155,60 @@ export default function OemIntegrationTab() {
                 {divergenciasVisiveis.map((c) => {
                   const aberto = clienteAberto === c.id;
                   const graves = c.itens.filter((i) => i.grave).length;
+                  const elegiveis = elegiveisDoCliente(c);
+                  const marcado = elegiveis.length > 0 && elegiveis.every((i) => selecao.has(i.linha!.id));
                   return (
                     <div key={c.id}>
-                      <button
-                        type="button"
-                        // A linha inteira abre: mirar a seta de 16px é o tipo de
-                        // precisão que não se pede a quem está com pressa.
-                        onClick={() => setClienteAberto(aberto ? null : c.id)}
-                        className="flex w-full items-center gap-3 p-3 text-left text-sm hover:bg-muted/50 transition-colors"
-                      >
-                        <ChevronRight
-                          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${aberto ? "rotate-90" : ""}`}
-                        />
-                        <div className="min-w-0 flex-1">
-                          {/* Mesmo desenho do bloco de clientes novos, e o
-                              documento agora sai pelo `doc`: aqui ele vinha cru
-                              (67500507000185), formatado logo abaixo na linha da
-                              divergência, e o mesmo número aparecia de dois
-                              jeitos na mesma tela. */}
-                          <div className="flex min-w-0 items-baseline gap-2">
-                            <p className="font-medium truncate" title={c.nome}>{c.nome}</p>
-                            <CnpjCopiavel valor={c.cnpj} />
-                          </div>
+                      {/* O checkbox fica FORA do botão que expande: button dentro
+                          de button é HTML inválido. Cliente sem nome/CNPJ
+                          divergente reserva o mesmo espaço em branco, senão as
+                          linhas dançam de acordo com o que dá para selecionar. */}
+                      <div className="flex items-center">
+                        <div className="shrink-0 pl-3">
+                          {elegiveis.length > 0
+                            ? <Checkbox checked={marcado} onCheckedChange={() => alternarCliente(c)} />
+                            : <div className="h-4 w-4" />}
                         </div>
-                        {graves > 0 && (
-                          <Badge variant="destructive" className="shrink-0">
-                            {graves} grave{graves > 1 ? "s" : ""}
-                          </Badge>
-                        )}
-                        {c.itens.length > 0 && (
-                          <Badge variant="outline" className="shrink-0">
-                            {c.itens.length} divergência{c.itens.length > 1 ? "s" : ""}
-                          </Badge>
-                        )}
-                        {/* Decisão não é pendência: entra com selo próprio, em
-                            verde, para não somar ao que ainda precisa de gente. */}
-                        {c.decisoes.length > 0 && (
-                          <Badge variant="outline" className="shrink-0 border-emerald-600/40 text-emerald-600 dark:text-emerald-500">
-                            {c.decisoes.length} decidida{c.decisoes.length > 1 ? "s" : ""} à mão
-                          </Badge>
-                        )}
-                      </button>
+                        <button
+                          type="button"
+                          // A linha inteira abre: mirar a seta de 16px é o tipo de
+                          // precisão que não se pede a quem está com pressa.
+                          onClick={() => setClienteAberto(aberto ? null : c.id)}
+                          className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left text-sm hover:bg-muted/50 transition-colors"
+                        >
+                          <ChevronRight
+                            className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${aberto ? "rotate-90" : ""}`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            {/* Mesmo desenho do bloco de clientes novos, e o
+                                documento agora sai pelo `doc`: aqui ele vinha cru
+                                (67500507000185), formatado logo abaixo na linha da
+                                divergência, e o mesmo número aparecia de dois
+                                jeitos na mesma tela. */}
+                            <div className="flex min-w-0 items-baseline gap-2">
+                              <p className="font-medium truncate" title={c.nome}>{c.nome}</p>
+                              <CnpjCopiavel valor={c.cnpj} />
+                            </div>
+                          </div>
+                          {graves > 0 && (
+                            <Badge variant="destructive" className="shrink-0">
+                              {graves} grave{graves > 1 ? "s" : ""}
+                            </Badge>
+                          )}
+                          {c.itens.length > 0 && (
+                            <Badge variant="outline" className="shrink-0">
+                              {c.itens.length} divergência{c.itens.length > 1 ? "s" : ""}
+                            </Badge>
+                          )}
+                          {/* Decisão não é pendência: entra com selo próprio, em
+                              verde, para não somar ao que ainda precisa de gente. */}
+                          {c.decisoes.length > 0 && (
+                            <Badge variant="outline" className="shrink-0 border-emerald-600/40 text-emerald-600 dark:text-emerald-500">
+                              {c.decisoes.length} decidida{c.decisoes.length > 1 ? "s" : ""} à mão
+                            </Badge>
+                          )}
+                        </button>
+                      </div>
 
                       {aberto && (
                         <div className="divide-y border-t bg-muted/20">
@@ -3208,6 +3373,125 @@ export default function OemIntegrationTab() {
         onOpenChange={(v) => { if (!v) setEscolhendo(null); }}
         onDecidido={recarregarRecon}
       />
+
+      {/* Confirmação do lote. Enquanto anda, o mesmo diálogo vira o progresso:
+          fechar no meio deixaria escrita acontecendo sem ninguém vendo. */}
+      <AlertDialog open={!!loteDestino} onOpenChange={(v) => { if (!v && !loteAndando) setLoteDestino(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {loteAndando
+                ? "Atualizando…"
+                : loteDestino === "oem"
+                  ? `Mandar ${selecao.size} cadastro${selecao.size > 1 ? "s" : ""} para o OEM?`
+                  : `Atualizar ${selecao.size} cadastro${selecao.size > 1 ? "s" : ""} no DoctorSaaS?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                {loteAndando ? (
+                  <>
+                    <p className="tabular-nums">
+                      <strong className="text-foreground">{loteFeitos}</strong> de {selecao.size}
+                    </p>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full bg-primary transition-all"
+                        style={{ width: `${Math.round((loteFeitos / Math.max(selecao.size, 1)) * 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs">
+                      Um de cada vez, de propósito. O que já foi está feito: parar agora não desfaz
+                      nada, só interrompe o resto.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    {/* Quantos de cada campo: com o filtro em "Todos os tipos" a
+                        mesma leva mistura nome e CNPJ, e o peso dos dois é bem
+                        diferente. */}
+                    <p>
+                      {(() => {
+                        const campos = [...selecao.values()];
+                        const nomes = campos.filter((c) => c === "nome").length;
+                        const cnpjs = campos.length - nomes;
+                        return (
+                          <>
+                            {nomes > 0 && <><strong>{nomes}</strong> de nome</>}
+                            {nomes > 0 && cnpjs > 0 && " e "}
+                            {cnpjs > 0 && <><strong>{cnpjs}</strong> de CNPJ</>}
+                            {loteDestino === "oem"
+                              ? " serão gravados na licença do parceiro."
+                              : " serão gravados na ficha do cliente."}
+                          </>
+                        );
+                      })()}
+                    </p>
+                    {loteDestino === "oem" ? (
+                      <p>
+                        Cada licença é uma <strong>gravação inteira</strong> no sistema do OEM, feita
+                        uma por vez — com esta quantidade, leva alguns minutos. Toda tentativa fica
+                        registrada, inclusive as recusadas.
+                      </p>
+                    ) : (
+                      <p>
+                        Cada cliente com <strong>contrato ativo</strong> entra na <strong>fila do
+                        Omie</strong> junto, pelo mesmo caminho de sempre.
+                      </p>
+                    )}
+                    <p className="text-xs">
+                      Se algum falhar, os outros seguem: no fim a tela diz quais não foram e por quê.
+                    </p>
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {loteAndando ? (
+              <Button variant="secondary" onClick={() => { pararLote.current = true; }}>
+                Parar
+              </Button>
+            ) : (
+              <>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={(e) => { e.preventDefault(); rodarLote(loteDestino!); }}>
+                  {loteDestino === "oem" ? "Mandar para o OEM" : "Atualizar no DoctorSaaS"}
+                </AlertDialogAction>
+              </>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* O resultado. Falha em lote sem lista de quem falhou obriga a conferir
+          92 clientes a olho para achar os 3 que não foram. */}
+      <Dialog open={!!loteResumo} onOpenChange={(v) => { if (!v) { setLoteResumo(null); setLoteFalhas([]); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {loteResumo?.ok} de {loteResumo?.total} atualizado{(loteResumo?.total ?? 0) > 1 ? "s" : ""}
+            </DialogTitle>
+            <DialogDescription>
+              {loteFalhas.length === 0
+                ? "Tudo certo. A lista se ajeita na próxima carga do espelho."
+                : `${loteFalhas.length} não ${loteFalhas.length > 1 ? "foram" : "foi"}. O motivo de cada um está abaixo.`}
+            </DialogDescription>
+          </DialogHeader>
+          {loteFalhas.length > 0 && (
+            <div className="max-h-72 divide-y overflow-y-auto rounded-md border">
+              {loteFalhas.map((f, i) => (
+                <div key={`${f.nome}:${i}`} className="p-3 text-sm">
+                  <p className="font-medium">{f.nome}</p>
+                  <p className="text-xs text-muted-foreground">{f.motivo}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => { setLoteResumo(null); setLoteFalhas([]); }}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!trazendo} onOpenChange={(v) => { if (!v && !trazendoAgora) setTrazendo(null); }}>
         <AlertDialogContent>

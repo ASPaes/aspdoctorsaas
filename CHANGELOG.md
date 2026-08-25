@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Agosto / 2026
 
+### 25/08
+
+- 🆕 **Integrações — OEM** — **Corrigir nome ou CNPJ de vários clientes de uma vez.** São **92 clientes** só com nome diferente, e até agora cada um era um clique de cada vez. Agora cada cliente tem uma **caixa de seleção**, e acima da lista existe **Selecionar todos desta lista** — "desta lista" no sentido literal: respeita o filtro de tipo e a busca, então com *Só o nome diferente* escolhido você marca exatamente esses 92. Com algo selecionado aparece o mesmo par de sempre, **Atualizar em → DoctorSaaS | OEM**, e a confirmação mostra quantos são de nome e quantos de CNPJ antes de começar. Durante a atualização a tela mostra **quantos já foram** e um botão **Parar** — o que já foi fica feito, parar só interrompe o resto. **Um que falha não derruba os outros:** ao terminar aparece *89 de 92 atualizados* com **a lista de quem não foi e o motivo**, em vez de deixar você procurar os três a olho. Trocar o tipo no filtro limpa a seleção, para nunca disparar um lote montado para outra coisa.
+
 ### 24/08
 
 - 🔧 **Notificações — o alerta de leitura do Omie parada só fala do que o sistema usa** — **O sino avisava que a leitura de *contas a receber* e de *ordens de serviço* do Omie tinha parado, e o DoctorSaaS não lê nem uma coisa nem outra.** Esses avisos vinham do sistema que conversa com o Omie, que lê quatro tipos de informação por conta própria; o alerta repassava os quatro sem distinguir. O efeito era o contrário do pretendido: um aviso de *contas a receber parada* ocupando o topo da lista, enquanto a leitura que realmente importava — a de **contratos**, parada havia mais de um dia numa das contas — ficava embaixo. Agora só geram alerta as duas leituras de que o DoctorSaaS depende, **clientes e contratos**. Os avisos que já chegaram continuam na lista até serem limpos.
