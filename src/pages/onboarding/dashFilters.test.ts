@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { filtrarJornadas, filtroAtivo, FILTRO_VAZIO, type JourneyFiltravel } from "./dashFilters";
+import {
+  filtrarJornadas, filtroAtivo, pipelineSelecionado, fasesDosPipelines,
+  FILTRO_VAZIO, type JourneyFiltravel,
+} from "./dashFilters";
 
 const jornadas: JourneyFiltravel[] = [
   { journey_id: "j1", responsavel_user_id: "u1", demand_type_id: "d1" },
@@ -53,5 +56,40 @@ describe("filtroAtivo", () => {
   });
   it("é verdadeiro com qualquer dimensão preenchida", () => {
     expect(filtroAtivo({ ...FILTRO_VAZIO, pipelineIds: ["p1"] })).toBe(true);
+  });
+});
+
+/* ---------- recorte por pipeline ---------- */
+
+describe("pipelineSelecionado", () => {
+  it("sem filtro, tudo passa", () => {
+    expect(pipelineSelecionado([], "p1")).toBe(true);
+    expect(pipelineSelecionado([], null)).toBe(true);
+  });
+
+  it("com filtro, só o pipeline escolhido passa", () => {
+    expect(pipelineSelecionado(["p1"], "p1")).toBe(true);
+    expect(pipelineSelecionado(["p1"], "p2")).toBe(false);
+  });
+
+  it("com filtro, passagem sem pipeline não passa", () => {
+    expect(pipelineSelecionado(["p1"], null)).toBe(false);
+  });
+});
+
+describe("fasesDosPipelines", () => {
+  const fasePorPipeline = { onbPDV: 1, onbGula: 1, impPDV: 2 };
+
+  it("sem filtro devolve null — quer dizer 'todas as fases'", () => {
+    expect(fasesDosPipelines([], fasePorPipeline)).toBeNull();
+  });
+
+  it("junta as fases dos pipelines escolhidos", () => {
+    expect([...fasesDosPipelines(["onbPDV", "onbGula"], fasePorPipeline)!]).toEqual([1]);
+    expect([...fasesDosPipelines(["onbPDV", "impPDV"], fasePorPipeline)!].sort()).toEqual([1, 2]);
+  });
+
+  it("pipeline desconhecido não inventa fase", () => {
+    expect([...fasesDosPipelines(["desconhecido"], fasePorPipeline)!]).toEqual([]);
   });
 });

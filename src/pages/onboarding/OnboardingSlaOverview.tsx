@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Clock, CheckCircle2, Pause, TrendingUp } from "lucide-react";
 import { agregarPorResponsavel, type LinhaAtribuicao } from "./dashMetrics";
+import { pipelineSelecionado } from "./dashFilters";
 import DrilldownSheet, { type LinhaDrilldown } from "./DrilldownSheet";
 import type { JourneyNomes } from "./useJourneyNames";
 import { formatMinUtil as formatMin, formatMinCal } from "./slaFormat";
@@ -223,7 +224,7 @@ function EmptyNote({ children }: { children: React.ReactNode }) {
 
 /* ---------- componente ---------- */
 
-export default function OnboardingSlaOverview({ journeys, tenantId, nomes }: { journeys: SlaJourneyRow[]; tenantId: string | null; nomes: JourneyNomes }) {
+export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipelineIds }: { journeys: SlaJourneyRow[]; tenantId: string | null; nomes: JourneyNomes; pipelineIds: string[] }) {
   const [areaDim, setAreaDim] = useState<"demanda" | "setor">("demanda");
   const [drill, setDrill] = useState<{ titulo: string; regra: string; linhas: LinhaDrilldown[]; unidade: "util" | "cal" } | null>(null);
 
@@ -325,6 +326,9 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes }: { j
       const out: { pipelineId: string; bruto: number; efetivo: number; target: number }[] = [];
       linhas.forEach((r) => {
         if (!r.pipeline_id) return;
+        // Recorte da fase: com pipeline filtrado, a passagem pela OUTRA fase da mesma
+        // jornada não entra. É o que separa "Onboarding PDV" de "Implantação PDV".
+        if (!pipelineSelecionado(pipelineIds, r.pipeline_id)) return;
         const target = pipeMap.get(r.pipeline_id)?.sla_total_minutos ?? null;
         if (!target || target <= 0) return;
         if ((r.sla_corrido_min ?? 0) <= 0) return;
@@ -333,7 +337,10 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes }: { j
       });
       return out;
     };
-  }, [pipeMap, phaseRowsByJourney]);
+  }, [pipeMap, phaseRowsByJourney, pipelineIds]);
+
+  /** Há pipeline escolhido? Então a tela inteira fala de UMA fase, não da jornada. */
+  const recorteDeFase = pipelineIds.length > 0;
 
   // KPIs "SLA Total"
   const total = useMemo(() => {
@@ -345,9 +352,18 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes }: { j
         if (phases.every((p) => p.bruto <= p.target)) okC++;
         if (phases.every((p) => p.efetivo <= p.target)) okE++;
       }
-      const cal = j.sla_total_corrido_min ?? 0;
-      const efe = j.sla_total_util_min ?? 0;
-      const par = j.sla_total_pausado_min ?? 0;
+      // `sla_total_*` é da JORNADA INTEIRA. Com pipeline filtrado isso responderia
+      // outra pergunta — o ciclo passa a sair das passagens da fase escolhida.
+      let cal: number, efe: number, par: number;
+      if (recorteDeFase) {
+        efe = phases.reduce((t, p) => t + p.efetivo, 0);
+        par = phases.reduce((t, p) => t + (p.bruto - p.efetivo), 0);
+        cal = phases.length ? efe + par : 0;
+      } else {
+        cal = j.sla_total_corrido_min ?? 0;
+        efe = j.sla_total_util_min ?? 0;
+        par = j.sla_total_pausado_min ?? 0;
+      }
       sumCal += cal;
       sumBruto += efe + par;
       sumParado += par;
@@ -368,7 +384,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes }: { j
       cicloCal: started ? cicloCal / started : 0,
       cicloE: started ? cicloE / started : 0,
     };
-  }, [journeys, journeyPhases]);
+  }, [journeys, journeyPhases, recorteDeFase]);
 
   // Por pipeline
   const pipelineAgg = useMemo(() => {
@@ -421,19 +437,19 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes }: { j
       if (phases.every((p) => p.bruto <= p.target)) cur.okC++;
       if (phases.every((p) => p.efetivo <= p.target)) cur.okE++;
       // mesma base das abas Total e Pipeline (antes esta aba usava corrido − pausado,
-      // uma grandeza diferente para o mesmo conceito de "efetivo")
-      cur.sumE += j.sla_total_util_min ?? 0;
-      cur.sumC += (j.sla_total_util_min ?? 0) + (j.sla_total_pausado_min ?? 0);
+      // uma grandeza diferente para o mesmo conceito de "efetivo").
+      // Com pipeline filtrado, `sla_total_*` seria da jornada inteira — soma as fases.
+      const efe = recorteDeFase ? phases.reduce((t, p) => t + p.efetivo, 0) : (j.sla_total_util_min ?? 0);
+      const bru = recorteDeFase
+        ? phases.reduce((t, p) => t + p.bruto, 0)
+        : (j.sla_total_util_min ?? 0) + (j.sla_total_pausado_min ?? 0);
+      cur.sumE += efe;
+      cur.sumC += bru;
       m.set(key, cur);
       // Alvo `null`: a área não tem SLA próprio — ele vive no pipeline. A coluna
       // "% SLA" fica "—" em vez de inventar um denominador.
       const arrA = porArea.get(key) ?? [];
-      arrA.push(linhaDrill(
-        j.journey_id!, nomes,
-        j.sla_total_util_min ?? null,
-        (j.sla_total_util_min ?? 0) + (j.sla_total_pausado_min ?? 0),
-        null,
-      ));
+      arrA.push(linhaDrill(j.journey_id!, nomes, efe, bru, null));
       porArea.set(key, arrA);
     });
     return Array.from(m.entries())
@@ -447,7 +463,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes }: { j
         linhas: porArea.get(key) ?? [],
       }))
       .sort((a, b) => b.count - a.count);
-  }, [journeys, journeyPhases, areaDim, nomes]);
+  }, [journeys, journeyPhases, areaDim, nomes, recorteDeFase]);
 
   /** Passagens por etapa já carimbadas com quem era responsável na ENTRADA da etapa. */
   const atribuicaoQ = useQuery({
@@ -461,11 +477,17 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes }: { j
       ),
   });
 
+  /** Alvo de cada etapa. Etapa fora do pipeline escolhido fica SEM alvo de propósito:
+   *  `agregarPorResponsavel` e a lista do drill-down já descartam etapa sem alvo, então
+   *  o recorte de fase entra nos dois de uma vez, por um caminho só. */
   const slaPorEtapa = useMemo(() => {
     const m: Record<string, number | null> = {};
-    (stagesQ.data ?? []).forEach((st: any) => { m[st.id] = st.sla_minutos; });
+    (stagesQ.data ?? []).forEach((st: any) => {
+      if (!pipelineSelecionado(pipelineIds, st.pipeline_id)) return;
+      m[st.id] = st.sla_minutos;
+    });
     return m;
-  }, [stagesQ.data]);
+  }, [stagesQ.data, pipelineIds]);
 
   const responsavelAgg = useMemo(() => {
     const allowed = new Set(journeys.map((j) => j.journey_id));
@@ -522,6 +544,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes }: { j
       if (!allowed.has(h.journey_id)) return;
       const st = stageMap.get(h.stage_id);
       if (!st || !st.sla_minutos || st.sla_minutos <= 0) return;
+      if (!pipelineSelecionado(pipelineIds, st.pipeline_id)) return;
       const c = h.duracao_minutos ?? 0; // calendário — informativo
       const e = h.duracao_util_minutos ?? 0; // expediente — é o que se compara com o SLA
       const cur = m.get(h.stage_id) ?? { count: 0, sumC: 0, sumE: 0 };
@@ -553,7 +576,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes }: { j
         };
       })
       .sort((a, b) => a.pipePos - b.pipePos || a.stagePos - b.stagePos);
-  }, [journeys, historyQ.data, trainingHistoryQ.data, stageMap, pipeMap, nomes]);
+  }, [journeys, historyQ.data, trainingHistoryQ.data, stageMap, pipeMap, nomes, pipelineIds]);
 
   return (
     <>

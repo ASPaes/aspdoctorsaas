@@ -249,6 +249,7 @@ export interface JourneyTempo {
   concluido_em: string | null;
   implantacao_iniciada_em?: string | null;
   implantacao_concluida_em?: string | null;
+  onboarding_concluido_em?: string | null;
 }
 
 export interface MediaTempo {
@@ -293,6 +294,17 @@ export function coorteImplantacao<T extends JourneyTempo>(journeys: T[], range: 
   return journeys.filter(
     (j) => j.situacao !== "cancelado" && !!j.implantacao_iniciada_em && dentroDaJanela(j.implantacao_concluida_em, range),
   );
+}
+
+/**
+ * Coorte de ONBOARDING: quem concluiu a fase de onboarding dentro da janela.
+ *
+ * Diferente das outras duas coortes num ponto: a jornada NÃO precisa estar concluída.
+ * Concluir o onboarding é o fim de uma fase, não da jornada — exigir `concluido_em`
+ * deixaria de fora justamente quem está na implantação agora.
+ */
+export function coorteOnboarding<T extends JourneyTempo>(journeys: T[], range: { from: Date; to: Date }): T[] {
+  return journeys.filter((j) => j.situacao !== "cancelado" && dentroDaJanela(j.onboarding_concluido_em, range));
 }
 
 /** Minutos corridos entre dois carimbos. `null` se faltar algum. */

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   pct, separarJornadas, contarSituacao, desfechoTreino, agregarTreinos,
-  agregarPorResponsavel, mediaTempo, coorteConcluidas, coorteImplantacao, minutosEntre,
+  agregarPorResponsavel, mediaTempo, coorteConcluidas, coorteImplantacao, coorteOnboarding, minutosEntre,
   type JourneyLite, type TreinoLite, type LinhaAtribuicao, type JourneyTempo,
 } from "./dashMetrics";
 
@@ -376,5 +376,26 @@ describe("minutosEntre", () => {
   it("devolve null se faltar um carimbo", () => {
     expect(minutosEntre(null, "2026-07-01T02:30:00Z")).toBeNull();
     expect(minutosEntre("2026-07-01T00:00:00Z", null)).toBeNull();
+  });
+});
+
+describe("coorteOnboarding", () => {
+  const JULHO_O = { from: new Date("2026-07-01T00:00:00"), to: new Date("2026-07-31T00:00:00") };
+  const jornadas: JourneyTempo[] = [
+    { journey_id: "o1", situacao: "em_andamento", aberta_em: "2026-06-25T12:00:00Z", concluido_em: null,
+      onboarding_concluido_em: "2026-07-03T12:00:00Z" },
+    { journey_id: "o2", situacao: "em_andamento", aberta_em: "2026-07-02T12:00:00Z", concluido_em: null,
+      onboarding_concluido_em: null },
+    { journey_id: "o3", situacao: "cancelado", aberta_em: "2026-07-02T12:00:00Z", concluido_em: null,
+      onboarding_concluido_em: "2026-07-05T12:00:00Z" },
+  ];
+
+  it("conta quem CONCLUIU o onboarding na janela, mesmo com a jornada ainda aberta", () => {
+    expect(coorteOnboarding(jornadas, JULHO_O).map((x) => x.journey_id)).toEqual(["o1"]);
+  });
+  it("exclui quem não concluiu o onboarding e quem foi cancelada", () => {
+    const ids = coorteOnboarding(jornadas, JULHO_O).map((x) => x.journey_id);
+    expect(ids).not.toContain("o2");
+    expect(ids).not.toContain("o3");
   });
 });

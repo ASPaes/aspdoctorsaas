@@ -45,6 +45,7 @@ interface JourneyRow {
   ticket_id: string | null;
   implantacao_iniciada_em: string | null;
   implantacao_concluida_em: string | null;
+  onboarding_concluido_em: string | null;
   setor_nome: string | null;
   sla_total_corrido_min: number | null;
   sla_total_pausado_min: number | null;
@@ -96,7 +97,7 @@ export default function OnboardingDashboardPage() {
     queryFn: async () => {
       const rows = await fetchAllRows<JourneyRow>(() => {
         let q = (supabase.from("vw_onboarding_journeys" as any) as any)
-          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, cliente_id, concluido_em, aberta_em, demand_type_nome, demand_type_id, responsavel_user_id, responsavel_nome, ticket_id, implantacao_iniciada_em, implantacao_concluida_em, setor_nome, sla_total_corrido_min, sla_total_pausado_min, sla_total_util_min")
+          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, cliente_id, concluido_em, aberta_em, demand_type_nome, demand_type_id, responsavel_user_id, responsavel_nome, ticket_id, implantacao_iniciada_em, implantacao_concluida_em, onboarding_concluido_em, setor_nome, sla_total_corrido_min, sla_total_pausado_min, sla_total_util_min")
           .eq("tenant_id", effectiveTenantId);
         if (selectedUnidadeIds.length > 0) q = q.in("cliente_unidade_id", selectedUnidadeIds);
         return q;
@@ -426,7 +427,7 @@ export default function OnboardingDashboardPage() {
           <SituacaoAgoraBand contagem={contagem} />
 
           {/* SLA — visão corrido vs. efetivo (total, pipeline, etapa, área) */}
-          <OnboardingSlaOverview journeys={periodo} tenantId={effectiveTenantId} nomes={nomes} />
+          <OnboardingSlaOverview journeys={periodo} tenantId={effectiveTenantId} nomes={nomes} pipelineIds={dashFilters.pipelineIds} />
 
           {/* Tempo de entrega. Usa `ativas`, não `periodo`: a coorte destes cards é a
               data de CONCLUSÃO, e `periodo` já recortou por sobreposição de abertura —
@@ -438,6 +439,8 @@ export default function OnboardingDashboardPage() {
             dateRange={dateRange}
             allowedJourneyIds={allowedJourneyIds}
             nomes={nomes}
+            pipelineIds={dashFilters.pipelineIds}
+            fasePorPipeline={dashFilters.fasePorPipeline}
           />
 
           {/* KPI Row 1b: PDV + previsto/realizado */}

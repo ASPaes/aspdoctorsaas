@@ -1,14 +1,19 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Flag, Rocket, MessageSquare } from "lucide-react";
+import { Flag, Rocket, MessageSquare, PlayCircle } from "lucide-react";
 import KpiCard from "./KpiCard";
 import { formatMinUtil, formatMinCal } from "./slaFormat";
 import DrilldownSheet, { type LinhaDrilldown } from "./DrilldownSheet";
 import {
-  coorteConcluidas, coorteImplantacao, mediaTempo, minutosEntre, pct,
+  coorteConcluidas, coorteImplantacao, coorteOnboarding, mediaTempo, minutosEntre, pct,
   type JourneyTempo,
 } from "./dashMetrics";
+import { fasesDosPipelines } from "./dashFilters";
+
+/** Posição da fase na régua do tenant. 1 = a primeira (Onboarding), 2 = a seguinte. */
+const FASE_ONBOARDING = 1;
+const FASE_IMPLANTACAO = 2;
 
 interface FirstContactRow {
   journey_id: string;
@@ -29,7 +34,7 @@ interface FirstContactRow {
  * de trabalho; o calendário vai junto no subtítulo.
  */
 export default function TempoDeEntregaSection({
-  journeys, tenantId, dateRange, allowedJourneyIds, nomes,
+  journeys, tenantId, dateRange, allowedJourneyIds, nomes, pipelineIds, fasePorPipeline,
 }: {
   journeys: JourneyTempo[];
   tenantId: string | null;
@@ -37,7 +42,21 @@ export default function TempoDeEntregaSection({
   allowedJourneyIds: Set<string>;
   /** Cliente e responsável por journey_id, para o drill-down. */
   nomes: { cliente: (id: string) => string; responsavel: (id: string) => string };
+  pipelineIds: string[];
+  /** pipeline_id → posição da fase que ele atende. */
+  fasePorPipeline: Record<string, number>;
 }) {
+  /**
+   * Cada cartão aqui é preso a uma fase: não existe "tempo de onboarding" dentro do
+   * pipeline de implantação. Com pipeline filtrado, o cartão de outra fase mostra "—"
+   * e diz por quê, em vez de repetir um número que não é daquele recorte.
+   *
+   * "Tempo total" atravessa as duas fases por natureza — some sob qualquer recorte.
+   */
+  const fases = fasesDosPipelines(pipelineIds, fasePorPipeline);
+  const vale = (fase: number) => fases === null || fases.has(fase);
+  const valeTotal = fases === null;
+  const motivoRecorte = "não se aplica ao pipeline filtrado";
   const [drill, setDrill] = useState<{ titulo: string; regra: string; linhas: LinhaDrilldown[]; unidade: "util" | "cal" } | null>(null);
 
   const linha = useCallback(
@@ -69,6 +88,12 @@ export default function TempoDeEntregaSection({
       n: c.length,
       linhas: c.map((j) => linha(j.journey_id, null, minutosEntre(j.aberta_em, j.concluido_em))),
     };
+  }, [journeys, dateRange, linha]);
+
+  const onboarding = useMemo(() => {
+    const c = coorteOnboarding(journeys, dateRange);
+    const min = (j: JourneyTempo) => minutosEntre(j.aberta_em, j.onboarding_concluido_em);
+    return { cal: mediaTempo(c.map(min)), n: c.length, linhas: c.map((j) => linha(j.journey_id, null, min(j))) };
   }, [journeys, dateRange, linha]);
 
   const implantacao = useMemo(() => {
@@ -103,30 +128,55 @@ export default function TempoDeEntregaSection({
   return (
     <section>
       <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-        Tempo de entrega · só jornadas que terminaram no período
+        Tempo de entrega · só o que terminou no período
       </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
           icon={Flag}
           label="Tempo total"
-          value={total.cal.media == null ? "—" : formatMinCal(total.cal.media)}
-          sub={`${total.n} ${total.n === 1 ? "jornada concluída" : "jornadas concluídas"} · abertura até conclusão`}
+          value={!valeTotal || total.cal.media == null ? "—" : formatMinCal(total.cal.media)}
+          sub={
+            !valeTotal
+              ? `atravessa as duas fases · ${motivoRecorte}`
+              : `${total.n} ${total.n === 1 ? "jornada concluída" : "jornadas concluídas"} · abertura até conclusão`
+          }
           tone="info"
-          subTone="muted"
-          onClick={total.n ? () => setDrill({
+          subTone={valeTotal ? "muted" : "warning"}
+          onClick={valeTotal && total.n ? () => setDrill({
             titulo: "Tempo total",
             regra: `Média de (conclusão − abertura) das ${total.n} jornadas concluídas no período. Jornada ainda aberta não entra.`,
             linhas: total.linhas, unidade: "cal",
           }) : undefined}
         />
         <KpiCard
+          icon={PlayCircle}
+          label="Tempo de onboarding"
+          value={!vale(FASE_ONBOARDING) || onboarding.cal.media == null ? "—" : formatMinCal(onboarding.cal.media)}
+          sub={
+            !vale(FASE_ONBOARDING)
+              ? motivoRecorte
+              : `${onboarding.n} ${onboarding.n === 1 ? "jornada" : "jornadas"} · abertura até o fim do onboarding`
+          }
+          tone="info"
+          subTone={vale(FASE_ONBOARDING) ? "muted" : "warning"}
+          onClick={vale(FASE_ONBOARDING) && onboarding.n ? () => setDrill({
+            titulo: "Tempo de onboarding",
+            regra: `Média de (fim do onboarding − abertura) das ${onboarding.n} jornadas que concluíram o onboarding no período. A jornada não precisa estar concluída: quem está na implantação agora já terminou esta fase.`,
+            linhas: onboarding.linhas, unidade: "cal",
+          }) : undefined}
+        />
+        <KpiCard
           icon={Rocket}
           label="Tempo de implantação"
-          value={implantacao.cal.media == null ? "—" : formatMinCal(implantacao.cal.media)}
-          sub={`${implantacao.n} ${implantacao.n === 1 ? "jornada" : "jornadas"} · amostra menor que o card ao lado`}
+          value={!vale(FASE_IMPLANTACAO) || implantacao.cal.media == null ? "—" : formatMinCal(implantacao.cal.media)}
+          sub={
+            !vale(FASE_IMPLANTACAO)
+              ? motivoRecorte
+              : `${implantacao.n} ${implantacao.n === 1 ? "jornada" : "jornadas"} · início ao fim da implantação`
+          }
           tone="info"
-          subTone="muted"
-          onClick={implantacao.n ? () => setDrill({
+          subTone={vale(FASE_IMPLANTACAO) ? "muted" : "warning"}
+          onClick={vale(FASE_IMPLANTACAO) && implantacao.n ? () => setDrill({
             titulo: "Tempo de implantação",
             regra: `Média de (implantação concluída − implantação iniciada) das ${implantacao.n} jornadas com os dois carimbos.`,
             linhas: implantacao.linhas, unidade: "cal",
@@ -135,22 +185,24 @@ export default function TempoDeEntregaSection({
         <KpiCard
           icon={MessageSquare}
           label="1º contato com o cliente"
-          value={contato.util.media == null ? "—" : formatMinUtil(contato.util.media)}
+          value={!vale(FASE_ONBOARDING) || contato.util.media == null ? "—" : formatMinUtil(contato.util.media)}
           sub={
-            contato.util.total === 0
+            !vale(FASE_ONBOARDING)
+              ? `o contato acontece no onboarding · ${motivoRecorte}`
+              : contato.util.total === 0
               ? "nenhuma jornada distribuída no período"
               : `${contato.util.n} de ${contato.util.total} com contato registrado · calendário ${contato.cal.media == null ? "—" : formatMinCal(contato.cal.media)}`
           }
-          tone={contato.util.media == null ? "default" : "success"}
-          subTone={contato.util.total > 0 && cobertura < 70 ? "warning" : "muted"}
-          onClick={contato.util.total ? () => setDrill({
+          tone={!vale(FASE_ONBOARDING) || contato.util.media == null ? "default" : "success"}
+          subTone={!vale(FASE_ONBOARDING) || (contato.util.total > 0 && cobertura < 70) ? "warning" : "muted"}
+          onClick={vale(FASE_ONBOARDING) && contato.util.total ? () => setDrill({
             titulo: "1º contato com o cliente",
             regra: `Média de (1ª mensagem do responsável ao cliente − distribuição) em horário útil. ${contato.util.n} de ${contato.util.total} jornadas distribuídas no período têm contato registrado; as outras ficam fora do numerador.`,
             linhas: contato.linhas, unidade: "util",
           }) : undefined}
         />
       </div>
-      {semContato > 0 && cobertura < 70 && (
+      {vale(FASE_ONBOARDING) && semContato > 0 && cobertura < 70 && (
         <p className="text-[11px] text-muted-foreground mt-2">
           {semContato} de {contato.util.total} jornadas não têm mensagem do responsável ao cliente no WhatsApp.
           A média fala só das {contato.util.n} que têm.

@@ -22,11 +22,11 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
     enabled: enabled && !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_pipelines" as any) as any)
-        .select("id, nome")
+        .select("id, nome, phase_id")
         .eq("tenant_id", tenantId!)
         .order("position");
       if (error) throw error;
-      return (data ?? []) as OpcaoFiltro[];
+      return (data ?? []) as Array<OpcaoFiltro & { phase_id: string | null }>;
     },
   });
 
@@ -48,17 +48,22 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
     queryKey: ["onb-dash-filtro-phases", tenantId],
     enabled: enabled && !!tenantId,
     queryFn: async () => {
-      const rows = await fetchAllRows<{ journey_id: string; pipeline_id: string | null }>(() =>
+      const rows = await fetchAllRows<{ journey_id: string; pipeline_id: string | null; phase_position: number | null }>(() =>
         (supabase.from("vw_onboarding_journey_phases" as any) as any)
-          .select("journey_id, pipeline_id")
+          .select("journey_id, pipeline_id, phase_position")
           .eq("tenant_id", tenantId!),
       );
-      const m: Record<string, string[]> = {};
+      const porJornada: Record<string, string[]> = {};
+      const posicoes = new Map<string, number>();
       rows.forEach((r) => {
         if (!r.pipeline_id) return;
-        (m[r.journey_id] ||= []).push(r.pipeline_id);
+        (porJornada[r.journey_id] ||= []).push(r.pipeline_id);
+        if (r.phase_position != null) posicoes.set(r.pipeline_id, r.phase_position);
       });
-      return m;
+      return {
+        porJornada,
+        posicoes: Array.from(posicoes.entries()).map(([pipeline_id, phase_position]) => ({ pipeline_id, phase_position })),
+      };
     },
   });
 
@@ -89,7 +94,18 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
     },
   });
 
-  const pipelinesPorJornada = useMemo(() => phasesQ.data ?? {}, [phasesQ.data]);
+  /** pipeline_id → posição da fase que ele atende, tirada da própria view de passagens.
+   *  Casar por NOME de fase não serve: cada tenant tem o seu conjunto e os nomes se
+   *  repetem entre eles (14 fases chamadas "Onboarding" no banco). */
+  const fasePorPipeline = useMemo(() => {
+    const m: Record<string, number> = {};
+    (phasesQ.data?.posicoes ?? []).forEach(({ pipeline_id, phase_position }) => {
+      if (pipeline_id && phase_position != null) m[pipeline_id] = phase_position;
+    });
+    return m;
+  }, [phasesQ.data]);
+
+  const pipelinesPorJornada = useMemo(() => phasesQ.data?.porJornada ?? {}, [phasesQ.data]);
   const participantesPorJornada = useMemo(() => participantsQ.data ?? {}, [participantsQ.data]);
 
   /** Pessoas: responsáveis das jornadas + participantes. Nome via profiles → funcionarios. */
@@ -146,5 +162,7 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
     ativo: filtroAtivo(filtro),
     opcoes,
     allowedByFilter,
+    pipelineIds: filtro.pipelineIds,
+    fasePorPipeline,
   };
 }
