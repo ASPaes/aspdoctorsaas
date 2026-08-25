@@ -376,7 +376,12 @@ export default function OemIntegrationTab() {
   // O cliente que está procurando a própria licença no OEM (a divergência
   // "Cliente sem licença"). Guarda id e nome porque o diálogo mostra o nome nos
   // dois lados da troca de vínculo.
-  const [procurandoLicenca, setProcurandoLicenca] = useState<{ id: string; nome: string } | null>(null);
+  // `soltar` só vem quando o cliente JÁ tem licença e ela é a errada: aí o
+  // diálogo troca em vez de só vincular, soltando a filial antiga antes de
+  // gravar a nova.
+  const [procurandoLicenca, setProcurandoLicenca] = useState<
+    { id: string; nome: string; soltar?: Recon | null } | null
+  >(null);
   // Ignorar é decisão silenciosa: some da lista e o alerta não volta enquanto o
   // dado for o mesmo. Por isso passa por confirmação, com o apontamento inteiro
   // na frente de quem decide — a mesma coisa que a dica do botão diz, só que
@@ -1237,7 +1242,7 @@ export default function OemIntegrationTab() {
         detalhe: <>filial {l.filial_codigo} · sai em{" "}
           <strong className="text-destructive">{dataBR(l.desativa_em!)}</strong> ·
           mensalidade {brl(Number(l.mensalidade_ds || 0))}. Ou o cancelamento foi feito só no
-          OEM, ou o cliente vai perder o sistema na data</>,
+          OEM, ou esta filial não é a dele, ou o cliente vai perder o sistema na data</>,
       });
     }
     // O código da licença gravado num produto que não é do parceiro. Grave: é
@@ -1471,6 +1476,22 @@ export default function OemIntegrationTab() {
             nome: i.linha?.razao_ds ?? i.linha?.razao_oem ?? "este cliente",
           })}>
           <Boxes className="h-3.5 w-3.5" /> Licenças OEM
+        </Button>
+      )}
+      {/* A terceira hipótese da baixa programada, e a única que se resolve
+          aqui dentro: a filial não é deste cliente. Ignorar cala um alerta que
+          está certo e Abrir ficha não deixa trocar de licença — quem via a
+          filial errada não tinha para onde ir. Troca, e não vínculo novo: a
+          filial que está saindo precisa sair do nome dele junto, senão o mesmo
+          alerta volta na lista logo depois de resolvido. */}
+      {i.tipo === "desativa_ativo" && i.linha && (
+        <Button size="sm" variant="secondary" className="gap-1.5"
+          onClick={() => setProcurandoLicenca({
+            id: clienteId,
+            nome: i.linha!.razao_ds ?? i.linha!.razao_oem ?? "este cliente",
+            soltar: i.linha!,
+          })}>
+          <Link2 className="h-3.5 w-3.5" /> Trocar licença
         </Button>
       )}
       {(i.tipo === "margem" || i.tipo === "sem_licenca" || i.tipo === "escolher_licenca"
@@ -1808,7 +1829,13 @@ export default function OemIntegrationTab() {
           title: data?.sem_mudanca ? `${campo} já estava igual no OEM` : `${campo} atualizado no OEM`,
           description: data?.sem_mudanca
             ? "O parceiro já estava com esse valor. Nada foi enviado."
-            : "A licença no OEM recebeu o valor da ficha. A divergência sai da lista na próxima carga do espelho.",
+            : trazendo.campo === "cnpj"
+              // Só o nome sai da lista na hora. No CNPJ o espelho guarda o
+              // documento do parceiro como CHAVE de match, e trocá-la com base
+              // no que mandamos (e não no que relemos) é apostar: quem confirma
+              // é a próxima carga.
+              ? "A licença no OEM recebeu o CNPJ da ficha. A divergência sai da lista na próxima carga do espelho."
+              : "A licença no OEM recebeu o nome da ficha.",
         });
         setTrazendo(null);
         await recarregarRecon();
