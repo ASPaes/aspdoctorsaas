@@ -7,7 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, Search, AlertTriangle } from "lucide-react";
+import { Check, Loader2, Search, AlertTriangle, Unlink } from "lucide-react";
 
 // ============================================================================
 // O CAMINHO INVERSO: escolher a LICENÇA de um cliente.
@@ -49,7 +49,11 @@ const TETO = 40;
 export default function EscolherLicencaOemDialog({
   cliente, licencas, aberto, onOpenChange, onDecidido,
 }: {
-  cliente: { id: string; nome: string } | null;
+  // `soltar` é o caso da TROCA: o cliente já tem uma licença vinculada e ela é
+  // a errada — foi por ela que a divergência apareceu. Sem isso a tela deixava
+  // vincular a certa e a errada continuava no nome dele, com o mesmo alerta na
+  // lista logo depois de alguém ter acabado de resolver.
+  cliente: { id: string; nome: string; soltar?: LicencaOem | null } | null;
   licencas: LicencaOem[];
   aberto: boolean;
   onOpenChange: (v: boolean) => void;
@@ -74,6 +78,12 @@ export default function EscolherLicencaOemDialog({
         || (l.razao_ds ?? "").toLowerCase().includes(termo);
     };
     const achadas = licencas.filter(casa).sort((a, b) => {
+      // A que está no cliente hoje vem antes de tudo: é com ela que a troca é
+      // comparada, e sem isso ela cairia no fim de 2.600 linhas — justamente a
+      // única que quem abriu a tela já conhece.
+      const sa = a.id === cliente?.soltar?.id ? 0 : 1;
+      const sb = b.id === cliente?.soltar?.id ? 0 : 1;
+      if (sa !== sb) return sa - sb;
       // Livre primeiro: é o caso sem efeito colateral. Depois as já vinculadas,
       // que exigem decisão.
       const da = a.ds_customer_id ? 1 : 0;
@@ -82,12 +92,23 @@ export default function EscolherLicencaOemDialog({
       return (a.razao_oem ?? "").localeCompare(b.razao_oem ?? "", "pt-BR");
     });
     return { achadas: achadas.slice(0, TETO), total: achadas.length };
-  }, [licencas, busca]);
+  }, [licencas, busca, cliente?.soltar?.id]);
 
   async function vincular(l: LicencaOem) {
     if (!cliente) return;
     setGravando(l.id);
     try {
+      // A ORDEM AQUI NÃO É ESCOLHA DE ESTILO. `desvincular_filial_oem` apaga o
+      // código do OEM da ficha do cliente; rodando depois do vínculo novo, ela
+      // apagaria justamente o código que acabou de ser gravado e o cliente
+      // ficaria sem licença nenhuma. Soltar primeiro, vincular depois.
+      const aSoltar = cliente.soltar;
+      if (aSoltar && aSoltar.id !== l.id) {
+        const { error } = await (supabase as any).rpc("desvincular_filial_oem", {
+          p_recon_id: aSoltar.id,
+        });
+        if (error) throw error;
+      }
       // A mesma RPC da fila de conciliação: ela já tira o código da ficha do
       // dono antigo antes de gravar no novo, então a troca não deixa dois
       // cadastros dizendo ser a mesma filial.
@@ -98,7 +119,9 @@ export default function EscolherLicencaOemDialog({
       if (error) throw error;
       toast({
         title: "Licença vinculada",
-        description: `Filial ${l.filial_codigo} agora é de ${cliente.nome}. A decisão sobrevive às próximas sincronizações.`,
+        description: aSoltar && aSoltar.id !== l.id
+          ? `Filial ${l.filial_codigo} agora é de ${cliente.nome}, e a filial ${aSoltar.filial_codigo} voltou para a fila sem dono.`
+          : `Filial ${l.filial_codigo} agora é de ${cliente.nome}. A decisão sobrevive às próximas sincronizações.`,
       });
       setTrocar(null);
       onDecidido();
@@ -110,14 +133,49 @@ export default function EscolherLicencaOemDialog({
     }
   }
 
+  // Soltar sem pôr nada no lugar. É o caso de quem descobre que a licença não é
+  // deste cliente e ainda não sabe de quem é: ela volta para a fila sem dono,
+  // onde a tela já sabe oferecer o cliente certo.
+  async function soltar(l: LicencaOem) {
+    setGravando(l.id);
+    try {
+      const { error } = await (supabase as any).rpc("desvincular_filial_oem", { p_recon_id: l.id });
+      if (error) throw error;
+      toast({
+        title: "Vínculo desfeito",
+        description: `A filial ${l.filial_codigo} voltou para a fila, sem cliente.`,
+      });
+      onDecidido();
+      onOpenChange(false);
+    } catch (e: any) {
+      toast({ title: "Não deu para soltar", description: e?.message ?? "Erro", variant: "destructive" });
+    } finally {
+      setGravando(null);
+    }
+  }
+
   return (
     <>
       <Dialog open={aberto} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Escolher a licença de {cliente?.nome ?? "—"}</DialogTitle>
+            <DialogTitle>
+              {cliente?.soltar ? "Trocar a licença de " : "Escolher a licença de "}
+              {cliente?.nome ?? "—"}
+            </DialogTitle>
             <DialogDescription asChild>
               <div className="space-y-2">
+                {cliente?.soltar && (
+                  <p className="flex items-start gap-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-amber-700 dark:text-amber-400">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>
+                      Hoje ele está na <strong>filial {cliente.soltar.filial_codigo}</strong>
+                      {cliente.soltar.razao_oem ? <> ({cliente.soltar.razao_oem})</> : null}. Escolher
+                      outra <strong>solta essa filial</strong>, que volta para a fila sem cliente, e
+                      grava a nova na ficha.
+                    </span>
+                  </p>
+                )}
                 <p>
                   Todas as <strong>licenças do OEM</strong> desta conta. Procure pelo nome da
                   loja, pelo CNPJ ou pelo número da filial e vincule a que é deste cliente.
@@ -150,8 +208,13 @@ export default function EscolherLicencaOemDialog({
               resultado.achadas.map((l) => {
                 const doOutro = !!l.ds_customer_id && l.ds_customer_id !== cliente?.id;
                 const jaDele = !!cliente && l.ds_customer_id === cliente.id;
+                // A que motivou a troca. Ela é "já é deste cliente" como as
+                // outras, mas é a única com saída própria: soltar sem escolher
+                // substituta, para quem não sabe qual é a certa.
+                const aTrocar = l.id === cliente?.soltar?.id;
                 return (
-                  <div key={l.id} className="flex items-center gap-3 p-3 text-sm">
+                  <div key={l.id}
+                    className={`flex items-center gap-3 p-3 text-sm ${aTrocar ? "bg-amber-500/5" : ""}`}>
                     <div className="min-w-0 flex-1">
                       <p className="font-medium truncate">
                         {l.razao_oem || "(sem nome no OEM)"}
@@ -169,7 +232,20 @@ export default function EscolherLicencaOemDialog({
                         </p>
                       )}
                     </div>
-                    {jaDele ? (
+                    {aTrocar ? (
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-400">
+                          vinculada hoje
+                        </Badge>
+                        <Button size="sm" variant="ghost" className="gap-1.5"
+                          disabled={!!gravando} onClick={() => soltar(l)}>
+                          {gravando === l.id
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <Unlink className="h-3.5 w-3.5" />}
+                          Só soltar
+                        </Button>
+                      </div>
+                    ) : jaDele ? (
                       <Badge variant="outline" className="shrink-0">já é deste cliente</Badge>
                     ) : (
                       <Button
