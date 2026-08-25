@@ -15,13 +15,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import OemFilaSincronizacaoPanel from "./OemFilaSincronizacaoPanel";
 import EscolherLicencaOemDialog from "./EscolherLicencaOemDialog";
 import { useAbaNaUrl } from "@/hooks/useDeepLinkIntegracao";
 import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
   Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
-  ArrowUpDown, ArrowUp, ArrowDown, Boxes, Plus, CalendarClock,
+  ArrowUpDown, ArrowUp, ArrowDown, Boxes, Plus, CalendarClock, ArrowDownToLine,
 } from "lucide-react";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
@@ -310,6 +314,11 @@ export default function OemIntegrationTab() {
   const [salvando, setSalvando] = useState(false);
   const [escolhendo, setEscolhendo] = useState<LinhaRecon | null>(null);
   const [desfazendo, setDesfazendo] = useState<string | null>(null);
+  // Qual divergência de cadastro está esperando confirmação para receber o
+  // valor do parceiro. Fica com os irmãos, e não junto da função lá embaixo:
+  // quem lê acoesDaDivergencia precisa achar o estado antes dela.
+  const [trazendo, setTrazendo] = useState<{ linha: Recon; campo: "nome" | "cnpj" } | null>(null);
+  const [trazendoAgora, setTrazendoAgora] = useState(false);
   const [ignorandoChave, setIgnorandoChave] = useState<string | null>(null);
   // O cliente que está procurando a própria licença no OEM (a divergência
   // "Cliente sem licença"). Guarda id e nome porque o diálogo mostra o nome nos
@@ -1315,8 +1324,20 @@ export default function OemIntegrationTab() {
           Remover vínculo
         </Button>
       )}
+      {/* A saída que faltava. As outras três partem do princípio de que o
+          VÍNCULO está errado; esta é para quando ele está certo e quem está
+          desatualizado é o cadastro daqui. Vem primeiro porque, quando é o
+          caso, é o clique óbvio.
+
+          Só existe no sentido OEM -> DS. O contrário depende de escrever a
+          filial inteira no parceiro, com três códigos que nenhuma leitura
+          devolve: é trabalho no DoctorOEM, não um botão a mais aqui. */}
       {(i.tipo === "cnpj" || i.tipo === "nome") && i.linha && (
         <>
+          <Button size="sm" variant="secondary" className="gap-1.5"
+            onClick={() => setTrazendo({ linha: i.linha!, campo: i.tipo === "cnpj" ? "cnpj" : "nome" })}>
+            <ArrowDownToLine className="h-3.5 w-3.5" /> Atualizar no DoctorSaaS
+          </Button>
           <Button size="sm" variant="secondary" className="gap-1.5"
             onClick={() => setEscolhendo(i.linha!)}>
             <Link2 className="h-3.5 w-3.5" /> Trocar cliente
@@ -1647,6 +1668,42 @@ export default function OemIntegrationTab() {
       toast({ title: "Não deu para remover", description: e?.message ?? String(e), variant: "destructive" });
     } finally {
       setDesfazendo(null);
+    }
+  }
+
+  // Traz para a ficha o valor que o parceiro tem. Confirmação obrigatória: a
+  // escrita não para no DoctorSaaS — cliente com contrato ativo e Omie ligado
+  // tem o cadastro enfileirado para lá no mesmo movimento, pelo gatilho de
+  // sempre. Quem clica precisa ler isso ANTES, não descobrir na fila do Omie.
+  async function trazerCadastroDoOem() {
+    if (!trazendo) return;
+    setTrazendoAgora(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("oem_trazer_cadastro_do_parceiro", {
+        p_recon_id: trazendo.linha.id,
+        p_campo: trazendo.campo,
+      });
+      if (error) throw error;
+      const campo = trazendo.campo === "cnpj" ? "CNPJ" : "Nome";
+      toast({
+        title: data?.sem_mudanca ? `${campo} já estava igual` : `${campo} atualizado na ficha`,
+        description: data?.sem_mudanca
+          ? "Nada foi gravado. A divergência sai da lista na próxima atualização do espelho."
+          : "A ficha do cliente já está com o valor do OEM. Se ele tem contrato ativo, a mudança também foi para a fila do Omie.",
+      });
+      setTrazendo(null);
+      await recarregarRecon();
+    } catch (e: any) {
+      // A recusa da guarda de CNPJ chega por aqui, com o nome do cliente que já
+      // tem aquele documento. É a mensagem mais útil da tela: ela diz o que
+      // fazer em vez de só negar.
+      toast({
+        title: "Não deu para atualizar",
+        description: e?.message ?? String(e),
+        variant: "destructive",
+      });
+    } finally {
+      setTrazendoAgora(false);
     }
   }
 
@@ -2915,6 +2972,56 @@ export default function OemIntegrationTab() {
         onOpenChange={(v) => { if (!v) setEscolhendo(null); }}
         onDecidido={recarregarRecon}
       />
+
+      <AlertDialog open={!!trazendo} onOpenChange={(v) => { if (!v && !trazendoAgora) setTrazendo(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {trazendo?.campo === "cnpj" ? "Usar o CNPJ do OEM nesta ficha?" : "Usar o nome do OEM nesta ficha?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="rounded-md border p-3 text-sm">
+                  <p className="text-muted-foreground text-xs">Está na ficha hoje</p>
+                  <p className="font-medium">
+                    {trazendo?.campo === "cnpj"
+                      ? (trazendo?.linha.cnpj_ds ? doc(trazendo.linha.cnpj_ds) : "— sem CNPJ —")
+                      : (trazendo?.linha.razao_ds ?? "— sem nome —")}
+                  </p>
+                  <p className="mt-2 text-muted-foreground text-xs">Passa a ser (valor do OEM)</p>
+                  <p className="font-medium text-sky-600 dark:text-sky-400">
+                    {trazendo?.campo === "cnpj"
+                      ? (trazendo?.linha.cnpj_norm ? doc(trazendo.linha.cnpj_norm) : "—")
+                      : (trazendo?.linha.razao_oem ?? "—")}
+                  </p>
+                </div>
+                <p>
+                  Isto muda o <strong>cadastro do cliente</strong>, não só esta tela. Se ele tiver{" "}
+                  <strong>contrato ativo</strong> e o Omie estiver ligado, a alteração entra na{" "}
+                  <strong>fila do Omie</strong> no mesmo movimento.
+                </p>
+                {trazendo?.campo === "cnpj" && (
+                  <p>
+                    Só faça isso se a licença for mesmo deste cliente. Quando o CNPJ difere porque a
+                    licença é <strong>de outro cliente</strong>, o caminho é <strong>Trocar cliente</strong>.
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={trazendoAgora}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); trazerCadastroDoOem(); }}
+              disabled={trazendoAgora}
+            >
+              {trazendoAgora
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Atualizando…</>
+                : "Atualizar na ficha"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <VincularProdutoOemDialog
         produtoOem={vinculandoProduto}
