@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   pct, separarJornadas, contarSituacao, desfechoTreino, agregarTreinos,
-  type JourneyLite, type TreinoLite,
+  agregarPorResponsavel,
+  type JourneyLite, type TreinoLite, type LinhaAtribuicao,
 } from "./dashMetrics";
 
 /** Espelha a Digi Office em 02/08/2026: 22 em andamento, 15 não iniciadas, 8 canceladas, 4 concluídas. */
@@ -274,5 +275,45 @@ describe("agregarTreinos", () => {
     expect(a.validos).toBe(0);
     expect(a.noShowRate).toBe(0);
     expect(a.propPct).toBeNull();
+  });
+});
+
+/* ---------- atribuição de etapa por responsável ---------- */
+
+describe("agregarPorResponsavel", () => {
+  const slaPorEtapa: Record<string, number | null> = { s1: 480, s2: 240 }; // 1 dia útil e meio dia útil
+
+  const linhas: LinhaAtribuicao[] = [
+    { journey_id: "j1", stage_id: "s1", responsavel_user_id: "u1", duracao_util_minutos: 300, duracao_minutos: 1400 },
+    { journey_id: "j2", stage_id: "s1", responsavel_user_id: "u1", duracao_util_minutos: 600, duracao_minutos: 2000 },
+    { journey_id: "j3", stage_id: "s2", responsavel_user_id: "u2", duracao_util_minutos: 120, duracao_minutos: 300 },
+    { journey_id: "j4", stage_id: "sem_sla", responsavel_user_id: "u2", duracao_util_minutos: 999, duracao_minutos: 999 },
+    { journey_id: "j5", stage_id: "s2", responsavel_user_id: null, duracao_util_minutos: 60, duracao_minutos: 90 },
+  ];
+
+  it("ignora etapa sem SLA cadastrado", () => {
+    const u2 = agregarPorResponsavel(linhas, slaPorEtapa).find((r) => r.userId === "u2")!;
+    expect(u2.count).toBe(1);
+    expect(u2.sumUtil).toBe(120);
+  });
+
+  it("conta no prazo por etapa, não por responsável", () => {
+    const u1 = agregarPorResponsavel(linhas, slaPorEtapa).find((r) => r.userId === "u1")!;
+    expect(u1.count).toBe(2);
+    expect(u1.dentroDoSla).toBe(1); // 300 <= 480 passa, 600 > 480 estoura
+    expect(u1.pctNoPrazo).toBe(50);
+  });
+
+  it("mantém quem não tem responsável como grupo próprio", () => {
+    const semDono = agregarPorResponsavel(linhas, slaPorEtapa).find((r) => r.userId === null)!;
+    expect(semDono.count).toBe(1);
+  });
+
+  it("ordena do maior volume para o menor", () => {
+    expect(agregarPorResponsavel(linhas, slaPorEtapa)[0].userId).toBe("u1");
+  });
+
+  it("devolve vazio sem linhas", () => {
+    expect(agregarPorResponsavel([], slaPorEtapa)).toEqual([]);
   });
 });

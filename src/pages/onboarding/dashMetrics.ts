@@ -190,3 +190,52 @@ export function agregarTreinos(treinos: TreinoLite[]): AgregadoTreinos {
     pdvFinalizados,
   };
 }
+
+/* ---------- atribuição de etapa por responsável ---------- */
+
+/** Uma passagem por etapa, já com o dono que ela teve na época. */
+export interface LinhaAtribuicao {
+  journey_id: string;
+  stage_id: string;
+  responsavel_user_id: string | null;
+  duracao_util_minutos: number | null;
+  duracao_minutos: number | null;
+}
+
+export interface ResponsavelAgg {
+  userId: string | null;
+  count: number;
+  sumUtil: number;
+  sumCal: number;
+  dentroDoSla: number;
+  pctNoPrazo: number;
+}
+
+/**
+ * Agrega passagens de etapa por responsável.
+ *
+ * "No prazo" é avaliado ETAPA A ETAPA contra o SLA daquela etapa — não contra um
+ * alvo do responsável, que não existe. Etapa sem SLA cadastrado fica de fora: sem
+ * alvo, "no prazo" não quer dizer nada e ela só inflaria o denominador.
+ * A comparação é em minutos ÚTEIS, a mesma base do cadastro de SLA.
+ */
+export function agregarPorResponsavel(
+  linhas: LinhaAtribuicao[],
+  slaPorEtapa: Record<string, number | null>,
+): ResponsavelAgg[] {
+  const m = new Map<string | null, { count: number; sumUtil: number; sumCal: number; dentroDoSla: number }>();
+  linhas.forEach((l) => {
+    const alvo = slaPorEtapa[l.stage_id];
+    if (!alvo || alvo <= 0) return;
+    const util = l.duracao_util_minutos ?? 0;
+    const cur = m.get(l.responsavel_user_id) ?? { count: 0, sumUtil: 0, sumCal: 0, dentroDoSla: 0 };
+    cur.count += 1;
+    cur.sumUtil += util;
+    cur.sumCal += l.duracao_minutos ?? 0;
+    if (util <= alvo) cur.dentroDoSla += 1;
+    m.set(l.responsavel_user_id, cur);
+  });
+  return Array.from(m.entries())
+    .map(([userId, v]) => ({ userId, ...v, pctNoPrazo: pct(v.dentroDoSla, v.count) }))
+    .sort((a, b) => b.count - a.count);
+}
