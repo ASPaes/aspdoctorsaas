@@ -29,6 +29,16 @@ export interface ContagemSituacao {
   concluidas: number;
   canceladas: number;
   pctCanceladas: number;
+  /** Canceladas sem data de cancelamento — ficam fora de qualquer janela. */
+  canceladasSemData: number;
+}
+
+export interface SituacaoLite {
+  situacao: string | null;
+  /** Opcionais porque sem `range` a contagem não olha data nenhuma. */
+  concluido_em?: string | null;
+  /** Vem do evento `onboarding_cancelado` do ticket: a tabela não guarda esse carimbo. */
+  cancelado_em?: string | null;
 }
 
 export function pct(num: number, den: number): number {
@@ -70,24 +80,43 @@ export function separarJornadas<T extends JourneyLite>(
   return { ativas, periodo };
 }
 
-/** Só depende de `situacao` — não exige a jornada inteira. */
-export function contarSituacao(journeys: Array<{ situacao: string | null }>): ContagemSituacao {
-  let naoIniciadas = 0, emAndamento = 0, paradas = 0, concluidas = 0, canceladas = 0;
+/**
+ * Contagem da faixa de situação. As duas metades respondem perguntas diferentes e
+ * por isso obedecem a regras diferentes:
+ *
+ *  - **Em aberto** é foto do AGORA — quanto está na mão da equipe hoje. Ignora a
+ *    janela de propósito: jornada aberta em maio e ainda rodando continua na mão.
+ *  - **Concluídas e canceladas** são DESFECHOS, e desfecho tem data. Sem janela elas
+ *    viravam total desde que o módulo existe, que nunca mudava ao trocar o período —
+ *    foi a queixa do cliente em 25/08.
+ *
+ * Sem `range`, conta tudo (a foto de sempre).
+ */
+export function contarSituacao(journeys: SituacaoLite[], range?: { from: Date; to: Date }): ContagemSituacao {
+  let naoIniciadas = 0, emAndamento = 0, paradas = 0, concluidas = 0, canceladas = 0, canceladasSemData = 0;
   journeys.forEach((j) => {
     switch (j.situacao) {
       case "nao_iniciado": naoIniciadas++; break;
       case "em_andamento": emAndamento++; break;
       case "parado": paradas++; break;
-      case "concluido": concluidas++; break;
-      case "cancelado": canceladas++; break;
+      case "concluido":
+        if (!range || dentroDaJanela(j.concluido_em, range)) concluidas++;
+        break;
+      case "cancelado":
+        if (!j.cancelado_em) canceladasSemData++;
+        if (!range || dentroDaJanela(j.cancelado_em, range)) canceladas++;
+        break;
       default: break; // situação desconhecida não vira "aberta" por omissão
     }
   });
-  const total = journeys.length;
+  const emAberto = naoIniciadas + emAndamento + paradas;
+  // O total é a base desta faixa — abertas mais os desfechos da janela. Usar
+  // `journeys.length` faria o "% das N" falar de uma população que a faixa não mostra.
+  const total = emAberto + concluidas + canceladas;
   return {
     total,
-    emAberto: naoIniciadas + emAndamento + paradas,
-    naoIniciadas, emAndamento, paradas, concluidas, canceladas,
+    emAberto,
+    naoIniciadas, emAndamento, paradas, concluidas, canceladas, canceladasSemData,
     pctCanceladas: pct(canceladas, total),
   };
 }

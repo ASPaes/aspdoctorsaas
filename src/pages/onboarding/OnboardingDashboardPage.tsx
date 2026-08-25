@@ -151,6 +151,29 @@ export default function OnboardingDashboardPage() {
     },
   });
 
+  /** Quando a jornada foi cancelada. `onboarding_journeys` NÃO guarda esse carimbo —
+   *  a única fonte é o evento do ticket. Conferido em 25/08: 22 de 22 canceladas têm
+   *  o evento, então a cobertura é total; ainda assim o card conta à parte as que
+   *  vierem sem data, para não sumir com jornada em silêncio. */
+  const canceladasEmQ = useQuery({
+    queryKey: ["onboarding-dash-cancelado-em", effectiveTenantId],
+    enabled: canAccess && !!effectiveTenantId,
+    queryFn: async () => {
+      const rows = await fetchAllRows<{ ticket_id: string; created_at: string }>(() =>
+        (supabase.from("support_ticket_events" as any) as any)
+          .select("ticket_id, created_at")
+          .eq("tenant_id", effectiveTenantId)
+          .eq("event_type", "onboarding_cancelado"),
+      );
+      const m: Record<string, string> = {};
+      rows.forEach((r) => {
+        // Reabertura + novo cancelamento: vale o mais recente.
+        if (!m[r.ticket_id] || r.created_at > m[r.ticket_id]) m[r.ticket_id] = r.created_at;
+      });
+      return m;
+    },
+  });
+
   const journeys = useMemo(() => journeysQ.data ?? [], [journeysQ.data]);
 
   const dashFilters = useOnboardingDashFilters(journeys, effectiveTenantId, canAccess);
@@ -171,7 +194,17 @@ export default function OnboardingDashboardPage() {
     [journeysFiltradas, dateRange],
   );
 
-  const contagem = useMemo(() => contarSituacao(journeysFiltradas), [journeysFiltradas]);
+  const contagem = useMemo(() => {
+    const canceladasEm = canceladasEmQ.data ?? {};
+    return contarSituacao(
+      journeysFiltradas.map((j) => ({
+        situacao: j.situacao,
+        concluido_em: j.concluido_em,
+        cancelado_em: j.ticket_id ? (canceladasEm[j.ticket_id] ?? null) : null,
+      })),
+      dateRange,
+    );
+  }, [journeysFiltradas, canceladasEmQ.data, dateRange]);
 
   /** Allowlist de treinos/pausas/retornos: SEM canceladas, mas SEM recorte por
    *  abertura — esses três já filtram pela data do próprio evento. Usar `periodo`

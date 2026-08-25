@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   pct, separarJornadas, contarSituacao, desfechoTreino, agregarTreinos,
   agregarPorResponsavel, mediaTempo, coorteConcluidas, coorteImplantacao, coorteOnboarding, minutosEntre,
-  type JourneyLite, type TreinoLite, type LinhaAtribuicao, type JourneyTempo,
+  type JourneyLite, type TreinoLite, type LinhaAtribuicao, type JourneyTempo, type SituacaoLite,
 } from "./dashMetrics";
 
 /** Espelha a Digi Office em 02/08/2026: 22 em andamento, 15 não iniciadas, 8 canceladas, 4 concluídas. */
@@ -106,8 +106,18 @@ describe("contarSituacao", () => {
 
   it("ignora situação desconhecida em vez de contar como aberta", () => {
     const c = contarSituacao([j("situacao_nova_do_futuro", "2026-07-01T12:00:00Z")]);
-    expect(c.total).toBe(1);
     expect(c.emAberto).toBe(0);
+    expect(c.concluidas).toBe(0);
+    expect(c.canceladas).toBe(0);
+  });
+
+  /** `total` é a base DESTA FAIXA (abertas + desfechos contados), não o tamanho da
+   *  lista. Mudou em 25/08 junto com o recorte por período: com janela, o "% das N"
+   *  precisa falar da população que a faixa mostra, senão compara canceladas do mês
+   *  com a base inteira desde sempre. */
+  it("total é a base da faixa, não o tamanho da lista", () => {
+    const c = contarSituacao([j("situacao_nova_do_futuro", "2026-07-01T12:00:00Z")]);
+    expect(c.total).toBe(0);
   });
 });
 
@@ -397,5 +407,52 @@ describe("coorteOnboarding", () => {
     const ids = coorteOnboarding(jornadas, JULHO_O).map((x) => x.journey_id);
     expect(ids).not.toContain("o2");
     expect(ids).not.toContain("o3");
+  });
+});
+
+/* ---------- situação: em aberto é foto de agora, desfecho é do período ---------- */
+
+describe("contarSituacao com janela", () => {
+  const JAN = { from: new Date("2026-07-01T00:00:00"), to: new Date("2026-07-31T00:00:00") };
+
+  const base: SituacaoLite[] = [
+    { situacao: "em_andamento", concluido_em: null, cancelado_em: null },
+    { situacao: "nao_iniciado", concluido_em: null, cancelado_em: null },
+    { situacao: "parado", concluido_em: null, cancelado_em: null },
+    // concluídas: uma dentro da janela, uma fora
+    { situacao: "concluido", concluido_em: "2026-07-10T12:00:00Z", cancelado_em: null },
+    { situacao: "concluido", concluido_em: "2026-08-10T12:00:00Z", cancelado_em: null },
+    // canceladas: uma dentro, uma fora, uma sem data
+    { situacao: "cancelado", concluido_em: null, cancelado_em: "2026-07-15T12:00:00Z" },
+    { situacao: "cancelado", concluido_em: null, cancelado_em: "2026-06-15T12:00:00Z" },
+    { situacao: "cancelado", concluido_em: null, cancelado_em: null },
+  ];
+
+  it("em aberto ignora a janela — é o que está na mão agora", () => {
+    expect(contarSituacao(base, JAN).emAberto).toBe(3);
+  });
+
+  it("concluídas contam só as que terminaram na janela", () => {
+    expect(contarSituacao(base, JAN).concluidas).toBe(1);
+  });
+
+  it("canceladas contam só as canceladas na janela", () => {
+    expect(contarSituacao(base, JAN).canceladas).toBe(1);
+  });
+
+  it("cancelada sem data não entra em janela nenhuma, e é contada à parte", () => {
+    const c = contarSituacao(base, JAN);
+    expect(c.canceladasSemData).toBe(1);
+  });
+
+  it("o total do rodapé é em aberto + desfechos da janela, não a base inteira", () => {
+    expect(contarSituacao(base, JAN).total).toBe(5); // 3 abertas + 1 concluída + 1 cancelada
+  });
+
+  it("sem janela, conta tudo — é a foto de sempre", () => {
+    const c = contarSituacao(base);
+    expect(c.concluidas).toBe(2);
+    expect(c.canceladas).toBe(3);
+    expect(c.total).toBe(8);
   });
 });

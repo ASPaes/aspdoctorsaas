@@ -61,9 +61,14 @@ describe("SituacaoAgoraBand", () => {
     expect(container.textContent).toContain("16,3% das 49");
   });
 
-  it("avisa na tela que a faixa ignora o período", () => {
+  /** Contrato mudou em 25/08: a faixa deixou de ignorar o período por inteiro. Só o
+   *  cartão de "em aberto" continua sendo foto do agora, e é ELE que precisa dizer
+   *  isso — os outros dois passaram a contar desfecho dentro da janela. */
+  it("só o cartão de em aberto avisa que não segue o período", () => {
     render(digiOffice);
-    expect(container.textContent).toContain("ignora o período");
+    expect(container.textContent).toContain("hoje, não do período");
+    expect(container.textContent).toContain("concluídas no período");
+    expect(container.textContent).toContain("canceladas no período");
   });
 
   it("só cita 'paradas' quando existe alguma", () => {
