@@ -22,6 +22,16 @@ vi.mock("@/contexts/TenantFilterContext", () => ({
   useTenantFilter: () => ({ effectiveTenantId: "tenant-1" }),
 }));
 
+// O hook assina um canal por operador (atendimento meu / fila do meu setor) —
+// ver useWhatsAppConversations.transferencia.test.tsx. Aqui só precisam existir.
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({ user: { id: "operador-1" } }),
+}));
+
+vi.mock("@/hooks/useUserDepartment", () => ({
+  useUserDepartment: () => ({ data: "setor-1" }),
+}));
+
 // O canal Realtime tem teste próprio (realtimeChannelPool.test.ts). Aqui o
 // `configure` sai do caminho de propósito — nenhum handler de postgres_changes
 // roda. O que fica é o `onStatus`, capturado para que o teste consiga simular

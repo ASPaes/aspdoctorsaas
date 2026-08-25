@@ -232,6 +232,22 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         .maybeSingle();
       if (error || !notif) return;
 
+      // Chat que mudou de dono: recarrega a LISTA de conversas, não só o sino.
+      // Este é o segundo caminho — independente do canal Realtime do tenant, que
+      // é o que o Chat usa e o que falhou nas transferências medidas em 25/08.
+      // Aqui o evento chega por `notification_recipients` filtrado por user_id,
+      // a assinatura mais estreita que existe no app e a que se manteve de pé.
+      //
+      // Fica ANTES de qualquer return abaixo de propósito: master_enabled,
+      // silent_mode e "a conversa já está aberta" decidem SOM e TOAST — não o
+      // que a lista mostra. Quem recebeu o chat precisa dele na tela mesmo com
+      // as notificações desligadas.
+      if ((notif as any).type === "chat_assignment") {
+        queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+        queryClient.invalidateQueries({ queryKey: ["whatsapp", "pill-counts"] });
+        queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+      }
+
       const s = settingsRef.current;
       if (!s.master_enabled) return;
 

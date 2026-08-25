@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { subscribeSharedChannel } from '@/lib/realtimeChannelPool';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserDepartment } from '@/hooks/useUserDepartment';
 
 
 export interface ConversationWithContact {
@@ -116,6 +118,9 @@ const DEFAULT_PAGE_SIZE = 50;
 export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { user } = useAuth();
+  const uid = user?.id ?? null;
+  const { data: meuSetorId } = useUserDepartment();
   const pageSize = filters?.pageSize ?? DEFAULT_PAGE_SIZE;
 
   const {
@@ -366,6 +371,64 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       });
     }, onChannelStatus);
   }, [queryClient, tid, onChannelStatus]);
+
+  // ---------------------------------------------------------------------------
+  // Canal do OPERADOR — o chat transferido tem que estar na tela dele
+  // ---------------------------------------------------------------------------
+  //
+  // O canal acima é do TENANT INTEIRO, e é o único aviso que a lista tinha de
+  // que um chat mudou de dono. Quando ele falha, a lista só se conserta no
+  // refetchInterval de 60s — que NÃO corre com a aba em segundo plano. Foi o
+  // caso medido em 25/08: transferência às 09:07:42 e o cartão só apareceu
+  // quando o cliente escreveu, 32 min depois. Em três transferências do mesmo
+  // dia com o destinatário logado (11:47:18, 11:58:00, 12:17:42) nenhuma
+  // produziu busca dentro dos 2s do canal do tenant — todas esperaram a batida
+  // do poll. E naquele momento 4 dos 39 operadores com o Chat aberto nem tinham
+  // o canal do tenant registrado no servidor (realtime.subscription).
+  //
+  // Este canal é estreito de propósito: assina só o que é MEU (o atendimento
+  // atribuído a mim) e o que é do MEU SETOR (a fila). É a mesma forma da
+  // assinatura do sino (`notification_recipients` por user_id), que é a que
+  // sobrevive hoje. Um caminho não cobre o outro — são independentes.
+  //
+  // O setor entra no NOME do topic porque `subscribeSharedChannel` roda o
+  // `configure` uma vez só, no primeiro assinante: se o setor chegasse depois
+  // (a query é assíncrona) o `.on` dele nunca seria registrado no canal já
+  // montado. Topic novo = canal novo com os dois handlers.
+  useEffect(() => {
+    if (!tid || !uid) return;
+    const topic = `minhas-atribuicoes-${uid}-${meuSetorId ?? 'sem-setor'}`;
+    return subscribeSharedChannel(topic, (channel) => {
+      // Coalescing de 1s: a transferência escreve conversa e atendimento na
+      // mesma transação, então os dois handlers podem cair juntos.
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const recarregar = () => {
+        if (timer) return;
+        timer = setTimeout(() => {
+          timer = null;
+          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'pill-counts'] });
+          queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
+        }, 1000);
+      };
+
+      channel.on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'support_attendances',
+        filter: `assigned_to=eq.${uid}`,
+      } as any, recarregar);
+
+      if (meuSetorId) {
+        channel.on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'support_attendances',
+          filter: `department_id=eq.${meuSetorId}`,
+        } as any, recarregar);
+      }
+    });
+  }, [queryClient, tid, uid, meuSetorId]);
 
   return {
     conversations,
