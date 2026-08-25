@@ -214,6 +214,14 @@ verify_jwt = false
 [functions.oem-cancelar-modulo]
 verify_jwt = true
 
+# Manda para o OEM o nome ou o CNPJ que a ficha tem, quando quem está
+# desatualizado é o parceiro. Chamada pelo NAVEGADOR com o token da pessoa (é
+# ela que assina a alteração no log), por isso verify_jwt = true; pode_decidir_oem
+# roda de novo por dentro. Sem esta entrada o CI publicaria com false e mudaria
+# a autenticação em silêncio.
+[functions.oem-atualizar-cadastro-licenca]
+verify_jwt = true
+
 # Apaga do Storage a mídia de chat vencida (documento/vídeo/imagem; áudio nunca).
 # Chamada pelo pg_cron, que manda a anon key no Authorization — a mesma receita
 # do check-csat-timeout. `true` de propósito: sem JWT válido do projeto ninguém
