@@ -202,7 +202,21 @@ function formatTime(iso: string): string {
 }
 
 // Item da timeline — compartilhado pelas colunas de Notas e de Movimentação.
-function TimelineEventItem({ ev, author }: { ev: any; author: string }) {
+// canEdit/onSaveEdit só chegam preenchidos na coluna de Notas, e só para o autor da nota.
+function TimelineEventItem({
+  ev,
+  author,
+  canEdit = false,
+  onSaveEdit,
+}: {
+  ev: any;
+  author: string;
+  canEdit?: boolean;
+  onSaveEdit?: (id: string, content: string) => Promise<boolean>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<string>(ev.content ?? "");
+  const [saving, setSaving] = useState(false);
   const meta = tlMeta(ev.event_type);
   const Icon = meta.Icon;
   const oldV = tlCleanValue(ev.old_value);
@@ -210,6 +224,17 @@ function TimelineEventItem({ ev, author }: { ev: any; author: string }) {
   const hasChips = ev.event_type === "onboarding_mudou_etapa" && !!oldV && !!newV;
   // Na mudança de etapa o content repete "Etapa: X → Y" — escondemos p/ não duplicar os chips.
   const showContent = ev.content && !hasChips;
+
+  async function saveEdit() {
+    const v = draft.trim();
+    if (!v || !onSaveEdit) return;
+    if (v === (ev.content ?? "")) { setEditing(false); return; }
+    setSaving(true);
+    const ok = await onSaveEdit(ev.id, v);
+    setSaving(false);
+    if (ok) setEditing(false);
+  }
+
   return (
     <div className="relative flex items-start gap-3">
       <div className={`relative z-10 h-6 w-6 rounded-full flex items-center justify-center ring-4 ring-background shrink-0 ${TL_TONES[meta.tone]}`}>
@@ -220,6 +245,14 @@ function TimelineEventItem({ ev, author }: { ev: any; author: string }) {
         <div className="flex items-baseline gap-1.5 flex-wrap">
           <span className="text-xs font-semibold">{author}</span>
           <span className="text-[11px] text-muted-foreground">· {meta.label}</span>
+          {ev.edited_at && (
+            <span
+              className="text-[10px] italic text-muted-foreground/80"
+              title={`Editado em ${formatDateTime(ev.edited_at)}`}
+            >
+              (editado)
+            </span>
+          )}
           {/* De qual sub-ticket a ação partiu — o evento vive no pai, a autoria de contexto é do filho. */}
           {ev.origem?.ticket_code && (
             <span
@@ -230,6 +263,16 @@ function TimelineEventItem({ ev, author }: { ev: any; author: string }) {
             </span>
           )}
           <span className="text-[10px] text-muted-foreground font-mono ml-auto pl-2">{formatTime(ev.created_at)}</span>
+          {canEdit && !editing && (
+            <button
+              type="button"
+              onClick={() => { setDraft(ev.content ?? ""); setEditing(true); }}
+              title="Editar nota"
+              className="text-muted-foreground/60 hover:text-foreground transition-colors"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+          )}
         </div>
         {hasChips && (
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -238,8 +281,39 @@ function TimelineEventItem({ ev, author }: { ev: any; author: string }) {
             <span className="text-[11px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium">{newV}</span>
           </div>
         )}
-        {showContent && (
-          <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap break-words">{ev.content}</p>
+        {editing ? (
+          <div className="mt-1.5">
+            <Textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={3}
+              autoFocus
+              className="text-xs"
+            />
+            <div className="flex justify-end gap-1.5 mt-1.5">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-[11px]"
+                onClick={() => setEditing(false)}
+                disabled={saving}
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                className="h-7 px-2 text-[11px]"
+                onClick={saveEdit}
+                disabled={saving || !draft.trim()}
+              >
+                <Check className="h-3 w-3 mr-1" /> Salvar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          showContent && (
+            <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap break-words">{ev.content}</p>
+          )
         )}
       </div>
     </div>
@@ -250,9 +324,13 @@ function TimelineEventItem({ ev, author }: { ev: any; author: string }) {
 function TimelineDayGroups({
   groups,
   authorOf,
+  canEdit,
+  onSaveEdit,
 }: {
   groups: Array<{ key: string; label: string; items: any[] }>;
   authorOf: (ev: any) => string;
+  canEdit?: (ev: any) => boolean;
+  onSaveEdit?: (id: string, content: string) => Promise<boolean>;
 }) {
   return (
     <div className="space-y-5">
@@ -269,7 +347,13 @@ function TimelineDayGroups({
             <div className="absolute left-[11px] top-3 bottom-3 w-px bg-border" />
             <div className="space-y-3">
               {day.items.map((ev: any) => (
-                <TimelineEventItem key={ev.id} ev={ev} author={authorOf(ev)} />
+                <TimelineEventItem
+                  key={ev.id}
+                  ev={ev}
+                  author={authorOf(ev)}
+                  canEdit={canEdit ? canEdit(ev) : false}
+                  onSaveEdit={onSaveEdit}
+                />
               ))}
             </div>
           </div>
@@ -654,7 +738,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journey?.ticket_id,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_ticket_events" as any) as any)
-        .select("id, user_id, event_type, content, old_value, new_value, created_at, origem_sub_ticket_id, origem:origem_sub_ticket_id(ticket_code)")
+        .select("id, user_id, event_type, content, old_value, new_value, created_at, edited_at, origem_sub_ticket_id, origem:origem_sub_ticket_id(ticket_code)")
         .eq("ticket_id", journey!.ticket_id!)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -1138,6 +1222,10 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const clienteNome = cliente?.nome_fantasia || cliente?.razao_social || "—";
   const isPaused = journey?.situacao === "pausado" || journey?.situacao === "parado";
   const isConcluded = journey?.situacao === "concluido";
+  // Editar nota da timeline: só o autor da nota, e só enquanto a jornada está aberta.
+  // Quem decide de verdade é a RPC editar_nota_agente; aqui é só o que aparece na tela.
+  const tlCanEditNote = (ev: any) =>
+    !isConcluded && !!user?.id && ev.user_id === user.id && TL_NOTE_TYPES.has(ev.event_type);
   const isCancelled = journey?.situacao === "cancelado";
   const isTerminal = isConcluded || isCancelled;
   const isAdmin = profile?.is_super_admin === true || profile?.role === "admin";
@@ -1426,6 +1514,33 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao adicionar nota");
+    }
+  }
+
+  async function handleEditNote(eventId: string, content: string): Promise<boolean> {
+    try {
+      const { data, error } = await (supabase.rpc as any)("editar_nota_agente", {
+        p_event_id: eventId,
+        p_content: content,
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res?.ok === false) {
+        toast.error(
+          res.reason === "nao_autor"
+            ? "Só quem escreveu a nota pode editar"
+            : res.reason === "conteudo_vazio"
+            ? "A nota não pode ficar vazia"
+            : "Não foi possível editar a nota"
+        );
+        return false;
+      }
+      toast.success("Nota atualizada");
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+      return true;
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao editar nota");
+      return false;
     }
   }
 
@@ -3350,7 +3465,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                               </p>
                             </div>
                           ) : (
-                            <TimelineDayGroups groups={tlNotesByDay} authorOf={tlAuthorOf} />
+                            <TimelineDayGroups
+                              groups={tlNotesByDay}
+                              authorOf={tlAuthorOf}
+                              canEdit={tlCanEditNote}
+                              onSaveEdit={handleEditNote}
+                            />
                           )}
                         </div>
                       </section>
