@@ -2778,6 +2778,20 @@ export default function OemIntegrationTab() {
                       // Dia cheio, não fração: "criado há 3 dias" é o que a
                       // pessoa diria, e 2,7 dias não ajuda ninguém.
                       const dias = Math.floor((Date.now() - new Date(criadoEm).getTime()) / 86400000);
+                      // A data vem junto porque "há 20 dias" não se compara com
+                      // nada: com 04/08 na tela dá para bater com o contrato, a
+                      // conversa e a nota. Formatada em São Paulo, e não com o
+                      // `dataBR` da aba — ele corta os 10 primeiros caracteres do
+                      // ISO, que estão em UTC, e cadastro feito depois das 21h
+                      // apareceria com a data do dia seguinte.
+                      const dataCadastro = new Date(criadoEm).toLocaleDateString("pt-BR", {
+                        timeZone: "America/Sao_Paulo",
+                      });
+                      const quando = dias === 0
+                        ? `hoje, ${dataCadastro}`
+                        : dias === 1
+                          ? `ontem, ${dataCadastro}`
+                          : `${dataCadastro} há ${dias} dias`;
                       const nome = l.razao_ds ?? l.razao_oem ?? "—";
                       return (
                         <div key={`impl:${l.id}`} className="flex items-center gap-3 p-3 text-sm">
@@ -2786,8 +2800,8 @@ export default function OemIntegrationTab() {
                             <p className="font-medium truncate" title={nome}>{nome}</p>
                             <p className="text-xs text-muted-foreground">
                               {l.cnpj_ds ? <>CNPJ {doc(l.cnpj_ds)} · </> : null}
-                              cadastrado {dias === 0 ? "hoje" : dias === 1 ? "ontem" : `há ${dias} dias`} ·
-                              {" "}mensalidade {brl(Number(l.mensalidade_ds || 0))}
+                              cadastrado {quando} ·{" "}
+                              mensalidade {brl(Number(l.mensalidade_ds || 0))}
                             </p>
                           </div>
                           {/* A mesma saída do "Cliente sem licença": quem já
