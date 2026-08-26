@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Agosto / 2026
 
+### 26/08
+
+- 🆕 **Chat — o administrador pode descartar um alerta de risco de churn** — **A IA avisava "risco de churn" e não havia como derrubar o aviso.** Um cliente perguntando *"está mexendo aí?"* durante um acesso remoto virava reclamação, o chat ganhava a faixa vermelha de **Abrir Ticket CS** e o alerta ia para o celular de quem acompanha — e o único jeito de calar isso era desligar o recurso para a empresa inteira. Agora, quando o aviso é um engano, **administrador, gestor ou super administrador clicam no × ao lado da faixa vermelha**: o alerta some, a sugestão de ticket some, o marcador some da lista de conversas e o *Clima* perde o vermelho. **O descarte vale até aquele atendimento ser encerrado** — se o cliente voltar depois com outra conversa, a IA avalia de novo do zero, para um "não é nada" de hoje não esconder uma reclamação de verdade daqui a dois meses. Errou ao descartar? O menu **⋮** do chat traz **Reativar risco de churn**. **O operador do atendimento não vê o ×**, de propósito: quem está no chat não apaga o próprio sinal de risco. E a leitura original da IA continua guardada, para dar para conferir depois com que frequência ela erra.
+
 ### 25/08
 
 - ⬆️ **Chat — mudar a velocidade do áudio virou um clique** — **Ouvir um áudio mais rápido custava três cliques:** os 3 pontinhos, *velocidade da reprodução* e a opção. Agora tem uma bolinha do lado direito do player, que começa sempre em **1x**: clicou, vai para **1,5x**; clicou de novo, **2x**; mais um clique e volta para **1x**. O menu dos 3 pontinhos continua onde estava, com as velocidades intermediárias (0,75x, 1,75x) para quem preferir — e se a troca for feita por lá, a bolinha passa a mostrar a velocidade escolhida. Vale para áudio recebido e enviado, e cada áudio começa no normal.
