@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useMacroTags } from "@/components/whatsapp/hooks/useMacroTags";
 import {
-  AlertTriangle, FileAudio, FileText, FileVideo, GripVertical, Image as ImageIcon, Paperclip, X,
+  AlertTriangle, ChevronDown, FileAudio, FileText, FileVideo, GripVertical, Image as ImageIcon, Paperclip, X,
 } from "lucide-react";
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent,
@@ -31,6 +31,8 @@ import {
 } from "@/components/whatsapp/hooks/useMacroAnexos";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 import { useSupportDepartments } from "@/components/whatsapp/hooks/useSupportDepartments";
 import { Loader2 } from "lucide-react";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -116,6 +118,10 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
   const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [anexos, setAnexos] = useState<PendingAnexo[]>([]);
+  // Os setores abrem fechados sempre: o resumo na própria linha já diz para
+  // quem a macro aparece, e a lista aberta empurrava o conteúdo da macro
+  // para fora da tela.
+  const [setoresAbertos, setSetoresAbertos] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const sensors = useSensors(
@@ -189,6 +195,7 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
         permite_edicao_livre: macro?.permite_edicao_livre ?? false,
       });
       setAnexos(macro ? macroAnexos(macro).map(pendingFromAnexo) : []);
+      setSetoresAbertos(false);
     }
   }, [open, macro, form]);
 
@@ -277,60 +284,85 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
               const orfaos = departments.length
                 ? selected.filter((id) => !departments.some((d) => d.id === id))
                 : [];
+              const nomes = departments.filter((d) => selected.includes(d.id)).map((d) => d.name);
+              const resumo = selected.length === 0
+                ? "Todos os setores"
+                : nomes.length > 0
+                  ? nomes.join(", ")
+                  : "Setor removido";
               return (
                 <FormItem>
-                  <div className="flex items-center justify-between">
-                    <FormLabel>Setores (opcional)</FormLabel>
-                    {selected.length > 0 && (
-                      <Button
+                  <Collapsible open={setoresAbertos} onOpenChange={setSetoresAbertos}>
+                    <CollapsibleTrigger asChild>
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-xs"
-                        onClick={() => field.onChange([])}
+                        className="flex w-full items-center justify-between gap-3 rounded-md border p-3 text-left transition-colors hover:bg-muted/40"
                       >
-                        Limpar
-                      </Button>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Sem setor marcado, a macro aparece para todo mundo no chat. Marcando um ou mais,
-                    ela só aparece para quem é desses setores.
-                  </p>
-                  <div className="border rounded-md max-h-40 overflow-y-auto divide-y">
-                    {departments.length === 0 ? (
-                      <div className="p-2 text-xs text-muted-foreground">Nenhum setor cadastrado.</div>
-                    ) : (
-                      departments.map((d) => {
-                        const checked = selected.includes(d.id);
-                        return (
-                          <label
-                            key={d.id}
-                            className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/40 cursor-pointer"
-                          >
-                            <Checkbox
-                              checked={checked}
-                              onCheckedChange={(v) =>
-                                field.onChange(v ? [...selected, d.id] : selected.filter((x) => x !== d.id))
-                              }
-                            />
-                            <span className="text-sm">{d.name}</span>
-                          </label>
-                        );
-                      })
-                    )}
-                  </div>
-                  {orfaos.length > 0 && (
-                    <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
-                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                      <p>
-                        {orfaos.length === 1
-                          ? "Um setor vinculado a esta macro foi removido."
-                          : `${orfaos.length} setores vinculados a esta macro foram removidos.`}{" "}
-                        A macro continua restrita. Use Limpar para voltar a aparecer para todos.
+                        <div className="min-w-0 space-y-0.5">
+                          <span className="block text-sm font-medium">Setores (opcional)</span>
+                          <p className="truncate text-xs text-muted-foreground">{resumo}</p>
+                        </div>
+                        <ChevronDown
+                          className={cn(
+                            "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+                            setoresAbertos && "rotate-180"
+                          )}
+                        />
+                      </button>
+                    </CollapsibleTrigger>
+
+                    <CollapsibleContent className="space-y-2 pt-2">
+                      <p className="text-xs text-muted-foreground">
+                        Sem setor marcado, a macro aparece para todo mundo no chat. Marcando um ou mais,
+                        ela só aparece para quem é desses setores.
                       </p>
-                    </div>
-                  )}
+                      <div className="border rounded-md max-h-40 overflow-y-auto divide-y">
+                        {departments.length === 0 ? (
+                          <div className="p-2 text-xs text-muted-foreground">Nenhum setor cadastrado.</div>
+                        ) : (
+                          departments.map((d) => {
+                            const checked = selected.includes(d.id);
+                            return (
+                              <label
+                                key={d.id}
+                                className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/40 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={(v) =>
+                                    field.onChange(v ? [...selected, d.id] : selected.filter((x) => x !== d.id))
+                                  }
+                                />
+                                <span className="text-sm">{d.name}</span>
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
+                      {selected.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => field.onChange([])}
+                        >
+                          Limpar seleção
+                        </Button>
+                      )}
+                      {orfaos.length > 0 && (
+                        <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                          <p>
+                            {orfaos.length === 1
+                              ? "Um setor vinculado a esta macro foi removido."
+                              : `${orfaos.length} setores vinculados a esta macro foram removidos.`}{" "}
+                            A macro continua restrita. Use Limpar seleção para voltar a aparecer para todos.
+                          </p>
+                        </div>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
                   <FormMessage />
                 </FormItem>
               );
