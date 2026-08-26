@@ -9,7 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
-import { ancoraTipoHorario } from "@/components/tickets/tipoHorarioAnchor";
+import { sugestaoAtendimentoEncerrado } from "@/components/tickets/tipoHorarioAnchor";
 
 interface Props {
   open: boolean;
@@ -55,19 +55,28 @@ export function ClassifyClosureModal({
     }
   }, [open, clienteProdutoId]);
 
-  // Dados do atendimento para ancorar a detecção de horário (mesmo padrão de
-  // CreateSupportTicketModal): plantao_em quando já houve trabalho fora do
-  // comercial, senão sem âncora — a RPC classifica pelo now().
+  // Dados do atendimento para sugerir tipo de horário. Este modal só existe
+  // para atendimento JÁ ENCERRADO (fila de backlog de PendingClosuresTab) —
+  // o gatilho de fechamento já calculou e gravou `plantao` / `plantao_em`.
+  // Não usar `now()` aqui: o operador está classificando dias depois, e
+  // ancorar na hora em que ele sentou pra limpar a fila (não na hora do
+  // atendimento) é exatamente o defeito que motivou esta correção.
   const { data: attendanceAnchor, isLoading: isLoadingAttendanceAnchor } = useQuery({
     queryKey: ["classify_closure_attendance_anchor", attendanceId],
     enabled: open && !!attendanceId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_attendances" as any) as any)
-        .select("opened_at, department_id, plantao_em")
+        .select("opened_at, department_id, plantao, plantao_em, closed_at")
         .eq("id", attendanceId)
         .maybeSingle();
       if (error) throw error;
-      return data as { opened_at: string; department_id: string | null; plantao_em: string | null } | null;
+      return data as {
+        opened_at: string;
+        department_id: string | null;
+        plantao: boolean | null;
+        plantao_em: string | null;
+        closed_at: string | null;
+      } | null;
     },
   });
 
@@ -75,17 +84,19 @@ export function ClassifyClosureModal({
   // substitui o default fixo "comercial" setado no reset acima.
   useEffect(() => {
     if (!open || !attendanceId || isLoadingAttendanceAnchor) return;
-    // Sem plantao_em (o trigger só grava no fechamento) a detecção continua
-    // valendo: a RPC roda sem p_at e classifica pelo now(), o instante em que o
-    // operador está encerrando. Barrar por !anchorAt deixaria o default fixo
-    // "comercial" de pé em todo atendimento ainda não fechado.
-    const anchorAt = ancoraTipoHorario(attendanceAnchor ?? {});
+    const sugestao = sugestaoAtendimentoEncerrado(attendanceAnchor ?? {});
+    if (sugestao.modo === "comercial") {
+      // Resposta definitiva do gatilho de fechamento: não houve trabalho fora
+      // do comercial. Não chama a RPC.
+      setTipoHorario("comercial");
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
         const { data, error } = await (supabase.rpc as any)("check_tipo_horario", {
           p_department_id: attendanceAnchor?.department_id ?? null,
-          ...(anchorAt !== undefined ? { p_at: anchorAt } : {}),
+          ...(sugestao.at !== undefined ? { p_at: sugestao.at } : {}),
           p_tenant_id: tid,
         });
         if (cancelled) return;
