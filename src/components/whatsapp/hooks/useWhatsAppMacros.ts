@@ -26,6 +26,8 @@ export interface WhatsAppMacro {
   is_active: boolean;
   usage_count: number;
   permite_edicao_livre: boolean;
+  /** Setores que enxergam a macro no chat. NULL/vazio = todos os setores. */
+  department_ids: string[] | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -56,6 +58,21 @@ export function macroAnexos(macro: Pick<WhatsAppMacro, "id" | "anexos" | "media_
     size_bytes: null,
     ordem: 0,
   }];
+}
+
+/**
+ * Macro sem setor marcado vale para todos — é o padrão de quem já estava
+ * cadastrado antes do vínculo existir. Atendente sem setor no cadastro
+ * (admin/super admin, tipicamente) continua enxergando tudo.
+ */
+export function macroVisibleForDepartment(
+  macro: Pick<WhatsAppMacro, "department_ids">,
+  departmentId: string | null | undefined
+): boolean {
+  const ids = macro.department_ids;
+  if (!ids || ids.length === 0) return true;
+  if (!departmentId) return true;
+  return ids.includes(departmentId);
 }
 
 export const useWhatsAppMacros = (instanceId?: string) => {

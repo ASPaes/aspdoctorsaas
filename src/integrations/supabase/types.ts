@@ -10996,6 +10996,7 @@ export type Database = {
           content: string
           created_at: string
           created_by: string | null
+          department_ids: string[] | null
           id: string
           instance_id: string | null
           is_active: boolean
@@ -11014,6 +11015,7 @@ export type Database = {
           content: string
           created_at?: string
           created_by?: string | null
+          department_ids?: string[] | null
           id?: string
           instance_id?: string | null
           is_active?: boolean
@@ -11032,6 +11034,7 @@ export type Database = {
           content?: string
           created_at?: string
           created_by?: string | null
+          department_ids?: string[] | null
           id?: string
           instance_id?: string | null
           is_active?: boolean

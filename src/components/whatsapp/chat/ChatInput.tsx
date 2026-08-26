@@ -19,7 +19,8 @@ import { SmartReplySuggestions } from "./input/SmartReplySuggestions";
 import { ReplyPreview } from "./input/ReplyPreview";
 import { AttachmentChip } from "./input/AttachmentChip";
 import { MediaSendPreviewDialog } from "./input/MediaSendPreviewDialog";
-import { useWhatsAppMacros, macroAnexos, type MacroAnexo } from "../hooks/useWhatsAppMacros";
+import { useWhatsAppMacros, macroAnexos, macroVisibleForDepartment, type MacroAnexo } from "../hooks/useWhatsAppMacros";
+import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { useMacroTags } from "../hooks/useMacroTags";
 import { useSmartReply } from "../hooks/useSmartReply";
 import { useWhatsAppSend } from "../hooks/useWhatsAppSend";
@@ -305,6 +306,10 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   }, [contactName, agentName]);
 
   const { macros, incrementUsage } = useWhatsAppMacros();
+  // Macro pode ser restrita a setores. Quem sugere é o setor de QUEM atende
+  // (funcionarios.department_id), não o da conversa: a conversa perde o setor
+  // no fechamento e nasce sem setor até a distribuição rodar.
+  const { data: userDepartmentId } = useUserDepartment();
   const { detectTags } = useMacroTags();
   const { suggestions, isLoading: isLoadingSmartReplies, isRefreshing, refresh, error: smartReplyError } = useSmartReply(conversationId);
 
@@ -326,7 +331,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     if (match) {
       const searchTerm = (match[1] || "").toLowerCase();
       const filtered = macros.filter(m =>
-        m.is_active !== false && (
+        m.is_active !== false &&
+        macroVisibleForDepartment(m, userDepartmentId) && (
           searchTerm === "" ||
           (m.shortcut?.toLowerCase().includes(searchTerm)) ||
           m.title.toLowerCase().includes(searchTerm)
@@ -338,7 +344,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       setShowMacroSuggestions(false);
       setFilteredMacros([]);
     }
-  }, [message, macros]);
+  }, [message, macros, userDepartmentId]);
 
   useEffect(() => {
     setMacroSelectedIndex(0);

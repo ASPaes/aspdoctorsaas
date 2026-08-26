@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import {
 import type { WhatsAppMacro } from "@/components/whatsapp/hooks/useWhatsAppMacros";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MacroTagsManager } from "./MacroTagsManager";
+import { useSupportDepartments } from "@/components/whatsapp/hooks/useSupportDepartments";
 
 export function MacrosManager() {
   return (
@@ -34,6 +35,11 @@ export function MacrosManager() {
 
 function MacrosList() {
   const { macros, isLoading, deleteMacro } = useWhatsAppMacros();
+  const { data: departments = [] } = useSupportDepartments();
+  const deptName = useMemo(
+    () => new Map(departments.map((d) => [d.id, d.name])),
+    [departments]
+  );
   const [showDialog, setShowDialog] = useState(false);
   const [editingMacro, setEditingMacro] = useState<WhatsAppMacro | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<WhatsAppMacro | null>(null);
@@ -77,6 +83,7 @@ function MacrosList() {
                 <TableHead>Atalho</TableHead>
                 <TableHead className="hidden md:table-cell">Conteúdo</TableHead>
                 <TableHead>Categoria</TableHead>
+                <TableHead>Setores</TableHead>
                 <TableHead className="text-center">Anexos</TableHead>
                 <TableHead className="text-right">Usos</TableHead>
                 <TableHead className="w-[100px]">Ações</TableHead>
@@ -85,6 +92,8 @@ function MacrosList() {
             <TableBody>
               {macros.map((macro) => {
                 const totalAnexos = macroAnexos(macro).length;
+                const setorIds = macro.department_ids ?? [];
+                const setorNomes = setorIds.map((id) => deptName.get(id)).filter(Boolean) as string[];
                 return (
                 <TableRow key={macro.id}>
                   <TableCell className="font-medium">{macro.title}</TableCell>
@@ -98,6 +107,19 @@ function MacrosList() {
                   </TableCell>
                   <TableCell>
                     {macro.category ? <Badge variant="secondary">{macro.category}</Badge> : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell>
+                    {setorIds.length === 0 ? (
+                      <span className="text-xs text-muted-foreground">Todos os setores</span>
+                    ) : setorNomes.length === 0 ? (
+                      <span className="text-xs text-amber-700 dark:text-amber-400">Setor removido</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {setorNomes.map((nome) => (
+                          <Badge key={nome} variant="outline" className="text-xs">{nome}</Badge>
+                        ))}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-center">
                     {totalAnexos > 0 ? (
