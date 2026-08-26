@@ -4,13 +4,12 @@ import { getAIConfig, callAI } from './ai-client.ts';
 import { getAdapter } from './providers/index.ts';
 import { NormalizedInboundMessage, SendContext, PhoneParseResult, UNSUPPORTED_MESSAGE_LABEL } from './message-types.ts';
 import { normalizeBRPhone, phoneSearchVariants } from './phone.ts';
+import { isGoodbyeOnlyMessage } from './goodbye.ts';
 
 const AUTO_SENTIMENT_THRESHOLD = 5;
 const AUTO_CATEGORIZATION_THRESHOLD = 5;
 
 const CSAT_LATE_GRACE_MINUTES = 180;
-
-const GOODBYE_PATTERNS = /^(tchau|obrigad[oa]|valeu|vlw|flw|falou|até\s*(mais|logo|breve)?|brigad[oa]|grat[oa]|obg|tmj|ok\s*obrigad[oa]?)[\s!.?]*$/i;
 
 const INVALID_OPTION_MESSAGES = [
   'Hmm, não consegui entender sua resposta \u{1F605}. Por favor, envie apenas o número de uma das opções acima.',
@@ -1552,19 +1551,45 @@ export async function handleUraResponse(supabase: any, ctx: SendContext, convers
 
 // ─── Attendance ───────────────────────────────────────────────────────────────
 
-export async function ensureAttendanceForIncomingMessage(supabase: any, conversationId: string, contactId: string, tenantId: string, messageContent?: string, ctx?: SendContext, skipUra: boolean = false): Promise<void> {
+/**
+ * Despedida do cliente depois do encerramento não movimenta nada: nem reabre o
+ * atendimento, nem tira a conversa de "Encerrados", nem dispara URA/horário.
+ *
+ * Ela é avaliada UMA vez, no topo de processInboundMessage, e não dentro de
+ * ensureAttendanceForIncomingMessage como era antes. O motivo é que a conversa
+ * volta para `active` (e o bucket sai de "Encerrados") antes de qualquer
+ * decisão sobre atendimento: aqui mesmo, e de novo no ramo de fora do
+ * expediente, que ainda por cima marca `opened_out_of_hours` e joga o chat no
+ * bucket "Fora do horário" sem passar por atendimento nenhum. Guardar só a
+ * criação do atendimento deixava o chat voltando para a lista assim mesmo.
+ *
+ * O regex é a primeira porta justamente para não cobrar 2 queries de toda
+ * mensagem: só mensagem que já parece despedida chega no banco.
+ */
+async function isPostClosureFarewell(supabase: any, conversationId: string, content: string): Promise<boolean> {
+  if (!isGoodbyeOnlyMessage(content)) return false;
+  const { data: ativo } = await supabase.from('support_attendances').select('id')
+    .eq('conversation_id', conversationId).in('status', ['waiting', 'in_progress']).limit(1).maybeSingle();
+  if (ativo) return false;
+  // Sem atendimento encerrado antes, não há o que "não reabrir": é contato novo
+  // que por acaso começou com "obrigado" e merece atendimento como qualquer outro.
+  const { data: encerrado } = await supabase.from('support_attendances').select('id')
+    .eq('conversation_id', conversationId).in('status', ['closed', 'inactive_closed'])
+    .not('closed_at', 'is', null).limit(1).maybeSingle();
+  return !!encerrado;
+}
+
+export async function ensureAttendanceForIncomingMessage(supabase: any, conversationId: string, contactId: string, tenantId: string, ctx?: SendContext, skipUra: boolean = false): Promise<void> {
   try {
     const { data: active } = await supabase.from('support_attendances').select('id, status').eq('conversation_id', conversationId).in('status', ['waiting', 'in_progress']).limit(1).maybeSingle();
     if (active) return;
     const supportConfig = await getSupportConfig(supabase, tenantId);
     const reopenWindow = supportConfig.support_reopen_window_minutes;
-    const ignoreGoodbye = Math.min(Math.floor(reopenWindow / 2), 3);
     const { data: lastClosed } = await supabase.from('support_attendances').select('id, closed_at, status, closed_reason').eq('conversation_id', conversationId).in('status', ['closed', 'inactive_closed']).order('closed_at', { ascending: false }).limit(1).maybeSingle();
     const now = new Date();
     const nowIso = now.toISOString();
     const closedAt = lastClosed?.closed_at ? new Date(lastClosed.closed_at) : null;
     const diffMin = closedAt ? (now.getTime() - closedAt.getTime()) / (1000 * 60) : Infinity;
-    if (messageContent && closedAt && diffMin <= ignoreGoodbye && GOODBYE_PATTERNS.test(messageContent.trim())) return;
     if (lastClosed && diffMin <= reopenWindow && lastClosed.status === 'closed') {
       const { data: full } = await supabase.from('support_attendances').select('assigned_to, attendance_code').eq('id', lastClosed.id).single();
       const lastOp = full?.assigned_to ?? null;
@@ -2183,6 +2208,11 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   const lateCsatHandled = await handleLateCsatResponse(supabase, ctx, conversationId, tenantId, content);
   if (lateCsatHandled) return;
 
+  if (content && await isPostClosureFarewell(supabase, conversationId, content)) {
+    console.log(`[processor] Despedida pós-encerramento ignorada em ${conversationId} — chat segue encerrado`);
+    return;
+  }
+
   const { data: convStatus } = await supabase.from('whatsapp_conversations').select('status').eq('id', conversationId).single();
   if (convStatus?.status === 'closed') await supabase.from('whatsapp_conversations').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', conversationId);
 
@@ -2283,6 +2313,6 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   } else {
     const uraHandled = await handleUraResponse(supabase, ctx, conversationId, tenantId, content, supportConfig);
     if (uraHandled) { incrementAttendanceCounter(supabase, conversationId, 'customer').catch(() => {}); }
-    else { ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, ctx, skipUra).then(() => incrementAttendanceCounter(supabase, conversationId, 'customer')).catch(() => {}); supabase.from('whatsapp_conversations').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', conversationId).eq('status', 'closed').then(() => {}).catch(() => {}); }
+    else { ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, ctx, skipUra).then(() => incrementAttendanceCounter(supabase, conversationId, 'customer')).catch(() => {}); supabase.from('whatsapp_conversations').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', conversationId).eq('status', 'closed').then(() => {}).catch(() => {}); }
   }
 }
