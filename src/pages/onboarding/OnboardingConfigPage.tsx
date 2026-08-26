@@ -6,7 +6,7 @@ import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 import { useOnboardingPhases } from "@/hooks/useOnboardingPhases";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ArrowLeft, Sparkles } from "lucide-react";
+import { Loader2, ArrowLeft, Sparkles, LayoutTemplate } from "lucide-react";
 import { PipelinesPanel } from "./config/PipelinesPanel";
 import { PauseReasonsPanel } from "./config/PauseReasonsPanel";
 import { DemandTypesPanel } from "./config/DemandTypesPanel";
@@ -18,6 +18,7 @@ import { DistribuicaoPanel } from "./config/DistribuicaoPanel";
 import { PhasesPanel } from "./config/PhasesPanel";
 import { IndicatorsPanel } from "./config/IndicatorsPanel";
 import { GenerateOperationAIDialog } from "./config/GenerateOperationAIDialog";
+import { ApplyTemplateDialog } from "./config/ApplyTemplateDialog";
 
 export default function OnboardingConfigPage() {
   const { profile, profileLoading } = useAuth();
@@ -32,6 +33,7 @@ export default function OnboardingConfigPage() {
     if (!phases.some((p) => p.id === phaseId)) setPhaseId(phases[0].id);
   }, [phases, phaseId]);
   const [aiOpen, setAiOpen] = useState(false);
+  const [tplOpen, setTplOpen] = useState(false);
   const canGenerateAI = profile?.role === "admin" || profile?.is_super_admin === true;
 
 
@@ -61,6 +63,12 @@ export default function OnboardingConfigPage() {
           <h1 className="text-lg font-semibold">Configuração · Implantação</h1>
         </div>
         <div className="flex items-center gap-2">
+          {canGenerateAI && (
+            <Button variant="outline" size="sm" onClick={() => setTplOpen(true)}>
+              <LayoutTemplate className="h-4 w-4 mr-1" />
+              Usar template
+            </Button>
+          )}
           {canGenerateAI && (
             <Button variant="outline" size="sm" onClick={() => setAiOpen(true)}>
               <Sparkles className="h-4 w-4 mr-1" />
@@ -133,6 +141,7 @@ export default function OnboardingConfigPage() {
       </Tabs>
 
       <GenerateOperationAIDialog open={aiOpen} onOpenChange={setAiOpen} />
+      <ApplyTemplateDialog open={tplOpen} onOpenChange={setTplOpen} />
     </div>
   );
 }
