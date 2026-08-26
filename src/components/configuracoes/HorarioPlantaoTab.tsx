@@ -112,7 +112,7 @@ export default function HorarioPlantaoTab() {
   const [deptSlaMin, setDeptSlaMin] = useState<number | "">("");
   const [savingSla, setSavingSla] = useState(false);
 
-  // ── Section A.1: Horário comercial (contrato) ──
+  // ── Section A.1: Horário padrão da empresa (base do plantão) ──
   const [hcEnabled, setHcEnabled] = useState(false);
   const [hcSchedule, setHcSchedule] = useState<BusinessHours>(() => parseBusinessHours({}));
 
@@ -216,7 +216,7 @@ export default function HorarioPlantaoTab() {
   const saveBH = useSectionSave("Disponibilidade de atendimento");
   const saveAI = useSectionSave("IA fora do horário");
   const saveOC = useSectionSave("Escalonamento de plantão");
-  const saveHC = useSectionSave("Horário comercial");
+  const saveHC = useSectionSave("Horário padrão da empresa");
 
   // ── Keyword helpers ──
   const addKeyword = useCallback(() => {
@@ -231,8 +231,8 @@ export default function HorarioPlantaoTab() {
   }, []);
 
   /**
-   * Traz a grade da Disponibilidade de atendimento como ponto de partida do Horário comercial.
-   * Sempre a GLOBAL — horário comercial vale para a empresa inteira, não existe por setor.
+   * Traz a grade da Disponibilidade de atendimento como ponto de partida do horário padrão.
+   * Sempre a GLOBAL — o horário padrão vale para a empresa inteira, não existe por setor.
    * Com o contexto "global" na tela, usa o que está no formulário (inclui edições não salvas).
    */
   const copyBHToHC = () => {
@@ -538,30 +538,39 @@ export default function HorarioPlantaoTab() {
           <AccordionTrigger className="px-4 hover:no-underline">
             <div className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-primary" />
-              <span className="font-semibold text-base">Horário comercial</span>
+              <span className="font-semibold text-base">Horário padrão da empresa</span>
+              <span className="text-xs font-normal text-muted-foreground">(base do plantão)</span>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4 space-y-5">
             {/* Toggle */}
             <div className="flex items-center gap-3">
               <Switch checked={hcEnabled} onCheckedChange={setHcEnabled} id="hc-enabled" />
-              <Label htmlFor="hc-enabled">Ativar horário comercial</Label>
+              <Label htmlFor="hc-enabled">Ativar horário padrão</Label>
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              Define o que está incluso no contrato. Todo atendimento trabalhado fora desta
-              janela conta como plantão nos relatórios. Vale para a empresa inteira — não há
-              horário comercial por setor. Sem esta configuração ativa, o plantão continua
-              sendo calculado pela disponibilidade acima.
-            </p>
+            <div className="space-y-2 text-xs text-muted-foreground">
+              <p>
+                O horário que a empresa considera normal de trabalho — o que o contrato cobre.
+                Serve de régua: todo atendimento feito <strong className="text-foreground">fora</strong>{" "}
+                desta janela é marcado como <strong className="text-foreground">plantão</strong> e passa
+                a aparecer nos filtros e nos painéis de atendimento.
+              </p>
+              <p>
+                <strong className="text-foreground">Não é a mesma coisa que a Disponibilidade de
+                atendimento</strong> lá em cima: aquela é operação — diz quando o time está no ar,
+                dispara a mensagem de fora do horário e pode variar por setor. Esta é contrato — diz o
+                que está incluso, e vale para a empresa inteira, sem exceção por setor.
+              </p>
+            </div>
 
             {!hcEnabled && (
               <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
                 <span className="text-blue-400 mt-0.5 text-lg">ℹ️</span>
                 <p className="text-sm text-blue-300">
-                  Enquanto estiver desligado, o relatório usa a disponibilidade de atendimento —
-                  que costuma ser mais larga que o horário comercial e faz o plantão aparecer menos
-                  do que aconteceu.
+                  Enquanto estiver desligado, o plantão é calculado pela disponibilidade de
+                  atendimento — que costuma ser mais larga que o horário padrão e faz o plantão
+                  aparecer menos do que realmente aconteceu.
                 </p>
               </div>
             )}
@@ -588,7 +597,7 @@ export default function HorarioPlantaoTab() {
 
             <Button onClick={handleSaveHC} disabled={saveHC.isPending} size="sm">
               {saveHC.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-              Salvar Horário comercial
+              Salvar horário padrão
             </Button>
           </AccordionContent>
         </AccordionItem>

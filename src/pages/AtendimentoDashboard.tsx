@@ -140,7 +140,7 @@ function FiltrosGlobais({ cfg }: { cfg: FiltroConfig }) {
           <SelectContent>
             <SelectItem value="all">Todos os horários</SelectItem>
             <SelectItem value="plantao">Só plantão</SelectItem>
-            <SelectItem value="comercial">Só horário comercial</SelectItem>
+            <SelectItem value="comercial">Só horário padrão</SelectItem>
           </SelectContent>
         </Select>
       )}
