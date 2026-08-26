@@ -2,7 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { X, Plus } from "lucide-react";
+import { X, Plus, CopyPlus } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 // ─── Types ───────────────────────────────────────────────────────
 export interface TimeSlot {
@@ -86,6 +87,24 @@ export function cleanSchedule(schedule: BusinessHours): BusinessHours {
   return out;
 }
 
+/**
+ * Copia os turnos de um dia para todos os outros dias da semana.
+ * NÃO mexe no ativo/inativo: dia desmarcado recebe os horários e continua desmarcado —
+ * assim quem ligar o sábado depois já encontra o horário certo, e nada é ativado sozinho.
+ */
+export function replicateDay(schedule: BusinessHours, sourceDay: string): BusinessHours {
+  const source = schedule[sourceDay];
+  if (!source) return schedule;
+  const out: BusinessHours = {};
+  for (const day of DAY_KEYS) {
+    const d = schedule[day] ?? { active: false, slots: [{ ...DEFAULT_SLOT }] };
+    out[day] = day === sourceDay
+      ? d
+      : { active: d.active, slots: source.slots.map((s) => ({ ...s })) };
+  }
+  return out;
+}
+
 // ─── Component ───────────────────────────────────────────────────
 export function WeeklyScheduleGrid({
   value,
@@ -96,6 +115,8 @@ export function WeeklyScheduleGrid({
   onChange: (next: BusinessHours) => void;
   idPrefix: string;
 }) {
+  const { toast } = useToast();
+
   const updateDayActive = (day: string, active: boolean) => {
     onChange({
       ...value,
@@ -123,6 +144,14 @@ export function WeeklyScheduleGrid({
     onChange({ ...value, [day]: { ...dayData, slots: newSlots } });
   };
 
+  const replicate = (day: string) => {
+    onChange(replicateDay(value, day));
+    toast({
+      title: `${DAY_LABELS[day]} replicada`,
+      description: "Os horários foram copiados para os outros dias. Os dias desmarcados continuam desmarcados.",
+    });
+  };
+
   return (
     <div className="rounded-lg border divide-y">
       {DAY_KEYS.map((day) => {
@@ -138,17 +167,32 @@ export function WeeklyScheduleGrid({
               <Label htmlFor={`${idPrefix}-${day}`} className="w-20 text-sm font-medium">
                 {DAY_LABELS[day]}
               </Label>
-              {s.active && s.slots.length < 2 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="ml-auto h-7 text-xs"
-                  onClick={() => addSlot(day)}
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Intervalo
-                </Button>
+              {s.active && (
+                <div className="ml-auto flex items-center gap-1">
+                  {s.slots.length < 2 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => addSlot(day)}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Intervalo
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => replicate(day)}
+                    title={`Copiar os horários de ${DAY_LABELS[day]} para os outros dias`}
+                  >
+                    <CopyPlus className="h-3 w-3 mr-1" />
+                    Replicar
+                  </Button>
+                </div>
               )}
             </div>
             {s.active && s.slots.map((slot, idx) => (

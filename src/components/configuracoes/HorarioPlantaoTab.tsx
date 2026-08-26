@@ -12,7 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Badge } from "@/components/ui/badge";
-import { Save, Loader2, Clock, Bot, Phone, X, Plus } from "lucide-react";
+import { Save, Loader2, Clock, Bot, Phone, X, Plus, ClipboardCopy } from "lucide-react";
 import { formatBRPhone, maskBRPhoneLive } from "@/lib/phoneBR";
 import BusinessHoursExceptionsSection from "./BusinessHoursExceptionsSection";
 import BusinessHoursHolidayTemplateSection from "./BusinessHoursHolidayTemplateSection";
@@ -229,6 +229,25 @@ export default function HorarioPlantaoTab() {
   const removeKeyword = useCallback((kw: string) => {
     setOcKeywords((prev) => prev.filter((k) => k !== kw));
   }, []);
+
+  /**
+   * Traz a grade da Disponibilidade de atendimento como ponto de partida do Horário comercial.
+   * Sempre a GLOBAL — horário comercial vale para a empresa inteira, não existe por setor.
+   * Com o contexto "global" na tela, usa o que está no formulário (inclui edições não salvas).
+   */
+  const copyBHToHC = () => {
+    const source = selectedContext === "global"
+      ? bhSchedule
+      : parseBusinessHours((config as Record<string, any> | null)?.business_hours);
+    const cleaned = cleanSchedule(source);
+    // cópia profunda: as duas grades vivem em estados separados, nada compartilhado
+    DAY_KEYS.forEach((k) => (cleaned[k] = { ...cleaned[k], slots: cleaned[k].slots.map((x) => ({ ...x })) }));
+    setHcSchedule(cleaned);
+    toast({
+      title: "Horários copiados",
+      description: "A grade da disponibilidade foi trazida. Ajuste o que precisar e clique em Salvar.",
+    });
+  };
 
   // ── Save handlers ──
   const handleSaveBH = async () => {
@@ -549,7 +568,20 @@ export default function HorarioPlantaoTab() {
 
             {hcEnabled && (
               <div className="space-y-2">
-                <Label>Grade semanal</Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label>Grade semanal</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={copyBHToHC}
+                    title="Trazer a grade da Disponibilidade de atendimento como ponto de partida"
+                  >
+                    <ClipboardCopy className="h-3.5 w-3.5 mr-1" />
+                    Copiar da disponibilidade
+                  </Button>
+                </div>
                 <WeeklyScheduleGrid value={hcSchedule} onChange={setHcSchedule} idPrefix="hc" />
               </div>
             )}
