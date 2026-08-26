@@ -15,6 +15,46 @@ const EDIT_SUPPORTED_PROVIDERS = new Set(['self_hosted', 'cloud']);
 // Limite do próprio WhatsApp.
 const EDIT_WINDOW_MS = 15 * 60 * 1000;
 
+// O que a Evolution sabe editar: texto sempre; imagem e vídeo via legenda
+// (o formatUpdateMessage dela reenvia o próprio imageMessage/videoMessage com a
+// caption nova). Documento, áudio, figurinha e contato ela recusa com
+// "Message not compatible" — o frontend também não oferece a opção.
+const EDITABLE_TYPES = new Set(['text', 'image', 'video']);
+const CAPTION_TYPES = new Set(['image', 'video']);
+
+// Editar legenda só existe a partir da 2.2.0. Nas versões anteriores o
+// updateMessage manda SÓ texto: o WhatsApp do cliente recebe uma edição de texto
+// para uma mensagem de mídia e a bolha vira outra coisa — sem erro nenhum de
+// volta. Por isso a versão é conferida antes, e na dúvida a edição não sai.
+const MIN_CAPTION_EDIT_VERSION = [2, 2, 0];
+
+function versionAtLeast(version: string, min: number[]): boolean {
+  const parts = version.split('.').map((p) => parseInt(p, 10));
+  for (let i = 0; i < min.length; i++) {
+    const atual = Number.isFinite(parts[i]) ? parts[i] : 0;
+    if (atual > min[i]) return true;
+    if (atual < min[i]) return false;
+  }
+  return true;
+}
+
+/** GET / da Evolution devolve `version` sem autenticação. */
+async function fetchEvolutionVersion(baseUrl: string): Promise<string | null> {
+  try {
+    const resp = await fetch(`${baseUrl}/`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!resp.ok) return null;
+    const body = await resp.json();
+    const version = typeof body?.version === 'string' ? body.version.trim() : '';
+    return version || null;
+  } catch {
+    return null;
+  }
+}
+
 interface EditMessageRequest {
   messageId: string;
   conversationId: string;
@@ -100,16 +140,22 @@ Deno.serve(async (req) => {
       return fail('Mensagem apagada não pode ser editada');
     }
 
-    if (message.message_type !== 'text') {
-      return fail('Só mensagens de texto podem ser editadas');
+    const messageType = message.message_type ?? 'text';
+    if (!EDITABLE_TYPES.has(messageType)) {
+      return fail(
+        messageType === 'document' || messageType === 'audio' || messageType === 'ptt'
+          ? 'O WhatsApp só permite editar texto e legenda de imagem ou vídeo'
+          : 'Este tipo de mensagem não pode ser editado'
+      );
     }
+    const isCaption = CAPTION_TYPES.has(messageType);
 
     if (Date.now() - new Date(message.timestamp).getTime() > EDIT_WINDOW_MS) {
       return fail('Mensagens só podem ser editadas em até 15 minutos após o envio', 403);
     }
 
     if ((message.content ?? '') === body.newContent) {
-      return fail('O texto é igual ao atual');
+      return fail(isCaption ? 'A legenda é igual à atual' : 'O texto é igual ao atual');
     }
 
     // Instância: a da mensagem; a da conversa só como rede de segurança para
@@ -155,6 +201,18 @@ Deno.serve(async (req) => {
 
     let baseUrl = secrets.api_url.endsWith('/') ? secrets.api_url.slice(0, -1) : secrets.api_url;
     baseUrl = baseUrl.replace(/\/manager$/, '');
+
+    if (isCaption) {
+      const version = await fetchEvolutionVersion(baseUrl);
+      if (!version) {
+        console.error(`[${FUNCTION_NAME}][${requestId}] Versão da Evolution não lida em ${baseUrl}`);
+        return fail('Não foi possível confirmar a versão do servidor de WhatsApp; a legenda não foi alterada');
+      }
+      if (!versionAtLeast(version, MIN_CAPTION_EDIT_VERSION)) {
+        console.warn(`[${FUNCTION_NAME}][${requestId}] Evolution ${version} não edita legenda (mín. ${MIN_CAPTION_EDIT_VERSION.join('.')})`);
+        return fail(`O servidor de WhatsApp (Evolution ${version}) não edita legenda de mídia`);
+      }
+    }
 
     const endpoint = `${baseUrl}/chat/updateMessage/${(instance as any).instance_name}`;
     const remoteJid = message.remote_jid;
