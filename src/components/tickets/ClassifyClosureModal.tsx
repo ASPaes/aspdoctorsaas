@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
+import { ancoraTipoHorario } from "@/components/tickets/tipoHorarioAnchor";
 
 interface Props {
   open: boolean;
@@ -53,6 +54,57 @@ export function ClassifyClosureModal({
       setObs("");
     }
   }, [open, clienteProdutoId]);
+
+  // Dados do atendimento para ancorar a detecção de horário (mesmo padrão de
+  // CreateSupportTicketModal): plantao_em quando já houve trabalho fora do
+  // comercial, senão opened_at.
+  const { data: attendanceAnchor, isLoading: isLoadingAttendanceAnchor } = useQuery({
+    queryKey: ["classify_closure_attendance_anchor", attendanceId],
+    enabled: open && !!attendanceId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_attendances" as any) as any)
+        .select("opened_at, department_id, plantao_em")
+        .eq("id", attendanceId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { opened_at: string; department_id: string | null; plantao_em: string | null } | null;
+    },
+  });
+
+  // Detecta tipo de horário (comercial/plantão) quando o atendimento carrega —
+  // substitui o default fixo "comercial" setado no reset acima.
+  useEffect(() => {
+    if (!open || !attendanceId || isLoadingAttendanceAnchor) return;
+    const anchorAt = ancoraTipoHorario(attendanceAnchor ?? {});
+    if (!anchorAt) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await (supabase.rpc as any)("check_tipo_horario", {
+          p_department_id: attendanceAnchor?.department_id ?? null,
+          p_at: anchorAt,
+          p_tenant_id: tid,
+        });
+        if (cancelled) return;
+        if (error) {
+          console.error("[check_tipo_horario] erro ao detectar horário:", error);
+          return;
+        }
+        const raw = typeof data === "string" ? data : null;
+        if (raw === "comercial" || raw === "plantao") {
+          setTipoHorario(raw);
+        } else {
+          console.error("[check_tipo_horario] valor inesperado:", raw);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.error("[check_tipo_horario] exceção:", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, attendanceId, attendanceAnchor, isLoadingAttendanceAnchor, tid]);
 
   const { data: produtos = [] } = useQuery({
     queryKey: ["classify_closure_produtos", tid],

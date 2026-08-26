@@ -14,6 +14,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
 import { useClienteSearch, type ClienteSearchResult } from "@/components/whatsapp/hooks/useClienteSearch";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
+import { ancoraTipoHorario } from "@/components/tickets/tipoHorarioAnchor";
 
 function HelpBadge({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
@@ -263,11 +264,11 @@ export function CreateSupportTicketModal({
     enabled: open && fromClosure && !!attendanceId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_attendances" as any) as any)
-        .select("opened_at, department_id")
+        .select("opened_at, department_id, plantao_em")
         .eq("id", attendanceId)
         .maybeSingle();
       if (error) throw error;
-      return data as { opened_at: string; department_id: string | null } | null;
+      return data as { opened_at: string; department_id: string | null; plantao_em: string | null } | null;
     },
   });
 
@@ -291,24 +292,34 @@ export function CreateSupportTicketModal({
       timeZone: "America/Sao_Paulo",
     }).format(new Date(iso));
 
+  // Converte um ISO (UTC) para o formato local que o input datetime-local aceita
+  // (YYYY-MM-DDTHH:mm em horário LOCAL) — mesmo cálculo de defaultPrevisao().
+  const toDatetimeLocal = (iso: string) => {
+    const d = new Date(iso);
+    const tzOffset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+  };
+
   // Detecta tipo de horário (comercial/plantão) ao abrir o modal, trocar setor
   // ou, no modo closure, quando os dados do atendimento carregam.
   useEffect(() => {
     if (!open) return;
-    // No modo closure, aguardar closureAttendance carregar para não disparar
-    // uma detecção com p_at=undefined (now) que depois seria substituída.
-    if (fromClosure && (isLoadingClosureAttendance || !closureAttendance?.opened_at)) {
+    const anchorAt = ancoraTipoHorario(closureAttendance ?? {});
+    // No modo closure, aguardar closureAttendance carregar (opened_at OU
+    // plantao_em, o que existir primeiro) para não disparar uma detecção com
+    // p_at=undefined (now) que depois seria substituída.
+    if (fromClosure && (isLoadingClosureAttendance || !anchorAt)) {
       setTipoDetectado(null);
       return;
     }
     let cancelled = false;
     setTipoDetectado(null);
     (async () => {
-      const isClosure = fromClosure && closureAttendance?.opened_at;
+      const isClosure = fromClosure && !!anchorAt;
       const p_department_id = isClosure
         ? (closureAttendance?.department_id ?? departamentoId ?? null)
         : (departamentoId || null);
-      const p_at = isClosure ? closureAttendance?.opened_at : undefined;
+      const p_at = isClosure ? anchorAt : undefined;
       try {
         const { data, error } = await (supabase.rpc as any)("check_tipo_horario", {
           p_department_id,
@@ -334,6 +345,8 @@ export function CreateSupportTicketModal({
               if (raw === "comercial") {
                 setHorarioInicio("");
                 setHorarioFim("");
+              } else if (raw === "plantao" && closureAttendance?.plantao_em) {
+                setHorarioInicio(toDatetimeLocal(closureAttendance.plantao_em));
               }
             }
             return currentMode;
