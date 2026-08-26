@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
+import { sugestaoAtendimentoEncerrado } from "@/components/tickets/tipoHorarioAnchor";
 
 interface Props {
   open: boolean;
@@ -53,6 +54,71 @@ export function ClassifyClosureModal({
       setObs("");
     }
   }, [open, clienteProdutoId]);
+
+  // Dados do atendimento para sugerir tipo de horário. Este modal só existe
+  // para atendimento JÁ ENCERRADO (fila de backlog de PendingClosuresTab) —
+  // o gatilho de fechamento já calculou e gravou `plantao` / `plantao_em`.
+  // Não usar `now()` aqui: o operador está classificando dias depois, e
+  // ancorar na hora em que ele sentou pra limpar a fila (não na hora do
+  // atendimento) é exatamente o defeito que motivou esta correção.
+  const { data: attendanceAnchor, isLoading: isLoadingAttendanceAnchor } = useQuery({
+    queryKey: ["classify_closure_attendance_anchor", attendanceId],
+    enabled: open && !!attendanceId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_attendances" as any) as any)
+        .select("opened_at, department_id, plantao, plantao_em, closed_at")
+        .eq("id", attendanceId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as {
+        opened_at: string;
+        department_id: string | null;
+        plantao: boolean | null;
+        plantao_em: string | null;
+        closed_at: string | null;
+      } | null;
+    },
+  });
+
+  // Detecta tipo de horário (comercial/plantão) quando o atendimento carrega —
+  // substitui o default fixo "comercial" setado no reset acima.
+  useEffect(() => {
+    if (!open || !attendanceId || isLoadingAttendanceAnchor) return;
+    const sugestao = sugestaoAtendimentoEncerrado(attendanceAnchor ?? {});
+    if (sugestao.modo === "comercial") {
+      // Resposta definitiva do gatilho de fechamento: não houve trabalho fora
+      // do comercial. Não chama a RPC.
+      setTipoHorario("comercial");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await (supabase.rpc as any)("check_tipo_horario", {
+          p_department_id: attendanceAnchor?.department_id ?? null,
+          ...(sugestao.at !== undefined ? { p_at: sugestao.at } : {}),
+          p_tenant_id: tid,
+        });
+        if (cancelled) return;
+        if (error) {
+          console.error("[check_tipo_horario] erro ao detectar horário:", error);
+          return;
+        }
+        const raw = typeof data === "string" ? data : null;
+        if (raw === "comercial" || raw === "plantao") {
+          setTipoHorario(raw);
+        } else {
+          console.error("[check_tipo_horario] valor inesperado:", raw);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.error("[check_tipo_horario] exceção:", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, attendanceId, attendanceAnchor, isLoadingAttendanceAnchor, tid]);
 
   const { data: produtos = [] } = useQuery({
     queryKey: ["classify_closure_produtos", tid],

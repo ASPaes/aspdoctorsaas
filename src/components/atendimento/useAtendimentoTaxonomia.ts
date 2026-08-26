@@ -39,9 +39,10 @@ export interface AtendimentoTaxonomia {
 export function useAtendimentoTaxonomia() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
-  const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds } = useAtendimentoFilter();
+  const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, plantao } = useAtendimentoFilter();
+  const pPlantao = plantao === 'all' ? null : plantao;
   return useQuery<AtendimentoTaxonomia>({
-    queryKey: ["atendimento-taxonomia", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds],
+    queryKey: ["atendimento-taxonomia", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, plantao],
     enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -55,6 +56,7 @@ export function useAtendimentoTaxonomia() {
         p_agent_id: agentId ?? null,
         p_segmento_ids: orNull(segmentoIds), p_area_ids: orNull(areaIds), p_estado_ids: orNull(estadoIds),
         p_cidade_ids: orNull(cidadeIds), p_fornecedor_ids: orNull(fornecedorIds), p_produto_ids: orNull(produtoIds),
+        p_plantao: pPlantao,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
