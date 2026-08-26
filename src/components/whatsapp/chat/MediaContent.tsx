@@ -9,6 +9,7 @@ import { hasRetrievableMedia as canRetrieveMedia, kindFromMessageType } from "@/
 import { AttachmentCard } from "./AttachmentCard";
 import { ZoomableImageLightbox } from "./ZoomableImageLightbox";
 import { ChatVideoPlayer } from "./ChatVideoPlayer";
+import { ChatAudioPlayer } from "./ChatAudioPlayer";
 
 const INLINE_TYPES = new Set(["image", "sticker", "audio", "video"]);
 
@@ -250,11 +251,7 @@ export function MediaContent({
       </>
     );
   } else if (messageType === "audio") {
-    body = (
-      <audio controls className="max-w-full mb-1" preload="metadata">
-        <source src={resolvedInlineUrl} />
-      </audio>
-    );
+    body = <ChatAudioPlayer src={resolvedInlineUrl} />;
   } else {
     body = (
       <ChatVideoPlayer
