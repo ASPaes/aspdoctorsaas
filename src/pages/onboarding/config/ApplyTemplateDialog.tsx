@@ -41,6 +41,8 @@ export function ApplyTemplateDialog({ open, onOpenChange }: Props) {
   const [tela, setTela] = useState<"escolha" | "produto" | "revisao">("escolha");
   const [tpl, setTpl] = useState<OnboardingTemplate | null>(null);
   const [produtoId, setProdutoId] = useState<string>(SEM_PRODUTO);
+  /** Enquanto false, a sugestão do template ainda pode preencher o campo sozinha. */
+  const [produtoTocado, setProdutoTocado] = useState(false);
   const [sel, setSel] = useState<SelecaoTemplate | null>(null);
   const [applying, setApplying] = useState(false);
 
@@ -81,8 +83,18 @@ export function ApplyTemplateDialog({ open, onOpenChange }: Props) {
       setTpl(null);
       setSel(null);
       setProdutoId(SEM_PRODUTO);
+      setProdutoTocado(false);
     }
   }, [open]);
+
+  // A sugestão de produto tem que sobreviver a um clique rápido: se a lista de produtos
+  // chegar DEPOIS de o template ser escolhido, ela preenche o campo aqui. Só enquanto o
+  // usuário não tiver mexido no seletor — escolher "Sem produto" é decisão, não vazio.
+  useEffect(() => {
+    if (!tpl || produtoTocado || produtos.length === 0) return;
+    const sugerido = resolverProdutoSugerido(produtos, tpl.produto_sugerido);
+    if (sugerido != null) setProdutoId(String(sugerido));
+  }, [tpl, produtos, produtoTocado]);
 
   const colisoes = useMemo(
     () => (tpl ? nomesEmColisao(tpl.blueprint, pipelinesExistentes) : []),
@@ -213,7 +225,10 @@ export function ApplyTemplateDialog({ open, onOpenChange }: Props) {
                 o ticket do cliente entra. Sem produto, os pipelines valem para qualquer venda.
               </p>
             </div>
-            <Select value={produtoId} onValueChange={setProdutoId}>
+            <Select
+              value={produtoId}
+              onValueChange={(v) => { setProdutoTocado(true); setProdutoId(v); }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>

@@ -29,6 +29,18 @@ vi.mock("@/contexts/TenantFilterContext", () => ({
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
+/** Clica no primeiro botão cujo texto começa com o rótulo. Sem @testing-library. */
+async function clicar(rotulo: string) {
+  const alvo = Array.from(document.querySelectorAll("button")).find((b) =>
+    (b.textContent ?? "").trim().startsWith(rotulo),
+  );
+  if (!alvo) throw new Error(`botão "${rotulo}" não encontrado`);
+  await act(async () => {
+    alvo.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+  });
+}
+
 function render(ui: React.ReactNode) {
   const el = document.createElement("div");
   document.body.appendChild(el);
@@ -66,5 +78,51 @@ describe("ApplyTemplateDialog", () => {
     render(<ApplyTemplateDialog open={false} onOpenChange={() => {}} />);
     await act(async () => { await Promise.resolve(); });
     expect(document.body.textContent ?? "").not.toContain("Software genérico");
+  });
+
+  it("escolher PDV Legal → revisar → aplicar manda o blueprint inteiro com o produto amarrado", async () => {
+    const onOpenChange = vi.fn();
+    render(<ApplyTemplateDialog open onOpenChange={onOpenChange} />);
+    await act(async () => { await Promise.resolve(); });
+
+    await clicar("PDV Legal");
+    // o produto sugerido do template existe neste tenant, então já vem escolhido
+    expect(document.body.textContent ?? "").toContain("Produto do template");
+
+    await clicar("Revisar");
+    const revisao = document.body.textContent ?? "";
+    expect(revisao).toContain("Treinamento Marcado");
+    expect(revisao).toContain("Check List Balcão");
+    expect(revisao).toContain("inicia SLA");
+
+    await clicar("Aplicar template");
+    expect(rpc).toHaveBeenCalledTimes(1);
+
+    const [fn, args] = rpc.mock.calls[0] as unknown as [string, any];
+    expect(fn).toBe("apply_onboarding_blueprint");
+    expect(args.p_tenant_id).toBe("t1");
+    const bp = args.p_blueprint;
+    expect(bp.pipelines.map((p: any) => p.nome)).toEqual(["Onboarding PDV", "Implantação PDV"]);
+    expect(bp.pipelines.every((p: any) => p.produto_id === 13)).toBe(true);
+    expect(bp.pipelines.flatMap((p: any) => p.stages)).toHaveLength(10);
+    const grupos = bp.pipelines.flatMap((p: any) => p.stages).flatMap((s: any) => s.checklist_groups ?? []);
+    expect(grupos).toHaveLength(9);
+    expect(grupos.flatMap((g: any) => g.itens)).toHaveLength(54);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("com pipeline de mesmo nome já existente, o que vai para o banco leva sufixo", async () => {
+    pipelines.mockReturnValue([{ nome: "Implantação PDV", fase: "implantacao" }]);
+    render(<ApplyTemplateDialog open onOpenChange={() => {}} />);
+    await act(async () => { await Promise.resolve(); });
+
+    await clicar("PDV Legal");
+    await clicar("Revisar");
+    expect(document.body.textContent ?? "").toContain("já tem");
+
+    await clicar("Aplicar template");
+    const [, args] = rpc.mock.calls[0] as unknown as [string, any];
+    expect(args.p_blueprint.pipelines.map((p: any) => p.nome))
+      .toEqual(["Onboarding PDV", "Implantação PDV (2)"]);
   });
 });
