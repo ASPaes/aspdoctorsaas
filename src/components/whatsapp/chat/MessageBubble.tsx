@@ -53,6 +53,11 @@ interface Props {
 // A Edge Function reaplica essa checagem — aqui é só para não oferecer o que vai falhar.
 const EDIT_WINDOW_MS = 15 * 60 * 1000;
 
+// Legenda de imagem e vídeo também é editável: o /chat/updateMessage da Evolution
+// reenvia a própria mídia com a legenda nova. Documento, áudio e figurinha ela
+// recusa ("Message not compatible"), por isso ficam de fora.
+const EDITABLE_TYPES = new Set(['text', 'image', 'video']);
+
 function canDeletePanelOnly(msg: Message): boolean {
   if (msg.id.startsWith('temp-')) return false;
   const deleteStatus = (msg as any).delete_status;
@@ -113,20 +118,26 @@ export function MessageBubble({
     !isDeleted &&
     !isPending &&
     msg.status !== 'failed' &&
-    msg.message_type === 'text' &&
+    EDITABLE_TYPES.has(msg.message_type ?? 'text') &&
     !!msg.message_id &&
     !msg.id.startsWith('temp-') &&
     Date.now() - new Date(msg.timestamp).getTime() <= EDIT_WINDOW_MS;
 
+  // Mídia sem legenda chega com o placeholder do webhook ("📷 Imagem") em
+  // `content`. Ele não está na tela e não é texto do operador: começar a edição
+  // com ele mandaria o placeholder como legenda de verdade pro cliente.
+  const isCaption = msg.message_type === 'image' || msg.message_type === 'video';
+
   const startEditing = () => {
-    setEditText(msg.content ?? '');
+    const atual = msg.content ?? '';
+    setEditText(isMediaPlaceholderContent(atual) ? '' : atual);
     setIsEditing(true);
   };
 
   const saveEdit = () => {
     const novo = editText.trim();
     if (!novo) {
-      toast.error('A mensagem não pode ficar vazia.');
+      toast.error(isCaption ? 'A legenda não pode ficar vazia.' : 'A mensagem não pode ficar vazia.');
       return;
     }
     if (novo === (msg.content ?? '').trim()) {
@@ -628,7 +639,7 @@ export function MessageBubble({
         {canEdit && (
           <DropdownMenuItem onClick={startEditing}>
             <Pencil className="h-4 w-4 mr-2" />
-            Editar
+            {isCaption ? 'Editar legenda' : 'Editar'}
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
