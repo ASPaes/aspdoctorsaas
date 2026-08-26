@@ -305,21 +305,22 @@ export function CreateSupportTicketModal({
   useEffect(() => {
     if (!open) return;
     const anchorAt = ancoraTipoHorario(closureAttendance ?? {});
-    // No modo closure, aguardar closureAttendance carregar (opened_at OU
-    // plantao_em, o que existir primeiro) para não disparar uma detecção com
-    // p_at=undefined (now) que depois seria substituída.
-    if (fromClosure && (isLoadingClosureAttendance || !anchorAt)) {
+    // No modo closure, aguardar só o CARREGAMENTO do atendimento — nunca o
+    // anchorAt. plantao_em só é gravado no fechamento (trg_zz_set_plantao), então
+    // `undefined` é o caso COMUM antes disso; barrar por !anchorAt faria o modo
+    // auto nunca disparar no fluxo pré-fechamento. Sem âncora, a RPC roda sem
+    // p_at e classifica pelo now(), que é o instante em que o operador trabalha.
+    if (fromClosure && isLoadingClosureAttendance) {
       setTipoDetectado(null);
       return;
     }
     let cancelled = false;
     setTipoDetectado(null);
     (async () => {
-      const isClosure = fromClosure && !!anchorAt;
-      const p_department_id = isClosure
+      const p_department_id = fromClosure
         ? (closureAttendance?.department_id ?? departamentoId ?? null)
         : (departamentoId || null);
-      const p_at = isClosure ? anchorAt : undefined;
+      const p_at = anchorAt;
       try {
         const { data, error } = await (supabase.rpc as any)("check_tipo_horario", {
           p_department_id,
