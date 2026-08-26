@@ -1,9 +1,13 @@
 import type { OnboardingTemplate } from "./types";
 import { PDV_LEGAL_TEMPLATE } from "./pdvLegal";
+import { SOFTWARE_GENERICO_TEMPLATE } from "./softwareGenerico";
 
 export * from "./types";
 
-export const ONBOARDING_TEMPLATES: OnboardingTemplate[] = [PDV_LEGAL_TEMPLATE];
+export const ONBOARDING_TEMPLATES: OnboardingTemplate[] = [
+  PDV_LEGAL_TEMPLATE,
+  SOFTWARE_GENERICO_TEMPLATE,
+];
 
 export function resumoTemplate(t: OnboardingTemplate): { pipelines: number; etapas: number; itens: number } {
   const stages = t.blueprint.pipelines.flatMap((p) => p.stages);
