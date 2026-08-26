@@ -293,75 +293,80 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
               return (
                 <FormItem>
                   <Collapsible open={setoresAbertos} onOpenChange={setSetoresAbertos}>
-                    <CollapsibleTrigger asChild>
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-between gap-3 rounded-md border p-3 text-left transition-colors hover:bg-muted/40"
-                      >
-                        <div className="min-w-0 space-y-0.5">
-                          <span className="block text-sm font-medium">Setores (opcional)</span>
-                          <p className="truncate text-xs text-muted-foreground">{resumo}</p>
-                        </div>
-                        <ChevronDown
-                          className={cn(
-                            "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
-                            setoresAbertos && "rotate-180"
-                          )}
-                        />
-                      </button>
-                    </CollapsibleTrigger>
+                    <div className="rounded-md border">
+                      <CollapsibleTrigger asChild>
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between gap-3 rounded-t-md px-3 pt-3 pb-2 text-left transition-colors hover:bg-muted/40"
+                        >
+                          <div className="min-w-0 space-y-0.5">
+                            <span className="block text-sm font-medium">Setores (opcional)</span>
+                            <p className="truncate text-xs text-muted-foreground">{resumo}</p>
+                          </div>
+                          <ChevronDown
+                            className={cn(
+                              "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+                              setoresAbertos && "rotate-180"
+                            )}
+                          />
+                        </button>
+                      </CollapsibleTrigger>
 
-                    <CollapsibleContent className="space-y-2 pt-2">
-                      <p className="text-xs text-muted-foreground">
+                      {/* Fora do CollapsibleContent de propósito: a regra tem que ser
+                          legível com o bloco fechado, senão ninguém sabe o que o campo faz. */}
+                      <p className="px-3 pb-3 text-xs text-muted-foreground">
                         Sem setor marcado, a macro aparece para todo mundo no chat. Marcando um ou mais,
                         ela só aparece para quem é desses setores.
                       </p>
-                      <div className="border rounded-md max-h-40 overflow-y-auto divide-y">
-                        {departments.length === 0 ? (
-                          <div className="p-2 text-xs text-muted-foreground">Nenhum setor cadastrado.</div>
-                        ) : (
-                          departments.map((d) => {
-                            const checked = selected.includes(d.id);
-                            return (
-                              <label
-                                key={d.id}
-                                className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/40 cursor-pointer"
-                              >
-                                <Checkbox
-                                  checked={checked}
-                                  onCheckedChange={(v) =>
-                                    field.onChange(v ? [...selected, d.id] : selected.filter((x) => x !== d.id))
-                                  }
-                                />
-                                <span className="text-sm">{d.name}</span>
-                              </label>
-                            );
-                          })
-                        )}
-                      </div>
-                      {selected.length > 0 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => field.onChange([])}
-                        >
-                          Limpar seleção
-                        </Button>
-                      )}
-                      {orfaos.length > 0 && (
-                        <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
-                          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                          <p>
-                            {orfaos.length === 1
-                              ? "Um setor vinculado a esta macro foi removido."
-                              : `${orfaos.length} setores vinculados a esta macro foram removidos.`}{" "}
-                            A macro continua restrita. Use Limpar seleção para voltar a aparecer para todos.
-                          </p>
+
+                      <CollapsibleContent className="space-y-2 px-3 pb-3">
+                        <div className="border rounded-md max-h-40 overflow-y-auto divide-y">
+                          {departments.length === 0 ? (
+                            <div className="p-2 text-xs text-muted-foreground">Nenhum setor cadastrado.</div>
+                          ) : (
+                            departments.map((d) => {
+                              const checked = selected.includes(d.id);
+                              return (
+                                <label
+                                  key={d.id}
+                                  className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/40 cursor-pointer"
+                                >
+                                  <Checkbox
+                                    checked={checked}
+                                    onCheckedChange={(v) =>
+                                      field.onChange(v ? [...selected, d.id] : selected.filter((x) => x !== d.id))
+                                    }
+                                  />
+                                  <span className="text-sm">{d.name}</span>
+                                </label>
+                              );
+                            })
+                          )}
                         </div>
-                      )}
-                    </CollapsibleContent>
+                        {selected.length > 0 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => field.onChange([])}
+                          >
+                            Limpar seleção
+                          </Button>
+                        )}
+                        {orfaos.length > 0 && (
+                          <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                            <p>
+                              {orfaos.length === 1
+                                ? "Um setor vinculado a esta macro foi removido."
+                                : `${orfaos.length} setores vinculados a esta macro foram removidos.`}{" "}
+                              A macro continua restrita. Use Limpar seleção para voltar a aparecer para todos.
+                            </p>
+                          </div>
+                        )}
+                      </CollapsibleContent>
+                    </div>
                   </Collapsible>
                   <FormMessage />
                 </FormItem>
