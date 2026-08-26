@@ -719,7 +719,7 @@ export default function HorarioPlantaoTab() {
 
             <Button onClick={handleSaveOC} disabled={saveOC.isPending} size="sm">
               {saveOC.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-              Salvar Plantão
+              Salvar Escalonamento
             </Button>
           </AccordionContent>
         </AccordionItem>
