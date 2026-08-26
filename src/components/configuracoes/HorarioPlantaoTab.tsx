@@ -54,7 +54,8 @@ function useConfigRow() {
           "business_hours_ai_enabled, business_hours_ai_prompt, business_hours_outside_prompt, " +
           "oncall_phone_number, oncall_message_template, oncall_escalation_window_minutes, " +
           "oncall_min_customer_messages, oncall_min_elapsed_seconds, oncall_repeat_cooldown_minutes, " +
-          "oncall_urgency_keywords"
+          "oncall_urgency_keywords, " +
+          "horario_comercial, horario_comercial_enabled"
         )
         .eq("tenant_id", tid!)
         .maybeSingle();
@@ -110,6 +111,10 @@ export default function HorarioPlantaoTab() {
   const [bhOutsidePrompt, setBhOutsidePrompt] = useState("");
   const [deptSlaMin, setDeptSlaMin] = useState<number | "">("");
   const [savingSla, setSavingSla] = useState(false);
+
+  // ── Section A.1: Horário comercial (contrato) ──
+  const [hcEnabled, setHcEnabled] = useState(false);
+  const [hcSchedule, setHcSchedule] = useState<BusinessHours>(() => parseBusinessHours({}));
 
   // ── Contexto: Global vs Setor ──
   const [selectedContext, setSelectedContext] = useState<string>("global");
@@ -203,12 +208,15 @@ export default function HorarioPlantaoTab() {
     setOcMinElapsed((c.oncall_min_elapsed_seconds as number) ?? 60);
     setOcCooldown((c.oncall_repeat_cooldown_minutes as number) ?? 360);
     setOcKeywords(parseKeywords(c.oncall_urgency_keywords));
+    setHcEnabled(!!c.horario_comercial_enabled);
+    setHcSchedule(parseBusinessHours(c.horario_comercial));
   }, [config]);
 
   // ── Mutations ──
-  const saveBH = useSectionSave("Horário de Atendimento");
+  const saveBH = useSectionSave("Disponibilidade de atendimento");
   const saveAI = useSectionSave("IA fora do horário");
-  const saveOC = useSectionSave("Plantão");
+  const saveOC = useSectionSave("Escalonamento de plantão");
+  const saveHC = useSectionSave("Horário comercial");
 
   // ── Keyword helpers ──
   const addKeyword = useCallback(() => {
@@ -285,6 +293,18 @@ export default function HorarioPlantaoTab() {
     });
   };
 
+  const handleSaveHC = async () => {
+    const err = validateSchedule(hcSchedule);
+    if (err) {
+      toast({ title: "Erro de validação", description: err, variant: "destructive" });
+      return;
+    }
+    saveHC.mutate({
+      horario_comercial_enabled: hcEnabled,
+      horario_comercial: cleanSchedule(hcSchedule),
+    });
+  };
+
   const handleSaveOC = () => {
     const phoneDigits = ocPhoneDisplay.replace(/\D/g, "") || null;
     saveOC.mutate({
@@ -310,7 +330,7 @@ export default function HorarioPlantaoTab() {
 
   return (
     <div className="space-y-4 max-w-3xl">
-      <Accordion type="multiple" defaultValue={["horario", "feriados", "ai", "plantao"]} className="space-y-4">
+      <Accordion type="multiple" defaultValue={["horario", "horario-comercial", "feriados", "ai", "plantao"]} className="space-y-4">
         {/* ════════════════════════════════════════════════════════════ */}
         {/* SECTION A: BUSINESS HOURS                                  */}
         {/* ════════════════════════════════════════════════════════════ */}
@@ -318,7 +338,7 @@ export default function HorarioPlantaoTab() {
           <AccordionTrigger className="px-4 hover:no-underline">
             <div className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-primary" />
-              <span className="font-semibold text-base">Horário de Atendimento</span>
+              <span className="font-semibold text-base">Disponibilidade de atendimento</span>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4 space-y-5">
@@ -493,6 +513,55 @@ export default function HorarioPlantaoTab() {
         </AccordionItem>
 
         {/* ════════════════════════════════════════════════════════════ */}
+        {/* SECTION A.1: HORÁRIO COMERCIAL (CONTRATO)                  */}
+        {/* ════════════════════════════════════════════════════════════ */}
+        <AccordionItem value="horario-comercial" className="border rounded-lg">
+          <AccordionTrigger className="px-4 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-primary" />
+              <span className="font-semibold text-base">Horário comercial</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4 space-y-5">
+            {/* Toggle */}
+            <div className="flex items-center gap-3">
+              <Switch checked={hcEnabled} onCheckedChange={setHcEnabled} id="hc-enabled" />
+              <Label htmlFor="hc-enabled">Ativar horário comercial</Label>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Define o que está incluso no contrato. Todo atendimento trabalhado fora desta
+              janela conta como plantão nos relatórios. Vale para a empresa inteira — não há
+              horário comercial por setor. Sem esta configuração ativa, o plantão continua
+              sendo calculado pela disponibilidade acima.
+            </p>
+
+            {!hcEnabled && (
+              <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
+                <span className="text-blue-400 mt-0.5 text-lg">ℹ️</span>
+                <p className="text-sm text-blue-300">
+                  Enquanto estiver desligado, o relatório usa a disponibilidade de atendimento —
+                  que costuma ser mais larga que o horário comercial e faz o plantão aparecer menos
+                  do que aconteceu.
+                </p>
+              </div>
+            )}
+
+            {hcEnabled && (
+              <div className="space-y-2">
+                <Label>Grade semanal</Label>
+                <WeeklyScheduleGrid value={hcSchedule} onChange={setHcSchedule} idPrefix="hc" />
+              </div>
+            )}
+
+            <Button onClick={handleSaveHC} disabled={saveHC.isPending} size="sm">
+              {saveHC.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+              Salvar Horário comercial
+            </Button>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* ════════════════════════════════════════════════════════════ */}
         {/* SECTION A.2: HOLIDAYS / EXCEPTIONS                         */}
         {/* ════════════════════════════════════════════════════════════ */}
         <BusinessHoursExceptionsSection />
@@ -555,7 +624,7 @@ export default function HorarioPlantaoTab() {
           <AccordionTrigger className="px-4 hover:no-underline">
             <div className="flex items-center gap-2">
               <Phone className="h-5 w-5 text-primary" />
-              <span className="font-semibold text-base">Plantão (Escalação por Insistência)</span>
+              <span className="font-semibold text-base">Escalonamento de plantão (Escalação por Insistência)</span>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4 space-y-5">
