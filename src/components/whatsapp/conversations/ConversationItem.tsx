@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
 import { useGroupMentionLookup } from "../hooks/useGroupMentionLookup";
 import { resolveMentionsToText } from "../chat/mentionUtils";
+import { showsCSTicketAlert } from "@/lib/churnDismiss";
 
 
 interface Props {
@@ -36,7 +37,14 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
   const sentimentData = conv.sentiment as any;
   const { timezone } = useAppTimezone();
-  const needsCSTicket = sentimentData?.needs_cs_ticket && !sentimentData?.cs_ticket_created_id;
+  // O marcador da lista respeita o descarte manual do admin/head — senao o
+  // chat descartado continuaria puxando o olho na lista.
+  const needsCSTicket = showsCSTicketAlert(
+    sentimentData,
+    attendance && (attendance.status === "waiting" || attendance.status === "in_progress")
+      ? attendance.id
+      : null
+  );
 
   const { data: allClientAlerts = [] } = useClientAlerts();
   const clientAlerts = resolveAlertsFor(allClientAlerts, {

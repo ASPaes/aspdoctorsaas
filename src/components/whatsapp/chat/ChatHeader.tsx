@@ -28,6 +28,8 @@ import { EditContactModal } from "./EditContactModal";
 import { QueueIndicator } from "./QueueIndicator";
 import { TransferDialog } from "./TransferDialog";
 import { CSTicketAlert } from "./CSTicketAlert";
+import { useChurnDismiss } from "../hooks/useChurnDismiss";
+import { isChurnDismissed } from "@/lib/churnDismiss";
 import { ChangeInstanceDialog } from "./ChangeInstanceDialog";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { SignatureControl } from "./SignatureControl";
@@ -120,6 +122,15 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   // para que o hook receba o attendanceId correto (fonte oficial do vínculo).
   const { attendanceMap } = useAttendanceStatus([conversation.id], true);
   const attendance = attendanceMap.get(conversation.id);
+  // Ancora do descarte de churn: precisa ser o MESMO atendimento que o
+  // backend considera ativo (waiting|in_progress), senao o sinal some numa
+  // tela e sobra na outra.
+  const activeAttendanceId =
+    attendance && (attendance.status === "waiting" || attendance.status === "in_progress")
+      ? attendance.id
+      : null;
+  const churnDescartado = isChurnDismissed(sentimentData as any, activeAttendanceId);
+  const { setDismissed: setChurnDismissed, isSaving: isSavingChurn } = useChurnDismiss(conversation.id);
 
   // Client link status (declarado antes dos handlers que dependem de linkedCliente)
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
@@ -933,6 +944,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 <DropdownMenuItem onClick={() => setIsManualTicketOpen(true)}>
                   <Ticket className="h-4 w-4 mr-2" /> Abrir Ticket CS
                 </DropdownMenuItem>
+                {isAdmin && churnDescartado && (
+                  <DropdownMenuItem onClick={() => setChurnDismissed(false)} disabled={isSavingChurn}>
+                    <AlertTriangle className="h-4 w-4 mr-2" /> Reativar risco de churn
+                  </DropdownMenuItem>
+                )}
                 {!isGroupConv && (isAdmin || (!!user?.id && attendance?.assigned_to === user.id)) && (
                   <DropdownMenuItem onClick={handleOpenAttendanceTicket}>
                     <FileText className="h-4 w-4 mr-2" /> Abrir Ticket do Atendimento
@@ -1059,8 +1075,9 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
           <ClimaResolucaoBadge
             conversationId={conversation.id}
-            hasActiveAttendance={!!(attendance && (attendance.status === "waiting" || attendance.status === "in_progress"))}
+            hasActiveAttendance={!!activeAttendanceId}
             sentiment={sentimentData}
+            activeAttendanceId={activeAttendanceId}
           />
         </div>
       </div>
@@ -1086,7 +1103,13 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
       )}
 
       {/* CS Ticket Alert Banner */}
-      <CSTicketAlert sentiment={sentimentData} conversation={conversation} variant="banner" />
+      <CSTicketAlert
+        sentiment={sentimentData}
+        conversation={conversation}
+        variant="banner"
+        activeAttendanceId={activeAttendanceId}
+        canDismiss={!!isAdmin}
+      />
 
       {/* Modals */}
       <InChatMessageSearchModal

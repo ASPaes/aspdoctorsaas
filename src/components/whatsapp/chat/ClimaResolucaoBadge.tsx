@@ -2,6 +2,8 @@ import { Loader2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { SentimentChip } from "./SentimentChip";
+import { isChurnDismissed } from "@/lib/churnDismiss";
+import { useUserDisplayName } from "../hooks/useUserDisplayName";
 import {
   useLatestAttendanceResolucao,
   RESOLUCAO_LABEL,
@@ -16,6 +18,8 @@ interface Props {
   conversationId: string;
   hasActiveAttendance: boolean;
   sentiment?: any | null;
+  /** Atendimento ativo — âncora do descarte manual do risco de churn. */
+  activeAttendanceId?: string | null;
 }
 
 const SENTIMENT_EMOJI: Record<string, string> = {
@@ -30,14 +34,24 @@ const SENTIMENT_CLASS: Record<string, string> = {
   negative: "bg-destructive/10 text-destructive border-destructive/20",
 };
 
-export function ClimaResolucaoBadge({ conversationId, hasActiveAttendance, sentiment }: Props) {
+export function ClimaResolucaoBadge({
+  conversationId,
+  hasActiveAttendance,
+  sentiment,
+  activeAttendanceId = null,
+}: Props) {
   const { data: latest } = useLatestAttendanceResolucao(hasActiveAttendance ? null : conversationId);
+  // Um admin/head pode ter descartado o risco por falso positivo. Nesse caso o
+  // clima continua sendo o que a IA leu — só perde o vermelho de alerta, que é
+  // o que puxa o olho do operador para uma conversa que já foi avaliada.
+  const descartado = isChurnDismissed(sentiment, activeAttendanceId);
+  const descartadoPor = useUserDisplayName(descartado ? sentiment?.churn_dismissed_by : null);
 
   // Caso A: atendimento ativo — mostrar clima ao vivo com prefixo "Clima:"
   if (hasActiveAttendance) {
     const s = (sentiment?.sentiment as string) || "neutral";
     const emoji = SENTIMENT_EMOJI[s] ?? "😐";
-    const cls = SENTIMENT_CLASS[s] ?? SENTIMENT_CLASS.neutral;
+    const cls = descartado ? SENTIMENT_CLASS.neutral : (SENTIMENT_CLASS[s] ?? SENTIMENT_CLASS.neutral);
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -53,6 +67,21 @@ export function ClimaResolucaoBadge({ conversationId, hasActiveAttendance, senti
         </TooltipTrigger>
         <TooltipContent className="text-xs">
           Clima ao vivo do atendimento em andamento
+          {descartado && (
+            <p className="max-w-xs pt-1 mt-1 border-t">
+              Risco de churn descartado
+              {descartadoPor ? ` por ${descartadoPor}` : ""}
+              {sentiment?.churn_dismissed_at
+                ? ` em ${new Date(sentiment.churn_dismissed_at).toLocaleString("pt-BR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}`
+                : ""}
+              .
+            </p>
+          )}
           {sentiment?.summary && <p className="max-w-xs pt-1 mt-1 border-t">{sentiment.summary}</p>}
         </TooltipContent>
       </Tooltip>

@@ -31,6 +31,7 @@ import { ContactHistoryUnifiedModal } from "./ContactHistoryUnifiedModal";
 import { ContactTicketsSection } from "./ContactTicketsSection";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { CSTicketAlert } from "./CSTicketAlert";
+import { showsCSTicketAlert } from "@/lib/churnDismiss";
 import { useConversationNotes } from "../hooks/useConversationNotes";
 import { useConversationSummaries } from "../hooks/useConversationSummaries";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
@@ -146,6 +147,9 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const { draft: kbDraft, isLoading: kbLoading, submitForReview, isSubmitting: kbSubmitting } = useKBDraft(closedAttendanceId);
 
   const { attendanceId: relevantAttendanceId, isClosed: isRelevantClosed } = useRelevantAttendance(conversation.id);
+  // Mesma ancora que o ChatHeader e o backend usam: so o atendimento ABERTO
+  // vale como referencia do descarte de churn.
+  const activeAttendanceId = relevantAttendanceId && !isRelevantClosed ? relevantAttendanceId : null;
 
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
   const isClienteLinked = !!(metadata?.cliente_id);
@@ -443,8 +447,14 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
                 )}
 
                 {/* CS Ticket — compact: just a button suggestion */}
-                {sentiment.needs_cs_ticket && !sentiment.cs_ticket_created_id && (
-                  <CSTicketAlert sentiment={sentiment} conversation={conversation} variant="inline" />
+                {showsCSTicketAlert(sentiment, activeAttendanceId) && (
+                  <CSTicketAlert
+                    sentiment={sentiment}
+                    conversation={conversation}
+                    variant="inline"
+                    activeAttendanceId={activeAttendanceId}
+                    canDismiss={!!isAdminOrHead}
+                  />
                 )}
                 {sentiment.cs_ticket_created_id && (
                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted rounded-md p-2">

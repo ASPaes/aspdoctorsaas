@@ -334,7 +334,23 @@ Criterios para abertura de Ticket CS (needs_cs_ticket = true):
       typeof result.churn_evidence === "string" && result.churn_evidence.trim().length > 0 &&
       prevAnalysis?.needs_cs_ticket === true;
 
+    // Descarte manual: um admin/head pode derrubar o sinal de risco desta
+    // conversa (falso positivo). Vale enquanto durar o atendimento em que foi
+    // descartado — `fn_churn_descarte_ativo` compara a ancora com o
+    // atendimento ativo de agora. Consultado so quando o gate ja passou, que e
+    // raro: nao adiciona chamada ao caminho comum.
+    let churnDescartado = false;
     if (churnGate) {
+      const { data: descarte } = await supabase.rpc("fn_churn_descarte_ativo", {
+        p_conversation_id: conversationId,
+      });
+      churnDescartado = descarte === true;
+      if (churnDescartado) {
+        console.log(`[churn-alert] descartado manualmente para conversation ${conversationId}`);
+      }
+    }
+
+    if (churnGate && !churnDescartado) {
       try {
         if (cfg?.churn_alert_enabled) {
           const cutoffIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();

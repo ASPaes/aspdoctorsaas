@@ -57,7 +57,12 @@ export interface ConversationWithContact {
     updated_at: string;
   };
   isLastMessageFromMe?: boolean;
-  sentiment?: { needs_cs_ticket: boolean | null; cs_ticket_created_id: string | null } | null;
+  sentiment?: {
+    needs_cs_ticket: boolean | null;
+    cs_ticket_created_id: string | null;
+    churn_dismissed_at?: string | null;
+    churn_dismissed_attendance_id?: string | null;
+  } | null;
   /**
    * Linha PARCIAL, vinda da busca por contato (search_conversations_by_contact).
    * Essa RPC não devolve `is_group`, `group_jid` nem `metadata`, então o objeto
@@ -220,7 +225,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       if (ids.length === 0) return result;
 
       const { data: sData } = await (supabase.from('whatsapp_sentiment_analysis' as any) as any)
-        .select('conversation_id, needs_cs_ticket, cs_ticket_created_id')
+        .select('conversation_id, needs_cs_ticket, cs_ticket_created_id, churn_dismissed_at, churn_dismissed_attendance_id')
         .in('conversation_id', ids);
       const sentimentMap = new Map((sData ?? []).map((s: any) => [s.conversation_id, s]));
       return result.map((c) => ({ ...c, sentiment: (sentimentMap.get(c.id) as any) ?? null }));
