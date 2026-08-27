@@ -244,7 +244,9 @@ export default function EnviarOmieComPreviaButton({
   // por tenant_id, que a minha versão anterior não tinha. E o erro sobe: `throw` em vez de ignorar.
   const { data: codigosBuscados, error: codigosErro } = useQuery<(string | number)[]>({
     queryKey: ["omie-codigos-do-cliente", tenantId, clienteId],
-    enabled: !codigosOmieDoCliente && !!clienteId && !!tenantId,
+    // length, nao truthiness: a prop chega como [] quando o pai ainda nao carregou, e um array
+    // vazio e truthy — a busca ficava desligada e nenhum cadastro era marcado.
+    enabled: !codigosOmieDoCliente?.length && !!clienteId && !!tenantId,
     queryFn: async () => {
       const { data: ctrs, error: eCtr } = await (supabase.from("contratos") as any)
         .select("id")
@@ -263,7 +265,7 @@ export default function EnviarOmieComPreviaButton({
   });
 
   const ocupadosPeloCliente = new Set(
-    (codigosOmieDoCliente ?? codigosBuscados ?? []).map(String),
+    (codigosOmieDoCliente?.length ? codigosOmieDoCliente : codigosBuscados ?? []).map(String),
   );
 
   type InfoCadastro = { contratos: string[]; doCliente: string[] };
@@ -530,14 +532,16 @@ export default function EnviarOmieComPreviaButton({
             <div className="space-y-3">
               <div className="space-y-1">
                 <div className="text-sm font-medium">
-                  Escolha a qual cadastro do Omie este cliente pertence:
+                  Em qual cadastro de cliente do Omie o contrato deve ser criado?
                 </div>
-                {/* Sem isto a ação parece "aproveitar um contrato que já existe lá", que é o
-                    oposto do que acontece. */}
+                {/* A confusão que isto desfaz: cadastro de CLIENTE e contrato são coisas
+                    diferentes, e a tela misturava as duas. Os números listados dentro de cada card
+                    são o CONTEÚDO daquele cadastro, não outras opções de escolha. */}
                 <div className="text-xs text-muted-foreground">
-                  Um <strong>contrato novo</strong> será criado dentro do cadastro escolhido. Os
-                  contratos listados abaixo são só para você reconhecer qual dos cadastros é o
-                  deste cliente: nenhum deles é reaproveitado.
+                  O Omie tem <strong>dois cadastros de cliente</strong> com este CNPJ. Escolha o que
+                  representa o seu cliente; o contrato novo será criado dentro dele. Os números
+                  listados em cada cadastro são os contratos que já existem lá dentro, mostrados só
+                  para você reconhecer o cadastro certo.
                 </div>
               </div>
               <div className="space-y-2">
@@ -557,6 +561,11 @@ export default function EnviarOmieComPreviaButton({
                     >
                       <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div className="text-sm min-w-0">
+                          {/* "Cadastro" na frente do código: é ele que está sendo escolhido, e sem
+                              a palavra o número se confundia com os de contrato logo abaixo. */}
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                            Cadastro de cliente
+                          </div>
                           <div className="font-medium flex items-center gap-2 flex-wrap">
                             {c?.razao_social ?? "(sem razão social)"}
                             {inativo && (
@@ -585,16 +594,16 @@ export default function EnviarOmieComPreviaButton({
                           {jaUsados > 0 && (
                             <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1">
                               {jaUsados === 1
-                                ? "1 contrato deste cliente já está neste cadastro."
-                                : `${jaUsados} contratos deste cliente já estão neste cadastro.`}
+                                ? "Contém 1 contrato deste cliente."
+                                : `Contém ${jaUsados} contratos deste cliente.`}
                             </div>
                           )}
                           {jaUsados === 0 && (info?.contratos.length ?? 0) > 0 && (
                             <div className="text-[11px] text-muted-foreground mt-1">
                               {info!.contratos.length === 1
-                                ? "1 contrato no Omie"
-                                : `${info!.contratos.length} contratos no Omie`}
-                              : <span className="font-mono">{info!.contratos.join(", ")}</span>
+                                ? "Contém 1 contrato: "
+                                : `Contém ${info!.contratos.length} contratos: `}
+                              <span className="font-mono">{info!.contratos.join(", ")}</span>
                             </div>
                           )}
                           {infoLoading && (
@@ -604,7 +613,7 @@ export default function EnviarOmieComPreviaButton({
                           )}
                           {!infoLoading && !infoErro && (info?.contratos.length ?? 0) === 0 && (
                             <div className="text-[11px] text-muted-foreground mt-1">
-                              Nenhum contrato neste cadastro.
+                              Cadastro vazio: nenhum contrato dentro dele.
                             </div>
                           )}
                           {!!(infoErro || codigosErro) && (
@@ -620,6 +629,10 @@ export default function EnviarOmieComPreviaButton({
                             type="button"
                             variant="outline"
                             size="sm"
+                            // shrink-0 + nowrap: sem isso o botão quebrava para a linha de baixo
+                            // quando o card tinha a lista de contratos, e os dois cards ficavam
+                            // com o botão em posições diferentes.
+                            className="shrink-0 whitespace-nowrap"
                             onClick={() => setConfirmandoVinculo(codigo)}
                             disabled={vinculando != null}
                           >
@@ -627,7 +640,7 @@ export default function EnviarOmieComPreviaButton({
                             {/* NÃO é "vincular o contrato": o de/para gravado aqui é o do CLIENTE,
                                 e o contrato é CRIADO novo dentro desse cadastro. O rótulo antigo
                                 ("Vincular a este") sugeria reaproveitar um contrato existente. */}
-                            Usar este e criar o contrato
+                            Criar o contrato aqui
                           </Button>
                         )}
                       </div>
