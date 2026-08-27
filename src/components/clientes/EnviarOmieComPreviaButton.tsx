@@ -190,12 +190,22 @@ export default function EnviarOmieComPreviaButton({
   contrato,
   clienteId,
   onEnviado,
+  codigosOmieDoCliente,
 }: {
   tenantId: string;
   contrato: ContratoParaEnvioOmie;
   clienteId: string;
   /** Chamado após o envio dar certo — para a tela de origem revalidar o que mostra. */
   onEnviado?: (omieContractId: string | number | null) => void;
+  /**
+   * Contratos do Omie que os OUTROS contratos deste cliente já ocupam. Serve para, num CNPJ com
+   * cadastro duplicado no Omie, apontar qual dos cadastros já é o do cliente.
+   *
+   * Vem de fora de propósito: quem chama já calculou isso para decidir o selo "Sincronizado" de
+   * cada contrato. A versão anterior refazia a conta aqui, com duas consultas cujo erro eu não
+   * checava — quando não respondiam, o refinamento sumia sem dizer nada.
+   */
+  codigosOmieDoCliente?: (string | number)[];
 }) {
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -229,13 +239,21 @@ export default function EnviarOmieComPreviaButton({
   // pelo código, e escolher o errado cria o contrato num cadastro separado dos outros — o cliente
   // fica partido em dois no Omie, cada metade com uma parte da cobrança. VALEMAR, 27/08/2026: dois
   // contratos já vinculados no 7248327517 e o terceiro sendo criado, com o 7248327513 vazio ao lado.
+  const ocupadosPeloCliente = new Set((codigosOmieDoCliente ?? []).map(String));
+
   type InfoCadastro = { contratos: string[]; doCliente: string[] };
   const {
     data: infoCadastros,
     isLoading: infoLoading,
     error: infoErro,
   } = useQuery<Record<string, InfoCadastro>>({
-    queryKey: ["omie-cadastro-em-uso", tenantId, clienteId, codigosCandidatos.join(",")],
+    queryKey: [
+      "omie-cadastro-em-uso",
+      tenantId,
+      clienteId,
+      codigosCandidatos.join(","),
+      [...ocupadosPeloCliente].sort().join(","),
+    ],
     enabled: codigosCandidatos.length >= 2 && !!clienteId,
     queryFn: async () => {
       // O que cada cadastro duplicado tem de contrato no Omie. Esta parte sozinha já desempata a
@@ -254,27 +272,11 @@ export default function EnviarOmieComPreviaButton({
         if (e.codigo_contrato_omie != null && !lista.includes(String(e.codigo_contrato_omie))) {
           lista.push(String(e.codigo_contrato_omie));
         }
-        info[String(e.codigo_cliente_omie)] = { contratos: lista, doCliente: [] };
-      }
-
-      // Enfeite por cima, não requisito: quais desses contratos já pertencem a ESTE cliente do DS.
-      // Se falhar, a lista de contratos acima continua valendo.
-      try {
-        const { data: ctrs } = await (supabase.from("contratos") as any)
-          .select("id")
-          .eq("cliente_id", clienteId);
-        const ids = (ctrs ?? []).map((c: any) => c.id);
-        if (ids.length) {
-          const { data: rec } = await (supabase.from("reconciliacao_cadastro") as any)
-            .select("ds_contract_id, candidato_escolhido, codigo_contrato_omie")
-            .in("ds_contract_id", ids);
-          const ocupados = new Set([...mapaVinculoOmie(rec as any[]).values()].map(String));
-          for (const chave of Object.keys(info)) {
-            info[chave].doCliente = info[chave].contratos.filter((c) => ocupados.has(c));
-          }
-        }
-      } catch {
-        /* mantém só a lista de contratos do cadastro */
+        // O que já é deste cliente sai da prop, não de consulta nova: quem chama já tem esse dado.
+        info[String(e.codigo_cliente_omie)] = {
+          contratos: lista,
+          doCliente: lista.filter((c) => ocupadosPeloCliente.has(c)),
+        };
       }
       return info;
     },
@@ -566,9 +568,9 @@ export default function EnviarOmieComPreviaButton({
                               verificando os contratos deste cadastro…
                             </div>
                           )}
-                          {!infoLoading && !infoErro && info == null && (
+                          {!infoLoading && !infoErro && (info?.contratos.length ?? 0) === 0 && (
                             <div className="text-[11px] text-muted-foreground mt-1">
-                              Este cadastro não está no espelho do Omie: nenhum contrato conhecido aqui.
+                              Nenhum contrato neste cadastro.
                             </div>
                           )}
                           {!!infoErro && (

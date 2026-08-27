@@ -80,6 +80,12 @@ export default function IntegracaoOmieSection({ clienteId }: Props) {
   }
 
   const contratos = contratosQuery.data ?? [];
+  // Os contratos do Omie que este cliente já ocupa. Vai para o botão porque, num CNPJ com cadastro
+  // duplicado no Omie, é o que diz qual dos cadastros já é o do cliente. Sai daqui e não de uma
+  // consulta dentro do botão: este dado já foi calculado acima para decidir cada selo.
+  const codigosOmieDoCliente = contratos
+    .map((c) => c.codigo_contrato_omie)
+    .filter((v): v is string | number => v != null);
 
   return (
     <section className="px-6 py-4">
@@ -111,6 +117,7 @@ export default function IntegracaoOmieSection({ clienteId }: Props) {
               contrato={contratos[0]}
               clienteId={clienteId}
               onEnviado={() => contratosQuery.refetch()}
+                  codigosOmieDoCliente={codigosOmieDoCliente}
             />
           </div>
         </div>
@@ -132,6 +139,7 @@ export default function IntegracaoOmieSection({ clienteId }: Props) {
                   contrato={c}
                   clienteId={clienteId}
                   onEnviado={() => contratosQuery.refetch()}
+                  codigosOmieDoCliente={codigosOmieDoCliente}
                 />
               </div>
             </div>
