@@ -239,7 +239,32 @@ export default function EnviarOmieComPreviaButton({
   // pelo código, e escolher o errado cria o contrato num cadastro separado dos outros — o cliente
   // fica partido em dois no Omie, cada metade com uma parte da cobrança. VALEMAR, 27/08/2026: dois
   // contratos já vinculados no 7248327517 e o terceiro sendo criado, com o 7248327513 vazio ao lado.
-  const ocupadosPeloCliente = new Set((codigosOmieDoCliente ?? []).map(String));
+  // Quando o pai não passa a lista (o diálogo de fim de cadastro de produto não passa), busca aqui.
+  // A forma é a MESMA da IntegracaoOmieSection, que comprovadamente funciona — inclusive o filtro
+  // por tenant_id, que a minha versão anterior não tinha. E o erro sobe: `throw` em vez de ignorar.
+  const { data: codigosBuscados, error: codigosErro } = useQuery<(string | number)[]>({
+    queryKey: ["omie-codigos-do-cliente", tenantId, clienteId],
+    enabled: !codigosOmieDoCliente && !!clienteId && !!tenantId,
+    queryFn: async () => {
+      const { data: ctrs, error: eCtr } = await (supabase.from("contratos") as any)
+        .select("id")
+        .eq("cliente_id", clienteId)
+        .eq("tenant_id", tenantId);
+      if (eCtr) throw eCtr;
+      const ids = (ctrs ?? []).map((c: any) => c.id);
+      if (!ids.length) return [];
+      const { data: rec, error: eRec } = await (supabase.from("reconciliacao_cadastro") as any)
+        .select("ds_contract_id, candidato_escolhido, codigo_contrato_omie")
+        .eq("tenant_id", tenantId)
+        .in("ds_contract_id", ids);
+      if (eRec) throw eRec;
+      return [...mapaVinculoOmie(rec as any[]).values()];
+    },
+  });
+
+  const ocupadosPeloCliente = new Set(
+    (codigosOmieDoCliente ?? codigosBuscados ?? []).map(String),
+  );
 
   type InfoCadastro = { contratos: string[]; doCliente: string[] };
   const {
@@ -503,8 +528,17 @@ export default function EnviarOmieComPreviaButton({
 
           {candidatos.length >= 2 && (
             <div className="space-y-3">
-              <div className="text-sm font-medium">
-                Escolha a qual cadastro do Omie este cliente pertence:
+              <div className="space-y-1">
+                <div className="text-sm font-medium">
+                  Escolha a qual cadastro do Omie este cliente pertence:
+                </div>
+                {/* Sem isto a ação parece "aproveitar um contrato que já existe lá", que é o
+                    oposto do que acontece. */}
+                <div className="text-xs text-muted-foreground">
+                  Um <strong>contrato novo</strong> será criado dentro do cadastro escolhido. Os
+                  contratos listados abaixo são só para você reconhecer qual dos cadastros é o
+                  deste cliente: nenhum deles é reaproveitado.
+                </div>
               </div>
               <div className="space-y-2">
                 {candidatos.map((c, i) => {
@@ -573,10 +607,10 @@ export default function EnviarOmieComPreviaButton({
                               Nenhum contrato neste cadastro.
                             </div>
                           )}
-                          {!!infoErro && (
+                          {!!(infoErro || codigosErro) && (
                             <div className="text-[11px] text-amber-700 dark:text-amber-400 mt-1">
-                              Não consegui verificar os contratos deste cadastro ({String(
-                                (infoErro as any)?.message ?? infoErro,
+                              Não consegui verificar este cadastro ({String(
+                                (infoErro as any)?.message ?? (codigosErro as any)?.message ?? infoErro ?? codigosErro,
                               ).slice(0, 120)}).
                             </div>
                           )}
@@ -590,7 +624,10 @@ export default function EnviarOmieComPreviaButton({
                             disabled={vinculando != null}
                           >
                             {esteVinculando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                            Vincular a este
+                            {/* NÃO é "vincular o contrato": o de/para gravado aqui é o do CLIENTE,
+                                e o contrato é CRIADO novo dentro desse cadastro. O rótulo antigo
+                                ("Vincular a este") sugeria reaproveitar um contrato existente. */}
+                            Usar este e criar o contrato
                           </Button>
                         )}
                       </div>
