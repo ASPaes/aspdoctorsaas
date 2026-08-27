@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Agosto / 2026
 
+### 27/08
+
+- 🔧 **Atendimento — produto do catálogo enviado pelo cliente aparecia como "Mensagem não suportada"** — Quando o cliente compartilhava um **item do catálogo do WhatsApp Business dele** (aquele card de produto com nome e preço), o chat mostrava apenas *📎 Mensagem não suportada* e o operador não tinha como saber o que tinha sido enviado — precisava pedir para o cliente repetir. Agora o card chega legível, com **nome do produto e preço** (ex.: *🛍️ Tele entrega Centro — R$ 5,00*); sem preço, mostra só o nome; sem nome, a descrição. A **foto** do card não é baixada — o WhatsApp não a entrega para sistemas externos —, mas o texto do produto agora fica registrado no histórico da conversa. As mensagens antigas continuam como estavam: só vale para as que chegarem daqui em diante.
+
 ### 26/08
 
 - ⬆️ **Configurações — o bloco que define o plantão mudou de nome para parar de ser confundido com a disponibilidade** — Em *Configurações · Horário e plantão* existiam dois blocos com nome quase igual: **Disponibilidade de atendimento** e **Horário comercial**. São coisas diferentes e era fácil configurar um achando que era o outro. O segundo agora se chama **Horário padrão da empresa (base do plantão)** e explica, logo abaixo do título, para que serve: é o horário que o contrato cobre e **todo atendimento feito fora dessa janela é marcado como plantão**, aparecendo nos filtros e nos painéis de atendimento. O texto também diz, com todas as letras, no que ele difere da Disponibilidade logo acima — aquela é operação (quando o time está no ar, quando dispara a mensagem de fora do horário, e pode variar por setor); esta é contrato (o que está incluso, valendo para a empresa inteira). No **Dashboard de atendimento**, o filtro "Só horário comercial" passou a se chamar **"Só horário padrão"**, para bater com o nome do que ele filtra. Nenhuma configuração sua foi alterada — mudou só o nome e a explicação.

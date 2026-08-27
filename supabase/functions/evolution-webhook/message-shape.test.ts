@@ -261,3 +261,53 @@ describe("ruído — não pode virar mensagem no chat", () => {
     expect(isIgnorableMessage({ ephemeralMessage: { message: { albumMessage: {} } } })).toBe("albumMessage");
   });
 });
+
+// Card de produto do catálogo do WhatsApp Business. Chegou depois do fix de
+// 10/08 e continuava virando rótulo: 3 msgs desde 12/08 (unsupportedKeys
+// ["productMessage","messageContextInfo"]). As chaves de fora vieram do banco;
+// os campos de dentro (title, priceAmount1000, currencyCode) vieram do proto.
+describe("card de produto do catálogo", () => {
+  it("mostra título e preço", () => {
+    expect(parse({
+      productMessage: {
+        businessOwnerJid: "555597209965@s.whatsapp.net",
+        product: {
+          productId: "123",
+          title: "Tele entrega Centro",
+          description: "Bairro Centro",
+          currencyCode: "BRL",
+          priceAmount1000: "5000",
+          productImage: { mimetype: "image/jpeg" },
+        },
+      },
+      messageContextInfo: {},
+    })).toEqual({ type: "text", content: "🛍️ Tele entrega Centro — R$ 5,00" });
+  });
+
+  it("preço vem como número também", () => {
+    expect(parse({ productMessage: { product: { title: "X", priceAmount1000: 1500, currencyCode: "BRL" } } }))
+      .toEqual({ type: "text", content: "🛍️ X — R$ 1,50" });
+  });
+
+  it("sem preço mostra só o título", () => {
+    expect(parse({ productMessage: { product: { title: "Combo 1" } } }))
+      .toEqual({ type: "text", content: "🛍️ Combo 1" });
+  });
+
+  it("sem título cai na descrição", () => {
+    expect(parse({ productMessage: { product: { description: "Entrega Bairro Alto" } } }))
+      .toEqual({ type: "text", content: "🛍️ Entrega Bairro Alto" });
+  });
+
+  it("produto vazio nunca volta para o rótulo de não suportada", () => {
+    expect(parse({ productMessage: {} }))
+      .toEqual({ type: "text", content: "🛍️ Produto do catálogo" });
+    expect(parse({ productMessage: { product: { priceAmount1000: "0", currencyCode: "ZZZ" } } }))
+      .toEqual({ type: "text", content: "🛍️ Produto do catálogo" });
+  });
+
+  it("card de produto não é ruído: tem que virar mensagem no chat", () => {
+    expect(isIgnorableMessage({ productMessage: { product: { title: "X" } }, messageContextInfo: {} }))
+      .toBe(false);
+  });
+});

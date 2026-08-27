@@ -110,6 +110,45 @@ function templateText(t: any): string {
   );
 }
 
+/**
+ * Preço do card de catálogo. O Baileys manda o valor em milésimos e, por ser
+ * int64, o protobuf entrega como STRING — daí aceitar os dois.
+ */
+function productPrice(prod: any): string {
+  const raw = prod?.priceAmount1000 ?? prod?.salePriceAmount1000;
+  const n = typeof raw === 'string' ? Number(raw) : raw;
+  if (typeof n !== 'number' || !Number.isFinite(n) || n <= 0) return '';
+  const code = typeof prod?.currencyCode === 'string' && /^[A-Za-z]{3}$/.test(prod.currencyCode)
+    ? prod.currencyCode.toUpperCase()
+    : 'BRL';
+  try {
+    // O Intl separa "R$" do número com espaço NBSP; troca por espaço normal
+    // para o texto gravado no banco continuar pesquisável.
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: code })
+      .format(n / 1000)
+      .replace(/\u00A0/g, ' ');
+  } catch {
+    return (n / 1000).toFixed(2);
+  }
+}
+
+/**
+ * Card de produto do catálogo do WhatsApp Business. O cliente manda um item do
+ * catálogo dele e o chat mostrava "📎 Mensagem não suportada" (medido em prod:
+ * 3 casos desde o fix de 10/08 — 12/08, 26/08 e 27/08).
+ *
+ * Fica em `text` de propósito: a foto vive em `product.productImage`, que não é
+ * uma mensagem de mídia que a Evolution saiba servir pelo `key` — pedir download
+ * daria spinner eterno no chat.
+ */
+function productText(p: any): string {
+  const prod = p?.product || {};
+  const head = [firstText(prod.title), productPrice(prod)].filter(Boolean).join(' — ');
+  if (head) return `🛍️ ${head}`;
+  const desc = firstText(prod.description);
+  return desc ? `🛍️ ${desc}` : '🛍️ Produto do catálogo';
+}
+
 function interactiveResponseText(r: any): string {
   const body = firstText(r?.body?.text);
   if (body) return body;
@@ -167,6 +206,7 @@ export function getMessageContent(message: any, type: string): string {
     const i = message.interactiveMessage;
     return firstText(i.body?.text, i.header?.title, i.header?.subtitle, i.footer?.text) || '💬 Mensagem interativa';
   }
+  if (message.productMessage) return productText(message.productMessage);
   if (message.groupInviteMessage) {
     const name = firstText(message.groupInviteMessage.groupName);
     return name ? `👥 Convite para o grupo "${name}"` : '👥 Convite para grupo';
