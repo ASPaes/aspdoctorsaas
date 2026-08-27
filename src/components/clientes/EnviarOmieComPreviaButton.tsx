@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { mapaVinculoOmie } from "@/lib/omieVinculo";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -211,6 +213,55 @@ export default function EnviarOmieComPreviaButton({
   // Fica AQUI, com os outros hooks: mais abaixo há um early return (contrato.sincronizado), e um
   // useState depois dele muda a contagem de hooks entre renders.
   const [corteDispensado, setCorteDispensado] = useState(false);
+  // Confirmação inline do "Vincular a este": era window.confirm, destoando de todo o resto e sem
+  // dizer a consequência inteira. Inline em vez de outro AlertDialog para não aninhar diálogo.
+  const [confirmandoVinculo, setConfirmandoVinculo] = useState<number | string | null>(null);
+
+  const codigosCandidatos = candidatos
+    .map((c) => c?.codigo_cliente_omie)
+    .filter((v) => v != null)
+    .map(String);
+
+  // Qual dos cadastros duplicados do Omie já é o "de casa" deste cliente.
+  //
+  // Sem isto a escolha é às cegas: os candidatos aparecem com a MESMA razão social e só diferem
+  // pelo código, e escolher o errado cria o contrato num cadastro separado dos outros — o cliente
+  // fica partido em dois no Omie, cada metade com uma parte da cobrança. VALEMAR, 27/08/2026: dois
+  // contratos já vinculados no 7248327517 e o terceiro sendo criado, com o 7248327513 vazio ao lado.
+  const { data: contratosPorCadastro } = useQuery<Record<string, number>>({
+    queryKey: ["omie-cadastro-em-uso", clienteId, codigosCandidatos.join(",")],
+    enabled: codigosCandidatos.length >= 2 && !!clienteId,
+    queryFn: async () => {
+      const { data: ctrs } = await (supabase.from("contratos") as any)
+        .select("id")
+        .eq("cliente_id", clienteId);
+      const ids = (ctrs ?? []).map((c: any) => c.id);
+      if (!ids.length) return {};
+
+      // Os contratos Omie que os OUTROS contratos deste cliente já ocupam.
+      const { data: rec } = await (supabase.from("reconciliacao_cadastro") as any)
+        .select("ds_contract_id, candidato_escolhido, codigo_contrato_omie")
+        .in("ds_contract_id", ids);
+      const ocupados = new Set([...mapaVinculoOmie(rec as any[]).values()].map(String));
+      if (!ocupados.size) return {};
+
+      // A quem pertence cada um desses contratos, do lado do Omie.
+      const { data: esp } = await (supabase.from("omie_espelho_cadastro") as any)
+        .select("codigo_cliente_omie, codigo_contrato_omie, contratos_omie")
+        .in("codigo_cliente_omie", codigosCandidatos);
+
+      const porCadastro: Record<string, number> = {};
+      for (const e of (esp ?? []) as any[]) {
+        const desteCadastro = Array.isArray(e.contratos_omie)
+          ? e.contratos_omie.map((c: any) => String(c?.codigo_contrato_omie))
+          : [];
+        if (e.codigo_contrato_omie != null) desteCadastro.push(String(e.codigo_contrato_omie));
+        const n = desteCadastro.filter((c) => ocupados.has(c)).length;
+        if (n > 0) porCadastro[String(e.codigo_cliente_omie)] = n;
+      }
+      return porCadastro;
+    },
+  });
   // Enviado NESTA sessão do componente: sem isto, o botão continua dizendo "Enviar ao Omie"
   // depois do sucesso e convida a mandar de novo.
   const [enviadoAgora, setEnviadoAgora] = useState<string | number | null | undefined>(undefined);
@@ -346,13 +397,9 @@ export default function EnviarOmieComPreviaButton({
 
   const handleVincular = async (candidato: any) => {
     const codigo = candidato?.codigo_cliente_omie;
-    const razao = candidato?.razao_social ?? "(sem razão social)";
-    const ok = window.confirm(
-      `Vincular este cliente ao cadastro ${razao} (código ${codigo}) no Omie?\n` +
-        "Isso define para onde todas as futuras sincronizações deste cliente vão."
-    );
-    if (!ok) return;
-
+    // A confirmação agora é inline no card do candidato: mostra a consequência e, quando o cadastro
+    // escolhido não é o que já tem os contratos deste cliente, avisa que ele fica partido em dois
+    // no Omie. O window.confirm que havia aqui não dizia isso e destoava do resto da tela.
     setVinculando(codigo);
     try {
       const { data, error } = await supabase.functions.invoke("omie-integration-call", {
@@ -389,6 +436,7 @@ export default function EnviarOmieComPreviaButton({
 
       setBloqueioOpen(false);
       setCandidatos([]);
+      setConfirmandoVinculo(null);
       toast.success(`Cliente vinculado ao cadastro ${codigo}. Enviando...`);
       handleConfirm();
     } catch {
@@ -444,37 +492,100 @@ export default function EnviarOmieComPreviaButton({
                   const codigo = c?.codigo_cliente_omie;
                   const inativo = c?.inativo === "S";
                   const esteVinculando = vinculando === codigo;
+                  const jaUsados = contratosPorCadastro?.[String(codigo)] ?? 0;
+                  const confirmando = confirmandoVinculo != null && String(confirmandoVinculo) === String(codigo);
                   return (
                     <div
                       key={`${codigo ?? "sem-codigo"}-${i}`}
-                      className="flex items-center justify-between gap-3 border rounded-md p-3 flex-wrap"
+                      className={`border rounded-md p-3 ${
+                        jaUsados > 0 ? "border-emerald-300 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20" : ""
+                      }`}
                     >
-                      <div className="text-sm min-w-0">
-                        <div className="font-medium flex items-center gap-2">
-                          {c?.razao_social ?? "(sem razão social)"}
-                          {inativo && (
-                            <Badge
-                              variant="outline"
-                              className="text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-900"
-                            >
-                              inativo no Omie
-                            </Badge>
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="text-sm min-w-0">
+                          <div className="font-medium flex items-center gap-2 flex-wrap">
+                            {c?.razao_social ?? "(sem razão social)"}
+                            {inativo && (
+                              <Badge
+                                variant="outline"
+                                className="text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-900"
+                              >
+                                inativo no Omie
+                              </Badge>
+                            )}
+                            {jaUsados > 0 && (
+                              <Badge
+                                variant="outline"
+                                className="text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-900"
+                              >
+                                já usado por este cliente
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-muted-foreground font-mono text-xs">
+                            código {codigo ?? "—"}
+                          </div>
+                          {/* O sinal que decide: sem ele os dois cadastros são indistinguíveis. */}
+                          {jaUsados > 0 && (
+                            <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1">
+                              {jaUsados === 1
+                                ? "1 contrato deste cliente já está neste cadastro."
+                                : `${jaUsados} contratos deste cliente já estão neste cadastro.`}
+                            </div>
                           )}
                         </div>
-                        <div className="text-muted-foreground font-mono text-xs">
-                          código {codigo ?? "—"}
-                        </div>
+                        {!confirmando && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setConfirmandoVinculo(codigo)}
+                            disabled={vinculando != null}
+                          >
+                            {esteVinculando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            Vincular a este
+                          </Button>
+                        )}
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleVincular(c)}
-                        disabled={vinculando != null}
-                      >
-                        {esteVinculando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Vincular a este
-                      </Button>
+
+                      {confirmando && (
+                        <div className="mt-2 rounded border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-2 space-y-2">
+                          <div className="text-xs text-amber-800 dark:text-amber-300">
+                            Este cliente passa a pertencer ao cadastro{" "}
+                            <strong className="font-mono">{codigo}</strong> no Omie, e o contrato será
+                            criado lá. Vale para <strong>todas</strong> as sincronizações seguintes
+                            deste cliente.
+                            {jaUsados === 0 && (
+                              <>
+                                {" "}
+                                Nenhum contrato deste cliente está neste cadastro hoje: se os outros
+                                estiverem no cadastro ao lado, o cliente fica dividido em dois no Omie.
+                              </>
+                            )}
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setConfirmandoVinculo(null)}
+                              disabled={vinculando != null}
+                            >
+                              Cancelar
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="bg-amber-600 hover:bg-amber-700"
+                              onClick={() => handleVincular(c)}
+                              disabled={vinculando != null}
+                            >
+                              {esteVinculando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                              Vincular e enviar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
