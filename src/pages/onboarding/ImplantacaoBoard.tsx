@@ -294,6 +294,12 @@ export default function ImplantacaoBoard({
         toast.warning("Treinamento fechado sem a chamada", {
           description: "Abra a jornada e marque quem participou.",
         });
+      } else if (res?.estornado) {
+        // Saiu da coluna de conclusão: a RPC desfaz o "realizado" e o cartão do pai
+        // volta a contar o treino como aberto — o go-live fica barrado de novo.
+        toast.success("Conclusão do treinamento estornada", {
+          description: "O treino voltou para a fila e o go-live está bloqueado até refazê-lo.",
+        });
       } else {
         toast.success(res?.realizado ? "Treinamento concluído" : "Etapa atualizada");
       }
