@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertCircle, CheckCircle2, Link2, Loader2, RefreshCw, Sparkles,
 } from "lucide-react";
@@ -237,21 +238,51 @@ export default function OmieEscolherCandidatoTab() {
     });
   }
 
-  async function confirmar(cnpj: string, confirmacoes: Confirmacao[], key: string) {
+  async function confirmar(cnpj: string, confirmacoes: Confirmacao[], key: string, permitirTroca = false) {
     if (!confirmacoes.length) return;
     setBusy(key);
     setErros((p) => ({ ...p, [cnpj]: null }));
     try {
       const { data, error } = await supabase.functions.invoke("recon-candidato-confirmar", {
-        body: { ...contaBody, tenant_id: tid, confirmacoes },
+        body: {
+          ...contaBody,
+          tenant_id: tid,
+          confirmacoes,
+          // Só pela dupla confirmação: sem a flag o de/para recusa a colisão, que é o default seguro.
+          ...(permitirTroca ? { permitir_troca: true } : {}),
+        },
       });
-      if (error) throw error;
-      const res = data as any;
+      // O supabase-js descarta o corpo em não-2xx e sobra "non-2xx status code" — e é exatamente
+      // nos 409 que a function escreve o motivo. Com o throw seco, todo o tratamento de invalidos e
+      // colisão abaixo era código morto e o operador só via a mensagem genérica.
+      let res = data as any;
+      if (error) {
+        const ctx = (error as any)?.context;
+        const cru = typeof ctx?.text === "function" ? await ctx.text().catch(() => "") : "";
+        let corpo: any = null;
+        try {
+          corpo = cru ? JSON.parse(cru) : null;
+        } catch {
+          /* não era JSON */
+        }
+        if (!corpo || typeof corpo !== "object") {
+          throw new Error(`HTTP ${ctx?.status ?? "?"}: ${cru.slice(0, 300) || error.message}`);
+        }
+        if (!corpo.error && (corpo.message || corpo.msg)) {
+          throw new Error(`HTTP ${ctx?.status ?? "?"}: ${corpo.message || corpo.msg}`);
+        }
+        res = corpo;
+      }
       if (res?.ok) {
         const resolvidos: { ds_contract_id: string }[] = res.resolvidos ?? [];
         removeResolvidos(resolvidos.map((r) => r.ds_contract_id));
         await qc.invalidateQueries({ queryKey: ["recon-escolher-candidato", "listar", tid, conta?.id] });
-        toast.success(`${res.vinculados ?? resolvidos.length} vínculo(s) criados`);
+        const t = res.transferidos?.[0];
+        toast.success(
+          t
+            ? `Vínculo transferido. O contrato Omie ${t.omie_contract_id} mudou de dono; o anterior voltou para a fila.`
+            : `${res.vinculados ?? resolvidos.length} vínculo(s) criados`,
+        );
       } else {
         // interpretar erros 409
         const detalhe = res?.detalhe ?? res;
@@ -409,6 +440,14 @@ export default function OmieEscolherCandidatoTab() {
                 }
                 if (!confs.length) return;
                 confirmar(g.cnpj_norm, confs, g.cnpj_norm);
+              }}
+              onTrocar={(ds_contract_id, codigo_contrato_omie) => {
+                confirmar(
+                  g.cnpj_norm,
+                  [{ ds_contract_id, codigo_contrato_omie }],
+                  g.cnpj_norm,
+                  true,
+                );
               }}
             />
           ))}
@@ -605,7 +644,7 @@ function ErroBox({ erro }: { erro: ErrorState }) {
 
 function GrupoCard({
   grupo, escolhas, setEscolha, erro, busy,
-  onConfirmarLimpo, onConfirmarDecisao, onConfirmarPareamento,
+  onConfirmarLimpo, onConfirmarDecisao, onConfirmarPareamento, onTrocar,
 }: {
   grupo: Grupo;
   escolhas: Record<string, number>;
@@ -615,8 +654,12 @@ function GrupoCard({
   onConfirmarLimpo: () => void;
   onConfirmarDecisao: () => void;
   onConfirmarPareamento: () => void;
+  onTrocar: (ds_contract_id: string, codigo_contrato_omie: number) => void;
 }) {
   const isBusy = busy === grupo.cnpj_norm;
+  // Troca de dono: candidato + linha DS em confirmação, e o "tenho certeza" que arma o botão.
+  const [troca, setTroca] = useState<{ cand: Candidato; ds: ContratoDS } | null>(null);
+  const [trocaCiente, setTrocaCiente] = useState(false);
   const cabecalho = grupo.contratos_ds[0];
   const nome = cabecalho?.nome_fantasia_ds || cabecalho?.razao_ds || "—";
 
@@ -690,6 +733,70 @@ function GrupoCard({
         {(grupo.pista === "parear" || grupo.pista === "conflito") && renderPareamento()}
         {grupo.pista === "bloqueado" && renderBloqueado()}
       </CardContent>
+
+      <AlertDialog
+        open={troca !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setTroca(null);
+            setTrocaCiente(false);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-amber-700 dark:text-amber-400">
+              Trocar o dono deste contrato do Omie?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="rounded border p-2 text-sm">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                    Contrato do Omie
+                  </div>
+                  <div className="font-mono text-sm">{troca?.cand.codigo_contrato_omie}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {troca?.cand.razao_social_omie} · {formatBRL(troca?.cand.valor_omie)}
+                  </div>
+                </div>
+                <div className="rounded border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-2 py-2 text-xs text-amber-800 dark:text-amber-300 space-y-1.5">
+                  <div>
+                    Ele já pertence a outro contrato do DoctorSaaS e passará para{" "}
+                    <strong>{troca?.ds.numero_ds ? `nº ${troca.ds.numero_ds}` : troca?.ds.razao_ds}</strong>.
+                  </div>
+                  <div>
+                    Daqui pra frente, reajuste e cancelamento deste contrato do Omie saem do contrato novo. O
+                    contrato anterior fica sem vínculo e volta para a fila.
+                  </div>
+                </div>
+                <label className="flex items-start gap-2 text-xs cursor-pointer">
+                  <Checkbox
+                    checked={trocaCiente}
+                    onCheckedChange={(v) => setTrocaCiente(v === true)}
+                    className="mt-0.5"
+                  />
+                  <span>Tenho certeza de que este contrato do Omie deve passar a pertencer a este contrato.</span>
+                </label>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBusy}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!trocaCiente || isBusy}
+              className="bg-amber-600 hover:bg-amber-700 focus:ring-amber-600"
+              onClick={(e) => {
+                // Segura o fechamento automático: o operador precisa ver o resultado da troca.
+                e.preventDefault();
+                if (troca) onTrocar(troca.ds.ds_contract_id, Number(troca.cand.codigo_contrato_omie));
+              }}
+            >
+              {isBusy ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+              Trocar o vínculo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 
@@ -749,7 +856,26 @@ function GrupoCard({
                 >
                   <RadioGroupItem id={id} value={String(c.codigo_contrato_omie)} disabled={disabled} className="mt-1" />
                   <CandidatoInfo c={c} recomendado={recomendado} sugestao={sugestaoFor(ds, c)} />
-                  {c.ja_vinculado_hint && <Badge variant="outline" className="text-[10px] shrink-0">já vinculado</Badge>}
+                  {c.ja_vinculado_hint && (
+                    <>
+                      <Badge variant="outline" className="text-[10px] shrink-0">já vinculado</Badge>
+                      {/* Sem isto o candidato tomado só podia ser olhado. A troca não passa pelo
+                          radio de propósito: é outra decisão, com outra confirmação. */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-[11px] shrink-0 text-amber-700 dark:text-amber-400"
+                        disabled={isBusy}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setTrocaCiente(false);
+                          setTroca({ cand: c, ds });
+                        }}
+                      >
+                        Trocar
+                      </Button>
+                    </>
+                  )}
                 </Label>
               );
             })}
@@ -867,12 +993,20 @@ function GrupoCard({
   }
 
   function renderBloqueado() {
+    // "Bloqueado" é nOmieDisp === 0, e isso tem DOIS significados que a tela tratava igual: não
+    // existe candidato nenhum, ou existem e estão todos tomados por outras linhas do DS. No segundo
+    // caso a tela dizia "nenhum contrato candidato" e escondia os candidatos — beco sem saída, e é
+    // o caso comum quando o mesmo CNPJ tem vários contratos no DS (VALEMAR, 27/08/2026).
+    const todosTomados = grupo.candidatos.length > 0;
+    const dsUnico = grupo.contratos_ds.length === 1 ? grupo.contratos_ds[0] : null;
     return (
       <div className="space-y-2">
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription className="text-xs">
-            Nenhum contrato Omie candidato para este CNPJ. Resolver manualmente.
+            {todosTomados
+              ? "Todos os contratos Omie deste CNPJ já pertencem a outros contratos do DoctorSaaS. Para vincular um deles aqui, é preciso trocar o dono."
+              : "Nenhum contrato Omie candidato para este CNPJ. Resolver manualmente."}
           </AlertDescription>
         </Alert>
         <div className="space-y-2">
@@ -882,6 +1016,35 @@ function GrupoCard({
             </div>
           ))}
         </div>
+        {todosTomados && (
+          <div className="rounded border p-3 space-y-2">
+            <div className="text-[10px] uppercase text-muted-foreground">Contratos Omie deste CNPJ</div>
+            {grupo.candidatos.map((c) => (
+              <div key={c.codigo_contrato_omie} className="flex items-start gap-2 rounded border p-2">
+                <div className="min-w-0 flex-1">
+                  <CandidatoInfo c={c} />
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 gap-1 border-amber-400 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
+                  // Com mais de uma linha DS no grupo não dá para adivinhar de qual delas é a troca;
+                  // esse pareamento é a pista "parear", não esta.
+                  disabled={isBusy || !dsUnico}
+                  title={dsUnico ? undefined : "Este CNPJ tem mais de um contrato no DoctorSaaS: use a pista de pareamento."}
+                  onClick={() => {
+                    if (!dsUnico) return;
+                    setTrocaCiente(false);
+                    setTroca({ cand: c, ds: dsUnico });
+                  }}
+                >
+                  {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+                  Trocar para este
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
         {grupo.clientes_omie_sem_contrato.length > 0 && (
           <div className="rounded border p-3 space-y-1">
             <div className="text-[10px] uppercase text-muted-foreground">Clientes Omie sem contrato</div>

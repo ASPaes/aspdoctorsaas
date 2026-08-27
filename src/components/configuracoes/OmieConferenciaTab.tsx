@@ -316,18 +316,27 @@ function CandidatosLinha({
       const inList = `(${codigos.join(",")})`;
       const { data: rec, error: eRec } = await supabase
         .from("reconciliacao_cadastro")
-        .select("ds_contract_id, razao_ds, codigo_contrato_omie, candidato_escolhido")
+        .select("ds_contract_id, razao_ds, codigo_contrato_omie, candidato_escolhido, resolvido_em")
         .eq("conta_integration_id", conta?.id ?? "")
         .or(`codigo_contrato_omie.in.${inList},candidato_escolhido.in.${inList}`);
       if (eRec) throw eRec;
 
-      const tomadoPor = new Map<string, { ds_contract_id: string; razao: string | null }>();
+      const tomadoPor = new Map<string, { ds_contract_id: string; razao: string | null; em: number }>();
       for (const r of rec ?? []) {
         // A própria linha não se bloqueia: reescolher o mesmo contrato é reconfirmação, não colisão.
         if (String(r.ds_contract_id) === String(dsContractId)) continue;
+        // Duas linhas podem reivindicar o mesmo contrato: a troca move o de/para no DoctorOMIE e
+        // devolve a linha antiga para a fila no DS, e são dois bancos sem transação. Se a devolução
+        // falhar, o dono antigo continua se declarando dono. Quem resolveu por último vence, então
+        // o quadro mostra o dono certo mesmo com o DS a meio caminho. Linha sem resolvido_em (o
+        // codigo_contrato_omie veio da detecção, não de uma escolha) perde para qualquer escolha.
+        const em = r.resolvido_em ? Date.parse(r.resolvido_em) : 0;
         for (const v of [r.codigo_contrato_omie, r.candidato_escolhido]) {
           if (v != null && String(v) !== "") {
-            tomadoPor.set(String(v), { ds_contract_id: String(r.ds_contract_id), razao: r.razao_ds ?? null });
+            const atual = tomadoPor.get(String(v));
+            if (!atual || em >= atual.em) {
+              tomadoPor.set(String(v), { ds_contract_id: String(r.ds_contract_id), razao: r.razao_ds ?? null, em });
+            }
           }
         }
       }
