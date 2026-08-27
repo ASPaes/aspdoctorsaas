@@ -40,6 +40,32 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
   const dataCorte = contaOmieQ.data?.integrar_a_partir_de ?? null;
   const cutoffLoading = contaOmieQ.isLoading;
 
+  // O de/para com o Omie. Sem isto o botão derivava o estado SÓ da omie_sync_fila, e contrato
+  // vinculado pela Conferência nunca passa pela fila: aparecia como se nunca tivesse ido ao Omie,
+  // com "Enviar para Omie" convidando a mandar de novo (VALEMAR, 27/08/2026).
+  // A verdade do vínculo é o contracts_mapping, que vive no DoctorOMIE e o browser não alcança.
+  // Esta é a mesma cópia local que a recon-candidatos-listar usa para decidir "já vinculado":
+  // status resolvido guarda a escolha em candidato_escolhido, vinculado em codigo_contrato_omie.
+  const { data: vinculo } = useQuery<number | null>({
+    queryKey: ["omie-vinculo-contrato", contratoId],
+    enabled: !!contratoId,
+    queryFn: async () => {
+      // limit(1) em vez de maybeSingle direto: tenant com mais de uma conta Omie pode ter a linha
+      // repetida por conta, e o maybeSingle levanta erro nesse caso em vez de responder.
+      const { data, error } = await (supabase.from("reconciliacao_cadastro" as any) as any)
+        .select("status_usuario, candidato_escolhido, codigo_contrato_omie")
+        .eq("ds_contract_id", contratoId)
+        .in("status_usuario", ["vinculado", "resolvido"])
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      if (!["vinculado", "resolvido"].includes(String(data.status_usuario))) return null;
+      const cod = data.status_usuario === "resolvido" ? data.candidato_escolhido : data.codigo_contrato_omie;
+      return cod != null && String(cod) !== "" ? Number(cod) : null;
+    },
+  });
+
   // Linha mais recente da fila para este contrato.
   const { data: fila } = useQuery<FilaRow | null>({
     queryKey: ["omie-sync-fila", contratoId],
@@ -118,9 +144,13 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
 
   // Estado visual por status.
   let icon = <Send className="h-4 w-4 mr-2" />;
-  let label = "Enviar para Omie";
+  // Contrato vinculado não é "enviado" ao Omie: a fila nunca cria, ela altera o contrato que já
+  // existe lá. Chamar isso de "enviar" fazia o botão parecer um segundo envio.
+  let label = vinculo ? "Atualizar no Omie" : "Enviar para Omie";
   let variant: "outline" | "default" | "destructive" | "secondary" = "outline";
-  let title: string | undefined;
+  let title: string | undefined = vinculo
+    ? `Vinculado ao contrato ${vinculo} no Omie. Este botão atualiza esse contrato, não cria outro.`
+    : undefined;
 
   if (submitting) {
     icon = <Loader2 className="h-4 w-4 mr-2 animate-spin" />;
@@ -152,16 +182,25 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
   }
 
   return (
-    <Button
-      type="button"
-      variant={variant}
-      size="sm"
-      onClick={handleClick}
-      disabled={disabled}
-      title={title}
-    >
-      {icon}
-      {label}
-    </Button>
+    <div className="flex flex-col items-end gap-1">
+      <Button
+        type="button"
+        variant={variant}
+        size="sm"
+        onClick={handleClick}
+        disabled={disabled}
+        title={title}
+      >
+        {icon}
+        {label}
+      </Button>
+      {/* Visível, não só no title: o operador precisa saber que o contrato já tem par no Omie
+          ANTES de clicar, sem passar o mouse por cima. */}
+      {vinculo != null && (
+        <span className="text-[11px] text-muted-foreground">
+          Vinculado ao Omie · contrato <span className="font-mono">{vinculo}</span>
+        </span>
+      )}
+    </div>
   );
 }
