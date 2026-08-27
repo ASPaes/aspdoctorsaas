@@ -257,18 +257,38 @@ Deno.serve(async (req)=>{
   ] : [];
   let devolvidos = 0;
   if (perdedores.length) {
-    const { data: dv, error: eDv } = await admin.from("reconciliacao_cadastro").update({
-      status_usuario: "novo",
-      candidato_escolhido: null,
-      resolvido_em: null,
-      resolvido_por: null
-    }).eq("tenant_id", tenantDs).eq("conta_integration_id", conta.id).in("ds_contract_id", perdedores).select("ds_contract_id");
+    // O de/para ja mudou de dono no DoctorOMIE neste ponto: sao dois bancos, nao ha transacao que
+    // cubra os dois. Nao da para reverter a troca com seguranca (reconstruir o vinculo antigo a
+    // partir do que sobrou seria adivinhar, e gravar de/para errado e pior do que este UPDATE
+    // falhar), entao a defesa e insistir: a falha realista aqui e rede/indisponibilidade passageira.
+    // A segunda camada esta na LEITURA -- a tela desempata dois donos do mesmo contrato pelo
+    // resolvido_em mais recente, entao mesmo que este UPDATE nao passe, o quadro nao mente.
+    let eDv = null;
+    for(let tentativa = 1; tentativa <= 3; tentativa++){
+      const r = await admin.from("reconciliacao_cadastro").update({
+        status_usuario: "novo",
+        candidato_escolhido: null,
+        resolvido_em: null,
+        resolvido_por: null
+      }).eq("tenant_id", tenantDs).eq("conta_integration_id", conta.id).in("ds_contract_id", perdedores).select("ds_contract_id");
+      if (!r.error) {
+        eDv = null;
+        devolvidos = (r.data ?? []).length;
+        break;
+      }
+      eDv = r.error;
+      if (tentativa < 3) await new Promise((res)=>setTimeout(res, 300 * tentativa));
+    }
     if (eDv) return json({
       ok: false,
       error: "Vínculo transferido, mas falhou ao devolver a linha anterior para a fila",
+      // Nomear o estado importa: a troca VALEU e nao deve ser refeita. O que ficou pendente e so a
+      // marcacao da linha antiga, que "Reconferir agora" reconstroi.
+      estado: "vinculo_movido_linha_antiga_nao_atualizada",
+      reparo: "Rode Reconferir agora. Não repita a troca: ela já foi aplicada.",
+      ds_contracts: perdedores,
       detalhe: eDv.message
     }, 500);
-    devolvidos = (dv ?? []).length;
   }
   // 4) Marca linhas resolvidas — 1 query via RPC
   const pares = vinculos.map((v)=>({
