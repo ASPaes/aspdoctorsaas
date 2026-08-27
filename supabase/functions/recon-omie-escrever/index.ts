@@ -312,6 +312,41 @@ Deno.serve(async (req)=>{
       console.error("FALHA_REGISTRAR_BLOQUEIO:", e.message);
     }
   }
+  // Dispensar a data de ativacao e decisao de uma pessoa contra uma regra da casa. Sem registro,
+  // ninguem saberia depois por que aquele contrato antigo entrou no Omie, nem quem mandou. Status
+  // 'sucesso' de proposito: nao foi bloqueio nem erro, foi uma decisao -- o ATENCAO na mensagem e
+  // o que a faz saltar na leitura do historico, como no vinculo transferido.
+  async function registrarDispensaDeCorte(dataContrato, dataCorte) {
+    if (modo !== "criar") return;
+    try {
+      await fetch(`${DOCTOROMIE}/ds-omie-log-registrar`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${chaveOmie}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          evento: "criar",
+          entidade: "contrato",
+          status: "sucesso",
+          referencia: dsContractId,
+          payload: {
+            origem: "botao_enviar_ao_omie",
+            usuario: userData.user.email ?? userData.user.id,
+            contrato: ctr.numero,
+            data_do_contrato: dataContrato,
+            data_de_corte: dataCorte
+          },
+          response: {
+            acao: "data_ativacao_dispensada"
+          },
+          error_message: `ATENCAO: data de ativacao DISPENSADA para este contrato. Ele e de ${dataContrato}, anterior ao corte de ${dataCorte}, e foi enviado ao Omie por decisao explicita de ${userData.user.email ?? userData.user.id}.`
+        })
+      });
+    } catch (e) {
+      console.error("FALHA_REGISTRAR_DISPENSA:", e.message);
+    }
+  }
   // KILL SWITCH
   const { data: pausaCheck } = await admin.from("omie_integration").select("integracao_pausada").eq("id", conta.id).maybeSingle();
   if (pausaCheck?.integracao_pausada === true) {
@@ -364,7 +399,21 @@ Deno.serve(async (req)=>{
     }, 422);
   }
   const dataContrato = ctr.data_venda ?? (ctr.created_at ? String(ctr.created_at).slice(0, 10) : null);
-  if (!dataContrato || dataContrato < dataCorte) {
+  const anteriorAoCorte = !dataContrato || dataContrato < dataCorte;
+  // ========================================================================
+  // EXCECAO POR CONTRATO (27/08/2026). A data de ativacao e trava de ESCOPO, nao limitacao do
+  // Omie -- ele aceita contrato com data retroativa. Ela existe para que ligar a integracao nao
+  // despeje a base historica inteira la. Mas contrato lancado hoje COM data retroativa e caso
+  // legitimo, e ate aqui nao havia saida nenhuma dentro do produto.
+  // Vale so para esta chamada, nunca fica gravado: quem decide e uma pessoa, contrato a contrato,
+  // e a decisao vai para o historico com nome e as duas datas. A fila NAO usa a data de corte
+  // (unico consumidor e esta funcao), entao o contrato criado por excecao continua sendo
+  // atualizado normalmente depois -- nao vira orfao no Omie.
+  // ========================================================================
+  const dispensarCorte = body?.permitir_anterior_ao_corte === true;
+  if (anteriorAoCorte && dispensarCorte && dataContrato) {
+    await registrarDispensaDeCorte(dataContrato, dataCorte);
+  } else if (anteriorAoCorte) {
     const msg = `Contrato de ${dataContrato ?? "data desconhecida"} \u00e9 anterior \u00e0 data de ativa\u00e7\u00e3o (${dataCorte}). N\u00e3o pode ser enviado ao Omie.`;
     await registrarBloqueio("data_ativacao", msg, {
       contrato: ctr.numero,
@@ -374,6 +423,11 @@ Deno.serve(async (req)=>{
     return json({
       ok: false,
       bloqueado: "data_ativacao",
+      // A tela precisa distinguir esta trava das outras para oferecer a excecao. As demais
+      // (documento invalido, sem modelo) nao tem "enviar mesmo assim" -- e nem deveriam ter.
+      dispensavel: true,
+      data_do_contrato: dataContrato,
+      data_de_corte: dataCorte,
       error: msg
     }, 422);
   }
