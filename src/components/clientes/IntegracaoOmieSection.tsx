@@ -50,20 +50,30 @@ export default function IntegracaoOmieSection({ clienteId }: Props) {
       const ids = (contratos ?? []).map((c: any) => c.id);
       let vinculos: any[] = [];
       if (ids.length > 0) {
+        // NÃO exigir estado_match='CASADO' nem codigo_contrato_omie preenchido. A detecção só
+        // preenche esses dois quando o CNPJ é 1:1 entre DS e Omie; quando o mesmo CNPJ tem vários
+        // cadastros/contratos no Omie o estado é 'AMBIGUO' e o código fica NULL, ainda que o
+        // contrato ESTEJA vinculado — vinculado pela Conferência, justamente porque era ambíguo.
+        // Resultado: contrato vinculado aparecia como nunca enviado, com o botão convidando a
+        // mandar de novo (VALEMAR, 27/08/2026). A escolha explícita mora em candidato_escolhido,
+        // e é a mesma regra que a Conferência usa para dizer "já vinculado".
         const { data: v, error: vError } = await supabase
           .from("reconciliacao_cadastro")
-          .select("ds_contract_id, codigo_contrato_omie")
+          .select("ds_contract_id, codigo_contrato_omie, candidato_escolhido")
           .eq("tenant_id", tid)
-          .eq("estado_match", "CASADO")
-          .not("codigo_contrato_omie", "is", null)
           .in("ds_contract_id", ids);
         if (vError) throw vError;
         vinculos = v ?? [];
       }
 
-      const vinculoMap = new Map<string, string | number>(
-        vinculos.map((v) => [v.ds_contract_id, v.codigo_contrato_omie])
-      );
+      const vinculoMap = new Map<string, string | number>();
+      for (const v of vinculos) {
+        const codigo = v.candidato_escolhido ?? v.codigo_contrato_omie;
+        if (codigo == null || String(codigo) === "") continue;
+        // Tenant com mais de uma conta Omie pode ter a linha repetida por contrato, e só uma delas
+        // com o código: a primeira que tiver código vence, em vez de a última sobrescrever com nulo.
+        if (!vinculoMap.has(v.ds_contract_id)) vinculoMap.set(v.ds_contract_id, codigo);
+      }
 
       return (contratos ?? []).map((c: any) => {
         const codigo = vinculoMap.get(c.id) ?? null;
