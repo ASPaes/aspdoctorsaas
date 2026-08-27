@@ -70,10 +70,10 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   },
   churn_rate_carteira: {
     title: "Churn Rate (Carteira)",
-    definition: "Percentual de clientes perdidos em relação à base total no período.",
-    why_it_matters: "Se o churn sobe, a empresa precisa vender cada vez mais só para manter o tamanho. Meta: < 2% ao mês.",
-    formula: "Cancelamentos ÷ (Clientes Ativos + Cancelados)",
-    example: "5 cancelamentos ÷ 200 base = 2,5%",
+    definition: "Percentual de clientes perdidos no período em relação à base ativa no início dele. Em período de mais de um mês o número é ACUMULADO — a média por mês aparece no rodapé do card.",
+    why_it_matters: "Se o churn sobe, a empresa precisa vender cada vez mais só para manter o tamanho. Meta: < 2% ao mês — compare com a média mensal do rodapé, não com o acumulado.",
+    formula: "Cancelamentos do período ÷ Clientes ativos no início do período",
+    example: "5 cancelamentos ÷ 200 ativos no início = 2,5%",
     unit: "%",
     benchmark: [
       { status: 'ok',   label: 'OK',      display: '< 2%',    range_max: 0.02 },
@@ -89,9 +89,9 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   },
   churn_rate_receita: {
     title: "Churn Rate (Receita)",
-    definition: "Percentual de receita recorrente perdida em relação ao MRR total.",
-    why_it_matters: "Mais importante que churn de carteira: se perde clientes grandes, o impacto financeiro é maior.",
-    formula: "MRR Cancelado ÷ (MRR Atual + MRR Cancelado)",
+    definition: "Percentual de receita recorrente perdida (cancelamento + downsell) em relação ao MRR no início do período. Em período de mais de um mês o número é ACUMULADO — a média por mês aparece no rodapé do card.",
+    why_it_matters: "Mais importante que churn de carteira: se perde clientes grandes, o impacto financeiro é maior. Compare com a média mensal do rodapé, não com o acumulado.",
+    formula: "(MRR cancelado + downsell) ÷ MRR no início do período",
     unit: "%",
     benchmark: [
       { status: 'ok',   label: 'OK',      display: '< 1%',    range_max: 0.01 },

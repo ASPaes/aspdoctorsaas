@@ -42,6 +42,21 @@ const fmt = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 const fmtPct = (v: number) => `${(v * 100).toFixed(2)}%`;
 const fmtPp = (v: number) => `${(v * 100).toFixed(2)}pp`;
+const fmtDataCurta = (iso: string | null) =>
+  iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(2, 4)}` : '—';
+
+// Rodapé de média mensal dos cards de churn. A taxa grande é ACUMULADA no período:
+// num filtro de 3 meses, 10% não é 10% ao mês. Some quando o período é de um mês só
+// (não haveria o que mediar) ou quando a série mensal não cobre o período inteiro.
+function MediaMensalFooter({ valor, meses }: { valor: number | null; meses: number | null }) {
+  if (valor === null || !meses) return null;
+  return (
+    <span className="text-xs text-muted-foreground">
+      Média: <span className="font-medium text-foreground">{fmtPct(valor)}</span>/mês
+      <span className="mx-1.5 opacity-50">·</span>{meses} meses
+    </span>
+  );
+}
 
 // ─── Delta helper (cores invertidas: subir = ruim) ───────────
 function getChurnDeltaInverted(current: number, previous: number | null, format: 'pct' | 'pp') {
@@ -201,7 +216,11 @@ export function CancelamentosTab({
       mrrCancelado: cancExtras.mrrCancelado,
       cancelamentosQtd: cancExtras.cancelamentosQtd,
       clientesAtivos: metrics.clientesAtivos,
-      earlyChurnRate: cancExtras.earlyChurnRate,
+      // A RPC devolve `early_churn_rate` = early ÷ TOTAL de cancelamentos: é a FATIA dos
+      // cancelamentos que sai em ≤90d, não a taxa de early churn da tarja (early ÷ coorte
+      // de vendas em risco). As duas convivem, com nomes distintos — a regra CAN4 e o
+      // limiar de 20% sempre falaram da fatia.
+      earlyChurnShareCanc: cancExtras.earlyChurnRate,
       motivoConcentradoPct,
       segmentoChurnMax,
       tendenciaSubindoFator,
@@ -279,6 +298,7 @@ export function CancelamentosTab({
             size={s} variant="destructive"
             trend={deltaChurnCarteira.trend} trendValue={deltaChurnCarteira.trendValue}
             helpKey="churn_rate_carteira"
+            footer={<MediaMensalFooter valor={metrics.churnCarteiraMediaMensal} meses={metrics.churnMesesNaMedia} />}
           />
           <KPICardEnhanced
             label="Churn Rate (Receita)" value={fmtPct(currChurnReceita)}
@@ -286,13 +306,14 @@ export function CancelamentosTab({
             size={s} variant="destructive"
             trend={deltaChurnReceita.trend} trendValue={deltaChurnReceita.trendValue}
             helpKey="churn_rate_receita"
+            footer={<MediaMensalFooter valor={metrics.churnReceitaMediaMensal} meses={metrics.churnMesesNaMedia} />}
           />
         </div>
 
         {/* Early Churn strip */}
         <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-2.5 min-h-[48px]">
           <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0" />
-          <span className="text-sm font-medium text-muted-foreground">Early Churn (≤90 dias após cadastro)</span>
+          <span className="text-sm font-medium text-muted-foreground">Early Churn (≤90 dias após a venda)</span>
           {hasEarlyChurn ? (
             <span className="text-sm text-foreground">
               Qtde: <strong>{metrics.cancelamentosEarly}</strong>
@@ -300,6 +321,11 @@ export function CancelamentosTab({
               MRR: <strong>{fmt(metrics.mrrCanceladoEarly)}</strong>
               <span className="mx-2 text-muted-foreground">|</span>
               Rate: <strong>{fmtPct(metrics.earlyChurnRate)}</strong>
+              {metrics.earlyChurnBase > 0 && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  ({metrics.cancelamentosEarly} de {metrics.earlyChurnBase} vendas desde {fmtDataCurta(metrics.earlyChurnBaseInicio)})
+                </span>
+              )}
             </span>
           ) : (
             <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20">
@@ -439,7 +465,7 @@ export function CancelamentosTab({
         {cancExtras ? (
           <TenureBucketsChart
             buckets={cancExtras.buckets}
-            earlyChurnRate={cancExtras.earlyChurnRate}
+            earlyShareCanc={cancExtras.earlyChurnRate}
             tvMode={tvMode}
           />
         ) : (

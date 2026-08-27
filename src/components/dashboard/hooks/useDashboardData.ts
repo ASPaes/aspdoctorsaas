@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { format, startOfMonth, endOfMonth, subMonths, subDays, differenceInDays } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, subDays, differenceInDays, differenceInCalendarMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { DashboardFilters, KPIMetrics, TimeSeriesData, DistributionData, DistributionDataPoint, CanceladoListItem, NovoClienteListItem, DownsellListItem } from '../types';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
@@ -10,7 +10,9 @@ import { buildChurnRuler, buildMrrRuler, MRR_MOV_TIPOS } from '@/lib/mrrRuler';
 const defaultMetrics: KPIMetrics = {
   faturamentoTotal: 0, faturamentoPorUnidade: [], clientesAtivos: 0, mrr: 0, ticketMedio: 0, arr: 0,
   crescimentoReais: 0, crescimentoPercent: 0, ltvMeses: 0, ltvReais: 0, cac: 0, ltvCac: 0,
-  cancelamentosQtd: 0, mrrCancelado: 0, cancelamentosEarly: 0, mrrCanceladoEarly: 0, earlyChurnRate: 0, churnCarteiraPercent: 0,
+  cancelamentosQtd: 0, mrrCancelado: 0, cancelamentosEarly: 0, mrrCanceladoEarly: 0, earlyChurnRate: 0,
+  earlyChurnBase: 0, earlyChurnBaseInicio: null, churnCarteiraPercent: 0,
+  churnCarteiraMediaMensal: null, churnReceitaMediaMensal: null, churnMesesNaMedia: null,
   clientesInicioCount: 0, mrrInicio: 0,
   novosClientes: 0, newMrr: 0, totalImplantacao: 0,
   prevNovosClientes: null, prevNewMrr: null, prevTotalImplantacao: null, prevUpsellMrr: null, prevCrossSellMrr: null,
@@ -245,13 +247,38 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       const cancelamentosQtd = cancelamentosFilt.length;
       const mrrCancelado = cancelamentosFilt.reduce((sum, c) => sum + churnMrrDe(c, periodoInicioStr, periodoFimStr), 0);
 
-      // Early churn (≤90 dias)
+      // Early churn (≤90 dias) — o relógio é `data_venda_efetiva`
+      // (COALESCE(min(contratos.data_venda), data_cadastro)), a MESMA data que define
+      // "cliente novo" no resto do dashboard. Antes o tenure saía de `data_cadastro` e o
+      // denominador de `data_venda_efetiva`: dois relógios na mesma taxa.
+      const vendaEfetivaPorCliente = new Map<string, string>();
+      (clientesRaw || []).forEach((c: any) => {
+        if (c.data_venda_efetiva) vendaEfetivaPorCliente.set(c.id, String(c.data_venda_efetiva));
+      });
+      const inicioClienteDe = (c: any) =>
+        vendaEfetivaPorCliente.get(c.id) ?? (c.data_venda ? String(c.data_venda) : null) ?? (c.data_cadastro ? String(c.data_cadastro) : null);
+
       const earlyChurn = cancelamentosFilt.filter(c => {
-        if (!c.data_cadastro || !c.data_cancelamento) return false;
-        return differenceInDays(new Date(c.data_cancelamento), new Date(c.data_cadastro)) <= 90;
+        const inicio = inicioClienteDe(c);
+        if (!inicio || !c.data_cancelamento) return false;
+        return differenceInDays(new Date(c.data_cancelamento), new Date(inicio)) <= 90;
       });
       const cancelamentosEarly = earlyChurn.length;
       const mrrCanceladoEarly = earlyChurn.reduce((sum, c) => sum + churnMrrDe(c, periodoInicioStr, periodoFimStr), 0);
+
+      // Coorte em risco de early churn: quem foi vendido entre (início − 90d) e o fim do
+      // período. É a única janela que contém TODOS os cancelamentos com tenure ≤ 90 dias
+      // ocorridos dentro do período. Medido em 27/08/2026 (Digi Office, agosto/26): dos 6
+      // early churns do mês, 1 foi vendido em 29/05 — fora tanto das vendas de agosto (36)
+      // quanto de "vendas dos últimos 90 dias contados do fim" (124). Com a janela correta
+      // (03/05 → 31/08) a coorte é 160 e os 6 estão dentro dela.
+      const earlyChurnBaseInicioStr = format(subDays(periodoInicio, 90), 'yyyy-MM-dd');
+      const earlyChurnBase = (clientesRaw || []).filter((c: any) => {
+        if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
+        const venda = c.data_venda_efetiva ? String(c.data_venda_efetiva) : null;
+        if (!venda) return false;
+        return venda >= earlyChurnBaseInicioStr && venda <= periodoFimStr;
+      }).length;
 
       // Enriquecer cancelados com dados de contrato/produto via contrato_eventos
       const eventosCancel = await eventosCancelPromise;
@@ -303,7 +330,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       // Churn rate mensal = cancelados no período / ativos no início do período
       const churnMensal = (clientesInicioCount || 0) > 0 ? cancelamentosQtd / (clientesInicioCount || 1) : 0;
       const ltvMeses = churnMensal > 0 ? (1 / churnMensal) : 0;
-      const earlyChurnRate = novosCount > 0 ? cancelamentosEarly / novosCount : 0;
+      const earlyChurnRate = earlyChurnBase > 0 ? cancelamentosEarly / earlyChurnBase : 0;
 
       // 6. CAC
       const cacData = await cacDataPromise;
@@ -480,6 +507,8 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         mrr: mrrTotalAtual, ticketMedio: ticketMedioAjustado, arr: mrrTotalAtual * 12,
         crescimentoReais, crescimentoPercent, ltvMeses, ltvReais, cac, ltvCac,
         cancelamentosQtd, mrrCancelado: churnMrrTotal, cancelamentosEarly, mrrCanceladoEarly, earlyChurnRate,
+        earlyChurnBase, earlyChurnBaseInicio: earlyChurnBaseInicioStr,
+        churnCarteiraMediaMensal: null, churnReceitaMediaMensal: null, churnMesesNaMedia: null,
         churnCarteiraPercent: (clientesInicioCount || 0) > 0 ? cancelamentosQtd / (clientesInicioCount || 1) : 0,
         clientesInicioCount, mrrInicio,
         novosClientes: novosCount, newMrr, totalImplantacao,
@@ -525,13 +554,24 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           .map(c => c.id)
       );
       const ativacaoMovPorMes: Record<string, number> = {};
+      // Downsell por mês — a outra metade da perda de receita. O card "Churn Rate (Receita)"
+      // é (cancelamento + downsell) ÷ MRR do início; a média mensal tem que somar o mesmo.
+      const downsellPorMes: Record<string, number> = {};
       (todosMovimentosAtivos || []).forEach((m: any) => {
-        const v = Number(m.vlr_ativacao) || 0;
-        if (!v || !m.data_movimento) return;
+        if (!m.data_movimento) return;
         if (!clientesNoFiltroSeries.has(m.cliente_id)) return;
         const ym = String(m.data_movimento).slice(0, 7);
-        ativacaoMovPorMes[ym] = (ativacaoMovPorMes[ym] || 0) + v;
+        const v = Number(m.vlr_ativacao) || 0;
+        if (v) ativacaoMovPorMes[ym] = (ativacaoMovPorMes[ym] || 0) + v;
+        if (m.tipo === 'downsell') {
+          downsellPorMes[ym] = (downsellPorMes[ym] || 0) + Math.abs(Number(m.valor_delta) || 0);
+        }
       });
+
+      // Série de churn mês a mês — cada mês com a SUA base. É a matéria-prima da média
+      // mensal mostrada nos cards quando o período pega mais de um mês: a taxa do período
+      // (cancelados ÷ base do início) é acumulada e não pode ser lida como taxa mensal.
+      const churnMensalSerie: { yearMonth: string; carteira: number; receita: number }[] = [];
 
       const mrrEvolution: typeof timeSeries.mrrEvolution = [];
       const faturamentoEvolution: typeof timeSeries.faturamentoEvolution = [];
@@ -623,6 +663,17 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         // LTV per month: rolling 3-month churn rate → 1/churnRate
         const churnRateMes = activosInicioMes.length > 0 ? canceladosNoMes.length / activosInicioMes.length : 0;
         trailingChurnRates.push(churnRateMes);
+
+        // Mesma régua do card, aplicada ao mês: base do dia anterior ao 1º do mês.
+        const corteMesStr = format(subDays(startDate, 1), 'yyyy-MM-dd');
+        const mrrInicioMes = activosInicioMes.reduce((sum, c) => sum + mrrDe(c.id, corteMesStr), 0);
+        const perdaMes = canceladosNoMes.reduce((sm, c) => sm + churnMrrDe(c, m.start, m.end), 0)
+          + (downsellPorMes[m.yearMonth] || 0);
+        churnMensalSerie.push({
+          yearMonth: m.yearMonth,
+          carteira: churnRateMes,
+          receita: mrrInicioMes > 0 ? perdaMes / mrrInicioMes : 0,
+        });
         const windowSize = Math.min(3, trailingChurnRates.length);
         const rollingChurn = trailingChurnRates.slice(-windowSize).reduce((s, v) => s + v, 0) / windowSize;
 
@@ -637,7 +688,31 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         ltvCacEvolution.push({ month: m.month, monthFull: m.monthFull, value: Math.round(ltvCacMes * 100) / 100 });
       });
 
+      // Média mensal do churn — só quando o período pega mais de um mês. A série cobre os
+      // últimos 12 meses a partir de hoje: se o período pedir um mês que não está nela
+      // (filtro antigo ou "todo o período"), a média sai `null` e o card não mostra nada,
+      // em vez de exibir média de um pedaço do período como se fosse do período inteiro.
+      //
+      // Cada ponto da série é o MÊS CHEIO. No mês corrente isso é inofensivo (o que ainda
+      // não aconteceu não está em lugar nenhum), mas um período que termine no meio de um
+      // mês passado entra na média com o mês inteiro, não com o pedaço filtrado.
+      const mesesEsperados = filters.showAllData
+        ? Infinity
+        : differenceInCalendarMonths(periodoFim, periodoInicio) + 1;
+      const mesesDoPeriodo = churnMensalSerie.filter(
+        r => r.yearMonth >= periodoInicioStr.slice(0, 7) && r.yearMonth <= periodoFimStr.slice(0, 7),
+      );
+      const temMediaMensal = mesesEsperados > 1 && mesesDoPeriodo.length === mesesEsperados;
+      const mediaDe = (pick: (r: typeof mesesDoPeriodo[number]) => number) =>
+        mesesDoPeriodo.reduce((sm, r) => sm + pick(r), 0) / mesesDoPeriodo.length;
+
       if (seq !== fetchSeqRef.current) return;
+      setMetrics(prev => ({
+        ...prev,
+        churnCarteiraMediaMensal: temMediaMensal ? mediaDe(r => r.carteira) : null,
+        churnReceitaMediaMensal: temMediaMensal ? mediaDe(r => r.receita) : null,
+        churnMesesNaMedia: temMediaMensal ? mesesDoPeriodo.length : null,
+      }));
       setTimeSeries({ mrrEvolution, faturamentoEvolution, churnQtdEvolution, churnMrrEvolution, ltvMesesEvolution, ltvCacEvolution });
 
       // === DISTRIBUTIONS ===

@@ -14,7 +14,7 @@ interface TenureBucketsChartProps {
     d181_365: BucketData;
     mais1y: BucketData;
   };
-  earlyChurnRate?: number; // 0-1
+  earlyShareCanc?: number; // 0-1 — fatia dos cancelamentos que saiu em ≤90d
   tvMode?: boolean;
   className?: string;
   onNavigateToCohort?: () => void;
@@ -40,7 +40,7 @@ interface BucketDef {
 
 export function TenureBucketsChart({
   buckets,
-  earlyChurnRate = 0,
+  earlyShareCanc = 0,
   tvMode = false,
   className,
   onNavigateToCohort,
@@ -125,7 +125,7 @@ export function TenureBucketsChart({
               Distribuição dos cancelamentos por tempo de vida do cliente
             </p>
           </div>
-          {earlyChurnRate > 0.2 && (
+          {earlyShareCanc > 0.2 && (
             <div className="flex items-center gap-1.5 shrink-0 rounded-md border border-red-500/30 bg-red-500/[0.08] px-2.5 py-1">
               <AlertTriangle className="h-3.5 w-3.5 text-red-600 dark:text-red-400 shrink-0" />
               <span className={cn('font-medium text-red-700 dark:text-red-300', labelSize)}>

@@ -64,7 +64,9 @@ export interface DiagnosticoInput {
   growthPersistence?: number;   // ratio (0.9 = mantendo, >1 = acelerando)
 
   // Cancelamentos V2 — derivados do useCancelamentosExtras
-  earlyChurnRate?: number;          // decimal (0.18 = 18%)
+  // Fatia dos cancelamentos que saiu em ≤90d (early ÷ total de cancelamentos).
+  // NÃO é a taxa de early churn do card, que é early ÷ coorte de vendas em risco.
+  earlyChurnShareCanc?: number;     // decimal (0.18 = 18%)
   motivoConcentradoPct?: number;    // decimal — % do MRR perdido concentrado no motivo top 1
   segmentoChurnMax?: number;        // decimal — maior churn_rate entre segmentos com base relevante (≥5 clientes)
   tendenciaSubindoFator?: number;   // ratio recente_6m / anterior_6m do motivo que mais cresceu (1.3 = +30%)

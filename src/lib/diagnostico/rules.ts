@@ -335,8 +335,8 @@ export const RULES: DiagnosticoRule[] = [
     tab: 'cancelamentos',
     severity: 'warn',
     priority: 75,
-    match: (i) => i.earlyChurnRate !== undefined && i.earlyChurnRate > 0.2,
-    buildCause: (i) => `Early Churn = ${fmtPct(i.earlyChurnRate!)} dos cancelamentos saem em ≤90d — falha estrutural de onboarding ou ICP errado`,
+    match: (i) => i.earlyChurnShareCanc !== undefined && i.earlyChurnShareCanc > 0.2,
+    buildCause: (i) => `Early Churn = ${fmtPct(i.earlyChurnShareCanc!)} dos cancelamentos saem em ≤90d — falha estrutural de onboarding ou ICP errado`,
     actionIds: ['early_churn_taskforce', 'onboarding_overhaul', 'segment_drill_down'],
   },
 

@@ -50,7 +50,7 @@ export function buildHeadline(
     }
 
     // Early Churn alto (onboarding/ICP)
-    if (input.earlyChurnRate !== undefined && input.earlyChurnRate > 0.2) {
+    if (input.earlyChurnShareCanc !== undefined && input.earlyChurnShareCanc > 0.2) {
       return `Cliente está saindo antes de ver valor. Onboarding fraco ou ICP errado — você perde antes mesmo do produto provar nada.`;
     }
 

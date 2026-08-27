@@ -32,7 +32,17 @@ export interface KPIMetrics {
   cancelamentosEarly: number;
   mrrCanceladoEarly: number;
   earlyChurnRate: number;
+  // Denominador do early churn: clientes vendidos entre (início − 90d) e o fim do período.
+  // É a coorte que PODE dar early churn dentro da janela — usar só as vendas do próprio
+  // período deixava de fora quem foi vendido antes e cancelou dentro dos 90 dias.
+  earlyChurnBase: number;
+  earlyChurnBaseInicio: string | null;
   churnCarteiraPercent: number;
+  // Média mensal do churn no período (null quando o período tem 1 mês só ou cai
+  // fora da série de 12 meses que alimenta o cálculo).
+  churnCarteiraMediaMensal: number | null;
+  churnReceitaMediaMensal: number | null;
+  churnMesesNaMedia: number | null;
   // Snapshot início do período (para fórmulas SaaS padrão de churn)
   clientesInicioCount: number;
   mrrInicio: number;
