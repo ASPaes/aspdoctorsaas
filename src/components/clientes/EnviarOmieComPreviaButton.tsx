@@ -217,10 +217,11 @@ export default function EnviarOmieComPreviaButton({
   // dizer a consequência inteira. Inline em vez de outro AlertDialog para não aninhar diálogo.
   const [confirmandoVinculo, setConfirmandoVinculo] = useState<number | string | null>(null);
 
+  // NUMEROS, não strings: omie_espelho_cadastro.codigo_cliente_omie é `number` no schema, e o
+  // .in() com strings não casou — a primeira versão desta tela ficou muda por isso.
   const codigosCandidatos = candidatos
-    .map((c) => c?.codigo_cliente_omie)
-    .filter((v) => v != null)
-    .map(String);
+    .map((c) => Number(c?.codigo_cliente_omie))
+    .filter((v) => Number.isFinite(v));
 
   // Qual dos cadastros duplicados do Omie já é o "de casa" deste cliente.
   //
@@ -228,38 +229,54 @@ export default function EnviarOmieComPreviaButton({
   // pelo código, e escolher o errado cria o contrato num cadastro separado dos outros — o cliente
   // fica partido em dois no Omie, cada metade com uma parte da cobrança. VALEMAR, 27/08/2026: dois
   // contratos já vinculados no 7248327517 e o terceiro sendo criado, com o 7248327513 vazio ao lado.
-  const { data: contratosPorCadastro } = useQuery<Record<string, number>>({
-    queryKey: ["omie-cadastro-em-uso", clienteId, codigosCandidatos.join(",")],
+  type InfoCadastro = { contratos: string[]; doCliente: string[] };
+  const {
+    data: infoCadastros,
+    isLoading: infoLoading,
+    error: infoErro,
+  } = useQuery<Record<string, InfoCadastro>>({
+    queryKey: ["omie-cadastro-em-uso", tenantId, clienteId, codigosCandidatos.join(",")],
     enabled: codigosCandidatos.length >= 2 && !!clienteId,
     queryFn: async () => {
-      const { data: ctrs } = await (supabase.from("contratos") as any)
-        .select("id")
-        .eq("cliente_id", clienteId);
-      const ids = (ctrs ?? []).map((c: any) => c.id);
-      if (!ids.length) return {};
-
-      // Os contratos Omie que os OUTROS contratos deste cliente já ocupam.
-      const { data: rec } = await (supabase.from("reconciliacao_cadastro") as any)
-        .select("ds_contract_id, candidato_escolhido, codigo_contrato_omie")
-        .in("ds_contract_id", ids);
-      const ocupados = new Set([...mapaVinculoOmie(rec as any[]).values()].map(String));
-      if (!ocupados.size) return {};
-
-      // A quem pertence cada um desses contratos, do lado do Omie.
-      const { data: esp } = await (supabase.from("omie_espelho_cadastro") as any)
+      // O que cada cadastro duplicado tem de contrato no Omie. Esta parte sozinha já desempata a
+      // escolha, e depende de UMA tabela só — de propósito: a versão anterior cruzava três e,
+      // quando qualquer uma não respondia, a tela ficava muda, indistinguível de "nenhum em uso".
+      const { data: esp, error: eEsp } = await (supabase.from("omie_espelho_cadastro") as any)
         .select("codigo_cliente_omie, codigo_contrato_omie, contratos_omie")
         .in("codigo_cliente_omie", codigosCandidatos);
+      if (eEsp) throw eEsp;
 
-      const porCadastro: Record<string, number> = {};
+      const info: Record<string, InfoCadastro> = {};
       for (const e of (esp ?? []) as any[]) {
-        const desteCadastro = Array.isArray(e.contratos_omie)
-          ? e.contratos_omie.map((c: any) => String(c?.codigo_contrato_omie))
+        const lista = Array.isArray(e.contratos_omie)
+          ? e.contratos_omie.map((c: any) => String(c?.codigo_contrato_omie)).filter(Boolean)
           : [];
-        if (e.codigo_contrato_omie != null) desteCadastro.push(String(e.codigo_contrato_omie));
-        const n = desteCadastro.filter((c) => ocupados.has(c)).length;
-        if (n > 0) porCadastro[String(e.codigo_cliente_omie)] = n;
+        if (e.codigo_contrato_omie != null && !lista.includes(String(e.codigo_contrato_omie))) {
+          lista.push(String(e.codigo_contrato_omie));
+        }
+        info[String(e.codigo_cliente_omie)] = { contratos: lista, doCliente: [] };
       }
-      return porCadastro;
+
+      // Enfeite por cima, não requisito: quais desses contratos já pertencem a ESTE cliente do DS.
+      // Se falhar, a lista de contratos acima continua valendo.
+      try {
+        const { data: ctrs } = await (supabase.from("contratos") as any)
+          .select("id")
+          .eq("cliente_id", clienteId);
+        const ids = (ctrs ?? []).map((c: any) => c.id);
+        if (ids.length) {
+          const { data: rec } = await (supabase.from("reconciliacao_cadastro") as any)
+            .select("ds_contract_id, candidato_escolhido, codigo_contrato_omie")
+            .in("ds_contract_id", ids);
+          const ocupados = new Set([...mapaVinculoOmie(rec as any[]).values()].map(String));
+          for (const chave of Object.keys(info)) {
+            info[chave].doCliente = info[chave].contratos.filter((c) => ocupados.has(c));
+          }
+        }
+      } catch {
+        /* mantém só a lista de contratos do cadastro */
+      }
+      return info;
     },
   });
   // Enviado NESTA sessão do componente: sem isto, o botão continua dizendo "Enviar ao Omie"
@@ -492,7 +509,8 @@ export default function EnviarOmieComPreviaButton({
                   const codigo = c?.codigo_cliente_omie;
                   const inativo = c?.inativo === "S";
                   const esteVinculando = vinculando === codigo;
-                  const jaUsados = contratosPorCadastro?.[String(codigo)] ?? 0;
+                  const info = infoCadastros?.[String(codigo)];
+                  const jaUsados = info?.doCliente.length ?? 0;
                   const confirmando = confirmandoVinculo != null && String(confirmandoVinculo) === String(codigo);
                   return (
                     <div
@@ -525,12 +543,39 @@ export default function EnviarOmieComPreviaButton({
                           <div className="text-muted-foreground font-mono text-xs">
                             código {codigo ?? "—"}
                           </div>
-                          {/* O sinal que decide: sem ele os dois cadastros são indistinguíveis. */}
+                          {/* O sinal que decide: sem ele os dois cadastros são indistinguíveis.
+                              Cada estado tem texto próprio — silêncio aqui já custou uma rodada,
+                              porque "não consegui verificar" ficava igual a "nenhum em uso". */}
                           {jaUsados > 0 && (
                             <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1">
                               {jaUsados === 1
                                 ? "1 contrato deste cliente já está neste cadastro."
                                 : `${jaUsados} contratos deste cliente já estão neste cadastro.`}
+                            </div>
+                          )}
+                          {jaUsados === 0 && (info?.contratos.length ?? 0) > 0 && (
+                            <div className="text-[11px] text-muted-foreground mt-1">
+                              {info!.contratos.length === 1
+                                ? "1 contrato no Omie"
+                                : `${info!.contratos.length} contratos no Omie`}
+                              : <span className="font-mono">{info!.contratos.join(", ")}</span>
+                            </div>
+                          )}
+                          {infoLoading && (
+                            <div className="text-[11px] text-muted-foreground mt-1">
+                              verificando os contratos deste cadastro…
+                            </div>
+                          )}
+                          {!infoLoading && !infoErro && info == null && (
+                            <div className="text-[11px] text-muted-foreground mt-1">
+                              Este cadastro não está no espelho do Omie: nenhum contrato conhecido aqui.
+                            </div>
+                          )}
+                          {!!infoErro && (
+                            <div className="text-[11px] text-amber-700 dark:text-amber-400 mt-1">
+                              Não consegui verificar os contratos deste cadastro ({String(
+                                (infoErro as any)?.message ?? infoErro,
+                              ).slice(0, 120)}).
                             </div>
                           )}
                         </div>
