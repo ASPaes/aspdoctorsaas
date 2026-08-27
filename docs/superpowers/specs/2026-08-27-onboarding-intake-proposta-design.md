@@ -96,8 +96,12 @@ O trigger `valor_modulo_enfileirar_omie` dispara em `AFTER INSERT` de `cliente_p
 (sem condição `WHEN`). Ou seja: **inserir um módulo enfileira sincronização real para o Omie**.
 Uma proposta errada deixa de ser linha para apagar e vira cadastro/faturamento lá fora.
 
-Existe freio pronto: `trg_valor_enfileirar_omie` retorna cedo quando
-`current_setting('doctorsaas.skip_valor_sync', true) = 'true'`.
+Existe um freio pronto — `current_setting('doctorsaas.skip_valor_sync', true) = 'true'` — **mas ele
+não serve aqui**: o mesmo setting também desliga `fn_sync_produto_valores`, que é quem recalcula
+`cliente_produtos.vlr_mensal` a partir dos módulos. Usá-lo deixaria o contrato com valor zerado.
+
+**Correção:** o freio do Omie precisa de setting próprio. Acrescentar em `trg_valor_enfileirar_omie`
+um segundo early-return lendo `doctorsaas.intake_hold_omie`, sem tocar em `fn_sync_produto_valores`.
 
 Os demais gatilhos de integração **não** disparam neste fluxo:
 - `cliente_cadastro_enfileirar_omie` e `cliente_observacao_enfileirar_omie` são `AFTER UPDATE` — INSERT não dispara.
@@ -224,14 +228,19 @@ a lógica de contrato implícito, que já divergiu antes.
 
 Passos, na ordem, numa transação:
 
-1. `SET LOCAL doctorsaas.skip_valor_sync = 'true'` — segura o Omie (decisão do owner).
+1. `SET LOCAL doctorsaas.intake_hold_omie = 'true'` — segura o Omie (decisão do owner).
+   **Nunca `skip_valor_sync`**: aquele setting também desliga o recálculo dos totais do contrato.
 2. **Cliente**: busca por `cnpj` normalizado (só dígitos) no tenant. Achou → reusa, **não atualiza
    nada**. Não achou → INSERT com os campos que têm coluna.
 3. **Contrato + itens**: para cada produto do payload, `create_cliente_produto_with_contract`.
    O 1º cria o contrato; os demais passam `p_link_to_contrato_id` para cair no mesmo contrato.
 4. **Módulos**: INSERT em `cliente_produto_modulos` com `quantidade` e `vlr_mensal`.
-   ⚠️ Módulo com `vlr_mensal = 0` dispara trigger que **zera todos os totais** (CLAUDE.md).
-   A RPC recusa `vlr_mensal <= 0` em vez de gravar.
+   ⚠️ **`vlr_mensal` é preço UNITÁRIO.** `fn_sync_produto_valores` faz
+   `SUM(vlr_mensal * quantidade)`. O PDF mostra "Ponto adicional x9 — R$ 360,00" como *total*;
+   mandar 360 com quantidade 9 grava **R$ 3.240**. O contrato do JSON precisa dizer isso em letra
+   garrafal, e a RPC recusa quando a soma dos módulos não bate com o total declarado da proposta.
+   ⚠️ Módulo com `vlr_mensal = 0` faz a mesma função **descartar a receita dos módulos**
+   (`bool_and(vlr_mensal > 0)`). A RPC recusa `vlr_mensal <= 0` em vez de gravar.
 5. **Jornada**: `create_onboarding_journey` com os **12** parâmetros, incluindo `p_demand_type_id`
    e `p_pipeline_id`.
    ⚠️ **`p_unidade_base_id` fica NULL de propósito.** No onboarding a unidade vem do CLIENTE
@@ -302,6 +311,7 @@ Arquivo acima do limite não é baixado — o log guarda a URL e o motivo, e a a
 | `external_ticket_id` repetido | 200 com os IDs já criados | nada novo |
 | ID de catálogo inexistente | 422 com a lista completa | log `erro`, nada criado |
 | Módulo com `vlr_mensal <= 0` | 422 | log `erro`, nada criado |
+| Soma dos módulos ≠ total da proposta | 422 | log `erro`, nada criado |
 | Falha no meio da RPC | 500 | rollback total, log `erro` com a mensagem |
 | Anexo não baixou | 200 (venda criada) | log com o anexo que falhou |
 
@@ -310,7 +320,8 @@ Arquivo acima do limite não é baixado — o log guarda a URL e o motivo, e a a
 - **SQL** (`scripts/sql-tests/`, via docker exec, banco local):
   cliente novo · cliente reusado por CNPJ · reenvio idempotente · ID de outro tenant recusado ·
   módulo com valor zero recusado · rollback deixa o banco limpo ·
-  `skip_valor_sync` impede a linha na `omie_sync_fila`.
+  `intake_hold_omie` impede a linha na `omie_sync_fila` **e o total do contrato continua correto** ·
+  módulo com quantidade > 1 grava `vlr_mensal * quantidade` no `cliente_produtos`.
 - **RLS com JWT forjado**: usuário de outro tenant não lê `onboarding_intake_log` nem chama a RPC.
 - **`create_cliente_produto_with_contract`**: a alteração da guarda não abre acesso cross-tenant.
 - **Frontend**: `bun run build` + `tsc -p tsconfig.app.json` (o `tsc` da raiz não checa nada).
