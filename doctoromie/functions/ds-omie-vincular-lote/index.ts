@@ -1,5 +1,17 @@
-// ds-omie-vincular-lote  v3  (projeto DoctorOMIE: vqrytdntynxuqozehals)
+// ds-omie-vincular-lote  v4  (projeto DoctorOMIE: vqrytdntynxuqozehals)
 // Ponto de escrita UNICO do de/para. verify_jwt = false (autentica por API key / validar_api_key).
+//
+// v4 (27/08/2026): TROCA EXPLICITA DE DONO, via permitir_troca=true.
+//     Ate aqui a trava anti-colisao da v2 era um beco sem saida: contrato Omie ja vinculado NAO
+//     tinha como mudar de dono por dentro do produto. E isso acontece de verdade -- CNPJ com 3
+//     contratos no DS onde um cobra o valor cheio e os outros ficam em R$ 1,00 por causa do
+//     faturamento. Quando o de/para amarrou o contrato Omie no DS errado, o certo e MOVER, nao
+//     recriar. Caso real: VALEMAR LTDA, 27/08/2026.
+//     Sem a flag NADA muda: a colisao continua recusada com 409, que e o comportamento seguro por
+//     padrao. Com a flag, o mapping do dono antigo e APAGADO antes do upsert e o historico ganha
+//     uma linha por transferencia, dos dois lados (quem perdeu e quem ganhou).
+//     A colisao DENTRO DO LOTE continua recusada sempre: dois DS disputando o mesmo contrato Omie
+//     no mesmo envio nao e troca, e ambiguidade -- nao ha "dono anterior" para mover.
 //
 // v3 (15/07/2026): PASSA A REGISTRAR NO HISTORICO. Ate agora vincular era invisivel: gravava o par
 //     e retornava. Os 760 vinculos feitos em 15/07 nao existem em log nenhum -- nao da para saber
@@ -74,6 +86,9 @@ Deno.serve(async (req)=>{
   // v3: quem pediu o vinculo (a Conferencia manda; se nao vier, fica null e o historico diz isso)
   const origem = typeof body?.origem === "string" ? body.origem : null;
   const usuario = typeof body?.usuario === "string" ? body.usuario : null;
+  // v4: so troca de dono quando quem chamou pediu explicitamente. Default = trava da v2.
+  const permitirTroca = body?.permitir_troca === true;
+  const transferidos = [];
   if (vinculos.length === 0) return json({
     ok: true,
     vinculados: 0
@@ -146,7 +161,59 @@ Deno.serve(async (req)=>{
       ][0]
     };
   });
-  if (conflitosExistentes.length) {
+  if (conflitosExistentes.length && permitirTroca) {
+    // v4: MOVE o contrato Omie para o novo dono. Apagar o mapping antigo antes do upsert e o que
+    // faz o indice unico aceitar -- e e tambem a semantica correta: dali pra frente reajuste e
+    // cancelamento daquele contrato Omie saem do contrato DS novo.
+    const perdedores = [
+      ...new Set(conflitosExistentes.map((c)=>c.ds_contract_existente))
+    ];
+    const { error: eDel } = await supa.from("contracts_mapping").delete().eq("tenant_id", tenant).in("ds_contract_id", perdedores);
+    if (eDel) {
+      await logar("erro", [
+        {
+          tenant_id: tenant,
+          evento: "vincular",
+          entidade: "contrato",
+          status: "erro",
+          referencia: String(conflitosExistentes[0].ds_contract_novo),
+          payload: {
+            origem,
+            usuario,
+            conflitos: conflitosExistentes
+          },
+          error_message: `Falha ao desfazer o vinculo anterior: ${eDel.message}`
+        }
+      ]);
+      return json({
+        ok: false,
+        error: "Falha ao desfazer o vínculo anterior",
+        detalhe: eDel.message
+      }, 500);
+    }
+    // Uma linha por transferencia, referenciando QUEM PERDEU. Sem isso o historico do contrato que
+    // ficou sem vinculo nao registra nada, e ele simplesmente some do de/para sem explicacao.
+    await logar("sucesso", conflitosExistentes.map((c)=>({
+        tenant_id: tenant,
+        evento: "vincular",
+        entidade: "contrato",
+        status: "sucesso",
+        referencia: String(c.ds_contract_existente),
+        payload: {
+          origem,
+          usuario,
+          conflito: c
+        },
+        response: {
+          acao: "vinculo_transferido",
+          omie_contract_id: c.omie_contract_id,
+          ds_contract_id_anterior: c.ds_contract_existente,
+          ds_contract_id_novo: c.ds_contract_novo
+        },
+        error_message: `ATENCAO: vinculo TRANSFERIDO. O contrato Omie ${c.omie_contract_id} deixou de pertencer ao contrato DS ${c.ds_contract_existente} e passou a pertencer ao ${c.ds_contract_novo}.`
+      })));
+    transferidos.push(...conflitosExistentes);
+  } else if (conflitosExistentes.length) {
     await logar("ignorado", conflitosExistentes.map((c)=>({
         tenant_id: tenant,
         evento: "vincular",
@@ -288,6 +355,8 @@ Deno.serve(async (req)=>{
     vinculados: vinculos.length,
     historico_gravado: logOk,
     trocados: trocados.length ? trocados : undefined,
+    // v4: quem PERDEU o contrato Omie. O DS usa isso para devolver a linha do dono antigo a fila.
+    transferidos: transferidos.length ? transferidos : undefined,
     ...logOk ? {} : {
       aviso: "Vinculos gravados; falha ao registrar no historico."
     }

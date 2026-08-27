@@ -17,6 +17,15 @@
 // Recebe SO a escolha; re-deriva o resto no servidor; grava via vincular-lote v2 (trava); marca via RPC.
 // NAO escreve no Omie.
 //
+// v3 (27/08/2026): TROCA DE DONO (permitir_troca). Contrato Omie ja vinculado nao tinha saida por
+//     dentro do produto: a tela oferecia o candidato e a trava do vincular-lote recusava com 409.
+//     Acontece de verdade quando um CNPJ tem varios contratos no DS e o de/para amarrou o Omie no
+//     errado. Com a flag (que so a dupla confirmacao da tela liga), o vincular-lote v4 MOVE o
+//     mapping, e aqui a linha que perdeu volta para a fila -- status_usuario='novo' e a escolha
+//     limpa. Sem a devolucao, a linha antiga continuaria "resolvida" apontando para um contrato
+//     que nao e mais dela. Passa a mandar origem/usuario tambem: o vincular-lote v3 ja logava os
+//     dois e a Conferencia nunca mandou, entao todo vinculo dela entrou no historico anonimo.
+//
 // v2 (BUGFIX): validava a escolha contra omie_espelho_cadastro.codigo_contrato_omie -- a coluna
 //     PLANA, que guarda 1 contrato por cliente (o "melhor"). Depois que recon-candidatos-listar v4/v5
 //     passou a oferecer TODOS os contratos (coluna contratos_omie), a tela oferecia candidatos que
@@ -97,6 +106,9 @@ Deno.serve(async (req)=>{
     ok: false,
     error: "Unidade base inválida."
   }, 400);
+  // v3: troca explicita de dono. So chega aqui pela dupla confirmacao da tela; sem a flag o
+  // vincular-lote continua recusando colisao com 409, que e o default seguro.
+  const permitirTroca = body?.permitir_troca === true;
   const confirmacoes = Array.isArray(body?.confirmacoes) ? body.confirmacoes : [];
   if (!confirmacoes.length) return json({
     ok: false,
@@ -223,7 +235,10 @@ Deno.serve(async (req)=>{
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      vinculos
+      vinculos,
+      permitir_troca: permitirTroca,
+      origem: "conferencia",
+      usuario: userData.user.id
     })
   });
   const rj = await resp.json().catch(()=>({}));
@@ -233,6 +248,27 @@ Deno.serve(async (req)=>{
       error: "Falha ao gravar de/para",
       detalhe: rj
     }, resp.status === 409 ? 409 : 502);
+  }
+  // 3b) v3: quem PERDEU o contrato Omie volta para a fila. Sem isso a linha antiga segue marcada
+  // como resolvida apontando para um contrato que nao e mais dela -- e continua bloqueando o
+  // candidato na tela, agora mentindo. E o inverso exato do recon_marcar_candidatos_resolvidos.
+  const perdedores = Array.isArray(rj?.transferidos) ? [
+    ...new Set(rj.transferidos.map((t)=>String(t.ds_contract_existente)))
+  ] : [];
+  let devolvidos = 0;
+  if (perdedores.length) {
+    const { data: dv, error: eDv } = await admin.from("reconciliacao_cadastro").update({
+      status_usuario: "novo",
+      candidato_escolhido: null,
+      resolvido_em: null,
+      resolvido_por: null
+    }).eq("tenant_id", tenantDs).eq("conta_integration_id", conta.id).in("ds_contract_id", perdedores).select("ds_contract_id");
+    if (eDv) return json({
+      ok: false,
+      error: "Vínculo transferido, mas falhou ao devolver a linha anterior para a fila",
+      detalhe: eDv.message
+    }, 500);
+    devolvidos = (dv ?? []).length;
   }
   // 4) Marca linhas resolvidas — 1 query via RPC
   const pares = vinculos.map((v)=>({
@@ -253,6 +289,8 @@ Deno.serve(async (req)=>{
     ok: true,
     vinculados: vinculos.length,
     linhas_marcadas: nMarcadas ?? null,
-    resolvidos: pares
+    resolvidos: pares,
+    transferidos: rj?.transferidos ?? undefined,
+    devolvidos_para_fila: perdedores.length ? devolvidos : undefined
   });
 });
