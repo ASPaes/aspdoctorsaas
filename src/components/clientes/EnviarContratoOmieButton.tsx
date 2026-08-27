@@ -50,19 +50,25 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
     queryKey: ["omie-vinculo-contrato", contratoId],
     enabled: !!contratoId,
     queryFn: async () => {
-      // limit(1) em vez de maybeSingle direto: tenant com mais de uma conta Omie pode ter a linha
-      // repetida por conta, e o maybeSingle levanta erro nesse caso em vez de responder.
+      // SEM filtro de status_usuario, de propósito. A primeira versão filtrava
+      // status in (vinculado, resolvido) e não achava nada — enquanto a Conferência, lendo esta
+      // mesma tabela e SEM esse filtro, mostrava o dono do contrato Omie na tela ao lado. O status
+      // não é confiável como prova de vínculo; o código preenchido é o sinal que as duas telas
+      // compartilham. Vale a mesma regra da Conferência: a escolha explícita (candidato_escolhido)
+      // vem antes do que a detecção casou (codigo_contrato_omie).
+      // Sem limit(1) fixo: tenant com mais de uma conta Omie pode ter a linha repetida por conta e
+      // só uma delas com o código, então filtrar aqui no cliente é mais fiel do que torcer pela
+      // ordem que o Postgres devolver.
       const { data, error } = await (supabase.from("reconciliacao_cadastro" as any) as any)
-        .select("status_usuario, candidato_escolhido, codigo_contrato_omie")
+        .select("candidato_escolhido, codigo_contrato_omie")
         .eq("ds_contract_id", contratoId)
-        .in("status_usuario", ["vinculado", "resolvido"])
-        .limit(1)
-        .maybeSingle();
+        .limit(5);
       if (error) throw error;
-      if (!data) return null;
-      if (!["vinculado", "resolvido"].includes(String(data.status_usuario))) return null;
-      const cod = data.status_usuario === "resolvido" ? data.candidato_escolhido : data.codigo_contrato_omie;
-      return cod != null && String(cod) !== "" ? Number(cod) : null;
+      for (const linha of (data ?? []) as any[]) {
+        const cod = linha?.candidato_escolhido ?? linha?.codigo_contrato_omie;
+        if (cod != null && String(cod) !== "") return Number(cod);
+      }
+      return null;
     },
   });
 
