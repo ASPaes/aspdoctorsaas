@@ -103,7 +103,11 @@ export function renderMentions(
     }
 
     nodes.push(
-      <span key={`m-${key++}-${start}`} className="text-sky-500 font-medium">
+      <span
+        key={`m-${key++}-${start}`}
+        className="rounded px-1 font-semibold"
+        style={{ backgroundColor: "color-mix(in srgb, currentColor 20%, transparent)" }}
+      >
         {display}
       </span>,
     );
