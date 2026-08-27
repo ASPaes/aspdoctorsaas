@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { mapaVinculoOmie } from "@/lib/omieVinculo";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useOmieContaDoCliente } from "@/hooks/useOmieContaDoCliente";
 import { Badge } from "@/components/ui/badge";
@@ -261,21 +262,23 @@ function HistoricoConteudo({ clienteId, aberto }: Props & { aberto: boolean }) {
 
       let vinculos: any[] = [];
       if (ids.length > 0) {
+        // Sem filtro de estado_match: ver a regra e o porquê em src/lib/omieVinculo.ts. Aqui o
+        // furo aparecia como histórico vazio — os contratos de CNPJ ambíguo não entravam na busca
+        // dos logs, justamente os que mais têm o que contar.
         const { data: v, error: vError } = await supabase
           .from("reconciliacao_cadastro")
-          .select("ds_customer_id, ds_contract_id, codigo_cliente_omie, codigo_contrato_omie")
+          .select("ds_customer_id, ds_contract_id, codigo_cliente_omie, codigo_contrato_omie, candidato_escolhido")
           .eq("tenant_id", tid)
-          .eq("estado_match", "CASADO")
-          .not("codigo_contrato_omie", "is", null)
           .in("ds_contract_id", ids);
         if (vError) throw vError;
         vinculos = v ?? [];
       }
 
-      const codigoClienteOmie = vinculos[0]?.codigo_cliente_omie ?? null;
-      const codigosContratoOmie = vinculos
-        .map((v) => v.codigo_contrato_omie)
-        .filter((c): c is string | number => c != null);
+      // O código do CLIENTE Omie continua vindo direto: é a detecção que o preenche e não existe
+      // equivalente de "escolha explícita" para cliente nesta tabela. Em CNPJ ambíguo ele fica
+      // nulo, e os logs por cliente não entram — como já era antes, não é regressão.
+      const codigoClienteOmie = vinculos.find((v) => v.codigo_cliente_omie != null)?.codigo_cliente_omie ?? null;
+      const codigosContratoOmie = [...mapaVinculoOmie(vinculos).values()];
 
       return {
         contratoIds: ids,

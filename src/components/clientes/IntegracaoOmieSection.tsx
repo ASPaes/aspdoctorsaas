@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useOmieContaDoCliente } from "@/hooks/useOmieContaDoCliente";
+import { mapaVinculoOmie } from "@/lib/omieVinculo";
 import { Badge } from "@/components/ui/badge";
 import { Cloud } from "lucide-react";
 import EnviarOmieComPreviaButton, {
@@ -50,13 +51,7 @@ export default function IntegracaoOmieSection({ clienteId }: Props) {
       const ids = (contratos ?? []).map((c: any) => c.id);
       let vinculos: any[] = [];
       if (ids.length > 0) {
-        // NÃO exigir estado_match='CASADO' nem codigo_contrato_omie preenchido. A detecção só
-        // preenche esses dois quando o CNPJ é 1:1 entre DS e Omie; quando o mesmo CNPJ tem vários
-        // cadastros/contratos no Omie o estado é 'AMBIGUO' e o código fica NULL, ainda que o
-        // contrato ESTEJA vinculado — vinculado pela Conferência, justamente porque era ambíguo.
-        // Resultado: contrato vinculado aparecia como nunca enviado, com o botão convidando a
-        // mandar de novo (VALEMAR, 27/08/2026). A escolha explícita mora em candidato_escolhido,
-        // e é a mesma regra que a Conferência usa para dizer "já vinculado".
+        // Sem filtro de estado_match: ver a regra e o porquê em src/lib/omieVinculo.ts.
         const { data: v, error: vError } = await supabase
           .from("reconciliacao_cadastro")
           .select("ds_contract_id, codigo_contrato_omie, candidato_escolhido")
@@ -66,14 +61,7 @@ export default function IntegracaoOmieSection({ clienteId }: Props) {
         vinculos = v ?? [];
       }
 
-      const vinculoMap = new Map<string, string | number>();
-      for (const v of vinculos) {
-        const codigo = v.candidato_escolhido ?? v.codigo_contrato_omie;
-        if (codigo == null || String(codigo) === "") continue;
-        // Tenant com mais de uma conta Omie pode ter a linha repetida por contrato, e só uma delas
-        // com o código: a primeira que tiver código vence, em vez de a última sobrescrever com nulo.
-        if (!vinculoMap.has(v.ds_contract_id)) vinculoMap.set(v.ds_contract_id, codigo);
-      }
+      const vinculoMap = mapaVinculoOmie(vinculos);
 
       return (contratos ?? []).map((c: any) => {
         const codigo = vinculoMap.get(c.id) ?? null;

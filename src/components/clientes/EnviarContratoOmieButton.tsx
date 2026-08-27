@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOmieContaDoCliente } from "@/hooks/useOmieContaDoCliente";
+import { mapaVinculoOmie } from "@/lib/omieVinculo";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -50,25 +51,15 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
     queryKey: ["omie-vinculo-contrato", contratoId],
     enabled: !!contratoId,
     queryFn: async () => {
-      // SEM filtro de status_usuario, de propósito. A primeira versão filtrava
-      // status in (vinculado, resolvido) e não achava nada — enquanto a Conferência, lendo esta
-      // mesma tabela e SEM esse filtro, mostrava o dono do contrato Omie na tela ao lado. O status
-      // não é confiável como prova de vínculo; o código preenchido é o sinal que as duas telas
-      // compartilham. Vale a mesma regra da Conferência: a escolha explícita (candidato_escolhido)
-      // vem antes do que a detecção casou (codigo_contrato_omie).
-      // Sem limit(1) fixo: tenant com mais de uma conta Omie pode ter a linha repetida por conta e
-      // só uma delas com o código, então filtrar aqui no cliente é mais fiel do que torcer pela
-      // ordem que o Postgres devolver.
+      // A regra e o porquê de não filtrar por estado_match nem status_usuario estão em
+      // src/lib/omieVinculo.ts. Sem limit(1) fixo: tenant com mais de uma conta Omie pode ter a
+      // linha repetida por conta e só uma delas com o código.
       const { data, error } = await (supabase.from("reconciliacao_cadastro" as any) as any)
-        .select("candidato_escolhido, codigo_contrato_omie")
+        .select("ds_contract_id, candidato_escolhido, codigo_contrato_omie")
         .eq("ds_contract_id", contratoId)
         .limit(5);
       if (error) throw error;
-      for (const linha of (data ?? []) as any[]) {
-        const cod = linha?.candidato_escolhido ?? linha?.codigo_contrato_omie;
-        if (cod != null && String(cod) !== "") return Number(cod);
-      }
-      return null;
+      return mapaVinculoOmie(data as any[]).get(contratoId) ?? null;
     },
   });
 
