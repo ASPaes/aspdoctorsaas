@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -248,6 +249,10 @@ function CandidatosLinha({
 }) {
   const queryClient = useQueryClient();
   const [escolhendo, setEscolhendo] = useState<string | number | null>(null);
+  // Troca de dono: candidato em confirmação + o "eu tenho certeza" que arma o botão. São duas
+  // ações distintas de propósito — mover o de/para redireciona reajuste e cancelamento.
+  const [trocaAlvo, setTrocaAlvo] = useState<any | null>(null);
+  const [trocaCiente, setTrocaCiente] = useState(false);
   const { conta, contaBody } = useOmieConta();
 
   const { data, isLoading } = useQuery({
@@ -272,7 +277,7 @@ function CandidatosLinha({
       // Mesma regra do contratosDoCliente da recon-candidatos-listar: se há ativos ('10'), são
       // eles; senão, o menos ruim.
       const prio = (s: any) => (String(s) === "10" ? 0 : String(s) === "90" ? 1 : 2);
-      return (data ?? []).flatMap((e: any) => {
+      const lista = (data ?? []).flatMap((e: any) => {
         const todos = Array.isArray(e.contratos_omie) ? e.contratos_omie : [];
         const ativos = todos.filter((c: any) => String(c.situacao_contrato) === "10");
         const escolhidos =
@@ -290,10 +295,72 @@ function CandidatosLinha({
           situacao_contrato: c.situacao_contrato,
         }));
       });
+
+      // Contrato do Omie já reivindicado por OUTRA linha do DS não está disponível: o de/para tem
+      // índice único e recusa com 409 "colisao_com_existente". Esta lista lia o espelho cru e não
+      // sabia disso, então oferecia candidato tomado (VALEMAR, 27/08). É o mesmo sinal que a
+      // recon-candidatos-listar v6 chama de ja_vinculado_hint na aba Escolher Candidato; aqui vem
+      // direto da reconciliação para as duas abas dizerem a mesma coisa.
+      const codigos = [
+        ...new Set(
+          lista
+            .map((c: any) => c.codigo_contrato_omie)
+            .filter((v: any) => v != null && /^\d+$/.test(String(v)))
+            .map(String),
+        ),
+      ];
+      if (codigos.length === 0) return lista.map((c: any) => ({ ...c, tomado_por: null }));
+
+      // O .or derruba índice ordenado, mas aqui é pontual: no máximo 20 códigos, já recortado por
+      // conta. Os dois campos importam — 'resolvido' guarda a escolha em candidato_escolhido.
+      const inList = `(${codigos.join(",")})`;
+      const { data: rec, error: eRec } = await supabase
+        .from("reconciliacao_cadastro")
+        .select("ds_contract_id, razao_ds, codigo_contrato_omie, candidato_escolhido")
+        .eq("conta_integration_id", conta?.id ?? "")
+        .or(`codigo_contrato_omie.in.${inList},candidato_escolhido.in.${inList}`);
+      if (eRec) throw eRec;
+
+      const tomadoPor = new Map<string, { ds_contract_id: string; razao: string | null }>();
+      for (const r of rec ?? []) {
+        // A própria linha não se bloqueia: reescolher o mesmo contrato é reconfirmação, não colisão.
+        if (String(r.ds_contract_id) === String(dsContractId)) continue;
+        for (const v of [r.codigo_contrato_omie, r.candidato_escolhido]) {
+          if (v != null && String(v) !== "") {
+            tomadoPor.set(String(v), { ds_contract_id: String(r.ds_contract_id), razao: r.razao_ds ?? null });
+          }
+        }
+      }
+
+      // O UUID não diz nada a quem opera. O número do contrato é o que ele reconhece na tela de
+      // contratos, e a razão social diz na hora se o dono é outro cliente ou o mesmo.
+      const donos = [...new Set([...tomadoPor.values()].map((d) => d.ds_contract_id))];
+      const numeroPorId = new Map<string, string>();
+      if (donos.length) {
+        const { data: ctrs, error: eCtr } = await supabase
+          .from("contratos")
+          .select("id, numero")
+          .in("id", donos);
+        if (eCtr) throw eCtr;
+        for (const ct of ctrs ?? []) {
+          if (ct?.numero != null) numeroPorId.set(String(ct.id), String(ct.numero));
+        }
+      }
+
+      return lista
+        .map((c: any) => {
+          const dono = c.codigo_contrato_omie != null ? tomadoPor.get(String(c.codigo_contrato_omie)) ?? null : null;
+          return {
+            ...c,
+            tomado_por: dono ? { ...dono, numero: numeroPorId.get(dono.ds_contract_id) ?? null } : null,
+          };
+        })
+        // Sort estável: os disponíveis sobem, a ordem dentro de cada grupo não muda.
+        .sort((a: any, b: any) => Number(!!a.tomado_por) - Number(!!b.tomado_por));
     },
   });
 
-  const escolher = async (candidato: any) => {
+  const escolher = async (candidato: any, permitirTroca = false) => {
     if (!tid || !dsContractId) {
       toast.error("Dados insuficientes para escolher o candidato.");
       return;
@@ -308,18 +375,54 @@ function CandidatosLinha({
       const { data: resp, error } = await supabase.functions.invoke("recon-candidato-confirmar", {
         body: { ...contaBody,
           tenant_id: tid,
+          // Só vai true pela dupla confirmação: sem a flag o de/para recusa a colisão, que é o
+          // comportamento seguro por padrão.
+          ...(permitirTroca ? { permitir_troca: true } : {}),
           confirmacoes: [
             { ds_contract_id: dsContractId, codigo_contrato_omie: codigoContrato },
           ],
         },
       });
+      // O invoke troca o corpo da resposta por "Edge Function returned a non-2xx status code" — e é
+      // justamente em não-2xx que a recon-candidato-confirmar escreve o motivo (409 "Escolha
+      // inválida", 409 fora do balde, 409/502 do de/para). Sem ler o error.context, todo o
+      // tratamento abaixo era código morto e a tela só sabia dizer "non-2xx".
+      // Lê como TEXTO e só então tenta JSON: em erro de boot/timeout o gateway devolve texto puro,
+      // e um .json() direto engoliria a única pista que existe. O status vai junto na mensagem —
+      // sem ele não dá para separar "corpo ilegível" de "build antigo sem este código".
+      let okResp = (resp as any) ?? {};
       if (error) {
-        toast.error(`Falha ao escolher candidato: ${error.message || "erro desconhecido"}`);
-        return;
+        const ctx = (error as any)?.context;
+        const status = ctx?.status ?? "?";
+        const cru = typeof ctx?.text === "function" ? await ctx.text().catch(() => "") : "";
+        let corpo: any = null;
+        try {
+          corpo = cru ? JSON.parse(cru) : null;
+        } catch {
+          /* não era JSON — cai no bruto abaixo */
+        }
+        if (!corpo || typeof corpo !== "object") {
+          toast.error(
+            `Falha ao escolher candidato (HTTP ${status}): ${cru.slice(0, 300) || error.message || "sem corpo na resposta"}`,
+          );
+          return;
+        }
+        // 401/403 do gateway não usam a chave "error" — sem isso a tela diria "Não foi possível
+        // escolher este candidato" para um JWT vencido.
+        if (!corpo.error && (corpo.message || corpo.msg)) {
+          toast.error(`Falha ao escolher candidato (HTTP ${status}): ${corpo.message || corpo.msg}`);
+          return;
+        }
+        okResp = corpo;
       }
-      const okResp = (resp as any) ?? {};
       if (okResp.ok === true) {
-        toast.success("Candidato escolhido. De/para gravado.");
+        const t = okResp.transferidos?.[0];
+        toast.success(
+          t
+            ? `Vínculo transferido. O contrato Omie ${t.omie_contract_id} agora pertence a este contrato; o anterior voltou para a fila.`
+            : "Candidato escolhido. De/para gravado.",
+        );
+        setTrocaAlvo(null);
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["omie-conf-resumo"] }),
           queryClient.invalidateQueries({ queryKey: ["omie-conf-lista"] }),
@@ -335,7 +438,20 @@ function CandidatosLinha({
         const motivo = typeof inv === "string" ? inv : inv?.motivo || "espelho desatualizado";
         toast.warning(`Escolha inválida: ${motivo}. Tente "Reconferir agora".`);
       } else if (errMsg === "Falha ao gravar de/para") {
-        toast.error(`Falha ao gravar de/para: ${okResp.detalhe || "erro no DoctorOMIE"}`);
+        // okResp.detalhe é o JSON que o DoctorOMIE devolveu, não uma string: interpolar direto
+        // imprimia "[object Object]". A colisão é o caso que o operador precisa entender.
+        const det = okResp.detalhe;
+        const dj = det && typeof det === "object" ? det : null;
+        let motivo: string;
+        if (dj?.error === "colisao_com_existente") {
+          const c = dj.conflitos?.[0];
+          motivo = c
+            ? `o contrato Omie ${c.omie_contract_id} já está vinculado a outro contrato do DoctorSaaS (${c.ds_contract_existente}).`
+            : "este contrato do Omie já está vinculado a outro contrato do DoctorSaaS.";
+        } else {
+          motivo = (typeof det === "string" ? det : dj?.detalhe || dj?.error) || "erro no DoctorOMIE";
+        }
+        toast.error(`Falha ao gravar de/para: ${motivo}`);
       } else {
         toast.error(errMsg);
       }
@@ -357,8 +473,14 @@ function CandidatosLinha({
         const codigo = c.codigo_contrato_omie;
         const semContrato = codigo == null || String(codigo) === "";
         const isThis = escolhendo != null && String(escolhendo) === String(codigo);
+        const tomado = !!c.tomado_por;
         return (
-          <div key={i} className="flex items-center justify-between rounded border p-2 text-sm">
+          <div
+            key={i}
+            className={`flex items-center justify-between rounded border p-2 text-sm ${
+              tomado ? "border-amber-300 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20" : ""
+            }`}
+          >
             <div className="min-w-0 flex-1">
               <div className="font-medium truncate">{c.razao_social_omie || "—"}</div>
               <div className="text-xs text-muted-foreground flex flex-wrap gap-2 mt-1">
@@ -375,21 +497,115 @@ function CandidatosLinha({
                 {c.situacao_contrato && <Badge variant="outline" className="text-[10px]">{c.situacao_contrato}</Badge>}
                 {c.omie_inativo && <Badge variant="destructive" className="text-[10px]">Inativo</Badge>}
                 {c.origem_codigo && <Badge variant="secondary" className="text-[10px]">{originLabel(c.origem_codigo).label}</Badge>}
+                {tomado && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-900"
+                  >
+                    Já vinculado
+                  </Badge>
+                )}
               </div>
+              {tomado && (
+                <div className="text-[11px] text-amber-700 dark:text-amber-400 mt-1">
+                  Já pertence ao contrato{" "}
+                  <strong>{c.tomado_por.numero ? `nº ${c.tomado_por.numero}` : c.tomado_por.ds_contract_id}</strong>
+                  {c.tomado_por.razao ? ` de ${c.tomado_por.razao}` : ""}. Trocar move o vínculo para cá.
+                </div>
+              )}
             </div>
             <Button
               size="sm"
               variant="outline"
-              className="gap-1"
+              className={`gap-1 shrink-0 ${
+                tomado ? "border-amber-400 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40" : ""
+              }`}
               disabled={semContrato || algumEscolhendo}
-              onClick={() => escolher(c)}
+              onClick={() => {
+                if (tomado) {
+                  setTrocaCiente(false);
+                  setTrocaAlvo(c);
+                } else {
+                  escolher(c);
+                }
+              }}
             >
               {isThis ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-              Escolher este
+              {tomado ? "Trocar para este" : "Escolher este"}
             </Button>
           </div>
         );
       })}
+
+      <AlertDialog
+        open={trocaAlvo !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setTrocaAlvo(null);
+            setTrocaCiente(false);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-amber-700 dark:text-amber-400">
+              Trocar o dono deste contrato do Omie?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="rounded border p-2 text-sm">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                    Contrato do Omie
+                  </div>
+                  <div className="font-mono text-sm">{trocaAlvo?.codigo_contrato_omie}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {trocaAlvo?.razao_social_omie} · {formatBRL(trocaAlvo?.valor_omie)}
+                  </div>
+                </div>
+                <div className="rounded border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-2 py-2 text-xs text-amber-800 dark:text-amber-300 space-y-1.5">
+                  <div>
+                    Sai do contrato{" "}
+                    <strong>
+                      {trocaAlvo?.tomado_por?.numero
+                        ? `nº ${trocaAlvo.tomado_por.numero}`
+                        : trocaAlvo?.tomado_por?.ds_contract_id}
+                    </strong>
+                    {trocaAlvo?.tomado_por?.razao ? ` de ${trocaAlvo.tomado_por.razao}` : ""} e passa para este.
+                  </div>
+                  <div>
+                    Daqui pra frente, reajuste e cancelamento deste contrato do Omie saem do contrato novo. O
+                    contrato anterior fica sem vínculo e volta para a fila da Conferência.
+                  </div>
+                </div>
+                <label className="flex items-start gap-2 text-xs cursor-pointer">
+                  <Checkbox
+                    checked={trocaCiente}
+                    onCheckedChange={(v) => setTrocaCiente(v === true)}
+                    className="mt-0.5"
+                  />
+                  <span>Tenho certeza de que este contrato do Omie deve passar a pertencer a este contrato.</span>
+                </label>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={algumEscolhendo}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!trocaCiente || algumEscolhendo}
+              className="bg-amber-600 hover:bg-amber-700 focus:ring-amber-600"
+              onClick={(e) => {
+                // O AlertDialogAction fecha sozinho ao clicar; segurar aqui mantém o diálogo até a
+                // troca terminar, senão o operador não vê o resultado da ação que acabou de tomar.
+                e.preventDefault();
+                if (trocaAlvo) escolher(trocaAlvo, true);
+              }}
+            >
+              {algumEscolhendo ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+              Trocar o vínculo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
