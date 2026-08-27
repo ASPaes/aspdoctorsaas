@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -68,12 +69,28 @@ export function extrairMensagemErro(corpo: any): string {
     const erros = Array.isArray(obj.erros)
       ? obj.erros.filter((e: any) => typeof e === "string" && e.trim() !== "").map(String)
       : [];
-    if (erros.length > 0) {
-      const lista = erros.length === 1 ? erros[0] : erros.map((e) => `• ${e}`).join("\n");
-      return base ? `${base}\n\n${lista}` : lista;
-    }
 
-    return base || (obj.bloqueado != null ? `Bloqueado: ${obj.bloqueado}` : "");
+    // `detalhe_omie` é a faultstring que o Omie devolveu, e é o único lugar onde o motivo real
+    // existe: o `error` do ds-omie-contrato-criar é sempre o mesmo texto genérico ("Falha ao criar
+    // o contrato no Omie."). Sem ler este campo, a tela mostrava só a frase genérica e não havia o
+    // que fazer com ela — contrato 2026-5700 (20/08/2026) foi recusado por "É obrigatório informar
+    // o valor unitário do item, tag [valorUnit]" (MRR do cliente zerado) e nada disso apareceu.
+    const omie =
+      typeof obj.detalhe_omie === "string" && obj.detalhe_omie.trim() !== ""
+        ? `Resposta do Omie: ${obj.detalhe_omie.trim()}`
+        : "";
+
+    const partes: string[] = [];
+    if (base) partes.push(base);
+    if (erros.length > 0) {
+      partes.push(erros.length === 1 ? erros[0] : erros.map((e) => `• ${e}`).join("\n"));
+    }
+    if (omie) partes.push(omie);
+
+    if (partes.length === 0) {
+      return obj.bloqueado != null ? `Bloqueado: ${obj.bloqueado}` : "";
+    }
+    return partes.join("\n\n");
   };
 
   const raiz = mensagemDe(corpo);
@@ -185,6 +202,15 @@ export default function EnviarOmieComPreviaButton({
   const [dryRun, setDryRun] = useState<any | null>(null);
   const [candidatos, setCandidatos] = useState<any[]>([]);
   const [vinculando, setVinculando] = useState<number | string | null>(null);
+  // Trava de data de ativação dispensável: o backend responde dispensavel:true SÓ nessa, com as
+  // duas datas. Documento inválido e contrato sem modelo não têm "enviar mesmo assim", de propósito.
+  const [dispensa, setDispensa] = useState<{ data_do_contrato?: string; data_de_corte?: string } | null>(null);
+  const [dispensaCiente, setDispensaCiente] = useState(false);
+  // Guarda a dispensa entre o dry_run e o criar: a decisão é tomada uma vez, no diálogo de
+  // bloqueio, e vale para as duas chamadas seguintes. O backend não persiste nada.
+  // Fica AQUI, com os outros hooks: mais abaixo há um early return (contrato.sincronizado), e um
+  // useState depois dele muda a contagem de hooks entre renders.
+  const [corteDispensado, setCorteDispensado] = useState(false);
   // Enviado NESTA sessão do componente: sem isto, o botão continua dizendo "Enviar ao Omie"
   // depois do sucesso e convida a mandar de novo.
   const [enviadoAgora, setEnviadoAgora] = useState<string | number | null | undefined>(undefined);
@@ -196,11 +222,31 @@ export default function EnviarOmieComPreviaButton({
     return <SincronizadoBadge codigo={enviadoAgora ?? null} />;
   }
 
-  const handleClick = async () => {
+  // Lê do corpo se ESTA trava aceita "enviar mesmo assim". Só a data de ativação devolve
+  // dispensavel:true — as outras não têm saída e nem deveriam ter.
+  const registrarBloqueio = (corpo: any) => {
+    setCandidatos(extrairCandidatos(corpo));
+    setBloqueioMsg(extrairMensagemErro(corpo));
+    setDispensa(
+      corpo?.dispensavel === true
+        ? { data_do_contrato: corpo?.data_do_contrato, data_de_corte: corpo?.data_de_corte }
+        : null,
+    );
+    setDispensaCiente(false);
+    setBloqueioOpen(true);
+  };
+
+  const handleClick = async (dispensarCorte = false) => {
     setLoading(true);
+    if (dispensarCorte) setCorteDispensado(true);
     try {
       const { data, error } = await supabase.functions.invoke("recon-omie-escrever", {
-        body: { tenant_id: tenantId, ds_contract_id: contrato.id, modo: "dry_run" },
+        body: {
+          tenant_id: tenantId,
+          ds_contract_id: contrato.id,
+          modo: "dry_run",
+          ...(dispensarCorte || corteDispensado ? { permitir_anterior_ao_corte: true } : {}),
+        },
       });
       if (error) {
         // A função responde bloqueio com 4xx, e o supabase-js descarta o corpo em não-2xx: sobrava
@@ -214,18 +260,14 @@ export default function EnviarOmieComPreviaButton({
           /* corpo não era JSON */
         }
         if (corpo?.bloqueado || corpo?.error) {
-          setCandidatos(extrairCandidatos(corpo));
-          setBloqueioMsg(extrairMensagemErro(corpo));
-          setBloqueioOpen(true);
+          registrarBloqueio(corpo);
         } else {
           toast.error("Falha ao preparar o envio. Tente novamente.");
         }
         return;
       }
       if (data?.ok === false) {
-        setCandidatos(extrairCandidatos(data));
-        setBloqueioMsg(extrairMensagemErro(data));
-        setBloqueioOpen(true);
+        registrarBloqueio(data);
         return;
       }
 
@@ -246,7 +288,14 @@ export default function EnviarOmieComPreviaButton({
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("recon-omie-escrever", {
-        body: { tenant_id: tenantId, ds_contract_id: contrato.id, modo: "criar" },
+        body: {
+          tenant_id: tenantId,
+          ds_contract_id: contrato.id,
+          modo: "criar",
+          // A dispensa vale para as duas chamadas: sem repeti-la aqui, o dry_run passaria e o
+          // criar bateria na mesma trava.
+          ...(corteDispensado ? { permitir_anterior_ao_corte: true } : {}),
+        },
       });
       if (error) {
         let body: any = {};
@@ -262,9 +311,7 @@ export default function EnviarOmieComPreviaButton({
           return;
         }
         setConfirmOpen(false);
-        setCandidatos(extrairCandidatos(body));
-        setBloqueioMsg(msg);
-        setBloqueioOpen(true);
+        registrarBloqueio(body);
         return;
       }
       if (data?.ok) {
@@ -357,7 +404,9 @@ export default function EnviarOmieComPreviaButton({
 
   return (
     <>
-      <Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={loading}>
+      {/* Arrow function obrigatória: onClick={handleClick} passaria o MouseEvent como
+          dispensarCorte, e um evento é truthy — todo clique dispensaria a data de ativação. */}
+      <Button type="button" variant="outline" size="sm" onClick={() => handleClick()} disabled={loading}>
         {loading ? (
           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
         ) : (
@@ -433,7 +482,44 @@ export default function EnviarOmieComPreviaButton({
             </div>
           )}
 
+          {dispensa && (
+            <div className="space-y-2 rounded border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5">
+              <div className="text-xs text-amber-800 dark:text-amber-300">
+                A data de ativação é uma regra desta casa, não uma limitação do Omie: ela existe para
+                a integração não levar a base antiga junto. Contrato lançado agora com data
+                retroativa é caso legítimo, e você pode enviar assim mesmo.
+              </div>
+              <label className="flex items-start gap-2 text-xs cursor-pointer text-amber-800 dark:text-amber-300">
+                <Checkbox
+                  checked={dispensaCiente}
+                  onCheckedChange={(v) => setDispensaCiente(v === true)}
+                  className="mt-0.5"
+                />
+                <span>
+                  Confirmo que este contrato deve ir ao Omie mesmo sendo de{" "}
+                  <strong>{dispensa.data_do_contrato ?? "data anterior"}</strong>. A decisão fica
+                  registrada no histórico com meu nome.
+                </span>
+              </label>
+            </div>
+          )}
+
           <AlertDialogFooter>
+            {dispensa && (
+              <Button
+                type="button"
+                variant="outline"
+                className="border-amber-400 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
+                disabled={!dispensaCiente || loading || vinculando != null}
+                onClick={() => {
+                  setBloqueioOpen(false);
+                  void handleClick(true);
+                }}
+              >
+                {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Enviar mesmo assim
+              </Button>
+            )}
             <AlertDialogAction disabled={vinculando != null}>Entendi</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
