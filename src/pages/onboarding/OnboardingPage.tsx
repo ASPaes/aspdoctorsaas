@@ -32,6 +32,7 @@ import {
   montarJornadasPorPipeline,
   somarColunas,
   contarTicketsImplantacao,
+  jornadasComTreinoAtivo,
 } from "./boardTotals";
 
 interface StageRow {
@@ -601,11 +602,13 @@ export default function OnboardingPage() {
     });
   }, [journeys, busca, filtroResponsavel, filtroDemanda, filtroSemaforo, filtroSituacao, periodoEntrada, filtroTags, tagsByJourney]);
 
-  /** Jornada que já entrou na Implantação e ainda não tem treinamento nenhum.
-   *  Sem isto ela sumiria do quadro ao trocar cartão de jornada por cartão de treino. */
+  /** Jornada que já entrou na Implantação e ainda não tem treinamento ATIVO — nunca teve,
+   *  ou os que tinha foram todos cancelados. Sem isto ela sumiria do quadro ao trocar
+   *  cartão de jornada por cartão de treino; e, como o cancelado não ocupa coluna, o
+   *  ticket ficava invisível no quadro enquanto pesava no total do pipeline. */
   const jornadasSemTreinoNaFase = useMemo<JornadaSemTreino[]>(() => {
     if (!isImplantacao) return [];
-    const comTreino = new Set(trainingCards.map((t) => t.journey_id));
+    const comTreino = jornadasComTreinoAtivo(trainingCards);
     const stageIds = new Set(stagesDaFase.map((s) => s.id));
     return journeysFiltradas
       .filter((j) => !comTreino.has(j.journey_id))

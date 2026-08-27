@@ -162,3 +162,23 @@ export function contarTicketsImplantacao({
   pipelineIds.forEach((pid) => (out[pid] = vistos[pid].size));
   return out;
 }
+
+/**
+ * Jornadas que já têm cartão de treinamento no quadro — as que têm pelo menos um treino
+ * NÃO cancelado. Quem fica de fora precisa de cartão próprio ("jornada sem treino").
+ *
+ * O cancelado não ocupa coluna nenhuma (fica só na visão agrupada, riscado), então ele não
+ * pode contar como "esta jornada já está no quadro": um ticket cujos treinos foram todos
+ * cancelados sumia por inteiro — sem cartão de treino e sem cartão de jornada — e continuava
+ * no total do pipeline. Era o "1" no badge com todas as colunas zeradas (TK-2026-2602,
+ * aberto em "Pendente Agendar" e invisível para a equipe).
+ */
+export function jornadasComTreinoAtivo(
+  treinos: { journey_id: string; status?: string | null }[],
+): Set<string> {
+  const out = new Set<string>();
+  treinos.forEach((t) => {
+    if (t.status !== "cancelado") out.add(t.journey_id);
+  });
+  return out;
+}

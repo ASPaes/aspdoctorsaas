@@ -1917,9 +1917,34 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     setParticipantsMode(modo);
   }
 
+  /** Cancelar o ÚLTIMO treino ativo devolve a jornada para o Onboarding — quem faz isso
+   *  precisa saber, senão o ticket parece ter sumido. A volta é do banco
+   *  (`trg_onb_training_cancel_undo`), então a fase é RELIDA depois do update em vez de
+   *  adivinhada aqui: o trigger tem guardas próprias e pode não devolver nada. */
   async function handleCancelTraining(id: string) {
+    const faseAntes = journey?.fase_atual;
     try {
       await updateTraining(id, { status: "cancelado" });
+      const { data: depois } = await (supabase.from("vw_onboarding_journeys" as any) as any)
+        .select("fase_atual, stage_nome")
+        .eq("tenant_id", tenantId)
+        .eq("journey_id", journeyId)
+        .maybeSingle();
+      const voltou = faseAntes === "implantacao" && (depois as any)?.fase_atual === "onboarding";
+      if (voltou) {
+        // A jornada mudou de fase: sem isto a aba continua desenhando a Implantação.
+        qc.invalidateQueries({ queryKey: ["onboarding-journey-detail", journeyId, tenantId] });
+        qc.invalidateQueries({ queryKey: ["onboarding-journey-row", journeyId] });
+        qc.invalidateQueries({ queryKey: ["onboarding-journey-phases-detail", journeyId] });
+        qc.invalidateQueries({ queryKey: ["onboarding-journeys"] });
+        qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+        toast.success("Treino cancelado", {
+          description: `Sem treinamento ativo, a jornada voltou para o Onboarding${
+            (depois as any)?.stage_nome ? ` · ${(depois as any).stage_nome}` : ""
+          }.`,
+        });
+        return;
+      }
       toast.success("Treino cancelado");
     } catch (e: any) { toast.error(e.message || "Erro"); }
   }

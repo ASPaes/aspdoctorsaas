@@ -5,6 +5,7 @@ import {
   montarJornadasPorPipeline,
   somarColunas,
   contarTicketsImplantacao,
+  jornadasComTreinoAtivo,
   type PassagemFase,
 } from "./boardTotals";
 
@@ -216,5 +217,25 @@ describe("contarTicketsImplantacao", () => {
 
     expect(totais[PDV]).toBe(0);
     expect(totais[GULA]).toBe(0);
+  });
+});
+
+describe("jornadasComTreinoAtivo", () => {
+  it("jornada cujo ÚNICO treino foi cancelado precisa de cartão próprio (TK-2026-2602)", () => {
+    // O cancelado não ocupa coluna nenhuma; contando-o como cartão a jornada some do
+    // quadro e sobra só no total do pipeline — "1" no badge com as colunas zeradas.
+    expect(jornadasComTreinoAtivo([{ journey_id: "j1", status: "cancelado" }]).has("j1")).toBe(false);
+  });
+
+  it("um treino ativo entre cancelados já dispensa o cartão da jornada", () => {
+    const com = jornadasComTreinoAtivo([
+      { journey_id: "j1", status: "cancelado" },
+      { journey_id: "j1", status: "agendado" },
+    ]);
+    expect(com.has("j1")).toBe(true);
+  });
+
+  it("treino sem status é treino ativo", () => {
+    expect(jornadasComTreinoAtivo([{ journey_id: "j1", status: null }]).has("j1")).toBe(true);
   });
 });
