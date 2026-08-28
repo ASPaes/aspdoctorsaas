@@ -498,12 +498,16 @@ export default function OemIntegrationTab() {
 
   // Só o número da aba. O painel da fila busca o resto por conta dele — puxar a
   // lista inteira aqui carregaria a página toda por causa de um badge.
+  // Por CONTA, como o resto da tela: o selo vermelho tem que dizer que ESTA
+  // unidade tem envio parado, senão a Digi Office aparece com erro que é da
+  // Digi Up e quem for olhar não acha nada na lista.
   const { data: filaParada = 0 } = useQuery({
-    queryKey: ["oem-fila-badge", tid],
+    queryKey: ["oem-fila-badge", tid, conta?.id],
     refetchInterval: 60_000,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("fn_oem_fila_status", {
         p_tenant_id: tid ?? null,
+        p_conta_integration_id: conta?.id ?? null,
       });
       if (error) throw error;
       const s = (data ?? {}) as { erros?: number; invalidos?: number };
@@ -2131,7 +2135,8 @@ export default function OemIntegrationTab() {
             <strong>Tentar de novo</strong>: use depois de corrigir a causa, senão ela toma a
             mesma recusa.
           </Explica>
-          <OemFilaSincronizacaoPanel />
+          {/* Da unidade selecionada no cabeçalho, como todas as outras abas. */}
+          <OemFilaSincronizacaoPanel contaId={conta?.id ?? null} />
         </TabsContent>
 
         {/* ------------------------------------------------------------ conexão */}

@@ -29,6 +29,9 @@ type Item = {
   cliente: string | null;
   produto: string | null;
   modulo: string | null;
+  // Linha que não ficou ligada a conta nenhuma. Ela aparece em TODAS as contas,
+  // de propósito: sumir das duas seria pior do que aparecer nas duas.
+  sem_conta?: boolean;
 };
 
 type Status = {
@@ -57,7 +60,12 @@ const ACAO_LABEL: Record<string, string> = {
 const dataHora = (s: string | null | undefined) =>
   s ? new Date(s).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "medium" }) : "—";
 
-export default function OemFilaSincronizacaoPanel() {
+// A fila é da CONTA, não do tenant — como toda outra aba desta tela. Sem
+// `contaId`, a segunda conta conectada faria esta lista mostrar os envios das
+// duas unidades misturados, com nome de cliente: era o único lugar da aba que
+// ainda somava as duas. Nulo mantém o comportamento antigo (tenant inteiro),
+// que é o que vale quando não há conta selecionada.
+export default function OemFilaSincronizacaoPanel({ contaId = null }: { contaId?: string | null }) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [filtro, setFiltro] = useState<string | null>(null);
   const [abertoOk, setAbertoOk] = useState(false);
@@ -67,13 +75,14 @@ export default function OemFilaSincronizacaoPanel() {
   const [simulacao, setSimulacao] = useState<{ titulo: string; corpo: unknown } | null>(null);
 
   const statusQ = useQuery<Status>({
-    queryKey: ["oem-fila-status", tid],
+    queryKey: ["oem-fila-status", tid, contaId],
     // A fila anda de 2 em 2 minutos; olhar a cada 30s é o suficiente para a tela
     // parecer viva sem transformar o painel em fonte de carga.
     refetchInterval: 30_000,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("fn_oem_fila_status", {
         p_tenant_id: tid ?? null,
+        p_conta_integration_id: contaId ?? null,
       });
       if (error) throw error;
       return (data ?? {}) as Status;
@@ -81,11 +90,12 @@ export default function OemFilaSincronizacaoPanel() {
   });
 
   const listaQ = useQuery<Item[]>({
-    queryKey: ["oem-fila-lista", tid],
+    queryKey: ["oem-fila-lista", tid, contaId],
     refetchInterval: 30_000,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("fn_oem_fila_listar", {
         p_tenant_id: tid ?? null, p_limite: 200,
+        p_conta_integration_id: contaId ?? null,
       });
       if (error) throw error;
       return (data ?? []) as Item[];
@@ -296,6 +306,16 @@ export default function OemFilaSincronizacaoPanel() {
                         {i.tentativas > 1 && (
                           <span className="text-[11px] text-muted-foreground">
                             {i.tentativas} tentativas
+                          </span>
+                        )}
+                        {/* Ela está na lista da unidade selecionada por falta de
+                            lugar melhor, não porque é dela. */}
+                        {i.sem_conta && (
+                          <span
+                            className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-600 dark:text-amber-400"
+                            title="Esta linha não ficou ligada a nenhuma conta do OEM, então aparece em todas as unidades."
+                          >
+                            sem unidade
                           </span>
                         )}
                       </div>

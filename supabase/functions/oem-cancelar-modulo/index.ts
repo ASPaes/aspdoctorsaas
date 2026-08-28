@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
 
     const { data: cp } = await ds
       .from("cliente_produtos")
-      .select("id, oem_codigo_grupo, oem_codigo_filial")
+      .select("id, cliente_id, oem_codigo_grupo, oem_codigo_filial")
       .eq("id", linha.cliente_produto_id)
       .maybeSingle();
 
@@ -101,14 +101,29 @@ Deno.serve(async (req) => {
     let httpOem: number | null = null;
 
     if (temLicenca) {
+      // A conta sai da licença, não da idade do cadastro. Buscar a primeira
+      // conta ativa do tenant mandava a baixa de um cliente de uma unidade com
+      // a chave de outra assim que a segunda chave fosse conectada.
+      const { data: contaId } = await ds.rpc("fn_oem_conta_da_licenca", {
+        p_tenant_id: linha.tenant_id,
+        p_filial_codigo: cp!.oem_codigo_filial,
+        p_empresa_codigo: cp!.oem_codigo_grupo,
+        p_cliente_id: cp!.cliente_id,
+      });
+      if (!contaId) {
+        return json({
+          ok: false,
+          mensagem: `Não dá para saber por qual conta do OEM enviar: a filial ${cp!.oem_codigo_filial} não está em nenhum espelho e a unidade do cliente não tem chave conectada.`,
+        }, 409);
+      }
+
       const { data: conta } = await ds
         .from("oem_integration")
         .select("id, api_url")
-        .eq("tenant_id", linha.tenant_id)
+        .eq("id", contaId)
         .eq("ativo", true)
-        .limit(1)
         .maybeSingle();
-      if (!conta) return json({ ok: false, mensagem: "Nenhuma conta OEM ativa neste tenant." }, 409);
+      if (!conta) return json({ ok: false, mensagem: "A conta do OEM desta licença não está ativa." }, 409);
 
       const { data: chave, error: errK } = await ds.rpc("obter_chave_oem_por_conta", {
         p_integration_id: conta.id,

@@ -29,6 +29,10 @@ const json = (corpo: unknown, status = 200) =>
 type Linha = {
   id: string;
   tenant_id: string;
+  // Por qual conta do OEM este pedido sai. Quem enfileira já resolve isso pela
+  // licença; aqui é só obedecer. Enviar pela conta errada é mandar a alteração
+  // com a chave de outra empresa.
+  conta_integration_id: string | null;
   cliente_produto_id: string | null;
   modulo_linha_id: string | null;
   acao: string;
@@ -100,19 +104,23 @@ Deno.serve(async (req) => {
 
       const { data: l, error: errL } = await ds
         .from("oem_sync_fila")
-        .select("tenant_id, empresa_codigo, filial_codigo, oem_modulo_codigo, quantidade, valor_unitario")
+        .select("tenant_id, conta_integration_id, empresa_codigo, filial_codigo, oem_modulo_codigo, quantidade, valor_unitario")
         .eq("id", filaId)
         .maybeSingle();
       if (errL || !l) return json({ ok: false, mensagem: "Linha não encontrada." }, 404);
 
+      // Pela conta DA LINHA. Simular contra a chave de outra unidade responderia
+      // sobre uma licença que não é esta.
+      if (!l.conta_integration_id) {
+        return json({ ok: false, mensagem: "A linha não diz por qual conta do OEM ela sai." }, 409);
+      }
       const { data: c } = await ds
         .from("oem_integration")
         .select("id, api_url")
-        .eq("tenant_id", l.tenant_id)
+        .eq("id", l.conta_integration_id)
         .eq("ativo", true)
-        .limit(1)
         .maybeSingle();
-      if (!c) return json({ ok: false, mensagem: "Nenhuma conta OEM ativa neste tenant." }, 409);
+      if (!c) return json({ ok: false, mensagem: "A conta do OEM desta linha não está ativa." }, 409);
       const { data: chave } = await ds.rpc("obter_chave_oem_por_conta", { p_integration_id: c.id });
       if (!chave) return json({ ok: false, mensagem: "Chave do OEM não encontrada no Vault." }, 409);
 
@@ -141,23 +149,25 @@ Deno.serve(async (req) => {
     const fila = (linhas ?? []) as Linha[];
     if (fila.length === 0) return json({ ok: true, processadas: 0, ok_count: 0, erros: 0 });
 
-    // A conta e a chave são por tenant e a fila costuma vir do mesmo cliente;
-    // buscar por linha seria repetir a mesma leitura do Vault N vezes.
+    // Cache por CONTA, não por tenant. Era por tenant, e o tenant com duas
+    // unidades conectadas mandava tudo pela chave da primeira: a alteração de um
+    // cliente da Digi Up saía pela empresa da Digi Office. A linha já traz a
+    // conta certa desde que foi enfileirada; a leitura do Vault continua sendo
+    // uma por conta, não uma por linha.
     const contas = new Map<string, { api_url: string; chave: string } | null>();
-    async function conta(tenantId: string) {
-      if (contas.has(tenantId)) return contas.get(tenantId)!;
+    async function conta(contaId: string) {
+      if (contas.has(contaId)) return contas.get(contaId)!;
       const { data: c } = await ds
         .from("oem_integration")
         .select("id, api_url")
-        .eq("tenant_id", tenantId)
+        .eq("id", contaId)
         .eq("ativo", true)
-        .limit(1)
         .maybeSingle();
-      if (!c) { contas.set(tenantId, null); return null; }
+      if (!c) { contas.set(contaId, null); return null; }
       const { data: chave } = await ds.rpc("obter_chave_oem_por_conta", { p_integration_id: c.id });
-      if (!chave) { contas.set(tenantId, null); return null; }
+      if (!chave) { contas.set(contaId, null); return null; }
       const v = { api_url: String(c.api_url).replace(/\/+$/, ""), chave: String(chave) };
-      contas.set(tenantId, v);
+      contas.set(contaId, v);
       return v;
     }
 
@@ -176,11 +186,23 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const c = await conta(l.tenant_id);
+      // Sem conta na linha não há por onde enviar, e escolher uma seria repetir
+      // o defeito que esta função tinha: parar aqui, com o motivo escrito.
+      if (!l.conta_integration_id) {
+        await ds.from("oem_sync_fila").update({
+          status: "invalido",
+          ultimo_erro: "A linha não diz por qual conta do OEM ela sai.",
+          processado_em: new Date().toISOString(),
+        }).eq("id", l.id);
+        erros++;
+        continue;
+      }
+
+      const c = await conta(l.conta_integration_id);
       if (!c) {
         await ds.from("oem_sync_fila").update({
           status: "invalido",
-          ultimo_erro: "Nenhuma conta OEM ativa neste tenant, ou chave ausente no Vault.",
+          ultimo_erro: "A conta OEM desta linha não está ativa, ou a chave sumiu do Vault.",
           processado_em: new Date().toISOString(),
         }).eq("id", l.id);
         erros++;
