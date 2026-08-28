@@ -1679,6 +1679,10 @@ export default function OemIntegrationTab() {
         description: res
           ? `${res.filiais} filiais · ${res.linhasRecon} vínculos · ${res.decisoesPreservadas} decisões preservadas`
             + (res.precosGravados ? ` · ${res.precosGravados} preços de módulo` : "")
+            // Licença cujo dono está em outra unidade não entra nesta conta. Ela
+            // some da tela inteira, então o número tem que aparecer em algum
+            // lugar — senão é sumiço silencioso.
+            + (res.outraUnidade ? ` · ${res.outraUnidade} de outra unidade` : "")
           : "Concluído.",
       });
       // A tabela de preços é secundária: quando ela falha, o espelho das
