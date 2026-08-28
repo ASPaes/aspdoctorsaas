@@ -411,6 +411,34 @@ Deno.serve(async (req) => {
         porCnpj.get(k)!.push(c);
       }
 
+      // ------------------------- 3b'. de quem a filial é, olhando o tenant todo
+      //
+      // A chave do OEM é do parceiro INTEIRO: a API devolve as filiais das duas
+      // operações e o espelho não tem coluna de unidade. Filtrar só o lado do
+      // DoctorSaaS esconde o cliente e deixa a LICENÇA entrar assim mesmo — sem
+      // candidato nenhum, ela virava "licença sem cliente no DoctorSaaS" na aba
+      // da outra unidade. Foi o CAFE WINCHESTER (filial 39825, cliente da Digi
+      // Up) aparecendo nas divergências da Digi Office em 27/08/2026.
+      //
+      // O CNPJ do tenant inteiro é quem sabe. Se o dono está fora das unidades
+      // desta conta, a filial não é assunto daqui.
+      const cnpjDeOutraUnidade = new Set<string>();
+      if (unidades.length) {
+        const cnpjDaConta = new Set<string>();
+        for (const c of clientes) {
+          const k = c.cnpj_digits || digitos(c.cnpj);
+          if (k) cnpjDaConta.add(k);
+        }
+        for (const c of todosDoTenant) {
+          if (unidades.includes(Number(c.unidade_base_id))) continue;
+          const k = c.cnpj_digits || digitos(c.cnpj);
+          // CNPJ que também existe num cliente DESTA unidade não prova nada:
+          // pode ser matriz aqui e filial lá, e cortar sumiria com uma licença
+          // que é daqui.
+          if (k && !cnpjDaConta.has(k)) cnpjDeOutraUnidade.add(k);
+        }
+      }
+
       // ------------------------------------------- 3c. quando o CNPJ é do GRUPO
       //
       // Medido no grupo 8201 (Bem Docado) em 16/08/2026: **23 filiais, 1 CNPJ**.
@@ -452,6 +480,10 @@ Deno.serve(async (req) => {
       // carga, e o CNPJ pode mudar dos dois lados — o código, não. Por isso ele
       // vem ANTES do casamento por CNPJ e antes até da decisão manual antiga.
       const porCodigo = new Map<string, string>();
+      // O código gravado na ficha de um cliente de outra unidade é a prova mais
+      // dura de que a licença não é desta conta: alguém já decidiu de quem ela
+      // é, e não foi de ninguém daqui.
+      const codigoDeOutraUnidade = new Set<string>();
       {
         const vinculados = await lerTudo<{ cliente_id: string; oem_codigo_filial: string; produto_id: number }>(
           (a, b) => ds.from("cliente_produtos")
@@ -467,7 +499,10 @@ Deno.serve(async (req) => {
         // conta da unidade 6 e somando R$ 891 na margem dela.
         const daUnidade = new Set(clientes.map((c) => c.id));
         for (const v of vinculados) {
-          if (!daUnidade.has(v.cliente_id)) continue;
+          if (!daUnidade.has(v.cliente_id)) {
+            codigoDeOutraUnidade.add(String(v.oem_codigo_filial));
+            continue;
+          }
           // Código gravado num produto que não é do OEM não vale como vínculo:
           // foi assim que 8 clientes do Gula Menu entraram na conta do parceiro.
           // A ficha continua com o número até alguém limpar; a conciliação
@@ -514,6 +549,10 @@ Deno.serve(async (req) => {
 
       const recon: Record<string, unknown>[] = [];
       const comFilial = new Set<string>();
+      // Quantas filiais ficaram de fora por serem de outra unidade. Some da
+      // tela, mas não do resumo da sincronização: sumiço sem número é o pior
+      // modo de falha desta aba.
+      let deOutraUnidade = 0;
 
       // A escolha automática de uma filial, isolada num lugar só porque agora é
       // usada duas vezes: uma para descobrir quem está sendo disputado, outra
@@ -574,6 +613,20 @@ Deno.serve(async (req) => {
         // Aqui a trava age: pretendente de cliente disputado não vira vínculo.
         const escolha = escolhaBruta && disputado.has(escolhaBruta.id) ? null : escolhaBruta;
         const anterior = decidido.get(l.filial_codigo);
+        const porCod = porCodigo.get(String(l.filial_codigo));
+
+        // A licença é de OUTRA unidade: não entra na reconciliação desta conta —
+        // nem nas divergências, nem no custo, nem na margem. Código gravado e
+        // decisão humana desta unidade vêm antes: se alguém daqui já disse que
+        // ela é de um cliente daqui, é dele.
+        if (
+          !porCod && !anterior?.ds_customer_id && cands.length === 0
+          && (codigoDeOutraUnidade.has(String(l.filial_codigo))
+            || (!!l.cnpj_norm && cnpjDeOutraUnidade.has(l.cnpj_norm)))
+        ) {
+          deOutraUnidade++;
+          continue;
+        }
 
         let estado: string, acao: string, alvo: ClienteDs | null = escolha;
         if (cands.length === 0) { estado = "SO_NO_OEM"; acao = "criar_cliente"; }
@@ -592,7 +645,6 @@ Deno.serve(async (req) => {
         // ...e o código gravado na ficha vence tudo. É o único elo que não
         // depende de o CNPJ continuar igual dos dois lados — e é justamente
         // quando ele deixa de estar igual que a conferência tem serviço.
-        const porCod = porCodigo.get(String(l.filial_codigo));
         if (porCod) {
           alvo = porId.get(porCod) ?? ({ id: porCod } as ClienteDs);
           estado = "CASADO";
@@ -792,6 +844,7 @@ Deno.serve(async (req) => {
       resultados.push({
         contaId: conta.id, unidades, filiais: linhas.length, removidas: mortas.length,
         clientesDs: clientes.length, linhasRecon: recon.length,
+        outraUnidade: deOutraUnidade,
         decisoesPreservadas: decidido.size,
         codigosGravados: codigosGravados ?? 0,
         precosGravados, precosErro,
