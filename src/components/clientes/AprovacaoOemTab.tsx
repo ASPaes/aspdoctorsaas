@@ -18,7 +18,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  AlertTriangle, Check, ChevronDown, ChevronRight, Clock, Loader2, RefreshCw, ShieldCheck, X,
+  AlertTriangle, Check, ChevronDown, ChevronRight, Clock, Copy, Loader2, RefreshCw, ShieldCheck, X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,12 +29,18 @@ type Pedido = {
   situacao: "aguardando" | "aprovado" | "recusado";
   cliente_id: string | null;
   cliente: string | null;
+  razao_social: string | null;
+  nome_fantasia: string | null;
+  cnpj: string | null;
   unidade_base_id: number | null;
   unidade: string | null;
   produto: string | null;
   modulo: string | null;
   quantidade: number | null;
   quantidade_atual: number | null;
+  // O "de" de quem já foi aplicado. Para pedido que ainda espera vem nulo, e aí
+  // vale a `quantidade_atual` — a linha do módulo ainda não mudou.
+  quantidade_antes: number | null;
   quantidade_cancelar: number | null;
   vlr_mensal: number | null;
   vlr_custo: number | null;
@@ -62,6 +68,29 @@ const ACAO_LABEL: Record<string, string> = {
 };
 
 /**
+ * O rótulo da ação já com o "de → para" quando ele existe.
+ *
+ * O "de" tem duas fontes e a ordem importa: `quantidade_antes` é o número
+ * guardado no momento em que o pedido foi aplicado, e é o único certo no
+ * histórico; `quantidade_atual` é o que a linha do módulo tem AGORA, e só serve
+ * para pedido que ainda espera. Invertido, o histórico mostraria "de 8 para 8".
+ */
+function rotuloAcao(p: Pedido): string {
+  const base = ACAO_LABEL[p.acao] ?? p.acao;
+  if (p.acao !== "quantidade") return base;
+  const de = p.quantidade_antes ?? p.quantidade_atual;
+  if (de == null || p.quantidade == null) return base;
+  return `${base} de ${de} para ${p.quantidade}`;
+}
+
+/** CNPJ com máscara. Sem ela o número vira uma tira de 14 dígitos ilegível. */
+const mascaraCnpj = (v: string | null) => {
+  const d = (v ?? "").replace(/\D/g, "");
+  if (d.length !== 14) return v ?? "";
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+};
+
+/**
  * O que acontece se este pedido for aprovado, em uma frase.
  *
  * É o mesmo texto do aviso no sino, de propósito: quem clica na notificação e
@@ -79,7 +108,8 @@ function efeito(p: Pedido): string {
     return base + mrr + at;
   }
   if (p.acao === "quantidade") {
-    const de = p.quantidade_atual ?? 0;
+    // Mesma precedência do rótulo: o número guardado manda sobre o atual.
+    const de = p.quantidade_antes ?? p.quantidade_atual ?? 0;
     const para = p.quantidade ?? 0;
     const delta = Number(para) - Number(de);
     const mrr = Number(p.vlr_mensal) > 0 && delta > 0
@@ -98,6 +128,54 @@ function efeito(p: Pedido): string {
     return `Dá baixa de ${saem} ${saem > 1 ? "unidades" : "unidade"} (${resto}) ${mrr}`;
   }
   return "Aplica a alteração no parceiro";
+}
+
+/**
+ * Quem é o cliente, embaixo do nome que já está na linha.
+ *
+ * A linha de cima mostra `cliente`, que é o nome fantasia quando existe e a
+ * razão social quando não. Aqui vai o OUTRO nome — repetir o mesmo seria só
+ * ocupar altura — e o CNPJ, que é o que se confere antes de liberar dinheiro e
+ * escrita na licença de terceiro.
+ *
+ * O CNPJ copia no clique: quem aprova costuma colar em outro sistema, e
+ * selecionar 14 dígitos com o mouse é onde o erro de digitação nasce.
+ */
+function IdentidadeDoCliente({ p }: { p: Pedido }) {
+  const outroNome =
+    p.razao_social && p.razao_social !== p.cliente
+      ? p.razao_social
+      : p.nome_fantasia && p.nome_fantasia !== p.cliente
+        ? p.nome_fantasia
+        : null;
+  const cnpj = mascaraCnpj(p.cnpj);
+  if (!outroNome && !cnpj) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+      {outroNome && <span className="truncate">{outroNome}</span>}
+      {outroNome && cnpj && <span aria-hidden="true">·</span>}
+      {cnpj && (
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded px-1 -mx-1 font-mono hover:bg-muted hover:text-foreground"
+          title="Copiar CNPJ"
+          onClick={(e) => {
+            // A linha inteira do pedido é clicável para marcar; sem isto, copiar
+            // o CNPJ também marcaria o pedido.
+            e.stopPropagation();
+            navigator.clipboard
+              .writeText(cnpj)
+              .then(() => toast.success("CNPJ copiado", { description: cnpj }))
+              .catch(() => toast.error("Não deu para copiar o CNPJ"));
+          }}
+        >
+          {cnpj}
+          <Copy className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function AprovacaoOemTab() {
@@ -365,12 +443,17 @@ export default function AprovacaoOemTab() {
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="truncate font-medium">{p.cliente ?? "—"}</span>
                           <Badge variant="outline" className="text-[10px]">
-                            {ACAO_LABEL[p.acao] ?? p.acao}
+                            {rotuloAcao(p)}
                           </Badge>
                           {p.unidade && (
                             <span className="text-[11px] text-muted-foreground">{p.unidade}</span>
                           )}
                         </div>
+                        {/* Quem é o cliente, sem precisar abrir outra aba: o
+                            outro nome (o que a linha de cima não mostrou) e o
+                            CNPJ, que é o que se confere de verdade antes de
+                            liberar escrita na licença de terceiro. */}
+                        <IdentidadeDoCliente p={p} />
                         <div className="text-xs text-muted-foreground">
                           {p.modulo ?? "Módulo"}
                           {p.produto ? ` · ${p.produto}` : ""}
@@ -405,7 +488,7 @@ export default function AprovacaoOemTab() {
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">{p.cliente ?? "—"}</span>
                         <span className="text-muted-foreground">
-                          {ACAO_LABEL[p.acao] ?? p.acao}
+                          {rotuloAcao(p)}
                           {p.modulo ? ` · ${p.modulo}` : ""}
                         </span>
                         <Badge
@@ -421,6 +504,9 @@ export default function AprovacaoOemTab() {
                         <span className="ml-auto text-muted-foreground">
                           {p.decidido_por ?? "—"} · {dataHora(p.decidido_em)}
                         </span>
+                      </div>
+                      <div className="mt-0.5">
+                        <IdentidadeDoCliente p={p} />
                       </div>
                       {p.situacao === "recusado" && p.motivo_recusa && (
                         <div className="mt-1 text-muted-foreground">Motivo: {p.motivo_recusa}</div>
