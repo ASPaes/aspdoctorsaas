@@ -24,9 +24,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle, Check, Percent, Download } from "lucide-react";
+import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle, Check, Percent, Download, ShieldCheck } from "lucide-react";
 import MovimentosMrrTab from "@/components/clientes/MovimentosMrrTab";
 import ReajustesTab from "@/components/clientes/ReajustesTab";
+import AprovacaoOemTab from "@/components/clientes/AprovacaoOemTab";
+import { useAprovacaoOemVisivel, useAprovacaoOemStatus } from "@/hooks/useAprovacaoOem";
+import { useAbaNaUrl } from "@/hooks/useDeepLinkIntegracao";
 import { exportClientesXlsx } from "@/lib/exportClientesXlsx";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
 import { toast } from "sonner";
@@ -83,6 +86,23 @@ export default function Clientes() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
   const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
+
+  // A aba fica na URL porque a notificação de pedido aguardando aponta para ela
+  // (`/clientes?tab=aprovacao-oem&fila=<id>`). Com a aba em useState, o clique no
+  // sino caía na lista de clientes e sobrava para a pessoa procurar o pedido.
+  const [abaAtiva, setAbaAtiva] = useAbaNaUrl("clientes", "tab");
+  const aprovacaoOemVisivel = useAprovacaoOemVisivel();
+  const aprovacaoOemStatus = useAprovacaoOemStatus(aprovacaoOemVisivel === true);
+  const aprovacaoOemPendentes = Number(aprovacaoOemStatus.data?.aguardando) || 0;
+  // A URL é digitável e a aba vem dela. Valor desconhecido, ou link para uma aba
+  // que ESTE usuário não tem, deixaria o Tabs com um `value` sem par e a página
+  // abriria em branco. Cai na primeira aba em vez de não desenhar nada.
+  const abasValidas = ["clientes", "movimentos", "reajustes", "aprovacao-oem"];
+  const aba =
+    !abasValidas.includes(abaAtiva) ||
+    (abaAtiva === "aprovacao-oem" && aprovacaoOemVisivel !== true)
+      ? "clientes"
+      : abaAtiva;
 
   useEffect(() => {
     const globalValue = selectedUnidadeId ? String(selectedUnidadeId) : "";
@@ -760,7 +780,7 @@ export default function Clientes() {
 
       </div>
 
-      <Tabs defaultValue="clientes">
+      <Tabs value={aba} onValueChange={setAbaAtiva}>
         <TabsList>
           <TabsTrigger value="clientes">
             <Users className="h-4 w-4 mr-1" />
@@ -774,6 +794,20 @@ export default function Clientes() {
             <Percent className="h-4 w-4 mr-1" />
             Reajustes
           </TabsTrigger>
+          {/* Só para admin de empresa que usa o OEM, e só com um tenant escolhido
+              (ver useAprovacaoOemVisivel). O número é o que faz a fila ser
+              descoberta sem ninguém precisar abrir a aba. */}
+          {aprovacaoOemVisivel === true && (
+            <TabsTrigger value="aprovacao-oem">
+              <ShieldCheck className="h-4 w-4 mr-1" />
+              Aprovação OEM
+              {aprovacaoOemPendentes > 0 && (
+                <Badge className="ml-1.5 h-5 min-w-5 justify-center px-1.5 text-[10px]">
+                  {aprovacaoOemPendentes}
+                </Badge>
+              )}
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="clientes" className="space-y-4 mt-4">
@@ -1234,6 +1268,12 @@ export default function Clientes() {
         <TabsContent value="reajustes" className="mt-4">
           <ReajustesTab tenantId={tid} />
         </TabsContent>
+
+        {aprovacaoOemVisivel === true && (
+          <TabsContent value="aprovacao-oem" className="mt-4">
+            <AprovacaoOemTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

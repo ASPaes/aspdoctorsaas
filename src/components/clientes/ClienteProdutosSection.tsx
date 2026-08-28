@@ -108,6 +108,8 @@ interface PendenciaOem {
   quantidade: number | null;
   status: string;
   ultimo_erro: string | null;
+  motivo_recusa: string | null;
+  decidido_em: string | null;
 }
 
 interface ClienteProdutoModulo {
@@ -171,7 +173,10 @@ const custoLinhaModulo = (m: { vlr_custo?: number | null; vlr_custo_total?: numb
 // ninguém vai tentar de novo, e a ficha nunca vai mudar sem alguém agir. Ele sai
 // em vermelho de propósito — o âmbar dos outros dois diz "espere", que aqui
 // seria mentira.
-const seloPendencia = (p: { status: string; acao?: string; quantidade?: number | null; ultimo_erro?: string | null }) => {
+const seloPendencia = (p: {
+  status: string; acao?: string; quantidade?: number | null;
+  ultimo_erro?: string | null; motivo_recusa?: string | null;
+}) => {
   if (p.status === "invalido") {
     return {
       texto: "parado na fila — precisa de você",
@@ -179,7 +184,28 @@ const seloPendencia = (p: { status: string; acao?: string; quantidade?: number |
       title: p.ultimo_erro ?? "O pedido não foi ao parceiro e não será repetido sozinho.",
     };
   }
+  // Recusado por um admin. Vermelho porque também não anda sozinho, e porque
+  // este selo é o ÚNICO lugar onde quem pediu descobre o que houve: head e user
+  // não enxergam a aba de aprovação.
+  if (p.status === "recusado") {
+    return {
+      texto: "recusado na aprovação",
+      classe: "border-destructive/40 bg-destructive/10 text-destructive",
+      title: p.motivo_recusa
+        ? `Motivo: ${p.motivo_recusa}. Corrija e peça de novo.`
+        : "Um admin recusou este pedido. Corrija e peça de novo.",
+    };
+  }
   const espera = "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400";
+  // Esperando gente, não o parceiro. A diferença importa: aqui não adianta
+  // aguardar, alguém precisa decidir.
+  if (p.status === "aguardando_aprovacao") {
+    return {
+      texto: `aguardando aprovação${p.acao === "quantidade" ? ` · para ${p.quantidade}` : ""}`,
+      classe: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-400",
+      title: "Nada foi enviado ao OEM. Um admin precisa aprovar em Clientes › Aprovação OEM.",
+    };
+  }
   if (p.status === "erro") {
     return {
       texto: "OEM recusou — na fila",
@@ -1322,22 +1348,6 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Baixa no MRR</Label>
-              <NumericInput value={valorDownsell} onChange={(v) => { setValorDownsell(v); setDownsellTocado(true); }} suffix="R$" />
-              {mrrDoModuloQuery.data && (
-                <p className="text-xs text-muted-foreground">
-                  Este módulo soma <strong>R$ {fmtBRL(mrrDoModuloQuery.data.total)}</strong> no MRR hoje
-                  {Number(mrrDoModuloQuery.data.movimentos) !== 0 && (
-                    <> — R$ {fmtBRL(mrrDoModuloQuery.data.na_linha)} na linha e{" "}
-                    R$ {fmtBRL(mrrDoModuloQuery.data.movimentos)} em movimentos</>
-                  )}
-                  . O valor sugerido é proporcional à quantidade que sai; ajuste se a unidade
-                  cancelada valia outra coisa. Zero não gera movimento.
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
               <Label>Observação <span className="text-muted-foreground font-normal">(opcional)</span></Label>
               <Textarea
                 rows={3}
@@ -1365,8 +1375,8 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                 <span>
                   O contrato {cancelInfoQuery.data?.numero ?? ""} continua ativo com os outros
                   {" "}{(cancelInfoQuery.data?.itens ?? 1) - 1} item(ns): o produto só sai dele e os totais
-                  são recalculados. Como isso <strong>não</strong> gera churn sozinho, a sugestão de
-                  downsell abre em seguida.
+                  são recalculados. Como isso <strong>não</strong> gera churn sozinho, o downsell de
+                  R$ {fmtBRL(cancelarProduto?.vlr_mensal)}/mês é lançado no MRR automaticamente.
                 </span>
               </p>
             ) : null}
@@ -1466,6 +1476,41 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
               </div>
             )}
 
+            {/* Quanto sai do MRR. O valor já era enviado (p_valor_downsell na
+                fn_cancelar_modulo_aplicar e valor_downsell no payload da fila),
+                mas o campo estava desenhado no diálogo de cancelar PRODUTO, onde
+                o handler nem o lê: na prática o cancelamento de módulo mandava
+                um número que ninguém tinha visto na tela.
+
+                Fica logo abaixo da quantidade porque é ela que move a sugestão.
+                E a conta aparece separada de propósito: o preço de uma venda
+                posterior mora no movimento, não na linha do módulo, então partir
+                só do cadastro acha zero. Foi assim que um upsell de R$ 1,00
+                continuou contando para uma unidade que já não existia. */}
+            <div className="space-y-1.5">
+              <Label>Baixa no MRR</Label>
+              <NumericInput
+                value={valorDownsell}
+                onChange={(v) => { setValorDownsell(v); setDownsellTocado(true); }}
+                decimals={2}
+                placeholder="0,00"
+                suffix="R$"
+              />
+              {mrrDoModuloQuery.isLoading ? (
+                <p className="text-xs text-muted-foreground">Somando quanto este módulo vale hoje...</p>
+              ) : mrrDoModuloQuery.data ? (
+                <p className="text-xs text-muted-foreground">
+                  Este módulo soma <strong>R$ {fmtBRL(mrrDoModuloQuery.data.total)}</strong> no MRR hoje
+                  {Number(mrrDoModuloQuery.data.movimentos) !== 0 && (
+                    <> (R$ {fmtBRL(mrrDoModuloQuery.data.na_linha)} na linha e{" "}
+                    R$ {fmtBRL(mrrDoModuloQuery.data.movimentos)} em movimentos)</>
+                  )}
+                  . O valor sugerido é proporcional à quantidade que sai; ajuste se a unidade
+                  cancelada valia outra coisa. Zero não gera movimento.
+                </p>
+              ) : null}
+            </div>
+
             <div className="space-y-1.5">
               <Label>Observação <span className="text-muted-foreground font-normal">(opcional)</span></Label>
               <Textarea
@@ -1479,13 +1524,17 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
               </p>
             </div>
 
-            {cancelarModulo?.origem === "oem" && (
+            {/* O aviso segue a LICENÇA, não a `origem` da linha: módulo digitado
+                à mão dentro de um produto com licença existe no OEM do mesmo
+                jeito e passa pela mesma fila. Amarrar isto a `origem === 'oem'`
+                escondia o aviso justamente de quem mais precisava dele. */}
+            {!!cancelarModulo && temLicencaOem(cancelarModulo.cliente_produto_id) && (
               <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
-                  A baixa é pedida <strong>ao OEM primeiro</strong>: se o parceiro recusar, nada
-                  muda aqui e você vê o motivo. Dando certo, a linha também fica travada contra a
-                  próxima carga do espelho.
+                  Este cancelamento <strong>passa por aprovação</strong>. Nada muda aqui, na licença
+                  do OEM nem no MRR até um admin aprovar. Depois disso a baixa é pedida ao parceiro
+                  primeiro: se ele recusar, nada muda aqui e você vê o motivo no selo da linha.
                 </span>
               </p>
             )}
@@ -1554,23 +1603,15 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                     return;
                   }
 
-                  // Enfileirou: pede o processamento agora para não fazer
-                  // ninguém esperar os 2 minutos do cron no caminho feliz.
-                  const { data: proc } = await supabase.functions.invoke("oem-sync-processar", {
-                    body: { fila_id: filaId },
+                  // Nada de pedir o processamento aqui. O pedido nasce
+                  // aguardando aprovação e quem o solta é o admin, na aba
+                  // Aprovação OEM. Chamar o processador agora não faria nada (a
+                  // fn_oem_fila_claim só reivindica 'pendente' e 'erro'), mas
+                  // deixaria a tela prometendo um envio que não aconteceu.
+                  toast({
+                    title: "Enviado para aprovação",
+                    description: `${detalhe} Nada foi cancelado ainda: o módulo sai da licença e o downsell entra no MRR depois que um admin aprovar.`,
                   });
-                  const r = (proc ?? {}) as { ok_count?: number; erros?: number };
-
-                  if ((r.ok_count ?? 0) > 0) {
-                    toast({ title: "Cancelado no OEM e na ficha", description: detalhe });
-                  } else {
-                    // Nada de "deu erro e acabou": a linha está viva, o motivo
-                    // está escrito e o cron tenta de novo sozinho.
-                    toast({
-                      title: "O OEM não aceitou agora — está na fila",
-                      description: `${detalhe} A ficha só muda quando o parceiro aceitar. O motivo está em Integrações › OEM › Sincronização.`,
-                    });
-                  }
                   setCancelarModulo(null);
                   invalidateAll();
                 } catch (e: any) {
@@ -2939,24 +2980,13 @@ function ModuloDialog({
             .update(localOnly).eq("id", edit.id);
           if (error) throw error;
 
-          const { data: proc } = await supabase.functions.invoke("oem-sync-processar", {
-            body: { fila_id: filaId },
+          // O pedido espera um admin. Os valores e datas acima já foram
+          // gravados na ficha (são só nossos); a QUANTIDADE é a única coisa que
+          // o parceiro precisa saber, e ela só muda depois da aprovação.
+          toast({
+            title: "Enviado para aprovação",
+            description: `Segue ${qtdAntes} na ficha. Vai para ${qtdNova} quando um admin aprovar e o OEM aceitar.`,
           });
-          const r = (proc ?? {}) as { ok_count?: number; erros?: number };
-          if ((r.ok_count ?? 0) > 0) {
-            toast({ title: "Módulo atualizado no OEM e na ficha", description: `${qtdAntes} → ${qtdNova}.` });
-          } else if ((r.erros ?? 0) > 0) {
-            toast({
-              variant: "destructive",
-              title: "A quantidade não foi ao OEM — o pedido ficou parado na fila",
-              description: `Segue ${qtdAntes} na ficha. O motivo está no selo da linha e em Integrações › OEM › Sincronização.`,
-            });
-          } else {
-            toast({
-              title: "Enviado ao OEM — aguardando confirmação",
-              description: `A quantidade muda para ${qtdNova} quando o parceiro aceitar.`,
-            });
-          }
           onSaved();
           onClose();
           return;
@@ -3019,32 +3049,16 @@ function ModuloDialog({
         if (errFila) throw new Error(errFila.message);
 
         if (filaId) {
-          // Enfileirou: pede o processamento na hora para não fazer ninguém
-          // esperar os 2 minutos do cron no caminho feliz.
-          const { data: proc } = await supabase.functions.invoke("oem-sync-processar", {
-            body: { fila_id: filaId },
+          // O pedido espera um admin. Nada foi ao parceiro, nada entrou na ficha
+          // e nenhum upsell foi lançado: quem faz tudo isso é a
+          // fn_oem_fila_aplicar, depois da aprovação. Dizer "ativado" aqui seria
+          // anunciar uma venda que ainda não existe.
+          toast({
+            title: "Enviado para aprovação",
+            description: existente
+              ? `Segue ${antes} na ficha. Vai para ${alvo} quando um admin aprovar e o OEM aceitar.`
+              : "O módulo entra na ficha, na licença e no MRR quando um admin aprovar.",
           });
-          const r = (proc ?? {}) as { ok_count?: number; erros?: number };
-          if ((r.ok_count ?? 0) > 0) {
-            toast({
-              title: existente ? "Quantidade alterada no OEM e na ficha" : "Módulo ativado no OEM e na ficha",
-              description: existente ? `${antes} → ${alvo}.` : undefined,
-            });
-          } else if ((r.erros ?? 0) > 0) {
-            // O parceiro recusou, ou faltou dado para chamá-lo. Anunciar
-            // "aguardando confirmação" aqui era o silêncio de sempre com outra
-            // roupa: nada está a caminho, o pedido está parado esperando gente.
-            toast({
-              variant: "destructive",
-              title: "Não foi ao OEM — o pedido ficou parado na fila",
-              description: "O módulo NÃO entrou na ficha. O motivo está no selo da linha e em Integrações › OEM › Sincronização.",
-            });
-          } else {
-            toast({
-              title: "Enviado ao OEM — aguardando confirmação",
-              description: "A ficha só muda quando o parceiro aceitar. O andamento está em Integrações › OEM › Sincronização.",
-            });
-          }
           onSaved();
           onClose();
           return;
@@ -3257,6 +3271,31 @@ function ModuloDialog({
             )}
           </div>
         </div>
+
+        {/* Antes de salvar, não só no toast depois. Quem digita o valor precisa
+            saber que ele ainda passa por um admin, senão fecha a janela achando
+            que o módulo já está no cliente. */}
+        {oemCodigoFilial && (
+          <p className="flex items-start gap-2 rounded-md border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs text-sky-700 dark:text-sky-400">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              {isEdit ? (
+                <>
+                  Este cliente tem licença no OEM. Mudar a <strong>quantidade</strong> vai para
+                  aprovação e só vale depois que um admin aprovar; valores, datas e vendedor são
+                  gravados na hora.
+                </>
+              ) : (
+                <>
+                  Este cliente tem licença no OEM: o pedido <strong>vai para aprovação</strong>. O
+                  módulo entra na ficha, na licença e no MRR depois que um admin aprovar em
+                  Clientes › Aprovação OEM.
+                </>
+              )}
+            </span>
+          </p>
+        )}
+
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button type="button" onClick={handleSave} disabled={saving}>
