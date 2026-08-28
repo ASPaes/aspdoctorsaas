@@ -589,7 +589,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   // Quanto este módulo soma no MRR HOJE. Não é só o vlr_mensal da linha: venda
   // feita depois costuma virar movimento, não preço — e foi assim que um
   // cancelamento passou sem gerar downsell enquanto o upsell continuava valendo.
-  const mrrDoModuloQuery = useQuery<{ quantidade: number; na_linha: number; movimentos: number; total: number } | null>({
+  const mrrDoModuloQuery = useQuery<{ quantidade: number; na_linha: number; movimentos: number; total: number; linha_conta?: boolean; valor_cadastro?: number } | null>({
     queryKey: ["mrr_do_modulo", cancelarModulo?.id],
     enabled: !!cancelarModulo?.id,
     queryFn: async () => {
@@ -1501,12 +1501,23 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
               ) : mrrDoModuloQuery.data ? (
                 <p className="text-xs text-muted-foreground">
                   Este módulo soma <strong>R$ {fmtBRL(mrrDoModuloQuery.data.total)}</strong> no MRR hoje
-                  {Number(mrrDoModuloQuery.data.movimentos) !== 0 && (
+                  {Number(mrrDoModuloQuery.data.na_linha) !== 0 && Number(mrrDoModuloQuery.data.movimentos) !== 0 && (
                     <> (R$ {fmtBRL(mrrDoModuloQuery.data.na_linha)} na linha e{" "}
                     R$ {fmtBRL(mrrDoModuloQuery.data.movimentos)} em movimentos)</>
                   )}
                   . O valor sugerido é proporcional à quantidade que sai; ajuste se a unidade
                   cancelada valia outra coisa. Zero não gera movimento.
+                  {/* Quando a receita do produto é a digitada nele, o valor mensal da linha é
+                      cadastro e nunca entrou no MRR: a venda está no movimento. Sem esta frase,
+                      o valor que a pessoa vê na lista some da conta sem explicação. */}
+                  {mrrDoModuloQuery.data.linha_conta === false
+                    && Number(mrrDoModuloQuery.data.valor_cadastro ?? 0) !== 0 && (
+                    <>
+                      {" "}O valor mensal da linha (R$ {fmtBRL(Number(mrrDoModuloQuery.data.valor_cadastro))}) fica
+                      de fora porque a receita deste produto é a digitada no produto, e a venda deste
+                      módulo está lançada em movimentos.
+                    </>
+                  )}
                 </p>
               ) : null}
             </div>
