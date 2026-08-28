@@ -256,35 +256,24 @@ Deno.serve(async (req) => {
       });
 
       // ------------------------------------------------- o parceiro CONFERIU?
-      // HTTP 200 é o parceiro dizendo "aceitei o pedido", não "a licença ficou
-      // assim". Desde 28/08/2026 a `oem-licenca-modulo` relê a filial depois de
-      // gravar e devolve `conferencia`:
+      // Desde 28/08/2026 a `oem-licenca-modulo` relê a filial depois de gravar
+      // e devolve `conferencia` (true / false / null), já com 3 tentativas por
+      // dentro. Ela fica guardada em `resposta` e a aba Sincronização a mostra.
       //
-      //   true       -> relido, está lá. É o caminho feliz.
-      //   'agendado' -> baixa aceita, mas o OEM só a aplica no fim do mês. É o
-      //                 comportamento normal dele para REDUÇÃO, não uma falha.
-      //   false      -> aceitou e não aplicou. É o caso que não pode virar 'ok'.
-      //   null       -> não deu para reler. Não é o mesmo que "não aplicou".
+      // ⚠️ E ELA NÃO BARRA NADA, DE PROPÓSITO. A primeira versão punha a linha
+      // em 'invalido' quando a releitura não batia, e sem atualizar a ficha.
+      // Medido no mesmo dia: a leitura do parceiro ATRASA — um cancelamento de
+      // 4 para 3 foi aceito, releu 4, e o portal já mostrava 3. Aquela regra
+      // teria transformado uma escrita certa em alarme vermelho E deixado a
+      // ficha atrás da licença, que é pior do que o problema que ela resolvia.
       //
-      // Só o `false` muda o rumo. E ele NÃO volta para 'erro': a alteração já
-      // saiu daqui, e repetir mandaria a mesma coisa de novo. Vai para
-      // 'invalido', que é o estado que para, fica à vista e dispara o alerta.
-      const conf = (resposta as { conferencia?: { confirmado?: unknown; mensagem?: string } } | null)?.conferencia;
-      if (sucesso && conf?.confirmado === false) {
-        erros++;
-        await ds.from("oem_sync_fila").update({
-          status: "invalido",
-          ultimo_erro: `O OEM aceitou o pedido mas não aplicou na licença. ${conf.mensagem ?? ""}`.trim(),
-          resposta: resposta as Record<string, unknown> | null,
-          http,
-          processado_em: new Date().toISOString(),
-        }).eq("id", l.id);
-        // A ficha NÃO é atualizada de propósito: gravar aqui um número que a
-        // licença não tem é exatamente a divergência silenciosa que a fila
-        // existe para impedir.
-        continue;
-      }
-
+      // Decisão do Alexandre em 28/08: passar e MARCAR, não barrar. Quem manda
+      // na ficha continua sendo o aceite do parceiro; a conferência é
+      // corroboração que pode chegar atrasada, e aparece na tela como tal.
+      //
+      // Quem for reintroduzir bloqueio aqui: só com um sinal que distinga
+      // "atrasou" de "não aplicou". O status HTTP não distingue, e a releitura
+      // imediata também não.
       if (sucesso) {
         // O parceiro aceitou. SÓ AGORA a ficha muda — é esta ordem que impede
         // as duas bases de divergirem, e é a mesma de antes da fila existir.

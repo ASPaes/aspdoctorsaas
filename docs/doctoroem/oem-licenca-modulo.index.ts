@@ -363,83 +363,92 @@ Deno.serve(async (req)=>{
     }
     // ------------------------------------------------------- a conferência
     // Gravar e receber 200 é o parceiro dizendo "aceitei o pedido", NÃO "a
-    // licença ficou assim". São coisas diferentes, e a diferença já custou:
-    // o IFood cancelado em 21/08/2026, aceito com HTTP 200, ainda voltava
-    // `ativo: true, quantidade: 1` na leitura de 28/08 — porque o OEM não tira
-    // na hora, ele agenda a baixa para o último dia do mês.
+    // licença ficou assim". Por isso a filial é RELIDA depois de gravar.
     //
-    // Então a filial é RELIDA depois de gravar, e a régua é diferente conforme
-    // o pedido — senão toda redução pareceria falha e o alarme ensinaria a ser
-    // ignorado:
+    // ⚠️ A RELEITURA ATRASA, e isso foi medido em 28/08/2026, não suposto:
+    // um cancelamento de 4 para 3 foi aceito, a releitura imediata devolveu 4,
+    // e o portal do parceiro já mostrava 3. No mesmo dia, um aumento de 3 para
+    // 4 releu 4 na hora. Ou seja: o atraso existe e não é constante.
     //
-    //   subir / ativar   -> tem que estar lá AGORA. Não estando, não confirma.
-    //   descer / baixar  -> o parceiro agenda. Continuar no valor antigo é o
-    //                       esperado: vira 'agendado', não erro.
+    // Duas consequências desenharam o que está abaixo:
     //
-    // Falha na releitura NÃO derruba a gravação, que já aconteceu: volta
-    // `confirmado: null`, que quer dizer "não sei", e quem chamou decide. Dizer
-    // "deu erro" aqui faria reprocessar, e reprocessar reenviaria ao parceiro
-    // uma alteração que ele já aplicou.
-    async function conferir(campoAlvo, esperado, antes) {
-      try {
-        const r = await fetch(`${creds.baseUrl}/v1/licenciamento/${empresa}/${filial}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json"
-          }
-        });
-        if (!r.ok) return {
-          confirmado: null,
-          mensagem: `Não deu para reler a licença depois de gravar (HTTP ${r.status}).`
-        };
-        const depois = await r.json().catch(()=>null);
-        if (!depois) return {
-          confirmado: null,
-          mensagem: "A releitura da licença não devolveu JSON."
-        };
-        const d = depois.filial ?? depois;
-        let encontrado;
-        if (campoAlvo === "usuarios" || campoAlvo === "pdvComandas") {
-          encontrado = campoAlvo === "usuarios" ? num(pega(d, "usuarios", "usuariosAdicionais", "usuariosadicionais")) ?? 0 : num(pega(d, "pdvComandas", "pdvcomandas")) ?? 0;
-        } else {
-          const lista = pega(d, "modulos") ?? pega(depois, "modulos");
-          const alvo = (Array.isArray(lista) ? lista : []).find((m)=>num(pega(m, "codigo", "codModulo", "cod")) === moduloCodigo);
-          // Sumiu da lista depois de um pedido de baixa: é baixa feita, não
-          // leitura incompleta. Inativo conta como zero pelo mesmo motivo.
-          encontrado = alvo === undefined ? 0 : pega(alvo, "ativo") === false ? 0 : num(pega(alvo, "quantidade", "qtd")) ?? 0;
+    //   1. TENTAR MAIS DE UMA VEZ. Uma leitura só, logo depois de gravar,
+    //      transforma escrita certa em alarme.
+    //   2. NÃO AFIRMAR CAUSA. A versão anterior deste código chamava
+    //      "leu o valor antigo numa redução" de baixa agendada para o fim do
+    //      mês. Era interpretação, e estava errada. O que dá para afirmar é o
+    //      fato: pedimos X e a licença mostrava Y depois de N leituras. Por que,
+    //      só o parceiro sabe.
+    //
+    // `confirmado: false` NÃO quer dizer "falhou" — quer dizer "não deu para
+    // confirmar". Quem consome não bloqueia nada com isso (ver a
+    // oem-sync-processar): marca e deixa à vista.
+    const CONF_TENTATIVAS = 3;
+    const CONF_ESPERA_MS = 1500;
+
+    async function lerCampoAgora(campoAlvo) {
+      const r = await fetch(`${creds.baseUrl}/v1/licenciamento/${empresa}/${filial}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json"
         }
-        const alvoNum = Number(esperado);
-        const antesNum = Number(antes);
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const depois = await r.json().catch(()=>null);
+      if (!depois) throw new Error("a releitura não devolveu JSON");
+      const d = depois.filial ?? depois;
+      if (campoAlvo === "usuarios" || campoAlvo === "pdvComandas") {
+        return campoAlvo === "usuarios" ? num(pega(d, "usuarios", "usuariosAdicionais", "usuariosadicionais")) ?? 0 : num(pega(d, "pdvComandas", "pdvcomandas")) ?? 0;
+      }
+      const lista = pega(d, "modulos") ?? pega(depois, "modulos");
+      const alvo = (Array.isArray(lista) ? lista : []).find((m)=>num(pega(m, "codigo", "codModulo", "cod")) === moduloCodigo);
+      // Sumiu da lista depois de um pedido de baixa: é baixa feita, não leitura
+      // incompleta. Inativo conta como zero pelo mesmo motivo.
+      return alvo === undefined ? 0 : pega(alvo, "ativo") === false ? 0 : num(pega(alvo, "quantidade", "qtd")) ?? 0;
+    }
+
+    async function conferir(campoAlvo, esperado, antes) {
+      const alvoNum = Number(esperado);
+      const antesNum = Number(antes);
+      let encontrado;
+      let ultimoMotivo = null;
+      for(let i = 1; i <= CONF_TENTATIVAS; i++){
+        if (i > 1) await new Promise((r)=>setTimeout(r, CONF_ESPERA_MS));
+        try {
+          encontrado = await lerCampoAgora(campoAlvo);
+        } catch (e) {
+          ultimoMotivo = e instanceof Error ? e.message : String(e);
+          continue;
+        }
         if (encontrado === alvoNum) return {
           confirmado: true,
           campo: campoAlvo,
           esperado: alvoNum,
           antes: antesNum,
           encontrado,
+          tentativas: i,
           mensagem: "Relido no OEM: a licença está com o valor pedido."
         };
-        if (alvoNum < antesNum && encontrado === antesNum) return {
-          confirmado: "agendado",
-          campo: campoAlvo,
-          esperado: alvoNum,
-          antes: antesNum,
-          encontrado,
-          mensagem: "O OEM aceitou a baixa, mas não a aplica na hora: ela entra no fim do mês. Até lá a licença segue no valor antigo."
-        };
-        return {
-          confirmado: false,
-          campo: campoAlvo,
-          esperado: alvoNum,
-          antes: antesNum,
-          encontrado,
-          mensagem: `O OEM aceitou o pedido, mas ao reler a licença ela está com ${encontrado}, e não com ${alvoNum}.`
-        };
-      } catch (e) {
-        return {
-          confirmado: null,
-          mensagem: `Não deu para reler a licença depois de gravar: ${e instanceof Error ? e.message : String(e)}`
-        };
       }
+      // Nunca conseguiu ler. Diferente de "leu e não bateu", e a diferença
+      // importa: aqui não se sabe nada sobre a licença.
+      if (encontrado === undefined) return {
+        confirmado: null,
+        campo: campoAlvo,
+        esperado: alvoNum,
+        antes: antesNum,
+        tentativas: CONF_TENTATIVAS,
+        mensagem: `Não deu para reler a licença depois de gravar: ${ultimoMotivo ?? "motivo desconhecido"}.`
+      };
+      return {
+        confirmado: false,
+        campo: campoAlvo,
+        esperado: alvoNum,
+        antes: antesNum,
+        encontrado,
+        tentativas: CONF_TENTATIVAS,
+        mensagem: `O parceiro aceitou o pedido (${alvoNum}), mas a licença ainda mostrava ${encontrado} depois de ${CONF_TENTATIVAS} leituras. A leitura do parceiro às vezes atrasa: confira no portal antes de concluir que não foi.`
+      };
     }
     // ------------------------------------------------- nem tudo é "módulo"
     // O contrato de gravação tem CAMPOS PRÓPRIOS para dois deles, fora de
