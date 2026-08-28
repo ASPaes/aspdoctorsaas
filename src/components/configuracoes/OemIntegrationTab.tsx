@@ -1515,6 +1515,10 @@ export default function OemIntegrationTab() {
   const [programadasAberto, setProgramadasAberto] = useState(false);
   const [implantacaoAberto, setImplantacaoAberto] = useState(false);
   const [ignoradosAberto, setIgnoradosAberto] = useState(false);
+  // Recolhido a cada abertura da aba, de propósito: a tabela de preços é o
+  // assunto de Módulos, e este quadro é vigia — precisa estar à vista, não
+  // ocupando a primeira tela. Quem quiser o detalhe clica.
+  const [mudancasAberto, setMudancasAberto] = useState(false);
   const [buscaDiv, setBuscaDiv] = useState("");
   const [tipoDiv, setTipoDiv] = useState("todos");
 
@@ -2270,28 +2274,57 @@ export default function OemIntegrationTab() {
               está olhando, que é a única coisa que ele tem a dizer. */}
           {(
             <Card className={mudancasCusto.length > 0 ? "border-sky-500/40" : undefined}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <TrendingDown className="h-4 w-4 text-sky-500" />
-                  {mudancasCusto.length > 0
-                    ? "O OEM passou a cobrar outro valor por estes módulos"
-                    : "Mudanças no custo cobrado pelo OEM"}
-                </CardTitle>
-                <CardDescription>
+              <button
+                type="button"
+                onClick={() => setMudancasAberto((v) => !v)}
+                className="flex w-full items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
+              >
+                <ChevronRight
+                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${mudancasAberto ? "rotate-90" : ""}`}
+                />
+                <TrendingDown className="h-4 w-4 shrink-0 text-sky-500" />
+                <div className="min-w-0 flex-1">
+                  <p className={`font-medium ${mudancasCusto.length > 0 ? "text-sky-500" : ""}`}>
+                    {mudancasCusto.length > 0
+                      ? "O OEM passou a cobrar outro valor por estes módulos"
+                      : "Mudanças no custo cobrado pelo OEM"}
+                  </p>
+                  {/* A linha recolhida tem que dizer o tamanho do assunto: com
+                      o saldo à vista dá para decidir se vale abrir. */}
+                  <p className="text-xs text-muted-foreground">
+                    {mudancasCusto.length > 0 ? (
+                      <>
+                        {mudancasCusto.length} módulo{mudancasCusto.length > 1 ? "s" : ""} ·{" "}
+                        saldo{" "}
+                        {(() => {
+                          const saldo = mudancasCusto.reduce((a, m) => a + Number(m.variacao_mensal || 0), 0);
+                          return `${saldo > 0 ? "+" : ""}${brl(saldo)}/mês`;
+                        })()}{" "}
+                        no custo · a mensalidade dos clientes não muda
+                      </>
+                    ) : (
+                      <>Nenhuma mudança até agora, que é o esperado. Acompanhando desde 23/08/2026.</>
+                    )}
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {mudancasAberto ? "recolher" : "ver detalhe"}
+                </span>
+              </button>
+              {mudancasAberto && (
+              <CardContent className="p-0">
+                <p className="border-t px-6 py-3 text-sm text-muted-foreground">
                   Reajuste da tabela acima <strong>não</strong> mexe em cliente nenhum: vale para
                   os próximos. O que aparece aqui é quando o OEM passa a cobrar{" "}
                   <strong>outro valor de um cliente que já tem o módulo</strong>, o que a carga do
                   espelho traz da licença dele. A <strong>mensalidade nunca muda</strong>:
                   repassar aumento é decisão sua, cliente a cliente.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
+                </p>
                 {mudancasCusto.length === 0 && (
                   <p className="border-t px-6 py-4 text-sm text-muted-foreground">
-                    Nenhuma mudança até agora, que é o esperado. Este quadro é o vigia da regra:
-                    reajuste de tabela não alcança quem já é cliente, então o que aparecer aqui é
-                    o OEM mudando o que cobra de uma licença que já existe. Acompanhando desde{" "}
-                    <strong>23/08/2026</strong>.
+                    Este quadro é o vigia da regra: reajuste de tabela não alcança quem já é
+                    cliente, então o que aparecer aqui é o OEM mudando o que cobra de uma licença
+                    que já existe. Acompanhando desde <strong>23/08/2026</strong>.
                   </p>
                 )}
                 <div className="divide-y border-t max-h-72 overflow-y-auto">
@@ -2324,6 +2357,7 @@ export default function OemIntegrationTab() {
                   })}
                 </div>
               </CardContent>
+              )}
             </Card>
           )}
 
