@@ -515,6 +515,26 @@ export default function OemIntegrationTab() {
     },
   });
 
+  // De quando é o dado do espelho na visão do PARCEIRO, que é diferente de
+  // quando o DoctorSaaS copiou. Ver o texto no cabeçalho do card: a diferença
+  // entre os dois já custou uma investigação inteira.
+  const frescor = useQuery<{
+    filiais: number; copiado_em: string | null; parceiro_de: string | null;
+    parceiro_mais_velho: string | null; com_mais_de_24h: number; sem_carimbo: number;
+  } | null>({
+    queryKey: ["oem-espelho-frescor", tid, conta?.id],
+    enabled: !!tid,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("fn_oem_espelho_frescor", {
+        p_tenant_id: tid ?? null,
+        p_conta_integration_id: conta?.id ?? null,
+      });
+      if (error) throw error;
+      return (data ?? null) as any;
+    },
+  });
+
   // Já o CUSTO só soma produto ATIVO — produto cancelado não custa mais nada, e
   // somá-lo faria a tela cobrar do cliente um custo que não existe.
   const custoDsPorFilial = useMemo(() => {
@@ -2066,6 +2086,42 @@ export default function OemIntegrationTab() {
             </Button>
           </div>
         </CardHeader>
+
+        {/* De QUANDO é o dado, e de onde ele vem.
+            "Atualizar espelho" não pergunta nada ao OEM: ele copia o que o
+            DoctorOEM já tinha lido do parceiro, no ritmo daquele processo. A
+            tela mostrava só a hora da cópia, então um dado de horas atrás
+            parecia recém-lido — e foi isso que fez, em 28/08/2026, uma licença
+            aparecer aqui com um número que o portal do parceiro não tinha. */}
+        {frescor.data && (
+          <CardContent className="pt-0">
+            <p className="text-xs text-muted-foreground">
+              Lido do parceiro em{" "}
+              <strong>
+                {frescor.data.parceiro_de
+                  ? new Date(frescor.data.parceiro_de).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+                  : "nunca"}
+              </strong>
+              {frescor.data.copiado_em && (
+                <>
+                  {" "}· copiado para cá em{" "}
+                  {new Date(frescor.data.copiado_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+                </>
+              )}
+              . O botão acima <strong>copia</strong> o que o DoctorOEM já leu; quem consulta o
+              parceiro é ele, no ritmo dele. Alteração feita agora no portal do OEM pode não
+              aparecer aqui na hora.
+              {Number(frescor.data.com_mais_de_24h) > 0 && (
+                <>
+                  {" "}
+                  <span className="text-amber-600 dark:text-amber-400">
+                    {frescor.data.com_mais_de_24h} filial(is) com leitura de mais de 24h.
+                  </span>
+                </>
+              )}
+            </p>
+          </CardContent>
+        )}
       </Card>
 
       {/* Dizer por que as abas estão apagadas. Sem isto, aba desabilitada

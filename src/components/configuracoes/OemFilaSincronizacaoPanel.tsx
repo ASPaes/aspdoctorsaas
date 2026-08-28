@@ -32,6 +32,18 @@ type Item = {
   // Linha que não ficou ligada a conta nenhuma. Ela aparece em TODAS as contas,
   // de propósito: sumir das duas seria pior do que aparecer nas duas.
   sem_conta?: boolean;
+  // O que o parceiro respondeu quando a licença foi RELIDA depois de gravar.
+  // true = está lá · false = leu e não bateu (pode ser atraso do parceiro, não
+  // é sinônimo de falha) · null = não deu para reler.
+  conferencia?: {
+    confirmado: boolean | null;
+    campo?: string;
+    esperado?: number;
+    antes?: number;
+    encontrado?: number;
+    tentativas?: number;
+    mensagem?: string;
+  } | null;
 };
 
 type Status = {
@@ -332,6 +344,19 @@ export default function OemFilaSincronizacaoPanel({ contaId = null }: { contaId?
                           {i.http ? ` (HTTP ${i.http})` : ""}
                         </div>
                       )}
+                      {/* O que a licença respondeu ao ser RELIDA depois da
+                          gravação.
+                          Âmbar, não vermelho: "não deu para confirmar" não é
+                          "falhou". A leitura do parceiro atrasa (medido em
+                          28/08/2026), então pintar isto de erro ensinaria a
+                          ignorar erro. `true` fica de fora — dizer "deu certo"
+                          ao lado de tudo que deu certo é ruído. */}
+                      {i.conferencia && i.conferencia.confirmado !== true && (
+                        <div className="text-xs break-words text-amber-600 dark:text-amber-400">
+                          {i.conferencia.mensagem ??
+                            "Não deu para conferir a licença depois de gravar."}
+                        </div>
+                      )}
                       <div className="text-[11px] text-muted-foreground">
                         Enfileirado {dataHora(i.enfileirado_em)}
                         {i.status === "erro" && i.proxima_tentativa_em
@@ -381,12 +406,23 @@ export default function OemFilaSincronizacaoPanel({ contaId = null }: { contaId?
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2 space-y-1">
                   {okRecentes.map((i) => (
-                    <div key={i.id} className="rounded border px-3 py-2 text-xs flex flex-wrap items-center gap-2">
-                      <span className="font-medium">{i.cliente ?? "—"}</span>
-                      <span className="text-muted-foreground">
-                        {ACAO_LABEL[i.acao] ?? i.acao}{i.modulo ? ` · ${i.modulo}` : ""}
-                      </span>
-                      <span className="ml-auto text-muted-foreground">{dataHora(i.processado_em)}</span>
+                    <div key={i.id} className="rounded border px-3 py-2 text-xs">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{i.cliente ?? "—"}</span>
+                        <span className="text-muted-foreground">
+                          {ACAO_LABEL[i.acao] ?? i.acao}{i.modulo ? ` · ${i.modulo}` : ""}
+                        </span>
+                        <span className="ml-auto text-muted-foreground">{dataHora(i.processado_em)}</span>
+                      </div>
+                      {/* A linha entrou como sucesso (o parceiro aceitou), mas a
+                          releitura não bateu. É aqui que isso não pode sumir:
+                          sem esta observação, "última sincronização OK" e uma
+                          licença com outro número convivem sem ninguém notar. */}
+                      {i.conferencia && i.conferencia.confirmado !== true && (
+                        <div className="mt-1 text-amber-600 dark:text-amber-400">
+                          {i.conferencia.mensagem ?? "Não deu para conferir a licença depois de gravar."}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </CollapsibleContent>
