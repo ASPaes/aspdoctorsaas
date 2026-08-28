@@ -361,6 +361,86 @@ Deno.serve(async (req)=>{
         headers: cors
       });
     }
+    // ------------------------------------------------------- a conferência
+    // Gravar e receber 200 é o parceiro dizendo "aceitei o pedido", NÃO "a
+    // licença ficou assim". São coisas diferentes, e a diferença já custou:
+    // o IFood cancelado em 21/08/2026, aceito com HTTP 200, ainda voltava
+    // `ativo: true, quantidade: 1` na leitura de 28/08 — porque o OEM não tira
+    // na hora, ele agenda a baixa para o último dia do mês.
+    //
+    // Então a filial é RELIDA depois de gravar, e a régua é diferente conforme
+    // o pedido — senão toda redução pareceria falha e o alarme ensinaria a ser
+    // ignorado:
+    //
+    //   subir / ativar   -> tem que estar lá AGORA. Não estando, não confirma.
+    //   descer / baixar  -> o parceiro agenda. Continuar no valor antigo é o
+    //                       esperado: vira 'agendado', não erro.
+    //
+    // Falha na releitura NÃO derruba a gravação, que já aconteceu: volta
+    // `confirmado: null`, que quer dizer "não sei", e quem chamou decide. Dizer
+    // "deu erro" aqui faria reprocessar, e reprocessar reenviaria ao parceiro
+    // uma alteração que ele já aplicou.
+    async function conferir(campoAlvo, esperado, antes) {
+      try {
+        const r = await fetch(`${creds.baseUrl}/v1/licenciamento/${empresa}/${filial}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json"
+          }
+        });
+        if (!r.ok) return {
+          confirmado: null,
+          mensagem: `Não deu para reler a licença depois de gravar (HTTP ${r.status}).`
+        };
+        const depois = await r.json().catch(()=>null);
+        if (!depois) return {
+          confirmado: null,
+          mensagem: "A releitura da licença não devolveu JSON."
+        };
+        const d = depois.filial ?? depois;
+        let encontrado;
+        if (campoAlvo === "usuarios" || campoAlvo === "pdvComandas") {
+          encontrado = campoAlvo === "usuarios" ? num(pega(d, "usuarios", "usuariosAdicionais", "usuariosadicionais")) ?? 0 : num(pega(d, "pdvComandas", "pdvcomandas")) ?? 0;
+        } else {
+          const lista = pega(d, "modulos") ?? pega(depois, "modulos");
+          const alvo = (Array.isArray(lista) ? lista : []).find((m)=>num(pega(m, "codigo", "codModulo", "cod")) === moduloCodigo);
+          // Sumiu da lista depois de um pedido de baixa: é baixa feita, não
+          // leitura incompleta. Inativo conta como zero pelo mesmo motivo.
+          encontrado = alvo === undefined ? 0 : pega(alvo, "ativo") === false ? 0 : num(pega(alvo, "quantidade", "qtd")) ?? 0;
+        }
+        const alvoNum = Number(esperado);
+        const antesNum = Number(antes);
+        if (encontrado === alvoNum) return {
+          confirmado: true,
+          campo: campoAlvo,
+          esperado: alvoNum,
+          antes: antesNum,
+          encontrado,
+          mensagem: "Relido no OEM: a licença está com o valor pedido."
+        };
+        if (alvoNum < antesNum && encontrado === antesNum) return {
+          confirmado: "agendado",
+          campo: campoAlvo,
+          esperado: alvoNum,
+          antes: antesNum,
+          encontrado,
+          mensagem: "O OEM aceitou a baixa, mas não a aplica na hora: ela entra no fim do mês. Até lá a licença segue no valor antigo."
+        };
+        return {
+          confirmado: false,
+          campo: campoAlvo,
+          esperado: alvoNum,
+          antes: antesNum,
+          encontrado,
+          mensagem: `O OEM aceitou o pedido, mas ao reler a licença ela está com ${encontrado}, e não com ${alvoNum}.`
+        };
+      } catch (e) {
+        return {
+          confirmado: null,
+          mensagem: `Não deu para reler a licença depois de gravar: ${e instanceof Error ? e.message : String(e)}`
+        };
+      }
+    }
     // ------------------------------------------------- nem tudo é "módulo"
     // O contrato de gravação tem CAMPOS PRÓPRIOS para dois deles, fora de
     // modulos[]: `usuarios` e `pdvComandas`. O espelho do lado do DoctorSaaS
@@ -395,6 +475,9 @@ Deno.serve(async (req)=>{
           valorUnitario: unitDe(m) ?? 0,
           valorTotal: totalDe(m)
         }));
+      // Antes de sobrescrever: é este número que diz se o pedido sobe ou desce,
+      // e a régua da conferência depende disso.
+      const antes = num(payload[campo]) ?? 0;
       payload[campo] = novaQtd;
       if (simular) {
         return Response.json({
@@ -426,12 +509,17 @@ Deno.serve(async (req)=>{
         http: rC.status,
         campo,
         payload,
-        resposta: respC
+        resposta: respC,
+        conferencia: rC.ok ? await conferir(campo, novaQtd, antes) : null
       }, {
         status: rC.ok ? 200 : 502,
         headers: cors
       });
     }
+    // Quanto o módulo tinha ANTES, para a conferência saber se o pedido sobe ou
+    // desce. Módulo que não está na licença, ou está inativo, vale zero.
+    const moduloAntes = modulosCrus.find((m)=>num(pega(m, "codigo", "codModulo", "cod")) === moduloCodigo);
+    const antesDoModulo = moduloAntes === undefined ? 0 : pega(moduloAntes, "ativo") === false ? 0 : qtdDe(moduloAntes);
     let achou = false;
     payload.modulos = modulosCrus.map((m)=>{
       const cod = num(pega(m, "codigo", "codModulo", "cod"));
@@ -530,7 +618,8 @@ Deno.serve(async (req)=>{
       ok: rGravar.ok,
       http: rGravar.status,
       payload,
-      resposta
+      resposta,
+      conferencia: rGravar.ok ? await conferir(`modulos[${moduloCodigo}]`, novaQtd, antesDoModulo) : null
     }, {
       status: rGravar.ok ? 200 : 502,
       headers: cors

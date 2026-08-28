@@ -255,6 +255,36 @@ Deno.serve(async (req) => {
         resposta: resposta as Record<string, unknown> | null,
       });
 
+      // ------------------------------------------------- o parceiro CONFERIU?
+      // HTTP 200 é o parceiro dizendo "aceitei o pedido", não "a licença ficou
+      // assim". Desde 28/08/2026 a `oem-licenca-modulo` relê a filial depois de
+      // gravar e devolve `conferencia`:
+      //
+      //   true       -> relido, está lá. É o caminho feliz.
+      //   'agendado' -> baixa aceita, mas o OEM só a aplica no fim do mês. É o
+      //                 comportamento normal dele para REDUÇÃO, não uma falha.
+      //   false      -> aceitou e não aplicou. É o caso que não pode virar 'ok'.
+      //   null       -> não deu para reler. Não é o mesmo que "não aplicou".
+      //
+      // Só o `false` muda o rumo. E ele NÃO volta para 'erro': a alteração já
+      // saiu daqui, e repetir mandaria a mesma coisa de novo. Vai para
+      // 'invalido', que é o estado que para, fica à vista e dispara o alerta.
+      const conf = (resposta as { conferencia?: { confirmado?: unknown; mensagem?: string } } | null)?.conferencia;
+      if (sucesso && conf?.confirmado === false) {
+        erros++;
+        await ds.from("oem_sync_fila").update({
+          status: "invalido",
+          ultimo_erro: `O OEM aceitou o pedido mas não aplicou na licença. ${conf.mensagem ?? ""}`.trim(),
+          resposta: resposta as Record<string, unknown> | null,
+          http,
+          processado_em: new Date().toISOString(),
+        }).eq("id", l.id);
+        // A ficha NÃO é atualizada de propósito: gravar aqui um número que a
+        // licença não tem é exatamente a divergência silenciosa que a fila
+        // existe para impedir.
+        continue;
+      }
+
       if (sucesso) {
         // O parceiro aceitou. SÓ AGORA a ficha muda — é esta ordem que impede
         // as duas bases de divergirem, e é a mesma de antes da fila existir.
