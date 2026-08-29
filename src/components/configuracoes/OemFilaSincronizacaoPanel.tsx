@@ -42,6 +42,10 @@ type Item = {
     antes?: number;
     encontrado?: number;
     tentativas?: number;
+    // Data até quando o módulo continua valendo. Num cancelamento explica por
+    // que a leitura ainda o conta; num módulo LIGADO é aviso: ele será
+    // desativado nessa data mesmo estando ativo agora.
+    valido_ate?: string | null;
     mensagem?: string;
   } | null;
 };
@@ -351,7 +355,7 @@ export default function OemFilaSincronizacaoPanel({ contaId = null }: { contaId?
                           28/08/2026), então pintar isto de erro ensinaria a
                           ignorar erro. `true` fica de fora — dizer "deu certo"
                           ao lado de tudo que deu certo é ruído. */}
-                      {i.conferencia && i.conferencia.confirmado !== true && (
+                      {i.conferencia && (i.conferencia.confirmado !== true || i.conferencia.valido_ate) && (
                         <div className="text-xs break-words text-amber-600 dark:text-amber-400">
                           {i.conferencia.mensagem ??
                             "Não deu para conferir a licença depois de gravar."}
@@ -418,7 +422,7 @@ export default function OemFilaSincronizacaoPanel({ contaId = null }: { contaId?
                           releitura não bateu. É aqui que isso não pode sumir:
                           sem esta observação, "última sincronização OK" e uma
                           licença com outro número convivem sem ninguém notar. */}
-                      {i.conferencia && i.conferencia.confirmado !== true && (
+                      {i.conferencia && (i.conferencia.confirmado !== true || i.conferencia.valido_ate) && (
                         <div className="mt-1 text-amber-600 dark:text-amber-400">
                           {i.conferencia.mensagem ?? "Não deu para conferir a licença depois de gravar."}
                         </div>

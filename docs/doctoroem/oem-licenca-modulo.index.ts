@@ -385,6 +385,9 @@ Deno.serve(async (req)=>{
     // oem-sync-processar): marca e deixa à vista.
     const CONF_TENTATIVAS = 3;
     const CONF_ESPERA_MS = 1500;
+    // O módulo cru da última leitura, para o veredito poder olhar campos que a
+    // normalização do payload joga fora (e para mostrá-los quando não confirmar).
+    let ultimoModuloLido = null;
 
     async function lerCampoAgora(campoAlvo) {
       const r = await fetch(`${creds.baseUrl}/v1/licenciamento/${empresa}/${filial}`, {
@@ -404,7 +407,32 @@ Deno.serve(async (req)=>{
       const alvo = (Array.isArray(lista) ? lista : []).find((m)=>num(pega(m, "codigo", "codModulo", "cod")) === moduloCodigo);
       // Sumiu da lista depois de um pedido de baixa: é baixa feita, não leitura
       // incompleta. Inativo conta como zero pelo mesmo motivo.
+      ultimoModuloLido = alvo ?? null;
       return alvo === undefined ? 0 : pega(alvo, "ativo") === false ? 0 : num(pega(alvo, "quantidade", "qtd")) ?? 0;
+    }
+
+    // Até quando o módulo continua valendo depois de desmarcado.
+    //
+    // O portal do parceiro mostra "IFood - Válido até: 31/08/2026" ao lado do
+    // módulo desmarcado: desativar CANCELA, mas a licença o mantém válido até o
+    // fim do mês. A leitura ainda o conta nesse intervalo, e sem isto um
+    // cancelamento CERTO vira observação de alarme na tela (foi o que aconteceu
+    // em 28/08/2026).
+    //
+    // ⚠️ Os nomes dos campos aqui são TENTATIVA, não contrato conhecido. O que
+    // se sabe é que a rota de custos chama de `datavalidade`; se a leitura da
+    // escrita usar outro nome, nada disto dispara e a conferência segue exatamente
+    // como antes. Por isso o módulo cru vai junto no retorno quando não confirma:
+    // é ele que mostra os nomes de verdade na próxima ocorrência, em vez de
+    // deixar a gente adivinhando de novo.
+    function validoAte(m) {
+      const v = pega(m, "datavalidade", "dataValidade", "data_validade", "validade", "dataValidadeModulo");
+      if (typeof v !== "string" || v.length < 10) return null;
+      const d = v.slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+      // Data no passado não é baixa combinada: é outra coisa, e não pode virar
+      // "está tudo certo".
+      return d >= new Date().toISOString().slice(0, 10) ? d : null;
     }
 
     async function conferir(campoAlvo, esperado, antes) {
@@ -420,15 +448,45 @@ Deno.serve(async (req)=>{
           ultimoMotivo = e instanceof Error ? e.message : String(e);
           continue;
         }
-        if (encontrado === alvoNum) return {
-          confirmado: true,
-          campo: campoAlvo,
-          esperado: alvoNum,
-          antes: antesNum,
-          encontrado,
-          tentativas: i,
-          mensagem: "Relido no OEM: a licença está com o valor pedido."
-        };
+        if (encontrado === alvoNum) {
+          // Módulo LIGADO que continua carregando uma data de validade futura.
+          //
+          // O contrato de escrita não tem campo de validade: ao reativar, a
+          // gente manda `ativo: true` e NÃO limpa a data que ficou do
+          // cancelamento anterior. Se o parceiro também não limpar, o módulo
+          // volta a funcionar e é desligado na data assim mesmo — e a
+          // conferência diria "confirmado", porque a quantidade bate.
+          //
+          // MEDIDO em 28/08/2026, no portal: marcar o módulo de volta LIMPA a
+          // data sozinho. Então, se a gravação por aqui tiver o mesmo efeito
+          // que o clique no portal, este aviso nunca dispara — e é justamente
+          // por não haver como provar isso daqui que ele existe. Rede de
+          // segurança que custa nada quando não é necessária.
+          //
+          // Não dá para consertar daqui (não há campo de validade para mandar).
+          // Dá para NÃO deixar passar calado, que é o que esta linha faz.
+          const pendente = alvoNum > 0 && ultimoModuloLido ? validoAte(ultimoModuloLido) : null;
+          if (pendente) return {
+            confirmado: true,
+            campo: campoAlvo,
+            esperado: alvoNum,
+            antes: antesNum,
+            encontrado,
+            valido_ate: pendente,
+            tentativas: i,
+            modulo_lido: ultimoModuloLido,
+            mensagem: `Relido no OEM: a licença está com o valor pedido, MAS o módulo segue com validade até ${pendente.split("-").reverse().join("/")}. Enquanto essa data existir, ele será desativado nesse dia mesmo estando ativo agora. Marcar o módulo no portal do parceiro limpa a data.`
+          };
+          return {
+            confirmado: true,
+            campo: campoAlvo,
+            esperado: alvoNum,
+            antes: antesNum,
+            encontrado,
+            tentativas: i,
+            mensagem: "Relido no OEM: a licença está com o valor pedido."
+          };
+        }
       }
       // Nunca conseguiu ler. Diferente de "leu e não bateu", e a diferença
       // importa: aqui não se sabe nada sobre a licença.
@@ -440,6 +498,21 @@ Deno.serve(async (req)=>{
         tentativas: CONF_TENTATIVAS,
         mensagem: `Não deu para reler a licença depois de gravar: ${ultimoMotivo ?? "motivo desconhecido"}.`
       };
+      // Desativação de módulo que o parceiro mantém válido até uma data futura:
+      // ele foi cancelado, e a leitura ainda o conta até lá. Isso é o certo
+      // acontecendo, não falha — ver o comentário da `validoAte`.
+      const ate = alvoNum === 0 && ultimoModuloLido ? validoAte(ultimoModuloLido) : null;
+      if (ate) return {
+        confirmado: true,
+        campo: campoAlvo,
+        esperado: alvoNum,
+        antes: antesNum,
+        encontrado,
+        valido_ate: ate,
+        tentativas: CONF_TENTATIVAS,
+        mensagem: `Módulo cancelado no OEM. A licença o mantém válido até ${ate.split("-").reverse().join("/")}, e até lá a leitura ainda o conta.`
+      };
+
       return {
         confirmado: false,
         campo: campoAlvo,
@@ -447,6 +520,9 @@ Deno.serve(async (req)=>{
         antes: antesNum,
         encontrado,
         tentativas: CONF_TENTATIVAS,
+        // O módulo como o parceiro devolveu, sem normalizar. É ele que mostra os
+        // nomes de campo de verdade quando a `validoAte` não achar a data.
+        modulo_lido: ultimoModuloLido,
         mensagem: `O parceiro aceitou o pedido (${alvoNum}), mas a licença ainda mostrava ${encontrado} depois de ${CONF_TENTATIVAS} leituras. A leitura do parceiro às vezes atrasa: confira no portal antes de concluir que não foi.`
       };
     }
