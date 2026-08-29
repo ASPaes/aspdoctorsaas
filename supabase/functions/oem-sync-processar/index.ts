@@ -48,6 +48,31 @@ type Linha = {
 // feitas. Depois da última a linha vira 'invalido' e para de consumir chamada.
 const ESPERA = [2, 5, 15, 60];
 
+/**
+ * A chave da troca do par de rotas do parceiro (28/08/2026).
+ *
+ * `false` = grava pelo par antigo (`/v1/licenciamento/...`, no host pdvlegal,
+ *           sem documentação e cuja leitura NÃO devolve `datavalidade`).
+ * `true`  = grava pelo par DOCUMENTADO (`minhaslicencas/modulos` para ler,
+ *           `saveFilial` para gravar), que carrega `datavalidade` — o campo que
+ *           de fato liga e desliga o módulo no portal.
+ *
+ * POR QUE ISSO É UMA CONSTANTE, E NÃO UMA TROCA DIRETA
+ * É a linha para reverter. Se o caminho novo se comportar diferente do medido,
+ * voltar é editar `true` para `false` e deixar o CI publicar — sem desfazer
+ * código e sem decidir no susto.
+ *
+ * O QUE JÁ FOI MEDIDO ANTES DE LIGAR (simulação na filial 4517/5089, 28/08):
+ * a leitura documentada devolve tipo de negócio, origem da venda,
+ * usuariosAdicionais e pdvComandas ZERADOS. O intermediário completa os cinco
+ * com a outra leitura e RECUSA gravar se eles faltarem. Sem essa guarda, a
+ * gravação teria zerado 4 usuários e 1 PDV numa licença real.
+ *
+ * A simulação usa o caminho documentado independentemente desta chave: ler não
+ * muda nada, e é assim que se confere antes de gravar.
+ */
+const GRAVAR_PELO_PAR_DOCUMENTADO = true;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
 
@@ -236,6 +261,7 @@ Deno.serve(async (req) => {
             // Só serve para acrescentar módulo que ainda não está na licença; o
             // parceiro recusa incluir sem preço.
             ...(l.valor_unitario != null ? { valor_unitario: Number(l.valor_unitario) } : {}),
+            par_documentado: GRAVAR_PELO_PAR_DOCUMENTADO,
           }),
         });
         http = resp.status;

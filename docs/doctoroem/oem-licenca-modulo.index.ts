@@ -114,62 +114,92 @@ function pega(obj, ...nomes) {
  *
  * Devolve `{novo, alvo, diferencas}` ou `{erro}`.
  */
-function montarPayloadDocumentado(lido, moduloCodigo, novaQtd) {
-  // No contrato de gravação, dois "módulos" não são módulos: são campos
-  // próprios da filial. Mexer neles dentro de `modulos[]` cria linha espúria e
-  // deixa o contador intacto.
-  const CAMPO_DOC = { 9: "usuariosAdicionais", 10: "pdvComandas" };
-
+function montarPayloadDocumentado(lido, escalares, moduloCodigo, novaQtd) {
   if (moduloCodigo === 8) {
     return { erro: { status: 400, mensagem: "O código 8 é o produto da licença, não um módulo. Nada foi enviado." } };
   }
 
-  const novo = JSON.parse(JSON.stringify(lido));
-  if (!Array.isArray(novo.modulos)) novo.modulos = [];
-  let alvo = null;
-
-  if (CAMPO_DOC[moduloCodigo]) {
-    const campo = CAMPO_DOC[moduloCodigo];
-    alvo = { tipo: "campo_proprio", campo, de: novo[campo], para: novaQtd };
-    novo[campo] = novaQtd;
-  } else {
-    const idx = novo.modulos.findIndex((m)=>num(pega(m, "codigo", "codModulo", "cod")) === moduloCodigo);
-    if (idx < 0) {
-      return { erro: {
-        status: 404,
-        mensagem: `A licença não tem o módulo ${moduloCodigo}. Nada foi enviado.`,
-        modulos_na_licenca: novo.modulos.map((m)=>pega(m, "codigo"))
-      } };
-    }
-    const antesMod = JSON.parse(JSON.stringify(novo.modulos[idx]));
-    const unit = num(pega(novo.modulos[idx], "valorUnitario")) ?? 0;
-    if (novaQtd > 0) {
-      novo.modulos[idx].ativo = true;
-      novo.modulos[idx].quantidade = novaQtd;
-      novo.modulos[idx].valorTotal = Math.round(unit * novaQtd * 100) / 100;
-      // O CONSERTO. Módulo cancelado carrega uma data futura, e é ela que o
-      // mantém desligado para o cliente — não o `ativo`. Reativar sem limpá-la
-      // foi o que falhou em 28/08 no CAMPINA VERDE. Limpar sem ligar seria pior,
-      // então as duas coisas andam juntas.
-      novo.modulos[idx].datavalidade = null;
-    } else {
-      novo.modulos[idx].ativo = false;
-      novo.modulos[idx].quantidade = 0;
-      novo.modulos[idx].valorTotal = 0;
-      // A data da baixa quem põe é o parceiro. Inventar uma aqui seria decidir
-      // por ele quando o cliente deixa de ter o módulo.
-    }
-    alvo = { tipo: "modulo", codigo: moduloCodigo, de: antesMod, para: novo.modulos[idx] };
+  // ⚠️ A LEITURA DOCUMENTADA VEM INCOMPLETA, e isso foi medido em 28/08/2026 na
+  // simulação da filial 4517/5089: ela devolve `codigoTipoNegocio`,
+  // `codigoDetalhesTipoNegocio`, `codigoOrigemVenda`, `usuariosAdicionais` e
+  // `pdvComandas` como ZERO, enquanto o portal mostra Varejo, Outros, Migração,
+  // 4 e 1. Como a rota grava a filial inteira, mandar de volta o que ela leu
+  // teria zerado os cinco numa licença de cliente real.
+  //
+  // Os cinco vêm da OUTRA leitura (a do host de escrita), que os traz. As duas
+  // leituras são complementares: uma tem `datavalidade`, a outra tem estes.
+  //
+  // A guarda é sobre AUSENTE, não sobre zero. `usuariosAdicionais: 0` é legítimo
+  // (cliente sem usuário extra); `codigoTipoNegocio` ausente é sintoma de nome
+  // de campo divergente, e gravar levaria zero para uma licença que tem tipo.
+  const OBRIGATORIOS = ["codigoTipoNegocio", "codigoDetalhesTipoNegocio", "codigoOrigemVenda"];
+  const faltando = OBRIGATORIOS.filter((k)=>escalares?.[k] === undefined || escalares?.[k] === null);
+  if (faltando.length) {
+    return { erro: {
+      status: 409,
+      mensagem: `A leitura complementar não trouxe ${faltando.join(", ")}. Gravar levaria zero para a licença. Nada foi enviado.`,
+      escalares
+    } };
   }
 
-  // Comparação campo a campo entre o que foi LIDO e o que seria GRAVADO.
-  // Qualquer diferença que não seja a pedida é campo se perdendo, e é isto que
-  // a lista existe para mostrar ANTES de gravar. Foi a simulação que impediu,
-  // em 21/08/2026, que o preço de todos os módulos fosse a zero numa licença
-  // de cliente real.
+  const novo = JSON.parse(JSON.stringify(lido));
+  if (!Array.isArray(novo.modulos)) novo.modulos = [];
+
+  // Completa o que a leitura documentada não traz. Fica registrado à parte da
+  // alteração pedida: são coisas diferentes e misturá-las esconderia a única
+  // que alguém aprovou.
+  const completados = [];
+  for (const k of Object.keys(escalares)) {
+    if (escalares[k] === undefined) continue;
+    if (JSON.stringify(novo[k]) !== JSON.stringify(escalares[k])) {
+      completados.push({ campo: k, de: novo[k], para: escalares[k] });
+    }
+    novo[k] = escalares[k];
+  }
+
+  // Nesta rota, 9 e 10 SÃO módulos da lista, com a quantidade certa — ao
+  // contrário da rota antiga, onde eles só existem como campo próprio. Mexer
+  // neles aqui é mexer na lista; o campo de topo acompanha, para as duas
+  // representações não divergirem dentro do mesmo corpo.
+  const CAMPO_ESPELHO = { 9: "usuariosAdicionais", 10: "pdvComandas" };
+
+  const idx = novo.modulos.findIndex((m)=>num(pega(m, "codigo", "codModulo", "cod")) === moduloCodigo);
+  if (idx < 0) {
+    return { erro: {
+      status: 404,
+      mensagem: `A licença não tem o módulo ${moduloCodigo}. Nada foi enviado.`,
+      modulos_na_licenca: novo.modulos.map((m)=>pega(m, "codigo"))
+    } };
+  }
+  const antesMod = JSON.parse(JSON.stringify(novo.modulos[idx]));
+  const unit = num(pega(novo.modulos[idx], "valorUnitario")) ?? 0;
+  if (novaQtd > 0) {
+    novo.modulos[idx].ativo = true;
+    novo.modulos[idx].quantidade = novaQtd;
+    novo.modulos[idx].valorTotal = Math.round(unit * novaQtd * 100) / 100;
+    // O CONSERTO. Módulo cancelado carrega uma data futura, e é ela que o
+    // mantém desligado para o cliente — não o `ativo`. Reativar sem limpá-la
+    // foi o que falhou em 28/08 no CAMPINA VERDE. Limpar sem ligar seria pior,
+    // então as duas coisas andam juntas.
+    novo.modulos[idx].datavalidade = null;
+  } else {
+    novo.modulos[idx].ativo = false;
+    novo.modulos[idx].quantidade = 0;
+    novo.modulos[idx].valorTotal = 0;
+    // A data da baixa quem põe é o parceiro. Inventar uma aqui seria decidir
+    // por ele quando o cliente deixa de ter o módulo.
+  }
+  if (CAMPO_ESPELHO[moduloCodigo]) novo[CAMPO_ESPELHO[moduloCodigo]] = novaQtd;
+  const alvo = { tipo: "modulo", codigo: moduloCodigo, de: antesMod, para: novo.modulos[idx] };
+
+  // O que muda ALÉM do que foi pedido e do que foi completado. Esta lista tem
+  // que ficar com a alteração pedida e nada mais: qualquer outra entrada é
+  // campo se perdendo, e é para isso que ela existe — a rota grava a filial
+  // inteira, e o que não vai, some.
+  const completadosSet = new Set(completados.map((c)=>c.campo));
   const diferencas = [];
   for (const k of new Set([...Object.keys(lido), ...Object.keys(novo)])) {
-    if (k === "modulos") continue;
+    if (k === "modulos" || completadosSet.has(k)) continue;
     if (JSON.stringify(lido[k]) !== JSON.stringify(novo[k])) {
       diferencas.push({ campo: k, de: lido[k], para: novo[k] });
     }
@@ -184,7 +214,7 @@ function montarPayloadDocumentado(lido, moduloCodigo, novaQtd) {
     }
   }
 
-  return { novo, alvo, diferencas };
+  return { novo, alvo, diferencas, completados };
 }
 
 const num = (v)=>{
@@ -354,8 +384,36 @@ Deno.serve(async (req)=>{
         }, { status: 409, headers: cors });
       }
 
+      // ------------------------------------------- a segunda leitura, e por quê
+      // A documentada devolve `codigoTipoNegocio`, `codigoDetalhesTipoNegocio`,
+      // `codigoOrigemVenda`, `usuariosAdicionais` e `pdvComandas` como ZERO
+      // (medido em 28/08/2026 na 4517/5089, com o portal mostrando Varejo,
+      // Outros, Migração, 4 e 1). A leitura do host de escrita traz esses cinco.
+      // Nenhuma das duas basta sozinha: uma tem a data, a outra tem o cadastro.
+      const tkPl = await obterToken(creds.baseUrl, creds);
+      const rPl = await fetch(`${creds.baseUrl}/v1/licenciamento/${empresa}/${filial}`, {
+        headers: { Authorization: `Bearer ${tkPl}`, Accept: "application/json" }
+      });
+      const cruPl = await rPl.json().catch(()=>null);
+      if (!rPl.ok || !cruPl) {
+        return Response.json({
+          ok: false, etapa: "leitura_complementar", http: rPl.status,
+          mensagem: "A leitura complementar da filial não respondeu. Sem ela, gravar zeraria tipo de negócio, origem da venda e os contadores. Nada foi enviado."
+        }, { status: 502, headers: cors });
+      }
+      const fPl = cruPl.filial ?? cruPl;
+      const escalares = {
+        codigoTipoNegocio: num(pega(fPl, "codTipoNegocio", "codigoTipoNegocio", "codtiponegocio")),
+        codigoDetalhesTipoNegocio: num(pega(fPl, "codDetalhesTipoNegocio", "codigoDetalhesTipoNegocio", "coddetalhestiponegocio")),
+        codigoOrigemVenda: num(pega(fPl, "codOrigemVenda", "codigoOrigemVenda", "codorigemvenda")),
+        usuariosAdicionais: num(pega(fPl, "usuarios", "usuariosAdicionais", "usuariosadicionais")),
+        pdvComandas: num(pega(fPl, "pdvComandas", "pdvcomandas")),
+        bloquearLicenca: pega(fPl, "bloquearLicenca", "bloqueado", "bloquear") === true,
+        desativarLicenca: pega(fPl, "desativarLicenca", "desativado") === true || pega(fPl, "ativo") === false
+      };
+
       // --------------------------------------------------------- modificar
-      const montado = montarPayloadDocumentado(lido, moduloCodigo, novaQtd);
+      const montado = montarPayloadDocumentado(lido, escalares, moduloCodigo, novaQtd);
       if (montado.erro) {
         return Response.json({
           ok: false, etapa: "modulo", ...montado.erro
@@ -364,6 +422,7 @@ Deno.serve(async (req)=>{
       const novo = montado.novo;
       const alvoDescrito = montado.alvo;
       const diferencas = montado.diferencas;
+      const completados = montado.completados;
 
       if (simular) {
         return Response.json({
@@ -371,6 +430,7 @@ Deno.serve(async (req)=>{
           codproduto: codProdutoDoc, url_leitura: urlLer,
           url_gravacao: `${LEITURA}/licenciamento/minhaslicencas/saveFilial`,
           alvo: alvoDescrito,
+          completados,
           diferencas,
           leitura: lido,
           payload: novo
@@ -422,7 +482,7 @@ Deno.serve(async (req)=>{
 
       return Response.json({
         ok: rSave.ok, http: rSave.status, par: "documentado",
-        codproduto: codProdutoDoc, alvo: alvoDescrito, diferencas,
+        codproduto: codProdutoDoc, alvo: alvoDescrito, completados, diferencas,
         payload: novo, resposta: respSave, conferencia
       }, { status: rSave.ok ? 200 : 502, headers: cors });
     }
