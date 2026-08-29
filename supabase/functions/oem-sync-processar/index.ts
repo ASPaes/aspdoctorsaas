@@ -134,6 +134,15 @@ Deno.serve(async (req) => {
           nova_quantidade: Number(l.quantidade ?? 0),
           ...(l.valor_unitario != null ? { valor_unitario: Number(l.valor_unitario) } : {}),
           simular: true,
+          // A simulação passa a mostrar o caminho DOCUMENTADO do parceiro
+          // (`minhaslicencas/modulos` + `saveFilial`), que é o único que enxerga
+          // a `datavalidade` — o campo que de fato liga e desliga o módulo.
+          //
+          // Só a simulação. A gravação de verdade continua no caminho antigo até
+          // este ser aprovado passo a passo (28/08/2026). Simular não escreve
+          // nada em lugar nenhum, então ver pelo caminho certo aqui não tem
+          // risco e é o que permite conferir antes de trocar.
+          par_documentado: corpo.par_documentado !== false,
         }),
       });
       const corpoResp = await resp.json().catch(() => null);

@@ -99,6 +99,94 @@ function pega(obj, ...nomes) {
   }
   return undefined;
 }
+/**
+ * Monta o corpo do `saveFilial` a partir do que a leitura documentada devolveu,
+ * aplicando UMA alteração.
+ *
+ * O payload NASCE do que foi lido — inclusive `datavalidade` e `datacadastro` de
+ * cada módulo. Só o alvo muda. É exatamente isso que o caminho antigo não fazia:
+ * ele remontava cada módulo com 5 campos, e tudo o que a leitura não trouxe
+ * sumia. Como a rota salva a filial INTEIRA, o que some da requisição some da
+ * licença.
+ *
+ * Função separada de propósito: é o miolo da mudança, e é ela que o teste
+ * exercita. Deixá-la embutida no handler significaria testar uma cópia.
+ *
+ * Devolve `{novo, alvo, diferencas}` ou `{erro}`.
+ */
+function montarPayloadDocumentado(lido, moduloCodigo, novaQtd) {
+  // No contrato de gravação, dois "módulos" não são módulos: são campos
+  // próprios da filial. Mexer neles dentro de `modulos[]` cria linha espúria e
+  // deixa o contador intacto.
+  const CAMPO_DOC = { 9: "usuariosAdicionais", 10: "pdvComandas" };
+
+  if (moduloCodigo === 8) {
+    return { erro: { status: 400, mensagem: "O código 8 é o produto da licença, não um módulo. Nada foi enviado." } };
+  }
+
+  const novo = JSON.parse(JSON.stringify(lido));
+  if (!Array.isArray(novo.modulos)) novo.modulos = [];
+  let alvo = null;
+
+  if (CAMPO_DOC[moduloCodigo]) {
+    const campo = CAMPO_DOC[moduloCodigo];
+    alvo = { tipo: "campo_proprio", campo, de: novo[campo], para: novaQtd };
+    novo[campo] = novaQtd;
+  } else {
+    const idx = novo.modulos.findIndex((m)=>num(pega(m, "codigo", "codModulo", "cod")) === moduloCodigo);
+    if (idx < 0) {
+      return { erro: {
+        status: 404,
+        mensagem: `A licença não tem o módulo ${moduloCodigo}. Nada foi enviado.`,
+        modulos_na_licenca: novo.modulos.map((m)=>pega(m, "codigo"))
+      } };
+    }
+    const antesMod = JSON.parse(JSON.stringify(novo.modulos[idx]));
+    const unit = num(pega(novo.modulos[idx], "valorUnitario")) ?? 0;
+    if (novaQtd > 0) {
+      novo.modulos[idx].ativo = true;
+      novo.modulos[idx].quantidade = novaQtd;
+      novo.modulos[idx].valorTotal = Math.round(unit * novaQtd * 100) / 100;
+      // O CONSERTO. Módulo cancelado carrega uma data futura, e é ela que o
+      // mantém desligado para o cliente — não o `ativo`. Reativar sem limpá-la
+      // foi o que falhou em 28/08 no CAMPINA VERDE. Limpar sem ligar seria pior,
+      // então as duas coisas andam juntas.
+      novo.modulos[idx].datavalidade = null;
+    } else {
+      novo.modulos[idx].ativo = false;
+      novo.modulos[idx].quantidade = 0;
+      novo.modulos[idx].valorTotal = 0;
+      // A data da baixa quem põe é o parceiro. Inventar uma aqui seria decidir
+      // por ele quando o cliente deixa de ter o módulo.
+    }
+    alvo = { tipo: "modulo", codigo: moduloCodigo, de: antesMod, para: novo.modulos[idx] };
+  }
+
+  // Comparação campo a campo entre o que foi LIDO e o que seria GRAVADO.
+  // Qualquer diferença que não seja a pedida é campo se perdendo, e é isto que
+  // a lista existe para mostrar ANTES de gravar. Foi a simulação que impediu,
+  // em 21/08/2026, que o preço de todos os módulos fosse a zero numa licença
+  // de cliente real.
+  const diferencas = [];
+  for (const k of new Set([...Object.keys(lido), ...Object.keys(novo)])) {
+    if (k === "modulos") continue;
+    if (JSON.stringify(lido[k]) !== JSON.stringify(novo[k])) {
+      diferencas.push({ campo: k, de: lido[k], para: novo[k] });
+    }
+  }
+  const antes = Array.isArray(lido.modulos) ? lido.modulos : [];
+  for (let i = 0; i < Math.max(antes.length, novo.modulos.length); i++) {
+    if (JSON.stringify(antes[i]) !== JSON.stringify(novo.modulos[i])) {
+      diferencas.push({
+        campo: `modulos[${i}] (codigo ${pega(antes[i] ?? novo.modulos[i] ?? {}, "codigo")})`,
+        de: antes[i], para: novo.modulos[i]
+      });
+    }
+  }
+
+  return { novo, alvo, diferencas };
+}
+
 const num = (v)=>{
   if (v === null || v === undefined || v === "") return undefined;
   const n = Number(String(v).replace(",", "."));
@@ -177,6 +265,168 @@ Deno.serve(async (req)=>{
       });
     }
     const creds = await carregarCreds(db, String(registro.tenant_id));
+
+    // ========================================================================
+    // CAMINHO DOCUMENTADO (opt-in por `par_documentado: true`)
+    //
+    // POR QUE ELE EXISTE
+    // O par que esta função usa desde sempre — GET /v1/licenciamento/{e}/{f} e
+    // POST /v1/licenciamento/filial, no host pdvlegal — NÃO é documentado
+    // (`/Help` responde 404) e a leitura dele NÃO devolve `datavalidade` por
+    // módulo. Medido em 28/08/2026: é `datavalidade` que define se o módulo está
+    // ligado para o cliente, não `ativo`. O portal mostra "desmarcado · Válido
+    // até 31/08" para um módulo que a API devolve como `ativo: true`.
+    //
+    // Consequência: ao reativar um módulo cancelado, mandamos `ativo: true`, a
+    // data continua lá porque não temos como enviá-la, e o módulo segue
+    // cancelado. Foi o que aconteceu no CAMPINA VERDE.
+    //
+    // A API TEM um par que fecha, e é documentado:
+    //   ler   GET  /licenciamento/minhaslicencas/modulos/{produto}/{grupo}/{loja}
+    //   gravar POST /licenciamento/minhaslicencas/saveFilial
+    // Os dois usam o MESMO objeto, com `datavalidade` e `datacadastro` por
+    // módulo. Ler e devolver o mesmo modelo é o que impede campo de sumir — a
+    // rota salva a filial inteira, e o que não vai, some.
+    //
+    // ⚠️ ENTRA DESLIGADO. Sem `par_documentado: true` no corpo, nada muda para
+    // quem já chama. Isso é de propósito: a troca do caminho de gravação de
+    // licença de cliente real se prova em etapas, e a primeira é simular.
+    // ========================================================================
+    if (corpo.par_documentado === true) {
+      const LEITURA = (Deno.env.get("OEM_API_LEITURA_URL") ?? "https://api.tabletcloud.com.br").replace(/\/+$/, "");
+
+      // -------------------------------------------------- de qual produto é
+      // O GET documentado exige o produto no caminho. O código já está no banco
+      // daqui: a carga (`oem-sync-passo`) grava o módulo CRU em
+      // `clientes_oem.modulos_ativos` (ela faz `...m` antes de normalizar), e
+      // cada módulo carrega `codproduto`. Nenhuma chamada extra à API, e nada a
+      // mudar no DoctorSaaS.
+      let codProdutoDoc = num(corpo.codproduto);
+      if (codProdutoDoc === undefined) {
+        const { data: linhaOem } = await db.from("clientes_oem")
+          .select("modulos_ativos, produto_principal")
+          .eq("tenant_id", String(registro.tenant_id))
+          .eq("filial_codigo", String(filial))
+          .maybeSingle();
+        const mods = Array.isArray(linhaOem?.modulos_ativos) ? linhaOem.modulos_ativos : [];
+        for (const m of mods) {
+          const c = num(pega(m, "codproduto", "codProduto"));
+          if (c !== undefined) { codProdutoDoc = c; break; }
+        }
+        // Reserva: o nome do produto contra o catálogo, que é o que a própria
+        // carga faz quando monta a linha.
+        if (codProdutoDoc === undefined && linhaOem?.produto_principal) {
+          const tkCat = await obterToken(LEITURA, creds);
+          const rCat = await fetch(`${LEITURA}/licenciamento/minhaslicencas/produtos`, {
+            headers: { Authorization: `Bearer ${tkCat}`, Accept: "application/json" }
+          });
+          const cat = await rCat.json().catch(()=>null);
+          const alvo = (Array.isArray(cat) ? cat : []).find((p)=>
+            String(pega(p, "nome") ?? "").trim().toUpperCase() ===
+            String(linhaOem.produto_principal).trim().toUpperCase());
+          codProdutoDoc = num(pega(alvo ?? {}, "codigo"));
+        }
+      }
+      if (codProdutoDoc === undefined) {
+        return Response.json({
+          ok: false, etapa: "produto",
+          mensagem: `Não deu para descobrir o código do produto da filial ${empresa}/${filial}. Informe "codproduto" no corpo, ou rode a carga do OEM para esta filial.`
+        }, { status: 409, headers: cors });
+      }
+
+      // ------------------------------------------------------------- ler
+      const tk = await obterToken(LEITURA, creds);
+      const urlLer = `${LEITURA}/licenciamento/minhaslicencas/modulos/${encodeURIComponent(String(codProdutoDoc))}/${empresa}/${filial}`;
+      const rDoc = await fetch(urlLer, { headers: { Authorization: `Bearer ${tk}`, Accept: "application/json" } });
+      const lido = await rDoc.json().catch(()=>null);
+      if (!rDoc.ok || !lido) {
+        return Response.json({
+          ok: false, etapa: "leitura", http: rDoc.status, url: urlLer,
+          mensagem: "A leitura documentada da filial não respondeu."
+        }, { status: 502, headers: cors });
+      }
+      const modsLidos = Array.isArray(pega(lido, "modulos")) ? pega(lido, "modulos") : null;
+      if (!modsLidos || modsLidos.length === 0) {
+        return Response.json({
+          ok: false, etapa: "leitura",
+          mensagem: "A leitura documentada não trouxe módulos. Nada foi enviado ao OEM.",
+          leitura: lido
+        }, { status: 409, headers: cors });
+      }
+
+      // --------------------------------------------------------- modificar
+      const montado = montarPayloadDocumentado(lido, moduloCodigo, novaQtd);
+      if (montado.erro) {
+        return Response.json({
+          ok: false, etapa: "modulo", ...montado.erro
+        }, { status: montado.erro.status ?? 400, headers: cors });
+      }
+      const novo = montado.novo;
+      const alvoDescrito = montado.alvo;
+      const diferencas = montado.diferencas;
+
+      if (simular) {
+        return Response.json({
+          ok: true, simulado: true, par: "documentado",
+          codproduto: codProdutoDoc, url_leitura: urlLer,
+          url_gravacao: `${LEITURA}/licenciamento/minhaslicencas/saveFilial`,
+          alvo: alvoDescrito,
+          diferencas,
+          leitura: lido,
+          payload: novo
+        }, { headers: cors });
+      }
+
+      // ---------------------------------------------------------- gravar
+      const rSave = await fetch(`${LEITURA}/licenciamento/minhaslicencas/saveFilial`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${tk}`, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(novo)
+      });
+      const txtSave = await rSave.text().catch(()=>"");
+      let respSave = txtSave;
+      try { respSave = JSON.parse(txtSave); } catch {}
+
+      // Releitura pelo MESMO caminho, que é o único que enxerga `datavalidade`.
+      let conferencia = null;
+      if (rSave.ok) {
+        try {
+          const rConf = await fetch(urlLer, { headers: { Authorization: `Bearer ${tk}`, Accept: "application/json" } });
+          const depois = await rConf.json().catch(()=>null);
+          if (depois) {
+            const mod = (pega(depois, "modulos") ?? []).find((m)=>num(pega(m, "codigo")) === moduloCodigo);
+            const campo = CAMPO_DOC[moduloCodigo];
+            const encontrado = campo
+              ? num(pega(depois, campo)) ?? 0
+              : (mod === undefined ? 0 : (pega(mod, "ativo") === false ? 0 : num(pega(mod, "quantidade")) ?? 0));
+            const dataDepois = mod ? pega(mod, "datavalidade") : null;
+            conferencia = {
+              par: "documentado",
+              campo: campo ?? `modulos[${moduloCodigo}]`,
+              esperado: novaQtd,
+              encontrado,
+              // Agora dá para conferir o que de fato manda: a data.
+              datavalidade: dataDepois ?? null,
+              confirmado: encontrado === novaQtd && (novaQtd === 0 || !dataDepois),
+              mensagem: encontrado !== novaQtd
+                ? `Gravado, mas a licença mostra ${encontrado} e não ${novaQtd}.`
+                : (novaQtd > 0 && dataDepois)
+                  ? `Quantidade certa, mas o módulo ficou com validade até ${String(dataDepois).slice(0,10)} — ele seria desativado nessa data.`
+                  : "Relido no OEM pelo caminho documentado: confere."
+            };
+          }
+        } catch (e) {
+          conferencia = { par: "documentado", confirmado: null, mensagem: `Não deu para reler: ${e instanceof Error ? e.message : String(e)}` };
+        }
+      }
+
+      return Response.json({
+        ok: rSave.ok, http: rSave.status, par: "documentado",
+        codproduto: codProdutoDoc, alvo: alvoDescrito, diferencas,
+        payload: novo, resposta: respSave, conferencia
+      }, { status: rSave.ok ? 200 : 502, headers: cors });
+    }
+
     const token = await obterToken(creds.baseUrl, creds);
     // ------------------------------------------------------------------ ler
     const rLer = await fetch(`${creds.baseUrl}/v1/licenciamento/${empresa}/${filial}`, {
