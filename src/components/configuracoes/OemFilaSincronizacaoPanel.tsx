@@ -369,19 +369,24 @@ export default function OemFilaSincronizacaoPanel({ contaId = null }: { contaId?
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                    {i.status !== "ok" && (
-                      <Button
-                        size="sm" variant="ghost" className="gap-1 shrink-0"
-                        onClick={() => simular(i.id, `${i.cliente ?? "—"} · ${ACAO_LABEL[i.acao] ?? i.acao}`)}
-                        disabled={simulando === i.id}
-                        title="Mostra o que seria gravado na licença, sem gravar"
-                      >
-                        {simulando === i.id
-                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          : <FlaskConical className="h-3.5 w-3.5" />}
-                        Simular
-                      </Button>
-                    )}
+                    {/* Simular também no que já deu OK. Ele não grava nada — lê
+                        a licença e mostra o que seria enviado — e é a única
+                        forma de perguntar ao parceiro "como está esta licença
+                        AGORA" sem sair do sistema. Esconder isso nas linhas OK
+                        custou uma investigação inteira em 28/08/2026: a pergunta
+                        que faltava só podia ser feita em linhas que já tinham
+                        dado certo. */}
+                    <Button
+                      size="sm" variant="ghost" className="gap-1 shrink-0"
+                      onClick={() => simular(i.id, `${i.cliente ?? "—"} · ${ACAO_LABEL[i.acao] ?? i.acao}`)}
+                      disabled={simulando === i.id}
+                      title="Lê a licença no parceiro e mostra o que seria gravado. Não grava nada."
+                    >
+                      {simulando === i.id
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <FlaskConical className="h-3.5 w-3.5" />}
+                      Simular
+                    </Button>
                     {(i.status === "erro" || i.status === "invalido") && (
                       <Button
                         size="sm" variant="outline" className="gap-1 shrink-0"
