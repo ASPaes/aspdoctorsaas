@@ -229,3 +229,20 @@ verify_jwt = true
 # ser apagado à noite — o prazo e o filtro moram na fn_chat_media_purge_lote.
 [functions.purge-chat-media]
 verify_jwt = true
+
+# Recebe a proposta finalizada no sistema comercial externo e cria cliente,
+# contrato e jornada de onboarding. `false` porque quem chama é um servidor de
+# terceiro, sem sessão do projeto — a autenticação é o x-webhook-secret comparado
+# ao ONBOARDING_INTAKE_SECRET dentro da própria function.
+# Valor conferido contra produção em 27/08/2026 (v59, verify_jwt=false): declarar
+# explícito para o CI não mudar isso em silêncio.
+[functions.onboarding-intake-webhook]
+verify_jwt = false
+
+# Devolve os catálogos do tenant (produtos, módulos, segmentos, origens de venda,
+# formas de pagamento, vendedores, unidades e tipos de demanda) para o sistema
+# comercial externo montar os selects do vendedor. Só leitura.
+# `false` pelo mesmo motivo da onboarding-intake-webhook: autenticação por
+# x-webhook-secret, não por JWT do projeto.
+[functions.onboarding-catalogo]
+verify_jwt = false

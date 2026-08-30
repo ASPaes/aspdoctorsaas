@@ -82,11 +82,32 @@ A proposta também **não diz qual produto é**. A Digi Office tem 6: `Gula` (14
 | Origem da venda | `origens_venda` | 19 | ⚠️ PDF "Já Cliente" / base "Já cliente" |
 | Vendedor | `funcionarios` | 38 | ⚠️ PDF "Gabriela" / base "Gabriela P" |
 | Forma de pagamento | `formas_pagamento` | 4 (Boleto, Cartão, Fornecedor cobra, PIX) | ⚠️ "Cartão 12x" — **o parcelamento não tem coluna** |
-| Unidade base | `unidades_base` | 4 (Digi Up, Nutrebem, Digi Office, Teste) | ❌ não informado |
+| Unidade base | `unidades_base` | 4: Digi Office (6), Digi Up (10), Nutrebem (11), Teste (12) | ❌ não informado no PDF — vem do "tenant" da tela deles |
 | Tipo de demanda | `onboarding_demand_types` | 9 | ✅ "Novo Cliente" exato |
 
 O "Adquirente: Stone" e "Homologadas: L4 - Positivo" **não têm tabela nenhuma** no Doctor — vão
 para a aba Proposta como texto.
+
+### O "tenant" do sistema externo é a nossa unidade — e a lista não bate
+
+A tela de propostas tem um seletor de tenant com 4 opções: **PDV Legal, Digi Up, Gula Digi,
+Nutrebem**. Isso colide de frente com o vocabulário do Doctor, onde tenant é a empresa inteira
+(a Digi Office é *um* tenant). A integração é só para o tenant Digi Office; `tenant_id` é
+constante e o seletor deles tem que virar `unidade_base_id`.
+
+O de-para não é 1:1 — a lista deles mistura marca com linha de produto:
+
+| Tenant deles | No Doctor |
+|---|---|
+| Digi Up | unidade `Digi Up` (10) — 109 clientes |
+| Nutrebem | unidade `Nutrebem` (11) — 46 clientes |
+| PDV Legal | **produto**, não unidade: vendido nas 3 unidades (693 ativos) |
+| Gula Digi | **produto** `Gula` (14) — os 63 ativos estão todos em `Digi Office` |
+
+A unidade `Digi Office` (1.378 clientes, 927 ativos) não existe na lista deles com esse nome.
+
+**Decisão do owner:** o `unidade_base_id` vem do payload, do catálogo, como os demais — o de-para
+é configurado no cadastro de tenants deles, não inferido aqui. O campo passa a ser **obrigatório**.
 
 ### A integração Omie está ATIVA neste tenant
 
@@ -277,8 +298,8 @@ Arquivo acima do limite não é baixado — o log guarda a URL e o motivo, e a a
   "external_ticket_id": "TCK-2026-0819-001",
   "tenant_id": "…",
   "demand_type_id": "cc28a94c-…",
-  "unidade_base_id": 3,
-  "_nota_unidade": "vai para clientes.unidade_base_id, nao para o ticket",
+  "unidade_base_id": 6,
+  "_nota_unidade": "obrigatorio; vai para clientes.unidade_base_id, nao para o ticket",
   "cliente": {
     "cnpj": "17739131000198", "razao_social": "BOTECO CHURRASCARIA DO PAULO",
     "tipo": "PJ", "email": "…", "telefone": "…",
