@@ -501,11 +501,12 @@ alterado. Vale avisar na tela.
 A lista vem **completa** — todos os problemas de uma vez, não um por chamada.
 Renderize cada erro ao lado do campo correspondente, em português.
 
-### Reenvio é seguro
+### Reenvio é seguro, inclusive depois de erro
 
 Rede caiu, vendedor clicou duas vezes, precisa retentar: **reenvie o mesmo `external_ticket_id`**.
-O DoctorSaaS reconhece que já processou aquele ticket e devolve `200` com os mesmos IDs, sem
-criar nada de novo.
+
+- Se a tentativa anterior **deu certo**, devolve `200` com os mesmos IDs e `ja_processado: true`, sem criar nada de novo.
+- Se a tentativa anterior **falhou**, nada foi criado — então o reenvio **reprocessa** com o payload novo. É assim que se corrige um ticket recusado: ajusta o mapeamento e fecha de novo, com o mesmo id.
 
 **O outro lado disso:** gerar um `external_ticket_id` novo para a mesma venda cria um segundo
 cliente e um segundo contrato, e o faturamento conta em dobro. O ID tem que ser **estável e vir
@@ -630,7 +631,7 @@ Por isso o vendedor escolhe num select alimentado pelo catálogo, e o que trafeg
 | 422 | `valor_zerado` | `avulso.valor` ou `alteracao.valor_delta` igual a zero. | Se não há valor, omita o bloco inteiro (modo D). |
 | 422 | `cliente_doc_invalido` | CNPJ/CPF com menos de 11 dígitos. | Validar o documento no formulário. |
 | 200 | — | `external_ticket_id` já processado com sucesso. | Nada. Devolve os IDs originais mais `ja_processado: true`. Reenvio é seguro. |
-| 409 | `ticket_ja_recebido_com_erro` | Esse `external_ticket_id` já chegou antes e **falhou**. | A resposta traz o erro anterior em `anterior`. Corrija e reenvie com um id novo, ou peça reprocessamento. O reenvio não repete a falha em silêncio. |
+
 | 500 | `internal_error` | Falhou no DoctorSaaS. **Nada foi criado.** | Retentar mais tarde com o mesmo `external_ticket_id`. |
 
 **Regra geral:** qualquer resposta diferente de `200` significa que **nada foi criado no

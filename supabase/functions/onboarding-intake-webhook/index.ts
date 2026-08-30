@@ -106,29 +106,40 @@ Deno.serve(async (req) => {
     .select('id')
     .maybeSingle();
 
-  // 2) Ja processado antes: devolve o que foi criado, sem criar nada de novo.
+  // 2) Ticket ja visto.
+  //
+  // So o SUCESSO e idempotente. Tentativa que falhou nao criou nada, entao
+  // reenviar e seguro e TEM de reprocessar: o external_ticket_id e o id do ticket
+  // no sistema de origem e nunca muda, entao recusar o reenvio deixaria um ticket
+  // recusado impossivel de corrigir.
+  let logId = log?.id ?? null;
   if (logErr) {
     if (logErr.code === '23505') {
       const { data: anterior } = await supabase
         .from('onboarding_intake_log')
-        .select('status, modo, cliente_id, contrato_id, journey_id, cliente_reusado, erro')
+        .select('id, status, modo, cliente_id, contrato_id, journey_id, cliente_reusado')
         .eq('tenant_id', tenantId)
         .eq('external_ticket_id', externalId)
         .maybeSingle();
 
       if (anterior?.status === 'processado') {
-        return json({ ok: true, ja_processado: true, ...anterior });
+        const { id: _id, ...dados } = anterior;
+        return json({ ok: true, ja_processado: true, ...dados });
       }
-      // Tentativa anterior falhou: nao repete a falha em silencio.
-      return json({
-        ok: false,
-        error: 'ticket_ja_recebido_com_erro',
-        detail: 'este external_ticket_id ja chegou e nao foi processado; corrija e reenvie com um novo id, ou peca reprocessamento',
-        anterior,
-      }, 409);
+
+      // Falhou antes: reaproveita a linha, com o payload novo, e tenta de novo.
+      logId = anterior?.id ?? null;
+      if (!logId) {
+        return json({ ok: false, error: 'internal_error', detail: 'log anterior nao encontrado' }, 500);
+      }
+      await supabase.from('onboarding_intake_log')
+        .update({ payload: body, modo: modoDoPayload(body), status: 'recebido', erro: null, avisos: null })
+        .eq('id', logId);
+      console.log('[intake] reprocessando tentativa que falhou:', externalId);
+    } else {
+      console.error('[intake] falha ao gravar log:', logErr);
+      return json({ ok: false, error: 'internal_error', detail: logErr.message }, 500);
     }
-    console.error('[intake] falha ao gravar log:', logErr);
-    return json({ ok: false, error: 'internal_error', detail: logErr.message }, 500);
   }
 
   // 3) A transacao: tudo ou nada.
@@ -138,7 +149,7 @@ Deno.serve(async (req) => {
     const { status, body: corpo } = traduzErro(rpcErr.message ?? '');
     await supabase.from('onboarding_intake_log')
       .update({ status: 'erro', erro: corpo })
-      .eq('id', log!.id);
+      .eq('id', logId);
     console.error('[intake] recusado:', externalId, rpcErr.message);
     return json(corpo, status);
   }
@@ -155,7 +166,7 @@ Deno.serve(async (req) => {
       // precisam de complemento manual.
       avisos: (resultado?.avisos?.length ?? 0) > 0 ? resultado.avisos : null,
     })
-    .eq('id', log!.id);
+    .eq('id', logId);
 
   const nAvisos = resultado?.avisos?.length ?? 0;
   console.log('[intake] ok:', externalId, resultado?.ticket_code, nAvisos > 0 ? `(${nAvisos} aviso(s))` : '');
