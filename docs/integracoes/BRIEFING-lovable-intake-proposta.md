@@ -335,7 +335,7 @@ carregam preço. Ver a armadilha nº 1.
 | `produto_id` | inteiro | **sim** | Do catálogo. Define qual sistema foi vendido. |
 | `vlr_mensal` | decimal | **sim** | **A mensalidade deste produto.** É o valor que vira MRR. |
 | `vlr_ativacao` | decimal | **sim** | O setup deste produto. Pode ser `0`. |
-| `modulos` | lista | **sim** | Mínimo 1. É a lista do que o cliente contratou. |
+| `modulos` | lista | recomendado | A lista do que o cliente contratou. Pode vir vazia — a venda passa com aviso. |
 | `modulos[].modulo_id` | uuid | **sim** | Do catálogo, e precisa pertencer ao `produto_id` acima. |
 | `modulos[].quantidade` | inteiro | **sim** | Mínimo 1. |
 | `modulos[].vlr_mensal` | decimal | **não enviar** | Deixe de fora. Ver armadilha nº 1 — mandar preço aqui **sobrescreve** o valor do contrato. |
@@ -343,6 +343,18 @@ carregam preço. Ver a armadilha nº 1.
 
 A soma dos `produtos[].vlr_mensal` tem que bater com `comercial.vlr_mensal`, e a soma dos
 `vlr_ativacao` com `comercial.vlr_ativacao`. Se não bater, a chamada é recusada.
+
+**Um produto por `produto_id`, nunca repetido.** Cada item da venda é um **módulo** do produto,
+não um produto novo. Mandar o mesmo `produto_id` duas vezes é recusado com `produto_repetido` —
+no DoctorSaaS um cliente tem uma linha por produto, e repetir criaria estrutura que não existe
+na base (conferido: 0 de 1.067 contratos ativos).
+
+Se a venda tiver itens de produtos diferentes, aí sim são entradas separadas — uma por produto.
+
+**Produto sem módulo passa, mas avisa.** Nem todo produto tem catálogo de módulos completo (o
+Gula tem 2 contra 20 do PDV Legal, e 55 dos seus 63 contratos ativos não têm módulo nenhum).
+A venda é criada e a resposta traz `avisos` com os produtos que entraram sem registrar o que foi
+vendido. Mostre esse aviso na tela — não é erro, mas alguém precisa saber.
 
 ### Blocos `anexos` e `proposta`
 
@@ -461,6 +473,7 @@ A resposta chega em segundos. Não há poll nem callback.
   "journey_id": "...",
   "ticket_numero": "TK-2026-0142",
   "cliente_reusado": true,
+  "avisos": [],
   "anexos_falhos": []
 }
 ```
@@ -609,6 +622,7 @@ Por isso o vendedor escolhe num select alimentado pelo catálogo, e o que trafeg
 | 404 | `tenant_not_found` | `tenant_id` não existe. | Erro de configuração. Conferir a constante. |
 | 422 | `ids_invalidos` | Um ou mais IDs não existem nesse tenant. | Recarregar o catálogo e pedir ao vendedor que reescolha. Mostrar a lista `invalidos`. |
 | 422 | `modulo_com_valor` | Módulo veio com preço. | Remover `vlr_mensal`/`vlr_ativacao` dos módulos — o valor é do produto. |
+| 422 | `produto_repetido` | O mesmo `produto_id` aparece mais de uma vez. | Enviar UM produto com o valor total e cada item da venda como módulo dele. |
 | 422 | `produto_sem_valor` | Produto sem `vlr_mensal` ou `vlr_ativacao`. | Preencher os dois no produto (podem ser `0`). |
 | 422 | `total_nao_confere` | Soma dos produtos ≠ `comercial.vlr_mensal`. | A resposta traz os dois valores. |
 | 422 | `cliente_nao_encontrado` | Modo B, C ou D com CNPJ que não existe no DoctorSaaS. | Só venda nova cria cliente. Conferir o CNPJ. |

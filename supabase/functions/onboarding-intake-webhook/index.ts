@@ -150,9 +150,14 @@ Deno.serve(async (req) => {
       contrato_id: resultado?.contrato_id ?? null,
       journey_id: resultado?.journey_id ?? null,
       cliente_reusado: resultado?.cliente_reusado ?? null,
+      // Venda aceita mas com lacuna — produto que entrou sem modulo nao registra o
+      // que foi vendido. Guardado para dar para consultar depois quais vendas
+      // precisam de complemento manual.
+      avisos: (resultado?.avisos?.length ?? 0) > 0 ? resultado.avisos : null,
     })
     .eq('id', log!.id);
 
-  console.log('[intake] ok:', externalId, resultado?.ticket_code);
+  const nAvisos = resultado?.avisos?.length ?? 0;
+  console.log('[intake] ok:', externalId, resultado?.ticket_code, nAvisos > 0 ? `(${nAvisos} aviso(s))` : '');
   return json(resultado);
 });
