@@ -246,3 +246,9 @@ verify_jwt = false
 # x-webhook-secret, não por JWT do projeto.
 [functions.onboarding-catalogo]
 verify_jwt = false
+
+# Baixa os anexos que vieram na proposta e guarda no ticket de onboarding.
+# `false` pelo mesmo motivo das outras duas do intake: autenticacao por
+# x-webhook-secret, nao por JWT do projeto. Chamada pela onboarding-intake-webhook.
+[functions.onboarding-intake-anexos]
+verify_jwt = false

@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import PropostaVendaSection from "./PropostaVendaSection";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOnboardingPhases } from "@/hooks/useOnboardingPhases";
 import AcompanhamentoSection from "./AcompanhamentoSection";
@@ -3241,6 +3242,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       )}
                     </section>
                   )}
+
+                    {/* Resumo da venda — so aparece quando a jornada veio importada */}
+                  <PropostaVendaSection journeyId={journeyId} enabled={open} />
 
                     {/* Anexos */}
                   {secVisible("anexos") && journey?.ticket_id && (

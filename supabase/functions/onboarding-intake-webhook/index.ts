@@ -245,6 +245,18 @@ Deno.serve(async (req) => {
     })
     .eq('id', logId);
 
+  // Anexos entram DEPOIS e fora da transacao: anexo que falha nao derruba a venda.
+  // Nao esperamos a resposta — o vendedor nao pode ficar parado por causa de um
+  // download; o resultado fica registrado no log.
+  if (Array.isArray(body?.anexos) && body.anexos.length > 0) {
+    supabase.functions
+      .invoke('onboarding-intake-anexos', {
+        body: { intake_log_id: logId },
+        headers: { 'x-webhook-secret': expected },
+      })
+      .catch((e) => console.warn('[intake] disparo dos anexos falhou:', e));
+  }
+
   const nAvisos = resultado?.avisos?.length ?? 0;
   console.log('[intake] ok:', externalId, resultado?.ticket_code, nAvisos > 0 ? `(${nAvisos} aviso(s))` : '');
   return json(resultado);
