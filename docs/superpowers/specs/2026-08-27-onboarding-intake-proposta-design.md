@@ -1,6 +1,6 @@
 # Intake de proposta comercial → cliente, contrato e jornada de onboarding
 
-Data: 2026-08-27 · Owner: Alexandre (ASP) · Status: aguardando revisão do owner
+Data: 2026-08-27 · Owner: Alexandre (ASP) · Status: **IMPLEMENTADO em produção 30/08/2026**
 
 ## Problema
 
@@ -367,3 +367,57 @@ Arquivo acima do limite não é baixado — o log guarda a URL e o motivo, e a a
 8. `onboarding-intake-anexos`.
 
 Cada passo é entregue e validado antes do seguinte. Nada vai para produção sem OK explícito.
+
+---
+
+## O que foi construído — 30/08/2026
+
+Tudo em produção, cada peça testada com rollback antes de aplicar.
+
+| # | Peça | Prova |
+|---|---|---|
+| 1 | Auditoria de functions | 88 em prod, 83 no repo, **zero divergência** — push seguro |
+| 2 | `config.toml` | as duas declaradas com `verify_jwt=false`, conferido contra prod |
+| 3 | `ONBOARDING_INTAKE_SECRET` | girado (o de 11/07 era irrecuperável) |
+| 4 | `onboarding-catalogo` | v1; 8 catálogos, 4 caminhos de erro |
+| 5 | `create_cliente_produto_with_contract` | servidor passa · outro tenant barrado |
+| 6 | Freio do Omie (`intake_hold_omie`) | com freio delta 0 · sem freio delta 1 · valor do contrato intacto |
+| 7 | `onboarding_intake_log` + `proposta_payload` | duplicata barrada · `authenticated` não escreve |
+| 8 | `fn_intake_proposta` modos A e D | 8 cenários |
+| 9 | Modos B e C | 8 cenários; **base do contrato intacta no up-sell** |
+| 10 | `onboarding-intake-webhook` | v61; 401 · 400 · 422 com lista completa · 409 |
+
+### Três descobertas que mudaram o desenho
+
+**1. Módulo não tem preço.** Dos 4.682 módulos ativos da Digi Office, **zero** carregam valor; a
+receita vive em `cliente_produtos` (1.058 de 1.058). A primeira versão desta spec mandava preço no
+módulo — teria feito `fn_sync_produto_valores` sobrescrever o contrato com `SUM(vlr × qtd)`,
+transformando "x9 R$ 360,00" em R$ 3.240,00.
+
+**2. `create_onboarding_journey` também barrava o servidor.** `can_access_tenant_row` devolve
+`false` para `service_role`. Consequência: o `onboarding-intake-webhook` publicado em 11/07/2026
+**nunca pode ter funcionado** — era código morto, não fluxo em uso.
+
+**3. `service_role` tem `rolbypassrls`.** As duas guardas que foram abertas não protegiam nada
+contra ele: já podia escrever direto nas tabelas. Só tornavam as funções canônicas inutilizáveis,
+empurrando para escrita manual e duplicação da lógica de contrato.
+
+### Correções feitas na própria spec durante a execução
+
+- O freio do Omie **não** podia ser `skip_valor_sync`: aquele setting também desliga
+  `fn_sync_produto_valores` e deixaria o contrato com valor errado. Setting próprio.
+- `unaccent` mora no schema `extensions` e precisa ser qualificado — a função tem
+  `SET search_path TO 'public'`, e ampliá-lo numa `SECURITY DEFINER` seria abrir superfície.
+- A unidade vai no **cliente**, não no ticket.
+
+### O que ficou de fora
+
+- **Ensaio do caminho de sucesso pelo webhook.** Cria cliente, contrato e MRR reais e dispara o
+  gatilho de boas-vindas. Depende de duas decisões do owner: qual CNPJ usar (a unidade `Teste` está
+  `is_active=false` e não aparece no catálogo) e o que fazer com o registro depois — apagar contrato
+  mexe em MRR e pode virar churn falso no mês.
+- **Aba "Proposta" e botão "Liberar para o Omie"** (item 11 do runbook). ⚠️ Enquanto o botão não
+  existir, a sincronização de cada venda nova fica retida **sem caminho de saída** pela UI; a
+  liberação teria que ser feita à mão no banco.
+- **`onboarding-intake-anexos`** (item 12). A integração funciona sem ele.
+- Compatibilidade com o formato antigo de payload: descartada, já que a v59 nunca funcionou.

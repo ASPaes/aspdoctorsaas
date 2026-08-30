@@ -18,11 +18,18 @@ Uma chamada bem-sucedida faz o DoctorSaaS criar, numa única transação:
 
 Se qualquer parte falhar, **nada é criado** — não existe estado pela metade.
 
-### Estado atual — leia antes de começar
+### Estado atual — 30/08/2026
 
-**Os dois endpoints descritos aqui ainda não existem.** Este é o contrato acordado entre as duas
-equipes, escrito para que os dois lados sejam construídos em paralelo. Construa contra este
-contrato e teste com respostas simuladas (mock) enquanto o servidor não sobe.
+**Os dois endpoints estão no ar e testados.** Pode desligar o modo de teste quando quiser.
+
+| Endpoint | Situação |
+|---|---|
+| `GET /onboarding-catalogo` | no ar, respondendo com os 8 catálogos reais |
+| `POST /onboarding-intake-webhook` | no ar, com os quatro modos funcionando |
+
+Testado ponta a ponta do lado do DoctorSaaS: venda nova cria cliente + contrato + módulos +
+ticket; up-sell e down-sell lançam movimento de MRR; cobrança avulsa não mexe na mensalidade;
+demanda sem valor abre só o ticket. Erro de validação devolve todos os campos de uma vez.
 
 Se o contrato mudar, sai uma versão nova deste documento. Nada muda em silêncio.
 
@@ -275,6 +282,15 @@ implantação e não toca em nada financeiro.
 
 Não mande `avulso` com `valor: 0` para representar isso — bloco ausente e bloco zerado são coisas
 diferentes, e o zerado é recusado.
+
+#### A venda não aparece no Omie na hora
+
+Por decisão da Digi Office, toda venda que entra por esta integração fica **retida antes do
+Omie**: ela é criada no DoctorSaaS normalmente, mas a sincronização com o Omie só acontece
+quando alguém confere e libera na tela da jornada.
+
+Isso não muda nada no que você envia — é só para que ninguém estranhe a venda não aparecer no
+Omie imediatamente.
 
 #### O bloco `comercial` fora do modo A
 
@@ -599,7 +615,8 @@ Por isso o vendedor escolhe num select alimentado pelo catálogo, e o que trafeg
 | 422 | `blocos_conflitantes` | Veio mais de um entre `produtos`, `alteracao` e `avulso`. | Enviar no máximo um. |
 | 422 | `valor_zerado` | `avulso.valor` ou `alteracao.valor_delta` igual a zero. | Se não há valor, omita o bloco inteiro (modo D). |
 | 422 | `cliente_doc_invalido` | CNPJ/CPF com menos de 11 dígitos. | Validar o documento no formulário. |
-| 200 | — | `external_ticket_id` já processado. | Nada. Devolve os IDs originais. Reenvio é seguro. |
+| 200 | — | `external_ticket_id` já processado com sucesso. | Nada. Devolve os IDs originais mais `ja_processado: true`. Reenvio é seguro. |
+| 409 | `ticket_ja_recebido_com_erro` | Esse `external_ticket_id` já chegou antes e **falhou**. | A resposta traz o erro anterior em `anterior`. Corrija e reenvie com um id novo, ou peça reprocessamento. O reenvio não repete a falha em silêncio. |
 | 500 | `internal_error` | Falhou no DoctorSaaS. **Nada foi criado.** | Retentar mais tarde com o mesmo `external_ticket_id`. |
 
 **Regra geral:** qualquer resposta diferente de `200` significa que **nada foi criado no
