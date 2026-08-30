@@ -505,8 +505,19 @@ Renderize cada erro ao lado do campo correspondente, em português.
 
 Rede caiu, vendedor clicou duas vezes, precisa retentar: **reenvie o mesmo `external_ticket_id`**.
 
-- Se a tentativa anterior **deu certo**, devolve `200` com os mesmos IDs e `ja_processado: true`, sem criar nada de novo.
-- Se a tentativa anterior **falhou**, nada foi criado — então o reenvio **reprocessa** com o payload novo. É assim que se corrige um ticket recusado: ajusta o mapeamento e fecha de novo, com o mesmo id.
+- Tentativa anterior **falhou** → nada foi criado, então o reenvio **reprocessa** com o payload novo. É assim que se corrige um ticket recusado: ajusta e fecha de novo, com o mesmo id.
+- Tentativa anterior **deu certo** e o conteúdo é **idêntico** → `200` com os mesmos IDs e `ja_processado: true`. Retentativa pura, nada é criado de novo.
+- Tentativa anterior **deu certo** e o conteúdo **mudou** → `409 ticket_ja_processado_com_alteracao`. A venda já está registrada e **a alteração não é aplicada**; a resposta traz o `journey_id` e o `ticket_code` para o ajuste ser feito no DoctorSaaS.
+
+O terceiro caso existe para não mentir: responder `200` a uma venda editada faria o vendedor acreditar que a correção chegou, e ela não chega.
+
+### O que registrar do lado de vocês
+
+Guarde no ticket o resultado do envio e mostre antes de reenviar:
+
+- `doctorsaas_status` (`enviado` · `simulado` · `pendente` · `erro`), `doctorsaas_sent_at`, `doctorsaas_journey_id`, `doctorsaas_ticket_numero`.
+- Ao finalizar um ticket que já está `enviado`, **peça confirmação**: *"Este ticket já foi enviado ao DoctorSaaS em <data> (TK-XXXX). Reenviar não altera o que já foi criado lá. Deseja reenviar mesmo assim?"*
+- Se o reenvio voltar `409 ticket_ja_processado_com_alteracao`, mostre que a alteração **não** foi aplicada e ofereça o link do ticket no DoctorSaaS.
 
 **O outro lado disso:** gerar um `external_ticket_id` novo para a mesma venda cria um segundo
 cliente e um segundo contrato, e o faturamento conta em dobro. O ID tem que ser **estável e vir

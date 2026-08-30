@@ -34,6 +34,15 @@ function json(obj: unknown, status = 200) {
   });
 }
 
+// Chaves ordenadas recursivamente. O payload guardado e jsonb, que o Postgres ja
+// normaliza (reordena chave, remove duplicata); comparar assim evita acusar
+// alteracao so porque o JSON chegou noutra ordem.
+function canonico(v: any): string {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return '[' + v.map(canonico).join(',') + ']';
+  return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + canonico(v[k])).join(',') + '}';
+}
+
 // Qual bloco financeiro veio. Espelha a decisao da fn_intake_proposta; serve so
 // para rotular o log — quem decide de verdade e a RPC.
 function modoDoPayload(body: any): string {
@@ -117,14 +126,27 @@ Deno.serve(async (req) => {
     if (logErr.code === '23505') {
       const { data: anterior } = await supabase
         .from('onboarding_intake_log')
-        .select('id, status, modo, cliente_id, contrato_id, journey_id, cliente_reusado')
+        .select('id, status, modo, payload, cliente_id, contrato_id, journey_id, cliente_reusado')
         .eq('tenant_id', tenantId)
         .eq('external_ticket_id', externalId)
         .maybeSingle();
 
       if (anterior?.status === 'processado') {
-        const { id: _id, ...dados } = anterior;
-        return json({ ok: true, ja_processado: true, ...dados });
+        const { id: _id, payload: payloadAnterior, ...dados } = anterior as any;
+        // Retentativa pura (rede caiu, clique duplo): devolve o que foi criado.
+        if (canonico(payloadAnterior) === canonico(body)) {
+          return json({ ok: true, ja_processado: true, ...dados });
+        }
+        // Mesmo ticket, conteudo diferente: a venda ja esta registrada e a
+        // alteracao NAO e aplicada. Responder 200 aqui faria o vendedor acreditar
+        // que a correcao chegou — e ela nao chega.
+        return json({
+          ok: false,
+          error: 'ticket_ja_processado_com_alteracao',
+          detail: 'este ticket ja foi registrado no DoctorSaaS e o conteudo mudou desde entao; a alteracao NAO foi aplicada. Ajuste direto no DoctorSaaS pelo ticket abaixo',
+          alteracao_ignorada: true,
+          ...dados,
+        }, 409);
       }
 
       // Falhou antes: reaproveita a linha, com o payload novo, e tenta de novo.
