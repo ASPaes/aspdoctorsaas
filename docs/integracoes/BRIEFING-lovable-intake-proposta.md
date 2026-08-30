@@ -302,14 +302,14 @@ obrigatórios — os valores vêm de `alteracao` ou `avulso`, ou não existem.
 | Campo | Tipo | Obrigatório | Observação |
 |---|---|---|---|
 | `cnpj` | texto | **sim** | **Só dígitos**, sem pontuação. É a chave de identificação: se já existir, o cliente é reaproveitado. Aceita CPF (11 dígitos). |
-| `razao_social` | texto | **sim** | Nome do cliente. |
-| `nome_fantasia` | texto | não | |
+| `razao_social` | texto | **sim** | Nome do cliente. Também aceito como `nome`. Faltando, o DoctorSaaS busca pelo CNPJ. |
+| `nome_fantasia` | texto | não | Faltando, o DoctorSaaS busca pelo CNPJ. |
 | `tipo` | texto | não | `PJ` ou `PF`. |
 | `email` | texto | não | |
 | `telefone` | texto | não | Só dígitos, com DDD. **Não** mande o `55` na frente. |
-| `contato_nome` | texto | não | Quem fala pelo cliente. |
+| `contato_nome` | texto | não | Quem fala pelo cliente. Também aceito como `nome_responsavel`. |
 | `segmento_id` | inteiro | não | Do catálogo. |
-| `endereco`, `numero`, `bairro`, `complemento`, `cep` | texto | não | CEP só dígitos. |
+| `endereco`, `numero`, `bairro`, `complemento`, `cep` | texto | não | CEP só dígitos. `endereco` também aceito como `logradouro`. |
 | `cidade_id` | inteiro | não | Da tabela de cidades do DoctorSaaS. Se você não tiver esse dado, **omita** e mande a cidade por texto dentro de `proposta`. |
 
 ### Bloco `comercial`

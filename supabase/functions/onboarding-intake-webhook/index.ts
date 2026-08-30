@@ -43,6 +43,55 @@ function canonico(v: any): string {
   return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + canonico(v[k])).join(',') + '}';
 }
 
+// Completa razao social e nome fantasia pelo CNPJ quando o payload nao traz.
+//
+// Cadastro que chega vazio nao da erro — some em silencio, e alguem descobre
+// semanas depois com o cliente na tela. Como o dado e publico e ja existe uma
+// tabela de cache no projeto (cnpj_cache, 1.225 linhas, alimentada pela tela de
+// cadastro), aproveitamos ela e so vamos na rede quando nao houver cache.
+//
+// NUNCA derruba a venda: qualquer falha aqui e ignorada e o cadastro segue com o
+// que veio. Uma API publica fora do ar nao pode impedir um contrato de existir.
+async function completarPorCnpj(supabase: any, cliente: any): Promise<{ enriquecido: boolean; fonte?: string }> {
+  const cnpj = String(cliente?.cnpj ?? '').replace(/\D/g, '');
+  const temNome = !!(cliente?.razao_social ?? cliente?.nome);
+  const temFantasia = !!(cliente?.nome_fantasia ?? cliente?.fantasia);
+  if (cnpj.length !== 14 || (temNome && temFantasia)) return { enriquecido: false };
+
+  const aplicar = (d: any, fonte: string) => {
+    if (!temNome && d?.razao_social) cliente.razao_social = d.razao_social;
+    if (!temFantasia && d?.nome_fantasia) cliente.nome_fantasia = d.nome_fantasia;
+    return { enriquecido: true, fonte };
+  };
+
+  try {
+    const { data: cache } = await supabase
+      .from('cnpj_cache').select('payload')
+      .eq('cnpj', cnpj).gt('expires_at', new Date().toISOString()).maybeSingle();
+    if (cache?.payload) return aplicar(cache.payload, 'cache');
+  } catch (e) { console.warn('[intake] cnpj_cache indisponivel:', e); }
+
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 3000);   // a venda nao espera a rede
+    const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (!res.ok) return { enriquecido: false };
+    const d = await res.json();
+    const norm = { razao_social: d.razao_social ?? null, nome_fantasia: d.nome_fantasia ?? null };
+    // devolve ao cache compartilhado: a tela de cadastro aproveita depois
+    await supabase.from('cnpj_cache').upsert({
+      cnpj, payload: d, source: 'brasilapi',
+      fetched_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+    }, { onConflict: 'cnpj' });
+    return aplicar(norm, 'brasilapi');
+  } catch (e) {
+    console.warn('[intake] consulta de CNPJ falhou, seguindo sem ela:', e);
+    return { enriquecido: false };
+  }
+}
+
 // Qual bloco financeiro veio. Espelha a decisao da fn_intake_proposta; serve so
 // para rotular o log — quem decide de verdade e a RPC.
 function modoDoPayload(body: any): string {
@@ -162,6 +211,12 @@ Deno.serve(async (req) => {
       console.error('[intake] falha ao gravar log:', logErr);
       return json({ ok: false, error: 'internal_error', detail: logErr.message }, 500);
     }
+  }
+
+  // 2.5) Completa o cadastro pelo CNPJ antes de gravar. Melhor esforco.
+  if (body?.cliente) {
+    const enr = await completarPorCnpj(supabase, body.cliente);
+    if (enr.enriquecido) console.log('[intake] cadastro completado por CNPJ:', externalId, enr.fonte);
   }
 
   // 3) A transacao: tudo ou nada.
