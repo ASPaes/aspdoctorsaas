@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import PropostaVendaSection from "./PropostaVendaSection";
+import PropostaVendaSection, { useTemProposta } from "./PropostaVendaSection";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOnboardingPhases } from "@/hooks/useOnboardingPhases";
 import AcompanhamentoSection from "./AcompanhamentoSection";
@@ -536,7 +536,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [returnText, setReturnText] = useState("");
   const [returnPauseSla, setReturnPauseSla] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<"atividade" | "timeline" | "geral">("atividade");
+  const [activeTab, setActiveTab] = useState<"atividade" | "timeline" | "geral" | "proposta">("atividade");
+  // A aba "Resumo da venda" so existe em jornada vinda do sistema comercial.
+  const temProposta = useTemProposta(journeyId, open);
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [quickTagName, setQuickTagName] = useState("");
   const [quickTagColor, setQuickTagColor] = useState("#0ea5e9");
@@ -2448,6 +2450,10 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     className={`px-4 py-1.5 text-xs rounded-md transition-colors ${activeTab==="timeline" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>Timeline</button>
                   <button onClick={() => setActiveTab("geral")}
                     className={`px-4 py-1.5 text-xs rounded-md transition-colors ${activeTab==="geral" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>Visão geral</button>
+                  {temProposta && (
+                    <button onClick={() => setActiveTab("proposta")}
+                      className={`px-4 py-1.5 text-xs rounded-md transition-colors ${activeTab==="proposta" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>Resumo da venda</button>
+                  )}
                 </div>
               </div>
 
@@ -3243,9 +3249,6 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     </section>
                   )}
 
-                    {/* Resumo da venda — so aparece quando a jornada veio importada */}
-                  <PropostaVendaSection journeyId={journeyId} enabled={open} />
-
                     {/* Anexos */}
                   {secVisible("anexos") && journey?.ticket_id && (
                     <section className="rounded-lg border border-border">
@@ -3361,6 +3364,10 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
 
                 </div>
               </div>
+              )}
+
+              {activeTab === "proposta" && (
+                <PropostaVendaSection journeyId={journeyId} enabled={open} />
               )}
 
               {activeTab === "timeline" && (

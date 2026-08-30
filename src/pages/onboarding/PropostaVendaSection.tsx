@@ -9,8 +9,7 @@
 // security_invoker (ja aconteceu neste projeto).
 
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { ChevronRight, FileText, Paperclip } from "lucide-react";
+import { FileText, Paperclip } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const brl = (n: number) =>
@@ -42,7 +41,18 @@ const OCULTOS = new Set([
   "produto_id", "segmento_id", "funcionario_id", "origem_venda_id",
   "forma_pagamento_ativacao_id", "forma_pagamento_mensalidade_id",
   "cidade_id", "modulo_id", "quantidade_delta", "classificacao",
+  // Estado interno do sistema de origem: identificadores, celulas de planilha
+  // (K3, L7, mrrKey), percentual de preenchimento e caminhos de storage. Nada
+  // disso significa coisa alguma para quem vai implantar.
+  "id", "completion_percentage", "snapshot", "row", "path", "size",
+  // Renderizados em bloco proprio, com nome legivel
+  "itens", "modulos", "produtos", "anexos",
+  // 66 respostas com chave UUID: ilegivel enquanto a origem nao mandar rotulo
+  "respostas_ticket",
 ]);
+
+// Chave que e um UUID nao tem rotulo possivel — mostrar so polui.
+const ehUuid = (k: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(k);
 
 function Valor({ k, v }: { k: string; v: unknown }) {
   if (v === null || v === undefined || v === "") return <span className="text-muted-foreground">—</span>;
@@ -61,11 +71,11 @@ function Valor({ k, v }: { k: string; v: unknown }) {
 }
 
 function Grupo({ titulo, dados }: { titulo: string; dados: Record<string, unknown> }) {
-  const linhas = Object.entries(dados).filter(
-    ([k, v]) => !OCULTOS.has(k) && !k.startsWith("_") && typeof v !== "object",
-  );
+  const mostra = ([k, v]: [string, unknown]) =>
+    !OCULTOS.has(k) && !k.startsWith("_") && !ehUuid(k);
+  const linhas = Object.entries(dados).filter((e) => mostra(e) && typeof e[1] !== "object");
   const objetos = Object.entries(dados).filter(
-    ([k, v]) => !OCULTOS.has(k) && v && typeof v === "object" && !Array.isArray(v),
+    (e) => mostra(e) && e[1] && typeof e[1] === "object" && !Array.isArray(e[1]),
   );
   if (!linhas.length && !objetos.length) return null;
   return (
@@ -86,12 +96,30 @@ function Grupo({ titulo, dados }: { titulo: string; dados: Record<string, unknow
   );
 }
 
+// A aba so existe para jornada importada. Consulta leve — so o id — para nao
+// carregar o payload inteiro apenas para decidir se desenha um botao.
+export function useTemProposta(journeyId: string | null, enabled = true) {
+  const { data } = useQuery({
+    queryKey: ["journey-tem-proposta", journeyId],
+    enabled: !!journeyId && enabled,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("onboarding_journeys" as any) as any)
+        .select("id")
+        .eq("id", journeyId)
+        .not("proposta_payload", "is", null)
+        .maybeSingle();
+      if (error) throw error;
+      return !!data;
+    },
+  });
+  return data === true;
+}
+
 export default function PropostaVendaSection({
   journeyId,
   enabled = true,
 }: { journeyId: string | null; enabled?: boolean }) {
-  const [aberto, setAberto] = useState(true);
-
   const { data } = useQuery({
     queryKey: ["journey-proposta", journeyId],
     enabled: !!journeyId && enabled,
@@ -118,23 +146,39 @@ export default function PropostaVendaSection({
   const avulso = data.avulso ?? null;
 
   return (
-    <section className="rounded-lg border border-border">
-      <div className="p-3 border-b border-border flex items-center justify-between">
-        <button type="button" onClick={() => setAberto((v) => !v)} className="flex items-center gap-2 flex-1 text-left">
-          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${aberto ? "rotate-90" : ""}`} />
-          <h3 className="text-sm font-semibold flex items-center gap-2">
-            <FileText className="h-4 w-4" /> Resumo da venda
-          </h3>
-        </button>
+    <div className="p-5 space-y-5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          <FileText className="h-4 w-4" /> Resumo da venda
+        </h3>
         <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1.5 py-0.5">
-          importado
+          importado do sistema comercial
         </span>
       </div>
 
-      {aberto && (
-        <div className="p-3 space-y-4">
+      <div className="space-y-5">
           <Grupo titulo="Cliente" dados={cliente} />
           <Grupo titulo="Comercial" dados={comercial} />
+
+          {Array.isArray(proposta.itens) && proposta.itens.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Itens da venda
+              </h4>
+              <div className="rounded border border-border divide-y divide-border">
+                {proposta.itens.map((it: any, i: number) => (
+                  <div key={i} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 p-2 text-sm">
+                    <span className="font-medium flex-1 min-w-0">{it.nome ?? "—"}</span>
+                    {Number(it.quantidade) > 1 && <span className="text-muted-foreground">{it.quantidade}x</span>}
+                    {it.mrr != null && <span>{brl(Number(it.mrr))}/mês</span>}
+                    {it.setup != null && Number(it.setup) > 0 && (
+                      <span className="text-muted-foreground">setup {brl(Number(it.setup))}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {produtos.length > 0 && (
             <div className="space-y-2">
@@ -194,8 +238,7 @@ export default function PropostaVendaSection({
               </p>
             </div>
           )}
-        </div>
-      )}
-    </section>
+      </div>
+    </div>
   );
 }
