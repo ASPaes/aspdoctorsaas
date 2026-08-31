@@ -5,7 +5,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Check, ChevronRight, ExternalLink, EyeOff, Loader2, RefreshCw, Wand2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Check, ChevronDown, ChevronRight, ExternalLink, EyeOff, Loader2, RefreshCw, Wand2 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -125,7 +127,8 @@ const acoesDe = (r: LinhaRecon) =>
 export default function HiperDivergenciasTab({ tid, recon }: { tid: string | null; recon: LinhaRecon[] }) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [familia, setFamilia] = useState("todas");
+  const [familias, setFamilias] = useState<Set<string>>(new Set());
+  const [comFilial, setComFilial] = useState("todas");
   const [status, setStatus] = useState("pendente");
   const [busca, setBusca] = useState("");
   const [aberta, setAberta] = useState<string | null>(null);
@@ -157,7 +160,15 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
     return recon
       .filter((r) => r.divergencias.length > 0)
       .filter((r) => status === "todos" || r.status_usuario === status)
-      .filter((r) => familia === "todas" || r.divergencias.includes(familia))
+      // Nenhuma marcada = todas. Com várias marcadas, basta UMA bater: quem
+      // filtra por "filial sem matriz" e "filial com valor" quer os dois montes
+      // juntos, não a interseção deles.
+      .filter((r) => familias.size === 0 || r.divergencias.some((d) => familias.has(d)))
+      .filter((r) => {
+        if (comFilial === "todas") return true;
+        const n = ((r.detalhe?.filiais?.grupo ?? []) as any[]).length;
+        return comFilial === "com" ? n > 0 : n === 0;
+      })
       .filter((r) => !q
         // O código do cadastro vem PRIMEIRO e casa exato: é por ele que a
         // operação chama o cliente ("o 351"), e como substring ele batia no
@@ -182,7 +193,7 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
         const vb = Math.abs(Number(b.custo_hiper ?? 0) - Number(b.custo_ds ?? 0));
         return vb - va;
       });
-  }, [recon, familia, status, busca]);
+  }, [recon, familias, comFilial, status, busca]);
 
   /**
    * Buscar por nome ou CNPJ nunca trunca: o resultado é curto e a pessoa está
@@ -308,12 +319,56 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
           <option value="ignorado">Ignoradas</option>
           <option value="todos">Todas</option>
         </select>
-        <select value={familia} onChange={(e) => { setFamilia(e.target.value); setPagina(1); }}
-          className="h-9 rounded-md border bg-background px-3 text-sm max-w-[20rem]">
-          <option value="todas">Todas as famílias</option>
-          {FAMILIAS.filter((f) => contagem[f.chave]).map((f) => (
-            <option key={f.chave} value={f.chave}>{f.rotulo} ({contagem[f.chave]})</option>
-          ))}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="h-9 justify-between gap-2 font-normal max-w-[22rem]">
+              <span className="truncate">
+                {familias.size === 0 ? "Todas as famílias"
+                  : familias.size === 1 ? (META[Array.from(familias)[0]]?.rotulo ?? "1 família")
+                  : `${familias.size} famílias`}
+              </span>
+              <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-80 p-2 max-h-[26rem] overflow-y-auto">
+            <div className="flex items-center justify-between px-1 pb-2">
+              <span className="text-xs text-muted-foreground">
+                Marque quantas quiser — basta uma bater
+              </span>
+              {familias.size > 0 && (
+                <button type="button" className="text-xs underline text-muted-foreground"
+                  onClick={() => { setFamilias(new Set()); setPagina(1); }}>
+                  limpar
+                </button>
+              )}
+            </div>
+            {FAMILIAS.filter((f) => contagem[f.chave]).map((f) => (
+              <label key={f.chave}
+                className="flex items-start gap-2 rounded px-1 py-1.5 text-sm cursor-pointer hover:bg-muted/50">
+                <Checkbox className="mt-0.5" checked={familias.has(f.chave)}
+                  onCheckedChange={() => {
+                    setFamilias((s) => {
+                      const n = new Set(s);
+                      n.has(f.chave) ? n.delete(f.chave) : n.add(f.chave);
+                      return n;
+                    });
+                    setPagina(1);
+                  }} />
+                <span className="min-w-0 flex-1">{f.rotulo}</span>
+                <span className="tabular-nums text-muted-foreground">{contagem[f.chave]}</span>
+              </label>
+            ))}
+          </PopoverContent>
+        </Popover>
+
+        {/* Filial muda o tipo de trabalho: grupo se resolve junto, cliente
+            solto se resolve sozinho. Separar os dois montes é o que permite
+            atacar um de cada vez. */}
+        <select value={comFilial} onChange={(e) => { setComFilial(e.target.value); setPagina(1); }}
+          className="h-9 rounded-md border bg-background px-3 text-sm">
+          <option value="todas">Com e sem filial</option>
+          <option value="com">Só com filial</option>
+          <option value="sem">Só sem filial</option>
         </select>
         <span className="text-sm text-muted-foreground ml-auto">
           {buscando
@@ -322,8 +377,8 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
         </span>
       </div>
 
-      {familia !== "todas" && META[familia] && (
-        <p className="text-xs text-muted-foreground px-1">{META[familia].explica}</p>
+      {familias.size === 1 && META[Array.from(familias)[0]] && (
+        <p className="text-xs text-muted-foreground px-1">{META[Array.from(familias)[0]].explica}</p>
       )}
 
       {/* Selecionar tudo o que está filtrado + o que fazer com a seleção. Fica

@@ -23,6 +23,15 @@ afterEach(() => {
   container.remove();
 });
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+/** Abre a linha do cliente. Procurar pelo nome evita depender da ordem dos
+ *  botoes da barra de filtros, que muda quando a tela ganha controle novo. */
+const abrirLinha = (nome = "Cine Gracher") =>
+  act(() => {
+    Array.from(container.querySelectorAll("button"))
+      .find((b) => b.textContent?.includes(nome))
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
 const render = (n: React.ReactNode) =>
   act(() => root.render(<QueryClientProvider client={qc}>{n}</QueryClientProvider>));
 
@@ -86,8 +95,7 @@ describe("abas da integração Hiper", () => {
   it("Divergências abre o detalhe do cliente com as filiais", () => {
     render(<HiperDivergenciasTab tid="t1" recon={[base]} />);
     expect(container.textContent).toContain("Cine Gracher");
-    const botao = container.querySelector("button");
-    act(() => { botao?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    abrirLinha();
     const txt = container.textContent ?? "";
     expect(txt).toContain("Cine Gracher (Indaial)");
     expect(txt).toContain("o portal não sabe o preço");
@@ -96,7 +104,7 @@ describe("abas da integração Hiper", () => {
 
   it("Divergências oferece atualizar e abrir cadastro em nova aba", () => {
     render(<HiperDivergenciasTab tid="t1" recon={[base]} />);
-    act(() => { container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    abrirLinha();
     const txt = container.textContent ?? "";
     expect(txt).toContain("Atualizar no DoctorSaaS");
     const link = container.querySelector('a[href="/clientes/c1"]') as HTMLAnchorElement;
@@ -110,7 +118,7 @@ describe("abas da integração Hiper", () => {
   it("não oferece atualizar quando não há nada que o botão saiba gravar", () => {
     render(<HiperDivergenciasTab tid="t1"
       recon={[{ ...base, divergencias: ["filial_com_valor", "sem_dono"], detalhe: {} }]} />);
-    act(() => { container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    abrirLinha();
     expect(container.textContent).not.toContain("Atualizar no DoctorSaaS");
     expect(container.textContent).toContain("não há o que gravar automaticamente");
   });
@@ -123,7 +131,7 @@ describe("abas da integração Hiper", () => {
       ...base, recorrencia_ds: "anual", custo_hiper: 51.09, custo_ds: 51.09,
       mrr_hiper: 92.76, mensalidade_ds: 92.76, divergencias: ["razao_social_divergente"],
     }]} />);
-    act(() => { container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    abrirLinha();
     const txt = (container.textContent ?? "").replace(/\u00a0/g, " ");
     expect(txt).toContain("cobrança anual");       // contexto, sem mudar a conta
     expect(txt).toContain("R$ 613,08 no ano");     // 51,09 x 12, os dois lados
@@ -133,7 +141,7 @@ describe("abas da integração Hiper", () => {
   it("deixa desmarcar a mensalidade e atualizar só o custo", () => {
     render(<HiperDivergenciasTab tid="t1"
       recon={[{ ...base, divergencias: ["custo_divergente", "mrr_divergente"], mrr_hiper: 92.76 }]} />);
-    act(() => { container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    abrirLinha();
     const botao = Array.from(container.querySelectorAll("button"))
       .find((b) => b.textContent?.includes("Atualizar no DoctorSaaS"));
     act(() => { botao?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
@@ -162,7 +170,7 @@ describe("abas da integração Hiper", () => {
   it("mostra o antes e o depois de cada campo antes de gravar", () => {
     render(<HiperDivergenciasTab tid="t1"
       recon={[{ ...base, divergencias: ["custo_divergente", "mrr_divergente"], mrr_hiper: 92.76 }]} />);
-    act(() => { container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    abrirLinha();
     const botao = Array.from(container.querySelectorAll("button"))
       .find((b) => b.textContent?.includes("Atualizar no DoctorSaaS"));
     act(() => { botao?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
@@ -205,7 +213,7 @@ describe("abas da integração Hiper", () => {
       mensalidade_ds: 98.3, mrr_hiper: 1798, recorrencia_ds: "mensal", divisor_periodo: 1,
       divergencias: ["valor_pode_ser_do_periodo"],
     }]} />);
-    act(() => { container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    abrirLinha("Alcidinei");
     const txt = (container.textContent ?? "").replace(/\u00a0/g, " ");
     expect(txt).toContain("Diferença de 18×");
     expect(txt).toContain("multiplicaria o MRR");
@@ -218,15 +226,61 @@ describe("abas da integração Hiper", () => {
       ...base, mrr_hiper: 149.83, custo_hiper: 82.52, divisor_periodo: 12,
       divergencias: ["mrr_divergente"],
     }]} />);
-    act(() => { container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    abrirLinha();
     const txt = (container.textContent ?? "").replace(/\u00a0/g, " ");
     expect(txt).toContain("R$ 1.797,96 cobrados de uma vez ÷ 12");
   });
 
+  it("filtra por várias famílias ao mesmo tempo, com OU entre elas", () => {
+    const linhas = [
+      { ...base, id: "a", id_portal: "1", razao_social_ds: "So custo", divergencias: ["custo_divergente"] },
+      { ...base, id: "b", id_portal: "2", razao_social_ds: "So filial", divergencias: ["filial_com_valor"] },
+      { ...base, id: "c", id_portal: "3", razao_social_ds: "So razao", divergencias: ["razao_social_divergente"] },
+    ];
+    render(<HiperDivergenciasTab tid="t1" recon={linhas} />);
+    act(() => {
+      Array.from(container.querySelectorAll("button"))
+        .find((b) => b.textContent?.includes("Todas as famílias"))
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    const marcar = (rotulo: string) => act(() => {
+      Array.from(document.querySelectorAll("label"))
+        .find((l) => l.textContent?.includes(rotulo))
+        ?.querySelector("button")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    marcar("Custo diferente");
+    marcar("Filial com valor próprio");
+    const txt = container.textContent ?? "";
+    expect(txt).toContain("So custo");
+    expect(txt).toContain("So filial");   // OU, não interseção
+    expect(txt).not.toContain("So razao");
+    expect(txt).toContain("2 famílias");
+  });
+
+  it("separa quem tem filial de quem não tem", () => {
+    const comGrupo = { ...base, id: "g", id_portal: "9", razao_social_ds: "Matriz com filial",
+      detalhe: { filiais: { grupo: [{ cnpj: "1", nome: "F1", codigo: 2, estado: "ok" }] } } };
+    const sem = { ...base, id: "s", id_portal: "8", razao_social_ds: "Cliente solto", detalhe: {} };
+    render(<HiperDivergenciasTab tid="t1" recon={[comGrupo, sem]} />);
+    const sel = Array.from(container.querySelectorAll("select"))
+      .find((s) => s.textContent?.includes("Com e sem filial")) as HTMLSelectElement;
+    const escolher = (v: string) => act(() => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value")!.set!;
+      setter.call(sel, v);
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    escolher("com");
+    expect(container.textContent).toContain("Matriz com filial");
+    expect(container.textContent).not.toContain("Cliente solto");
+    escolher("sem");
+    expect(container.textContent).toContain("Cliente solto");
+    expect(container.textContent).not.toContain("Matriz com filial");
+  });
+
   it("Divergências não quebra quando o detalhe vem vazio", () => {
     render(<HiperDivergenciasTab tid="t1" recon={[{ ...base, detalhe: {}, divergencias: ["sem_dono"] }]} />);
-    const botao = container.querySelector("button");
-    act(() => { botao?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    abrirLinha();
     expect(container.textContent).toContain("Já resolvi por fora");
   });
 });
