@@ -137,7 +137,7 @@ begin
   comds as (
     select b.*, d.cliente_id as ds_id, d.razao_social as razao_ds, d.cnpj as cnpj_ds,
            d.vlr_mensal, d.vlr_custo, d.cancelado, d.modelo_contrato_id, d.cp_id,
-           d.recorrencia
+           d.recorrencia, d.codigo_sequencial
     from base b
     left join _ds d on d.cliente_id = b.cliente_id
   ),
@@ -165,7 +165,7 @@ begin
   select
     y.id_portal, y.cnpj_norm, y.razao_hiper, y.situacao, y.responsavel_tipo, y.plano,
     y.cancelada_em, y.cancelada_por, y.custo_hiper, y.mrr_hiper,
-    y.ds_id, y.cp_id, y.razao_ds, y.cnpj_ds, y.modelo_contrato_id, y.recorrencia,
+    y.ds_id, y.cp_id, y.razao_ds, y.cnpj_ds, y.modelo_contrato_id, y.recorrencia, y.codigo_sequencial,
     y.vlr_mensal, y.vlr_custo, y.cancelado, y.qtd, y.candidato_escolhido,
     case when y.ds_id is not null then 'vinculado'
          when y.qtd > 1            then 'ambiguo'
@@ -183,14 +183,14 @@ begin
     plano_hiper, responsavel_tipo, mrr_hiper, custo_hiper, cancelada_em, cancelada_por,
     ds_cliente_id, ds_cliente_produto_id, razao_social_ds, cnpj_ds,
     modelo_contrato_id_ds, modelo_contrato_ds, mensalidade_ds, custo_ds, cancelado_ds,
-    qtd_candidatos_ds, criterio_match, estado_match, recorrencia_ds, divergencias, detalhe, margem
+    qtd_candidatos_ds, criterio_match, estado_match, recorrencia_ds, codigo_sequencial_ds, divergencias, detalhe, margem
   )
   select
     p_tenant_id, now(), n.id_portal, n.cnpj_norm, n.razao_hiper, n.situacao,
     n.plano, n.responsavel_tipo, n.mrr_hiper, n.custo_hiper, n.cancelada_em, n.cancelada_por,
     n.ds_id, n.cp_id, n.razao_ds, n.cnpj_ds,
     n.modelo_contrato_id, mc.nome, n.vlr_mensal, n.vlr_custo, n.cancelado,
-    n.qtd, n.criterio_match, n.estado_match, n.recorrencia,
+    n.qtd, n.criterio_match, n.estado_match, n.recorrencia, n.codigo_sequencial,
     -- as comparações escalares, na ordem em que a operação ataca:
     -- tipo de contrato decide a regra do dinheiro; filial decide de quem ele é.
       (case when n.estado_match = 'sem_dono' and n.viva            then array['sem_dono']                 else '{}'::text[] end)
@@ -408,6 +408,7 @@ begin
     criterio_match        = excluded.criterio_match,
     estado_match          = excluded.estado_match,
     recorrencia_ds        = excluded.recorrencia_ds,
+    codigo_sequencial_ds  = excluded.codigo_sequencial_ds,
     divergencias          = excluded.divergencias,
     detalhe               = excluded.detalhe,
     margem                = excluded.margem,
@@ -431,11 +432,11 @@ begin
   insert into public.reconciliacao_hiper as r (
     tenant_id, gerado_em, ds_cliente_id, ds_cliente_produto_id, razao_social_ds, cnpj_ds,
     modelo_contrato_id_ds, modelo_contrato_ds, mensalidade_ds, custo_ds, cancelado_ds,
-    estado_match, divergencias, detalhe
+    estado_match, codigo_sequencial_ds, divergencias, detalhe
   )
   select p_tenant_id, now(), d.cliente_id, d.cp_id, d.razao_social, d.cnpj,
          d.modelo_contrato_id, mc.nome, d.vlr_mensal, d.vlr_custo, d.cancelado,
-         'sem_conta', array['sem_conta_no_hiper'], '{}'::jsonb
+         'sem_conta', d.codigo_sequencial, array['sem_conta_no_hiper'], '{}'::jsonb
   from _ds d
   left join public.modelos_contrato mc on mc.id = d.modelo_contrato_id
   where not d.cancelado
@@ -451,6 +452,7 @@ begin
     custo_ds              = excluded.custo_ds,
     cancelado_ds          = excluded.cancelado_ds,
     estado_match          = excluded.estado_match,
+    codigo_sequencial_ds  = excluded.codigo_sequencial_ds,
     divergencias          = excluded.divergencias;
 
   get diagnostics v_orfaos = row_count;

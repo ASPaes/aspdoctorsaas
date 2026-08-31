@@ -42,6 +42,7 @@ export interface LinhaRecon {
   cancelado_ds: boolean | null;
   qtd_candidatos_ds: number;
   recorrencia_ds: string | null;
+  codigo_sequencial_ds: number | null;
   estado_match: string;
   divergencias: string[];
   detalhe: Record<string, any>;

@@ -154,9 +154,13 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
       .filter((r) => status === "todos" || r.status_usuario === status)
       .filter((r) => familia === "todas" || r.divergencias.includes(familia))
       .filter((r) => !q
+        // O código do cadastro vem PRIMEIRO e casa exato: é por ele que a
+        // operação chama o cliente ("o 351"), e como substring ele batia no
+        // CNPJ de outros três antes de achar o certo.
+        || String(r.codigo_sequencial_ds ?? "") === q
         || (r.razao_social_ds ?? "").toLowerCase().includes(q)
         || (r.razao_social_hiper ?? "").toLowerCase().includes(q)
-        || (qd && (r.cnpj_norm ?? "").includes(qd)))
+        || (qd.length >= 4 && (r.cnpj_norm ?? "").includes(qd)))
       .sort((a, b) => {
         const pa = Math.min(...a.divergencias.map((d) => META[d]?.peso ?? 9));
         const pb = Math.min(...b.divergencias.map((d) => META[d]?.peso ?? 9));
@@ -257,7 +261,7 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
       </Explica>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Input placeholder="Buscar por nome ou CNPJ…" value={busca}
+        <Input placeholder="Código do cadastro, nome ou CNPJ…" value={busca}
           onChange={(e) => setBusca(e.target.value)} className="max-w-xs" />
         <select value={status} onChange={(e) => setStatus(e.target.value)}
           className="h-9 rounded-md border bg-background px-3 text-sm">
@@ -356,7 +360,14 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
                   className="flex w-full items-start gap-3 py-3 pr-3 text-left hover:bg-muted/30 transition-colors">
                   <ChevronRight className={`h-4 w-4 mt-0.5 shrink-0 text-muted-foreground transition-transform ${abertoAqui ? "rotate-90" : ""}`} />
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm truncate">{nome}</p>
+                    <p className="font-medium text-sm truncate">
+                      {r.codigo_sequencial_ds != null && (
+                        <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground">
+                          {r.codigo_sequencial_ds}
+                        </span>
+                      )}
+                      {nome}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {cnpjMask(r.cnpj_norm ?? r.cnpj_ds)} · {nomeTipo(r.responsavel_tipo)}
                       {r.situacao_hiper && ` · ${r.situacao_hiper} no Hiper`}

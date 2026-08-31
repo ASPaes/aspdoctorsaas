@@ -34,7 +34,7 @@ const base: LinhaRecon = {
   ds_cliente_id: "c1", ds_cliente_produto_id: "cp1", razao_social_ds: "Cine Gracher",
   cnpj_ds: "07272690000187", modelo_contrato_id_ds: 2, modelo_contrato_ds: "Royalties",
   mensalidade_ds: 425.63, custo_ds: 126.77, cancelado_ds: false,
-  qtd_candidatos_ds: 1, recorrencia_ds: "mensal", estado_match: "vinculado",
+  qtd_candidatos_ds: 1, recorrencia_ds: "mensal", codigo_sequencial_ds: 351, estado_match: "vinculado",
   divergencias: ["custo_divergente", "filial_com_valor"],
   detalhe: {
     filiais: {
@@ -190,6 +190,21 @@ describe("abas da integração Hiper", () => {
     });
     expect(container.textContent).toContain("FERNANDA NAIR");
     expect(container.textContent).not.toContain("fora da tela");
+  });
+
+  it("acha pelo código do cadastro, e não pelo CNPJ de outro cliente", () => {
+    // Digitar 351 trazia quem tem 351 no CNPJ e não o cliente 351.
+    const outro = { ...base, id: "2", id_portal: "9", codigo_sequencial_ds: 88,
+      razao_social_ds: "Outro Cliente", cnpj_norm: "50677351000100" };
+    render(<HiperDivergenciasTab tid="t1" recon={[outro, base]} />);
+    const input = container.querySelector("input[placeholder]") as HTMLInputElement;
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
+      setter.call(input, "351");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("Cine Gracher");
+    expect(container.textContent).not.toContain("Outro Cliente");
   });
 
   it("Divergências não quebra quando o detalhe vem vazio", () => {
