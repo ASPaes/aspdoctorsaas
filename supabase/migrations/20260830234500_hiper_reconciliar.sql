@@ -124,6 +124,7 @@ begin
       e.responsavel_tipo, e.plano, e.cancelada_em, e.cancelada_por,
       e.bruto_mes, e.custo_mes, e.mrr, e.a_pagar,
       e.cad_mensalidade, e.cad_custo, e.cad_repasse,
+      e.ult_mensalidade, e.ult_custo, e.ult_a_pagar, e.ult_a_receber, e.ult_mes,
       c.qtd,
       -- escolha humana anterior manda sobre o automático
       coalesce(r.candidato_escolhido, case when c.qtd = 1 then c.unico end) as cliente_id,
@@ -156,21 +157,38 @@ begin
       -- ZERO NÃO É VALOR: a conta cujo último extrato não é o do lote global
       -- chegava com tudo zerado (26 ativas na ASP) e virava "custo R$ 0,00" —
       -- divergência falsa que, aplicada, zeraria R$ 2.317 de custo real.
+      -- Quando o mês do lote não tem NADA desta conta, vale o último extrato
+      -- DELA por inteiro. Trocar campo a campo misturaria meses diferentes.
+      (coalesce(x.bruto_mes,0) = 0 and coalesce(x.custo_mes,0) = 0
+       and coalesce(x.mrr,0) = 0 and coalesce(x.a_pagar,0) = 0) as usa_ultimo,
       (nullif(x.cad_custo, 0) is null and nullif(x.cad_mensalidade, 0) is null
        and coalesce(x.bruto_mes,0) = 0 and coalesce(x.custo_mes,0) = 0
-       and coalesce(x.mrr,0) = 0 and coalesce(x.a_pagar,0) = 0) as sem_valor,
+       and coalesce(x.mrr,0) = 0 and coalesce(x.a_pagar,0) = 0
+       and coalesce(x.ult_mensalidade,0) = 0 and coalesce(x.ult_custo,0) = 0
+       and coalesce(x.ult_a_pagar,0) = 0 and coalesce(x.ult_a_receber,0) = 0) as sem_valor,
       case when not x.viva then null
            -- Em Central de Cobrança o custo do cadastro JÁ inclui a taxa da
            -- central (mensalidade menos repasse); o campo `custo` do extrato não.
            when nullif(x.cad_custo, 0) is not null then x.cad_custo
-           when x.responsavel_tipo = 'hiper'
-             then nullif(coalesce(x.custo_mes, x.a_pagar), 0)
-           when nullif(x.bruto_mes, 0) is null then null
-           else round(coalesce(x.bruto_mes,0) - coalesce(x.mrr,0), 2)
+           when x.responsavel_tipo = 'hiper' then nullif(coalesce(
+             case when coalesce(x.bruto_mes,0)=0 and coalesce(x.custo_mes,0)=0
+                       and coalesce(x.mrr,0)=0 and coalesce(x.a_pagar,0)=0
+                  then coalesce(x.ult_custo, x.ult_a_pagar)
+                  else coalesce(x.custo_mes, x.a_pagar) end), 0)
+           else (
+             select case when nullif(b,0) is null then null else round(b - coalesce(rc,0), 2) end
+             from (select
+                     case when coalesce(x.bruto_mes,0)=0 and coalesce(x.custo_mes,0)=0
+                               and coalesce(x.mrr,0)=0 and coalesce(x.a_pagar,0)=0
+                          then x.ult_mensalidade else x.bruto_mes end as b,
+                     case when coalesce(x.bruto_mes,0)=0 and coalesce(x.custo_mes,0)=0
+                               and coalesce(x.mrr,0)=0 and coalesce(x.a_pagar,0)=0
+                          then x.ult_a_receber else x.mrr end as rc) q
+           )
       end as custo_hiper,
       case when not x.viva then null
            when x.responsavel_tipo = 'hiper' then null
-           else coalesce(nullif(x.cad_mensalidade, 0), nullif(x.bruto_mes, 0))
+           else coalesce(nullif(x.cad_mensalidade, 0), nullif(x.bruto_mes, 0), nullif(x.ult_mensalidade, 0))
       end as mrr_hiper,
       v.modelo_contrato_id as modelo_esperado
     from comds x
@@ -179,7 +197,7 @@ begin
   )
   select
     y.id_portal, y.cnpj_norm, y.razao_hiper, y.situacao, y.responsavel_tipo, y.plano,
-    y.cancelada_em, y.cancelada_por, y.custo_hiper, y.mrr_hiper, y.sem_valor,
+    y.cancelada_em, y.cancelada_por, y.custo_hiper, y.mrr_hiper, y.sem_valor, y.usa_ultimo,
     y.ds_id, y.cp_id, y.razao_ds, y.cnpj_ds, y.modelo_contrato_id, y.recorrencia, y.codigo_sequencial,
     y.vlr_mensal, y.vlr_custo, y.cancelado, y.qtd, y.candidato_escolhido,
     case when y.ds_id is not null then 'vinculado'

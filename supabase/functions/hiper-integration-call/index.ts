@@ -179,6 +179,7 @@ serve(async (req) => {
       const c = achado as Record<string, any>;
       const plano = c.plano_detalhe ?? null;
       const cad = c.cadastro ?? null;
+      const ult = c.ultimo_extrato ?? null;
       const { error: upErr } = await supabase.from("hiper_espelho_cadastro").update({
         cnpj: c.cnpj ?? null,
         cnpj_norm: soDigitos(c.cnpj) || null,
@@ -220,6 +221,15 @@ serve(async (req) => {
               cad_custo: num(cad.custo),
               cad_repasse: num(cad.repasse),
               cad_taxa_central: num(cad.taxa_central),
+            }
+          : {}),
+        ...(ult
+          ? {
+              ult_mes: ult.mes ?? null,
+              ult_mensalidade: num(ult.mensalidade),
+              ult_custo: num(ult.custo),
+              ult_a_pagar: num(ult.a_pagar),
+              ult_a_receber: num(ult.a_receber),
             }
           : {}),
         raw: c,
@@ -334,6 +344,7 @@ serve(async (req) => {
             // Mesma regra do plano: portal antigo não manda `cadastro`, e
             // gravar null apagaria o que já está aqui. Ausente ≠ zero.
             const cad = c.cadastro ?? null;
+            const ult = c.ultimo_extrato ?? null;
             contas.set(idPortal, {
               tenant_id: targetTenantId,
               id_portal: idPortal,
@@ -425,14 +436,15 @@ serve(async (req) => {
       const temAgregados = modulos.size > 0 || filiais.size > 0;
       const temPlano = Array.from(contas.values()).some((c) => "plano_qt_caixas" in c);
       const temCadastro = Array.from(contas.values()).some((c) => "cad_custo" in c);
+      const temUltimo = Array.from(contas.values()).some((c) => "ult_mes" in c);
 
       // O espelho de cadastro é regravado do zero. Quando o portal não manda os
       // contadores do plano, eles precisam vir do que já está aqui — senão o
       // delete leva junto e as contas perdem os módulos de plano.
-      if ((!temPlano || !temCadastro) && contas.size > 0) {
+      if ((!temPlano || !temCadastro || !temUltimo) && contas.size > 0) {
         const { data: anterior } = await supabase
           .from("hiper_espelho_cadastro")
-          .select("id_portal, plano_qt_usuarios, plano_qt_caixas, plano_qt_filiais, cad_mensalidade, cad_custo, cad_repasse, cad_taxa_central")
+          .select("id_portal, plano_qt_usuarios, plano_qt_caixas, plano_qt_filiais, cad_mensalidade, cad_custo, cad_repasse, cad_taxa_central, ult_mes, ult_mensalidade, ult_custo, ult_a_pagar, ult_a_receber")
           .eq("tenant_id", targetTenantId);
         for (const a of anterior ?? []) {
           const c = contas.get(String(a.id_portal));
@@ -447,6 +459,13 @@ serve(async (req) => {
             c.cad_custo = a.cad_custo;
             c.cad_repasse = a.cad_repasse;
             c.cad_taxa_central = a.cad_taxa_central;
+          }
+          if (!temUltimo) {
+            c.ult_mes = a.ult_mes;
+            c.ult_mensalidade = a.ult_mensalidade;
+            c.ult_custo = a.ult_custo;
+            c.ult_a_pagar = a.ult_a_pagar;
+            c.ult_a_receber = a.ult_a_receber;
           }
         }
       }
