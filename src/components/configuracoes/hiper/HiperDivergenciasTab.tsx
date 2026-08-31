@@ -53,40 +53,54 @@ const FAMILIAS: { chave: string; rotulo: string; explica: string; peso: number }
 const META = Object.fromEntries(FAMILIAS.map((f) => [f.chave, f]));
 
 /**
- * As divergências que o botão sabe consertar sozinho, e o efeito de cada uma.
- * O resto continua sendo decisão na ficha do cliente: filial mexe em árvore,
- * cadastro duplicado é fusão, e conta sem dono não tem o que gravar.
+ * O que o botão sabe gravar, e o efeito de cada coisa. A unidade aqui é a AÇÃO
+ * e não a divergência: "tipo de contrato ausente" e "tipo de contrato
+ * divergente" gravam o mesmo campo, e em lote é por ação que se escolhe.
+ *
+ * O resto continua sendo decisão na ficha: filial mexe em árvore de cadastro,
+ * cadastro duplicado é fusão, e conta sem dono não tem onde escrever.
  */
-const APLICAVEIS: Record<string, { acao: string; rotulo: (r: LinhaRecon) => string; efeito?: string }> = {
-  tipo_contrato_ausente: {
+const ACOES: {
+  acao: string;
+  rotulo: string;
+  divs: string[];
+  detalhe: (r: LinhaRecon) => string;
+  efeito?: string;
+}[] = [
+  {
     acao: "tipo_contrato",
-    rotulo: (r) => `Definir contrato como ${nomeTipo(r.responsavel_tipo)}`,
+    rotulo: "Tipo de contrato",
+    divs: ["tipo_contrato_ausente", "tipo_contrato_divergente"],
+    detalhe: (r) => `${r.modelo_contrato_ds ?? "sem modelo"} → ${nomeTipo(r.responsavel_tipo)}`,
   },
-  tipo_contrato_divergente: {
-    acao: "tipo_contrato",
-    rotulo: (r) => `Trocar contrato para ${nomeTipo(r.responsavel_tipo)}`,
-  },
-  custo_divergente: {
+  {
     acao: "custo",
-    rotulo: (r) => `Custo: ${brl(r.custo_ds)} → ${brl(r.custo_hiper)}`,
+    rotulo: "Custo",
+    divs: ["custo_divergente"],
+    detalhe: (r) => `${brl(r.custo_ds)} → ${brl(r.custo_hiper)}`,
     efeito: "Atualiza o custo do contrato e o custo de operação do cliente. Não mexe em receita.",
   },
-  mrr_divergente: {
+  {
     acao: "mrr",
-    rotulo: (r) => `Mensalidade: ${brl(r.mensalidade_ds)} → ${brl(r.mrr_hiper)}`,
+    rotulo: "Mensalidade (MRR)",
+    divs: ["mrr_divergente"],
+    detalhe: (r) => `${brl(r.mensalidade_ds)} → ${brl(r.mrr_hiper)}`,
     efeito: "Muda a mensalidade do cliente e o MRR da base. Não gera movimento de upsell/downsell, então o Net New do mês não vai explicar essa diferença. Nos tenants com Omie ativo, o novo valor vai para o ERP.",
   },
-  razao_social_divergente: {
+  {
     acao: "razao_social",
-    rotulo: (r) => `Razão social: usar “${r.razao_social_hiper}”`,
+    rotulo: "Razão social",
+    divs: ["razao_social_divergente"],
+    detalhe: (r) => `usar “${r.razao_social_hiper}”`,
     efeito: "Enfileira sincronismo do cadastro para o Omie.",
   },
-};
+];
 
-const aplicaveisDe = (r: LinhaRecon) =>
-  r.divergencias.filter((d) => APLICAVEIS[d]).filter((d, i, todas) =>
-    // tipo ausente e tipo divergente gravam a mesma coisa: não repete o botão
-    todas.findIndex((x) => APLICAVEIS[x].acao === APLICAVEIS[d].acao) === i);
+const ACAO = Object.fromEntries(ACOES.map((a) => [a.acao, a]));
+
+/** As ações que fazem sentido para esta linha, na ordem da lista acima. */
+const acoesDe = (r: LinhaRecon) =>
+  ACOES.filter((a) => a.divs.some((d) => r.divergencias.includes(d))).map((a) => a.acao);
 
 export default function HiperDivergenciasTab({ tid, recon }: { tid: string | null; recon: LinhaRecon[] }) {
   const { toast } = useToast();
@@ -96,7 +110,15 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
   const [busca, setBusca] = useState("");
   const [aberta, setAberta] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
-  const [confirmar, setConfirmar] = useState<{ linha: LinhaRecon; escolhidas: string[] } | null>(null);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [confirmar, setConfirmar] = useState<{ linhas: LinhaRecon[]; escolhidas: Set<string> } | null>(null);
+
+  const alternar = (id: string) =>
+    setSelecionados((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
 
   const contagem = useMemo(() => {
     const m: Record<string, number> = {};
@@ -129,6 +151,9 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
       });
   }, [recon, familia, status, busca]);
 
+  /** Só entra no lote quem tem algo que o botão sabe gravar. */
+  const selecionaveis = useMemo(() => linhas.filter((l) => acoesDe(l).length > 0), [linhas]);
+
   const marcar = async (id: string, novo: "resolvido" | "ignorado" | "pendente") => {
     setOcupado(id);
     try {
@@ -147,21 +172,30 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
 
   const aplicar = async () => {
     if (!confirmar) return;
-    const { linha, escolhidas } = confirmar;
-    setOcupado(linha.id);
+    const { linhas, escolhidas } = confirmar;
+    setOcupado("aplicando");
     try {
       const { data, error } = await supabase.rpc("hiper_aplicar_correcao" as any, {
-        p_tenant_id: tid, p_recon_id: linha.id,
-        p_acoes: escolhidas.map((d) => APLICAVEIS[d].acao),
+        p_tenant_id: tid,
+        p_recon_ids: linhas.map((l) => l.id),
+        p_acoes: Array.from(escolhidas),
       } as any);
       if (error) throw error;
       const r = data as any;
       if (!r?.ok) throw new Error(r?.erro || "Não foi possível aplicar.");
       setConfirmar(null);
+      setSelecionados(new Set());
+      // O que foi recusado importa tanto quanto o que gravou: sem isso o
+      // operador acha que atualizou 200 e atualizou 40.
+      const motivos = (r.motivos ?? []) as { motivo: string; qt: number }[];
       toast({
-        title: `${r.aplicado.length} ${r.aplicado.length === 1 ? "campo atualizado" : "campos atualizados"}`,
-        description: r.aplicado
-          .map((a: any) => `${a.acao}: ${a.de ?? "—"} → ${a.para}`).join(" · "),
+        title: r.clientes === 0
+          ? "Nada foi atualizado"
+          : `${num(r.clientes)} ${r.clientes === 1 ? "cliente atualizado" : "clientes atualizados"} · ${num(r.aplicado.length)} ${r.aplicado.length === 1 ? "campo" : "campos"}`,
+        description: motivos.length
+          ? `Pulados: ${motivos.map((m) => `${m.qt}× ${m.motivo}`).join(" · ")}`
+          : undefined,
+        variant: r.clientes === 0 ? "destructive" : undefined,
       });
       qc.invalidateQueries({ queryKey: ["hiper_recon"] });
     } catch (e: any) {
@@ -219,6 +253,41 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
         <p className="text-xs text-muted-foreground px-1">{META[familia].explica}</p>
       )}
 
+      {/* Selecionar tudo o que está filtrado + o que fazer com a seleção. Fica
+          acima da lista porque é daqui que se decide o lote. */}
+      {linhas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+          <label className="flex items-center gap-2">
+            <input type="checkbox"
+              checked={selecionaveis.length > 0 && selecionaveis.every((l) => selecionados.has(l.id))}
+              ref={(el) => { if (el) el.indeterminate =
+                selecionados.size > 0 && !selecionaveis.every((l) => selecionados.has(l.id)); }}
+              onChange={(e) => setSelecionados(e.target.checked
+                ? new Set(selecionaveis.map((l) => l.id)) : new Set())} />
+            Selecionar {num(selecionaveis.length)} com correção automática
+          </label>
+          {selecionados.size > 0 && (
+            <>
+              <span className="text-muted-foreground">{num(selecionados.size)} selecionados</span>
+              <Button size="sm" onClick={() => {
+                const escolhidos = linhas.filter((l) => selecionados.has(l.id));
+                setConfirmar({
+                  linhas: escolhidos,
+                  // Começa com tudo o que dá, e o dinheiro fica visível para
+                  // desmarcar: atualizar só o custo é caso comum.
+                  escolhidas: new Set(escolhidos.flatMap(acoesDe)),
+                });
+              }}>
+                <Wand2 className="h-3 w-3" /> Atualizar {num(selecionados.size)}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelecionados(new Set())}>
+                Limpar seleção
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+
       {linhas.length === 0 ? (
         <Vazio>
           {recon.length === 0
@@ -232,11 +301,19 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
             const nome = r.razao_social_ds ?? r.razao_social_hiper ?? "—";
             const fil = (r.detalhe?.filiais ?? {}) as any;
             const mods = (r.detalhe?.modulos ?? {}) as any;
-            const aplicaveis = aplicaveisDe(r);
+            const aplicaveis = acoesDe(r);
             return (
-              <div key={r.id}>
+              <div key={r.id} className={selecionados.has(r.id) ? "bg-primary/5" : undefined}>
+                <div className="flex items-start gap-2 pl-3">
+                  <input type="checkbox" className="mt-3.5 shrink-0"
+                    disabled={aplicaveis.length === 0}
+                    title={aplicaveis.length === 0
+                      ? "Nada nesta linha pode ser gravado automaticamente"
+                      : undefined}
+                    checked={selecionados.has(r.id)}
+                    onChange={() => alternar(r.id)} />
                 <button type="button" onClick={() => setAberta(abertoAqui ? null : r.id)}
-                  className="flex w-full items-start gap-3 p-3 text-left hover:bg-muted/30 transition-colors">
+                  className="flex w-full items-start gap-3 py-3 pr-3 text-left hover:bg-muted/30 transition-colors">
                   <ChevronRight className={`h-4 w-4 mt-0.5 shrink-0 text-muted-foreground transition-transform ${abertoAqui ? "rotate-90" : ""}`} />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm truncate">{nome}</p>
@@ -258,6 +335,7 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
                     </Badge>
                   )}
                 </button>
+                </div>
 
                 {abertoAqui && (
                   <div className="border-t bg-muted/20 p-4 space-y-4 text-sm">
@@ -406,9 +484,9 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
 
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       {aplicaveis.length > 0 && (
-                        <Button size="sm" disabled={ocupado === r.id}
-                          onClick={() => setConfirmar({ linha: r, escolhidas: aplicaveis })}>
-                          {ocupado === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+                        <Button size="sm" disabled={!!ocupado}
+                          onClick={() => setConfirmar({ linhas: [r], escolhidas: new Set(aplicaveis) })}>
+                          {ocupado ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
                           Atualizar no DoctorSaaS
                           {aplicaveis.length > 1 && ` (${aplicaveis.length})`}
                         </Button>
@@ -467,33 +545,58 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
 
       {/* Confirmação com o antes e o depois de CADA campo. O botão é um clique,
           mas nenhum valor muda sem estar escrito na tela primeiro. */}
+      {/* Cada ação é uma caixa. Atualizar só o custo e deixar a mensalidade de
+          fora é caso comum, e antes era tudo-ou-nada. */}
       <AlertDialog open={!!confirmar} onOpenChange={(o) => !o && setConfirmar(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Atualizar {confirmar?.linha.razao_social_ds ?? confirmar?.linha.razao_social_hiper}
+              {confirmar && confirmar.linhas.length === 1
+                ? `Atualizar ${confirmar.linhas[0].razao_social_ds ?? confirmar.linhas[0].razao_social_hiper}`
+                : `Atualizar ${num(confirmar?.linhas.length)} clientes`}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm">
-                <p>O cadastro daqui passa a ter o que o portal diz:</p>
+                <p>Escolha o que o cadastro daqui passa a ter do portal:</p>
                 <ul className="space-y-2">
-                  {(confirmar?.escolhidas ?? []).map((d) => (
-                    <li key={d} className="rounded border bg-muted/40 px-2.5 py-2">
-                      <span className="font-medium text-foreground">
-                        {APLICAVEIS[d].rotulo(confirmar!.linha)}
-                      </span>
-                      {APLICAVEIS[d].efeito && (
-                        <span className="block text-xs mt-0.5">{APLICAVEIS[d].efeito}</span>
-                      )}
-                    </li>
-                  ))}
+                  {ACOES.filter((a) => confirmar?.linhas.some((l) => acoesDe(l).includes(a.acao)))
+                    .map((a) => {
+                      const alvo = confirmar!.linhas.filter((l) => acoesDe(l).includes(a.acao));
+                      const marcada = confirmar!.escolhidas.has(a.acao);
+                      return (
+                        <li key={a.acao} className="rounded border bg-muted/40 px-2.5 py-2">
+                          <label className="flex items-start gap-2 cursor-pointer">
+                            <input type="checkbox" className="mt-1 shrink-0" checked={marcada}
+                              onChange={() => setConfirmar((c) => {
+                                if (!c) return c;
+                                const e = new Set(c.escolhidas);
+                                e.has(a.acao) ? e.delete(a.acao) : e.add(a.acao);
+                                return { ...c, escolhidas: e };
+                              })} />
+                            <span className="min-w-0">
+                              <span className="font-medium text-foreground">{a.rotulo}</span>
+                              <span className="text-foreground">
+                                {confirmar!.linhas.length === 1
+                                  ? ` — ${a.detalhe(confirmar!.linhas[0])}`
+                                  : ` — ${num(alvo.length)} ${alvo.length === 1 ? "cliente" : "clientes"}`}
+                              </span>
+                              {a.efeito && <span className="block text-xs mt-0.5">{a.efeito}</span>}
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
                 </ul>
+                <p className="text-xs">
+                  Quem não puder receber uma dessas — contrato anual, mais de um contrato Hiper —
+                  é pulado com o motivo, e o resto grava normalmente.
+                </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction disabled={!!ocupado}
+            <AlertDialogAction disabled={!!ocupado || !confirmar?.escolhidas.size}
               onClick={(e) => { e.preventDefault(); aplicar(); }}>
               {ocupado && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
               Atualizar

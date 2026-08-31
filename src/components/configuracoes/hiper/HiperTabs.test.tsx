@@ -99,6 +99,35 @@ describe("abas da integração Hiper", () => {
     expect(container.textContent).toContain("não há o que gravar automaticamente");
   });
 
+  it("deixa desmarcar a mensalidade e atualizar só o custo", () => {
+    render(<HiperDivergenciasTab tid="t1"
+      recon={[{ ...base, divergencias: ["custo_divergente", "mrr_divergente"], mrr_hiper: 92.76 }]} />);
+    act(() => { container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    const botao = Array.from(container.querySelectorAll("button"))
+      .find((b) => b.textContent?.includes("Atualizar no DoctorSaaS"));
+    act(() => { botao?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+
+    const caixas = Array.from(document.querySelectorAll('[role="alertdialog"] input[type="checkbox"]')) as HTMLInputElement[];
+    expect(caixas.length).toBe(2);            // custo e mensalidade
+    expect(caixas.every((c) => c.checked)).toBe(true);
+    act(() => { caixas[1].click(); });        // desmarca a mensalidade
+    const depois = Array.from(document.querySelectorAll('[role="alertdialog"] input[type="checkbox"]')) as HTMLInputElement[];
+    expect(depois[0].checked).toBe(true);
+    expect(depois[1].checked).toBe(false);
+  });
+
+  it("seleciona em lote só quem tem correção automática", () => {
+    const semAcao = { ...base, id: "2", id_portal: "999", divergencias: ["filial_com_valor"], detalhe: {} };
+    render(<HiperDivergenciasTab tid="t1" recon={[base, semAcao]} />);
+    expect(container.textContent).toContain("Selecionar 1 com correção automática");
+    const caixas = Array.from(container.querySelectorAll('input[type="checkbox"]')) as HTMLInputElement[];
+    // a primeira é o "selecionar todos"; as outras são as linhas
+    expect(caixas[1].disabled).toBe(false);   // tem custo_divergente
+    expect(caixas[2].disabled).toBe(true);    // só filial: nada a gravar
+    act(() => { caixas[0].click(); });
+    expect(container.textContent).toContain("Atualizar 1");
+  });
+
   it("mostra o antes e o depois de cada campo antes de gravar", () => {
     render(<HiperDivergenciasTab tid="t1"
       recon={[{ ...base, divergencias: ["custo_divergente", "mrr_divergente"], mrr_hiper: 92.76 }]} />);
