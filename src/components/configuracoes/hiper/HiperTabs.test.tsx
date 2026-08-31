@@ -39,7 +39,7 @@ const base: LinhaRecon = {
   id: "1", id_portal: "3482", cnpj_norm: "07272690000187",
   razao_social_hiper: "CINE GRACHER LTDA EPP (MATRIZ)", situacao_hiper: "ativo",
   plano_hiper: "Hiper Gestão - Mensal", responsavel_tipo: "hiper",
-  mrr_hiper: null, custo_hiper: 1461.77, cancelada_em: null,
+  mrr_hiper: null, custo_hiper: 1461.77, cancelada_em: null, cancelada_por: null,
   ds_cliente_id: "c1", ds_cliente_produto_id: "cp1", razao_social_ds: "Cine Gracher",
   cnpj_ds: "07272690000187", modelo_contrato_id_ds: 2, modelo_contrato_ds: "Royalties",
   mensalidade_ds: 425.63, custo_ds: 126.77, cancelado_ds: false,
@@ -323,6 +323,29 @@ describe("abas da integração Hiper", () => {
     expect(container.textContent).toContain("Leads sem valor");
     expect(container.textContent).not.toContain("Hiperador ok");
     expect(container.textContent).not.toContain("Cobranca ok");
+  });
+
+  it("oferece cancelar com a data do portal, e exige motivo", () => {
+    render(<HiperDivergenciasTab tid="t1" motivos={[{ id: 1, descricao: "Preço" }]}
+      recon={[{ ...base, razao_social_ds: "Happy Bear", mensalidade_ds: 294.54,
+        situacao_hiper: "inativo", cancelada_em: "2026-02-02", cancelada_por: "dev",
+        divergencias: ["conta_inativa_no_hiper"], detalhe: {} }]} />);
+    abrirLinha("Happy Bear");
+    const txt = (container.textContent ?? "").replace(/\u00a0/g, " ");
+    expect(txt).toContain("Cancelar aqui em 02/02/2026");
+    expect(txt).toContain("Saiu do Hiper em 02/02/2026, por dev");
+    // o efeito irreversivel fica escrito antes de clicar
+    expect(txt).toContain("não é desfeito");
+  });
+
+  it("não oferece cancelar quando o portal não deu a data", () => {
+    render(<HiperDivergenciasTab tid="t1" motivos={[{ id: 1, descricao: "Preço" }]}
+      recon={[{ ...base, razao_social_ds: "Sem data", situacao_hiper: "inativo",
+        cancelada_em: null, divergencias: ["conta_inativa_no_hiper"], detalhe: {} }]} />);
+    abrirLinha("Sem data");
+    const txt = container.textContent ?? "";
+    expect(txt).not.toContain("Cancelar aqui em");
+    expect(txt).toContain("não informou a data de saída");
   });
 
   it("Divergências não quebra quando o detalhe vem vazio", () => {

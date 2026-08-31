@@ -31,6 +31,7 @@ export interface LinhaRecon {
   mrr_hiper: number | null;
   custo_hiper: number | null;
   cancelada_em: string | null;
+  cancelada_por: string | null;
   ds_cliente_id: string | null;
   ds_cliente_produto_id: string | null;
   razao_social_ds: string | null;
@@ -170,6 +171,22 @@ export function useHiperLog(tid: string | null, ligado: boolean) {
         .limit(1000);
       if (error) throw error;
       return (data ?? []) as any[];
+    },
+  });
+}
+
+/** Motivos de cancelamento do tenant, para o seletor da baixa retroativa. */
+export function useMotivosCancelamento(tid: string | null, ligado: boolean) {
+  return useQuery({
+    queryKey: ["hiper_motivos_cancelamento", tid],
+    enabled: !!tid && ligado,
+    queryFn: async () => {
+      const { data, error } = await t("motivos_cancelamento")
+        .select("id, descricao")
+        .eq("tenant_id", tid as string)
+        .order("descricao");
+      if (error) throw error;
+      return (data ?? []) as { id: number; descricao: string }[];
     },
   });
 }

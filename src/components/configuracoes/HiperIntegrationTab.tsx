@@ -12,7 +12,7 @@ import HiperDivergenciasTab from "./hiper/HiperDivergenciasTab";
 import HiperHistoricoTab from "./hiper/HiperHistoricoTab";
 import {
   useCatalogoDS, useHiperEspelho, useHiperFiliais, useHiperIntegracao,
-  useHiperLog, useHiperModulos, useHiperPlanoModulos, useHiperRecon, useHiperRuns, useHiperVinculos,
+  useHiperLog, useMotivosCancelamento, useHiperModulos, useHiperPlanoModulos, useHiperRecon, useHiperRuns, useHiperVinculos,
 } from "./hiper/useHiperDados";
 
 /**
@@ -37,6 +37,7 @@ export default function HiperIntegrationTab() {
   const { data: planoModulos = [] } = useHiperPlanoModulos(tid, conectado);
   const { data: runs = [] } = useHiperRuns(tid, conectado);
   const { data: log = [] } = useHiperLog(tid, conectado);
+  const { data: motivos = [] } = useMotivosCancelamento(tid, conectado);
   const { data: catalogo } = useCatalogoDS(tid, conectado);
 
   const pendentes = recon.filter((r) => r.status_usuario === "pendente" && r.divergencias.length > 0).length;
@@ -92,7 +93,7 @@ export default function HiperIntegrationTab() {
       </TabsContent>
 
       <TabsContent value="divergencias">
-        <HiperDivergenciasTab tid={tid} recon={recon} />
+        <HiperDivergenciasTab tid={tid} recon={recon} motivos={motivos} />
       </TabsContent>
 
       <TabsContent value="historico">

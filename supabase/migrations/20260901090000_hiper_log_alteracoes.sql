@@ -38,6 +38,7 @@ comment on table public.hiper_alteracao_log is
 
 alter table public.hiper_alteracao_log enable row level security;
 
+drop policy if exists hiper_log_select on public.hiper_alteracao_log;
 create policy hiper_log_select on public.hiper_alteracao_log for select to authenticated
 using ((select public.is_super_admin())
     or (tenant_id = (select public.current_tenant_id()) and (select public.is_tenant_admin_or_head())));
@@ -79,6 +80,16 @@ begin
     order by feito_em desc, id desc
   loop
     begin
+      -- Cancelamento NÃO volta por aqui. Ele gera churn, baixa contrato e
+      -- encerra movimentos: desfazer é reativação, que é outro fluxo com regra
+      -- própria. Fingir que um UPDATE resolve deixaria o cliente meio vivo.
+      if l.acao = 'cancelamento' then
+        v_falhou := v_falhou || jsonb_build_object(
+          'campo', 'cancelamento', 'cliente', l.cliente_nome,
+          'motivo', 'Cancelamento não é desfeito por aqui: use a reativação na ficha do cliente.');
+        continue;
+      end if;
+
       if l.tabela = 'cliente_produtos' then
         execute format('update public.cliente_produtos set %I = $1, updated_at = now() where id = $2', l.campo)
           using (case when l.valor_antes = 'null'::jsonb then null

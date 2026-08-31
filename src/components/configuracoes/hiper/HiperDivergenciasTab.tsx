@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Check, ChevronDown, ChevronRight, ExternalLink, EyeOff, Loader2, RefreshCw, Wand2 } from "lucide-react";
+import { Ban, Check, ChevronDown, ChevronRight, ExternalLink, EyeOff, Loader2, RefreshCw, Wand2 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -137,7 +137,13 @@ const ACAO = Object.fromEntries(ACOES.map((a) => [a.acao, a]));
 const acoesDe = (r: LinhaRecon) =>
   ACOES.filter((a) => a.divs.some((d) => r.divergencias.includes(d))).map((a) => a.acao);
 
-export default function HiperDivergenciasTab({ tid, recon }: { tid: string | null; recon: LinhaRecon[] }) {
+export default function HiperDivergenciasTab({
+  tid, recon, motivos = [],
+}: {
+  tid: string | null;
+  recon: LinhaRecon[];
+  motivos?: { id: number; descricao: string }[];
+}) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [familias, setFamilias] = useState<Set<string>>(new Set());
@@ -152,6 +158,8 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
   const POR_PAGINA = 100;
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [confirmar, setConfirmar] = useState<{ linhas: LinhaRecon[]; escolhidas: Set<string> } | null>(null);
+  const [baixar, setBaixar] = useState<LinhaRecon | null>(null);
+  const [motivoId, setMotivoId] = useState("");
 
   const alternar = (id: string) =>
     setSelecionados((s) => {
@@ -320,6 +328,28 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
       qc.invalidateQueries({ queryKey: ["hiper_recon"] });
     } catch (e: any) {
       toast({ title: "Não foi possível rebuscar", description: e.message, variant: "destructive" });
+    } finally { setOcupado(null); }
+  };
+
+  /** Cancela aqui o que já saiu no Hiper, com a data real da saída. */
+  const cancelarPeloPortal = async () => {
+    if (!baixar) return;
+    setOcupado(baixar.id);
+    try {
+      const { data, error } = await supabase.rpc("hiper_cancelar_pelo_portal" as any, {
+        p_tenant_id: tid, p_recon_id: baixar.id, p_motivo_id: Number(motivoId), p_observacao: null,
+      } as any);
+      if (error) throw error;
+      const r = data as any;
+      if (!r?.ok) throw new Error(r?.erro || "Não foi possível cancelar.");
+      setBaixar(null); setMotivoId("");
+      toast({
+        title: `Cancelado em ${new Date(`${r.data}T12:00:00`).toLocaleDateString("pt-BR")}`,
+        description: `${r.cancelados.length} ${r.cancelados.length === 1 ? "produto baixado" : "produtos baixados"} · o churn entrou no mês da saída`,
+      });
+      ["hiper_recon", "hiper_log"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+    } catch (e: any) {
+      toast({ title: "Não foi possível cancelar", description: e.message, variant: "destructive" });
     } finally { setOcupado(null); }
   };
 
@@ -610,6 +640,25 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
                       </div>
                     </div>
 
+                    {r.divergencias.includes("conta_inativa_no_hiper") && (
+                      <div className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2">
+                        <p className="font-medium text-destructive">
+                          Saiu do Hiper{r.cancelada_em && ` em ${new Date(`${r.cancelada_em}T12:00:00`).toLocaleDateString("pt-BR")}`}
+                          {r.cancelada_por && `, por ${r.cancelada_por}`} — e continua ativo aqui
+                        </p>
+                        <p className="text-muted-foreground mt-1">
+                          {brl(r.mensalidade_ds)}/mês seguem contando como receita viva.{" "}
+                          {r.cancelada_em
+                            ? <>Cancelar por aqui usa a <strong>data real da saída</strong>: o churn entra
+                               no mês em que ele saiu, não no de hoje — e o MRR daquele mês em diante
+                               muda. O cancelamento <strong>não é desfeito</strong> pelo Histórico;
+                               voltar atrás é reativação, na ficha do cliente.</>
+                            : <>O portal não informou a data de saída, então o cancelamento por aqui fica
+                               indisponível. Use a ficha do cliente e escolha a data.</>}
+                        </p>
+                      </div>
+                    )}
+
                     {r.divergencias.includes("valor_pode_ser_do_periodo") && (
                       <div className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2">
                         <p className="font-medium text-amber-600 dark:text-amber-400">
@@ -806,6 +855,14 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
                         </Button>
                       )}
 
+                      {r.divergencias.includes("conta_inativa_no_hiper") && r.cancelada_em && (
+                        <Button size="sm" variant="destructive" disabled={!!ocupado}
+                          onClick={() => { setBaixar(r); setMotivoId(""); }}>
+                          <Ban className="h-3 w-3" />
+                          Cancelar aqui em {new Date(`${r.cancelada_em}T12:00:00`).toLocaleDateString("pt-BR")}
+                        </Button>
+                      )}
+
                       {r.id_portal && (
                         <Button size="sm" variant="outline" disabled={!!ocupado}
                           onClick={() => rebuscar(r.id_portal as string)}>
@@ -873,6 +930,48 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
           )}
         </div>
       )}
+
+      <AlertDialog open={!!baixar} onOpenChange={(o) => !o && setBaixar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Cancelar {baixar?.razao_social_ds} em{" "}
+              {baixar?.cancelada_em && new Date(`${baixar.cancelada_em}T12:00:00`).toLocaleDateString("pt-BR")}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  Baixa os contratos Hiper deste cliente com a <strong>data em que ele saiu do
+                  portal</strong>. O churn de <strong>{brl(baixar?.mensalidade_ds)}</strong> entra
+                  naquele mês — o MRR dele em diante muda, e é isso que faz a conta ficar certa.
+                </p>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-foreground">Motivo do cancelamento</label>
+                  <select value={motivoId} onChange={(e) => setMotivoId(e.target.value)}
+                    className="h-9 w-full rounded-md border bg-background px-3 text-sm">
+                    <option value="">Escolha o motivo…</option>
+                    {motivos.map((m) => (
+                      <option key={m.id} value={m.id}>{m.descricao}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs">
+                  A observação registra que a baixa veio do portal, com a data e quem cancelou lá.
+                  <strong> Isto não é desfeito pelo Histórico</strong> — voltar atrás é reativação.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={!motivoId || !!ocupado}
+              onClick={(e) => { e.preventDefault(); cancelarPeloPortal(); }}>
+              {ocupado && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Confirmar baixa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Confirmação com o antes e o depois de CADA campo. O botão é um clique,
           mas nenhum valor muda sem estar escrito na tela primeiro. */}
