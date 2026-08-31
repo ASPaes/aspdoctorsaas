@@ -207,6 +207,34 @@ describe("abas da integração Hiper", () => {
     expect(container.textContent).not.toContain("Outro Cliente");
   });
 
+  it("acha o grupo pelo nome da filial, que não tem linha própria", () => {
+    const comGrupo = {
+      ...base, codigo_sequencial_ds: 101, razao_social_ds: "Colt Ltda - Matriz",
+      detalhe: { filiais: { grupo: [
+        { cnpj: "14448816000430", nome: "Colt Ltda - Floripa Filial", codigo: 108, estado: "ok", cliente_id: "f1" },
+        { cnpj: "14448816000278", nome: "Colt Ltda - Trindade Filial", codigo: 157, estado: "ok", cliente_id: "f2" },
+      ] } },
+    };
+    render(<HiperDivergenciasTab tid="t1" recon={[comGrupo]} />);
+    expect(container.textContent).toContain("2 filiais");
+
+    const input = container.querySelector("input[placeholder]") as HTMLInputElement;
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
+      setter.call(input, "Floripa");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("Colt Ltda - Matriz");
+
+    // e o grupo aparece no detalhe mesmo estando tudo certo
+    const linha = Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes("Colt"));
+    act(() => { linha?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    const txt = container.textContent ?? "";
+    expect(txt).toContain("Filiais do grupo");
+    expect(txt).toContain("Colt Ltda - Trindade Filial");
+    expect(txt).toContain("confere");
+  });
+
   it("Divergências não quebra quando o detalhe vem vazio", () => {
     render(<HiperDivergenciasTab tid="t1" recon={[{ ...base, detalhe: {}, divergencias: ["sem_dono"] }]} />);
     const botao = container.querySelector("button");

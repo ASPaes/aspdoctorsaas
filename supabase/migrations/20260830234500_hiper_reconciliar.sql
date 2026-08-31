@@ -362,6 +362,22 @@ begin
         -- `cadastro_duplicado`, não "o portal cobra dela separado".
         and c3.cnpj_digits is distinct from n.cnpj_norm
     ),
+    -- O grupo inteiro, esteja certo ou errado. Sem isto a matriz não diz que
+    -- TEM filial quando está tudo em ordem, e procurar pelo nome da filial não
+    -- acha nada — ela não tem linha própria, por desenho.
+    grupo as (
+      select esp.cnpj_norm, esp.nome as nome_portal,
+             a.id as cliente_id, a.razao_social as nome_ds, a.codigo_sequencial,
+             case
+               when a.id is null then 'faltando'
+               when a.matriz_id is distinct from n.ds_id then 'sem_matriz'
+               when coalesce(a.decisao, '') = 'paga_propria_conta' then 'paga_propria'
+               when coalesce(a.vlr_mensal, 0) > 0.01 or coalesce(a.vlr_custo, 0) > 0.01 then 'com_valor'
+               else 'ok'
+             end as estado
+      from esp
+      left join aqui a on a.cnpj_digits = esp.cnpj_norm
+    ),
     -- "filial" com o MESMO CNPJ da matriz não é filial: é o cadastro repetido
     duplicado as (
       select c4.id, c4.razao_social
@@ -377,6 +393,10 @@ begin
    || (case when exists (select 1 from duplicado)     then array['cadastro_duplicado']     else '{}'::text[] end)
       as divergencias,
       jsonb_strip_nulls(jsonb_build_object(
+        'grupo',         (select jsonb_agg(jsonb_build_object(
+                            'cnpj', cnpj_norm, 'nome', coalesce(nome_ds, nome_portal),
+                            'cliente_id', cliente_id, 'codigo', codigo_sequencial, 'estado', estado)
+                          order by coalesce(nome_ds, nome_portal)) from grupo),
         'faltando',      (select jsonb_agg(jsonb_build_object('cnpj', cnpj_norm, 'nome', nome)) from faltando),
         'sem_matriz',    (select jsonb_agg(jsonb_build_object('cliente_id', id, 'nome', razao_social, 'cnpj', cnpj_digits)) from sem_matriz),
         'com_valor',     (select jsonb_agg(jsonb_build_object('cliente_id', id, 'nome', razao_social, 'cnpj', cnpj_digits, 'mrr', vlr_mensal, 'custo', vlr_custo)) from com_valor),

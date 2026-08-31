@@ -160,7 +160,14 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
         || String(r.codigo_sequencial_ds ?? "") === q
         || (r.razao_social_ds ?? "").toLowerCase().includes(q)
         || (r.razao_social_hiper ?? "").toLowerCase().includes(q)
-        || (qd.length >= 4 && (r.cnpj_norm ?? "").includes(qd)))
+        || (qd.length >= 4 && (r.cnpj_norm ?? "").includes(qd))
+        // A filial não tem linha própria: ela vive dentro da matriz. Sem
+        // procurar aqui dentro, buscar pelo nome dela não acha nada e parece
+        // que ela não está no sistema.
+        || ((r.detalhe?.filiais?.grupo ?? []) as any[]).some((f) =>
+             String(f.codigo ?? "") === q
+             || String(f.nome ?? "").toLowerCase().includes(q)
+             || (qd.length >= 4 && String(f.cnpj ?? "").includes(qd))))
       .sort((a, b) => {
         const pa = Math.min(...a.divergencias.map((d) => META[d]?.peso ?? 9));
         const pb = Math.min(...b.divergencias.map((d) => META[d]?.peso ?? 9));
@@ -346,6 +353,7 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
             const fil = (r.detalhe?.filiais ?? {}) as any;
             const mods = (r.detalhe?.modulos ?? {}) as any;
             const aplicaveis = acoesDe(r);
+            const grupo = (fil.grupo ?? []) as any[];
             return (
               <div key={r.id} className={selecionados.has(r.id) ? "bg-primary/5" : undefined}>
                 <div className="flex items-start gap-2 pl-3">
@@ -374,6 +382,11 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
                       {rotuloRecorrencia(r.recorrencia_ds) && ` · ${rotuloRecorrencia(r.recorrencia_ds)}`}
                     </p>
                     <div className="flex flex-wrap gap-1 mt-1.5">
+                      {grupo.length > 0 && (
+                        <Badge variant="outline" className="text-[10px] font-normal">
+                          {grupo.length === 1 ? "1 filial" : `${grupo.length} filiais`}
+                        </Badge>
+                      )}
                       {r.divergencias.map((d) => (
                         <Badge key={d} variant="secondary" className="text-[10px] font-normal">
                           {META[d]?.rotulo ?? d}
@@ -439,6 +452,44 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
                         O portal diz <strong>{nomeTipo(r.responsavel_tipo)}</strong>; aqui está{" "}
                         <strong>{r.modelo_contrato_ds ?? "—"}</strong>.
                       </p>
+                    )}
+
+                    {/* O grupo aparece esteja certo ou errado: sem isso, uma
+                        matriz com filial em ordem não mostra nada e parece que
+                        as filiais não existem no sistema. */}
+                    {grupo.length > 0 && (
+                      <div>
+                        <p className="font-medium mb-1">
+                          Filiais do grupo · matriz {r.codigo_sequencial_ds ?? "—"}
+                        </p>
+                        <div className="space-y-1">
+                          {grupo.map((f: any) => (
+                            <div key={f.cnpj} className="flex flex-wrap items-center gap-2 rounded border bg-background px-2 py-1.5">
+                              {f.codigo != null && (
+                                <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground">
+                                  {f.codigo}
+                                </span>
+                              )}
+                              <span className="min-w-0 flex-1 truncate">{f.nome}</span>
+                              <span className="text-xs text-muted-foreground">{cnpjMask(f.cnpj)}</span>
+                              <Badge variant={f.estado === "ok" ? "outline" : "secondary"}
+                                className={`text-[10px] ${f.estado === "ok" ? "text-emerald-600 dark:text-emerald-400 border-emerald-600/30" : ""}`}>
+                                {f.estado === "ok" ? "confere"
+                                  : f.estado === "faltando" ? "só no Hiper"
+                                  : f.estado === "sem_matriz" ? "matriz errada"
+                                  : f.estado === "paga_propria" ? "paga a própria conta"
+                                  : "com valor próprio"}
+                              </Badge>
+                              {f.cliente_id && (
+                                <a href={`/clientes/${f.cliente_id}`} target="_blank" rel="noreferrer"
+                                  className="text-muted-foreground hover:text-foreground" title="Abrir cadastro">
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
 
                     {Array.isArray(fil.faltando) && fil.faltando.length > 0 && (
