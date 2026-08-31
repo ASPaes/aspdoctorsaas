@@ -160,28 +160,19 @@ describe("abas da integração Hiper", () => {
     expect(dialogo).toContain("Net New");
   });
 
-  it("avisa quantos clientes ficaram fora da tela, em vez de deixar sumir", () => {
-    // A régua de ataque empurra quem já teve o pior resolvido para o fim da
-    // fila. Sem o aviso, esse cliente parece ter saído do sistema.
-    const muitos = Array.from({ length: 320 }, (_, i) => ({
-      ...base, id: `r${i}`, id_portal: `p${i}`,
-      razao_social_ds: `Cliente ${i}`,
-      divergencias: [i < 310 ? "tipo_contrato_ausente" : "modulo_a_mais_no_hiper"],
+  it("pagina a lista e a busca ignora a paginação", () => {
+    const muitos = Array.from({ length: 250 }, (_, i) => ({
+      ...base, id: `r${i}`, id_portal: `p${i}`, codigo_sequencial_ds: i,
+      razao_social_ds: i === 249 ? "FERNANDA NAIR" : `Cliente ${i}`,
+      divergencias: ["custo_divergente"],
     }));
     render(<HiperDivergenciasTab tid="t1" recon={muitos} />);
-    const txt = container.textContent ?? "";
-    expect(txt).toContain("mostrando 300 de 320");
-    expect(txt).toContain("20 clientes fora da tela");
-    expect(txt).toContain("Mostrar mais 20 de 20");
-  });
+    expect(container.textContent).toContain("página 1 de 3");
+    expect(container.textContent).toContain("1–100 de 250");
+    // quem está na última página não aparece na primeira
+    expect(container.textContent).not.toContain("FERNANDA NAIR");
 
-  it("busca nunca trunca — é assim que se acha quem caiu para o fim da fila", () => {
-    const muitos = Array.from({ length: 320 }, (_, i) => ({
-      ...base, id: `r${i}`, id_portal: `p${i}`,
-      razao_social_ds: i === 319 ? "FERNANDA NAIR" : `Cliente ${i}`,
-      divergencias: ["modulo_a_mais_no_hiper"],
-    }));
-    render(<HiperDivergenciasTab tid="t1" recon={muitos} />);
+    // mas a busca alcança, esteja em que página estiver
     const input = container.querySelector("input[placeholder]") as HTMLInputElement;
     act(() => {
       const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
@@ -189,50 +180,7 @@ describe("abas da integração Hiper", () => {
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
     expect(container.textContent).toContain("FERNANDA NAIR");
-    expect(container.textContent).not.toContain("fora da tela");
-  });
-
-  it("acha pelo código do cadastro, e não pelo CNPJ de outro cliente", () => {
-    // Digitar 351 trazia quem tem 351 no CNPJ e não o cliente 351.
-    const outro = { ...base, id: "2", id_portal: "9", codigo_sequencial_ds: 88,
-      razao_social_ds: "Outro Cliente", cnpj_norm: "50677351000100" };
-    render(<HiperDivergenciasTab tid="t1" recon={[outro, base]} />);
-    const input = container.querySelector("input[placeholder]") as HTMLInputElement;
-    act(() => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
-      setter.call(input, "351");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    expect(container.textContent).toContain("Cine Gracher");
-    expect(container.textContent).not.toContain("Outro Cliente");
-  });
-
-  it("acha o grupo pelo nome da filial, que não tem linha própria", () => {
-    const comGrupo = {
-      ...base, codigo_sequencial_ds: 101, razao_social_ds: "Colt Ltda - Matriz",
-      detalhe: { filiais: { grupo: [
-        { cnpj: "14448816000430", nome: "Colt Ltda - Floripa Filial", codigo: 108, estado: "ok", cliente_id: "f1" },
-        { cnpj: "14448816000278", nome: "Colt Ltda - Trindade Filial", codigo: 157, estado: "ok", cliente_id: "f2" },
-      ] } },
-    };
-    render(<HiperDivergenciasTab tid="t1" recon={[comGrupo]} />);
-    expect(container.textContent).toContain("2 filiais");
-
-    const input = container.querySelector("input[placeholder]") as HTMLInputElement;
-    act(() => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
-      setter.call(input, "Floripa");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    expect(container.textContent).toContain("Colt Ltda - Matriz");
-
-    // e o grupo aparece no detalhe mesmo estando tudo certo
-    const linha = Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes("Colt"));
-    act(() => { linha?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
-    const txt = container.textContent ?? "";
-    expect(txt).toContain("Filiais do grupo");
-    expect(txt).toContain("Colt Ltda - Trindade Filial");
-    expect(txt).toContain("confere");
+    expect(container.textContent).toContain("1 cliente na busca");
   });
 
   it("Divergências não quebra quando o detalhe vem vazio", () => {

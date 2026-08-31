@@ -46,7 +46,7 @@ serve(async (req) => {
       return json({ ok: false, error: "Acesso negado: apenas admins podem operar integrações" });
     }
 
-    const { acao, tenant_id } = await req.json();
+    const { acao, tenant_id, id_portal: req_id_portal } = await req.json();
     const targetTenantId = profile.is_super_admin && tenant_id ? tenant_id : profile.tenant_id;
     if (!targetTenantId) return json({ ok: false, error: "tenant_id não encontrado" });
 
@@ -137,6 +137,127 @@ serve(async (req) => {
           portal_atualizado: ident !== null && primeira !== null
             ? Array.isArray(primeira?.modulos) && Array.isArray(primeira?.filiais)
             : ident !== null,
+        },
+      });
+    }
+
+    // Rebuscar UMA conta no portal. A API é paginada por cursor e não tem filtro
+    // por conta, então varre as páginas e fica só com a que interessa — a
+    // carteira inteira leva ~4s, e o que importa aqui é não regravar as outras
+    // 993 contas para conferir uma.
+    if (acao === "puxar_um") {
+      const alvo = String(req_id_portal ?? "").trim();
+      if (!alvo) return json({ ok: false, error: "Informe a conta do portal a rebuscar." });
+
+      let achado: Record<string, unknown> | null = null;
+      let cursor: string | null = null;
+      let paginas = 0;
+      try {
+        do {
+          const u = new URL(`${baseUrl}/api/integ/v1/clientes`);
+          u.searchParams.set("limit", String(PAGE_SIZE));
+          if (cursor) u.searchParams.set("cursor", cursor);
+          const resp = await fetch(u.toString(), { headers: auth });
+          if (!resp.ok) return json({ ok: false, error: `PortalHiper recusou (HTTP ${resp.status})` });
+          const body = await resp.json();
+          const lista = Array.isArray(body?.clientes) ? body.clientes : [];
+          achado = lista.find((c: Record<string, unknown>) => String(c.id_portal ?? "") === alvo) ?? null;
+          cursor = body?.next_cursor ?? null;
+          paginas++;
+        } while (!achado && cursor && paginas < MAX_PAGES);
+      } catch (e) {
+        return json({ ok: false, error: `Falha de rede ao rebuscar: ${(e as Error).message}` });
+      }
+
+      if (!achado) {
+        return json({
+          ok: false,
+          error: "Esta conta não está mais na carteira do portal. Rode a sincronização completa para o espelho refletir isso.",
+        });
+      }
+
+      const c = achado as Record<string, any>;
+      const plano = c.plano_detalhe ?? null;
+      const { error: upErr } = await supabase.from("hiper_espelho_cadastro").update({
+        cnpj: c.cnpj ?? null,
+        cnpj_norm: soDigitos(c.cnpj) || null,
+        razao_social: c.razao_social ?? null,
+        nome_fantasia: c.nome_fantasia ?? null,
+        cidade: c.cidade ?? null,
+        uf: c.uf ?? null,
+        situacao: c.situacao ?? null,
+        responsavel_tipo: c.responsavel_tipo ?? null,
+        plano: c.plano ?? null,
+        cliente_desde: c.cliente_desde ?? null,
+        cancelada_em: c.cancelada_em ?? null,
+        cancelada_por: c.cancelada_por ?? null,
+        saude: c.saude ?? null,
+        ultimo_acesso: c.ultimo_acesso ?? null,
+        mrr: num(c.mrr),
+        a_pagar: num(c.a_pagar),
+        bruto_mes: num(c.bruto_mes),
+        custo_mes: num(c.custo_mes),
+        mensalidade_ultima: num(c.mensalidade_ultima),
+        a_pagar_ultima: num(c.a_pagar_ultima),
+        extrato_mes_ultima: c.extrato_mes_ultima ?? null,
+        usuarios_contratados: c.usuarios_contratados ?? null,
+        usuarios_ativos_30d: c.usuarios_ativos_30d ?? null,
+        qt_modulos: c.qt_modulos ?? null,
+        atraso_dias: c.atraso_dias ?? null,
+        total_aberto: num(c.total_aberto),
+        last_scraped_at: c.last_scraped_at ?? null,
+        ...(plano
+          ? {
+              plano_qt_usuarios: plano.qt_usuarios ?? null,
+              plano_qt_caixas: plano.qt_caixas ?? null,
+              plano_qt_filiais: plano.qt_filiais ?? null,
+            }
+          : {}),
+        raw: c,
+        pulled_at: new Date().toISOString(),
+      }).eq("tenant_id", targetTenantId).eq("id_portal", alvo);
+      if (upErr) return json({ ok: false, error: `Falha ao gravar o espelho: ${upErr.message}` });
+
+      // Módulos e filiais só são substituídos quando o portal REALMENTE mandou
+      // os campos: um portal desatualizado zeraria o que já tínhamos.
+      let mods = 0, fils = 0;
+      if (Array.isArray(c.modulos)) {
+        await supabase.from("hiper_espelho_modulo").delete()
+          .eq("tenant_id", targetTenantId).eq("id_portal", alvo);
+        const linhas = (c.modulos as any[])
+          .filter((m) => String(m.nome ?? "").trim())
+          .map((m) => ({
+            tenant_id: targetTenantId, id_portal: alvo, app_nome: String(m.nome).trim(),
+            custo: num(m.custo) ?? 0, comprado_por: m.comprado_por ?? null, ativo: m.ativo !== false,
+          }));
+        if (linhas.length) await supabase.from("hiper_espelho_modulo").insert(linhas);
+        mods = linhas.length;
+      }
+      if (Array.isArray(c.filiais)) {
+        await supabase.from("hiper_espelho_filial").delete()
+          .eq("tenant_id", targetTenantId).eq("id_portal", alvo);
+        const linhas = (c.filiais as any[])
+          .map((f) => ({ ...f, cnpj_norm: soDigitos(f.cnpj) }))
+          .filter((f) => f.cnpj_norm.length === 14)
+          .map((f) => ({
+            tenant_id: targetTenantId, id_portal: alvo, cnpj: f.cnpj ?? null, cnpj_norm: f.cnpj_norm,
+            nome: f.nome ?? null, cidade: f.cidade ?? null, uf: f.uf ?? null, ativo: f.ativo !== false,
+          }));
+        if (linhas.length) await supabase.from("hiper_espelho_filial").insert(linhas);
+        fils = linhas.length;
+      }
+
+      const { data: rec, error: recErr } = await supabase.rpc("hiper_reconciliar", {
+        p_tenant_id: targetTenantId,
+      });
+      if (recErr) return json({ ok: false, error: `Espelho atualizado, mas a reconciliação falhou: ${recErr.message}` });
+
+      return json({
+        ok: true,
+        resultado: {
+          id_portal: alvo, paginas, modulos: mods, filiais: fils,
+          portal_atualizado: Array.isArray(c.modulos) && Array.isArray(c.filiais),
+          recon: rec,
         },
       });
     }

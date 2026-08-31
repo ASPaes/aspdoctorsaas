@@ -5,11 +5,13 @@
 -- Ganha p_recon_id para rodar num cliente só — é o botão "Atualizar" da aba
 -- Divergências chamando a mesma lógica do lote, em vez de uma cópia dela.
 drop function if exists public.hiper_importar_modulos(uuid, boolean);
+drop function if exists public.hiper_importar_modulos(uuid, boolean, uuid);
 
 create or replace function public.hiper_importar_modulos(
   p_tenant_id uuid,
   p_previa    boolean default true,
-  p_recon_id  uuid default null
+  p_recon_id  uuid default null,
+  p_lote_id   uuid default null
 )
 returns jsonb
 language plpgsql
@@ -24,6 +26,7 @@ declare
   v_sem_prod  integer := 0;
   v_ja_ok     integer := 0;
   v_amostra   jsonb;
+  v_lote      uuid := coalesce(p_lote_id, gen_random_uuid());
 begin
   if not (
     coalesce(current_setting('role', true), '') = 'service_role'
@@ -86,6 +89,9 @@ begin
   -- variante do outro produto sobrar e ser contada como "sem produto no
   -- contrato". O `order by` põe a que CASOU na frente.
   select distinct on (x.ds_cliente_id, x.app_nome)
+    -- Id gerado aqui, e não pelo default do INSERT: é ele que amarra a linha
+    -- nova à sua trilha sem depender de casar RETURNING com esta tabela.
+    gen_random_uuid() as novo_id,
     x.recon_id, x.ds_cliente_id, x.razao_social_ds as cliente, x.app_nome,
     x.custo, x.quantidade, x.modulo_id, x.produto_id,
     cp.id as cliente_produto_id,
@@ -130,13 +136,38 @@ begin
   -- fn_sync_produto_valores já protege — como nem todos os módulos têm valor,
   -- v_todos_pagos é falso e a receita do contrato não vira zero.
   insert into public.cliente_produto_modulos
-    (tenant_id, cliente_produto_id, modulo_id, vlr_mensal, vlr_custo, quantidade,
+    (id, tenant_id, cliente_produto_id, modulo_id, vlr_mensal, vlr_custo, quantidade,
      ativo, data_ativacao, origem)
-  select p_tenant_id, i.cliente_produto_id, i.modulo_id, 0, i.custo, i.quantidade,
+  select i.novo_id, p_tenant_id, i.cliente_produto_id, i.modulo_id, 0, i.custo, i.quantidade,
          true, current_date, 'hiper'
   from _imp i
   where i.cliente_produto_id is not null and i.cpm_id is null;
   get diagnostics v_inserir = row_count;
+
+  -- `valor_antes` nulo é o que diz ao desfazer que a linha não existia e deve
+  -- sumir, em vez de voltar para um valor antigo.
+  insert into public.hiper_alteracao_log
+    (tenant_id, lote_id, recon_id, cliente_id, cliente_produto_id, codigo_sequencial,
+     cliente_nome, acao, tabela, registro_id, campo, valor_antes, valor_depois, feito_por)
+  select p_tenant_id, v_lote, i.recon_id, i.ds_cliente_id, i.cliente_produto_id,
+         (select codigo_sequencial_ds from public.reconciliacao_hiper where id = i.recon_id),
+         i.cliente, 'modulos', 'cliente_produto_modulos', i.novo_id, i.app_nome,
+         null, jsonb_build_object('vlr_custo', i.custo, 'quantidade', i.quantidade), auth.uid()
+  from _imp i
+  where i.cliente_produto_id is not null and i.cpm_id is null;
+
+  insert into public.hiper_alteracao_log
+    (tenant_id, lote_id, recon_id, cliente_id, cliente_produto_id, codigo_sequencial,
+     cliente_nome, acao, tabela, registro_id, campo, valor_antes, valor_depois, feito_por)
+  select p_tenant_id, v_lote, i.recon_id, i.ds_cliente_id, i.cliente_produto_id,
+         (select codigo_sequencial_ds from public.reconciliacao_hiper where id = i.recon_id),
+         i.cliente, 'modulos', 'cliente_produto_modulos', i.cpm_id, i.app_nome,
+         jsonb_build_object('vlr_custo', cpm.vlr_custo, 'quantidade', cpm.quantidade),
+         jsonb_build_object('vlr_custo', i.custo, 'quantidade', i.quantidade),
+         auth.uid()
+  from _imp i join public.cliente_produto_modulos cpm on cpm.id = i.cpm_id
+  where i.cpm_id is not null
+    and (coalesce(cpm.quantidade, 1) <> i.quantidade or abs(coalesce(cpm.vlr_custo, 0) - i.custo) > 0.01);
 
   update public.cliente_produto_modulos cpm
      set quantidade = i.quantidade, vlr_custo = i.custo, updated_at = now()
@@ -145,11 +176,11 @@ begin
     and (coalesce(cpm.quantidade, 1) <> i.quantidade or abs(coalesce(cpm.vlr_custo, 0) - i.custo) > 0.01);
   get diagnostics v_qtd = row_count;
 
-  return jsonb_build_object('ok', true, 'previa', false,
+  return jsonb_build_object('ok', true, 'previa', false, 'lote_id', v_lote,
     'inseridos', v_inserir, 'ajustados', v_qtd,
     'ja_conferiam', v_ja_ok, 'sem_produto_no_contrato', v_sem_prod);
 end;
 $$;
 
-revoke all on function public.hiper_importar_modulos(uuid, boolean, uuid) from public;
-grant execute on function public.hiper_importar_modulos(uuid, boolean, uuid) to authenticated, service_role;
+revoke all on function public.hiper_importar_modulos(uuid, boolean, uuid, uuid) from public;
+grant execute on function public.hiper_importar_modulos(uuid, boolean, uuid, uuid) to authenticated, service_role;

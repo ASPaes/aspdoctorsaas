@@ -43,6 +43,7 @@ export interface LinhaRecon {
   qtd_candidatos_ds: number;
   recorrencia_ds: string | null;
   codigo_sequencial_ds: number | null;
+  id_portal_ref?: string | null;
   estado_match: string;
   divergencias: string[];
   detalhe: Record<string, any>;
@@ -149,6 +150,23 @@ export function useHiperPlanoModulos(tid: string | null, ligado: boolean) {
       const { data, error } = await t("hiper_plano_modulo")
         .select("id, plano, modulo_id, produto_id, quantidade_de, quantidade_fixa")
         .eq("tenant_id", tid as string);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+}
+
+/** A trilha do que a integração mudou no cadastro, agrupada por lote. */
+export function useHiperLog(tid: string | null, ligado: boolean) {
+  return useQuery({
+    queryKey: ["hiper_log", tid],
+    enabled: !!tid && ligado,
+    queryFn: async () => {
+      const { data, error } = await t("hiper_alteracao_log")
+        .select("*")
+        .eq("tenant_id", tid as string)
+        .order("feito_em", { ascending: false })
+        .limit(1000);
       if (error) throw error;
       return (data ?? []) as any[];
     },

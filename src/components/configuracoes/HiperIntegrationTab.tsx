@@ -9,9 +9,10 @@ import HiperVisaoGeralTab from "./hiper/HiperVisaoGeralTab";
 import HiperCustosTab from "./hiper/HiperCustosTab";
 import HiperSincronizacaoTab from "./hiper/HiperSincronizacaoTab";
 import HiperDivergenciasTab from "./hiper/HiperDivergenciasTab";
+import HiperHistoricoTab from "./hiper/HiperHistoricoTab";
 import {
   useCatalogoDS, useHiperEspelho, useHiperFiliais, useHiperIntegracao,
-  useHiperModulos, useHiperPlanoModulos, useHiperRecon, useHiperRuns, useHiperVinculos,
+  useHiperLog, useHiperModulos, useHiperPlanoModulos, useHiperRecon, useHiperRuns, useHiperVinculos,
 } from "./hiper/useHiperDados";
 
 /**
@@ -35,6 +36,7 @@ export default function HiperIntegrationTab() {
   const { data: vinculos = [] } = useHiperVinculos(tid, conectado);
   const { data: planoModulos = [] } = useHiperPlanoModulos(tid, conectado);
   const { data: runs = [] } = useHiperRuns(tid, conectado);
+  const { data: log = [] } = useHiperLog(tid, conectado);
   const { data: catalogo } = useCatalogoDS(tid, conectado);
 
   const pendentes = recon.filter((r) => r.status_usuario === "pendente" && r.divergencias.length > 0).length;
@@ -64,6 +66,7 @@ export default function HiperIntegrationTab() {
             <Badge variant="secondary" className="h-5 px-1.5 text-[10px] tabular-nums">{pendentes}</Badge>
           )}
         </TabsTrigger>
+        <TabsTrigger value="historico" disabled={!conectado} title={travada}>Histórico</TabsTrigger>
       </TabsList>
 
       <TabsContent value="conexao">
@@ -90,6 +93,10 @@ export default function HiperIntegrationTab() {
 
       <TabsContent value="divergencias">
         <HiperDivergenciasTab tid={tid} recon={recon} />
+      </TabsContent>
+
+      <TabsContent value="historico">
+        <HiperHistoricoTab tid={tid} log={log} />
       </TabsContent>
     </Tabs>
   );

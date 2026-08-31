@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Check, ChevronRight, ExternalLink, EyeOff, Loader2, Wand2 } from "lucide-react";
+import { Check, ChevronRight, ExternalLink, EyeOff, Loader2, RefreshCw, Wand2 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -126,7 +126,8 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
   const [busca, setBusca] = useState("");
   const [aberta, setAberta] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
-  const [limite, setLimite] = useState(300);
+  const [pagina, setPagina] = useState(1);
+  const POR_PAGINA = 100;
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [confirmar, setConfirmar] = useState<{ linhas: LinhaRecon[]; escolhidas: Set<string> } | null>(null);
 
@@ -186,8 +187,11 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
    * resolvidas, porque a régua de ataque joga o resto para o fim da fila.
    */
   const buscando = busca.trim().length > 0;
-  const visiveis = buscando ? linhas : linhas.slice(0, limite);
-  const ocultas = linhas.length - visiveis.length;
+  const paginas = Math.max(1, Math.ceil(linhas.length / POR_PAGINA));
+  const paginaAtual = Math.min(pagina, paginas);
+  const visiveis = buscando
+    ? linhas
+    : linhas.slice((paginaAtual - 1) * POR_PAGINA, paginaAtual * POR_PAGINA);
 
   /** Só entra no lote quem está na tela E tem algo que o botão sabe gravar. */
   const selecionaveis = useMemo(() => visiveis.filter((l) => acoesDe(l).length > 0), [visiveis]);
@@ -241,6 +245,29 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
     } finally { setOcupado(null); }
   };
 
+  /** Relê ESTA conta no portal e reconcilia. Para quando o dado de lá mudou e
+   *  não vale esperar a sincronização da carteira inteira. */
+  const rebuscar = async (idPortal: string) => {
+    setOcupado(`portal-${idPortal}`);
+    try {
+      const { data, error } = await supabase.functions.invoke("hiper-integration-call", {
+        body: { acao: "puxar_um", tenant_id: tid, id_portal: idPortal },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Falhou.");
+      const res = data.resultado ?? {};
+      toast({
+        title: "Conta relida do portal",
+        description: res.portal_atualizado === false
+          ? "O portal ainda é a versão sem módulos e filiais — só o cadastro foi atualizado."
+          : `${num(res.modulos)} módulos · ${num(res.filiais)} filiais`,
+      });
+      qc.invalidateQueries({ queryKey: ["hiper_recon"] });
+    } catch (e: any) {
+      toast({ title: "Não foi possível rebuscar", description: e.message, variant: "destructive" });
+    } finally { setOcupado(null); }
+  };
+
   const decidirFilial = async (clienteId: string, decisao: string) => {
     setOcupado(clienteId);
     try {
@@ -270,14 +297,14 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
       <div className="flex flex-wrap items-center gap-2">
         <Input placeholder="Código do cadastro, nome ou CNPJ…" value={busca}
           onChange={(e) => setBusca(e.target.value)} className="max-w-xs" />
-        <select value={status} onChange={(e) => setStatus(e.target.value)}
+        <select value={status} onChange={(e) => { setStatus(e.target.value); setPagina(1); }}
           className="h-9 rounded-md border bg-background px-3 text-sm">
           <option value="pendente">Pendentes</option>
           <option value="resolvido">Resolvidas</option>
           <option value="ignorado">Ignoradas</option>
           <option value="todos">Todas</option>
         </select>
-        <select value={familia} onChange={(e) => setFamilia(e.target.value)}
+        <select value={familia} onChange={(e) => { setFamilia(e.target.value); setPagina(1); }}
           className="h-9 rounded-md border bg-background px-3 text-sm max-w-[20rem]">
           <option value="todas">Todas as famílias</option>
           {FAMILIAS.filter((f) => contagem[f.chave]).map((f) => (
@@ -285,20 +312,11 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
           ))}
         </select>
         <span className="text-sm text-muted-foreground ml-auto">
-          {ocultas > 0
-            ? <>mostrando {num(visiveis.length)} de <strong>{num(linhas.length)}</strong> clientes</>
-            : <>{num(linhas.length)} clientes</>}
+          {buscando
+            ? <>{num(linhas.length)} {linhas.length === 1 ? "cliente" : "clientes"} na busca</>
+            : <>{num(linhas.length)} clientes · página {paginaAtual} de {num(paginas)}</>}
         </span>
       </div>
-
-      {ocultas > 0 && (
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
-          <strong className="text-amber-600 dark:text-amber-400">{num(ocultas)} clientes fora da tela.</strong>{" "}
-          A lista vem na ordem de atacar, então quem já teve as divergências mais graves resolvidas
-          desce para o fim — e some daqui sem ter saído da lista. Use a busca ou o filtro de
-          família para chegar em alguém específico.
-        </div>
-      )}
 
       {familia !== "todas" && META[familia] && (
         <p className="text-xs text-muted-foreground px-1">{META[familia].explica}</p>
@@ -620,6 +638,16 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
                         </Button>
                       )}
 
+                      {r.id_portal && (
+                        <Button size="sm" variant="outline" disabled={!!ocupado}
+                          onClick={() => rebuscar(r.id_portal as string)}>
+                          {ocupado === `portal-${r.id_portal}`
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : <RefreshCw className="h-3 w-3" />}
+                          Rebuscar no portal
+                        </Button>
+                      )}
+
                       {/* Nova aba de propósito: a lista de divergências costuma ser
                           percorrida inteira, e navegar para fora perderia o lugar. */}
                       {r.ds_cliente_id && (
@@ -663,11 +691,16 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
               </div>
             );
           })}
-          {ocultas > 0 && (
-            <div className="p-3 text-center">
-              <Button variant="outline" size="sm" onClick={() => setLimite((l) => l + 300)}>
-                Mostrar mais {num(Math.min(ocultas, 300))} de {num(ocultas)}
-              </Button>
+          {!buscando && paginas > 1 && (
+            <div className="flex items-center justify-between gap-2 p-3 text-sm">
+              <Button variant="outline" size="sm" disabled={paginaAtual <= 1}
+                onClick={() => setPagina(paginaAtual - 1)}>Anterior</Button>
+              <span className="text-muted-foreground">
+                {num((paginaAtual - 1) * POR_PAGINA + 1)}–{num(Math.min(paginaAtual * POR_PAGINA, linhas.length))}{" "}
+                de {num(linhas.length)}
+              </span>
+              <Button variant="outline" size="sm" disabled={paginaAtual >= paginas}
+                onClick={() => setPagina(paginaAtual + 1)}>Próxima</Button>
             </div>
           )}
         </div>
