@@ -59,6 +59,51 @@ export default function HiperModulosTab({
   const vinculoDe = (tipo: string, chave: string) =>
     vinculos.find((v) => v.tipo === tipo && v.chave === chave);
 
+  /**
+   * Módulo do Hiper só pode virar módulo de um produto Hiper. Quem define quais
+   * produtos são esses é a seção Planos logo acima — oferecer o catálogo inteiro
+   * do tenant deixava vincular um app do Hiper a um módulo de outro produto, e o
+   * erro só apareceria depois, na importação, como "sem produto no contrato".
+   */
+  const produtosDosPlanos = useMemo(
+    () => new Set(vinculos.filter((v) => v.tipo === "plano" && v.produto_id).map((v) => v.produto_id)),
+    [vinculos],
+  );
+
+  const nomeProduto = (id: number) =>
+    catalogo?.produtos?.find((p: any) => p.id === id)?.nome ?? "Sem produto";
+
+  /**
+   * Agrupado por produto. Um vínculo que já existe fora desses produtos continua
+   * na lista: escondê-lo faria o campo parecer "não vinculado" quando não está.
+   */
+  const opcoesModulo = useMemo(() => {
+    const todos = catalogo?.modulos ?? [];
+    const jaUsados = new Set(
+      vinculos.filter((v) => v.tipo === "modulo" && v.modulo_id).map((v) => v.modulo_id),
+    );
+    const visiveis = todos.filter(
+      (m: any) => produtosDosPlanos.has(m.produto_id) || jaUsados.has(m.id),
+    );
+    const grupos = new Map<number, any[]>();
+    for (const m of visiveis) {
+      const g = grupos.get(m.produto_id) ?? [];
+      g.push(m);
+      grupos.set(m.produto_id, g);
+    }
+    return Array.from(grupos.entries())
+      .map(([produtoId, mods]) => ({
+        produtoId,
+        produto: nomeProduto(produtoId),
+        deFora: !produtosDosPlanos.has(produtoId),
+        mods: mods.sort((a: any, b: any) => a.nome.localeCompare(b.nome, "pt-BR")),
+      }))
+      .sort((a, b) => Number(a.deFora) - Number(b.deFora) || a.produto.localeCompare(b.produto, "pt-BR"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogo, vinculos, produtosDosPlanos]);
+
+  const semPlanoVinculado = produtosDosPlanos.size === 0;
+
   const apps = useMemo(() => {
     const m = new Map<string, { nome: string; contas: number; bonificados: number; min: number; max: number }>();
     for (const x of modulos) {
@@ -209,6 +254,25 @@ export default function HiperModulosTab({
             </Button>
           )}
         </div>
+        {semPlanoVinculado && apps.length > 0 && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+            <p className="font-medium text-amber-600 dark:text-amber-400">
+              Vincule os planos primeiro
+            </p>
+            <p className="text-muted-foreground mt-1">
+              A lista de módulos sai dos <strong>produtos escolhidos nos planos</strong> acima.
+              Sem isso não há de onde tirá-la — e oferecer o catálogo inteiro deixaria ligar um
+              app do Hiper a um módulo de outro produto.
+            </p>
+          </div>
+        )}
+        {!semPlanoVinculado && (
+          <p className="text-xs text-muted-foreground">
+            Só os módulos de{" "}
+            <strong>{Array.from(produtosDosPlanos).map((id) => nomeProduto(id as number)).join(" e ")}</strong>
+            {" "}— os produtos que você escolheu nos planos.
+          </p>
+        )}
         {apps.length === 0 ? (
           <PortalDesatualizado o_que="os módulos de cada conta" />
         ) : (
@@ -231,14 +295,16 @@ export default function HiperModulosTab({
                       {a.bonificados > 0 && !gratuito && ` · ${num(a.bonificados)} sem custo`}
                     </p>
                   </div>
-                  <Sel value={v?.modulo_id ?? ""} disabled={salvando === `modulo|${a.nome}`}
+                  <Sel value={v?.modulo_id ?? ""}
+                    disabled={salvando === `modulo|${a.nome}` || semPlanoVinculado}
                     onChange={(val) => gravar("modulo", a.nome, "modulo_id", val)}>
-                    {(catalogo?.modulos ?? []).map((m: any) => (
-                      <option key={m.id} value={m.id}>
-                        {m.nome}
-                        {catalogo?.produtos?.find((p: any) => p.id === m.produto_id)
-                          ? ` · ${catalogo.produtos.find((p: any) => p.id === m.produto_id).nome}` : ""}
-                      </option>
+                    {opcoesModulo.map((g) => (
+                      <optgroup key={g.produtoId}
+                        label={g.deFora ? `${g.produto} (fora dos planos)` : g.produto}>
+                        {g.mods.map((m: any) => (
+                          <option key={m.id} value={m.id}>{m.nome}</option>
+                        ))}
+                      </optgroup>
                     ))}
                   </Sel>
                 </div>

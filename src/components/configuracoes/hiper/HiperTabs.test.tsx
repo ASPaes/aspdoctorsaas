@@ -85,3 +85,50 @@ describe("abas da integração Hiper", () => {
     expect(container.textContent).toContain("Marcar resolvida");
   });
 });
+
+// ── aba Módulos: a lista de módulos sai dos produtos escolhidos nos planos ────
+import HiperModulosTab from "./HiperModulosTab";
+
+const catalogo = {
+  produtos: [{ id: 3, nome: "Hiper Gestão" }, { id: 4, nome: "Hiper Mini" }, { id: 9, nome: "Outro Produto" }],
+  modulos: [
+    { id: "m1", nome: "Arquivos fiscais", produto_id: 3, vlr_custo: 21.9 },
+    { id: "m2", nome: "Boletos", produto_id: 4, vlr_custo: 32 },
+    { id: "m9", nome: "Coisa de outro produto", produto_id: 9, vlr_custo: 10 },
+  ],
+  modelos: [{ id: 2, nome: "Royalties" }],
+};
+const espelho = [{ plano: "Hiper Gestão - Mensal", responsavel_tipo: "hiper" }];
+const modulosEspelho = [{ app_nome: "Arquivos fiscais", custo: 21.9, comprado_por: "VEX", ativo: true }];
+
+describe("aba Módulos", () => {
+  it("só oferece módulos dos produtos vinculados nos planos", () => {
+    render(<HiperModulosTab tid="t1" espelho={espelho} modulos={modulosEspelho}
+      vinculos={[{ id: "v1", tipo: "plano", chave: "Hiper Gestão - Mensal", produto_id: 3 }]}
+      catalogo={catalogo} temRecon />);
+    const grupos = Array.from(container.querySelectorAll("optgroup")).map((g) => g.getAttribute("label"));
+    expect(grupos).toContain("Hiper Gestão");
+    expect(grupos).not.toContain("Outro Produto");
+    const opcoes = Array.from(container.querySelectorAll("optgroup option")).map((o) => o.textContent);
+    expect(opcoes).toEqual(["Arquivos fiscais"]);
+    expect(container.textContent).toContain("os produtos que você escolheu nos planos");
+  });
+
+  it("mantém visível um vínculo que já existe fora dos planos, em vez de parecer não vinculado", () => {
+    render(<HiperModulosTab tid="t1" espelho={espelho} modulos={modulosEspelho}
+      vinculos={[
+        { id: "v1", tipo: "plano", chave: "Hiper Gestão - Mensal", produto_id: 3 },
+        { id: "v2", tipo: "modulo", chave: "Arquivos fiscais", modulo_id: "m9" },
+      ]}
+      catalogo={catalogo} temRecon />);
+    const grupos = Array.from(container.querySelectorAll("optgroup")).map((g) => g.getAttribute("label"));
+    expect(grupos).toContain("Outro Produto (fora dos planos)");
+  });
+
+  it("sem plano vinculado, não oferece módulo nenhum e diz o que fazer", () => {
+    render(<HiperModulosTab tid="t1" espelho={espelho} modulos={modulosEspelho}
+      vinculos={[]} catalogo={catalogo} temRecon />);
+    expect(container.querySelectorAll("optgroup").length).toBe(0);
+    expect(container.textContent).toContain("Vincule os planos primeiro");
+  });
+});
