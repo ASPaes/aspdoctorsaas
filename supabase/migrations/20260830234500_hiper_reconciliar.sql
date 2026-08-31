@@ -296,10 +296,20 @@ begin
       join public.produto_modulos    pm on pm.id = cpm.modulo_id
       where cp.cliente_id = n.ds_id and cp.fornecedor_id = v_forn
         and cp.ativo and cpm.ativo
-        and exists (
-          select 1 from public.hiper_catalogo_vinculo v2
-          where v2.tenant_id = p_tenant_id and v2.tipo = 'modulo'
-            and v2.modulo_id = cpm.modulo_id
+        -- Módulo que o motor CONHECE: veio de um app do portal (catálogo) ou
+        -- do plano. Olhar só o catálogo deixava o Hiper Caixa de fora — ele não
+        -- é app, vem do contador de caixas —, então ele nunca contava como
+        -- "tem" e a divergência voltava mesmo depois de inserido.
+        and (
+          exists (
+            select 1 from public.hiper_catalogo_vinculo v2
+            where v2.tenant_id = p_tenant_id and v2.tipo = 'modulo'
+              and v2.modulo_id = cpm.modulo_id
+          )
+          or exists (
+            select 1 from public.hiper_plano_modulo pmod2
+            where pmod2.tenant_id = p_tenant_id and pmod2.modulo_id = cpm.modulo_id
+          )
         )
     ),
     a_mais as (select h.app_nome, h.custo, h.quantidade from hip h
