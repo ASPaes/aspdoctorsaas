@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Explica, Origem, Vazio, anual, brl, nomeTipo, cnpjMask } from "./ui";
+import { Explica, Numero, Origem, Vazio, anual, brl, nomeTipo, cnpjMask, num } from "./ui";
 import type { LinhaRecon } from "./useHiperDados";
 
 /**
@@ -28,6 +28,27 @@ export default function HiperCustosTab({ recon }: { recon: LinhaRecon[] }) {
         - Math.abs(Number(a.custo_ds ?? 0) - Number(a.custo_hiper ?? 0)));
   }, [recon, busca, tipo, soDivergentes]);
 
+  /**
+   * Os totais são do que está FILTRADO na tela — o que se vê é o que se soma.
+   *
+   * E vêm quebrados nos dois sentidos de propósito: o saldo líquido esconde o
+   * tamanho do problema, porque quem tem custo cadastrado a mais compensa quem
+   * tem a menos. Na ASP o líquido é −R$ 8,4 mil, mas são R$ 11,9 mil a menos e
+   * R$ 3,4 mil a mais — R$ 15,3 mil de cadastro errado.
+   */
+  const totais = useMemo(() => {
+    let ds = 0, hiper = 0, aMais = 0, aMenos = 0, qtMais = 0, qtMenos = 0, mens = 0;
+    for (const r of linhas) {
+      const h = Number(r.custo_hiper ?? 0);
+      const d = Number(r.custo_ds ?? 0);
+      ds += d; hiper += h; mens += Number(r.mensalidade_ds ?? 0);
+      const dif = d - h;
+      if (dif > 0.01) { aMais += dif; qtMais++; }
+      else if (dif < -0.01) { aMenos += dif; qtMenos++; }
+    }
+    return { ds, hiper, aMais, aMenos, qtMais, qtMenos, mens, dif: ds - hiper };
+  }, [linhas]);
+
   if (recon.length === 0) {
     return <Vazio>O espelho ainda não foi puxado. Vá em <strong>Sincronização</strong> e atualize.</Vazio>;
   }
@@ -44,6 +65,25 @@ export default function HiperCustosTab({ recon }: { recon: LinhaRecon[] }) {
         O <strong>MRR Hiper</strong> aparece vazio no Hiperador de propósito: ali quem cobra o
         cliente é você e o portal não conhece o seu preço. Comparar seria inventar divergência.
       </Explica>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Numero valor={brl(totais.ds)} rotulo="Custo no DoctorSaaS"
+          sub={`${num(linhas.length)} ${linhas.length === 1 ? "conta" : "contas"} nesta lista`} />
+        <Numero valor={brl(totais.hiper)} rotulo="Custo no Hiper"
+          sub="O que a Hiper cobra ou retém no último lote fechado" />
+        <Numero valor={brl(totais.aMenos)} rotulo="Custo a menos no cadastro"
+          tom={totais.aMenos < -0.01 ? "ruim" : "bom"}
+          sub={`${num(totais.qtMenos)} contas · a margem real é PIOR do que a ficha mostra`} />
+        <Numero valor={`+${brl(totais.aMais)}`} rotulo="Custo a mais no cadastro"
+          tom={totais.aMais > 0.01 ? "alerta" : "bom"}
+          sub={`${num(totais.qtMais)} contas · a margem real é melhor do que a ficha mostra`} />
+        <Numero valor={brl(totais.dif)} rotulo="Diferença líquida"
+          tom={Math.abs(totais.dif) < 0.01 ? "bom" : totais.dif < 0 ? "ruim" : "alerta"}
+          sub={<>
+            Esconde o tamanho do erro: os dois sentidos somam{" "}
+            <strong>{brl(Math.abs(totais.aMenos) + totais.aMais)}</strong>
+          </>} />
+      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <Input placeholder="Buscar por nome ou CNPJ…" value={busca}

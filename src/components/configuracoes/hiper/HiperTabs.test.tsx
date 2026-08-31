@@ -59,6 +59,22 @@ describe("abas da integração Hiper", () => {
     expect(container.textContent).toContain("espelho ainda não foi puxado");
   });
 
+  it("Custos soma os dois sentidos, e não só o saldo", () => {
+    // O líquido esconde o tamanho do erro: quem tem custo a mais compensa quem
+    // tem a menos, e os dois são cadastro errado.
+    render(<HiperCustosTab recon={[
+      { ...base, id: "a", custo_ds: 10, custo_hiper: 100, divergencias: ["custo_divergente"] },
+      { ...base, id: "b", custo_ds: 200, custo_hiper: 110, divergencias: ["custo_divergente"] },
+    ]} />);
+    const txt = (container.textContent ?? "").replace(/\u00a0/g, " ");
+    expect(txt).toContain("R$ 210,00");   // custo DS somado
+    expect(txt).toContain("R$ 210,00");   // custo Hiper somado (100 + 110)
+    expect(txt).toContain("-R$ 90,00");   // a menos
+    expect(txt).toContain("+R$ 90,00");   // a mais
+    expect(txt).toContain("R$ 180,00");   // os dois sentidos somados
+    expect(txt).toContain("a margem real é PIOR");
+  });
+
   it("Custos deixa o MRR do Hiperador vazio — o portal não sabe o preço", () => {
     render(<HiperCustosTab recon={[base]} />);
     const celulas = Array.from(container.querySelectorAll("tbody td")).map((c) => c.textContent);
