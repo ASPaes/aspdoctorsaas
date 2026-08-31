@@ -61,6 +61,19 @@ const FAMILIAS: { chave: string; rotulo: string; explica: string; peso: number }
 const META = Object.fromEntries(FAMILIAS.map((f) => [f.chave, f]));
 
 /**
+ * O portal deixou de informar o que ele DEVERIA informar para este tipo.
+ *
+ * No Hiperador o MRR vazio é o normal — quem cobra o cliente é a revenda e o
+ * portal não conhece o preço. Tratar isso como falta jogaria as 342 contas de
+ * Hiperador na lista e esconderia as 24 das centrais, que são o caso real.
+ */
+const semValorEsperado = (r: LinhaRecon) =>
+  r.responsavel_tipo === "hiper"
+    ? r.custo_hiper == null || Number(r.custo_hiper) === 0
+    : r.mrr_hiper == null || Number(r.mrr_hiper) === 0
+      || r.custo_hiper == null || Number(r.custo_hiper) === 0;
+
+/**
  * O que o botão sabe gravar, e o efeito de cada coisa. A unidade aqui é a AÇÃO
  * e não a divergência: "tipo de contrato ausente" e "tipo de contrato
  * divergente" gravam o mesmo campo, e em lote é por ação que se escolhe.
@@ -130,6 +143,7 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
   const [familias, setFamilias] = useState<Set<string>>(new Set());
   const [comFilial, setComFilial] = useState("todas");
   const [tipos, setTipos] = useState<Set<string>>(new Set());
+  const [valorHiper, setValorHiper] = useState("todos");
   const [status, setStatus] = useState("pendente");
   const [busca, setBusca] = useState("");
   const [aberta, setAberta] = useState<string | null>(null);
@@ -145,6 +159,12 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
       n.has(id) ? n.delete(id) : n.add(id);
       return n;
     });
+
+  const qtdSemValor = useMemo(
+    () => recon.filter((r) => r.estado_match === "vinculado"
+      && r.divergencias.length > 0 && semValorEsperado(r)).length,
+    [recon],
+  );
 
   const porTipo = useMemo(() => {
     const m: Record<string, number> = {};
@@ -181,6 +201,10 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
       // olhar os dois juntos contra o Hiperador.
       .filter((r) => tipos.size === 0 || tipos.has(r.responsavel_tipo ?? ""))
       .filter((r) => {
+        if (valorHiper === "todos") return true;
+        return valorHiper === "sem" ? semValorEsperado(r) : !semValorEsperado(r);
+      })
+      .filter((r) => {
         if (comFilial === "todas") return true;
         const n = ((r.detalhe?.filiais?.grupo ?? []) as any[]).length;
         return comFilial === "com" ? n > 0 : n === 0;
@@ -209,7 +233,7 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
         const vb = Math.abs(Number(b.custo_hiper ?? 0) - Number(b.custo_ds ?? 0));
         return vb - va;
       });
-  }, [recon, familias, comFilial, tipos, status, busca]);
+  }, [recon, familias, comFilial, tipos, valorHiper, status, busca]);
 
   /**
    * Buscar por nome ou CNPJ nunca trunca: o resultado é curto e a pessoa está
@@ -380,6 +404,15 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
         {/* Filial muda o tipo de trabalho: grupo se resolve junto, cliente
             solto se resolve sozinho. Separar os dois montes é o que permite
             atacar um de cada vez. */}
+        {/* O que o portal deixou de informar. No Hiperador só o custo é
+            esperado; nas centrais, MRR e custo. */}
+        <select value={valorHiper} onChange={(e) => { setValorHiper(e.target.value); setPagina(1); }}
+          className="h-9 rounded-md border bg-background px-3 text-sm">
+          <option value="todos">Com e sem valor do Hiper</option>
+          <option value="sem">Sem valor do Hiper ({num(qtdSemValor)})</option>
+          <option value="com">Só com valor do Hiper</option>
+        </select>
+
         <select value={comFilial} onChange={(e) => { setComFilial(e.target.value); setPagina(1); }}
           className="h-9 rounded-md border bg-background px-3 text-sm">
           <option value="todas">Com e sem filial</option>

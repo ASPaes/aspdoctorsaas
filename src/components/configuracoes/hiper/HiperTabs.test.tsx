@@ -301,6 +301,30 @@ describe("abas da integração Hiper", () => {
     expect(container.textContent).not.toContain("Do Hiperador");
   });
 
+  it("isola quem está sem o valor que o portal deveria ter mandado", () => {
+    const linhas = [
+      // No Hiperador o MRR vazio é o normal: nao pode entrar no filtro.
+      { ...base, id: "h", id_portal: "1", razao_social_ds: "Hiperador ok",
+        responsavel_tipo: "hiper", mrr_hiper: null, custo_hiper: 85 },
+      { ...base, id: "l", id_portal: "2", razao_social_ds: "Leads sem valor",
+        responsavel_tipo: "central_leads", mrr_hiper: null, custo_hiper: null },
+      { ...base, id: "c", id_portal: "3", razao_social_ds: "Cobranca ok",
+        responsavel_tipo: "central_cobranca", mrr_hiper: 300, custo_hiper: 120 },
+    ];
+    render(<HiperDivergenciasTab tid="t1" recon={linhas} />);
+    const sel = Array.from(container.querySelectorAll("select"))
+      .find((s) => s.textContent?.includes("Sem valor do Hiper")) as HTMLSelectElement;
+    expect(sel.textContent).toContain("Sem valor do Hiper (1)");
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value")!.set!;
+      setter.call(sel, "sem");
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("Leads sem valor");
+    expect(container.textContent).not.toContain("Hiperador ok");
+    expect(container.textContent).not.toContain("Cobranca ok");
+  });
+
   it("Divergências não quebra quando o detalhe vem vazio", () => {
     render(<HiperDivergenciasTab tid="t1" recon={[{ ...base, detalhe: {}, divergencias: ["sem_dono"] }]} />);
     abrirLinha();
