@@ -278,6 +278,29 @@ describe("abas da integração Hiper", () => {
     expect(container.textContent).not.toContain("Matriz com filial");
   });
 
+  it("filtra por tipo de contrato, somando os marcados", () => {
+    const linhas = [
+      { ...base, id: "h", id_portal: "1", razao_social_ds: "Do Hiperador", responsavel_tipo: "hiper" },
+      { ...base, id: "c", id_portal: "2", razao_social_ds: "Da Cobranca", responsavel_tipo: "central_cobranca" },
+      { ...base, id: "l", id_portal: "3", razao_social_ds: "Dos Leads", responsavel_tipo: "central_leads" },
+    ];
+    render(<HiperDivergenciasTab tid="t1" recon={linhas} />);
+    const clicar = (rotulo: string) => act(() => {
+      Array.from(container.querySelectorAll("button"))
+        .find((b) => b.textContent?.startsWith(rotulo))
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    clicar("Central de Cobrança");
+    expect(container.textContent).toContain("Da Cobranca");
+    expect(container.textContent).not.toContain("Do Hiperador");
+
+    // marcar o segundo SOMA, nao troca
+    clicar("Central de Leads");
+    expect(container.textContent).toContain("Da Cobranca");
+    expect(container.textContent).toContain("Dos Leads");
+    expect(container.textContent).not.toContain("Do Hiperador");
+  });
+
   it("Divergências não quebra quando o detalhe vem vazio", () => {
     render(<HiperDivergenciasTab tid="t1" recon={[{ ...base, detalhe: {}, divergencias: ["sem_dono"] }]} />);
     abrirLinha();

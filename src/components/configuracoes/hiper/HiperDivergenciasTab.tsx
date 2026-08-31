@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Explica, Origem, Vazio, anual, brl, cnpjMask, nomeTipo, num, rotuloRecorrencia } from "./ui";
+import { Explica, Origem, TIPO_CONTRATO, Vazio, anual, brl, cnpjMask, nomeTipo, num, rotuloRecorrencia } from "./ui";
 import type { LinhaRecon } from "./useHiperDados";
 
 /**
@@ -129,6 +129,7 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
   const qc = useQueryClient();
   const [familias, setFamilias] = useState<Set<string>>(new Set());
   const [comFilial, setComFilial] = useState("todas");
+  const [tipos, setTipos] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState("pendente");
   const [busca, setBusca] = useState("");
   const [aberta, setAberta] = useState<string | null>(null);
@@ -144,6 +145,17 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
       n.has(id) ? n.delete(id) : n.add(id);
       return n;
     });
+
+  const porTipo = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const r of recon) {
+      if (status !== "todos" && r.status_usuario !== status) continue;
+      if (r.divergencias.length === 0) continue;
+      const t = r.responsavel_tipo ?? "";
+      if (t) m[t] = (m[t] ?? 0) + 1;
+    }
+    return m;
+  }, [recon, status]);
 
   const contagem = useMemo(() => {
     const m: Record<string, number> = {};
@@ -164,6 +176,10 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
       // filtra por "filial sem matriz" e "filial com valor" quer os dois montes
       // juntos, não a interseção deles.
       .filter((r) => familias.size === 0 || r.divergencias.some((d) => familias.has(d)))
+      // Vazio = todos. Marcar mais de um soma os montes: "Central de Leads" com
+      // "Central de Cobrança" é o recorte de quem a Hiper fatura, e é natural
+      // olhar os dois juntos contra o Hiperador.
+      .filter((r) => tipos.size === 0 || tipos.has(r.responsavel_tipo ?? ""))
       .filter((r) => {
         if (comFilial === "todas") return true;
         const n = ((r.detalhe?.filiais?.grupo ?? []) as any[]).length;
@@ -193,7 +209,7 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
         const vb = Math.abs(Number(b.custo_hiper ?? 0) - Number(b.custo_ds ?? 0));
         return vb - va;
       });
-  }, [recon, familias, comFilial, status, busca]);
+  }, [recon, familias, comFilial, tipos, status, busca]);
 
   /**
    * Buscar por nome ou CNPJ nunca trunca: o resultado é curto e a pessoa está
@@ -370,6 +386,35 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
           <option value="com">Só com filial</option>
           <option value="sem">Só sem filial</option>
         </select>
+
+        {/* Tipo de contrato como botões, não lista: são três e cada um manda
+            numa regra de dinheiro diferente — precisam estar à vista, não
+            escondidos atrás de um clique. */}
+        <div className="flex items-center rounded-md border p-0.5">
+          {["hiper", "central_cobranca", "central_leads"].map((t) => {
+            const ligado = tipos.has(t);
+            return (
+              <button key={t} type="button"
+                title={TIPO_CONTRATO[t]?.explica}
+                onClick={() => {
+                  setTipos((s) => {
+                    const n = new Set(s);
+                    n.has(t) ? n.delete(t) : n.add(t);
+                    return n;
+                  });
+                  setPagina(1);
+                }}
+                className={`rounded px-2.5 py-1 text-sm transition-colors ${
+                  ligado ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                }`}>
+                {nomeTipo(t)}
+                {porTipo[t] != null && (
+                  <span className="ml-1.5 tabular-nums opacity-70">{num(porTipo[t])}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
         <span className="text-sm text-muted-foreground ml-auto">
           {buscando
             ? <>{num(linhas.length)} {linhas.length === 1 ? "cliente" : "clientes"} na busca</>
