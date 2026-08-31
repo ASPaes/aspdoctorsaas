@@ -102,33 +102,48 @@ const espelho = [{ plano: "Hiper Gestão - Mensal", responsavel_tipo: "hiper" }]
 const modulosEspelho = [{ app_nome: "Arquivos fiscais", custo: 21.9, comprado_por: "VEX", ativo: true }];
 
 describe("aba Módulos", () => {
-  it("só oferece módulos dos produtos vinculados nos planos", () => {
+  const vinculosPlanos = [
+    { id: "v1", tipo: "plano", chave: "Hiper Gestão - Mensal", produto_id: 3 },
+    { id: "v2", tipo: "plano", chave: "Hiper Mini - Mensal", produto_id: 4 },
+  ];
+
+  it("dá um seletor por produto, cada um só com os módulos daquele produto", () => {
     render(<HiperModulosTab tid="t1" espelho={espelho} modulos={modulosEspelho}
-      vinculos={[{ id: "v1", tipo: "plano", chave: "Hiper Gestão - Mensal", produto_id: 3 }]}
-      catalogo={catalogo} temRecon />);
-    const grupos = Array.from(container.querySelectorAll("optgroup")).map((g) => g.getAttribute("label"));
-    expect(grupos).toContain("Hiper Gestão");
-    expect(grupos).not.toContain("Outro Produto");
-    const opcoes = Array.from(container.querySelectorAll("optgroup option")).map((o) => o.textContent);
-    expect(opcoes).toEqual(["Arquivos fiscais"]);
-    expect(container.textContent).toContain("os produtos que você escolheu nos planos");
+      vinculos={vinculosPlanos} catalogo={catalogo} temRecon />);
+    const rotulos = Array.from(container.querySelectorAll("label span")).map((s) => s.textContent);
+    expect(rotulos).toContain("Hiper Gestão");
+    expect(rotulos).toContain("Hiper Mini");
+
+    // O select de cada produto só oferece os módulos DELE — misturar deixaria
+    // ligar um app a um módulo de produto que o cliente não tem.
+    const selects = Array.from(container.querySelectorAll("select"));
+    const doApp = selects.slice(-2); // os dois últimos são os do app "Arquivos fiscais"
+    const opcoes = doApp.map((s) =>
+      Array.from(s.querySelectorAll("option")).map((o) => o.textContent).filter((t) => t !== "— não vinculado —"));
+    expect(opcoes[0]).toEqual(["Arquivos fiscais"]);   // produto 3
+    expect(opcoes[1]).toEqual(["Boletos"]);            // produto 4
+    expect(opcoes.flat()).not.toContain("Coisa de outro produto");
   });
 
-  it("mantém visível um vínculo que já existe fora dos planos, em vez de parecer não vinculado", () => {
+  it("mostra o vínculo já gravado no seletor do produto certo", () => {
     render(<HiperModulosTab tid="t1" espelho={espelho} modulos={modulosEspelho}
-      vinculos={[
-        { id: "v1", tipo: "plano", chave: "Hiper Gestão - Mensal", produto_id: 3 },
-        { id: "v2", tipo: "modulo", chave: "Arquivos fiscais", modulo_id: "m9" },
-      ]}
+      vinculos={[...vinculosPlanos,
+        { id: "v3", tipo: "modulo", chave: "Arquivos fiscais", modulo_id: "m1", produto_id: 3 }]}
       catalogo={catalogo} temRecon />);
-    const grupos = Array.from(container.querySelectorAll("optgroup")).map((g) => g.getAttribute("label"));
-    expect(grupos).toContain("Outro Produto (fora dos planos)");
+    const selects = Array.from(container.querySelectorAll("select")) as HTMLSelectElement[];
+    const doApp = selects.slice(-2);
+    expect(doApp[0].value).toBe("m1");  // Hiper Gestão vinculado
+    expect(doApp[1].value).toBe("");    // Hiper Mini ainda não
   });
 
   it("sem plano vinculado, não oferece módulo nenhum e diz o que fazer", () => {
     render(<HiperModulosTab tid="t1" espelho={espelho} modulos={modulosEspelho}
       vinculos={[]} catalogo={catalogo} temRecon />);
-    expect(container.querySelectorAll("optgroup").length).toBe(0);
+    // Os selects de plano e de tipo de contrato continuam; o que não pode
+    // existir é seletor de MÓDULO, que só nasce dentro de um label por produto.
+    expect(container.querySelectorAll("label span").length).toBe(0);
+    const opcoes = Array.from(container.querySelectorAll("option")).map((o) => o.textContent);
+    expect(opcoes).not.toContain("Arquivos fiscais");
     expect(container.textContent).toContain("Vincule os planos primeiro");
   });
 });

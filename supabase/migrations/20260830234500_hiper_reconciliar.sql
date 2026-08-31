@@ -218,11 +218,21 @@ begin
   --    a mesma linha).
   left join lateral (
     with hip as (
-      select m.app_nome, coalesce(m.custo, 0) as custo, v.modulo_id
+      -- O mesmo app do Hiper existe nos DOIS produtos (Gestão e Mini) e o módulo
+      -- daqui pertence a um só. Vale o vínculo do produto que ESTE cliente tem
+      -- contratado; sem o join em cliente_produtos, cada app viria duas vezes e
+      -- a metade acusaria "módulo a mais" falso. O distinct on cobre o cliente
+      -- que tem os dois produtos.
+      select distinct on (m.app_nome)
+             m.app_nome, coalesce(m.custo, 0) as custo, v.modulo_id
       from public.hiper_espelho_modulo m
       join public.hiper_catalogo_vinculo v
         on v.tenant_id = p_tenant_id and v.tipo = 'modulo' and v.chave = m.app_nome
+      join public.cliente_produtos cpx
+        on cpx.cliente_id = n.ds_id and cpx.fornecedor_id = v_forn and cpx.ativo
+       and cpx.produto_id = v.produto_id
       where m.tenant_id = p_tenant_id and m.id_portal = n.id_portal and m.ativo
+      order by m.app_nome, v.produto_id
     ),
     dsm as (
       -- Só módulo VINCULADO a um app do Hiper. Sem vínculo não dá para saber se

@@ -35,14 +35,18 @@ begin
     return jsonb_build_object('ok', false, 'erro', 'Escolha o fornecedor Hiper na aba Conexão.');
   end if;
 
+  -- Uma linha por (cliente, app). O mesmo app tem vínculo nos dois produtos, e
+  -- só um deles é o que o cliente contratou: o `order by` põe a linha que CASOU
+  -- na frente, então "sem produto no contrato" só sobra quando nenhum casou —
+  -- e não uma vez para cada produto que ele não tem.
   create temp table _imp on commit drop as
-  select
+  select distinct on (r.ds_cliente_id, m.app_nome)
     r.ds_cliente_id                                  as cliente_id,
     r.razao_social_ds                                as cliente,
     m.app_nome,
     coalesce(m.custo, 0)                             as custo,
     v.modulo_id,
-    pm.produto_id,
+    v.produto_id,
     cp.id                                            as cliente_produto_id,
     exists (
       select 1 from public.cliente_produto_modulos x
@@ -53,13 +57,13 @@ begin
     on m.tenant_id = p_tenant_id and m.id_portal = r.id_portal and m.ativo
   join public.hiper_catalogo_vinculo v
     on v.tenant_id = p_tenant_id and v.tipo = 'modulo' and v.chave = m.app_nome
-  join public.produto_modulos pm on pm.id = v.modulo_id
   left join public.cliente_produtos cp
     on cp.cliente_id = r.ds_cliente_id and cp.fornecedor_id = v_forn
-   and cp.produto_id = pm.produto_id and cp.ativo
+   and cp.produto_id = v.produto_id and cp.ativo
   where r.tenant_id = p_tenant_id
     and r.estado_match = 'vinculado'
-    and r.ds_cliente_id is not null;
+    and r.ds_cliente_id is not null
+  order by r.ds_cliente_id, m.app_nome, (cp.id is null), v.produto_id;
 
   select count(*) filter (where cliente_produto_id is null),
          count(*) filter (where cliente_produto_id is not null and ja_tem),

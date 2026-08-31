@@ -73,34 +73,21 @@ export default function HiperModulosTab({
   const nomeProduto = (id: number) =>
     catalogo?.produtos?.find((p: any) => p.id === id)?.nome ?? "Sem produto";
 
-  /**
-   * Agrupado por produto. Um vínculo que já existe fora desses produtos continua
-   * na lista: escondê-lo faria o campo parecer "não vinculado" quando não está.
-   */
-  const opcoesModulo = useMemo(() => {
-    const todos = catalogo?.modulos ?? [];
-    const jaUsados = new Set(
-      vinculos.filter((v) => v.tipo === "modulo" && v.modulo_id).map((v) => v.modulo_id),
-    );
-    const visiveis = todos.filter(
-      (m: any) => produtosDosPlanos.has(m.produto_id) || jaUsados.has(m.id),
-    );
-    const grupos = new Map<number, any[]>();
-    for (const m of visiveis) {
-      const g = grupos.get(m.produto_id) ?? [];
-      g.push(m);
-      grupos.set(m.produto_id, g);
-    }
-    return Array.from(grupos.entries())
-      .map(([produtoId, mods]) => ({
-        produtoId,
-        produto: nomeProduto(produtoId),
-        deFora: !produtosDosPlanos.has(produtoId),
-        mods: mods.sort((a: any, b: any) => a.nome.localeCompare(b.nome, "pt-BR")),
-      }))
-      .sort((a, b) => Number(a.deFora) - Number(b.deFora) || a.produto.localeCompare(b.produto, "pt-BR"));
+  /** Os produtos que a seção Planos escolheu, na ordem em que aparecem na tela. */
+  const produtosAlvo = useMemo(
+    () => Array.from(produtosDosPlanos).sort((a, b) =>
+      nomeProduto(a as number).localeCompare(nomeProduto(b as number), "pt-BR")) as number[],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalogo, vinculos, produtosDosPlanos]);
+    [produtosDosPlanos, catalogo],
+  );
+
+  const vinculoModulo = (app: string, produtoId: number) =>
+    vinculos.find((v) => v.tipo === "modulo" && v.chave === app && v.produto_id === produtoId);
+
+  const modulosDoProduto = (produtoId: number) =>
+    (catalogo?.modulos ?? [])
+      .filter((m: any) => m.produto_id === produtoId)
+      .sort((a: any, b: any) => a.nome.localeCompare(b.nome, "pt-BR"));
 
   const semPlanoVinculado = produtosDosPlanos.size === 0;
 
@@ -132,11 +119,16 @@ export default function HiperModulosTab({
       .sort((a, b) => b.contas - a.contas);
   }, [espelho]);
 
-  const gravar = async (tipo: string, chave: string, campo: string, valor: any) => {
-    setSalvando(`${tipo}|${chave}`);
+  const gravar = async (
+    tipo: string, chave: string, campo: string, valor: any,
+    // Só para tipo='modulo': o mesmo app tem um vínculo por produto, então a
+    // linha a mexer é a daquele produto, não "a do app".
+    produtoId?: number,
+  ) => {
+    setSalvando(`${tipo}|${chave}|${produtoId ?? ""}`);
     try {
       const t = (supabase.from("hiper_catalogo_vinculo" as any) as any);
-      const existente = vinculoDe(tipo, chave);
+      const existente = produtoId != null ? vinculoModulo(chave, produtoId) : vinculoDe(tipo, chave);
       if (valor === null) {
         if (existente) {
           const { error } = await t.delete().eq("id", existente.id);
@@ -147,7 +139,10 @@ export default function HiperModulosTab({
           .eq("id", existente.id);
         if (error) throw error;
       } else {
-        const { error } = await t.insert({ tenant_id: tid, tipo, chave, [campo]: valor });
+        const { error } = await t.insert({
+          tenant_id: tid, tipo, chave, [campo]: valor,
+          ...(produtoId != null ? { produto_id: produtoId } : {}),
+        });
         if (error) throw error;
       }
       qc.invalidateQueries({ queryKey: ["hiper_vinculos"] });
@@ -268,9 +263,10 @@ export default function HiperModulosTab({
         )}
         {!semPlanoVinculado && (
           <p className="text-xs text-muted-foreground">
-            Só os módulos de{" "}
-            <strong>{Array.from(produtosDosPlanos).map((id) => nomeProduto(id as number)).join(" e ")}</strong>
-            {" "}— os produtos que você escolheu nos planos.
+            Um vínculo por produto:{" "}
+            <strong>{produtosAlvo.map((id) => nomeProduto(id)).join(" e ")}</strong> — os que você
+            escolheu nos planos. O mesmo app do Hiper aparece nos dois, e o módulo daqui pertence
+            a um produto só.
           </p>
         )}
         {apps.length === 0 ? (
@@ -278,10 +274,9 @@ export default function HiperModulosTab({
         ) : (
           <div className="rounded-lg border divide-y">
             {apps.map((a) => {
-              const v = vinculoDe("modulo", a.nome);
               const gratuito = a.max === 0;
               return (
-                <div key={a.nome} className="flex flex-wrap items-center gap-3 p-3">
+                <div key={a.nome} className="flex flex-wrap items-start gap-3 p-3">
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm flex items-center gap-2">
                       {a.nome}
@@ -295,18 +290,26 @@ export default function HiperModulosTab({
                       {a.bonificados > 0 && !gratuito && ` · ${num(a.bonificados)} sem custo`}
                     </p>
                   </div>
-                  <Sel value={v?.modulo_id ?? ""}
-                    disabled={salvando === `modulo|${a.nome}` || semPlanoVinculado}
-                    onChange={(val) => gravar("modulo", a.nome, "modulo_id", val)}>
-                    {opcoesModulo.map((g) => (
-                      <optgroup key={g.produtoId}
-                        label={g.deFora ? `${g.produto} (fora dos planos)` : g.produto}>
-                        {g.mods.map((m: any) => (
-                          <option key={m.id} value={m.id}>{m.nome}</option>
-                        ))}
-                      </optgroup>
+                  {/* Um seletor POR PRODUTO. O mesmo app aparece nos dois planos
+                      e o módulo daqui pertence a um produto só — um seletor
+                      único obrigaria a escolher um plano e deixaria o outro sem
+                      o módulo na hora de importar. */}
+                  <div className="flex flex-col gap-1.5">
+                    {produtosAlvo.map((pid) => (
+                      <label key={pid} className="flex items-center gap-2">
+                        <span className="w-28 shrink-0 text-right text-xs text-muted-foreground">
+                          {nomeProduto(pid)}
+                        </span>
+                        <Sel value={vinculoModulo(a.nome, pid)?.modulo_id ?? ""}
+                          disabled={salvando === `modulo|${a.nome}|${pid}`}
+                          onChange={(val) => gravar("modulo", a.nome, "modulo_id", val, pid)}>
+                          {modulosDoProduto(pid).map((m: any) => (
+                            <option key={m.id} value={m.id}>{m.nome}</option>
+                          ))}
+                        </Sel>
+                      </label>
                     ))}
-                  </Sel>
+                  </div>
                 </div>
               );
             })}
