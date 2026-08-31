@@ -252,3 +252,13 @@ verify_jwt = false
 # x-webhook-secret, nao por JWT do projeto. Chamada pela onboarding-intake-webhook.
 [functions.onboarding-intake-anexos]
 verify_jwt = false
+
+# Integração Hiper. verify_jwt = TRUE: as duas são chamadas do navegador, com a
+# sessão do admin, e já autenticam por dentro (auth.getUser + papel + tenant).
+# Estavam em produção com FALSE e sem entrada aqui — sem declaração o CI deploya
+# FALSE e o portão do gateway some sem decisão de ninguém.
+[functions.hiper-integration-save]
+verify_jwt = true
+
+[functions.hiper-integration-call]
+verify_jwt = true
