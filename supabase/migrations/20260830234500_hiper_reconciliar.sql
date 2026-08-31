@@ -225,12 +225,19 @@ begin
       where m.tenant_id = p_tenant_id and m.id_portal = n.id_portal and m.ativo
     ),
     dsm as (
+      -- Só módulo VINCULADO a um app do Hiper. Sem vínculo não dá para saber se
+      -- o portal tem ou não tem — dizer "a menos no Hiper" seria inventar.
       select cpm.modulo_id, coalesce(cpm.vlr_custo, 0) as custo, pm.nome
       from public.cliente_produto_modulos cpm
       join public.cliente_produtos cp on cp.id = cpm.cliente_produto_id
       join public.produto_modulos    pm on pm.id = cpm.modulo_id
       where cp.cliente_id = n.ds_id and cp.fornecedor_id = v_forn
         and cp.ativo and cpm.ativo
+        and exists (
+          select 1 from public.hiper_catalogo_vinculo v2
+          where v2.tenant_id = p_tenant_id and v2.tipo = 'modulo'
+            and v2.modulo_id = cpm.modulo_id
+        )
     ),
     a_mais as (select h.app_nome, h.custo from hip h
                where not exists (select 1 from dsm d where d.modulo_id = h.modulo_id)),
@@ -300,6 +307,9 @@ begin
       where c3.tenant_id = p_tenant_id and c3.matriz_id = n.ds_id
         and coalesce(c3.cancelado, false) = false
         and coalesce(dec3.decisao, '') <> 'paga_propria_conta'
+        -- O cadastro repetido tem o mesmo CNPJ da conta e casaria aqui: ele é
+        -- `cadastro_duplicado`, não "o portal cobra dela separado".
+        and c3.cnpj_digits is distinct from n.cnpj_norm
     ),
     -- "filial" com o MESMO CNPJ da matriz não é filial: é o cadastro repetido
     duplicado as (
