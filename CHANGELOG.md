@@ -12,6 +12,18 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Agosto / 2026
 
+### 31/08
+
+- 🆕 **Integração Hiper — a carteira do PortalHiper conferida contra a daqui** — A integração ganhou seis abas: **Conexão**, **Módulos**, **Visão geral**, **Custos**, **Sincronização** e **Divergências**. A sincronização é de mão única — o DoctorSaaS **lê** o portal e nunca escreve nele. Na primeira conferência da ASP: 994 contas, 633 vinculadas a clientes e **646 pendências** para decidir.
+
+- 🆕 **Cada tipo de contrato com a Hiper é conferido pela régua certa** — No **Hiperador** quem cobra o cliente é você, então só o **custo** é comparado: a coluna de MRR do Hiper fica vazia de propósito, porque o portal não conhece o seu preço. Na **Central de Cobrança** e na **Central de Leads** quem cobra é a Hiper, e ali o MRR e o custo saem do portal.
+
+- 🆕 **Filial deixou de sumir na conta** — A tela reconhece filial (estabelecimento com CNPJ próprio), amarra ela à matriz pelo código do cadastro e aponta os casos em que ela está carregando valor que deveria estar na matriz. Filial que **paga a própria conta** também existe: basta registrar uma vez e ela para de aparecer na lista.
+
+- 🆕 **Divergências já vem na ordem de atacar** — Primeiro o **tipo de contrato**, que decide qual regra de dinheiro vale; depois **filial**, que decide de quem o dinheiro é; e só então **valor**. Ao contrário, a mesma coisa é corrigida duas vezes.
+
+- ⬆️ **Um token do portal não pode mais ser usado na empresa errada** — Ao salvar, o DoctorSaaS pergunta ao portal de qual empresa aquele token é, mostra o nome na tela e **impede** que a mesma carteira seja ligada a duas empresas. Antes, um token colado no lugar errado espelhava a carteira de outra revenda sem nenhum aviso.
+
 ### 28/08
 
 - ⬆️ **Aprovação OEM — dá para saber quem é o cliente sem sair da tela** — Cada pedido passa a mostrar, abaixo do nome, o **outro nome do cliente** (razão social ou nome fantasia, o que a linha de cima não mostrou) e o **CNPJ, que copia no clique**. É o que se confere antes de liberar dinheiro e alteração na licença de um cliente. Vale para os pedidos que esperam e para o histórico.

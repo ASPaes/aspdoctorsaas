@@ -656,3 +656,84 @@ Não escreve nada no Hiper nem no PortalHiper. Não altera MRR sozinho — nem n
 consolidação de filial, que é ação humana em Divergências. Não funde cadastro
 duplicado. Não toca em `clientes.fornecedor_id`. Não cria endpoint de
 gravação. Não substitui a integração OEM nem compartilha tabela com ela.
+
+---
+
+## 12. Estado da implementação — 31/08/2026
+
+Executado de madrugada, com o dono dormindo. **Nenhum dado de negócio foi
+alterado**: o recon grava só nas tabelas dele, e as duas ações que escrevem em
+`cliente_produtos`/`cliente_produto_modulos` nascem em prévia e esperam um
+clique.
+
+### No ar
+
+| O quê | Onde | Estado |
+|---|---|---|
+| `/api/integ/v1/me` e `plano_detalhe`/`modulos[]`/`filiais[]` em `/clientes` | `projeto-hiper` `cd2b4f9` | **commitado, NÃO deployado** — o VPS é manual |
+| Schema (6 tabelas, RLS, índices) | prod `vbngjzovjhkmietztffo` | aplicado |
+| `hiper_reconciliar`, `hiper_norm_razao`, `hiper_importar_modulos` | prod | aplicadas, com grants |
+| `hiper-integration-save` / `-call` | prod v53, `verify_jwt=true` | deployadas pelo CI |
+| As 6 abas | `app.doctorsaas.com.br` | publicadas |
+
+### O primeiro cruzamento, medido
+
+994 contas no espelho · 1.411 módulos · 72 filiais · **633 contas vinculadas** ·
+**646 pendências**. Custo Hiper das vinculadas **R$ 61.269,48** contra
+**R$ 152.580,92** de mensalidade no DoctorSaaS.
+
+Divergências por família: custo 588 · sem tipo de contrato 143 · MRR 118 ·
+razão social 92 · filial só no Hiper 28 · conta sem cliente 23 · conta inativa
+17 · filial com valor 11 · cliente sem conta 9 · filial que é conta própria 3 ·
+tipo divergente 7 · filial sem matriz 6 · cadastro duplicado 4.
+
+Os 588 de custo **não são ruído**: a diferença média é de R$ 17 (Hiperador) a
+R$ 38 (centrais), e só 23 casos ficam abaixo de R$ 1.
+
+### Diferenças em relação ao desenho, e por quê
+
+- **`plano{}` virou `plano_detalhe{}`.** O payload já tinha um campo `plano`
+  (string) em uso pelo consumidor no ar; renomear quebraria quem já lê.
+- **`reconciliacao_hiper` ganhou `detalhe jsonb`.** O array `divergencias` diz
+  o QUE está errado; sem um segundo campo não havia onde dizer QUAL módulo ou
+  QUAL filial, e a aba não teria o que expandir.
+- **`hiper_importar_modulos` virou RPC.** O desenho tratava a importação como
+  função da aba; em SQL ela é transacional e reexecutável, e a prévia sai da
+  mesma consulta que grava — sem risco de a tela prometer um número e o banco
+  fazer outro.
+- **Duas queries por página no portal precisaram de lote e `range()`.** Com 500
+  contas por página os 500 uuids estouram a query string do PostgREST
+  ("fetch failed"), e sem `range()` ele corta em 1000 linhas devolvendo 200 —
+  o consumidor receberia cliente sem módulo achando que ele não tem.
+
+### O que NÃO foi feito, e por quê
+
+- **Consolidar filial na matriz.** É a única ação do módulo que move MRR.
+  Deixar um caminho que altera MRR armado em produção sem revisão do dono não é
+  aceitável; a aba mostra os valores lado a lado e registra a decisão, e o
+  movimento do dinheiro se constrói junto. **R$ 7.892,48 em 25 filiais seguem
+  como estão.**
+- **Cron da sincronização automática.** A coluna `sync_automatica_ativa` existe
+  desde antes, mas não há job. Um liga/desliga sem cron atrás seria um botão
+  que mente, então a aba tem só o disparo manual.
+- **Deploy do PortalHiper.** Não há CI no `projeto-hiper` e esta máquina não tem
+  chave SSH. Enquanto o portal não subir, as abas Módulos e Filiais vivem do
+  espelho já carregado e o aviso na tela explica isso em vez de aparecer vazio.
+
+### Como subir o portal
+
+```bash
+cd /var/www/hiper && git pull && pnpm install --frozen-lockfile && pnpm build \
+  && cp -r .next/static .next/standalone/.next/static \
+  && pm2 restart hiper
+```
+
+Depois: **Sincronização → Atualizar espelho agora**. A partir daí o pull traz
+módulos e filiais sozinho e liga a trava de identidade do tenant.
+
+### Credencial criada
+
+Token `hig_SKbYJwbS…` no PortalHiper, tenant ASP Softwares, nome
+`DoctorSaaS - integracao`, escopo `clientes:read`. Criado para conectar e testar
+de ponta a ponta. Está no Vault do DoctorSaaS. Para trocar: gere outro no
+painel do portal, cole em Conexão → Trocar token, e revogue este.
