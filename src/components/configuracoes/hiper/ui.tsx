@@ -116,3 +116,17 @@ export function Vazio({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+/**
+ * O portal informa valor MENSAL; o contrato daqui pode ser de outro período.
+ * Comparar cru fazia um contrato anual parecer 12× errado — "R$ 574,90 →
+ * R$ 51,09" quando o certo é R$ 613,08.
+ */
+export const noPeriodo = (valorMensal: number | null | undefined, fator: number | null | undefined) =>
+  valorMensal == null || fator == null ? null : Number(valorMensal) * fator;
+
+export const rotuloPeriodo = (fator: number | null | undefined) =>
+  fator == null ? "período sem conversão segura"
+  : fator === 12 ? "×12 · contrato anual"
+  : fator === 6 ? "×6 · contrato semestral"
+  : null;

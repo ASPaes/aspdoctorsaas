@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Explica, Origem, Vazio, brl, nomeTipo, cnpjMask } from "./ui";
+import { Explica, Origem, Vazio, brl, nomeTipo, cnpjMask, noPeriodo, rotuloPeriodo } from "./ui";
 import type { LinhaRecon } from "./useHiperDados";
 
 /**
@@ -24,8 +24,8 @@ export default function HiperCustosTab({ recon }: { recon: LinhaRecon[] }) {
         || (r.razao_social_hiper ?? "").toLowerCase().includes(q)
         || (r.cnpj_norm ?? "").includes(q.replace(/\D/g, "")))
       .sort((a, b) =>
-        Math.abs(Number(b.custo_ds ?? 0) - Number(b.custo_hiper ?? 0))
-        - Math.abs(Number(a.custo_ds ?? 0) - Number(a.custo_hiper ?? 0)));
+        Math.abs(Number(b.custo_ds ?? 0) - (noPeriodo(b.custo_hiper, b.fator_periodo) ?? 0))
+        - Math.abs(Number(a.custo_ds ?? 0) - (noPeriodo(a.custo_hiper, a.fator_periodo) ?? 0)));
   }, [recon, busca, tipo, soDivergentes]);
 
   if (recon.length === 0) {
@@ -82,9 +82,12 @@ export default function HiperCustosTab({ recon }: { recon: LinhaRecon[] }) {
             </thead>
             <tbody>
               {linhas.map((r) => {
-                const dif = Number(r.custo_ds ?? 0) - Number(r.custo_hiper ?? 0);
-                const markup = Number(r.custo_hiper ?? 0) > 0
-                  ? Number(r.mensalidade_ds ?? 0) / Number(r.custo_hiper) : null;
+                // Tudo no período do contrato: comparar o anual daqui com o
+                // mensal do portal daria 12x de diferença inventada.
+                const custoH = noPeriodo(r.custo_hiper, r.fator_periodo);
+                const mrrH = noPeriodo(r.mrr_hiper, r.fator_periodo);
+                const dif = custoH == null ? null : Number(r.custo_ds ?? 0) - custoH;
+                const markup = custoH && custoH > 0 ? Number(r.mensalidade_ds ?? 0) / custoH : null;
                 return (
                   <tr key={r.id} className="border-t hover:bg-muted/30">
                     <td className="px-3 py-2">
@@ -94,14 +97,21 @@ export default function HiperCustosTab({ recon }: { recon: LinhaRecon[] }) {
                     <td className="px-3 py-2 whitespace-nowrap">{nomeTipo(r.responsavel_tipo)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{brl(r.mensalidade_ds)}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                      {r.mrr_hiper == null ? "—" : brl(r.mrr_hiper)}
+                      {mrrH == null ? "—" : brl(mrrH)}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">{brl(r.custo_ds)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{brl(r.custo_hiper)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {custoH == null ? "—" : brl(custoH)}
+                      {rotuloPeriodo(r.fator_periodo) && (
+                        <span className="block text-[10px] text-muted-foreground">
+                          {rotuloPeriodo(r.fator_periodo)}
+                        </span>
+                      )}
+                    </td>
                     <td className={`px-3 py-2 text-right tabular-nums font-medium ${
-                      Math.abs(dif) < 0.01 ? "text-muted-foreground"
+                      dif == null || Math.abs(dif) < 0.01 ? "text-muted-foreground"
                         : dif > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
-                      {dif > 0 ? "+" : ""}{brl(dif)}
+                      {dif == null ? "—" : <>{dif > 0 ? "+" : ""}{brl(dif)}</>}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">
                       {markup == null ? "—" : `${markup.toFixed(2)}×`}
