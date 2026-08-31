@@ -35,6 +35,18 @@ Tudo abaixo foi conferido no banco, não inferido do repositório.
 - `cliente_produto_modulos` para produtos Hiper na ASP: **2 linhas, 1 contrato**.
   O portal tem 1.367 módulos ativos. Do lado de cá, módulo de Hiper praticamente
   não existe.
+- **Filial é um registro próprio em `clientes`**, com `matriz_id` apontando para
+  a matriz e `codigo_sequencial` como código do cadastro. Na ASP, clientes Hiper:
+  **33 filiais vivas** contra as 72 do portal.
+- **A regra do R$ 0,01 não é o que a base tem.** Das 33, só **2** estão em
+  R$ 0,01; **25 têm valor próprio**, somando **R$ 7.892,48 de MRR** e
+  R$ 2.414,08 de custo. Prova em um caso: CINE GRACHER é **uma conta** no portal
+  (`id_portal` 3482) com 10 estabelecimentos e custo total de **R$ 1.278,65**;
+  no DoctorSaaS são **11 registros**, cada um com ~R$ 420 de MRR e custo próprio.
+  O portal cobra uma vez, o cadastro daqui espalhou em onze.
+- Entre as 33, **6 têm o mesmo CNPJ da matriz** (é cadastro duplicado, não
+  filial) e **3 têm raiz de CNPJ diferente da matriz e são conta própria no
+  portal** — nessas, a regra do R$ 0,01 estaria errada.
 
 **Projeto Hiper (`ygevmtqzainzcjrqxenr`, repo `projeto-hiper`)**
 
@@ -69,6 +81,13 @@ Tudo abaixo foi conferido no banco, não inferido do repositório.
   Quatro apps são gratuitos por natureza — Gestão de preços (327), Comissão de
   vendas (320), POS Connect (95) e Hiper Connection (39), todos com custo 0 em
   100% das contas. Módulo **não tem MRR em lugar nenhum**: só custo.
+- **Filiais.** 768 linhas de estabelecimento, 698 vivas em 637 contas, das quais
+  **72 com CNPJ diferente do cadastro da conta** — que é a definição de filial
+  aqui. Dessas, **5 também existem como conta própria** no portal e **1 CNPJ
+  aparece em duas contas**. `client_branches` **não tem coluna de dinheiro
+  nenhuma**: o custo é sempre da conta, nunca do estabelecimento. E
+  `client_branches.id_portal` é **NULL nas 768 linhas** — a filial não tem
+  identificador no portal, a chave é o CNPJ e só.
 - API de integração: **um único endpoint**, `GET /api/integ/v1/clientes`,
   read-only, keyset por `id`, token `hig_` por tenant com escopo
   `clientes:read`, auditado em `audit_log`. **Um token ativo, do tenant ASP.**
@@ -81,9 +100,11 @@ Tudo abaixo foi conferido no banco, não inferido do repositório.
 |---|---|---|
 | D1 | Módulos e custo viajam **dentro de `/api/integ/v1/clientes`**, num array `modulos[]` por conta | Um pull, um snapshot, um ponto de consistência. Dois endpoints podem pegar estados diferentes do mesmo scrape e a reconciliação teria que casar os dois. |
 | D2 | **Nada é escrito no DoctorSaaS automaticamente.** Toda diferença vira linha em Divergências | Modelo do OEM, já em uso e já confiado. E porque o portal da ASP tem 355 contas inativas: uma sincronização automática cancelaria contratos em massa e geraria churn de MRR irreversível na base real. |
-| D3 | As famílias de divergência aprovadas entram todas na v1 | Decisão do dono. Viraram 6 depois que o tipo de contrato entrou no desenho. |
+| D3 | As famílias de divergência aprovadas entram todas na v1 | Decisão do dono. Viraram 7 depois que o tipo de contrato e a filial entraram no desenho. |
 | D4 | O escopo do lado DS sai de **`cliente_produtos.fornecedor_id`**, nunca de `clientes.fornecedor_id` | O campo legado é DEPRECATED no CLAUDE.md e os dois já discordam em 11 clientes na ASP. |
-| D5 | A unidade de reconciliação é a **conta** (`id_portal`), não a filial | A API não expõe filial e a cobrança do Hiper é por conta. Diferente do OEM, que é filial por natureza. |
+| D5 | **Filial entra na v1.** O match tem dois níveis: conta do portal ↔ cliente do DoctorSaaS, e estabelecimento do portal ↔ filial do DoctorSaaS. A chave dos dois é o CNPJ | Filial é registro próprio em `clientes`, com `matriz_id`, e sem tratá-la o recon acusaria as 33 filiais da ASP como "cliente sem conta no Hiper". A chave é o CNPJ porque `client_branches.id_portal` é NULL nas 768 linhas. |
+| D12 | **Conta própria ganha de estabelecimento.** Se um CNPJ existe como conta no portal, ele é cliente — mesmo aparecendo como estabelecimento de outra conta | São 5 casos hoje. O portal é quem sabe como cobra: se ele emite conta separada, aquilo não é filial. |
+| D13 | **Filial que paga a própria conta é decisão registrada, não regra** | Existem os dois casos na operação. A divergência apresenta e o operador decide; a decisão fica gravada em `hiper_filial_decisao` e **não volta** no recon seguinte. |
 | D6 | O DoctorSaaS passa a **saber e travar** de qual tenant do portal o token é, via `GET /api/integ/v1/me` | Ver capítulo 3. Sem isso o isolamento é torcida, não garantia. |
 | D7 | O catálogo de Módulos é **derivado do espelho**, não um endpoint próprio | O Hiper não tem tabela de preços como o OEM; o custo é por cliente. O catálogo é o `distinct` do que a carteira tem. |
 | D8 | **O tipo de contrato governa o que é comparado.** Nada é comparado do mesmo jeito nos três | No Hiperador o preço é decisão da ASP e o portal nem o conhece; em CC e CL quem cobra é a Hiper e o número dela é a verdade. |
@@ -168,8 +189,17 @@ Cada item de `clientes[]` passa a ter:
 "modulos": [
   { "nome": "Arquivos fiscais", "custo": 21.90, "comprado_por": "VEX DESENVOLVIMENTO DE SOFTWARES LTDA", "ativo": true },
   { "nome": "Gestão de preços",  "custo": 0.00,  "comprado_por": "Bonificado", "ativo": true }
+],
+"filiais": [
+  { "cnpj": "07272690000268", "nome": "CINE GRACHER LTDA EPP", "cidade": "Joinville", "uf": "SC", "ativo": true }
 ]
 ```
+
+`filiais[]` traz só os estabelecimentos **vivos** (`missing_since IS NULL` e não
+inativos) cujo CNPJ é **diferente do CNPJ da conta** — a definição de filial
+aqui. Não vai valor nenhum, porque `client_branches` não tem coluna de dinheiro:
+o custo é sempre da conta. Mesma query em lote da de módulos, `.in("end_client_id",
+idsDaPagina)`.
 
 Implementação: depois de montar a página (já limitada a `limit`), uma segunda
 query `client_addons` com `.eq("tenant_id", auth.tenantId).in("end_client_id",
@@ -255,7 +285,35 @@ A chave é o **nome** porque é isso que o portal tem: `client_addons.app_nome` 
 vínculo cai e o módulo reaparece como "não vinculado" na aba Módulos — visível,
 que é o comportamento certo, em vez de silenciosamente errado.
 
-### 5.5 `reconciliacao_hiper` (nova)
+### 5.5 `hiper_espelho_filial` (nova)
+
+```
+id uuid pk · tenant_id uuid not null · id_portal text not null   -- da CONTA
+cnpj text · cnpj_norm text not null · nome text · cidade text · uf text
+ativo boolean · pull_run_id uuid · pulled_at timestamptz
+UNIQUE (tenant_id, id_portal, cnpj_norm)
+INDEX (tenant_id, cnpj_norm)
+```
+
+`id_portal` é o da conta-mãe, não da filial: a filial não tem id no portal.
+Sem unicidade por `cnpj_norm` sozinho, de propósito — **um CNPJ aparece como
+estabelecimento de duas contas** hoje, e apagar um dos dois esconderia o
+problema em vez de mostrá-lo.
+
+### 5.6 `hiper_filial_decisao` (nova)
+
+```
+id uuid pk · tenant_id uuid not null · cliente_id uuid not null   -- a filial no DS
+decisao text not null CHECK (decisao IN ('consolida_na_matriz','paga_propria_conta','cliente_proprio'))
+observacao text · decidido_em timestamptz · decidido_por uuid
+UNIQUE (tenant_id, cliente_id)
+```
+
+É o que faz a decisão do operador **sobreviver ao recon**. Sem esta tabela, uma
+filial que paga a própria conta voltaria como divergência todo dia, e a lista
+viraria ruído até ninguém mais abrir a aba.
+
+### 5.7 `reconciliacao_hiper` (nova)
 
 Mesmo formato de `reconciliacao_oem`, adaptado:
 
@@ -289,7 +347,7 @@ Decisões do usuário (`status_usuario`, `candidato_escolhido`, `observacao`)
 só reabre uma linha resolvida se o conjunto `divergencias` mudar — senão,
 resolver uma divergência de manhã traria ela de volta à tarde.
 
-### 5.6 `hiper_sync_run` (nova) — é a aba Sincronização
+### 5.8 `hiper_sync_run` (nova) — é a aba Sincronização
 
 ```
 id uuid pk · tenant_id uuid not null
@@ -328,6 +386,18 @@ Chave única: **CNPJ normalizado** (`regexp_replace(cnpj,'\D','','g')`, 14
 dígitos). Sem match por nome — razão social do portal e do cadastro divergem
 demais para virar chave, e um falso positivo aqui vira churn errado.
 
+**O match tem dois níveis, nesta ordem:**
+
+1. **Conta** do portal ↔ cliente do DoctorSaaS. Um CNPJ que é conta no portal é
+   sempre cliente, nunca filial — inclusive quando também aparece como
+   estabelecimento de outra conta (5 casos hoje). É a precedência de D12.
+2. **Estabelecimento** do portal ↔ filial do DoctorSaaS, só para os CNPJs que
+   sobraram do passo 1. A filial casada tem que ter `matriz_id` apontando para o
+   cliente que casou com a conta-mãe; se apontar para outro, é divergência.
+
+Sem esse segundo nível o recon acusaria as 33 filiais da ASP como "cliente sem
+conta no Hiper" — 33 pendências falsas no dia 1.
+
 | Candidatos DS | `estado_match` |
 |---|---|
 | exatamente 1 | `vinculado` |
@@ -356,7 +426,7 @@ Conta ativa **sem lote de extrato** (26 das 622 ativas na ASP) não tem dinheiro
 a comparar: entra com `mrr_hiper` e `custo_hiper` nulos e **não** gera
 divergência de valor. Ausência de dado não é divergência.
 
-### 6.4 As 6 famílias, com as regras exatas
+### 6.4 As 7 famílias, com as regras exatas
 
 **F1 · Conta ativa no Hiper sem cliente no DS** → `estado_match='sem_dono'` e
 `situacao_hiper IN ('ativo','bloqueado')`. Custo saindo sem receita entrando.
@@ -365,6 +435,8 @@ Divergência: `sem_dono`.
 
 **F2 · Cliente no DS sem conta ativa no Hiper** → cliente no escopo, não
 cancelado, cuja conta está `inativo` no portal, ou cujo CNPJ não existe lá.
+**Não dispara para quem casou como filial no nível 2 do match** — senão as 33
+filiais da ASP entrariam aqui como cliente órfão, que é o oposto da verdade.
 Duas divergências distintas, porque as ações são distintas:
 `conta_inativa_no_hiper` (o cliente saiu e ninguém baixou aqui) e
 `sem_conta_no_hiper` (o vínculo está errado, ou é venda que nunca foi
@@ -409,11 +481,44 @@ pontuação, sem sufixo societário — senão "LTDA" vira 900 divergências), e
 `plano_divergente` (plano do portal vinculado a um produto que o cliente não
 tem ativo).
 
+**F7 · Filial** — o de-para de estabelecimento, onde toda decisão de árvore e de
+valor acontece:
+- `filial_faltando_no_ds`: estabelecimento vivo no portal com CNPJ próprio e sem
+  registro em `clientes`. São ~39 na ASP (72 lá contra 33 aqui).
+- `filial_sem_matriz`: registro no DS que casa com um estabelecimento mas está
+  sem `matriz_id`, ou com `matriz_id` apontando para um cliente que não é a
+  conta-mãe do portal.
+- `filial_com_valor`: filial com `vlr_mensal` ou `vlr_custo` acima de R$ 0,01 —
+  **25 hoje, somando R$ 7.892,48 de MRR**. A divergência mostra o valor da
+  filial, o da matriz e o custo total que o portal cobra da conta, e oferece as
+  duas saídas: **consolidar na matriz** (matriz passa a valer a soma, filial vai
+  a R$ 0,01) ou **paga a própria conta** (fica como está). A escolha grava em
+  `hiper_filial_decisao` e não volta.
+- `filial_e_conta_propria`: o CNPJ está amarrado como filial aqui, mas é conta
+  própria no portal — 3 casos. A saída sugerida é **desamarrar** (limpar
+  `matriz_id`, virar cliente com MRR e custo próprios), mas quem decide é o
+  operador, na lista, caso a caso.
+- `cadastro_duplicado`: "filial" com **o mesmo CNPJ da matriz** — 6 hoje. Não é
+  filial nem cliente novo: é o mesmo cadastro duas vezes. Só aponta; a fusão de
+  cadastro é decisão fora deste módulo.
+
+Consolidar na matriz **muda MRR**, então essa ação passa pelas mesmas travas de
+qualquer escrita de valor: prévia do antes/depois, uma transação por grupo, e
+registro de quem decidiu.
+
+**A amarração é `clientes.matriz_id`**, e o **`codigo_sequencial` da matriz** é o
+código que aparece na tela e nas listas — é por ele que a operação reconhece o
+grupo. Filial criada a partir de `filial_faltando_no_ds` nasce com `matriz_id`
+apontando para o cliente da conta-mãe, `vlr_mensal` e `vlr_custo` em **R$ 0,01**,
+e o mesmo fornecedor da matriz.
+
 ### 6.5 O que fica de fora da v1
 
 Inadimplência (`atraso_dias`, `total_aberto`) e usuários ativos aparecem na
 **Visão geral** como informação, não como divergência: não há ação de correção
-no DoctorSaaS para eles. Filial, conforme D5.
+no DoctorSaaS para eles. Fusão de cadastro duplicado: o módulo aponta, mas
+juntar dois clientes mexe em contrato, atendimento e histórico — é outro
+projeto.
 
 ---
 
@@ -462,7 +567,10 @@ automático (`sync_automatica_ativa`, já existe na tabela). Cron diário fora d
 pico, off-peak, seguindo a regra de performance do projeto.
 
 **Divergências** — uma linha por cliente, expandindo nas divergências dele, cada
-uma com o botão que resolve aquele caso. É a única aba onde algo é escrito.
+uma com o botão que resolve aquele caso. É a única aba onde algo é escrito. A
+filial aparece **dentro da linha da matriz**, nunca solta: o grupo é a unidade de
+leitura, identificado pelo `codigo_sequencial` da matriz. Filtro por família e
+ordenação por dinheiro desde o primeiro dia — a lista nasce longa.
 
 ---
 
@@ -503,8 +611,11 @@ Uma por vez, cada uma testável sozinha.
    como existir.
 4. **Visão geral + Custos** — leitura pura, sai barato depois de 2 e 3.
 5. **Divergências** — o recon completo e as ações de resolução. Dentro dela, a
-   ordem de ataque é F5 (tipo de contrato) antes de F3 (valor): corrigir o tipo
-   muda qual regra de dinheiro vale, e 166 contratos ativos não têm tipo nenhum.
+   ordem de ataque é **F5 (tipo de contrato) → F7 (filial) → F3 (valor)**: o tipo
+   decide qual regra de dinheiro vale e 166 contratos ativos não têm tipo nenhum;
+   a filial decide **de quem** é o dinheiro, e enquanto 25 filiais carregarem
+   R$ 7.892,48 a divergência de valor da matriz está comparando o número errado.
+   Atacar o valor antes dessas duas é corrigir duas vezes.
 
 ---
 
@@ -526,12 +637,22 @@ Uma por vez, cada uma testável sozinha.
   conta de dinheiro é do último lote disponível, e a tela precisa dizer de que
   mês está falando — senão a divergência de custo parece erro do sistema quando
   é só defasagem do fechamento.
+- **Filial não tem identificador no portal.** `client_branches.id_portal` é NULL
+  nas 768 linhas: a chave é o CNPJ. Se o portal corrigir o CNPJ de um
+  estabelecimento, ele vira uma filial nova e a antiga some — falha visível na
+  aba, nunca silenciosa.
+- **Cadastro defasado no portal gera filial falsa.** A conta cujo CNPJ do
+  cadastro não aparece entre os estabelecimentos faz o próprio estabelecimento
+  principal ser lido como filial. Pela contagem, são ~11 casos na ASP (72
+  estabelecimentos com CNPJ próprio contra 61 pela conta estabelecimentos − 1).
+  A aba precisa deixar esse caso reconhecível, não empurrar cadastro novo.
 - **A importação de módulos é escrita em massa na base real.** É a única parte
   do módulo que grava fora de Divergências. Prévia obrigatória, lote, e nada de
   rodar no pico.
 
 ## 11. O que este desenho não faz
 
-Não escreve nada no Hiper nem no PortalHiper. Não mexe em filiais. Não altera
-MRR sozinho. Não toca em `clientes.fornecedor_id`. Não cria endpoint de
+Não escreve nada no Hiper nem no PortalHiper. Não altera MRR sozinho — nem na
+consolidação de filial, que é ação humana em Divergências. Não funde cadastro
+duplicado. Não toca em `clientes.fornecedor_id`. Não cria endpoint de
 gravação. Não substitui a integração OEM nem compartilha tabela com ela.
