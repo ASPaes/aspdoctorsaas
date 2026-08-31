@@ -43,6 +43,8 @@ const FAMILIAS: { chave: string; rotulo: string; explica: string; peso: number }
   { chave: "modulo_a_mais_no_hiper", rotulo: "Módulo só no Hiper", peso: 4, explica: "O portal cobra um módulo que o contrato daqui não tem." },
   { chave: "modulo_a_menos_no_hiper", rotulo: "Módulo só aqui", peso: 4, explica: "O contrato tem um módulo que o portal não cobra." },
   { chave: "modulo_custo_divergente", rotulo: "Custo de módulo diferente", peso: 4, explica: "Módulo vinculado com custo diferente dos dois lados." },
+  { chave: "modulo_quantidade_divergente", rotulo: "Quantidade de módulo diferente", peso: 4,
+    explica: "O portal diz uma quantidade e o contrato daqui tem outra — normalmente o número de caixas do plano." },
   { chave: "sem_dono", rotulo: "Conta sem cliente aqui", peso: 5, explica: "Conta viva no Hiper que nenhum cadastro daqui é dono. Custo saindo sem receita entrando." },
   { chave: "sem_conta_no_hiper", rotulo: "Cliente sem conta no Hiper", peso: 5, explica: "Contrato ativo aqui sem conta no portal." },
   { chave: "conta_inativa_no_hiper", rotulo: "Conta inativa no Hiper", peso: 5, explica: "O cliente saiu no portal e o contrato daqui continua ativo." },
@@ -86,6 +88,20 @@ const ACOES: {
     divs: ["mrr_divergente"],
     detalhe: (r) => `${brl(r.mensalidade_ds)} → ${brl(r.mrr_hiper)} por mês`,
     efeito: "Muda a mensalidade do cliente e o MRR da base. Não gera movimento de upsell/downsell, então o Net New do mês não vai explicar essa diferença. Nos tenants com Omie ativo, o novo valor vai para o ERP.",
+  },
+  {
+    acao: "modulos",
+    rotulo: "Módulos",
+    divs: ["modulo_a_mais_no_hiper", "modulo_custo_divergente", "modulo_quantidade_divergente"],
+    detalhe: (r) => {
+      const m = (r.detalhe?.modulos ?? {}) as any;
+      const partes: string[] = [];
+      if (m.a_mais?.length) partes.push(`${m.a_mais.length} a inserir`);
+      if (m.quantidade?.length) partes.push(`${m.quantidade.length} com quantidade errada`);
+      if (m.custo?.length) partes.push(`${m.custo.length} com custo errado`);
+      return partes.join(" · ") || "acertar com o portal";
+    },
+    efeito: "Insere no contrato os módulos que o portal cobra e os que o plano implica (o Hiper Caixa vem do número de caixas da conta), e acerta quantidade e custo dos que já existem. Módulo do Hiper entra sem preço de venda — só custo.",
   },
   {
     acao: "razao_social",
@@ -463,13 +479,27 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
                       </div>
                     )}
 
-                    {(mods.a_mais || mods.a_menos || mods.custo) && (
-                      <div className="grid gap-3 sm:grid-cols-3">
+                    {(mods.a_mais || mods.a_menos || mods.custo || mods.quantidade) && (
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         {mods.a_mais && (
                           <div>
-                            <p className="font-medium mb-1">Só no Hiper</p>
+                            <p className="font-medium mb-1">Falta no contrato</p>
                             <ul className="text-muted-foreground space-y-0.5">
-                              {mods.a_mais.map((m: any) => <li key={m.nome}>{m.nome} · {brl(m.custo)}</li>)}
+                              {mods.a_mais.map((m: any) => (
+                                <li key={m.nome}>
+                                  {m.qtd > 1 && `${m.qtd}× `}{m.nome} · {brl(m.custo)}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {mods.quantidade && (
+                          <div>
+                            <p className="font-medium mb-1">Quantidade diferente</p>
+                            <ul className="text-muted-foreground space-y-0.5">
+                              {mods.quantidade.map((m: any) => (
+                                <li key={m.nome}>{m.nome}: {m.ds} aqui · {m.hiper} lá</li>
+                              ))}
                             </ul>
                           </div>
                         )}

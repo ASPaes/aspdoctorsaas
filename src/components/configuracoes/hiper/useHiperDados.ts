@@ -139,6 +139,21 @@ export function useHiperVinculos(tid: string | null, ligado: boolean) {
   });
 }
 
+/** Módulos que o plano implica e o portal não lista (o Caixa vem do contador). */
+export function useHiperPlanoModulos(tid: string | null, ligado: boolean) {
+  return useQuery({
+    queryKey: ["hiper_plano_modulos", tid],
+    enabled: !!tid && ligado,
+    queryFn: async () => {
+      const { data, error } = await t("hiper_plano_modulo")
+        .select("id, plano, modulo_id, produto_id, quantidade_de, quantidade_fixa")
+        .eq("tenant_id", tid as string);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+}
+
 export function useHiperRuns(tid: string | null, ligado: boolean) {
   return useQuery({
     queryKey: ["hiper_runs", tid],

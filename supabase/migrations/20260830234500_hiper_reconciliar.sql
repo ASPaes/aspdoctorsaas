@@ -57,6 +57,7 @@ begin
   end if;
 
   -- ── escopo do DoctorSaaS: só quem tem contrato ativo com o fornecedor Hiper ──
+  drop table if exists _ds;
   create temp table _ds on commit drop as
   select c.id                                as cliente_id,
          nullif(c.cnpj_digits, '')           as cnpj,
@@ -86,6 +87,7 @@ begin
   create index on _ds (cliente_id);
 
   -- ── candidatos por CNPJ da CONTA (nível 1 do match) ─────────────────────────
+  drop table if exists _cand;
   create temp table _cand on commit drop as
   select e.id_portal,
          count(d.cliente_id)                          as qtd,
@@ -99,6 +101,7 @@ begin
   -- ── nível 2: cliente que casa com um ESTABELECIMENTO, e não com uma conta.
   --    Conta própria ganha de estabelecimento: quem já casou no nível 1 não
   --    entra aqui (o portal é quem sabe como cobra).
+  drop table if exists _fil_match;
   create temp table _fil_match on commit drop as
   select f.id_portal, f.cnpj_norm, d.cliente_id, d.matriz_id,
          d.vlr_mensal, d.vlr_custo, d.cancelado, d.razao_social
@@ -113,6 +116,7 @@ begin
   create index on _fil_match (cliente_id);
 
   -- ── as linhas da conta ──────────────────────────────────────────────────────
+  drop table if exists _novo;
   create temp table _novo on commit drop as
   with base as (
     select
@@ -222,14 +226,14 @@ begin
   --    é pendência da aba Módulos, não do cliente (senão 327 contas repetiriam
   --    a mesma linha).
   left join lateral (
-    with hip as (
+    with addons as (
       -- O mesmo app do Hiper existe nos DOIS produtos (Gestão e Mini) e o módulo
       -- daqui pertence a um só. Vale o vínculo do produto que ESTE cliente tem
       -- contratado; sem o join em cliente_produtos, cada app viria duas vezes e
       -- a metade acusaria "módulo a mais" falso. O distinct on cobre o cliente
       -- que tem os dois produtos.
       select distinct on (m.app_nome)
-             m.app_nome, coalesce(m.custo, 0) as custo, v.modulo_id
+             m.app_nome, coalesce(m.custo, 0) as custo, v.modulo_id, 1 as quantidade
       from public.hiper_espelho_modulo m
       join public.hiper_catalogo_vinculo v
         on v.tenant_id = p_tenant_id and v.tipo = 'modulo' and v.chave = m.app_nome
@@ -239,10 +243,35 @@ begin
       where m.tenant_id = p_tenant_id and m.id_portal = n.id_portal and m.ativo
       order by m.app_nome, v.produto_id
     ),
+    -- O plano implica módulo que o portal não lista como addon: 1 caixa na
+    -- conta = 1 Hiper Caixa. Custo zero — a sobra fica no produto.
+    do_plano as (
+      select pm2.nome as app_nome, 0::numeric as custo, pmod.modulo_id,
+             (case pmod.quantidade_de
+                when 'qt_caixas'   then coalesce(e2.plano_qt_caixas, 0)
+                when 'qt_usuarios' then coalesce(e2.plano_qt_usuarios, 0)
+                when 'qt_filiais'  then coalesce(e2.plano_qt_filiais, 0)
+                else pmod.quantidade_fixa
+              end)::integer as quantidade
+      from public.hiper_plano_modulo pmod
+      join public.hiper_espelho_cadastro e2
+        on e2.tenant_id = p_tenant_id and e2.id_portal = n.id_portal and e2.plano = pmod.plano
+      join public.produto_modulos pm2 on pm2.id = pmod.modulo_id
+      join public.cliente_produtos cpy
+        on cpy.cliente_id = n.ds_id and cpy.fornecedor_id = v_forn and cpy.ativo
+       and cpy.produto_id = pmod.produto_id
+      where pmod.tenant_id = p_tenant_id
+    ),
+    hip as (
+      select app_nome, custo, modulo_id, quantidade from addons
+      union all
+      select app_nome, custo, modulo_id, quantidade from do_plano where quantidade > 0
+    ),
     dsm as (
       -- Só módulo VINCULADO a um app do Hiper. Sem vínculo não dá para saber se
       -- o portal tem ou não tem — dizer "a menos no Hiper" seria inventar.
-      select cpm.modulo_id, coalesce(cpm.vlr_custo, 0) as custo, pm.nome
+      select cpm.modulo_id, coalesce(cpm.vlr_custo, 0) as custo, pm.nome,
+             coalesce(cpm.quantidade, 1) as quantidade
       from public.cliente_produto_modulos cpm
       join public.cliente_produtos cp on cp.id = cpm.cliente_produto_id
       join public.produto_modulos    pm on pm.id = cpm.modulo_id
@@ -254,8 +283,13 @@ begin
             and v2.modulo_id = cpm.modulo_id
         )
     ),
-    a_mais as (select h.app_nome, h.custo from hip h
+    a_mais as (select h.app_nome, h.custo, h.quantidade from hip h
                where not exists (select 1 from dsm d where d.modulo_id = h.modulo_id)),
+    qtd_dif as (
+      select h.app_nome, h.quantidade as no_hiper, d.quantidade as no_ds
+      from hip h join dsm d on d.modulo_id = h.modulo_id
+      where h.quantidade <> d.quantidade
+    ),
     a_menos as (select d.nome, d.custo from dsm d
                 where not exists (select 1 from hip h where h.modulo_id = d.modulo_id)),
     -- custo só diverge quando há custo de algum lado: 1.079 dos 1.367 módulos
@@ -270,9 +304,11 @@ begin
       (case when exists (select 1 from a_mais)    then array['modulo_a_mais_no_hiper']  else '{}'::text[] end)
    || (case when exists (select 1 from a_menos)   then array['modulo_a_menos_no_hiper'] else '{}'::text[] end)
    || (case when exists (select 1 from custo_dif) then array['modulo_custo_divergente'] else '{}'::text[] end)
+   || (case when exists (select 1 from qtd_dif)   then array['modulo_quantidade_divergente'] else '{}'::text[] end)
       as divergencias,
       jsonb_strip_nulls(jsonb_build_object(
-        'a_mais',  (select jsonb_agg(jsonb_build_object('nome', app_nome, 'custo', custo)) from a_mais),
+        'a_mais',  (select jsonb_agg(jsonb_build_object('nome', app_nome, 'custo', custo, 'qtd', quantidade)) from a_mais),
+        'quantidade', (select jsonb_agg(jsonb_build_object('nome', app_nome, 'hiper', no_hiper, 'ds', no_ds)) from qtd_dif),
         'a_menos', (select jsonb_agg(jsonb_build_object('nome', nome, 'custo', custo)) from a_menos),
         'custo',   (select jsonb_agg(jsonb_build_object('nome', app_nome, 'hiper', custo_hiper, 'ds', custo_ds)) from custo_dif)
       )) as detalhe

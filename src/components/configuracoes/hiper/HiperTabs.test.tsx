@@ -191,7 +191,7 @@ describe("aba Módulos", () => {
 
   it("dá um seletor por produto, cada um só com os módulos daquele produto", () => {
     render(<HiperModulosTab tid="t1" espelho={espelho} modulos={modulosEspelho}
-      vinculos={vinculosPlanos} catalogo={catalogo} temRecon />);
+      vinculos={vinculosPlanos} planoModulos={[]} catalogo={catalogo} temRecon />);
     const rotulos = Array.from(container.querySelectorAll("label span")).map((s) => s.textContent);
     expect(rotulos).toContain("Hiper Gestão");
     expect(rotulos).toContain("Hiper Mini");
@@ -211,16 +211,29 @@ describe("aba Módulos", () => {
     render(<HiperModulosTab tid="t1" espelho={espelho} modulos={modulosEspelho}
       vinculos={[...vinculosPlanos,
         { id: "v3", tipo: "modulo", chave: "Arquivos fiscais", modulo_id: "m1", produto_id: 3 }]}
-      catalogo={catalogo} temRecon />);
+      planoModulos={[]} catalogo={catalogo} temRecon />);
     const selects = Array.from(container.querySelectorAll("select")) as HTMLSelectElement[];
     const doApp = selects.slice(-2);
     expect(doApp[0].value).toBe("m1");  // Hiper Gestão vinculado
     expect(doApp[1].value).toBe("");    // Hiper Mini ainda não
   });
 
+  it("mostra o módulo que o plano implica, com a origem da quantidade", () => {
+    render(<HiperModulosTab tid="t1" espelho={espelho} modulos={modulosEspelho}
+      vinculos={vinculosPlanos}
+      planoModulos={[{ id: "pm1", plano: "Hiper Gestão - Mensal", modulo_id: "m1",
+                       produto_id: 3, quantidade_de: "qt_caixas", quantidade_fixa: 1 }]}
+      catalogo={catalogo} temRecon />);
+    const txt = container.textContent ?? "";
+    expect(txt).toContain("Módulos que o plano implica");
+    expect(txt).toContain("quantidade = caixas da conta");
+    // custo zero é decisão, e precisa estar escrito
+    expect(txt).toContain("custo zero");
+  });
+
   it("sem plano vinculado, não oferece módulo nenhum e diz o que fazer", () => {
     render(<HiperModulosTab tid="t1" espelho={espelho} modulos={modulosEspelho}
-      vinculos={[]} catalogo={catalogo} temRecon />);
+      vinculos={[]} planoModulos={[]} catalogo={catalogo} temRecon />);
     // Os selects de plano e de tipo de contrato continuam; o que não pode
     // existir é seletor de MÓDULO, que só nasce dentro de um label por produto.
     expect(container.querySelectorAll("label span").length).toBe(0);

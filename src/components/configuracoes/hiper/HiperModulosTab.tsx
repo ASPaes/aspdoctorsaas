@@ -41,12 +41,13 @@ function Sel({ value, onChange, children, disabled }: {
 }
 
 export default function HiperModulosTab({
-  tid, espelho, modulos, vinculos, catalogo, temRecon,
+  tid, espelho, modulos, vinculos, planoModulos, catalogo, temRecon,
 }: {
   tid: string | null;
   espelho: any[];
   modulos: any[];
   vinculos: any[];
+  planoModulos: any[];
   catalogo: { produtos: any[]; modulos: any[]; modelos: any[] } | undefined;
   temRecon: boolean;
 }) {
@@ -164,8 +165,8 @@ export default function HiperModulosTab({
       if (previaApenas) { setPrevia(r); return; }
       setPrevia(null);
       toast({
-        title: `${num(r.inseridos)} módulos importados`,
-        description: `${num(r.ja_tinham)} já existiam · ${num(r.sem_produto_no_contrato)} sem o produto no contrato`,
+        title: `${num(r.inseridos)} inseridos · ${num(r.ajustados)} ajustados`,
+        description: `${num(r.ja_conferiam)} já conferiam · ${num(r.sem_produto_no_contrato)} sem o produto no contrato`,
       });
       qc.invalidateQueries({ queryKey: ["hiper_recon"] });
     } catch (e: any) {
@@ -237,6 +238,47 @@ export default function HiperModulosTab({
             );
           })}
         </div>
+      </section>
+
+      {/* O portal não lista como addon o que o PLANO já inclui: uma conta com
+          1 caixa tem um Hiper Caixa, e isso precisa entrar no contrato daqui
+          para o custo e a lista de módulos baterem. */}
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold">Módulos que o plano implica</h3>
+        <p className="text-xs text-muted-foreground">
+          O portal não lista estes como app comprado — eles saem dos contadores da conta.
+          Entram no contrato com <strong>custo zero</strong>: quem carrega o valor é o produto,
+          porque o Hiper informa o total da conta e não separa quanto é caixa.
+        </p>
+        {planoModulos.length === 0 ? (
+          <Vazio>Nenhum módulo de plano mapeado.</Vazio>
+        ) : (
+          <div className="rounded-lg border divide-y">
+            {planoModulos.map((pm) => {
+              const mod = catalogo?.modulos?.find((m: any) => m.id === pm.modulo_id);
+              const contas = espelho.filter((c) => c.plano === pm.plano).length;
+              return (
+                <div key={pm.id} className="flex flex-wrap items-center gap-3 p-3 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">{pm.plano}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {num(contas)} contas · {nomeProduto(pm.produto_id)}
+                    </p>
+                  </div>
+                  <span className="text-muted-foreground">→</span>
+                  <div className="min-w-0">
+                    <p className="font-medium">{mod?.nome ?? "módulo removido"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {pm.quantidade_de === "fixo"
+                        ? `quantidade fixa: ${pm.quantidade_fixa}`
+                        : `quantidade = ${pm.quantidade_de.replace("qt_", "")} da conta`}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <section className="space-y-2">
@@ -330,13 +372,19 @@ export default function HiperModulosTab({
                 </p>
                 <ul className="list-disc pl-5 space-y-0.5">
                   <li><strong>{num(previa?.a_inserir)}</strong> módulos a inserir</li>
-                  <li>{num(previa?.ja_tem)} já existem no contrato e não serão tocados</li>
+                  {previa?.ajustar_quantidade > 0 && (
+                    <li>{num(previa?.ajustar_quantidade)} com quantidade a acertar</li>
+                  )}
+                  {previa?.ajustar_custo > 0 && (
+                    <li>{num(previa?.ajustar_custo)} com custo a acertar</li>
+                  )}
+                  <li>{num(previa?.ja_conferem)} já conferem e não serão tocados</li>
                   <li>
                     {num(previa?.sem_produto_no_contrato)} sem o produto correspondente no
                     contrato do cliente — esses ficam de fora
                   </li>
                 </ul>
-                {previa?.a_inserir === 0 && (
+                {previa?.a_inserir === 0 && previa?.ajustar_quantidade === 0 && previa?.ajustar_custo === 0 && (
                   <p className="text-muted-foreground">
                     Nada a fazer: vincule os apps aos módulos do DoctorSaaS acima primeiro.
                   </p>
@@ -346,10 +394,11 @@ export default function HiperModulosTab({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction disabled={!previa?.a_inserir || importando}
+            <AlertDialogAction
+              disabled={importando || !(previa?.a_inserir || previa?.ajustar_quantidade || previa?.ajustar_custo)}
               onClick={(e) => { e.preventDefault(); importar(false); }}>
               {importando && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              Importar {num(previa?.a_inserir)} módulos
+              Importar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

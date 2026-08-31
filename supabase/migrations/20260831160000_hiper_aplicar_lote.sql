@@ -27,6 +27,7 @@ declare
   v_recorr  text;
   v_modelo  bigint;
   v_antes   numeric;
+  v_mod     jsonb;
   v_ok      jsonb := '[]'::jsonb;
   v_nao     jsonb := '[]'::jsonb;
   v_motivo  text;
@@ -93,11 +94,15 @@ begin
         'motivo', 'O portal não tem custo apurado para esta conta.');
     else
       select vlr_custo into v_antes from public.cliente_produtos where id = v_cp_id;
-      update public.cliente_produtos
-         set vlr_custo = r.custo_hiper, updated_at = now()
-       where id = v_cp_id;
-      v_ok := v_ok || jsonb_build_object('acao', 'custo', 'cliente', r.razao_social_ds,
-        'de', v_antes, 'para', r.custo_hiper);
+      -- Só grava e só reporta quando MUDA. Listar "51,09 -> 51,09" como
+      -- aplicado faz o operador achar que corrigiu algo que já estava certo.
+      if abs(coalesce(v_antes, 0) - r.custo_hiper) > 0.01 then
+        update public.cliente_produtos
+           set vlr_custo = r.custo_hiper, updated_at = now()
+         where id = v_cp_id;
+        v_ok := v_ok || jsonb_build_object('acao', 'custo', 'cliente', r.razao_social_ds,
+          'de', v_antes, 'para', r.custo_hiper);
+      end if;
     end if;
   end if;
 
@@ -109,11 +114,37 @@ begin
         'motivo', 'No Hiperador o portal não conhece o preço — só você define a mensalidade.');
     else
       select vlr_mensal into v_antes from public.cliente_produtos where id = v_cp_id;
-      update public.cliente_produtos
-         set vlr_mensal = r.mrr_hiper, updated_at = now()
-       where id = v_cp_id;
-      v_ok := v_ok || jsonb_build_object('acao', 'mrr', 'cliente', r.razao_social_ds,
-        'de', v_antes, 'para', r.mrr_hiper);
+      if abs(coalesce(v_antes, 0) - r.mrr_hiper) > 0.01 then
+        update public.cliente_produtos
+           set vlr_mensal = r.mrr_hiper, updated_at = now()
+         where id = v_cp_id;
+        v_ok := v_ok || jsonb_build_object('acao', 'mrr', 'cliente', r.razao_social_ds,
+          'de', v_antes, 'para', r.mrr_hiper);
+      end if;
+    end if;
+  end if;
+
+  -- ── módulos ───────────────────────────────────────────────────────────────
+  -- A mesma lógica do lote da aba Módulos, para um cliente só: insere o que
+  -- falta (addon do portal e módulo que o plano implica) e acerta quantidade e
+  -- custo do que já existe.
+  if 'modulos' = any(p_acoes) then
+    if v_cp_qtd = 0 then
+      v_nao := v_nao || jsonb_build_object('acao', 'modulos', 'cliente', r.razao_social_ds,
+        'motivo', 'Sem contrato ativo com o fornecedor Hiper.');
+    else
+      v_mod := public.hiper_importar_modulos(p_tenant_id, false, p_recon_id);
+      if coalesce((v_mod->>'inseridos')::integer, 0)
+       + coalesce((v_mod->>'ajustados')::integer, 0) > 0 then
+        v_ok := v_ok || jsonb_build_object('acao', 'modulos', 'cliente', r.razao_social_ds,
+          'de', format('%s no contrato', coalesce((v_mod->>'ja_conferiam')::integer, 0)),
+          'para', format('%s inseridos, %s ajustados',
+                         coalesce((v_mod->>'inseridos')::integer, 0),
+                         coalesce((v_mod->>'ajustados')::integer, 0)));
+      elsif coalesce((v_mod->>'sem_produto_no_contrato')::integer, 0) > 0 then
+        v_nao := v_nao || jsonb_build_object('acao', 'modulos', 'cliente', r.razao_social_ds,
+          'motivo', 'O produto do módulo não está no contrato do cliente.');
+      end if;
     end if;
   end if;
 
@@ -131,6 +162,25 @@ begin
           'de', r.razao_social_ds, 'para', r.razao_social_hiper);
       end if;
     end if;
+  end if;
+
+  -- O contrato precisa acompanhar o produto. Sem isto a ficha do cliente abre
+  -- com "os valores dos contratos divergem dos produtos" logo depois de o botão
+  -- dizer que atualizou. sync_cliente_produto_to_contract já existe e é ela que
+  -- o resto do sistema usa: atualiza o item, e no contrato IMPLÍCITO sincroniza
+  -- também datas, modelo e recorrência. Num contrato real ela mexe só no item e
+  -- no total — cláusula assinada não é coisa de robô.
+  if jsonb_array_length(v_ok) > 0 and v_cp_id is not null
+     and (p_acoes && array['mrr', 'tipo_contrato', 'modulos']) then
+    -- Não derruba o lote. A guarda dela é por auth.uid(), então um chamador sem
+    -- sessão (service_role, cron) faria 500 clientes falharem por causa do
+    -- primeiro. O valor já gravou; o que falta é dito, não escondido.
+    begin
+      perform public.sync_cliente_produto_to_contract(v_cp_id);
+    exception when others then
+      v_nao := v_nao || jsonb_build_object('acao', 'contrato', 'cliente', r.razao_social_ds,
+        'motivo', format('Valor atualizado, mas o contrato não sincronizou: %s', sqlerrm));
+    end;
   end if;
 
   return jsonb_build_object('aplicado', v_ok, 'recusado', v_nao);

@@ -197,7 +197,10 @@ serve(async (req) => {
             if (c.last_scraped_at && (!maxScraped || c.last_scraped_at > maxScraped)) {
               maxScraped = c.last_scraped_at;
             }
-            const plano = c.plano_detalhe ?? {};
+            // Portal antigo não manda plano_detalhe. Gravar null aqui apagaria
+            // os contadores que já estão no espelho — e com eles os módulos de
+            // plano, que saem de qt_caixas. Ausente ≠ zero.
+            const plano = c.plano_detalhe ?? null;
             contas.set(idPortal, {
               tenant_id: targetTenantId,
               id_portal: idPortal,
@@ -228,9 +231,13 @@ serve(async (req) => {
               atraso_dias: c.atraso_dias ?? null,
               total_aberto: num(c.total_aberto),
               last_scraped_at: c.last_scraped_at ?? null,
-              plano_qt_usuarios: plano.qt_usuarios ?? null,
-              plano_qt_caixas: plano.qt_caixas ?? null,
-              plano_qt_filiais: plano.qt_filiais ?? null,
+              ...(plano
+                ? {
+                    plano_qt_usuarios: plano.qt_usuarios ?? null,
+                    plano_qt_caixas: plano.qt_caixas ?? null,
+                    plano_qt_filiais: plano.qt_filiais ?? null,
+                  }
+                : {}),
               pull_run_id: runId,
               raw: c,
             });
@@ -275,6 +282,24 @@ serve(async (req) => {
 
       const truncado = paginas >= MAX_PAGES && !!cursor;
       const temAgregados = modulos.size > 0 || filiais.size > 0;
+      const temPlano = Array.from(contas.values()).some((c) => "plano_qt_caixas" in c);
+
+      // O espelho de cadastro é regravado do zero. Quando o portal não manda os
+      // contadores do plano, eles precisam vir do que já está aqui — senão o
+      // delete leva junto e as contas perdem os módulos de plano.
+      if (!temPlano && contas.size > 0) {
+        const { data: anterior } = await supabase
+          .from("hiper_espelho_cadastro")
+          .select("id_portal, plano_qt_usuarios, plano_qt_caixas, plano_qt_filiais")
+          .eq("tenant_id", targetTenantId);
+        for (const a of anterior ?? []) {
+          const c = contas.get(String(a.id_portal));
+          if (!c) continue;
+          c.plano_qt_usuarios = a.plano_qt_usuarios;
+          c.plano_qt_caixas = a.plano_qt_caixas;
+          c.plano_qt_filiais = a.plano_qt_filiais;
+        }
+      }
 
       // Snapshot fresco por tenant. Os espelhos de módulo e filial só são
       // apagados quando o portal REALMENTE mandou esses campos — senão um portal

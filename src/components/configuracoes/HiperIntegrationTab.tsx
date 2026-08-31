@@ -11,7 +11,7 @@ import HiperSincronizacaoTab from "./hiper/HiperSincronizacaoTab";
 import HiperDivergenciasTab from "./hiper/HiperDivergenciasTab";
 import {
   useCatalogoDS, useHiperEspelho, useHiperFiliais, useHiperIntegracao,
-  useHiperModulos, useHiperRecon, useHiperRuns, useHiperVinculos,
+  useHiperModulos, useHiperPlanoModulos, useHiperRecon, useHiperRuns, useHiperVinculos,
 } from "./hiper/useHiperDados";
 
 /**
@@ -33,6 +33,7 @@ export default function HiperIntegrationTab() {
   const { data: filiais = [] } = useHiperFiliais(tid, conectado);
   const { data: recon = [] } = useHiperRecon(tid, conectado);
   const { data: vinculos = [] } = useHiperVinculos(tid, conectado);
+  const { data: planoModulos = [] } = useHiperPlanoModulos(tid, conectado);
   const { data: runs = [] } = useHiperRuns(tid, conectado);
   const { data: catalogo } = useCatalogoDS(tid, conectado);
 
@@ -71,7 +72,8 @@ export default function HiperIntegrationTab() {
 
       <TabsContent value="modulos">
         <HiperModulosTab tid={tid} espelho={espelho} modulos={modulos}
-          vinculos={vinculos} catalogo={catalogo} temRecon={recon.length > 0} />
+          vinculos={vinculos} planoModulos={planoModulos} catalogo={catalogo}
+          temRecon={recon.length > 0} />
       </TabsContent>
 
       <TabsContent value="visao">
