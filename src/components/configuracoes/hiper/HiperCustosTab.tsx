@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Explica, Origem, Vazio, brl, nomeTipo, cnpjMask, noPeriodo, rotuloPeriodo } from "./ui";
+import { Explica, Origem, Vazio, anual, brl, nomeTipo, cnpjMask } from "./ui";
 import type { LinhaRecon } from "./useHiperDados";
 
 /**
@@ -24,8 +24,8 @@ export default function HiperCustosTab({ recon }: { recon: LinhaRecon[] }) {
         || (r.razao_social_hiper ?? "").toLowerCase().includes(q)
         || (r.cnpj_norm ?? "").includes(q.replace(/\D/g, "")))
       .sort((a, b) =>
-        Math.abs(Number(b.custo_ds ?? 0) - (noPeriodo(b.custo_hiper, b.fator_periodo) ?? 0))
-        - Math.abs(Number(a.custo_ds ?? 0) - (noPeriodo(a.custo_hiper, a.fator_periodo) ?? 0)));
+        Math.abs(Number(b.custo_ds ?? 0) - Number(b.custo_hiper ?? 0))
+        - Math.abs(Number(a.custo_ds ?? 0) - Number(a.custo_hiper ?? 0)));
   }, [recon, busca, tipo, soDivergentes]);
 
   if (recon.length === 0) {
@@ -84,8 +84,8 @@ export default function HiperCustosTab({ recon }: { recon: LinhaRecon[] }) {
               {linhas.map((r) => {
                 // Tudo no período do contrato: comparar o anual daqui com o
                 // mensal do portal daria 12x de diferença inventada.
-                const custoH = noPeriodo(r.custo_hiper, r.fator_periodo);
-                const mrrH = noPeriodo(r.mrr_hiper, r.fator_periodo);
+                const custoH = r.custo_hiper == null ? null : Number(r.custo_hiper);
+                const mrrH = r.mrr_hiper == null ? null : Number(r.mrr_hiper);
                 const dif = custoH == null ? null : Number(r.custo_ds ?? 0) - custoH;
                 const markup = custoH && custoH > 0 ? Number(r.mensalidade_ds ?? 0) / custoH : null;
                 return (
@@ -102,9 +102,9 @@ export default function HiperCustosTab({ recon }: { recon: LinhaRecon[] }) {
                     <td className="px-3 py-2 text-right tabular-nums">{brl(r.custo_ds)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">
                       {custoH == null ? "—" : brl(custoH)}
-                      {rotuloPeriodo(r.fator_periodo) && (
+                      {custoH != null && (
                         <span className="block text-[10px] text-muted-foreground">
-                          {rotuloPeriodo(r.fator_periodo)}
+                          {brl(anual(custoH))} no ano
                         </span>
                       )}
                     </td>

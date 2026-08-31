@@ -41,7 +41,7 @@ export interface LinhaRecon {
   custo_ds: number | null;
   cancelado_ds: boolean | null;
   qtd_candidatos_ds: number;
-  fator_periodo: number | null;
+  recorrencia_ds: string | null;
   estado_match: string;
   divergencias: string[];
   detalhe: Record<string, any>;

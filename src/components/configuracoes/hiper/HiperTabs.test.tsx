@@ -34,7 +34,7 @@ const base: LinhaRecon = {
   ds_cliente_id: "c1", ds_cliente_produto_id: "cp1", razao_social_ds: "Cine Gracher",
   cnpj_ds: "07272690000187", modelo_contrato_id_ds: 2, modelo_contrato_ds: "Royalties",
   mensalidade_ds: 425.63, custo_ds: 126.77, cancelado_ds: false,
-  qtd_candidatos_ds: 1, fator_periodo: 1, estado_match: "vinculado",
+  qtd_candidatos_ds: 1, recorrencia_ds: "mensal", estado_match: "vinculado",
   divergencias: ["custo_divergente", "filial_com_valor"],
   detalhe: {
     filiais: {
@@ -99,20 +99,19 @@ describe("abas da integração Hiper", () => {
     expect(container.textContent).toContain("não há o que gravar automaticamente");
   });
 
-  it("mostra o valor do portal no período do contrato, não o mensal cru", () => {
-    // Contrato anual: o portal diz R$ 51,09/mês e o cadastro daqui guarda o ano.
-    // Sem o fator, a tela mostraria "R$ 574,90 → R$ 51,09" e a diferença
-    // pareceria 12x maior do que é.
+  it("compara mês a mês e mostra o ano calculado dos dois lados", () => {
+    // O contrato guarda valor MENSAL mesmo com cobrança anual — é o que o MRR
+    // do sistema soma. O ano é derivado, e é ele que deixa ver de relance se os
+    // dois lados batem.
     render(<HiperDivergenciasTab tid="t1" recon={[{
-      ...base, fator_periodo: 12, custo_hiper: 51.09, custo_ds: 574.9,
-      mrr_hiper: 92.76, mensalidade_ds: 1149.79,
-      divergencias: ["custo_divergente", "mrr_divergente"],
+      ...base, recorrencia_ds: "anual", custo_hiper: 51.09, custo_ds: 51.09,
+      mrr_hiper: 92.76, mensalidade_ds: 92.76, divergencias: ["razao_social_divergente"],
     }]} />);
     act(() => { container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
     const txt = (container.textContent ?? "").replace(/\u00a0/g, " ");
-    expect(txt).toContain("R$ 613,08");             // 51,09 x 12
-    expect(txt).toContain("R$ 51,09/mês ×12 · contrato anual");
-    expect(txt).toContain("R$ 1.113,12");           // 92,76 x 12
+    expect(txt).toContain("cobrança anual");       // contexto, sem mudar a conta
+    expect(txt).toContain("R$ 613,08 no ano");     // 51,09 x 12, os dois lados
+    expect(txt).toContain("R$ 1.113,12 no ano");   // 92,76 x 12
   });
 
   it("deixa desmarcar a mensalidade e atualizar só o custo", () => {

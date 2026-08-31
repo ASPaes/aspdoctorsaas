@@ -68,8 +68,7 @@ begin
          a.vlr_custo,
          a.modelo_contrato_id,
          a.cp_id,
-         a.recorrencia,
-         public.hiper_fator_periodo(a.recorrencia) as fator
+         a.recorrencia
   from public.clientes c
   cross join lateral (
     select sum(cp.vlr_mensal)                                              as vlr_mensal,
@@ -134,7 +133,7 @@ begin
   comds as (
     select b.*, d.cliente_id as ds_id, d.razao_social as razao_ds, d.cnpj as cnpj_ds,
            d.vlr_mensal, d.vlr_custo, d.cancelado, d.modelo_contrato_id, d.cp_id,
-           d.fator
+           d.recorrencia
     from base b
     left join _ds d on d.cliente_id = b.cliente_id
   ),
@@ -162,7 +161,7 @@ begin
   select
     y.id_portal, y.cnpj_norm, y.razao_hiper, y.situacao, y.responsavel_tipo, y.plano,
     y.cancelada_em, y.cancelada_por, y.custo_hiper, y.mrr_hiper,
-    y.ds_id, y.cp_id, y.razao_ds, y.cnpj_ds, y.modelo_contrato_id, y.fator,
+    y.ds_id, y.cp_id, y.razao_ds, y.cnpj_ds, y.modelo_contrato_id, y.recorrencia,
     y.vlr_mensal, y.vlr_custo, y.cancelado, y.qtd, y.candidato_escolhido,
     case when y.ds_id is not null then 'vinculado'
          when y.qtd > 1            then 'ambiguo'
@@ -180,14 +179,14 @@ begin
     plano_hiper, responsavel_tipo, mrr_hiper, custo_hiper, cancelada_em, cancelada_por,
     ds_cliente_id, ds_cliente_produto_id, razao_social_ds, cnpj_ds,
     modelo_contrato_id_ds, modelo_contrato_ds, mensalidade_ds, custo_ds, cancelado_ds,
-    qtd_candidatos_ds, criterio_match, estado_match, fator_periodo, divergencias, detalhe, margem
+    qtd_candidatos_ds, criterio_match, estado_match, recorrencia_ds, divergencias, detalhe, margem
   )
   select
     p_tenant_id, now(), n.id_portal, n.cnpj_norm, n.razao_hiper, n.situacao,
     n.plano, n.responsavel_tipo, n.mrr_hiper, n.custo_hiper, n.cancelada_em, n.cancelada_por,
     n.ds_id, n.cp_id, n.razao_ds, n.cnpj_ds,
     n.modelo_contrato_id, mc.nome, n.vlr_mensal, n.vlr_custo, n.cancelado,
-    n.qtd, n.criterio_match, n.estado_match, n.fator,
+    n.qtd, n.criterio_match, n.estado_match, n.recorrencia,
     -- as comparações escalares, na ordem em que a operação ataca:
     -- tipo de contrato decide a regra do dinheiro; filial decide de quem ele é.
       (case when n.estado_match = 'sem_dono' and n.viva            then array['sem_dono']                 else '{}'::text[] end)
@@ -199,20 +198,14 @@ begin
    || (case when n.estado_match = 'vinculado' and n.viva
                  and n.modelo_contrato_id is not null and n.modelo_esperado is not null
                  and n.modelo_contrato_id <> n.modelo_esperado     then array['tipo_contrato_divergente'] else '{}'::text[] end)
-   -- O contrato daqui pode ser de outro período; o valor do portal é mensal.
-   -- Sem o fator, todo contrato anual viraria divergência falsa de 12x.
-   || (case when n.estado_match = 'vinculado' and n.custo_hiper is not null and n.fator is not null
-                 and abs(coalesce(n.vlr_custo, 0) - n.custo_hiper * n.fator) > 0.01
+   -- Mês contra mês, sempre. O contrato guarda valor MENSAL mesmo quando a
+   -- cobrança é anual — a recorrência é a cadência, não o valor.
+   || (case when n.estado_match = 'vinculado' and n.custo_hiper is not null
+                 and abs(coalesce(n.vlr_custo, 0) - n.custo_hiper) > 0.01
                                                                    then array['custo_divergente']         else '{}'::text[] end)
-   || (case when n.estado_match = 'vinculado' and n.mrr_hiper is not null and n.fator is not null
-                 and abs(coalesce(n.vlr_mensal, 0) - n.mrr_hiper * n.fator) > 0.01
+   || (case when n.estado_match = 'vinculado' and n.mrr_hiper is not null
+                 and abs(coalesce(n.vlr_mensal, 0) - n.mrr_hiper) > 0.01
                                                                    then array['mrr_divergente']           else '{}'::text[] end)
-   -- Recorrência sem conversão segura (semanal): some da comparação de valor,
-   -- mas NÃO some da lista. Sumir em silêncio esconderia que aquele cliente
-   -- nunca é conferido.
-   || (case when n.estado_match = 'vinculado' and n.viva
-                 and n.fator is null and n.custo_hiper is not null
-                                                                   then array['periodo_nao_comparavel'] else '{}'::text[] end)
    || (case when n.estado_match = 'vinculado' and n.viva
                  and public.hiper_norm_razao(n.razao_hiper) is distinct from public.hiper_norm_razao(n.razao_ds)
                                                                    then array['razao_social_divergente']  else '{}'::text[] end)
@@ -220,8 +213,8 @@ begin
     jsonb_strip_nulls(jsonb_build_object(
       'modulos', nullif(coalesce(md.detalhe, '{}'::jsonb), '{}'::jsonb),
       'filiais', nullif(coalesce(fl.detalhe, '{}'::jsonb), '{}'::jsonb))),
-    case when n.custo_hiper is not null and n.vlr_mensal is not null and n.fator is not null
-         then round(n.vlr_mensal - n.custo_hiper * n.fator, 2) end
+    case when n.custo_hiper is not null and n.vlr_mensal is not null
+         then round(n.vlr_mensal - n.custo_hiper, 2) end
   from _novo n
   left join public.modelos_contrato mc on mc.id = n.modelo_contrato_id
 
@@ -378,7 +371,7 @@ begin
     qtd_candidatos_ds     = excluded.qtd_candidatos_ds,
     criterio_match        = excluded.criterio_match,
     estado_match          = excluded.estado_match,
-    fator_periodo         = excluded.fator_periodo,
+    recorrencia_ds        = excluded.recorrencia_ds,
     divergencias          = excluded.divergencias,
     detalhe               = excluded.detalhe,
     margem                = excluded.margem,

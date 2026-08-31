@@ -27,7 +27,6 @@ declare
   v_recorr  text;
   v_modelo  bigint;
   v_antes   numeric;
-  v_fator   integer;
   v_ok      jsonb := '[]'::jsonb;
   v_nao     jsonb := '[]'::jsonb;
   v_motivo  text;
@@ -53,8 +52,6 @@ begin
   from public.cliente_produtos cp
   where cp.cliente_id = r.ds_cliente_id and cp.fornecedor_id = v_forn and cp.ativo;
 
-  -- Quantos meses do portal cabem num período deste contrato. Anual = 12.
-  v_fator := public.hiper_fator_periodo(v_recorr);
 
   -- ── tipo de contrato ──────────────────────────────────────────────────────
   if 'tipo_contrato' = any(p_acoes) then
@@ -86,8 +83,6 @@ begin
   v_motivo := case
     when v_cp_qtd = 0 then 'Sem contrato ativo com o fornecedor Hiper.'
     when v_cp_qtd > 1 then 'Mais de um contrato Hiper ativo: o valor do portal é da conta inteira e não dá para saber em qual linha entra.'
-    when v_fator is null then
-      format('Recorrência "%s" não tem conversão segura a partir do valor mensal do portal.', v_recorr)
   end;
 
   if 'custo' = any(p_acoes) then
@@ -99,10 +94,10 @@ begin
     else
       select vlr_custo into v_antes from public.cliente_produtos where id = v_cp_id;
       update public.cliente_produtos
-         set vlr_custo = round(r.custo_hiper * v_fator, 2), updated_at = now()
+         set vlr_custo = r.custo_hiper, updated_at = now()
        where id = v_cp_id;
       v_ok := v_ok || jsonb_build_object('acao', 'custo', 'cliente', r.razao_social_ds,
-        'de', v_antes, 'para', round(r.custo_hiper * v_fator, 2));
+        'de', v_antes, 'para', r.custo_hiper);
     end if;
   end if;
 
@@ -115,10 +110,10 @@ begin
     else
       select vlr_mensal into v_antes from public.cliente_produtos where id = v_cp_id;
       update public.cliente_produtos
-         set vlr_mensal = round(r.mrr_hiper * v_fator, 2), updated_at = now()
+         set vlr_mensal = r.mrr_hiper, updated_at = now()
        where id = v_cp_id;
       v_ok := v_ok || jsonb_build_object('acao', 'mrr', 'cliente', r.razao_social_ds,
-        'de', v_antes, 'para', round(r.mrr_hiper * v_fator, 2));
+        'de', v_antes, 'para', r.mrr_hiper);
     end if;
   end if;
 

@@ -10,7 +10,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Explica, Origem, Vazio, brl, cnpjMask, nomeTipo, noPeriodo, num, rotuloPeriodo } from "./ui";
+import { Explica, Origem, Vazio, anual, brl, cnpjMask, nomeTipo, num, rotuloRecorrencia } from "./ui";
 import type { LinhaRecon } from "./useHiperDados";
 
 /**
@@ -48,8 +48,6 @@ const FAMILIAS: { chave: string; rotulo: string; explica: string; peso: number }
   { chave: "conta_inativa_no_hiper", rotulo: "Conta inativa no Hiper", peso: 5, explica: "O cliente saiu no portal e o contrato daqui continua ativo." },
   { chave: "cnpj_ambiguo", rotulo: "CNPJ com mais de um cliente", peso: 5, explica: "Precisa de escolha humana: dois cadastros disputam a mesma conta." },
   { chave: "razao_social_divergente", rotulo: "Razão social diferente", peso: 6, explica: "Comparação já ignora acento, pontuação e sufixo societário." },
-  { chave: "periodo_nao_comparavel", rotulo: "Valor não comparável", peso: 6,
-    explica: "O contrato aqui tem recorrência sem conversão segura a partir do valor mensal do portal (semanal). O valor não é comparado nem gravado automaticamente — a linha fica na lista para você conferir na mão." },
 ];
 
 const META = Object.fromEntries(FAMILIAS.map((f) => [f.chave, f]));
@@ -79,14 +77,14 @@ const ACOES: {
     acao: "custo",
     rotulo: "Custo",
     divs: ["custo_divergente"],
-    detalhe: (r) => `${brl(r.custo_ds)} → ${brl(noPeriodo(r.custo_hiper, r.fator_periodo))}`,
+    detalhe: (r) => `${brl(r.custo_ds)} → ${brl(r.custo_hiper)} por mês`,
     efeito: "Atualiza o custo do contrato e o custo de operação do cliente. Não mexe em receita.",
   },
   {
     acao: "mrr",
     rotulo: "Mensalidade (MRR)",
     divs: ["mrr_divergente"],
-    detalhe: (r) => `${brl(r.mensalidade_ds)} → ${brl(noPeriodo(r.mrr_hiper, r.fator_periodo))}`,
+    detalhe: (r) => `${brl(r.mensalidade_ds)} → ${brl(r.mrr_hiper)} por mês`,
     efeito: "Muda a mensalidade do cliente e o MRR da base. Não gera movimento de upsell/downsell, então o Net New do mês não vai explicar essa diferença. Nos tenants com Omie ativo, o novo valor vai para o ERP.",
   },
   {
@@ -322,6 +320,7 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
                     <p className="text-xs text-muted-foreground">
                       {cnpjMask(r.cnpj_norm ?? r.cnpj_ds)} · {nomeTipo(r.responsavel_tipo)}
                       {r.situacao_hiper && ` · ${r.situacao_hiper} no Hiper`}
+                      {rotuloRecorrencia(r.recorrencia_ds) && ` · ${rotuloRecorrencia(r.recorrencia_ds)}`}
                     </p>
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {r.divergencias.map((d) => (
@@ -341,37 +340,38 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
 
                 {abertoAqui && (
                   <div className="border-t bg-muted/20 p-4 space-y-4 text-sm">
+                    {/* Tudo por MÊS, que é a unidade dos dois lados e a que o MRR
+                        do sistema soma. O ano vem embaixo, calculado — é ele que
+                        deixa ver de relance que os dois lados estão de acordo. */}
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       <div>
                         <p className="text-xs text-muted-foreground">Mensalidade <Origem lado="ds" /></p>
                         <p className="tabular-nums font-medium">{brl(r.mensalidade_ds)}</p>
+                        <p className="text-[10px] text-muted-foreground">{brl(anual(r.mensalidade_ds))} no ano</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">MRR <Origem lado="hiper" /></p>
                         <p className="tabular-nums font-medium">
                           {r.mrr_hiper == null
                             ? <span className="text-muted-foreground font-normal">o portal não sabe o preço</span>
-                            : brl(noPeriodo(r.mrr_hiper, r.fator_periodo) ?? r.mrr_hiper)}
+                            : brl(r.mrr_hiper)}
                         </p>
-                        {r.mrr_hiper != null && rotuloPeriodo(r.fator_periodo) && (
-                          <p className="text-[10px] text-muted-foreground">
-                            {brl(r.mrr_hiper)}/mês {rotuloPeriodo(r.fator_periodo)}
-                          </p>
+                        {r.mrr_hiper != null && (
+                          <p className="text-[10px] text-muted-foreground">{brl(anual(r.mrr_hiper))} no ano</p>
                         )}
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Custo <Origem lado="ds" /></p>
                         <p className="tabular-nums font-medium">{brl(r.custo_ds)}</p>
+                        <p className="text-[10px] text-muted-foreground">{brl(anual(r.custo_ds))} no ano</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Custo <Origem lado="hiper" /></p>
                         <p className="tabular-nums font-medium">
-                          {r.custo_hiper == null ? "—" : brl(noPeriodo(r.custo_hiper, r.fator_periodo) ?? r.custo_hiper)}
+                          {r.custo_hiper == null ? "—" : brl(r.custo_hiper)}
                         </p>
-                        {r.custo_hiper != null && rotuloPeriodo(r.fator_periodo) && (
-                          <p className="text-[10px] text-muted-foreground">
-                            {brl(r.custo_hiper)}/mês {rotuloPeriodo(r.fator_periodo)}
-                          </p>
+                        {r.custo_hiper != null && (
+                          <p className="text-[10px] text-muted-foreground">{brl(anual(r.custo_hiper))} no ano</p>
                         )}
                       </div>
                     </div>

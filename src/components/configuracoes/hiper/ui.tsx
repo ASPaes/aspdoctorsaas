@@ -118,15 +118,13 @@ export function Vazio({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * O portal informa valor MENSAL; o contrato daqui pode ser de outro período.
- * Comparar cru fazia um contrato anual parecer 12× errado — "R$ 574,90 →
- * R$ 51,09" quando o certo é R$ 613,08.
+ * O contrato guarda valor MENSAL, sempre — inclusive quando a cobrança é anual.
+ * A recorrência é a cadência, não o valor: é assim que o MRR do sistema já
+ * soma. O valor do ano é calculado, nunca digitado.
  */
-export const noPeriodo = (valorMensal: number | null | undefined, fator: number | null | undefined) =>
-  valorMensal == null || fator == null ? null : Number(valorMensal) * fator;
+export const anual = (mensal: number | null | undefined) =>
+  mensal == null ? null : Number(mensal) * 12;
 
-export const rotuloPeriodo = (fator: number | null | undefined) =>
-  fator == null ? "período sem conversão segura"
-  : fator === 12 ? "×12 · contrato anual"
-  : fator === 6 ? "×6 · contrato semestral"
-  : null;
+/** Cadência da cobrança, como contexto. Mensal não precisa ser dito. */
+export const rotuloRecorrencia = (r: string | null | undefined) =>
+  !r || r === "mensal" ? null : `cobrança ${r}`;
