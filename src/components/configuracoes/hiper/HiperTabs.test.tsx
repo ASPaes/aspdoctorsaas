@@ -78,11 +78,49 @@ describe("abas da integração Hiper", () => {
     expect(txt).toContain("07.272.690/0003-49"); // filial só no Hiper, com máscara
   });
 
+  it("Divergências oferece atualizar e abrir cadastro em nova aba", () => {
+    render(<HiperDivergenciasTab tid="t1" recon={[base]} />);
+    act(() => { container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    const txt = container.textContent ?? "";
+    expect(txt).toContain("Atualizar no DoctorSaaS");
+    const link = container.querySelector('a[href="/clientes/c1"]') as HTMLAnchorElement;
+    expect(link).toBeTruthy();
+    expect(link.target).toBe("_blank");
+    // "Marcar resolvida" virou texto honesto: ela não corrige nada.
+    expect(txt).toContain("Já resolvi por fora");
+    expect(txt).not.toContain("Marcar resolvida");
+  });
+
+  it("não oferece atualizar quando não há nada que o botão saiba gravar", () => {
+    render(<HiperDivergenciasTab tid="t1"
+      recon={[{ ...base, divergencias: ["filial_com_valor", "sem_dono"], detalhe: {} }]} />);
+    act(() => { container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    expect(container.textContent).not.toContain("Atualizar no DoctorSaaS");
+    expect(container.textContent).toContain("não há o que gravar automaticamente");
+  });
+
+  it("mostra o antes e o depois de cada campo antes de gravar", () => {
+    render(<HiperDivergenciasTab tid="t1"
+      recon={[{ ...base, divergencias: ["custo_divergente", "mrr_divergente"], mrr_hiper: 92.76 }]} />);
+    act(() => { container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    const botao = Array.from(container.querySelectorAll("button"))
+      .find((b) => b.textContent?.includes("Atualizar no DoctorSaaS"));
+    act(() => { botao?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    // Intl usa espaço NÃO SEPARÁVEL depois do "R$": comparar com espaço comum
+    // falha sem nenhuma pista do porquê.
+    const dialogo = (document.body.textContent ?? "").replace(/\u00a0/g, " ");
+    expect(dialogo).toContain("R$ 126,77");   // custo daqui
+    expect(dialogo).toContain("R$ 1.461,77"); // custo do portal
+    expect(dialogo).toContain("R$ 92,76");    // MRR do portal
+    // o efeito do MRR fica escrito, não escondido
+    expect(dialogo).toContain("Net New");
+  });
+
   it("Divergências não quebra quando o detalhe vem vazio", () => {
     render(<HiperDivergenciasTab tid="t1" recon={[{ ...base, detalhe: {}, divergencias: ["sem_dono"] }]} />);
     const botao = container.querySelector("button");
     act(() => { botao?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
-    expect(container.textContent).toContain("Marcar resolvida");
+    expect(container.textContent).toContain("Já resolvi por fora");
   });
 });
 

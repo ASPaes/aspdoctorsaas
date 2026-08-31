@@ -5,7 +5,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Check, ChevronRight, EyeOff, Loader2 } from "lucide-react";
+import { Check, ChevronRight, ExternalLink, EyeOff, Loader2, Wand2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Explica, Origem, Vazio, brl, cnpjMask, nomeTipo, num } from "./ui";
 import type { LinhaRecon } from "./useHiperDados";
 
@@ -48,6 +52,42 @@ const FAMILIAS: { chave: string; rotulo: string; explica: string; peso: number }
 
 const META = Object.fromEntries(FAMILIAS.map((f) => [f.chave, f]));
 
+/**
+ * As divergências que o botão sabe consertar sozinho, e o efeito de cada uma.
+ * O resto continua sendo decisão na ficha do cliente: filial mexe em árvore,
+ * cadastro duplicado é fusão, e conta sem dono não tem o que gravar.
+ */
+const APLICAVEIS: Record<string, { acao: string; rotulo: (r: LinhaRecon) => string; efeito?: string }> = {
+  tipo_contrato_ausente: {
+    acao: "tipo_contrato",
+    rotulo: (r) => `Definir contrato como ${nomeTipo(r.responsavel_tipo)}`,
+  },
+  tipo_contrato_divergente: {
+    acao: "tipo_contrato",
+    rotulo: (r) => `Trocar contrato para ${nomeTipo(r.responsavel_tipo)}`,
+  },
+  custo_divergente: {
+    acao: "custo",
+    rotulo: (r) => `Custo: ${brl(r.custo_ds)} → ${brl(r.custo_hiper)}`,
+    efeito: "Atualiza o custo do contrato e o custo de operação do cliente. Não mexe em receita.",
+  },
+  mrr_divergente: {
+    acao: "mrr",
+    rotulo: (r) => `Mensalidade: ${brl(r.mensalidade_ds)} → ${brl(r.mrr_hiper)}`,
+    efeito: "Muda a mensalidade do cliente e o MRR da base. Não gera movimento de upsell/downsell, então o Net New do mês não vai explicar essa diferença. Nos tenants com Omie ativo, o novo valor vai para o ERP.",
+  },
+  razao_social_divergente: {
+    acao: "razao_social",
+    rotulo: (r) => `Razão social: usar “${r.razao_social_hiper}”`,
+    efeito: "Enfileira sincronismo do cadastro para o Omie.",
+  },
+};
+
+const aplicaveisDe = (r: LinhaRecon) =>
+  r.divergencias.filter((d) => APLICAVEIS[d]).filter((d, i, todas) =>
+    // tipo ausente e tipo divergente gravam a mesma coisa: não repete o botão
+    todas.findIndex((x) => APLICAVEIS[x].acao === APLICAVEIS[d].acao) === i);
+
 export default function HiperDivergenciasTab({ tid, recon }: { tid: string | null; recon: LinhaRecon[] }) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -56,6 +96,7 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
   const [busca, setBusca] = useState("");
   const [aberta, setAberta] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
+  const [confirmar, setConfirmar] = useState<{ linha: LinhaRecon; escolhidas: string[] } | null>(null);
 
   const contagem = useMemo(() => {
     const m: Record<string, number> = {};
@@ -101,6 +142,30 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
       qc.invalidateQueries({ queryKey: ["hiper_recon"] });
     } catch (e: any) {
       toast({ title: "Não foi possível marcar", description: e.message, variant: "destructive" });
+    } finally { setOcupado(null); }
+  };
+
+  const aplicar = async () => {
+    if (!confirmar) return;
+    const { linha, escolhidas } = confirmar;
+    setOcupado(linha.id);
+    try {
+      const { data, error } = await supabase.rpc("hiper_aplicar_correcao" as any, {
+        p_tenant_id: tid, p_recon_id: linha.id,
+        p_acoes: escolhidas.map((d) => APLICAVEIS[d].acao),
+      } as any);
+      if (error) throw error;
+      const r = data as any;
+      if (!r?.ok) throw new Error(r?.erro || "Não foi possível aplicar.");
+      setConfirmar(null);
+      toast({
+        title: `${r.aplicado.length} ${r.aplicado.length === 1 ? "campo atualizado" : "campos atualizados"}`,
+        description: r.aplicado
+          .map((a: any) => `${a.acao}: ${a.de ?? "—"} → ${a.para}`).join(" · "),
+      });
+      qc.invalidateQueries({ queryKey: ["hiper_recon"] });
+    } catch (e: any) {
+      toast({ title: "Não foi possível aplicar", description: e.message, variant: "destructive" });
     } finally { setOcupado(null); }
   };
 
@@ -167,6 +232,7 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
             const nome = r.razao_social_ds ?? r.razao_social_hiper ?? "—";
             const fil = (r.detalhe?.filiais ?? {}) as any;
             const mods = (r.detalhe?.modulos ?? {}) as any;
+            const aplicaveis = aplicaveisDe(r);
             return (
               <div key={r.id}>
                 <button type="button" onClick={() => setAberta(abertoAqui ? null : r.id)}
@@ -338,13 +404,31 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
                       </div>
                     )}
 
-                    <div className="flex flex-wrap gap-2 pt-1">
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {aplicaveis.length > 0 && (
+                        <Button size="sm" disabled={ocupado === r.id}
+                          onClick={() => setConfirmar({ linha: r, escolhidas: aplicaveis })}>
+                          {ocupado === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+                          Atualizar no DoctorSaaS
+                          {aplicaveis.length > 1 && ` (${aplicaveis.length})`}
+                        </Button>
+                      )}
+
+                      {/* Nova aba de propósito: a lista de divergências costuma ser
+                          percorrida inteira, e navegar para fora perderia o lugar. */}
+                      {r.ds_cliente_id && (
+                        <Button asChild size="sm" variant="outline">
+                          <a href={`/clientes/${r.ds_cliente_id}`} target="_blank" rel="noreferrer">
+                            <ExternalLink className="h-3 w-3" /> Abrir cadastro
+                          </a>
+                        </Button>
+                      )}
+
                       {r.status_usuario === "pendente" ? (
                         <>
-                          <Button size="sm" variant="outline" disabled={ocupado === r.id}
+                          <Button size="sm" variant="ghost" disabled={ocupado === r.id}
                             onClick={() => marcar(r.id, "resolvido")}>
-                            {ocupado === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                            Marcar resolvida
+                            <Check className="h-3 w-3" /> Já resolvi por fora
                           </Button>
                           <Button size="sm" variant="ghost" disabled={ocupado === r.id}
                             onClick={() => marcar(r.id, "ignorado")}>
@@ -359,8 +443,14 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Marcar não altera nada no cadastro — some da lista e volta sozinha se o
-                      conjunto de divergências deste cliente mudar no próximo espelho.
+                      <strong>Atualizar</strong> grava no cadastro daqui o que o portal diz.{" "}
+                      <strong>Já resolvi por fora</strong> e <strong>Ignorar</strong> não mexem em
+                      nada: só tiram a linha da lista, e ela volta sozinha se o conjunto de
+                      divergências deste cliente mudar no próximo espelho.
+                      {aplicaveis.length === 0 && (
+                        <> Nesta linha não há o que gravar automaticamente — filial mexe na árvore
+                        de cadastro e conta sem dono não tem onde escrever.</>
+                      )}
                     </p>
                   </div>
                 )}
@@ -374,6 +464,43 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
           )}
         </div>
       )}
+
+      {/* Confirmação com o antes e o depois de CADA campo. O botão é um clique,
+          mas nenhum valor muda sem estar escrito na tela primeiro. */}
+      <AlertDialog open={!!confirmar} onOpenChange={(o) => !o && setConfirmar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Atualizar {confirmar?.linha.razao_social_ds ?? confirmar?.linha.razao_social_hiper}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>O cadastro daqui passa a ter o que o portal diz:</p>
+                <ul className="space-y-2">
+                  {(confirmar?.escolhidas ?? []).map((d) => (
+                    <li key={d} className="rounded border bg-muted/40 px-2.5 py-2">
+                      <span className="font-medium text-foreground">
+                        {APLICAVEIS[d].rotulo(confirmar!.linha)}
+                      </span>
+                      {APLICAVEIS[d].efeito && (
+                        <span className="block text-xs mt-0.5">{APLICAVEIS[d].efeito}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={!!ocupado}
+              onClick={(e) => { e.preventDefault(); aplicar(); }}>
+              {ocupado && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Atualizar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
