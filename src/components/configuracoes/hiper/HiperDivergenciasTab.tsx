@@ -126,6 +126,7 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
   const [busca, setBusca] = useState("");
   const [aberta, setAberta] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
+  const [limite, setLimite] = useState(300);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [confirmar, setConfirmar] = useState<{ linhas: LinhaRecon[]; escolhidas: Set<string> } | null>(null);
 
@@ -167,8 +168,18 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
       });
   }, [recon, familia, status, busca]);
 
-  /** Só entra no lote quem tem algo que o botão sabe gravar. */
-  const selecionaveis = useMemo(() => linhas.filter((l) => acoesDe(l).length > 0), [linhas]);
+  /**
+   * Buscar por nome ou CNPJ nunca trunca: o resultado é curto e a pessoa está
+   * procurando UM cliente. Sem isso, quem some do teto parece ter sumido do
+   * sistema — e some justamente quem já teve as divergências mais graves
+   * resolvidas, porque a régua de ataque joga o resto para o fim da fila.
+   */
+  const buscando = busca.trim().length > 0;
+  const visiveis = buscando ? linhas : linhas.slice(0, limite);
+  const ocultas = linhas.length - visiveis.length;
+
+  /** Só entra no lote quem está na tela E tem algo que o botão sabe gravar. */
+  const selecionaveis = useMemo(() => visiveis.filter((l) => acoesDe(l).length > 0), [visiveis]);
 
   const marcar = async (id: string, novo: "resolvido" | "ignorado" | "pendente") => {
     setOcupado(id);
@@ -262,8 +273,21 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
             <option key={f.chave} value={f.chave}>{f.rotulo} ({contagem[f.chave]})</option>
           ))}
         </select>
-        <span className="text-sm text-muted-foreground ml-auto">{num(linhas.length)} clientes</span>
+        <span className="text-sm text-muted-foreground ml-auto">
+          {ocultas > 0
+            ? <>mostrando {num(visiveis.length)} de <strong>{num(linhas.length)}</strong> clientes</>
+            : <>{num(linhas.length)} clientes</>}
+        </span>
       </div>
+
+      {ocultas > 0 && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+          <strong className="text-amber-600 dark:text-amber-400">{num(ocultas)} clientes fora da tela.</strong>{" "}
+          A lista vem na ordem de atacar, então quem já teve as divergências mais graves resolvidas
+          desce para o fim — e some daqui sem ter saído da lista. Use a busca ou o filtro de
+          família para chegar em alguém específico.
+        </div>
+      )}
 
       {familia !== "todas" && META[familia] && (
         <p className="text-xs text-muted-foreground px-1">{META[familia].explica}</p>
@@ -312,7 +336,7 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
         </Vazio>
       ) : (
         <div className="rounded-lg border divide-y">
-          {linhas.slice(0, 300).map((r) => {
+          {visiveis.map((r) => {
             const abertoAqui = aberta === r.id;
             const nome = r.razao_social_ds ?? r.razao_social_hiper ?? "—";
             const fil = (r.detalhe?.filiais ?? {}) as any;
@@ -577,9 +601,11 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
               </div>
             );
           })}
-          {linhas.length > 300 && (
-            <div className="p-3 text-center text-xs text-muted-foreground">
-              Mostrando as 300 primeiras de {num(linhas.length)}. Use os filtros para chegar no resto.
+          {ocultas > 0 && (
+            <div className="p-3 text-center">
+              <Button variant="outline" size="sm" onClick={() => setLimite((l) => l + 300)}>
+                Mostrar mais {num(Math.min(ocultas, 300))} de {num(ocultas)}
+              </Button>
             </div>
           )}
         </div>

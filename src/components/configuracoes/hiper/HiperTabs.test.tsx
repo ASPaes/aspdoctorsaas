@@ -160,6 +160,38 @@ describe("abas da integração Hiper", () => {
     expect(dialogo).toContain("Net New");
   });
 
+  it("avisa quantos clientes ficaram fora da tela, em vez de deixar sumir", () => {
+    // A régua de ataque empurra quem já teve o pior resolvido para o fim da
+    // fila. Sem o aviso, esse cliente parece ter saído do sistema.
+    const muitos = Array.from({ length: 320 }, (_, i) => ({
+      ...base, id: `r${i}`, id_portal: `p${i}`,
+      razao_social_ds: `Cliente ${i}`,
+      divergencias: [i < 310 ? "tipo_contrato_ausente" : "modulo_a_mais_no_hiper"],
+    }));
+    render(<HiperDivergenciasTab tid="t1" recon={muitos} />);
+    const txt = container.textContent ?? "";
+    expect(txt).toContain("mostrando 300 de 320");
+    expect(txt).toContain("20 clientes fora da tela");
+    expect(txt).toContain("Mostrar mais 20 de 20");
+  });
+
+  it("busca nunca trunca — é assim que se acha quem caiu para o fim da fila", () => {
+    const muitos = Array.from({ length: 320 }, (_, i) => ({
+      ...base, id: `r${i}`, id_portal: `p${i}`,
+      razao_social_ds: i === 319 ? "FERNANDA NAIR" : `Cliente ${i}`,
+      divergencias: ["modulo_a_mais_no_hiper"],
+    }));
+    render(<HiperDivergenciasTab tid="t1" recon={muitos} />);
+    const input = container.querySelector("input[placeholder]") as HTMLInputElement;
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
+      setter.call(input, "FERNANDA");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("FERNANDA NAIR");
+    expect(container.textContent).not.toContain("fora da tela");
+  });
+
   it("Divergências não quebra quando o detalhe vem vazio", () => {
     render(<HiperDivergenciasTab tid="t1" recon={[{ ...base, detalhe: {}, divergencias: ["sem_dono"] }]} />);
     const botao = container.querySelector("button");
