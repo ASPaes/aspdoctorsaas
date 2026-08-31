@@ -14,6 +14,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 31/08
 
+- 🔧 **Conversa aberta por template já nasce sua** — Quando você inicia um contato pelo **template oficial da Meta**, o atendimento agora abre direto no seu nome e no seu setor, como "Atendendo". Antes ele caía na **Fila sem setor** e ficava parado até alguém clicar em Assumir — mesmo tendo sido você quem iniciou a conversa. Quem envia pelo chat normal já funcionava assim.
+
+- 🔧 **A tarja "Fora do horário" não gruda mais no chat** — A marca sobrevivia ao encerramento do atendimento: um contato iniciado numa segunda de manhã, dentro do expediente, aparecia como fora do horário porque o chat tinha sido marcado no sábado. Agora ela some quando **o agente age dentro do expediente** — ao assumir ou ao responder — e se mantém quando o atendimento é feito fora dele, para o plantão continuar visível.
+
 - 🆕 **Integração Hiper — a carteira do PortalHiper conferida contra a daqui** — A integração ganhou seis abas: **Conexão**, **Módulos**, **Visão geral**, **Custos**, **Sincronização** e **Divergências**. A sincronização é de mão única — o DoctorSaaS **lê** o portal e nunca escreve nele. Na primeira conferência da ASP: 994 contas, 633 vinculadas a clientes e **646 pendências** para decidir.
 
 - 🆕 **Cada tipo de contrato com a Hiper é conferido pela régua certa** — No **Hiperador** quem cobra o cliente é você, então só o **custo** é comparado: a coluna de MRR do Hiper fica vazia de propósito, porque o portal não conhece o seu preço. Na **Central de Cobrança** e na **Central de Leads** quem cobra é a Hiper, e ali o MRR e o custo saem do portal.
