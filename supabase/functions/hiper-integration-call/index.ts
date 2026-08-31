@@ -390,6 +390,15 @@ serve(async (req) => {
                     cad_taxa_central: num(cad.taxa_central),
                   }
                 : {}),
+              ...(ult
+                ? {
+                    ult_mes: ult.mes ?? null,
+                    ult_mensalidade: num(ult.mensalidade),
+                    ult_custo: num(ult.custo),
+                    ult_a_pagar: num(ult.a_pagar),
+                    ult_a_receber: num(ult.a_receber),
+                  }
+                : {}),
               pull_run_id: runId,
               raw: c,
             });
