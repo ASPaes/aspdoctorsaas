@@ -64,6 +64,10 @@ export default function HiperCustosTab({ recon }: { recon: LinhaRecon[] }) {
         <br /><br />
         O <strong>MRR Hiper</strong> aparece vazio no Hiperador de propósito: ali quem cobra o
         cliente é você e o portal não conhece o seu preço. Comparar seria inventar divergência.
+        <br /><br />
+        Conta que o portal não informou no mês fica <strong>fora desta lista</strong> e aparece em
+        Divergências como <strong>“Portal sem valor do mês”</strong>. Zero não é valor: tratar
+        assim zeraria o custo do cliente na hora de aplicar.
       </Explica>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">

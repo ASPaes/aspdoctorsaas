@@ -123,6 +123,7 @@ begin
       e.id_portal, e.cnpj_norm, e.razao_social as razao_hiper, e.situacao,
       e.responsavel_tipo, e.plano, e.cancelada_em, e.cancelada_por,
       e.bruto_mes, e.custo_mes, e.mrr, e.a_pagar,
+      e.cad_mensalidade, e.cad_custo, e.cad_repasse,
       c.qtd,
       -- escolha humana anterior manda sobre o automático
       coalesce(r.candidato_escolhido, case when c.qtd = 1 then c.unico end) as cliente_id,
@@ -147,15 +148,29 @@ begin
       -- contas). Central: quem cobra é a Hiper, e o custo é tudo o que ela
       -- retém — o campo `custo` do portal não serve (zero em CL, sem a taxa
       -- da central em CC).
+      -- O portal tem DUAS verdades sobre dinheiro, e o CADASTRO vem primeiro:
+      -- ele são os valores vigentes (o que o Cliente 360 do portal mostra),
+      -- enquanto o extrato é o último mês FECHADO e pode estar atrás — ou
+      -- faltar. Comparar contrato de hoje pede número de hoje.
+      --
+      -- ZERO NÃO É VALOR: a conta cujo último extrato não é o do lote global
+      -- chegava com tudo zerado (26 ativas na ASP) e virava "custo R$ 0,00" —
+      -- divergência falsa que, aplicada, zeraria R$ 2.317 de custo real.
+      (nullif(x.cad_custo, 0) is null and nullif(x.cad_mensalidade, 0) is null
+       and coalesce(x.bruto_mes,0) = 0 and coalesce(x.custo_mes,0) = 0
+       and coalesce(x.mrr,0) = 0 and coalesce(x.a_pagar,0) = 0) as sem_valor,
       case when not x.viva then null
+           -- Em Central de Cobrança o custo do cadastro JÁ inclui a taxa da
+           -- central (mensalidade menos repasse); o campo `custo` do extrato não.
+           when nullif(x.cad_custo, 0) is not null then x.cad_custo
            when x.responsavel_tipo = 'hiper'
              then nullif(coalesce(x.custo_mes, x.a_pagar), 0)
-           when x.bruto_mes is null then null
+           when nullif(x.bruto_mes, 0) is null then null
            else round(coalesce(x.bruto_mes,0) - coalesce(x.mrr,0), 2)
       end as custo_hiper,
       case when not x.viva then null
            when x.responsavel_tipo = 'hiper' then null
-           else nullif(x.bruto_mes, 0)
+           else coalesce(nullif(x.cad_mensalidade, 0), nullif(x.bruto_mes, 0))
       end as mrr_hiper,
       v.modelo_contrato_id as modelo_esperado
     from comds x
@@ -164,7 +179,7 @@ begin
   )
   select
     y.id_portal, y.cnpj_norm, y.razao_hiper, y.situacao, y.responsavel_tipo, y.plano,
-    y.cancelada_em, y.cancelada_por, y.custo_hiper, y.mrr_hiper,
+    y.cancelada_em, y.cancelada_por, y.custo_hiper, y.mrr_hiper, y.sem_valor,
     y.ds_id, y.cp_id, y.razao_ds, y.cnpj_ds, y.modelo_contrato_id, y.recorrencia, y.codigo_sequencial,
     y.vlr_mensal, y.vlr_custo, y.cancelado, y.qtd, y.candidato_escolhido,
     case when y.ds_id is not null then 'vinculado'
@@ -210,6 +225,10 @@ begin
    || (case when n.estado_match = 'vinculado' and n.mrr_hiper is not null
                  and abs(coalesce(n.vlr_mensal, 0) - n.mrr_hiper) > 0.01
                                                                    then array['mrr_divergente']           else '{}'::text[] end)
+   -- O portal não mandou valor NENHUM deste mês. Some da comparação, mas não
+   -- some da lista: silêncio aqui esconde que aquele cliente não é conferido.
+   || (case when n.estado_match = 'vinculado' and n.viva and n.sem_valor
+                                                                   then array['sem_valor_no_portal'] else '{}'::text[] end)
    || (case when n.estado_match = 'vinculado' and n.viva
                  and public.hiper_norm_razao(n.razao_hiper) is distinct from public.hiper_norm_razao(n.razao_ds)
                                                                    then array['razao_social_divergente']  else '{}'::text[] end)

@@ -178,6 +178,7 @@ serve(async (req) => {
 
       const c = achado as Record<string, any>;
       const plano = c.plano_detalhe ?? null;
+      const cad = c.cadastro ?? null;
       const { error: upErr } = await supabase.from("hiper_espelho_cadastro").update({
         cnpj: c.cnpj ?? null,
         cnpj_norm: soDigitos(c.cnpj) || null,
@@ -211,6 +212,14 @@ serve(async (req) => {
               plano_qt_usuarios: plano.qt_usuarios ?? null,
               plano_qt_caixas: plano.qt_caixas ?? null,
               plano_qt_filiais: plano.qt_filiais ?? null,
+            }
+          : {}),
+        ...(cad
+          ? {
+              cad_mensalidade: num(cad.mensalidade),
+              cad_custo: num(cad.custo),
+              cad_repasse: num(cad.repasse),
+              cad_taxa_central: num(cad.taxa_central),
             }
           : {}),
         raw: c,
@@ -322,6 +331,9 @@ serve(async (req) => {
             // os contadores que já estão no espelho — e com eles os módulos de
             // plano, que saem de qt_caixas. Ausente ≠ zero.
             const plano = c.plano_detalhe ?? null;
+            // Mesma regra do plano: portal antigo não manda `cadastro`, e
+            // gravar null apagaria o que já está aqui. Ausente ≠ zero.
+            const cad = c.cadastro ?? null;
             contas.set(idPortal, {
               tenant_id: targetTenantId,
               id_portal: idPortal,
@@ -357,6 +369,14 @@ serve(async (req) => {
                     plano_qt_usuarios: plano.qt_usuarios ?? null,
                     plano_qt_caixas: plano.qt_caixas ?? null,
                     plano_qt_filiais: plano.qt_filiais ?? null,
+                  }
+                : {}),
+              ...(cad
+                ? {
+                    cad_mensalidade: num(cad.mensalidade),
+                    cad_custo: num(cad.custo),
+                    cad_repasse: num(cad.repasse),
+                    cad_taxa_central: num(cad.taxa_central),
                   }
                 : {}),
               pull_run_id: runId,
@@ -404,21 +424,30 @@ serve(async (req) => {
       const truncado = paginas >= MAX_PAGES && !!cursor;
       const temAgregados = modulos.size > 0 || filiais.size > 0;
       const temPlano = Array.from(contas.values()).some((c) => "plano_qt_caixas" in c);
+      const temCadastro = Array.from(contas.values()).some((c) => "cad_custo" in c);
 
       // O espelho de cadastro é regravado do zero. Quando o portal não manda os
       // contadores do plano, eles precisam vir do que já está aqui — senão o
       // delete leva junto e as contas perdem os módulos de plano.
-      if (!temPlano && contas.size > 0) {
+      if ((!temPlano || !temCadastro) && contas.size > 0) {
         const { data: anterior } = await supabase
           .from("hiper_espelho_cadastro")
-          .select("id_portal, plano_qt_usuarios, plano_qt_caixas, plano_qt_filiais")
+          .select("id_portal, plano_qt_usuarios, plano_qt_caixas, plano_qt_filiais, cad_mensalidade, cad_custo, cad_repasse, cad_taxa_central")
           .eq("tenant_id", targetTenantId);
         for (const a of anterior ?? []) {
           const c = contas.get(String(a.id_portal));
           if (!c) continue;
-          c.plano_qt_usuarios = a.plano_qt_usuarios;
-          c.plano_qt_caixas = a.plano_qt_caixas;
-          c.plano_qt_filiais = a.plano_qt_filiais;
+          if (!temPlano) {
+            c.plano_qt_usuarios = a.plano_qt_usuarios;
+            c.plano_qt_caixas = a.plano_qt_caixas;
+            c.plano_qt_filiais = a.plano_qt_filiais;
+          }
+          if (!temCadastro) {
+            c.cad_mensalidade = a.cad_mensalidade;
+            c.cad_custo = a.cad_custo;
+            c.cad_repasse = a.cad_repasse;
+            c.cad_taxa_central = a.cad_taxa_central;
+          }
         }
       }
 

@@ -49,6 +49,8 @@ const FAMILIAS: { chave: string; rotulo: string; explica: string; peso: number }
   { chave: "sem_conta_no_hiper", rotulo: "Cliente sem conta no Hiper", peso: 5, explica: "Contrato ativo aqui sem conta no portal." },
   { chave: "conta_inativa_no_hiper", rotulo: "Conta inativa no Hiper", peso: 5, explica: "O cliente saiu no portal e o contrato daqui continua ativo." },
   { chave: "cnpj_ambiguo", rotulo: "CNPJ com mais de um cliente", peso: 5, explica: "Precisa de escolha humana: dois cadastros disputam a mesma conta." },
+  { chave: "sem_valor_no_portal", rotulo: "Portal sem valor do mês", peso: 5,
+    explica: "A conta está ativa no Hiper, mas o portal não enviou valor nenhum do mês — normalmente porque o último extrato dela é de um mês anterior ao do lote. Sem valor não há o que comparar, e comparar contra zero zeraria o custo do cliente. A linha fica na lista para você conferir na mão ou rebuscar no portal." },
   { chave: "razao_social_divergente", rotulo: "Razão social diferente", peso: 6, explica: "Comparação já ignora acento, pontuação e sufixo societário." },
 ];
 
@@ -434,9 +436,13 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
                       <div>
                         <p className="text-xs text-muted-foreground">MRR <Origem lado="hiper" /></p>
                         <p className="tabular-nums font-medium">
-                          {r.mrr_hiper == null
+                          {r.mrr_hiper != null ? brl(r.mrr_hiper)
+                            : r.responsavel_tipo === "hiper"
+                            // No Hiperador é assim mesmo: quem cobra é você.
                             ? <span className="text-muted-foreground font-normal">o portal não sabe o preço</span>
-                            : brl(r.mrr_hiper)}
+                            // Nas centrais, vazio é ausência de dado — dizer a
+                            // mesma frase aqui seria mentira.
+                            : <span className="text-muted-foreground font-normal">o portal não enviou o valor do mês</span>}
                         </p>
                         {r.mrr_hiper != null && (
                           <p className="text-[10px] text-muted-foreground">{brl(anual(r.mrr_hiper))} no ano</p>
