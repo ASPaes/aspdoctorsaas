@@ -825,10 +825,12 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                       </div>
                       <div className="text-sm text-muted-foreground truncate">{p.fornecedores?.nome ?? "—"}</div>
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <Badge variant={p.ativo ? "default" : "secondary"} className="shrink-0">
+                        <Badge variant={p.ativo ? "default" : "secondary"} className="shrink-0"
+                          title={`R$ ${fmtBRL(Number(p.vlr_mensal ?? 0) * 12)} no ano`}>
                           R$ {fmtBRL(p.vlr_mensal)}/mês
                         </Badge>
-                        <Badge variant="outline" className="shrink-0 text-muted-foreground">
+                        <Badge variant="outline" className="shrink-0 text-muted-foreground"
+                          title={`R$ ${fmtBRL(Number(p.vlr_custo ?? 0) * 12)} no ano`}>
                           Custo: R$ {fmtBRL(p.vlr_custo)}
                         </Badge>
                         {Number(p.vlr_ativacao) > 0 && (
@@ -1183,8 +1185,21 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         <Separator />
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm">
           <div className="flex flex-wrap gap-4">
-            <div className="font-semibold">Total Mensal: <span className="text-primary">R$ {fmtBRL(totalMensal)}</span></div>
-            <div className="font-semibold">Total Custo: <span className="text-muted-foreground">R$ {fmtBRL(totalCusto)}</span></div>
+            {/* O ano é sempre 12x o mês. Ele aparece porque contrato anual é
+                comum e a conta de cabeça na hora de conferir com o fornecedor
+                era feita errada — mas quem manda no MRR continua sendo o mês. */}
+            <div className="font-semibold">
+              Total Mensal: <span className="text-primary">R$ {fmtBRL(totalMensal)}</span>
+              <span className="ml-1.5 font-normal text-xs text-muted-foreground">
+                · R$ {fmtBRL(totalMensal * 12)}/ano
+              </span>
+            </div>
+            <div className="font-semibold">
+              Total Custo: <span className="text-muted-foreground">R$ {fmtBRL(totalCusto)}</span>
+              <span className="ml-1.5 font-normal text-xs text-muted-foreground">
+                · R$ {fmtBRL(totalCusto * 12)}/ano
+              </span>
+            </div>
             {totalAtivacao > 0 && (
               <div className="font-semibold">Total Ativação: <span className="text-amber-500">R$ {fmtBRL(totalAtivacao)}</span></div>
             )}
@@ -2325,10 +2340,20 @@ function ProdutoDialog({
             <div className="space-y-1">
               <Label>Valor Mensal</Label>
               <NumericInput value={vlrMensal} onChange={setVlrMensal} decimals={2} placeholder="0,00" suffix="R$" />
+              {/* O campo é MENSAL, sempre — inclusive em contrato anual, onde a
+                  recorrência é a cadência da cobrança e não o valor. O ano vem
+                  calculado para conferir com o fornecedor sem fazer a conta de
+                  cabeça, e muda enquanto se digita. */}
+              <p className="text-xs text-muted-foreground">
+                R$ {fmtBRL(Number(vlrMensal || 0) * 12)} no ano
+              </p>
             </div>
             <div className="space-y-1">
               <Label>Custo Operação</Label>
               <NumericInput value={vlrCusto} onChange={setVlrCusto} decimals={2} placeholder="0,00" suffix="R$" />
+              <p className="text-xs text-muted-foreground">
+                R$ {fmtBRL(Number(vlrCusto || 0) * 12)} no ano
+              </p>
             </div>
           </div>
         </div>
