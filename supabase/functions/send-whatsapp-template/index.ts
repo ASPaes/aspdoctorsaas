@@ -73,6 +73,43 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'instance has no meta_phone_number_id configured' }, 400);
     }
 
+    // Quem clicou. Sem isso o atendimento nascia orfao: o eco do webhook da Meta
+    // chegava ~100ms depois, ensureAttendanceForOperatorMessage abria um atendimento
+    // 'waiting' sem dono e sem setor, e fn_assign_conversation_if_ready sai em
+    // 'no_department' — o chat ficava parado na Fila ate alguem clicar Assumir.
+    // Medido na Delvale em 31/08/2026: 12 de 12 conversas iniciadas por template
+    // nasceram sem dono, contra 2 de 2 pelo envio normal, que ja cria o atendimento
+    // antes de enviar. A funcao roda com service_role e verify_jwt=false, entao o
+    // token do usuario e lido a mao do header.
+    let senderUserId: string | null = null;
+    try {
+      const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+      if (jwt) {
+        const { data: authData } = await supabase.auth.getUser(jwt);
+        senderUserId = authData?.user?.id ?? null;
+      }
+    } catch (err) {
+      console.error(`${LOG} could not resolve caller:`, err);
+    }
+
+    // O setor vem de support_department_members — e o que o motor de distribuicao
+    // le. funcionarios.department_id e so o que a UI escreve; o sync roda por trigger.
+    let senderDepartmentId: string | null = null;
+    if (senderUserId) {
+      const { data: mem } = await supabase
+        .from('support_department_members')
+        .select('department_id')
+        .eq('user_id', senderUserId)
+        .eq('tenant_id', instance.tenant_id)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+      senderDepartmentId = mem?.department_id ?? null;
+    }
+    if (!senderUserId) {
+      console.warn(`${LOG} sem autor no header — atendimento cai na fila (comportamento antigo)`);
+    }
+
     const { data: template, error: tplErr } = await supabase
       .from('whatsapp_meta_templates')
       .select('id, tenant_id, instance_id, name, language, status, body_text, components')
@@ -212,6 +249,7 @@ Deno.serve(async (req) => {
       timestamp: nowIso,
       tenant_id: instance.tenant_id,
       instance_id: instance.id,
+      sent_by_user_id: senderUserId,
       metadata: {
         message_kind: 'template',
         template_name: template.name,
@@ -240,8 +278,73 @@ Deno.serve(async (req) => {
       updated_at: nowIso,
     }).eq('id', conversationId);
 
+    // Quem inicia a conversa fica com ela. Mesma regra do envio normal
+    // (send-whatsapp-message cria o atendimento 'in_progress' antes de enviar).
+    // Aqui o atendimento so pode nascer DEPOIS do envio, porque a conversa e criada
+    // a partir do wamid — entao o eco do webhook pode chegar primeiro. Por isso os
+    // dois casos: adotar o que ja existe, ou criar.
     try {
-      await ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, instance.tenant_id);
+      if (senderUserId) {
+        const { data: existingAtt } = await supabase
+          .from('support_attendances')
+          .select('id, status, assigned_to, department_id')
+          .eq('conversation_id', conversationId)
+          .in('status', ['waiting', 'in_progress'])
+          .limit(1)
+          .maybeSingle();
+
+        if (!existingAtt) {
+          const { error: attErr } = await supabase.from('support_attendances').insert({
+            tenant_id: instance.tenant_id,
+            conversation_id: conversationId,
+            contact_id: contactId,
+            status: 'in_progress',
+            opened_at: nowIso,
+            assigned_to: senderUserId,
+            assumed_at: nowIso,
+            first_response_at: nowIso,
+            last_operator_message_at: nowIso,
+            department_id: senderDepartmentId,
+            created_from: 'agent',
+          });
+          if (attErr) console.error(`${LOG} Error creating attendance:`, attErr);
+        } else if (existingAtt.status === 'waiting' && !existingAtt.assigned_to) {
+          // O eco do webhook ganhou a corrida e abriu um atendimento orfao: adota.
+          const { error: adoptErr } = await supabase
+            .from('support_attendances')
+            .update({
+              status: 'in_progress',
+              assigned_to: senderUserId,
+              assumed_at: nowIso,
+              queued_at: null,
+              department_id: existingAtt.department_id ?? senderDepartmentId,
+              updated_at: nowIso,
+            })
+            .eq('id', existingAtt.id)
+            .eq('status', 'waiting')
+            .is('assigned_to', null);
+          if (adoptErr) console.error(`${LOG} Error adopting attendance:`, adoptErr);
+        }
+
+        await supabase
+          .from('whatsapp_conversations')
+          .update({ assigned_to: senderUserId, updated_at: nowIso })
+          .eq('id', conversationId)
+          .is('assigned_to', null);
+
+        if (senderDepartmentId) {
+          await supabase
+            .from('whatsapp_conversations')
+            .update({ department_id: senderDepartmentId, updated_at: nowIso })
+            .eq('id', conversationId)
+            .is('department_id', null);
+        }
+      } else {
+        // Sem autor identificado, mantem o caminho antigo. O 5o argumento estava
+        // faltando na chamada original: sem instanceId a cascata do dono consultava
+        // whatsapp_instances com id undefined e nunca achava a instancia pessoal.
+        await ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, instance.tenant_id, instance.id);
+      }
       await incrementAttendanceCounter(supabase, conversationId, 'agent');
     } catch (err) {
       console.error(`${LOG} attendance creation/counter error:`, err);
