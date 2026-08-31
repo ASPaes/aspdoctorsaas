@@ -134,6 +134,34 @@ export default function PropostaVendaSection({
     },
   });
 
+  // Traduz os ids do contrato em nome. Sem isto o bloco "Registrado no contrato"
+  // mostra "Produto 13" e UUID de modulo — identificador nao e informacao.
+  const produtoIds = (Array.isArray(data?.produtos) ? data.produtos : [])
+    .map((p: any) => p?.produto_id).filter((v: any) => v != null);
+  const moduloIds = (Array.isArray(data?.produtos) ? data.produtos : [])
+    .flatMap((p: any) => (Array.isArray(p?.modulos) ? p.modulos : []))
+    .map((m: any) => m?.modulo_id).filter(Boolean);
+
+  const { data: nomes } = useQuery({
+    queryKey: ["journey-proposta-nomes", journeyId, produtoIds.length, moduloIds.length],
+    enabled: produtoIds.length > 0 || moduloIds.length > 0,
+    staleTime: 10 * 60_000,
+    queryFn: async () => {
+      const [prod, mod] = await Promise.all([
+        produtoIds.length
+          ? (supabase.from("produtos" as any) as any).select("id, nome").in("id", produtoIds)
+          : Promise.resolve({ data: [] }),
+        moduloIds.length
+          ? (supabase.from("produto_modulos" as any) as any).select("id, nome").in("id", moduloIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+      const mapa: Record<string, string> = {};
+      for (const r of (prod.data ?? [])) mapa[`p${r.id}`] = r.nome;
+      for (const r of (mod.data ?? [])) mapa[`m${r.id}`] = r.nome;
+      return mapa;
+    },
+  });
+
   // Jornada criada a mao nao tem proposta: a secao simplesmente nao existe.
   if (!data) return null;
 
@@ -183,12 +211,14 @@ export default function PropostaVendaSection({
           {produtos.length > 0 && (
             <div className="space-y-2">
               <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Itens contratados
+                Registrado no contrato
               </h4>
               {produtos.map((p, i) => (
                 <div key={i} className="rounded border border-border p-2 text-sm space-y-1">
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    <span className="font-medium">{p.produto_nome ?? `Produto ${p.produto_id}`}</span>
+                    <span className="font-medium">
+                      {p.produto_nome ?? nomes?.[`p${p.produto_id}`] ?? `Produto ${p.produto_id}`}
+                    </span>
                     {p.vlr_mensal != null && <span className="text-muted-foreground">{brl(Number(p.vlr_mensal))}/mês</span>}
                     {p.vlr_ativacao != null && Number(p.vlr_ativacao) > 0 && (
                       <span className="text-muted-foreground">setup {brl(Number(p.vlr_ativacao))}</span>
@@ -198,7 +228,7 @@ export default function PropostaVendaSection({
                     <ul className="text-muted-foreground pl-4 list-disc">
                       {p.modulos.map((m: any, j: number) => (
                         <li key={j}>
-                          {m.modulo_nome ?? m.modulo_id}
+                          {m.modulo_nome ?? nomes?.[`m${m.modulo_id}`] ?? m.modulo_id}
                           {Number(m.quantidade) > 1 ? ` · ${m.quantidade}x` : ""}
                         </li>
                       ))}
