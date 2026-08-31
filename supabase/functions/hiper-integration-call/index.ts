@@ -230,6 +230,7 @@ serve(async (req) => {
               ult_custo: num(ult.custo),
               ult_a_pagar: num(ult.a_pagar),
               ult_a_receber: num(ult.a_receber),
+              ult_lancamentos_12m: ult.lancamentos_12m ?? null,
             }
           : {}),
         raw: c,
@@ -397,6 +398,7 @@ serve(async (req) => {
                     ult_custo: num(ult.custo),
                     ult_a_pagar: num(ult.a_pagar),
                     ult_a_receber: num(ult.a_receber),
+                    ult_lancamentos_12m: ult.lancamentos_12m ?? null,
                   }
                 : {}),
               pull_run_id: runId,
@@ -453,7 +455,7 @@ serve(async (req) => {
       if ((!temPlano || !temCadastro || !temUltimo) && contas.size > 0) {
         const { data: anterior } = await supabase
           .from("hiper_espelho_cadastro")
-          .select("id_portal, plano_qt_usuarios, plano_qt_caixas, plano_qt_filiais, cad_mensalidade, cad_custo, cad_repasse, cad_taxa_central, ult_mes, ult_mensalidade, ult_custo, ult_a_pagar, ult_a_receber")
+          .select("id_portal, plano_qt_usuarios, plano_qt_caixas, plano_qt_filiais, cad_mensalidade, cad_custo, cad_repasse, cad_taxa_central, ult_mes, ult_mensalidade, ult_custo, ult_a_pagar, ult_a_receber, ult_lancamentos_12m")
           .eq("tenant_id", targetTenantId);
         for (const a of anterior ?? []) {
           const c = contas.get(String(a.id_portal));
@@ -475,6 +477,7 @@ serve(async (req) => {
             c.ult_custo = a.ult_custo;
             c.ult_a_pagar = a.ult_a_pagar;
             c.ult_a_receber = a.ult_a_receber;
+            c.ult_lancamentos_12m = a.ult_lancamentos_12m;
           }
         }
       }

@@ -125,6 +125,7 @@ begin
       e.bruto_mes, e.custo_mes, e.mrr, e.a_pagar,
       e.cad_mensalidade, e.cad_custo, e.cad_repasse,
       e.ult_mensalidade, e.ult_custo, e.ult_a_pagar, e.ult_a_receber, e.ult_mes,
+      e.ult_lancamentos_12m,
       c.qtd,
       -- escolha humana anterior manda sobre o automático
       coalesce(r.candidato_escolhido, case when c.qtd = 1 then c.unico end) as cliente_id,
@@ -161,6 +162,15 @@ begin
       -- DELA por inteiro. Trocar campo a campo misturaria meses diferentes.
       (coalesce(x.bruto_mes,0) = 0 and coalesce(x.custo_mes,0) = 0
        and coalesce(x.mrr,0) = 0 and coalesce(x.a_pagar,0) = 0) as usa_ultimo,
+      -- Quantos meses o valor do portal cobre. Só divide quando as DUAS coisas
+      -- batem: contrato não-mensal AQUI e cobrança esparsa LÁ. A Fernanda é
+      -- anual e o portal cobra dela todo mês — nela o divisor tem que ser 1.
+      (case
+         when coalesce(x.ult_lancamentos_12m, 99) > 5 then 1
+         when x.recorrencia = 'anual'     then 12
+         when x.recorrencia = 'semestral' then 6
+         else 1
+       end) as divisor,
       (nullif(x.cad_custo, 0) is null and nullif(x.cad_mensalidade, 0) is null
        and coalesce(x.bruto_mes,0) = 0 and coalesce(x.custo_mes,0) = 0
        and coalesce(x.mrr,0) = 0 and coalesce(x.a_pagar,0) = 0
@@ -185,11 +195,11 @@ begin
                                and coalesce(x.mrr,0)=0 and coalesce(x.a_pagar,0)=0
                           then x.ult_a_receber else x.mrr end as rc) q
            )
-      end as custo_hiper,
+      end as custo_hiper_bruto,
       case when not x.viva then null
            when x.responsavel_tipo = 'hiper' then null
            else coalesce(nullif(x.cad_mensalidade, 0), nullif(x.bruto_mes, 0), nullif(x.ult_mensalidade, 0))
-      end as mrr_hiper,
+      end as mrr_hiper_bruto,
       v.modelo_contrato_id as modelo_esperado
     from comds x
     left join public.hiper_catalogo_vinculo v
@@ -197,7 +207,11 @@ begin
   )
   select
     y.id_portal, y.cnpj_norm, y.razao_hiper, y.situacao, y.responsavel_tipo, y.plano,
-    y.cancelada_em, y.cancelada_por, y.custo_hiper, y.mrr_hiper, y.sem_valor, y.usa_ultimo,
+    y.cancelada_em, y.cancelada_por, y.sem_valor, y.usa_ultimo, y.divisor,
+    case when y.custo_hiper_bruto is null then null
+         else round(y.custo_hiper_bruto / y.divisor, 2) end as custo_hiper,
+    case when y.mrr_hiper_bruto is null then null
+         else round(y.mrr_hiper_bruto / y.divisor, 2) end as mrr_hiper,
     y.ds_id, y.cp_id, y.razao_ds, y.cnpj_ds, y.modelo_contrato_id, y.recorrencia, y.codigo_sequencial,
     y.vlr_mensal, y.vlr_custo, y.cancelado, y.qtd, y.candidato_escolhido,
     case when y.ds_id is not null then 'vinculado'
@@ -216,14 +230,14 @@ begin
     plano_hiper, responsavel_tipo, mrr_hiper, custo_hiper, cancelada_em, cancelada_por,
     ds_cliente_id, ds_cliente_produto_id, razao_social_ds, cnpj_ds,
     modelo_contrato_id_ds, modelo_contrato_ds, mensalidade_ds, custo_ds, cancelado_ds,
-    qtd_candidatos_ds, criterio_match, estado_match, recorrencia_ds, codigo_sequencial_ds, divergencias, detalhe, margem
+    qtd_candidatos_ds, criterio_match, estado_match, recorrencia_ds, codigo_sequencial_ds, divisor_periodo, divergencias, detalhe, margem
   )
   select
     p_tenant_id, now(), n.id_portal, n.cnpj_norm, n.razao_hiper, n.situacao,
     n.plano, n.responsavel_tipo, n.mrr_hiper, n.custo_hiper, n.cancelada_em, n.cancelada_por,
     n.ds_id, n.cp_id, n.razao_ds, n.cnpj_ds,
     n.modelo_contrato_id, mc.nome, n.vlr_mensal, n.vlr_custo, n.cancelado,
-    n.qtd, n.criterio_match, n.estado_match, n.recorrencia, n.codigo_sequencial,
+    n.qtd, n.criterio_match, n.estado_match, n.recorrencia, n.codigo_sequencial, n.divisor,
     -- as comparações escalares, na ordem em que a operação ataca:
     -- tipo de contrato decide a regra do dinheiro; filial decide de quem ele é.
       (case when n.estado_match = 'sem_dono' and n.viva            then array['sem_dono']                 else '{}'::text[] end)
@@ -237,10 +251,22 @@ begin
                  and n.modelo_contrato_id <> n.modelo_esperado     then array['tipo_contrato_divergente'] else '{}'::text[] end)
    -- Mês contra mês, sempre. O contrato guarda valor MENSAL mesmo quando a
    -- cobrança é anual — a recorrência é a cadência, não o valor.
+   -- Uma mensalidade 6x maior no portal não é erro de cadastro: é o valor de um
+   -- PERÍODO chegando como se fosse do mês (o cliente paga o ano de uma vez e o
+   -- portal lança tudo num mês só). Enquanto o divisor for 1, comparar isso
+   -- acusaria divergência falsa e aplicar multiplicaria o MRR. Medido: 1 caso.
+   || (case when n.estado_match = 'vinculado' and n.divisor = 1
+                 and n.mrr_hiper is not null and coalesce(n.vlr_mensal, 0) > 0
+                 and n.mrr_hiper / n.vlr_mensal >= 6
+                                                                   then array['valor_pode_ser_do_periodo'] else '{}'::text[] end)
    || (case when n.estado_match = 'vinculado' and n.custo_hiper is not null
+                 and not (n.divisor = 1 and n.mrr_hiper is not null and coalesce(n.vlr_mensal, 0) > 0
+                          and n.mrr_hiper / n.vlr_mensal >= 6)
                  and abs(coalesce(n.vlr_custo, 0) - n.custo_hiper) > 0.01
                                                                    then array['custo_divergente']         else '{}'::text[] end)
    || (case when n.estado_match = 'vinculado' and n.mrr_hiper is not null
+                 and not (n.divisor = 1 and coalesce(n.vlr_mensal, 0) > 0
+                          and n.mrr_hiper / n.vlr_mensal >= 6)
                  and abs(coalesce(n.vlr_mensal, 0) - n.mrr_hiper) > 0.01
                                                                    then array['mrr_divergente']           else '{}'::text[] end)
    -- O portal não mandou valor NENHUM deste mês. Some da comparação, mas não
@@ -476,6 +502,7 @@ begin
     estado_match          = excluded.estado_match,
     recorrencia_ds        = excluded.recorrencia_ds,
     codigo_sequencial_ds  = excluded.codigo_sequencial_ds,
+    divisor_periodo       = excluded.divisor_periodo,
     divergencias          = excluded.divergencias,
     detalhe               = excluded.detalhe,
     margem                = excluded.margem,

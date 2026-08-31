@@ -34,7 +34,7 @@ const base: LinhaRecon = {
   ds_cliente_id: "c1", ds_cliente_produto_id: "cp1", razao_social_ds: "Cine Gracher",
   cnpj_ds: "07272690000187", modelo_contrato_id_ds: 2, modelo_contrato_ds: "Royalties",
   mensalidade_ds: 425.63, custo_ds: 126.77, cancelado_ds: false,
-  qtd_candidatos_ds: 1, recorrencia_ds: "mensal", codigo_sequencial_ds: 351, estado_match: "vinculado",
+  qtd_candidatos_ds: 1, recorrencia_ds: "mensal", codigo_sequencial_ds: 351, divisor_periodo: 1, estado_match: "vinculado",
   divergencias: ["custo_divergente", "filial_com_valor"],
   detalhe: {
     filiais: {
@@ -197,6 +197,30 @@ describe("abas da integração Hiper", () => {
     });
     expect(container.textContent).toContain("FERNANDA NAIR");
     expect(container.textContent).toContain("1 cliente na busca");
+  });
+
+  it("avisa quando o valor do portal parece ser do período inteiro", () => {
+    render(<HiperDivergenciasTab tid="t1" recon={[{
+      ...base, codigo_sequencial_ds: 335, razao_social_ds: "Alcidinei",
+      mensalidade_ds: 98.3, mrr_hiper: 1798, recorrencia_ds: "mensal", divisor_periodo: 1,
+      divergencias: ["valor_pode_ser_do_periodo"],
+    }]} />);
+    act(() => { container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    const txt = (container.textContent ?? "").replace(/\u00a0/g, " ");
+    expect(txt).toContain("Diferença de 18×");
+    expect(txt).toContain("multiplicaria o MRR");
+    // e NAO oferece gravar dinheiro nesse estado
+    expect(txt).not.toContain("Atualizar no DoctorSaaS");
+  });
+
+  it("mostra a conta quando o portal cobra o período de uma vez", () => {
+    render(<HiperDivergenciasTab tid="t1" recon={[{
+      ...base, mrr_hiper: 149.83, custo_hiper: 82.52, divisor_periodo: 12,
+      divergencias: ["mrr_divergente"],
+    }]} />);
+    act(() => { container.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    const txt = (container.textContent ?? "").replace(/\u00a0/g, " ");
+    expect(txt).toContain("R$ 1.797,96 cobrados de uma vez ÷ 12");
   });
 
   it("Divergências não quebra quando o detalhe vem vazio", () => {

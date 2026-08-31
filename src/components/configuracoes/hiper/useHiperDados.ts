@@ -43,6 +43,7 @@ export interface LinhaRecon {
   qtd_candidatos_ds: number;
   recorrencia_ds: string | null;
   codigo_sequencial_ds: number | null;
+  divisor_periodo: number | null;
   id_portal_ref?: string | null;
   estado_match: string;
   divergencias: string[];

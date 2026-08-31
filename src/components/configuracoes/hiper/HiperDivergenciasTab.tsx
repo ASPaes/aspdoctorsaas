@@ -49,6 +49,8 @@ const FAMILIAS: { chave: string; rotulo: string; explica: string; peso: number }
   { chave: "sem_conta_no_hiper", rotulo: "Cliente sem conta no Hiper", peso: 5, explica: "Contrato ativo aqui sem conta no portal." },
   { chave: "conta_inativa_no_hiper", rotulo: "Conta inativa no Hiper", peso: 5, explica: "O cliente saiu no portal e o contrato daqui continua ativo." },
   { chave: "cnpj_ambiguo", rotulo: "CNPJ com mais de um cliente", peso: 5, explica: "Precisa de escolha humana: dois cadastros disputam a mesma conta." },
+  { chave: "valor_pode_ser_do_periodo", rotulo: "Valor pode ser do período", peso: 1,
+    explica: "A mensalidade do portal é 6× ou mais a daqui — isso normalmente não é cadastro errado, é o cliente que paga o período inteiro de uma vez e o portal lança tudo num mês só. Enquanto o contrato aqui estiver como mensal, o valor não é comparado nem gravado: aplicar multiplicaria o MRR. Corrija a recorrência na ficha do cliente e sincronize — o sistema passa a dividir pelo período sozinho." },
   { chave: "sem_valor_no_portal", rotulo: "Portal sem valor do mês", peso: 5,
     explica: "A conta está ativa no Hiper, mas o portal não enviou valor nenhum do mês — normalmente porque o último extrato dela é de um mês anterior ao do lote. Sem valor não há o que comparar, e comparar contra zero zeraria o custo do cliente. A linha fica na lista para você conferir na mão ou rebuscar no portal." },
   { chave: "razao_social_divergente", rotulo: "Razão social diferente", peso: 6, explica: "Comparação já ignora acento, pontuação e sufixo societário." },
@@ -445,7 +447,14 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
                             : <span className="text-muted-foreground font-normal">o portal não enviou o valor do mês</span>}
                         </p>
                         {r.mrr_hiper != null && (
-                          <p className="text-[10px] text-muted-foreground">{brl(anual(r.mrr_hiper))} no ano</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {(r.divisor_periodo ?? 1) > 1
+                              // O portal cobra o período de uma vez; aqui o campo
+                              // é mensal. A conta fica à vista para ninguém achar
+                              // que o número foi inventado.
+                              ? `${brl(Number(r.mrr_hiper) * (r.divisor_periodo ?? 1))} cobrados de uma vez ÷ ${r.divisor_periodo}`
+                              : `${brl(anual(r.mrr_hiper))} no ano`}
+                          </p>
                         )}
                       </div>
                       <div>
@@ -459,10 +468,30 @@ export default function HiperDivergenciasTab({ tid, recon }: { tid: string | nul
                           {r.custo_hiper == null ? "—" : brl(r.custo_hiper)}
                         </p>
                         {r.custo_hiper != null && (
-                          <p className="text-[10px] text-muted-foreground">{brl(anual(r.custo_hiper))} no ano</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {(r.divisor_periodo ?? 1) > 1
+                              ? `${brl(Number(r.custo_hiper) * (r.divisor_periodo ?? 1))} cobrados de uma vez ÷ ${r.divisor_periodo}`
+                              : `${brl(anual(r.custo_hiper))} no ano`}
+                          </p>
                         )}
                       </div>
                     </div>
+
+                    {r.divergencias.includes("valor_pode_ser_do_periodo") && (
+                      <div className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+                        <p className="font-medium text-amber-600 dark:text-amber-400">
+                          O portal cobra {brl(r.mrr_hiper)} e aqui está {brl(r.mensalidade_ds)}
+                        </p>
+                        <p className="text-muted-foreground mt-1">
+                          Diferença de {((Number(r.mrr_hiper) || 0) / (Number(r.mensalidade_ds) || 1)).toFixed(0)}×.
+                          Isso quase nunca é cadastro errado — é o cliente pagando o período inteiro de uma
+                          vez, com o portal lançando tudo num mês só. O contrato aqui está como{" "}
+                          <strong>{r.recorrencia_ds ?? "mensal"}</strong>. Corrija a recorrência na ficha
+                          e sincronize: o sistema passa a dividir pelo período sozinho. Até lá o valor não
+                          é comparado nem gravado — aplicar multiplicaria o MRR deste cliente.
+                        </p>
+                      </div>
+                    )}
 
                     {r.divergencias.includes("tipo_contrato_ausente") && (
                       <p className="text-muted-foreground">
