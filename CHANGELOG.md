@@ -10,6 +10,30 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ---
 
+## Setembro / 2026
+
+### 01/09
+
+- 🆕 **Corrigir o cadastro pelo portal, num clique ou em lote** — Na aba **Divergências**, o botão **Atualizar no DoctorSaaS** grava aqui o que o Hiper diz: tipo de contrato, custo, mensalidade, razão social e os módulos. Dá para marcar vários clientes e escolher **o que** atualizar em cada um — atualizar só o custo e deixar a mensalidade de fora, por exemplo. Quem não puder receber alguma coisa é pulado com o motivo, e o resto grava normalmente.
+
+- 🆕 **Histórico com desfazer** — Tudo o que a integração grava no cadastro fica registrado com **quem fez, quando, e qual era o valor antes**, agrupado por clique. O botão **Desfazer** devolve os valores ao que eram. O histórico não some: a linha fica marcada como desfeita.
+
+- 🆕 **Baixar aqui quem já saiu do Hiper, com a data real** — Cliente inativo no portal e ativo aqui ganha o botão de cancelar **com a data em que ele saiu de lá**, escolhendo o motivo. O churn entra no mês da saída, não no de hoje.
+
+- 🆕 **Módulos do plano entram sozinhos** — O portal não lista como app o que o plano já inclui. Agora o número de caixas da conta gera o módulo **Hiper Caixa** no contrato, junto com os apps comprados e seus custos.
+
+- ⬆️ **Filtros que combinam** — Famílias de divergência agora são multi-seleção; ao lado, filtros por **tipo de contrato** (Hiperador, Central de Cobrança, Central de Leads), por **ter ou não filial** e por **estar sem valor no portal**. A busca acha pelo **código do cadastro**, pelo nome ou pelo CNPJ — inclusive pelo nome de uma filial, que traz a matriz do grupo.
+
+- 🔧 **Valores do portal que chegavam zerados** — Conta cujo último extrato é de um mês anterior ao fechamento da carteira aparecia com custo R$ 0,00. Passou a valer o cadastro vigente do portal e, na falta dele, o último extrato do próprio cliente. Sem isso, aplicar a correção zeraria o custo real do cliente.
+
+- 🔧 **Cliente que paga o ano de uma vez** — O portal lança o valor do período todo num mês só. A tela agora reconhece isso, mostra a conta dividida e **recusa gravar** enquanto a recorrência do contrato não estiver certa — aplicar multiplicaria o MRR do cliente.
+
+- 🔧 **Cliente cadastrado aparecendo como "sem cliente aqui"** — Contrato de produto Hiper com o fornecedor vazio ou de outra empresa ficava fora da conferência. O produto passou a valer como âncora junto com o fornecedor, e o cadastro errado virou uma pendência própria.
+
+- 🔧 **Cliente sumia da lista ao ter a divergência mais grave resolvida** — A lista mostrava só as 300 primeiras e avisava disso no rodapé. Virou paginação, e a busca alcança qualquer página.
+
+- ⬆️ **Valor anual na ficha do produto** — Ao lado do mensal, nos totais e no formulário de edição, calculado enquanto se digita.
+
 ## Agosto / 2026
 
 ### 31/08
