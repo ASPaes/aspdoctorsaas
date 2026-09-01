@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Ban, Check, ChevronDown, ChevronRight, ExternalLink, EyeOff, Loader2, RefreshCw, Wand2 } from "lucide-react";
+import { Ban, Check, ChevronDown, ChevronRight, Download, ExternalLink, EyeOff, Loader2, RefreshCw, Wand2 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Explica, Origem, TIPO_CONTRATO, Vazio, anual, brl, cnpjMask, nomeTipo, num, rotuloRecorrencia } from "./ui";
+import HiperImportarDialog from "./HiperImportarDialog";
 import type { LinhaRecon } from "./useHiperDados";
 
 /**
@@ -158,6 +159,7 @@ export default function HiperDivergenciasTab({
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [importar, setImportar] = useState<LinhaRecon[] | null>(null);
   const [familias, setFamilias] = useState<Set<string>>(new Set());
   const [comFilial, setComFilial] = useState("todas");
   const [tipos, setTipos] = useState<Set<string>>(new Set());
@@ -270,6 +272,13 @@ export default function HiperDivergenciasTab({
 
   /** Só entra no lote quem está na tela E tem algo que o botão sabe gravar. */
   const selecionaveis = useMemo(() => visiveis.filter((l) => acoesDe(l).length > 0), [visiveis]);
+
+  /**
+   * Conta viva no portal que nenhum cadastro daqui é dono — o único caso que
+   * vira cliente novo. Sai do filtro inteiro e não da página: o diálogo lista
+   * todas de uma vez, e paginar a importação faria a pessoa importar metade.
+   */
+  const semDono = useMemo(() => linhas.filter((l) => l.divergencias.includes("sem_dono")), [linhas]);
 
   const marcar = async (id: string, novo: "resolvido" | "ignorado" | "pendente") => {
     setOcupado(id);
@@ -514,6 +523,16 @@ export default function HiperDivergenciasTab({
                 ? new Set(selecionaveis.map((l) => l.id)) : new Set())} />
             Selecionar {num(selecionaveis.length)} com correção automática
           </label>
+          {/* Conta sem dono não tem "correção": ela não existe aqui ainda. O
+              caminho dela é virar cadastro, e por isso o botão é separado do
+              lote de correção — juntar os dois abriria a porta para aplicar
+              mensalidade numa linha e criar cliente na outra sem perceber. */}
+          {podeAcoesAdmin && semDono.length > 0 && (
+            <Button size="sm" variant="outline" onClick={() => setImportar(semDono)}>
+              <Download className="h-3 w-3" />
+              Importar {num(semDono.length)} sem cliente
+            </Button>
+          )}
           {selecionados.size > 0 && (
             <>
               <span className="text-muted-foreground">{num(selecionados.size)} selecionados</span>
@@ -889,6 +908,13 @@ export default function HiperDivergenciasTab({
                         </Button>
                       )}
 
+                      {podeAcoesAdmin && r.divergencias.includes("sem_dono") && (
+                        <Button size="sm" variant="outline" disabled={!!ocupado}
+                          onClick={() => setImportar([r])}>
+                          <Download className="h-3 w-3" /> Importar para o DoctorSaaS
+                        </Button>
+                      )}
+
                       {/* Nova aba de propósito: a lista de divergências costuma ser
                           percorrida inteira, e navegar para fora perderia o lugar. */}
                       {r.ds_cliente_id && (
@@ -947,6 +973,14 @@ export default function HiperDivergenciasTab({
             </div>
           )}
         </div>
+      )}
+
+      {/* Montado só quando há conta escolhida. Deixá-lo montado fechado faria
+          os seis lookups do formulário (unidades, origens, vendedores, formas
+          de pagamento, áreas, segmentos) saírem em toda abertura da aba. */}
+      {importar && (
+        <HiperImportarDialog tid={tid} contas={importar}
+          open onOpenChange={(o) => !o && setImportar(null)} />
       )}
 
       <AlertDialog open={!!baixar} onOpenChange={(o) => !o && setBaixar(null)}>

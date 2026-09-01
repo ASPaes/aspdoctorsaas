@@ -28,6 +28,7 @@ const ROTULO: Record<string, string> = {
   mrr: "Mensalidade",
   razao_social: "Razão social",
   modulos: "Módulo",
+  importacao: "Cadastro importado",
 };
 
 const valor = (v: any, acao: string) => {
@@ -36,6 +37,11 @@ const valor = (v: any, acao: string) => {
     return `${brl(v.vlr_custo)}${v.quantidade > 1 ? ` · ${v.quantidade}×` : ""}`;
   }
   if (acao === "custo" || acao === "mrr") return brl(Number(v));
+  // A importação não muda um campo: ela cria o cliente inteiro. O "depois" é o
+  // resumo do que entrou, e String(objeto) viraria [object Object].
+  if (acao === "importacao" && typeof v === "object") {
+    return `${v.plano ?? "—"} · ${brl(Number(v.mensalidade))}/mês · custo ${brl(Number(v.custo))}`;
+  }
   return String(v);
 };
 
