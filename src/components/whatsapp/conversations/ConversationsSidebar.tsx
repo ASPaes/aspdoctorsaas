@@ -184,6 +184,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         rulesDisabledOnly: s.rulesDisabledOnly ?? false,
         groupByAgent: s.groupByAgent ?? false,
       }));
+      if (Array.isArray(s.collapsedAgents)) setCollapsedAgents(new Set<string>(s.collapsedAgents));
     }
     setHydratedFor(user.id);
   }, [user?.id, hydratedFor]);
@@ -207,12 +208,15 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const { data: agentOptionsData } = useAgentOptions();
   const agentLabelMap = useMemo(() => new Map((agentOptionsData ?? []).map(a => [a.userId, a.label])), [agentOptionsData]);
 
-  const [collapsedAgents, setCollapsedAgents] = useState<Set<string>>(new Set());
+  const [collapsedAgents, setCollapsedAgents] = useState<Set<string>>(
+    () => new Set<string>(Array.isArray(saved?.collapsedAgents) ? saved.collapsedAgents : [])
+  );
   const toggleAgent = (key: string) => {
     setCollapsedAgents(prev => {
       const n = new Set(prev);
       if (n.has(key)) n.delete(key);
       else n.add(key);
+      persist({ collapsedAgents: Array.from(n) });
       return n;
     });
   };
