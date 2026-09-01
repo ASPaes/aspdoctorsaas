@@ -147,6 +147,26 @@ const brl = (v: number | null | undefined) =>
 const num2 = (v: number) =>
   v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// Percentual com o SINAL escrito, do mesmo jeito que a diferença em dinheiro:
+// os dois aparecem lado a lado e um sem sinal ao lado de um com sinal se lê
+// como número diferente. Uma casa decimal — a segunda não muda decisão nenhuma.
+// Abaixo de 0,05% arredondar daria "+0,0%", que parece "nenhuma diferença" numa
+// linha que está aberta justamente porque há diferença.
+const pct = (v: number) => {
+  const sinal = v > 0 ? "+" : v < 0 ? "−" : "";
+  if (Math.abs(v) < 0.05) return `${sinal}menos de 0,1%`;
+  return `${sinal}${Math.abs(v).toLocaleString("pt-BR", {
+    minimumFractionDigits: 1, maximumFractionDigits: 1,
+  })}%`;
+};
+
+// Um nome só para a divergência de custo em toda a aba. A lista de Divergências
+// chamava de um jeito e a tabela de Custos de outro ("valor diferente entre as
+// duas bases"): quem passava pelas duas telas achava que eram dois problemas.
+const ROTULO_CUSTO = "Custo da ficha diferente do que o OEM cobra";
+// No meio de uma frase, só a primeira letra cai — OEM continua OEM.
+const rotuloCustoNaFrase = ROTULO_CUSTO.charAt(0).toLowerCase() + ROTULO_CUSTO.slice(1);
+
 // Documento vem só com dígitos das duas bases. 11 é CPF, 14 é CNPJ; o que não
 // for nenhum dos dois sai como veio, sem máscara mentirosa por cima.
 const doc = (v: string | null | undefined) => {
@@ -1122,7 +1142,20 @@ export default function OemIntegrationTab() {
       // do que a tela do cliente mostra); NEGATIVO = abaixo (a margem real é
       // pior). É a mesma conta do total no topo do card — lá somada, aqui
       // cliente a cliente.
-      diferenca: c.custo_ds - c.custo_oem,
+      // OEM MENOS DS, nesta ordem (decisão do Alexandre, 31/08/2026). É a conta
+      // do REAJUSTE que falta na ficha: positivo = o parceiro cobra mais do que
+      // o cadastro daqui e o custo tem que subir. Era DS − OEM, e os mesmos 109
+      // casos apareciam negativos — o número certo com o sinal invertido do que
+      // a pessoa vem conferir.
+      diferenca: c.custo_oem - c.custo_ds,
+      // A mesma diferença em percentual, dividida pelo custo DA FICHA: é sobre
+      // ele que o reajuste incide, então "+4,4%" se lê como "o custo daqui
+      // precisa subir 4,4%". Dividir pelo do OEM daria 4,3% no mesmo caso —
+      // certo como proporção, mas não é o reajuste.
+      //
+      // Divisor zero não existe: ficha sem custo não tem percentual, tem custo
+      // faltando. Nesses casos só o dinheiro aparece.
+      percentual: c.custo_ds > 0 ? ((c.custo_oem - c.custo_ds) / c.custo_ds) * 100 : null,
       // Centavo de diferença já é divergência de cadastro; o que não passa
       // disso é arredondamento e não merece alarme.
       divergente: Math.abs(c.custo_ds - c.custo_oem) >= 0.01,
@@ -1134,9 +1167,11 @@ export default function OemIntegrationTab() {
       lista,
       totalDs,
       totalOem,
-      // O que a diferença SIGNIFICA, não só quanto ela é: cadastro acima do
-      // que o OEM cobra faz a margem parecer pior do que é, e abaixo, melhor.
-      diferenca: totalDs - totalOem,
+      // Mesma ordem da diferença por cliente: OEM menos DS. O que ela SIGNIFICA,
+      // não só quanto ela é: cadastro acima do que o OEM cobra faz a margem
+      // parecer pior do que é, e abaixo, melhor — e é o "abaixo" que engana para
+      // o lado ruim, porque a operação parece render mais do que rende.
+      diferenca: totalOem - totalDs,
       divergentes: lista.filter((c) => c.divergente).length,
       emDia: lista.filter((c) => !c.divergente).length,
     };
@@ -1230,10 +1265,19 @@ export default function OemIntegrationTab() {
       doCliente(c.id, c.cliente, c.cnpj).itens.push({
         chave: `custo:${c.id}`, tipo: "custo", grave: false, custo: c,
         assinatura: `${c.custo_ds}|${c.custo_oem}`,
-        rotulo: "Custo da ficha diferente do que o OEM cobra",
+        rotulo: ROTULO_CUSTO,
         detalhe: <>ficha {brl(c.custo_ds)} · OEM {brl(c.custo_oem)} · diferença{" "}
-          <strong className={c.diferenca > 0 ? "text-amber-500" : "text-destructive"}>
+          {/* Vermelho é a ficha ABAIXO do OEM (diferença positiva na ordem
+              OEM − DS): aí a operação parece render mais do que rende, que é o
+              erro que custa dinheiro. Ficha acima só faz a margem parecer pior
+              do que é — âmbar. */}
+          <strong className={c.diferenca > 0 ? "text-destructive" : "text-amber-500"}>
             {c.diferenca > 0 ? "+" : ""}{brl(c.diferenca)}
+            {/* O percentual cola no valor, dentro do mesmo destaque: é a mesma
+                diferença dita de outro jeito, e separada ela viraria um terceiro
+                número para comparar. Licença sem custo no OEM não tem divisor —
+                aí só o dinheiro aparece. */}
+            {c.percentual != null && <> ({pct(c.percentual)})</>}
           </strong></>,
       });
     }
@@ -1582,6 +1626,31 @@ export default function OemIntegrationTab() {
     return base.filter((c) => combina(q, [c.nome, c.cnpj]));
   }, [divergencias.lista, buscaDiv, tipoAtivo]);
 
+  // O reajuste médio do recorte, em percentual. Só com o filtro em custo: em
+  // "Todos os tipos" a média sairia de um pedaço da lista e apareceria ao lado
+  // do total de TODAS as divergências — número certo respondendo à pergunta
+  // errada.
+  //
+  // Média simples das linhas, e não a diferença total dividida pelo custo total:
+  // a pergunta é de quanto a tabela andou, e a ponderada deixaria os dois ou três
+  // clientes de licença cara decidirem o número sozinhos. Sai da lista VISÍVEL,
+  // então a busca também recorta.
+  const mediaCusto = useMemo(() => {
+    if (tipoAtivo !== "custo") return null;
+    const linhasCusto = divergenciasVisiveis.flatMap((c) => c.itens).filter((i) => i.tipo === "custo");
+    // Ficha sem custo digitado não tem divisor. Ela conta como divergência, mas
+    // não pode entrar na média — e some sem aviso seria pior do que não ter média.
+    const pcts = linhasCusto
+      .map((i) => i.custo?.percentual)
+      .filter((p): p is number => p != null);
+    if (!pcts.length) return null;
+    return {
+      media: pcts.reduce((a, b) => a + b, 0) / pcts.length,
+      dentro: pcts.length,
+      fora: linhasCusto.length - pcts.length,
+    };
+  }, [divergenciasVisiveis, tipoAtivo]);
+
   const custosVisiveis = useMemo(() => {
     const q = buscaCusto.trim().toLowerCase();
     const porEstado = filtroCusto === "todos"
@@ -1597,8 +1666,8 @@ export default function OemIntegrationTab() {
       : custoSort === "mensalidade" ? c.mensalidade
       : custoSort === "custo_oem" ? c.custo_oem
       // Ordena pelo valor COM sinal, não pelo tamanho do erro: é o que a
-      // coluna mostra. Descendo, quem está mais a maior no DS vem primeiro;
-      // subindo, quem está mais a menor.
+      // coluna mostra. A conta é OEM − DS, então descendo vem primeiro quem tem
+      // o maior reajuste a aplicar na ficha; subindo, quem está mais acima do OEM.
       : custoSort === "diferenca" ? c.diferenca
       : c.markup;
 
@@ -2717,10 +2786,13 @@ export default function OemIntegrationTab() {
             divergem, quem está desatualizado é o cadastro daqui, e a correção acontece na aba{" "}
             <strong>Divergências</strong>, junto do resto do que aquele cliente tem para resolver.
             <br /><br />
-            A <strong>Diferença DS</strong> é <strong>Custo DS menos Custo OEM</strong>, e o sinal
-            é a informação: com <strong>+</strong>, o cadastro daqui está cobrando custo acima do
-            que a licença cobra e a margem real é <em>melhor</em> do que a ficha mostra; com{" "}
-            <strong>−</strong>, está abaixo e a margem real é <em>pior</em>. A{" "}
+            A <strong>Diferença</strong> é <strong>Custo OEM menos Custo DS</strong>, e o sinal é
+            a informação: com <strong>+</strong>, a licença cobra mais do que o cadastro daqui — o
+            custo da ficha precisa <em>subir</em>, e a margem real é <em>pior</em> do que a ficha
+            mostra; com <strong>−</strong>, o cadastro está acima do que a licença cobra e a margem
+            real é <em>melhor</em>. O <strong>percentual</strong> embaixo do valor é essa diferença
+            sobre o <strong>Custo DS</strong>: é o <strong>reajuste que falta aplicar</strong> na
+            ficha para ela alcançar o OEM. A{" "}
             <strong>Mensalidade DS</strong> é o <strong>MRR atual</strong> do cliente, a base já
             com os movimentos vigentes (upsell, cross-sell, downsell e reajuste), o mesmo número
             que a ficha dele mostra em <em>MRR Atual</em>. O <strong>Markup</strong> é essa
@@ -2746,14 +2818,16 @@ export default function OemIntegrationTab() {
                       {brl(Math.abs(custos.diferenca))}
                     </strong>{" "}
                     {/* Dizer o sentido importa: cadastro acima do que o OEM cobra
-                        faz a margem parecer pior do que é; abaixo, melhor. */}
+                        faz a margem parecer pior do que é; abaixo, melhor. A
+                        conta é OEM − DS, então positivo é o cadastro daqui
+                        atrasado para baixo. */}
                     <span className="text-amber-600 dark:text-amber-400">
-                      {custos.diferenca > 0 ? "a maior no DS" : "a menor no DS"}
+                      {custos.diferenca > 0 ? "faltando no DS" : "sobrando no DS"}
                     </span></>
                   )}
                   {custos.divergentes > 0 && (
                     <> · <span className="text-amber-600 dark:text-amber-400">
-                      {custos.divergentes} com valor diferente entre as duas bases
+                      {custos.divergentes} com {rotuloCustoNaFrase}
                     </span></>
                   )}
                 </CardDescription>
@@ -2816,7 +2890,7 @@ export default function OemIntegrationTab() {
                     {thCusto("mensalidade", <span className="text-emerald-600 dark:text-emerald-400">Mensalidade DS</span>, "w-32 shrink-0", true)}
                     {thCusto("markup", "Markup", "w-24 shrink-0", true)}
                     {thCusto("custo_oem", <span className="text-sky-600 dark:text-sky-400">Custo OEM</span>, "w-28 shrink-0", true)}
-                    {thCusto("diferenca", "Diferença DS", "w-28 shrink-0", true)}
+                    {thCusto("diferenca", "Diferença", "w-28 shrink-0", true)}
                     <span className="w-36 shrink-0 text-right">Ação</span>
                   </div>
 
@@ -2896,14 +2970,25 @@ export default function OemIntegrationTab() {
                                 : "text-muted-foreground"
                             }`}
                             title={c.divergente
-                              ? `${brl(c.custo_ds)} (DS) − ${brl(c.custo_oem)} (OEM): o cadastro daqui está ${
+                              ? `${brl(c.custo_oem)} (OEM) − ${brl(c.custo_ds)} (DS): o cadastro daqui está ${
                                   brl(Math.abs(c.diferenca))
-                                } ${c.diferenca > 0 ? "acima" : "abaixo"} do que a licença cobra`
+                                } ${c.diferenca > 0 ? "abaixo" : "acima"} do que a licença cobra`
+                                + (c.percentual != null
+                                  ? `, ou ${pct(c.percentual)} sobre o custo da ficha`
+                                  : "")
                               : "O custo daqui é igual ao do OEM"}
                           >
                             {!c.divergente
                               ? brl(0)
                               : c.diferenca > 0 ? `+${brl(c.diferenca)}` : brl(c.diferenca)}
+                            {/* O percentual entra embaixo, e não ao lado: a
+                                coluna é estreita e lado a lado ele empurraria o
+                                dinheiro para fora do alinhamento das outras. */}
+                            {c.divergente && c.percentual != null && (
+                              <span className="block text-xs font-normal opacity-80">
+                                {pct(c.percentual)}
+                              </span>
+                            )}
                           </span>
                           {/* Corrigir caso a caso saiu daqui: esta aba virou o
                               retrato dos dois custos lado a lado, e a correção
@@ -3293,6 +3378,28 @@ export default function OemIntegrationTab() {
                   <strong>{divergenciasVisiveis.length}</strong> clientes ·{" "}
                   <strong>{divergenciasVisiveis.reduce((a, c) => a + c.itens.length, 0)}</strong>{" "}
                   divergências
+                  {/* O reajuste médio do recorte. Fica colado na contagem porque
+                      é a leitura da MESMA lista, e o sinal é o mesmo das linhas
+                      logo abaixo — positivo, a ficha precisa subir. */}
+                  {mediaCusto && (
+                    <> ·{" "}
+                      <span
+                        className="text-amber-600 dark:text-amber-400"
+                        title={`Média das ${mediaCusto.dentro} diferenças desta lista, cada uma`
+                          + ` sobre o custo da ficha. É o reajuste médio que falta aplicar aqui`
+                          + ` para o cadastro alcançar o que o OEM cobra: em média a ficha está ${
+                            Math.abs(mediaCusto.media).toLocaleString("pt-BR", {
+                              minimumFractionDigits: 1, maximumFractionDigits: 1,
+                            })
+                          }% ${mediaCusto.media > 0 ? "abaixo" : "acima"} da licença.`
+                          + (mediaCusto.fora
+                            ? ` ${mediaCusto.fora} fora da conta, sem custo na ficha para dividir.`
+                            : "")}
+                      >
+                        reajuste médio <strong>{pct(mediaCusto.media)}</strong>
+                      </span>
+                    </>
+                  )}
                 </p>
               </div>
 
