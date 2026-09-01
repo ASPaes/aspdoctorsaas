@@ -160,6 +160,18 @@ const pct = (v: number) => {
   })}%`;
 };
 
+// Cor da diferença de custo, nas três telas onde ela aparece (linha da
+// divergência, coluna da aba Custos e a média no topo da lista). Segue o SINAL,
+// como qualquer delta financeiro: verde é o reajuste que falta aplicar na ficha,
+// vermelho é o cadastro daqui acima do que a licença cobra.
+//
+// A leitura de risco é a oposta — ficha abaixo do OEM faz a operação parecer
+// render mais do que rende —, mas ela pintava de vermelho 109 das 111 linhas, e
+// um alarme que vale para quase tudo não separa nada. Decisão do Alexandre,
+// 31/08/2026.
+const corDiferenca = (v: number) =>
+  v > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive";
+
 // Um nome só para a divergência de custo em toda a aba. A lista de Divergências
 // chamava de um jeito e a tabela de Custos de outro ("valor diferente entre as
 // duas bases"): quem passava pelas duas telas achava que eram dois problemas.
@@ -1267,11 +1279,7 @@ export default function OemIntegrationTab() {
         assinatura: `${c.custo_ds}|${c.custo_oem}`,
         rotulo: ROTULO_CUSTO,
         detalhe: <>ficha {brl(c.custo_ds)} · OEM {brl(c.custo_oem)} · diferença{" "}
-          {/* Vermelho é a ficha ABAIXO do OEM (diferença positiva na ordem
-              OEM − DS): aí a operação parece render mais do que rende, que é o
-              erro que custa dinheiro. Ficha acima só faz a margem parecer pior
-              do que é — âmbar. */}
-          <strong className={c.diferenca > 0 ? "text-destructive" : "text-amber-500"}>
+          <strong className={corDiferenca(c.diferenca)}>
             {c.diferenca > 0 ? "+" : ""}{brl(c.diferenca)}
             {/* O percentual cola no valor, dentro do mesmo destaque: é a mesma
                 diferença dita de outro jeito, e separada ela viraria um terceiro
@@ -2966,7 +2974,7 @@ export default function OemIntegrationTab() {
                           <span
                             className={`w-28 shrink-0 text-right tabular-nums ${
                               c.divergente
-                                ? "text-amber-600 dark:text-amber-400 font-medium"
+                                ? `${corDiferenca(c.diferenca)} font-medium`
                                 : "text-muted-foreground"
                             }`}
                             title={c.divergente
@@ -3384,7 +3392,7 @@ export default function OemIntegrationTab() {
                   {mediaCusto && (
                     <> ·{" "}
                       <span
-                        className="text-amber-600 dark:text-amber-400"
+                        className={corDiferenca(mediaCusto.media)}
                         title={`Média das ${mediaCusto.dentro} diferenças desta lista, cada uma`
                           + ` sobre o custo da ficha. É o reajuste médio que falta aplicar aqui`
                           + ` para o cadastro alcançar o que o OEM cobra: em média a ficha está ${
