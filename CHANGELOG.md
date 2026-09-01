@@ -36,6 +36,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 - ⬆️ **Valor anual na ficha do produto** — Ao lado do mensal, nos totais e no formulário de edição, calculado enquanto se digita.
 
+- ⬆️ **Integração OEM — de qual fornecedor é cada divergência** — Em *Configurações › Integrações › OEM › Divergências*, a linha de cada cliente passa a mostrar o **fornecedor** ao lado do CNPJ, e o topo ganhou o seletor **Todos os fornecedores**, com quantos clientes cada um tem. Dá para olhar só o **PDV Legal**, só o **Gula Menu** ou só a **Base BM** em vez de percorrer a lista inteira procurando de quem é cada linha. O fornecedor vem do **produto do cliente**, o mesmo que o Dashboard usa para filtrar.
+
+- ⬆️ **Integração OEM — o nome do cliente aparece inteiro** — Na mesma lista, razão social comprida era cortada e não havia como ler o resto. Agora, ao **abrir o cliente**, o nome aparece por completo, quebrando em mais de uma linha; fechado ele continua cortado, para as linhas manterem o mesmo tamanho e a lista seguir legível de cima a baixo.
+
 ## Agosto / 2026
 
 ### 31/08

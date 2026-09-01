@@ -579,25 +579,77 @@ export default function OemIntegrationTab() {
     return m;
   }, [produtosOem]);
 
+  // Os produtos de cada cliente, com o fornecedor de cada linha.
+  //
+  // Vem SEM o corte por `ativo`: a contagem de produtos ativos precisa dele,
+  // mas o fornecedor não. Cliente cancelado aqui com licença viva no OEM só
+  // tem linha inativa, e cortar no servidor o deixaria sem fornecedor nenhum —
+  // justo ele, que é a divergência de dinheiro saindo. São ~480 linhas a mais
+  // no tenant da Digi Office (1.551 contra 1.069), medido em 01/09/2026.
+  const { data: clienteProdutos = [] } = useQuery({
+    queryKey: ["oem-cliente-produtos", tid],
+    enabled: !!tid,
+    queryFn: () =>
+      fetchAllRows<{ cliente_id: string; fornecedor_id: number | null; ativo: boolean }>(() =>
+        (supabase.from("cliente_produtos" as any) as any)
+          .select("cliente_id, fornecedor_id, ativo")
+          .eq("tenant_id", tid),
+      ),
+  });
+
   // Quantos produtos ATIVOS cada cliente tem. Sem isto a tela classificava por
   // eliminação — "não é o caso de várias filiais, então deve ser falta de
   // produto" — e rotulava de "cliente sem produto ativo" cliente com produto,
   // custo e contrato. Rótulo deduzido é rótulo que mente.
-  const { data: produtosAtivos = new Map<string, number>() } = useQuery({
-    queryKey: ["oem-produtos-ativos", tid],
+  const produtosAtivos = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of clienteProdutos) {
+      if (!l.ativo) continue;
+      m.set(l.cliente_id, (m.get(l.cliente_id) ?? 0) + 1);
+    }
+    return m;
+  }, [clienteProdutos]);
+
+  // O FORNECEDOR do cliente. Ele não mora na ficha (`clientes.fornecedor_id` é
+  // campo legado): quem manda é o produto, e é assim que o Dashboard filtra.
+  //
+  // Produto ativo tem preferência sobre inativo. Sem ela, o cliente que trocou
+  // de produto apareceria com os dois fornecedores e entraria no filtro de um
+  // que ele não é mais. Os inativos só valem quando não sobrou nenhum ativo —
+  // é o que dá fornecedor ao cliente cancelado.
+  const fornecedoresDoCliente = useMemo(() => {
+    const ativos = new Map<string, number[]>();
+    const todos = new Map<string, number[]>();
+    const juntar = (m: Map<string, number[]>, id: string, forn: number) => {
+      const lista = m.get(id);
+      if (!lista) m.set(id, [forn]);
+      else if (!lista.includes(forn)) lista.push(forn);
+    };
+    for (const l of clienteProdutos) {
+      if (l.fornecedor_id == null) continue;
+      juntar(todos, l.cliente_id, Number(l.fornecedor_id));
+      if (l.ativo) juntar(ativos, l.cliente_id, Number(l.fornecedor_id));
+    }
+    const m = new Map<string, number[]>();
+    for (const [id, lista] of todos) m.set(id, ativos.get(id) ?? lista);
+    return m;
+  }, [clienteProdutos]);
+
+  const { data: fornecedores = [] } = useQuery({
+    queryKey: ["oem-fornecedores", tid],
     enabled: !!tid,
     queryFn: async () => {
-      const linhas = await fetchAllRows<{ cliente_id: string }>(() =>
-        (supabase.from("cliente_produtos" as any) as any)
-          .select("cliente_id")
-          .eq("tenant_id", tid)
-          .eq("ativo", true),
-      );
-      const m = new Map<string, number>();
-      for (const l of linhas) m.set(l.cliente_id, (m.get(l.cliente_id) ?? 0) + 1);
-      return m;
+      const { data, error } = await supabase.from("fornecedores")
+        .select("id, nome").eq("tenant_id", tid!).order("nome");
+      if (error) throw error;
+      return data ?? [];
     },
   });
+
+  const nomeFornecedor = useMemo(() => {
+    const m = new Map(fornecedores.map((f) => [f.id, f.nome]));
+    return (id: number) => m.get(id) ?? `Fornecedor ${id}`;
+  }, [fornecedores]);
 
   const rotulo = (c: Conta) =>
     (c.unidades_base_ids ?? []).map((u) => unidades.find((x) => x.id === u)?.nome ?? `Unidade ${u}`)
@@ -1593,6 +1645,7 @@ export default function OemIntegrationTab() {
   const [mudancasAberto, setMudancasAberto] = useState(false);
   const [buscaDiv, setBuscaDiv] = useState("");
   const [tipoDiv, setTipoDiv] = useState("todos");
+  const [fornDiv, setFornDiv] = useState("todos");
 
   // Os tipos que REALMENTE estão na lista, com quantos clientes cada um pega.
   // Sai dos próprios itens em vez de uma lista fixa: tipo que ninguém tem hoje
@@ -1619,6 +1672,37 @@ export default function OemIntegrationTab() {
   // quebrada — cai em "todos" sozinho.
   const tipoAtivo = tiposDiv.some((t) => t.tipo === tipoDiv) ? tipoDiv : "todos";
 
+  // Os fornecedores que ESTÃO na lista, com quantos clientes cada um. Mesma
+  // regra do seletor de tipos: sai dos próprios clientes, então fornecedor sem
+  // divergência hoje não vira opção morta.
+  //
+  // "Sem fornecedor" é opção de verdade e não sobra: é o cliente cujo produto
+  // não tem fornecedor na ficha, e ele precisa de um jeito de ser encontrado —
+  // escondido, ele só apareceria em "Todos" e ninguém saberia que existe.
+  const fornecedoresDiv = useMemo(() => {
+    const m = new Map<string, { rotulo: string; clientes: number }>();
+    for (const c of divergencias.lista) {
+      const ids = fornecedoresDoCliente.get(c.id) ?? [];
+      const chaves = ids.length ? ids.map(String) : ["sem"];
+      for (const k of chaves) {
+        const at = m.get(k) ?? { rotulo: k === "sem" ? "Sem fornecedor" : nomeFornecedor(Number(k)), clientes: 0 };
+        at.clientes += 1;
+        m.set(k, at);
+      }
+    }
+    return [...m.entries()]
+      .map(([id, v]) => ({ id, ...v }))
+      // "Sem fornecedor" por último: é o balde de cadastro incompleto, não um
+      // fornecedor entre os outros.
+      .sort((a, b) => (a.id === "sem" ? 1 : b.id === "sem" ? -1 : 0)
+        || b.clientes - a.clientes
+        || a.rotulo.localeCompare(b.rotulo, "pt-BR"));
+  }, [divergencias.lista, fornecedoresDoCliente, nomeFornecedor]);
+
+  // Mesmo cuidado do tipo: corrigida a última divergência de um fornecedor, o
+  // filtro dele deixa de existir e a lista voltaria vazia para sempre.
+  const fornAtivo = fornecedoresDiv.some((f) => f.id === fornDiv) ? fornDiv : "todos";
+
   const divergenciasVisiveis = useMemo(() => {
     const q = buscaDiv.trim().toLowerCase();
     // Filtrar por tipo recorta TAMBÉM os itens de dentro do cliente, não só
@@ -1630,9 +1714,25 @@ export default function OemIntegrationTab() {
       : divergencias.lista
           .map((c) => ({ ...c, itens: c.itens.filter((i) => i.tipo === tipoAtivo) }))
           .filter((c) => c.itens.length > 0);
-    if (!q) return base;
-    return base.filter((c) => combina(q, [c.nome, c.cnpj]));
-  }, [divergencias.lista, buscaDiv, tipoAtivo]);
+    const porFornecedor = fornAtivo === "todos" ? base : base.filter((c) => {
+      const ids = fornecedoresDoCliente.get(c.id) ?? [];
+      return fornAtivo === "sem" ? ids.length === 0 : ids.includes(Number(fornAtivo));
+    });
+    if (!q) return porFornecedor;
+    return porFornecedor.filter((c) => combina(q, [c.nome, c.cnpj]));
+  }, [divergencias.lista, buscaDiv, tipoAtivo, fornAtivo, fornecedoresDoCliente]);
+
+  // A saída do recorte vazio nomeia os filtros que ESTÃO ligados, e só eles:
+  // mandar limpar a busca a quem não buscou é pedir para desfazer o que a
+  // pessoa não fez.
+  const dicaRecorteVazio = useMemo(() => {
+    const ligados = [
+      tipoAtivo !== "todos" ? "escolher Todos os tipos" : null,
+      fornAtivo !== "todos" ? "escolher Todos os fornecedores" : null,
+      buscaDiv.trim() ? "limpar a busca" : null,
+    ].filter(Boolean);
+    return ligados.length ? `Tente ${ligados.join(", ")}.` : "Tente outro nome ou CNPJ.";
+  }, [tipoAtivo, fornAtivo, buscaDiv]);
 
   // O reajuste médio do recorte, em percentual. Só com o filtro em custo: em
   // "Todos os tipos" a média sairia de um pedaço da lista e apareceria ao lado
@@ -3382,6 +3482,22 @@ export default function OemIntegrationTab() {
                     <option key={t.tipo} value={t.tipo}>{t.rotulo} ({t.itens})</option>
                   ))}
                 </select>
+                {/* Só aparece quando há mais de um fornecedor na lista: com um
+                    só, o seletor não recorta nada e é caixa para ler à toa. */}
+                {fornecedoresDiv.length > 1 && (
+                  <select
+                    className="h-10 rounded-md border bg-background px-3 text-sm max-w-full"
+                    value={fornAtivo}
+                    // Mesmo motivo do seletor de tipos: a seleção morre junto,
+                    // porque o lote passaria a valer sobre outra lista.
+                    onChange={(e) => { setFornDiv(e.target.value); setClienteAberto(null); setSelecao(new Map()); }}
+                  >
+                    <option value="todos">Todos os fornecedores ({divergencias.lista.length})</option>
+                    {fornecedoresDiv.map((f) => (
+                      <option key={f.id} value={f.id}>{f.rotulo} ({f.clientes})</option>
+                    ))}
+                  </select>
+                )}
                 <p className="text-sm text-muted-foreground">
                   <strong>{divergenciasVisiveis.length}</strong> clientes ·{" "}
                   <strong>{divergenciasVisiveis.reduce((a, c) => a + c.itens.length, 0)}</strong>{" "}
@@ -3469,12 +3585,7 @@ export default function OemIntegrationTab() {
                     sozinha na tela parece tela quebrada. */}
                 {divergenciasVisiveis.length === 0 && (
                   <p className="px-6 py-8 text-center text-sm text-muted-foreground">
-                    Nenhum cliente com esse recorte.{" "}
-                    {tipoAtivo !== "todos" && buscaDiv.trim()
-                      ? "Tente limpar a busca ou escolher Todos os tipos."
-                      : tipoAtivo !== "todos"
-                        ? "Escolha Todos os tipos para ver a lista inteira."
-                        : "Tente outro nome ou CNPJ."}
+                    Nenhum cliente com esse recorte. {dicaRecorteVazio}
                   </p>
                 )}
                 {divergenciasVisiveis.map((c) => {
@@ -3511,8 +3622,33 @@ export default function OemIntegrationTab() {
                                 divergência, e o mesmo número aparecia de dois
                                 jeitos na mesma tela. */}
                             <div className="flex min-w-0 items-baseline gap-2">
-                              <p className="font-medium truncate" title={c.nome}>{c.nome}</p>
+                              {/* Cortado enquanto fechado, inteiro quando o
+                                  cliente está aberto: nome de razão social não
+                                  cabe numa linha, e quem abriu já pediu para ver
+                                  este cliente. Fechado ele continua cortado
+                                  porque é o corte que mantém as linhas do mesmo
+                                  tamanho e a lista legível de cima a baixo. */}
+                              <p
+                                className={`font-medium ${aberto ? "whitespace-normal break-words" : "truncate"}`}
+                                title={c.nome}
+                              >
+                                {c.nome}
+                              </p>
                               <CnpjCopiavel valor={c.cnpj} />
+                              {/* De quem é o cliente. Fica colado no documento e
+                                  não junto dos selos da direita: é identificação,
+                                  como o nome e o CNPJ, e não contagem de
+                                  pendência. */}
+                              {fornecedoresDoCliente.get(c.id)?.length ? (
+                                <span
+                                  className="shrink-0 truncate max-w-[12rem] text-xs text-muted-foreground"
+                                  title={fornecedoresDoCliente.get(c.id)!.map(nomeFornecedor).join(" · ")}
+                                >
+                                  {nomeFornecedor(fornecedoresDoCliente.get(c.id)![0])}
+                                  {fornecedoresDoCliente.get(c.id)!.length > 1
+                                    && ` +${fornecedoresDoCliente.get(c.id)!.length - 1}`}
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                           {graves > 0 && (
