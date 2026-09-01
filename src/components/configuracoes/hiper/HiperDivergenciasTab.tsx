@@ -53,6 +53,8 @@ const FAMILIAS: { chave: string; rotulo: string; explica: string; peso: number }
   { chave: "cnpj_ambiguo", rotulo: "CNPJ com mais de um cliente", peso: 5, explica: "Precisa de escolha humana: dois cadastros disputam a mesma conta." },
   { chave: "valor_pode_ser_do_periodo", rotulo: "Valor pode ser do período", peso: 1,
     explica: "A mensalidade do portal é 6× ou mais a daqui — isso normalmente não é cadastro errado, é o cliente que paga o período inteiro de uma vez e o portal lança tudo num mês só. Enquanto o contrato aqui estiver como mensal, o valor não é comparado nem gravado: aplicar multiplicaria o MRR. Corrija a recorrência na ficha do cliente e sincronize — o sistema passa a dividir pelo período sozinho." },
+  { chave: "fornecedor_divergente", rotulo: "Fornecedor errado no contrato", peso: 6,
+    explica: "O produto é do Hiper, mas o contrato aqui está com o fornecedor vazio ou apontando para outra empresa. O cruzamento passa por cima disso — o produto também serve de âncora —, mas o cadastro continua errado: esse cliente some de qualquer filtro por fornecedor no resto do sistema." },
   { chave: "sem_valor_no_portal", rotulo: "Portal sem valor do mês", peso: 5,
     explica: "A conta está ativa no Hiper, mas o portal não enviou valor nenhum do mês — normalmente porque o último extrato dela é de um mês anterior ao do lote. Sem valor não há o que comparar, e comparar contra zero zeraria o custo do cliente. A linha fica na lista para você conferir na mão ou rebuscar no portal." },
   { chave: "razao_social_divergente", rotulo: "Razão social diferente", peso: 6, explica: "Comparação já ignora acento, pontuação e sufixo societário." },

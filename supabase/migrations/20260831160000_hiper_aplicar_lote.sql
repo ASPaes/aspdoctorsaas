@@ -25,6 +25,7 @@ as $$
 declare
   r         public.reconciliacao_hiper%rowtype;
   v_forn    bigint;
+  v_produtos bigint[];
   v_cp_id   uuid;
   v_cp_qtd  integer;
   v_recorr  text;
@@ -51,10 +52,17 @@ begin
 
   select fornecedor_id into v_forn from public.hiper_integration where tenant_id = p_tenant_id;
 
+  -- Fornecedor OU produto do Hiper: 11 contratos estão com o fornecedor vazio
+  -- ou de outra empresa e sairiam do escopo por erro de cadastro.
+  select coalesce(array_agg(distinct produto_id) filter (where produto_id is not null), '{}')
+    into v_produtos
+  from public.hiper_catalogo_vinculo where tenant_id = p_tenant_id and tipo = 'plano';
+
   select count(*), min(cp.id::text)::uuid, min(cp.recorrencia::text)
     into v_cp_qtd, v_cp_id, v_recorr
   from public.cliente_produtos cp
-  where cp.cliente_id = r.ds_cliente_id and cp.fornecedor_id = v_forn and cp.ativo;
+  where cp.cliente_id = r.ds_cliente_id and cp.ativo
+    and (cp.fornecedor_id = v_forn or cp.produto_id = any(v_produtos));
 
   -- ── tipo de contrato ──────────────────────────────────────────────────────
   if 'tipo_contrato' = any(p_acoes) then
@@ -77,12 +85,14 @@ begin
              r.razao_social_ds, 'tipo_contrato', 'cliente_produtos', cp.id, 'modelo_contrato_id',
              to_jsonb(cp.modelo_contrato_id), to_jsonb(v_modelo), auth.uid()
       from public.cliente_produtos cp
-      where cp.cliente_id = r.ds_cliente_id and cp.fornecedor_id = v_forn and cp.ativo
+      where cp.cliente_id = r.ds_cliente_id and cp.ativo
+        and (cp.fornecedor_id = v_forn or cp.produto_id = any(v_produtos))
         and cp.modelo_contrato_id is distinct from v_modelo;
 
       update public.cliente_produtos
          set modelo_contrato_id = v_modelo, updated_at = now()
-       where cliente_id = r.ds_cliente_id and fornecedor_id = v_forn and ativo
+       where cliente_id = r.ds_cliente_id and ativo
+         and (fornecedor_id = v_forn or produto_id = any(v_produtos))
          and modelo_contrato_id is distinct from v_modelo;
 
       if found then

@@ -32,6 +32,7 @@ set search_path = public
 as $$
 declare
   v_forn        bigint;
+  v_produtos    bigint[];
   v_contas      integer := 0;
   v_orfaos      integer := 0;
   v_pendentes   integer := 0;
@@ -49,6 +50,15 @@ begin
 
   select fornecedor_id into v_forn
   from public.hiper_integration where tenant_id = p_tenant_id;
+
+  -- Os produtos que os planos do Hiper apontam. O fornecedor sozinho não basta
+  -- como âncora: 11 contratos de "Hiper Gestão"/"Hiper Mini" estão com o campo
+  -- vazio ou apontando para outro fornecedor, e ficavam invisíveis — a conta do
+  -- portal aparecia como "sem cliente aqui" com o cliente cadastrado do lado.
+  select coalesce(array_agg(distinct produto_id) filter (where produto_id is not null), '{}')
+    into v_produtos
+  from public.hiper_catalogo_vinculo
+  where tenant_id = p_tenant_id and tipo = 'plano';
 
   if v_forn is null then
     return jsonb_build_object(
@@ -79,7 +89,8 @@ begin
            min(cp.recorrencia::text)                                       as recorrencia,
            count(*)                                                        as n
     from public.cliente_produtos cp
-    where cp.cliente_id = c.id and cp.fornecedor_id = v_forn and cp.ativo
+    where cp.cliente_id = c.id and cp.ativo
+      and (cp.fornecedor_id = v_forn or cp.produto_id = any(v_produtos))
   ) a
   where c.tenant_id = p_tenant_id and a.n > 0 and nullif(c.cnpj_digits, '') is not null;
 
@@ -273,6 +284,15 @@ begin
    -- some da lista: silêncio aqui esconde que aquele cliente não é conferido.
    || (case when n.estado_match = 'vinculado' and n.viva and n.sem_valor
                                                                    then array['sem_valor_no_portal'] else '{}'::text[] end)
+   -- Produto do Hiper com fornecedor vazio ou de outra empresa. Não impede mais
+   -- a conferência, mas o cadastro está errado e some do filtro por fornecedor
+   -- em todo o resto do sistema.
+   || (case when n.estado_match = 'vinculado' and n.viva and exists (
+              select 1 from public.cliente_produtos cpf
+              where cpf.cliente_id = n.ds_id and cpf.ativo
+                and cpf.produto_id = any(v_produtos)
+                and cpf.fornecedor_id is distinct from v_forn)
+                                                                   then array['fornecedor_divergente']  else '{}'::text[] end)
    || (case when n.estado_match = 'vinculado' and n.viva
                  and public.hiper_norm_razao(n.razao_hiper) is distinct from public.hiper_norm_razao(n.razao_ds)
                                                                    then array['razao_social_divergente']  else '{}'::text[] end)
@@ -301,8 +321,8 @@ begin
       join public.hiper_catalogo_vinculo v
         on v.tenant_id = p_tenant_id and v.tipo = 'modulo' and v.chave = m.app_nome
       join public.cliente_produtos cpx
-        on cpx.cliente_id = n.ds_id and cpx.fornecedor_id = v_forn and cpx.ativo
-       and cpx.produto_id = v.produto_id
+        on cpx.cliente_id = n.ds_id and cpx.ativo and cpx.produto_id = v.produto_id
+       and (cpx.fornecedor_id = v_forn or cpx.produto_id = any(v_produtos))
       where m.tenant_id = p_tenant_id and m.id_portal = n.id_portal and m.ativo
       order by m.app_nome, v.produto_id
     ),
@@ -321,8 +341,8 @@ begin
         on e2.tenant_id = p_tenant_id and e2.id_portal = n.id_portal and e2.plano = pmod.plano
       join public.produto_modulos pm2 on pm2.id = pmod.modulo_id
       join public.cliente_produtos cpy
-        on cpy.cliente_id = n.ds_id and cpy.fornecedor_id = v_forn and cpy.ativo
-       and cpy.produto_id = pmod.produto_id
+        on cpy.cliente_id = n.ds_id and cpy.ativo and cpy.produto_id = pmod.produto_id
+       and (cpy.fornecedor_id = v_forn or cpy.produto_id = any(v_produtos))
       where pmod.tenant_id = p_tenant_id
     ),
     hip as (
@@ -338,8 +358,8 @@ begin
       from public.cliente_produto_modulos cpm
       join public.cliente_produtos cp on cp.id = cpm.cliente_produto_id
       join public.produto_modulos    pm on pm.id = cpm.modulo_id
-      where cp.cliente_id = n.ds_id and cp.fornecedor_id = v_forn
-        and cp.ativo and cpm.ativo
+      where cp.cliente_id = n.ds_id and cp.ativo and cpm.ativo
+        and (cp.fornecedor_id = v_forn or cp.produto_id = any(v_produtos))
         -- Módulo que o motor CONHECE: veio de um app do portal (catálogo) ou
         -- do plano. Olhar só o catálogo deixava o Hiper Caixa de fora — ele não
         -- é app, vem do contador de caixas —, então ele nunca contava como

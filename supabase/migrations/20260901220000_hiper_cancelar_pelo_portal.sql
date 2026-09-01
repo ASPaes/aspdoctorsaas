@@ -21,6 +21,7 @@ as $$
 declare
   r        public.reconciliacao_hiper%rowtype;
   v_forn   bigint;
+  v_produtos bigint[];
   v_cp     record;
   v_lote   uuid := gen_random_uuid();
   v_feitos jsonb := '[]'::jsonb;
@@ -59,12 +60,16 @@ begin
 
   v_data := r.cancelada_em;
   select fornecedor_id into v_forn from public.hiper_integration where tenant_id = p_tenant_id;
+  select coalesce(array_agg(distinct produto_id) filter (where produto_id is not null), '{}')
+    into v_produtos
+  from public.hiper_catalogo_vinculo where tenant_id = p_tenant_id and tipo = 'plano';
 
   for v_cp in
     select cp.id, cp.vlr_mensal, cp.vlr_custo, pr.nome as produto
     from public.cliente_produtos cp
     join public.produtos pr on pr.id = cp.produto_id
-    where cp.cliente_id = r.ds_cliente_id and cp.fornecedor_id = v_forn and cp.ativo
+    where cp.cliente_id = r.ds_cliente_id and cp.ativo
+      and (cp.fornecedor_id = v_forn or cp.produto_id = any(v_produtos))
   loop
     -- A trilha vem ANTES: depois do cancelamento o valor antigo não existe mais.
     insert into public.hiper_alteracao_log

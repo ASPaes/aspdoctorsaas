@@ -20,6 +20,7 @@ set search_path = public
 as $$
 declare
   v_forn      bigint;
+  v_produtos  bigint[];
   v_inserir   integer := 0;
   v_qtd       integer := 0;
   v_custo     integer := 0;
@@ -37,6 +38,9 @@ begin
   end if;
 
   select fornecedor_id into v_forn from public.hiper_integration where tenant_id = p_tenant_id;
+  select coalesce(array_agg(distinct produto_id) filter (where produto_id is not null), '{}')
+    into v_produtos
+  from public.hiper_catalogo_vinculo where tenant_id = p_tenant_id and tipo = 'plano';
   if v_forn is null then
     return jsonb_build_object('ok', false, 'erro', 'Escolha o fornecedor Hiper na aba Conexão.');
   end if;
@@ -100,8 +104,8 @@ begin
     coalesce(cpm.vlr_custo, 0) as custo_atual
   from esperado x
   left join public.cliente_produtos cp
-    on cp.cliente_id = x.ds_cliente_id and cp.fornecedor_id = v_forn
-   and cp.produto_id = x.produto_id and cp.ativo
+    on cp.cliente_id = x.ds_cliente_id and cp.produto_id = x.produto_id and cp.ativo
+   and (cp.fornecedor_id = v_forn or cp.produto_id = any(v_produtos))
   left join public.cliente_produto_modulos cpm
     on cpm.cliente_produto_id = cp.id and cpm.modulo_id = x.modulo_id and cpm.ativo
   order by x.ds_cliente_id, x.app_nome, (cp.id is null), x.custo desc, x.quantidade desc;
