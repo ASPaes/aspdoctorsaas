@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 31/08
 
+- ⬆️ **Integração OEM — dá para ajustar o custo de vários clientes de uma vez** — Em *Configurações › Integrações › OEM › Divergências*, o apontamento **"Custo da ficha diferente do que o OEM cobra"** só tinha saída de um em um, e são mais de cem. Agora ele entra na seleção que já existia para nome e CNPJ: filtre por esse tipo, marque os clientes (ou use **Selecionar todos desta lista**) e clique em **Ajustar custo dos selecionados** — a leva inteira vai numa chamada só. O ajuste continua indo **só na direção OEM → DoctorSaaS**, porque quem fatura a licença é o parceiro, e mexe apenas no **custo do produto** na ficha: a mensalidade não muda e nada é enfileirado para o Omie. Licença sem custo no OEM, ou cuja filial cai em mais de um produto ativo, não é gravada — e a tela diz quantas ficaram de fora, em vez de mostrar um "tudo certo" que esconde as recusadas.
+
 - 🔧 **Conversa aberta por template já nasce sua** — Quando você inicia um contato pelo **template oficial da Meta**, o atendimento agora abre direto no seu nome e no seu setor, como "Atendendo". Antes ele caía na **Fila sem setor** e ficava parado até alguém clicar em Assumir — mesmo tendo sido você quem iniciou a conversa. Quem envia pelo chat normal já funcionava assim.
 
 - 🔧 **A tarja "Fora do horário" não gruda mais no chat** — A marca sobrevivia ao encerramento do atendimento: um contato iniciado numa segunda de manhã, dentro do expediente, aparecia como fora do horário porque o chat tinha sido marcado no sábado. Agora ela some quando **o agente age dentro do expediente** — ao assumir ou ao responder — e se mantém quando o atendimento é feito fora dele, para o plantão continuar visível.

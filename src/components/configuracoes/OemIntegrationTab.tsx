@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -1903,49 +1903,75 @@ export default function OemIntegrationTab() {
 
   // ------------------------------------------------------------- em lote
   //
-  // Só nome e CNPJ entram: são as duas divergências que têm um valor certo de
-  // um lado e errado do outro. As demais pedem decisão caso a caso (qual
-  // licença é dele, o que fazer com a que está sobrando) e não existe "aplicar
-  // em todos" que faça sentido.
+  // Três divergências entram: nome, CNPJ e custo. São as que têm um valor certo
+  // de um lado e errado do outro, e por isso admitem "aplica em todos". As
+  // demais pedem decisão caso a caso (qual licença é dele, o que fazer com a
+  // que está sobrando) e não existe lote que faça sentido.
   //
-  // A seleção guarda recon_id -> campo, e não só o id: com o filtro em "Todos
-  // os tipos" a mesma leva pode ter nome e CNPJ misturados, e cada item precisa
-  // ir para o seu lado.
-  const [selecao, setSelecao] = useState<Map<string, "nome" | "cnpj">>(new Map());
+  // Custo só anda na direção OEM -> DS: quem fatura é o parceiro. Por isso ele
+  // desliga o botão do OEM quando entra na leva.
+  //
+  // A seleção guarda a chave do ITEM (e não o recon_id) apontando para o que
+  // fazer com ele, já com o que a execução precisa: recon_id para cadastro,
+  // filiais para custo. Com o filtro em "Todos os tipos" a mesma leva mistura
+  // os três, e cada um precisa ir para o seu lado.
+  type AlvoLote =
+    | { campo: "nome" | "cnpj"; reconId: string; nome: string }
+    | { campo: "custo"; filiais: string[]; nome: string };
+  const [selecao, setSelecao] = useState<Map<string, AlvoLote>>(new Map());
   const [loteDestino, setLoteDestino] = useState<"ds" | "oem" | null>(null);
   const [loteAndando, setLoteAndando] = useState(false);
   const [loteFeitos, setLoteFeitos] = useState(0);
   const [loteFalhas, setLoteFalhas] = useState<{ nome: string; motivo: string }[]>([]);
   const [loteResumo, setLoteResumo] = useState<{ ok: number; total: number } | null>(null);
+  // O que a RPC do custo recusou. Não é falha de cliente (não dá para dizer de
+  // quem), mas também não pode sumir: um "111 de 111" escondendo 12 licenças
+  // não gravadas é pior do que não ter lote.
+  const [loteNota, setLoteNota] = useState<string | null>(null);
   // Parada pedida pela pessoa. Ref e não estado: o loop lê isso a cada volta, e
   // um estado só chegaria nele no próximo render.
   const pararLote = useRef(false);
 
+  const alvoDoItem = (i: ItemDivergencia, nome: string): [string, AlvoLote] | null => {
+    if ((i.tipo === "nome" || i.tipo === "cnpj") && i.linha)
+      return [i.chave, { campo: i.tipo === "cnpj" ? "cnpj" : "nome", reconId: i.linha.id, nome }];
+    // Sem filial não há o que mandar para a RPC — ela filtra por filial_codigo.
+    if (i.tipo === "custo" && i.custo?.filiais.length)
+      return [i.chave, { campo: "custo", filiais: i.custo.filiais, nome }];
+    return null;
+  };
+
   const elegiveisDoCliente = (c: (typeof divergencias)["lista"][number]) =>
-    c.itens.filter((i) => (i.tipo === "nome" || i.tipo === "cnpj") && i.linha);
+    c.itens.map((i) => alvoDoItem(i, c.nome)).filter(Boolean) as [string, AlvoLote][];
 
   const elegiveisVisiveis = useMemo(
-    () => divergenciasVisiveis.flatMap((c) => c.itens.filter((i) => (i.tipo === "nome" || i.tipo === "cnpj") && i.linha)),
+    () => divergenciasVisiveis.flatMap(elegiveisDoCliente),
     [divergenciasVisiveis],
   );
 
-  const nomePorRecon = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const c of divergenciasVisiveis) {
-      for (const i of elegiveisDoCliente(c)) m.set(i.linha!.id, c.nome);
+  // Quantos de cada campo estão marcados. Decide o que a barra oferece, o que o
+  // diálogo promete e se o botão do OEM pode existir.
+  const contagemLote = useMemo(() => {
+    let nomes = 0, cnpjs = 0, custos = 0;
+    for (const a of selecao.values()) {
+      if (a.campo === "nome") nomes += 1;
+      else if (a.campo === "cnpj") cnpjs += 1;
+      else custos += 1;
     }
-    return m;
-  }, [divergenciasVisiveis]);
+    return { nomes, cnpjs, custos, cadastros: nomes + cnpjs };
+  }, [selecao]);
+
+  const soCusto = contagemLote.custos > 0 && contagemLote.cadastros === 0;
 
   function alternarCliente(c: (typeof divergencias)["lista"][number]) {
-    const itens = elegiveisDoCliente(c);
-    if (!itens.length) return;
+    const alvos = elegiveisDoCliente(c);
+    if (!alvos.length) return;
     setSelecao((antes) => {
       const nova = new Map(antes);
-      const todosJa = itens.every((i) => nova.has(i.linha!.id));
-      for (const i of itens) {
-        if (todosJa) nova.delete(i.linha!.id);
-        else nova.set(i.linha!.id, i.tipo === "cnpj" ? "cnpj" : "nome");
+      const todosJa = alvos.every(([k]) => nova.has(k));
+      for (const [k, v] of alvos) {
+        if (todosJa) nova.delete(k);
+        else nova.set(k, v);
       }
       return nova;
     });
@@ -1955,44 +1981,86 @@ export default function OemIntegrationTab() {
   // uma busca ativa, marcar o que está fora da tela seria escolher por quem
   // está olhando.
   function alternarTodosVisiveis() {
-    const itens = divergenciasVisiveis.flatMap(elegiveisDoCliente);
-    if (!itens.length) return;
+    if (!elegiveisVisiveis.length) return;
     setSelecao((antes) => {
-      const todosJa = itens.every((i) => antes.has(i.linha!.id));
+      const todosJa = elegiveisVisiveis.every(([k]) => antes.has(k));
       if (todosJa) return new Map();
       const nova = new Map(antes);
-      for (const i of itens) nova.set(i.linha!.id, i.tipo === "cnpj" ? "cnpj" : "nome");
+      for (const [k, v] of elegiveisVisiveis) nova.set(k, v);
       return nova;
     });
   }
 
-  // Um por um, e não uma chamada só: no OEM cada licença é um ler-modificar-
-  // gravar no parceiro, e uma edge function que fizesse 92 delas estouraria o
-  // tempo limite no meio, sem dizer quais já tinham ido. Aqui a tela mostra o
-  // progresso, dá para parar, e o que já foi está feito.
+  // Cadastro vai um por um, e não numa chamada só: no OEM cada licença é um
+  // ler-modificar-gravar no parceiro, e uma edge function que fizesse 92 delas
+  // estouraria o tempo limite no meio, sem dizer quais já tinham ido. Aqui a
+  // tela mostra o progresso, dá para parar, e o que já foi está feito.
+  //
+  // Custo é o contrário: uma RPC só para a leva inteira. Cada escrita em
+  // cliente_produtos dispara o gatilho que recalcula o custo do cliente — 111
+  // chamadas seriam 111 recálculos, e é por isso que a RPC nasceu recebendo
+  // array de filiais.
   async function rodarLote(destino: "ds" | "oem") {
-    const itens = [...selecao.entries()];
-    if (!itens.length) return;
+    const alvos = [...selecao.values()];
+    if (!alvos.length) return;
+    // Segunda tranca: a barra já não deixa mandar custo para o OEM (escrever a
+    // filial no parceiro é outro caminho, com três códigos que leitura nenhuma
+    // devolve). Sem isto, um estado errado sairia gravando cadastro no lugar.
+    if (destino === "oem" && alvos.some((a) => a.campo === "custo")) return;
+
+    const custos = alvos.filter((a): a is Extract<AlvoLote, { campo: "custo" }> => a.campo === "custo");
+    const cadastros = alvos.filter(
+      (a): a is Extract<AlvoLote, { campo: "nome" | "cnpj" }> => a.campo !== "custo",
+    );
+
     pararLote.current = false;
     setLoteAndando(true);
     setLoteFeitos(0);
     setLoteFalhas([]);
+    setLoteNota(null);
     const falhas: { nome: string; motivo: string }[] = [];
     let ok = 0;
+    let nota: string | null = null;
 
-    for (const [reconId, campo] of itens) {
+    // O custo vai primeiro: é uma chamada só, é a mais rápida, e quem parar o
+    // lote no meio já leva essa parte inteira feita.
+    if (custos.length) {
+      const filiais = [...new Set(custos.flatMap((a) => a.filiais))];
+      try {
+        const { data, error } = await (supabase as any).rpc("atualizar_custo_ds_oem", {
+          p_tenant_id: tid,
+          p_filiais: filiais,
+        });
+        if (error) throw error;
+        const r = (data ?? {}) as { atualizados?: number; sem_custo_no_oem?: number; ambiguos?: number };
+        ok += custos.length;
+        // A RPC se recusa a gravar custo zero e filial que cai em mais de um
+        // produto ativo. O que ela não gravou aparece na nota do resumo.
+        const recusas: string[] = [];
+        if (r.sem_custo_no_oem) recusas.push(`${r.sem_custo_no_oem} sem custo no OEM`);
+        if (r.ambiguos) recusas.push(`${r.ambiguos} com mais de um produto ativo`);
+        nota = `Custo: ${r.atualizados ?? 0} de ${filiais.length} licença(s) gravada(s)`
+          + (recusas.length ? ` · não gravadas: ${recusas.join(" · ")}` : "");
+      } catch (e: any) {
+        // A chamada é uma só: se ela falhou, nenhum dos selecionados foi.
+        for (const a of custos) falhas.push({ nome: a.nome, motivo: e?.message ?? String(e) });
+      }
+      setLoteFeitos((n) => n + custos.length);
+      queryClient.invalidateQueries({ queryKey: ["oem-codigos-gravados", tid] });
+    }
+
+    for (const a of cadastros) {
       if (pararLote.current) break;
-      const nome = nomePorRecon.get(reconId) ?? "cliente";
       try {
         if (destino === "oem") {
           const { data, error } = await supabase.functions.invoke("oem-atualizar-cadastro-licenca", {
-            body: { recon_id: reconId, campo },
+            body: { recon_id: a.reconId, campo: a.campo },
           });
           if (error) throw new Error(error.message);
           if (data?.ok === false) throw new Error(String(data?.mensagem ?? "o OEM recusou"));
         } else {
           const { error } = await (supabase as any).rpc("oem_trazer_cadastro_do_parceiro", {
-            p_recon_id: reconId, p_campo: campo,
+            p_recon_id: a.reconId, p_campo: a.campo,
           });
           if (error) throw new Error(error.message);
         }
@@ -2000,7 +2068,7 @@ export default function OemIntegrationTab() {
       } catch (e: any) {
         // A falha de um não para os outros: numa leva de 92, um CNPJ que já é
         // de outro cliente não pode impedir os 91 que estão certos.
-        falhas.push({ nome, motivo: e?.message ?? String(e) });
+        falhas.push({ nome: a.nome, motivo: e?.message ?? String(e) });
       }
       setLoteFeitos((n) => n + 1);
     }
@@ -2008,7 +2076,8 @@ export default function OemIntegrationTab() {
     setLoteAndando(false);
     setLoteDestino(null);
     setLoteFalhas(falhas);
-    setLoteResumo({ ok, total: itens.length });
+    setLoteNota(nota);
+    setLoteResumo({ ok, total: alvos.length });
     setSelecao(new Map());
     await recarregarRecon();
   }
@@ -3227,14 +3296,14 @@ export default function OemIntegrationTab() {
                 </p>
               </div>
 
-              {/* Seleção em massa. Só aparece quando há o que selecionar: nome e
-                  CNPJ são as únicas divergências com um valor certo de um lado e
-                  errado do outro. "Qual licença é dele" não tem lote possível. */}
+              {/* Seleção em massa. Só aparece quando há o que selecionar: nome,
+                  CNPJ e custo são as divergências com um valor certo de um lado
+                  e errado do outro. "Qual licença é dele" não tem lote possível. */}
               {elegiveisVisiveis.length > 0 && (
                 <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
                   <label className="flex cursor-pointer items-center gap-2 text-sm">
                     <Checkbox
-                      checked={elegiveisVisiveis.every((i) => selecao.has(i.linha!.id))}
+                      checked={elegiveisVisiveis.every(([k]) => selecao.has(k))}
                       onCheckedChange={alternarTodosVisiveis}
                     />
                     Selecionar todos os {elegiveisVisiveis.length} desta lista
@@ -3244,17 +3313,32 @@ export default function OemIntegrationTab() {
                       <span className="text-sm text-muted-foreground">
                         <strong className="text-foreground">{selecao.size}</strong> selecionado{selecao.size > 1 ? "s" : ""}
                       </span>
-                      <div className="inline-flex items-center gap-0.5 rounded-md border bg-background p-0.5">
-                        <span className="px-1.5 text-xs text-muted-foreground">Atualizar em</span>
-                        <Button size="sm" variant="ghost" className="h-7 gap-1 px-2"
+                      {/* Leva só de custo não tem para onde escolher: o valor
+                          vem do parceiro por definição. Um par com um lado
+                          sempre desligado seria pedir uma escolha que não
+                          existe — vira um botão só, com o nome da ação. */}
+                      {soCusto ? (
+                        <Button size="sm" variant="secondary" className="h-7 gap-1.5 px-2.5"
                           onClick={() => setLoteDestino("ds")}>
-                          <ArrowDownToLine className="h-3.5 w-3.5" /> DoctorSaaS
+                          <RefreshCw className="h-3.5 w-3.5" /> Ajustar custo dos selecionados
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-7 gap-1 px-2"
-                          onClick={() => setLoteDestino("oem")}>
-                          <ArrowUpFromLine className="h-3.5 w-3.5" /> OEM
-                        </Button>
-                      </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-0.5 rounded-md border bg-background p-0.5">
+                          <span className="px-1.5 text-xs text-muted-foreground">Atualizar em</span>
+                          <Button size="sm" variant="ghost" className="h-7 gap-1 px-2"
+                            onClick={() => setLoteDestino("ds")}>
+                            <ArrowDownToLine className="h-3.5 w-3.5" /> DoctorSaaS
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 gap-1 px-2"
+                            disabled={contagemLote.custos > 0}
+                            title={contagemLote.custos > 0
+                              ? "Custo só vem do OEM para cá. Tire os de custo da seleção para mandar cadastro ao parceiro."
+                              : undefined}
+                            onClick={() => setLoteDestino("oem")}>
+                            <ArrowUpFromLine className="h-3.5 w-3.5" /> OEM
+                          </Button>
+                        </div>
+                      )}
                       <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground"
                         onClick={() => setSelecao(new Map())}>
                         Limpar
@@ -3282,7 +3366,7 @@ export default function OemIntegrationTab() {
                   const aberto = clienteAberto === c.id;
                   const graves = c.itens.filter((i) => i.grave).length;
                   const elegiveis = elegiveisDoCliente(c);
-                  const marcado = elegiveis.length > 0 && elegiveis.every((i) => selecao.has(i.linha!.id));
+                  const marcado = elegiveis.length > 0 && elegiveis.every(([k]) => selecao.has(k));
                   return (
                     <div key={c.id}>
                       {/* O checkbox fica FORA do botão que expande: button dentro
@@ -3510,7 +3594,9 @@ export default function OemIntegrationTab() {
                 ? "Atualizando…"
                 : loteDestino === "oem"
                   ? `Mandar ${selecao.size} cadastro${selecao.size > 1 ? "s" : ""} para o OEM?`
-                  : `Atualizar ${selecao.size} cadastro${selecao.size > 1 ? "s" : ""} no DoctorSaaS?`}
+                  : soCusto
+                    ? `Ajustar o custo de ${selecao.size} cliente${selecao.size > 1 ? "s" : ""}?`
+                    : `Atualizar ${selecao.size} cadastro${selecao.size > 1 ? "s" : ""} no DoctorSaaS?`}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
@@ -3526,28 +3612,38 @@ export default function OemIntegrationTab() {
                       />
                     </div>
                     <p className="text-xs">
-                      Um de cada vez, de propósito. O que já foi está feito: parar agora não desfaz
-                      nada, só interrompe o resto.
+                      {soCusto
+                        ? "Uma chamada só para a leva inteira: ela não para no meio."
+                        : "Um de cada vez, de propósito. O que já foi está feito: parar agora não "
+                          + "desfaz nada, só interrompe o resto."}
                     </p>
                   </>
                 ) : (
                   <>
                     {/* Quantos de cada campo: com o filtro em "Todos os tipos" a
-                        mesma leva mistura nome e CNPJ, e o peso dos dois é bem
+                        mesma leva mistura os três, e o peso deles é bem
                         diferente. */}
                     <p>
                       {(() => {
-                        const campos = [...selecao.values()];
-                        const nomes = campos.filter((c) => c === "nome").length;
-                        const cnpjs = campos.length - nomes;
+                        const { nomes, cnpjs, custos } = contagemLote;
+                        const partes = ([
+                          nomes > 0 && <><strong>{nomes}</strong> de nome</>,
+                          cnpjs > 0 && <><strong>{cnpjs}</strong> de CNPJ</>,
+                          custos > 0 && <><strong>{custos}</strong> de custo</>,
+                        ].filter(Boolean) as React.ReactNode[]);
                         return (
                           <>
-                            {nomes > 0 && <><strong>{nomes}</strong> de nome</>}
-                            {nomes > 0 && cnpjs > 0 && " e "}
-                            {cnpjs > 0 && <><strong>{cnpjs}</strong> de CNPJ</>}
+                            {partes.map((p, idx) => (
+                              <Fragment key={idx}>
+                                {idx > 0 && (idx === partes.length - 1 ? " e " : ", ")}
+                                {p}
+                              </Fragment>
+                            ))}
                             {loteDestino === "oem"
                               ? " serão gravados na licença do parceiro."
-                              : " serão gravados na ficha do cliente."}
+                              : soCusto
+                                ? " passam a ter na ficha o custo que o OEM cobra."
+                                : " serão gravados na ficha do cliente."}
                           </>
                         );
                       })()}
@@ -3559,10 +3655,25 @@ export default function OemIntegrationTab() {
                         registrada, inclusive as recusadas.
                       </p>
                     ) : (
-                      <p>
-                        Cada cliente com <strong>contrato ativo</strong> entra na <strong>fila do
-                        Omie</strong> junto, pelo mesmo caminho de sempre.
-                      </p>
+                      <>
+                        {contagemLote.cadastros > 0 && (
+                          <p>
+                            Cada cliente com <strong>contrato ativo</strong> entra na <strong>fila do
+                            Omie</strong> junto, pelo mesmo caminho de sempre.
+                          </p>
+                        )}
+                        {/* O que o custo mexe, e o que ele NÃO mexe. Sem isto,
+                            um lote de 111 clientes parece que pode mudar
+                            mensalidade e disparar contrato no Omie. */}
+                        {contagemLote.custos > 0 && (
+                          <p>
+                            O custo mexe só no <strong>custo do produto</strong> na ficha: a
+                            mensalidade não muda e <strong>nada é enfileirado para o Omie</strong>.
+                            Licença sem custo no OEM, ou cuja filial cai em mais de um produto ativo,
+                            não é gravada — a tela diz quantas no fim.
+                          </p>
+                        )}
+                      </>
                     )}
                     <p className="text-xs">
                       Se algum falhar, os outros seguem: no fim a tela diz quais não foram e por quê.
@@ -3574,14 +3685,20 @@ export default function OemIntegrationTab() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             {loteAndando ? (
-              <Button variant="secondary" onClick={() => { pararLote.current = true; }}>
-                Parar
-              </Button>
+              // Sem Parar quando é só custo: é uma chamada só, e um botão que
+              // não interrompe nada é pior do que botão nenhum.
+              soCusto ? null : (
+                <Button variant="secondary" onClick={() => { pararLote.current = true; }}>
+                  Parar
+                </Button>
+              )
             ) : (
               <>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                 <AlertDialogAction onClick={(e) => { e.preventDefault(); rodarLote(loteDestino!); }}>
-                  {loteDestino === "oem" ? "Mandar para o OEM" : "Atualizar no DoctorSaaS"}
+                  {loteDestino === "oem"
+                    ? "Mandar para o OEM"
+                    : soCusto ? "Ajustar custo" : "Atualizar no DoctorSaaS"}
                 </AlertDialogAction>
               </>
             )}
@@ -3591,7 +3708,7 @@ export default function OemIntegrationTab() {
 
       {/* O resultado. Falha em lote sem lista de quem falhou obriga a conferir
           92 clientes a olho para achar os 3 que não foram. */}
-      <Dialog open={!!loteResumo} onOpenChange={(v) => { if (!v) { setLoteResumo(null); setLoteFalhas([]); } }}>
+      <Dialog open={!!loteResumo} onOpenChange={(v) => { if (!v) { setLoteResumo(null); setLoteFalhas([]); setLoteNota(null); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
@@ -3603,6 +3720,14 @@ export default function OemIntegrationTab() {
                 : `${loteFalhas.length} não ${loteFalhas.length > 1 ? "foram" : "foi"}. O motivo de cada um está abaixo.`}
             </DialogDescription>
           </DialogHeader>
+          {/* O que a RPC do custo gravou de fato, e o que ela recusou. Fica
+              fora da lista de falhas porque não dá para dizer de qual cliente
+              é cada recusa — mas some seria pior. */}
+          {loteNota && (
+            <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              {loteNota}
+            </p>
+          )}
           {loteFalhas.length > 0 && (
             <div className="max-h-72 divide-y overflow-y-auto rounded-md border">
               {loteFalhas.map((f, i) => (
