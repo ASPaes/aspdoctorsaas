@@ -139,6 +139,7 @@ export default function SupportTickets() {
   const [canalFilter, setCanalFilter] = useState<string>("all");
   const [tipoHorarioFilter, setTipoHorarioFilter] = useState<string>("all");
   const [subcategoriaFilter, setSubcategoriaFilter] = useState<string>("all");
+  const [ticketDevFilter, setTicketDevFilter] = useState<string>("all");
   const [serviceTypeFilters, setServiceTypeFilters] = useState<string[]>([]);
   const [search, setSearch] = useState<string>("");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -196,7 +197,7 @@ export default function SupportTickets() {
   }, [
     dateRange.from, dateRange.to,
     produtoFilter, statusFilter, atendenteFilter, categoriaFilter, subcategoriaFilter,
-    canalFilter, tipoHorarioFilter, serviceTypeFilters, departmentFilter, tagFilters,
+    canalFilter, tipoHorarioFilter, ticketDevFilter, serviceTypeFilters, departmentFilter, tagFilters,
     clienteFilterId, selectedUnidadeId, ticketStateFilter, sortBy, debouncedSearch,
   ]);
   const { results: clienteSearchResults, isLoading: clienteSearchLoading } = useClienteSearch(clienteSearchTerm);
@@ -600,6 +601,7 @@ export default function SupportTickets() {
     if (subcategoriaFilter !== "all") count++;
     if (canalFilter !== "all") count++;
     if (tipoHorarioFilter !== "all") count++;
+    if (ticketDevFilter !== "all") count++;
     if (serviceTypeFilters.length > 0) count++;
     if (tagFilters.length > 0) count++;
     if (ticketsView === "atendimentos") {
@@ -613,7 +615,7 @@ export default function SupportTickets() {
       if (attTipoFilter !== "all") count++;
     }
     return count;
-  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, serviceTypeFilters, tagFilters, ticketsView, attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter, attSentimentFilter, attInstanceFilter, attResolucaoFilter, attTipoFilter]);
+  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, ticketDevFilter, serviceTypeFilters, tagFilters, ticketsView, attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter, attSentimentFilter, attInstanceFilter, attResolucaoFilter, attTipoFilter]);
 
   const clearAdvancedFilters = () => {
     setProdutoFilter("all");
@@ -622,6 +624,7 @@ export default function SupportTickets() {
     setSubcategoriaFilter("all");
     setCanalFilter("all");
     setTipoHorarioFilter("all");
+    setTicketDevFilter("all");
     setServiceTypeFilters([]);
     setTagFilters([]);
   };
@@ -637,12 +640,24 @@ export default function SupportTickets() {
         return labels[value] ?? value;
       }
       case "tipoHorario": return value === "plantao" ? "Plantão" : "Comercial";
+      case "ticketDev": return value === "preenchido" ? "Ticket Dev preenchido" : "Ticket Dev vazio";
       default: return value;
     }
   };
 
+  /**
+   * O campo Ticket Dev limpo na tela grava string vazia, não NULL (o input do
+   * detalhe salva `e.target.value.trim()`). Por isso "vazio" precisa pegar os
+   * dois casos, senão o ticket que teve código e foi apagado ficava de fora.
+   */
+  const applyTicketDevFilter = (q: any) => {
+    if (ticketDevFilter === "preenchido") return q.not("ticket_dev", "is", null).neq("ticket_dev", "");
+    if (ticketDevFilter === "vazio") return q.or("ticket_dev.is.null,ticket_dev.eq.");
+    return q;
+  };
+
   const { data: listData = { rows: [] as TicketRow[], total: 0 }, isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, tipoHorarioFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, userDepartmentId, clienteFilterId, selectedUnidadeId, ticketStateFilter, sortBy, debouncedSearch, currentPage, ticketStatuses.map((s) => s.id).join(","), matchedAgentIds.join(",")],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, tipoHorarioFilter, ticketDevFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, userDepartmentId, clienteFilterId, selectedUnidadeId, ticketStateFilter, sortBy, debouncedSearch, currentPage, ticketStatuses.map((s) => s.id).join(","), matchedAgentIds.join(",")],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -716,6 +731,7 @@ export default function SupportTickets() {
       if (categoriaFilter !== "all") q = q.eq("category_id", categoriaFilter);
       if (canalFilter !== "all") q = q.eq("canal_origem", canalFilter);
       if (tipoHorarioFilter !== "all") q = q.eq("tipo_horario", tipoHorarioFilter);
+      q = applyTicketDevFilter(q);
       if (subcategoriaFilter !== "all") q = q.eq("subcategory_id", subcategoriaFilter);
       if (serviceTypeFilters.length > 0) q = q.in("service_type_id", serviceTypeFilters);
       if (departmentFilter !== "all") q = q.eq("department_id", departmentFilter);
@@ -764,7 +780,7 @@ export default function SupportTickets() {
   const tickets = listData.rows;
 
   const { data: counts = { total: 0, ativos: 0, finalizados: 0 } } = useQuery({
-    queryKey: ["support_tickets_counts", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, serviceTypeFilters.join(","), departmentFilter, tagFilters.join(","), clienteFilterId, selectedUnidadeId, isAdminOrHead, userId, userDepartmentId, ticketStatuses.map((s) => s.id).join(",")],
+    queryKey: ["support_tickets_counts", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, ticketDevFilter, serviceTypeFilters.join(","), departmentFilter, tagFilters.join(","), clienteFilterId, selectedUnidadeId, isAdminOrHead, userId, userDepartmentId, ticketStatuses.map((s) => s.id).join(",")],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -803,6 +819,7 @@ export default function SupportTickets() {
         if (subcategoriaFilter !== "all") q = q.eq("subcategory_id", subcategoriaFilter);
         if (canalFilter !== "all") q = q.eq("canal_origem", canalFilter);
         if (tipoHorarioFilter !== "all") q = q.eq("tipo_horario", tipoHorarioFilter);
+        q = applyTicketDevFilter(q);
         if (serviceTypeFilters.length > 0) q = q.in("service_type_id", serviceTypeFilters);
         if (departmentFilter !== "all") q = q.eq("department_id", departmentFilter);
         if (clienteFilterId) q = q.eq("cliente_id", clienteFilterId);
@@ -911,6 +928,7 @@ export default function SupportTickets() {
       if (subcategoriaFilter !== "all") q = q.eq("subcategory_id", subcategoriaFilter);
       if (canalFilter !== "all") q = q.eq("canal_origem", canalFilter);
       if (tipoHorarioFilter !== "all") q = q.eq("tipo_horario", tipoHorarioFilter);
+      q = applyTicketDevFilter(q);
       if (serviceTypeFilters.length > 0) q = q.in("service_type_id", serviceTypeFilters);
       if (departmentFilter !== "all") q = q.eq("department_id", departmentFilter);
       if (clienteFilterId) q = q.eq("cliente_id", clienteFilterId);
@@ -1335,6 +1353,17 @@ export default function SupportTickets() {
                       </PopoverContent>
                     </Popover>
                   </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Tickets Dev</label>
+                    <Select value={ticketDevFilter} onValueChange={setTicketDevFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="preenchido">Preenchido</SelectItem>
+                        <SelectItem value="vazio">Vazio</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="space-y-1 pt-2 border-t">
@@ -1608,6 +1637,14 @@ export default function SupportTickets() {
               className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
             >
               {getFilterLabel("tipoHorario", tipoHorarioFilter)} <X className="h-3 w-3" />
+            </button>
+          )}
+          {ticketDevFilter !== "all" && (
+            <button
+              onClick={() => setTicketDevFilter("all")}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            >
+              {getFilterLabel("ticketDev", ticketDevFilter)} <X className="h-3 w-3" />
             </button>
           )}
           {serviceTypeFilters.map((stId) => {

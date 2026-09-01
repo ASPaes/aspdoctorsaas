@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 31/08
 
+- 🆕 **Tickets — filtrar por Ticket Dev preenchido ou vazio** — Em **Chamados**, o painel de **Filtros** ganhou o campo **Tickets Dev**. Com **Preenchido**, a lista traz só os chamados que têm o código da demanda do DoctorDev anotado; com **Vazio**, só os que ainda não têm; e **Todos** continua sendo o padrão, com os dois juntos. O filtro vale para a lista, o kanban, os números do topo (Total, Ativos, Finalizados) e a exportação, e aparece como etiqueta ao lado dos demais filtros ativos.
+
 - 🆕 **Chat — uma seta para voltar ao fim da conversa** — Depois de subir bastante no histórico de um chat, a única saída era rolar de volta até embaixo. Agora aparece uma **seta no canto inferior direito**, como no WhatsApp: um clique e a conversa volta para a última mensagem. Ela some sozinha quando você já está no fim. Se chegar mensagem nova enquanto você está lá em cima, a seta ganha um **contador** com quantas entraram — o aviso "Novas mensagens" que ficava no meio da tela virou esse número.
 
 - ⬆️ **Chat — o operador que você minimizou continua minimizado** — Na aba **Atendendo**, com os atendimentos agrupados por operador, fechar a setinha do nome de alguém valia só até você sair da tela: bastava trocar de página ou recarregar para tudo voltar aberto. Agora esse estado é lembrado por usuário, como já acontece com o filtro e a aba escolhida — quem acompanha só dois ou três operadores deixa os demais fechados e eles ficam assim na próxima vez que abrir o chat.
