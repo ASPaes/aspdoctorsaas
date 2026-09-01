@@ -429,3 +429,35 @@ describe("aba Módulos", () => {
     expect(container.textContent).toContain("Vincule os planos primeiro");
   });
 });
+
+/**
+ * A mesma tela vive em dois lugares: em Configurações (só admin chega lá pelo
+ * RBAC) e na aba Divergências dentro de Clientes, que o head também abre. Três
+ * ações escrevem direto na tabela ou numa edge function que exige admin — para
+ * o head elas só existiriam para falhar depois do clique.
+ */
+describe("Divergências: ações que o head não pode executar", () => {
+  it("com podeAcoesAdmin, oferece marcar, decidir filial e rebuscar", () => {
+    render(<HiperDivergenciasTab tid="t1" recon={[base]} />);
+    abrirLinha();
+    const txt = container.textContent ?? "";
+    expect(txt).toContain("Ignorar");
+    expect(txt).toContain("Já resolvi por fora");
+    expect(txt).toContain("Rebuscar no portal");
+    expect(txt).toContain("Paga a própria conta");
+  });
+
+  it("sem podeAcoesAdmin, some com as três e mantém o que o RPC deixa gravar", () => {
+    render(<HiperDivergenciasTab tid="t1" recon={[base]} podeAcoesAdmin={false} />);
+    abrirLinha();
+    const txt = container.textContent ?? "";
+    expect(txt).not.toContain("Ignorar");
+    expect(txt).not.toContain("Já resolvi por fora");
+    expect(txt).not.toContain("Rebuscar no portal");
+    expect(txt).not.toContain("Paga a própria conta");
+    // O que continua: aplicar a correção passa por RPC SECURITY DEFINER, que o
+    // head executa. E a filial some como BOTÃO, não como informação.
+    expect(txt).toContain("Atualizar no DoctorSaaS");
+    expect(txt).toContain("Cine Gracher (Indaial)");
+  });
+});

@@ -140,11 +140,21 @@ const acoesDe = (r: LinhaRecon) =>
   ACOES.filter((a) => a.divs.some((d) => r.divergencias.includes(d))).map((a) => a.acao);
 
 export default function HiperDivergenciasTab({
-  tid, recon, motivos = [],
+  tid, recon, motivos = [], podeAcoesAdmin = true,
 }: {
   tid: string | null;
   recon: LinhaRecon[];
   motivos?: { id: number; descricao: string }[];
+  /**
+   * Três ações desta tela não passam por RPC: marcar resolvido/ignorar e a
+   * decisão de filial escrevem direto na tabela (RLS `is_tenant_admin()`), e
+   * rebuscar chama uma edge function que exige `role='admin'`. Para um head
+   * elas existiriam só para falhar depois do clique, então somem.
+   *
+   * O padrão é `true` porque em Configurações a aba já é admin-only pelo RBAC
+   * (`cfg.integracoes_hiper`) — lá nada muda.
+   */
+  podeAcoesAdmin?: boolean;
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -754,11 +764,13 @@ export default function HiperDivergenciasTab({
                             <div key={f.cliente_id} className="flex flex-wrap items-center gap-2 rounded border bg-background px-2 py-1.5">
                               <span className="min-w-0 flex-1 truncate">{f.nome}</span>
                               <span className="tabular-nums text-xs">{brl(f.mrr)} MRR · {brl(f.custo)} custo</span>
-                              <Button size="sm" variant="outline" disabled={ocupado === f.cliente_id}
-                                onClick={() => decidirFilial(f.cliente_id, "paga_propria_conta")}>
-                                {ocupado === f.cliente_id && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
-                                Paga a própria conta
-                              </Button>
+                              {podeAcoesAdmin && (
+                                <Button size="sm" variant="outline" disabled={ocupado === f.cliente_id}
+                                  onClick={() => decidirFilial(f.cliente_id, "paga_propria_conta")}>
+                                  {ocupado === f.cliente_id && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                                  Paga a própria conta
+                                </Button>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -772,10 +784,12 @@ export default function HiperDivergenciasTab({
                           {fil.conta_propria.map((f: any) => (
                             <div key={f.cliente_id} className="flex flex-wrap items-center gap-2 rounded border bg-background px-2 py-1.5">
                               <span className="min-w-0 flex-1 truncate">{f.nome} · {cnpjMask(f.cnpj)}</span>
-                              <Button size="sm" variant="outline" disabled={ocupado === f.cliente_id}
-                                onClick={() => decidirFilial(f.cliente_id, "cliente_proprio")}>
-                                Tratar como cliente próprio
-                              </Button>
+                              {podeAcoesAdmin && (
+                                <Button size="sm" variant="outline" disabled={ocupado === f.cliente_id}
+                                  onClick={() => decidirFilial(f.cliente_id, "cliente_proprio")}>
+                                  Tratar como cliente próprio
+                                </Button>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -865,7 +879,7 @@ export default function HiperDivergenciasTab({
                         </Button>
                       )}
 
-                      {r.id_portal && (
+                      {r.id_portal && podeAcoesAdmin && (
                         <Button size="sm" variant="outline" disabled={!!ocupado}
                           onClick={() => rebuscar(r.id_portal as string)}>
                           {ocupado === `portal-${r.id_portal}`
@@ -885,7 +899,7 @@ export default function HiperDivergenciasTab({
                         </Button>
                       )}
 
-                      {r.status_usuario === "pendente" ? (
+                      {podeAcoesAdmin && (r.status_usuario === "pendente" ? (
                         <>
                           <Button size="sm" variant="ghost" disabled={ocupado === r.id}
                             onClick={() => marcar(r.id, "resolvido")}>
@@ -901,13 +915,15 @@ export default function HiperDivergenciasTab({
                           onClick={() => marcar(r.id, "pendente")}>
                           Reabrir
                         </Button>
-                      )}
+                      ))}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       <strong>Atualizar</strong> grava no cadastro daqui o que o portal diz.{" "}
-                      <strong>Já resolvi por fora</strong> e <strong>Ignorar</strong> não mexem em
-                      nada: só tiram a linha da lista, e ela volta sozinha se o conjunto de
-                      divergências deste cliente mudar no próximo espelho.
+                      {podeAcoesAdmin && (
+                        <><strong>Já resolvi por fora</strong> e <strong>Ignorar</strong> não mexem em
+                        nada: só tiram a linha da lista, e ela volta sozinha se o conjunto de
+                        divergências deste cliente mudar no próximo espelho.</>
+                      )}
                       {aplicaveis.length === 0 && (
                         <> Nesta linha não há o que gravar automaticamente — filial mexe na árvore
                         de cadastro e conta sem dono não tem onde escrever.</>

@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 01/09
 
+- 🆕 **Divergências do Hiper agora ficam dentro de Clientes** — A mesma tela de conferência que vivia em Configurações › Integrações › Hiper ganhou uma aba ao lado de **Reajustes**, na página de **Clientes**, com o número de pendências no rótulo. Mesmos filtros, mesmo detalhe e as mesmas correções em lote. A aba só aparece para quem usa a integração. Gerentes também passam a enxergar e corrigir; as ações que dependem de administrador continuam só com ele.
+
 - 🆕 **Corrigir o cadastro pelo portal, num clique ou em lote** — Na aba **Divergências**, o botão **Atualizar no DoctorSaaS** grava aqui o que o Hiper diz: tipo de contrato, custo, mensalidade, razão social e os módulos. Dá para marcar vários clientes e escolher **o que** atualizar em cada um — atualizar só o custo e deixar a mensalidade de fora, por exemplo. Quem não puder receber alguma coisa é pulado com o motivo, e o resto grava normalmente.
 
 - 🆕 **Histórico com desfazer** — Tudo o que a integração grava no cadastro fica registrado com **quem fez, quando, e qual era o valor antes**, agrupado por clique. O botão **Desfazer** devolve os valores ao que eram. O histórico não some: a linha fica marcada como desfeita.

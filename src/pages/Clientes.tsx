@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useEffect, useState } from "react";
+import { useMemo, useCallback, useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,11 +24,15 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle, Check, Percent, Download, ShieldCheck } from "lucide-react";
+import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle, Check, Percent, Download, ShieldCheck, GitCompareArrows } from "lucide-react";
 import MovimentosMrrTab from "@/components/clientes/MovimentosMrrTab";
 import ReajustesTab from "@/components/clientes/ReajustesTab";
 import AprovacaoOemTab from "@/components/clientes/AprovacaoOemTab";
+// Sob demanda: a tela de divergências pesa ~10 kB gzip e hoje só uma empresa a
+// enxerga. Importada direto, ela entraria no bundle inicial de todo mundo.
+const DivergenciasHiperTab = lazy(() => import("@/components/clientes/DivergenciasHiperTab"));
 import { useAprovacaoOemVisivel, useAprovacaoOemStatus } from "@/hooks/useAprovacaoOem";
+import { useHiperDivergenciasVisivel, useHiperDivergenciasPendentes } from "@/hooks/useHiperDivergencias";
 import { useAbaNaUrl } from "@/hooks/useDeepLinkIntegracao";
 import { exportClientesXlsx } from "@/lib/exportClientesXlsx";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
@@ -94,13 +98,19 @@ export default function Clientes() {
   const aprovacaoOemVisivel = useAprovacaoOemVisivel();
   const aprovacaoOemStatus = useAprovacaoOemStatus(aprovacaoOemVisivel === true);
   const aprovacaoOemPendentes = Number(aprovacaoOemStatus.data?.aguardando) || 0;
+  // Mesma ideia da Aprovação OEM: a divergência do Hiper era corrigida dentro de
+  // Configurações, longe da carteira. Aqui ela fica onde o cliente está.
+  const divergenciasHiperVisivel = useHiperDivergenciasVisivel();
+  const divergenciasHiperPendentes =
+    Number(useHiperDivergenciasPendentes(divergenciasHiperVisivel === true).data) || 0;
   // A URL é digitável e a aba vem dela. Valor desconhecido, ou link para uma aba
   // que ESTE usuário não tem, deixaria o Tabs com um `value` sem par e a página
   // abriria em branco. Cai na primeira aba em vez de não desenhar nada.
-  const abasValidas = ["clientes", "movimentos", "reajustes", "aprovacao-oem"];
+  const abasValidas = ["clientes", "movimentos", "reajustes", "divergencias-hiper", "aprovacao-oem"];
   const aba =
     !abasValidas.includes(abaAtiva) ||
-    (abaAtiva === "aprovacao-oem" && aprovacaoOemVisivel !== true)
+    (abaAtiva === "aprovacao-oem" && aprovacaoOemVisivel !== true) ||
+    (abaAtiva === "divergencias-hiper" && divergenciasHiperVisivel !== true)
       ? "clientes"
       : abaAtiva;
 
@@ -781,7 +791,9 @@ export default function Clientes() {
       </div>
 
       <Tabs value={aba} onValueChange={setAbaAtiva}>
-        <TabsList>
+        {/* Com Hiper e OEM ligados são cinco abas: sem quebra de linha a barra
+            estoura a largura em tela de tablet. */}
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="clientes">
             <Users className="h-4 w-4 mr-1" />
             Clientes
@@ -794,6 +806,19 @@ export default function Clientes() {
             <Percent className="h-4 w-4 mr-1" />
             Reajustes
           </TabsTrigger>
+          {/* Só para empresa com Hiper ativo (ver useHiperDivergenciasVisivel).
+              O número é o que faz a pendência ser vista sem ninguém abrir a aba. */}
+          {divergenciasHiperVisivel === true && (
+            <TabsTrigger value="divergencias-hiper">
+              <GitCompareArrows className="h-4 w-4 mr-1" />
+              Divergências Hiper
+              {divergenciasHiperPendentes > 0 && (
+                <Badge className="ml-1.5 h-5 min-w-5 justify-center px-1.5 text-[10px]">
+                  {divergenciasHiperPendentes}
+                </Badge>
+              )}
+            </TabsTrigger>
+          )}
           {/* Só para admin de empresa que usa o OEM, e só com um tenant escolhido
               (ver useAprovacaoOemVisivel). O número é o que faz a fila ser
               descoberta sem ninguém precisar abrir a aba. */}
@@ -1268,6 +1293,14 @@ export default function Clientes() {
         <TabsContent value="reajustes" className="mt-4">
           <ReajustesTab tenantId={tid} />
         </TabsContent>
+
+        {divergenciasHiperVisivel === true && (
+          <TabsContent value="divergencias-hiper" className="mt-4">
+            <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+              <DivergenciasHiperTab />
+            </Suspense>
+          </TabsContent>
+        )}
 
         {aprovacaoOemVisivel === true && (
           <TabsContent value="aprovacao-oem" className="mt-4">
