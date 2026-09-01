@@ -45,6 +45,8 @@ type TimelineItem =
   | { type: 'note'; note: ConversationNote };
 
 const NEAR_BOTTOM_THRESHOLD = 150;
+// Distância a partir da qual vale mostrar o atalho para o fim da conversa
+const SHOW_SCROLL_DOWN_THRESHOLD = 320;
 const TOP_LOAD_THRESHOLD = 120;
 
 export function ChatMessages({
@@ -97,6 +99,8 @@ export function ChatMessages({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const isNearBottomRef = useRef(true);
   const [showNewMessages, setShowNewMessages] = useState(false);
+  const [newMessagesCount, setNewMessagesCount] = useState(0);
+  const [showScrollDown, setShowScrollDown] = useState(false);
   const [internalHighlight, setInternalHighlight] = useState<string | null>(null);
   const pendingNewCountRef = useRef(0);
   const prependAnchorRef = useRef<number | null>(null);
@@ -107,8 +111,10 @@ export function ChatMessages({
     if (!viewport) return;
     const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
     isNearBottomRef.current = distanceFromBottom < NEAR_BOTTOM_THRESHOLD;
+    setShowScrollDown(distanceFromBottom > SHOW_SCROLL_DOWN_THRESHOLD);
     if (isNearBottomRef.current) {
       setShowNewMessages(false);
+      setNewMessagesCount(0);
       pendingNewCountRef.current = 0;
     }
     // Perto do topo: carregar mensagens anteriores (salva âncora antes de prepender)
@@ -155,7 +161,9 @@ export function ChatMessages({
       }
       if (!isNearBottomRef.current) {
         pendingNewCountRef.current += 1;
+        setNewMessagesCount(pendingNewCountRef.current);
         setShowNewMessages(true);
+        setShowScrollDown(true);
       }
     });
   }, [onNewMessage]);
@@ -243,6 +251,8 @@ export function ChatMessages({
     if (conversationId !== prevConversationId.current) {
       setHasScrolledToUnread(false);
       setShowNewMessages(false);
+      setNewMessagesCount(0);
+      setShowScrollDown(false);
       pendingNewCountRef.current = 0;
       isNearBottomRef.current = true;
       prependAnchorRef.current = null;
@@ -268,7 +278,10 @@ export function ChatMessages({
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    isNearBottomRef.current = true;
     setShowNewMessages(false);
+    setNewMessagesCount(0);
+    setShowScrollDown(false);
     pendingNewCountRef.current = 0;
   }, []);
 
@@ -496,14 +509,21 @@ export function ChatMessages({
 
 
 
-      {/* Floating "New messages" button */}
-      {showNewMessages && (
+      {/* Atalho para o fim da conversa, com contador de novas mensagens */}
+      {(showScrollDown || showNewMessages) && (
         <button
+          type="button"
           onClick={scrollToBottom}
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium shadow-lg hover:opacity-90 transition-opacity"
+          aria-label={showNewMessages ? "Ir para as novas mensagens" : "Ir para o fim da conversa"}
+          title={showNewMessages ? "Novas mensagens" : "Ir para o fim da conversa"}
+          className="absolute bottom-4 right-4 z-10 h-10 w-10 flex items-center justify-center rounded-full border border-border bg-background text-foreground/70 shadow-lg transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-muted hover:text-foreground animate-in fade-in zoom-in-95"
         >
-          <ChevronDown className="h-3.5 w-3.5" />
-          Novas mensagens
+          <ChevronDown className="h-5 w-5" />
+          {showNewMessages && (
+            <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+              {newMessagesCount > 99 ? "99+" : newMessagesCount}
+            </span>
+          )}
         </button>
       )}
     </div>
