@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 01/09
 
+- ⬆️ **Integração OEM: a situação da licença na ficha do cliente** — No card **Integração**, cada licença do OEM passa a mostrar **Status** e **Bloqueado** com rótulo, do jeito que o portal do OEM mostra. O status vem com a data quando o OEM a tem: *Desativado · 31/07/2026* para a licença que já caiu, e *Ativo até 30/09/2026* para a que tem baixa combinada e ainda está de pé. **Bloqueado** responde **Sim** ou **Não** sempre, em vez de aparecer só quando é Sim. Tudo vem da sincronização com o OEM.
+
 - 🆕 **Importar para a base o cliente que só existe no Hiper** — Na aba **Divergências**, as contas marcadas como *Conta sem cliente aqui* ganharam o botão **Importar**. Razão social, CNPJ, cidade, plano, tipo de contrato e custo vêm do portal; o que ele não tem — mensalidade, e-mail, WhatsApp — você preenche na hora, e unidade, origem da venda, vendedor, forma de pagamento e data de início valem para o lote todo. O cliente entra com contrato e módulos já montados. Conta cujo CNPJ já tem cadastro aqui fica de fora, com link para o cadastro que existe: importar criaria um cliente repetido.
 - 🆕 **Divergências do Hiper agora ficam dentro de Clientes** — A mesma tela de conferência que vivia em Configurações › Integrações › Hiper ganhou uma aba ao lado de **Reajustes**, na página de **Clientes**, com o número de pendências no rótulo. Mesmos filtros, mesmo detalhe e as mesmas correções em lote. A aba só aparece para quem usa a integração. Gerentes também passam a enxergar e corrigir; as ações que dependem de administrador continuam só com ele.
 

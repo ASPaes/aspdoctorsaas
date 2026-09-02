@@ -30,6 +30,7 @@ type Licenca = {
   custo_oem: number | null;
   status_oem: string | null;
   bloqueado_oem: boolean | null;
+  desativa_em: string | null;
   mensalidade_ds: number | null;
   status_usuario: string;
   resolvido_em: string | null;
@@ -41,6 +42,46 @@ const brl = (v: number | null | undefined) =>
 // Quantas vezes a mensalidade cobre o custo. Sem custo ativo não existe divisão
 // — e "infinito" não é informação, então o campo simplesmente não aparece.
 const num2 = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const dataBR = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
+// Comparar `desativa_em` (date) com o "hoje" do navegador em UTC vira erro de um
+// dia inteiro à noite no Brasil: às 21h de 31/07 o UTC já é 01/08 e uma baixa
+// marcada para hoje apareceria como vencida. O fuso é o da operação.
+const hojeSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+
+/**
+ * O status da licença como ele está no OEM, com a data quando ela existe.
+ *
+ * `desativa_em` é a MAIOR `datavalidade` entre os módulos ativos, gravada pela
+ * sincronização (`oem-espelho-sync`). Ela quer dizer coisas diferentes conforme
+ * o status, e é por isso que a leitura não pode ser só "tem data / não tem":
+ *
+ * - `Desativado` + data no passado (713 linhas em 01/09/2026): é o dia em que a
+ *   licença caiu. É o "Desativado · 31/07/2026" que o portal do OEM mostra.
+ * - `Ativo` + data no futuro: baixa já combinada. A licença está de pé e cai
+ *   naquele dia — cancelar no OEM não desliga na hora, vale até o fim do mês.
+ * - Sem data: o OEM não deixou rastro (licença antiga, ou nenhum módulo ativo
+ *   sobrou para carregar a validade). Aí só resta o status seco, sem inventar
+ *   uma data que não veio de lá.
+ */
+function statusDaLicenca(l: Licenca): { texto: string; classe: string } {
+  if (l.status_oem === "Desativado") {
+    return {
+      texto: l.desativa_em ? `Desativado · ${dataBR(l.desativa_em)}` : "Desativado",
+      classe: "text-muted-foreground",
+    };
+  }
+  if (l.status_oem === "Ativo") {
+    if (l.desativa_em && l.desativa_em >= hojeSP()) {
+      return {
+        texto: `Ativo até ${dataBR(l.desativa_em)}`,
+        classe: "text-amber-600 dark:text-amber-400",
+      };
+    }
+    return { texto: "Ativo", classe: "text-emerald-600 dark:text-emerald-400" };
+  }
+  return { texto: l.status_oem ?? "sem leitura", classe: "text-muted-foreground" };
+}
 
 /**
  * O que esta seção tem para mostrar — e se tem alguma coisa.
@@ -104,7 +145,7 @@ export function useOemDoCliente(clienteId: string) {
       const { data, error } = await (supabase.from("reconciliacao_oem" as any) as any)
         .select(
           "id, filial_codigo, empresa_codigo, razao_oem, custo_oem, status_oem, " +
-          "bloqueado_oem, mensalidade_ds, status_usuario, resolvido_em",
+          "bloqueado_oem, desativa_em, mensalidade_ds, status_usuario, resolvido_em",
         )
         .eq("tenant_id", tid)
         .in("filial_codigo", codigos)
@@ -207,29 +248,68 @@ export default function IntegracaoOemSection({ clienteId }: { clienteId: string 
         )}
       </div>
 
-      {/* Linha 3: as licenças, uma por linha. */}
+      {/* Linha 3: as licenças, uma por linha.
+
+          Status e Bloqueado saíram de dois selos soltos para duas colunas com rótulo. O selo
+          "bloqueada" só aparecia quando era verdade, então a ausência dele não distinguia
+          "não está bloqueada" de "o OEM não disse" — e o selo do status nunca carregava a data.
+          Com rótulo em cima, as duas dimensões estão sempre na tela, do jeito que o portal do
+          OEM as mostra: Ativado/Desativado de um lado, Sim/Não do outro. */}
       <div className="mt-3 rounded-md border divide-y">
-        {licencas.map((l) => (
-          <div key={l.id} className="flex items-center gap-3 px-3 py-2 text-sm">
-            <div className="min-w-0 flex-1">
-              <p className="truncate">{l.razao_oem ?? `Filial ${l.filial_codigo}`}</p>
-              <p className="text-xs text-muted-foreground">
-                filial {l.filial_codigo} · grupo {l.empresa_codigo}
-                {/* `status_usuario = 'vinculado'` também é o que a
-                    sincronização grava no casamento automático — o que separa
-                    a decisão humana é o carimbo de quem e quando. */}
-                {l.resolvido_em && " · vinculada à mão"}
-              </p>
+        {licencas.map((l) => {
+          const st = statusDaLicenca(l);
+          return (
+            <div key={l.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+              <div className="min-w-0 flex-1">
+                <p className="truncate">{l.razao_oem ?? `Filial ${l.filial_codigo}`}</p>
+                <p className="text-xs text-muted-foreground">
+                  filial {l.filial_codigo} · grupo {l.empresa_codigo}
+                  {/* `status_usuario = 'vinculado'` também é o que a
+                      sincronização grava no casamento automático — o que separa
+                      a decisão humana é o carimbo de quem e quando. */}
+                  {l.resolvido_em && " · vinculada à mão"}
+                </p>
+              </div>
+
+              <div className="shrink-0 text-right leading-tight">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Status</p>
+                <p className={`text-xs font-medium whitespace-nowrap ${st.classe}`}>{st.texto}</p>
+              </div>
+
+              <div className="shrink-0 w-[68px] text-right leading-tight">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Bloqueado
+                </p>
+                {/* `null` é o OEM não ter respondido essa filial na última leitura — não é "não".
+                    Dizer "Não" aí seria afirmar o que ninguém verificou. */}
+                <p
+                  className={
+                    "text-xs font-medium " +
+                    (l.bloqueado_oem === true
+                      ? "text-destructive"
+                      : l.bloqueado_oem === false
+                        ? "text-muted-foreground"
+                        : "text-muted-foreground/60")
+                  }
+                >
+                  {l.bloqueado_oem === true ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Lock className="h-3 w-3" /> Sim
+                    </span>
+                  ) : l.bloqueado_oem === false ? (
+                    "Não"
+                  ) : (
+                    "sem leitura"
+                  )}
+                </p>
+              </div>
+
+              <span className="tabular-nums text-muted-foreground w-24 text-right">
+                {l.status_oem === "Ativo" ? brl(l.custo_oem) : "—"}
+              </span>
             </div>
-            {l.bloqueado_oem && <Badge variant="destructive" className="text-xs">bloqueada</Badge>}
-            <Badge variant={l.status_oem === "Ativo" ? "secondary" : "outline"} className="text-xs">
-              {l.status_oem ?? "—"}
-            </Badge>
-            <span className="tabular-nums text-muted-foreground w-24 text-right">
-              {l.status_oem === "Ativo" ? brl(l.custo_oem) : "—"}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
