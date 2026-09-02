@@ -562,6 +562,13 @@ Deno.serve(async (req)=>{
         // clique repetido porque a tela não mostrava a data. Aconteceu 3 vezes
         // seguidas na filial 39735 em 01/09/2026.
         const pedeBaixaJaMarcada = novoDesativado === true && desatLido === false && baixaAtual !== null;
+        // ATIVAR COM BAIXA MARCADA É MUDANÇA, mesmo com os dois flags iguais.
+        // O que muda é a DATA, e comparar só os booleanos dizia "nada a fazer"
+        // para a única tela que sabe desfazer uma baixa. Foi o que aconteceu na
+        // Beda Pizzaria em 01/09/2026, logo depois de a baixa ser marcada.
+        const cancelaBaixaMarcada = novoDesativado === false && baixaAtual !== null;
+        const semMudanca = pedeBaixaJaMarcada
+          || (antes.bloqueado === depois.bloqueado && antes.desativado === depois.desativado && !cancelaBaixaMarcada);
         const camposVistos = {
           filial: Object.keys(fPl ?? {}),
           raiz: Object.keys(cruPl ?? {}),
@@ -593,6 +600,33 @@ Deno.serve(async (req)=>{
           }
           novo.bloquearLicenca = depois.bloqueado;
           novo.desativarLicenca = depois.desativado;
+
+          // ⚠️ MANDAR `desativarLicenca: false` NÃO CANCELA A BAIXA. Quem
+          // mantém a licença marcada para cair é a `datavalidade` dos módulos,
+          // e ela sobrevive a uma gravação que não a toca. É o mesmo fato já
+          // conhecido do módulo: cancelar registra a data, e reativar tem que
+          // LIMPAR a data. Sem isto, "Ativar" devolveria HTTP 200 e a licença
+          // continuaria caindo no dia marcado.
+          //
+          // Limpa só as datas IGUAIS à baixa da licença. Um módulo com data
+          // própria e anterior foi cancelado sozinho, e ressuscitá-lo aqui
+          // seria decidir por alguém que essa venda voltou.
+          const datasLimpas = [];
+          if (novoDesativado === false && baixaAtual) {
+            for (const m of novo.modulos){
+              if (pega(m, "ativo") === false) continue;
+              const bruto = pega(m, "datavalidade", "dataValidade", "data_validade");
+              const d = typeof bruto === "string" ? bruto.slice(0, 10) : null;
+              if (d !== baixaAtual) continue;
+              datasLimpas.push({ modulo: pega(m, "codigo"), de: bruto });
+              // Escreve no MESMO nome que veio, para não criar uma chave nova
+              // ao lado da que o parceiro lê.
+              for (const k of Object.keys(m)){
+                if (k.toLowerCase() === "datavalidade") m[k] = null;
+              }
+            }
+          }
+
           // O que muda ALÉM do pedido e do que foi completado. Mais de zero
           // aqui é campo se perdendo, e é para isso que a lista existe.
           const jaContados = new Set([
@@ -608,7 +642,7 @@ Deno.serve(async (req)=>{
               diferencas.push({ campo: k, de: lido[k], para: novo[k] });
             }
           }
-          return { novo, completados, diferencas };
+          return { novo, completados, diferencas, datas_limpas: datasLimpas };
         };
 
         // Os obrigatórios da gravação, os mesmos do modo módulo: sem eles a
@@ -629,10 +663,11 @@ Deno.serve(async (req)=>{
             campos_vistos: camposVistos,
             antes,
             depois,
-            sem_mudanca: podeGravar && ((antes.bloqueado === depois.bloqueado && antes.desativado === depois.desativado) || pedeBaixaJaMarcada),
+            sem_mudanca: podeGravar && semMudanca,
             url_gravacao: `${LEITURA}/licenciamento/minhaslicencas/saveFilial`,
             completados: m?.completados ?? null,
             diferencas: m?.diferencas ?? null,
+            datas_limpas: m?.datas_limpas ?? null,
             payload: m?.novo ?? null,
             leitura_crua: cruPl
           }, {
@@ -653,7 +688,7 @@ Deno.serve(async (req)=>{
             headers: cors
           });
         }
-        if ((antes.bloqueado === depois.bloqueado && antes.desativado === depois.desativado) || pedeBaixaJaMarcada) {
+        if (semMudanca) {
           return Response.json({
             ok: true,
             modo: "estado",
@@ -790,6 +825,7 @@ Deno.serve(async (req)=>{
           depois,
           completados: mont.completados,
           diferencas: mont.diferencas,
+          datas_limpas: mont.datas_limpas,
           payload: mont.novo,
           resposta: respEst,
           conferencia
