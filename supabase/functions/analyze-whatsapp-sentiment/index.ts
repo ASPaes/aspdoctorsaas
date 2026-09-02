@@ -9,6 +9,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Piso da janela de analise quando a conversa nao tem atendimento aberto.
+// Ver o comentario na montagem de `windowStart` — sem esse piso a analise lia a
+// conversa inteira e o alerta de churn citava mensagem de dias atras.
+const WINDOW_FALLBACK_HOURS = 6;
+
 // === Modelo utilitario decidido pela PLATAFORMA (nunca pelo tenant) ===
 // Classificacao de sentimento roda num modelo barato, independente do modelo
 // premium que o tenant configurou. Para provider 'custom'/desconhecido nao
@@ -162,6 +167,15 @@ serve(async (req) => {
       );
     }
 
+    // Janela de analise. O corte precisa existir SEMPRE: sem ele a busca pega as
+    // ultimas 20 mensagens da conversa INTEIRA e, como a thread de um contato e
+    // continua (nunca "termina"), a IA cita como evidencia de churn uma frase de
+    // dias atras. Foi o alerta de 02/09 citando mensagem de 27/08.
+    //
+    // Preferencia e o atendimento aberto. Quando nao ha nenhum, cai no piso de
+    // WINDOW_FALLBACK_HOURS — que e o caso real, uma corrida: o processor dispara
+    // a analise ao RECEBER a mensagem e o atendimento so e gravado segundos
+    // depois, entao aqui a busca por atendimento aberto volta vazia.
     const { data: att } = await supabase
       .from("support_attendances")
       .select("opened_at")
@@ -171,18 +185,17 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    let messagesQuery = supabase
+    const windowStart =
+      att?.opened_at ??
+      new Date(Date.now() - WINDOW_FALLBACK_HOURS * 60 * 60 * 1000).toISOString();
+
+    const { data: messages, error: messagesError } = await supabase
       .from("whatsapp_messages")
       .select("content, timestamp, audio_transcription, message_type, is_from_me")
       .eq("conversation_id", conversationId)
+      .gte("timestamp", windowStart)
       .order("timestamp", { ascending: false })
       .limit(20);
-
-    if (att?.opened_at) {
-      messagesQuery = messagesQuery.gte("timestamp", att.opened_at);
-    }
-
-    const { data: messages, error: messagesError } = await messagesQuery;
 
     if (messagesError) throw messagesError;
 
