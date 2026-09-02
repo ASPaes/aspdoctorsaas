@@ -131,6 +131,38 @@ function desativadoLido(f) {
   if (s === "IN" || s === "INATIVO" || s === "DESATIVADO") return true;
   return undefined;
 }
+/**
+ * A data em que a licença INTEIRA cai, ou `null` se não há baixa marcada.
+ *
+ * ⚠️ DESATIVAR NÃO DESLIGA NA HORA. Medido em 01/09/2026 na filial 39735
+ * (Pizzaria Beda): `desativarLicenca: true` voltou HTTP 200, o portal do
+ * parceiro passou a mostrar "Desativa em: 30/09/2026" e o `status` da licença
+ * continuou `"AT"`. O OEM agenda a baixa para o fim do mês de cobrança, como já
+ * faz com cancelamento de módulo. Conferir a desativação pelo `status` nunca
+ * confirmaria: ele só muda no dia 30.
+ *
+ * Onde a data está: na `datavalidade` de cada módulo, e ela só existe na
+ * leitura DOCUMENTADA. A do pdvlegal não traz esse campo.
+ *
+ * Mesma regra da `desativacaoProgramada` no DoctorSaaS, e ela não é "tem data /
+ * não tem": TODOS os módulos ativos precisam ter data. Enquanto um módulo ativo
+ * estiver sem prazo, quem vence é aquele módulo, não a licença. 2099 é
+ * sentinela de "sem prazo".
+ */
+function baixaProgramada(modulos) {
+  if (!Array.isArray(modulos)) return null;
+  const ativos = modulos.filter((m)=>m && pega(m, "ativo") !== false);
+  if (!ativos.length) return null;
+  let maior = null;
+  for (const m of ativos){
+    const bruto = pega(m, "datavalidade", "dataValidade", "data_validade");
+    const d = typeof bruto === "string" ? bruto.slice(0, 10) : null;
+    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+    if (d >= "2099-01-01") return null;
+    if (!maior || d > maior) maior = d;
+  }
+  return maior;
+}
 function pega(obj, ...nomes) {
   for (const n of nomes){
     for (const k of Object.keys(obj)){
@@ -514,14 +546,22 @@ Deno.serve(async (req)=>{
             : `um status que dê para interpretar (veio "${String(st)}", e só AT e IN são conhecidos)`);
         }
         const podeGravar = faltaEstado.length === 0;
+        // A baixa já marcada. Ela é a TERCEIRA informação do estado, e sem ela
+        // "Desativada: Não" mente para uma licença que cai no fim do mês.
+        const baixaAtual = baixaProgramada(pega(lido, "modulos"));
         const antes = {
           bloqueado: bloqLido ?? null,
-          desativado: desatLido ?? null
+          desativado: desatLido ?? null,
+          baixa_em: baixaAtual
         };
         const depois = {
           bloqueado: novoBloqueado ?? bloqLido ?? null,
           desativado: novoDesativado ?? desatLido ?? null
         };
+        // Pedir de novo uma baixa que já está marcada não é mudança: é o mesmo
+        // clique repetido porque a tela não mostrava a data. Aconteceu 3 vezes
+        // seguidas na filial 39735 em 01/09/2026.
+        const pedeBaixaJaMarcada = novoDesativado === true && desatLido === false && baixaAtual !== null;
         const camposVistos = {
           filial: Object.keys(fPl ?? {}),
           raiz: Object.keys(cruPl ?? {}),
@@ -589,7 +629,7 @@ Deno.serve(async (req)=>{
             campos_vistos: camposVistos,
             antes,
             depois,
-            sem_mudanca: podeGravar && antes.bloqueado === depois.bloqueado && antes.desativado === depois.desativado,
+            sem_mudanca: podeGravar && ((antes.bloqueado === depois.bloqueado && antes.desativado === depois.desativado) || pedeBaixaJaMarcada),
             url_gravacao: `${LEITURA}/licenciamento/minhaslicencas/saveFilial`,
             completados: m?.completados ?? null,
             diferencas: m?.diferencas ?? null,
@@ -613,13 +653,15 @@ Deno.serve(async (req)=>{
             headers: cors
           });
         }
-        if (antes.bloqueado === depois.bloqueado && antes.desativado === depois.desativado) {
+        if ((antes.bloqueado === depois.bloqueado && antes.desativado === depois.desativado) || pedeBaixaJaMarcada) {
           return Response.json({
             ok: true,
             modo: "estado",
             sem_mudanca: true,
             antes,
-            mensagem: "A licença já está nesse estado no OEM. Nada foi enviado."
+            mensagem: pedeBaixaJaMarcada
+              ? `A baixa desta licença já está marcada para ${antes.baixa_em} no OEM. Nada foi enviado.`
+              : "A licença já está nesse estado no OEM. Nada foi enviado."
           }, {
             headers: cors
           });
@@ -641,12 +683,27 @@ Deno.serve(async (req)=>{
           respEst = JSON.parse(txtEst);
         } catch  {}
 
-        // A conferência é pelo PDVLEGAL, que é onde o estado se lê. Mesma regra
-        // do modo módulo: RELER, tentar mais de uma vez e NÃO AFIRMAR CAUSA. A
-        // releitura do parceiro atrasa, e não de forma constante (medido em
-        // 28/08/2026). `confirmado: false` quer dizer "não deu para confirmar".
+        // ------------------------------------------------- a conferência
+        //
+        // ⚠️ CADA DIMENSÃO CONFIRMA POR UM SINAL DIFERENTE, e confundi-las foi
+        // o defeito da primeira versão.
+        //
+        // BLOQUEIO aplica na hora: o `bloqueado` do pdvlegal vira `true` e a
+        // releitura fecha (provado na filial 5089, com o portal na mão).
+        //
+        // DESATIVAÇÃO NÃO. O OEM agenda a baixa para o fim do mês de cobrança:
+        // na filial 39735, em 01/09/2026, `desativarLicenca: true` voltou 200,
+        // o portal passou a mostrar "Desativa em: 30/09/2026" e o `status`
+        // continuou `"AT"`. Conferir isso pelo `status` NUNCA confirmaria, e a
+        // primeira versão marcava âmbar em cima de uma gravação certa. Alarme
+        // que dispara com tudo certo ensina a ignorar a tela: o usuário clicou
+        // três vezes seguidas por causa dele.
+        //
+        // O sinal da desativação é a DATA, e ela só existe na leitura
+        // documentada. Por isso a conferência lê os DOIS hosts.
         let conferencia = null;
         if (rEst.ok) {
+          const mexeuNoBloqueio = novoBloqueado !== undefined;
           for(let i = 0; i < 3; i++){
             if (i > 0) await new Promise((r)=>setTimeout(r, 1500));
             try {
@@ -660,21 +717,54 @@ Deno.serve(async (req)=>{
               const depoisCru = await rConf.json().catch(()=>null);
               if (!depoisCru) throw new Error("a releitura não devolveu JSON");
               const d = depoisCru.filial ?? depoisCru;
+
+              // A data só na releitura documentada, e só quando o pedido foi
+              // sobre desativação: uma chamada a mais por bloqueio seria custo
+              // sem pergunta.
+              let baixaDepois = null;
+              if (!mexeuNoBloqueio) {
+                const rDoc2 = await fetch(urlLer, {
+                  headers: {
+                    Authorization: `Bearer ${tk}`,
+                    Accept: "application/json"
+                  }
+                });
+                const lido2 = rDoc2.ok ? await rDoc2.json().catch(()=>null) : null;
+                baixaDepois = lido2 ? baixaProgramada(pega(lido2, "modulos")) : null;
+              }
+
               const achado = {
                 bloqueado: boolEstrito(pega(d, "bloquearLicenca", "bloqueado", "bloquear")) ?? null,
-                desativado: desativadoLido(d) ?? null
+                desativado: desativadoLido(d) ?? null,
+                baixa_em: baixaDepois
               };
-              const bate = achado.bloqueado === depois.bloqueado && achado.desativado === depois.desativado;
+
+              // Desativar: vale a baixa marcada OU o status já virado.
+              // Ativar: precisa das duas coisas, senão "ativei" com uma baixa
+              // pendente seria mentira.
+              const bate = mexeuNoBloqueio
+                ? achado.bloqueado === depois.bloqueado
+                : depois.desativado === true
+                  ? (achado.desativado === true || achado.baixa_em !== null)
+                  : (achado.desativado === false && achado.baixa_em === null);
+
               conferencia = {
                 par: "documentado",
-                relido_em: "pdvlegal",
+                dimensao: mexeuNoBloqueio ? "bloqueio" : "desativacao",
                 tentativas: i + 1,
                 esperado: depois,
                 encontrado: achado,
                 confirmado: bate,
-                mensagem: bate
-                  ? "Relido no OEM: confere."
-                  : `Gravado, mas a licença ainda mostra bloqueado=${achado.bloqueado} / desativado=${achado.desativado}. A releitura do parceiro atrasa, então isto não afirma que não aplicou.`
+                baixa_em: achado.baixa_em,
+                mensagem: !bate
+                  ? (mexeuNoBloqueio
+                      ? `Gravado, mas a licença ainda mostra bloqueado=${achado.bloqueado}. A releitura do parceiro atrasa, então isto não afirma que não aplicou.`
+                      : `Gravado, mas a licença não mostra nem a baixa marcada nem o estado novo. A releitura do parceiro atrasa, então isto não afirma que não aplicou.`)
+                  : mexeuNoBloqueio
+                    ? "Relido no OEM: confere."
+                    : achado.baixa_em && achado.desativado !== true
+                      ? `Baixa marcada no OEM para ${achado.baixa_em}. A licença fica de pé e continua sendo cobrada até lá.`
+                      : "Relido no OEM: confere."
               };
               if (bate) break;
             } catch (e) {

@@ -189,9 +189,13 @@ Deno.serve(async (req) => {
     const oem = await resp.json().catch(() => null) as Record<string, any> | null;
     const ok = resp.ok && oem?.ok === true;
 
-    const antes = (oem?.antes ?? null) as { bloqueado: boolean | null; desativado: boolean | null } | null;
+    const antes = (oem?.antes ?? null) as { bloqueado: boolean | null; desativado: boolean | null; baixa_em?: string | null } | null;
     const depois = (oem?.depois ?? null) as { bloqueado: boolean | null; desativado: boolean | null } | null;
     const confirmado = oem?.conferencia?.confirmado ?? null;
+    // A data em que a licença cai, quando o OEM agendou a baixa em vez de
+    // desligar na hora. É o sinal que confirma uma desativação: o `status` da
+    // licença só muda no dia.
+    const baixaEm = (oem?.conferencia?.baixa_em ?? null) as string | null;
 
     await ds.from("oem_estado_licenca_log").insert({
       tenant_id: linha.tenant_id,
@@ -244,7 +248,9 @@ Deno.serve(async (req) => {
     }
 
     if (oem?.sem_mudanca === true) {
-      return json({ ok: true, acao, sem_mudanca: true, antes });
+      // A mensagem de lá distingue "já está assim" de "a baixa já está marcada
+      // para tal dia", e é a segunda que explica por que o clique não fez nada.
+      return json({ ok: true, acao, sem_mudanca: true, antes, mensagem: oem?.mensagem ?? null });
     }
 
     // ---------------------------------------------------------- o espelho
@@ -263,9 +269,23 @@ Deno.serve(async (req) => {
       if (campo === "novo_bloqueado") {
         patchRecon.bloqueado_oem = depois.bloqueado;
         patchEspelho.bloqueado = depois.bloqueado;
+      } else if (depois.desativado === true && baixaEm) {
+        // DESATIVAR NÃO DESLIGA NA HORA: o OEM marca a baixa para o fim do mês
+        // e a licença fica de pé (e cobrando) até lá. Gravar "Desativado" aqui
+        // seria a tela contradizendo o portal do parceiro por até 30 dias. O
+        // que muda é a DATA, que é o que a ficha já sabe desenhar como
+        // "Ativo até 30/09/2026".
+        patchRecon.desativa_em = baixaEm;
+        patchEspelho.desativa_em = baixaEm;
       } else {
         patchRecon.status_oem = depois.desativado ? "Desativado" : "Ativo";
         patchEspelho.status = depois.desativado ? "Desativado" : "Ativo";
+        // Reativar tira a baixa marcada. Deixar a data seria a ficha dizendo
+        // que a licença cai numa data que o parceiro já esqueceu.
+        if (depois.desativado === false) {
+          patchRecon.desativa_em = null;
+          patchEspelho.desativa_em = null;
+        }
       }
       await ds.from("reconciliacao_oem").update(patchRecon)
         .eq("tenant_id", linha.tenant_id).eq("filial_codigo", linha.filial_codigo);
@@ -279,6 +299,7 @@ Deno.serve(async (req) => {
       antes,
       depois,
       confirmado: typeof confirmado === "boolean" ? confirmado : null,
+      baixa_em: baixaEm,
       mensagem: oem?.conferencia?.mensagem ?? null,
     });
   } catch (e) {

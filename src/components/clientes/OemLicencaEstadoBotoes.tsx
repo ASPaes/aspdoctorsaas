@@ -44,6 +44,7 @@ type Licenca = {
   razao_oem: string | null;
   status_oem: string | null;
   bloqueado_oem: boolean | null;
+  desativa_em: string | null;
 };
 
 type Acao = "ativar" | "desativar" | "bloquear" | "desbloquear";
@@ -52,11 +53,15 @@ type Simulacao = {
   pode_gravar: boolean;
   faltando: string[];
   sem_mudanca: boolean;
-  antes: { bloqueado: boolean | null; desativado: boolean | null } | null;
+  antes: { bloqueado: boolean | null; desativado: boolean | null; baixa_em?: string | null } | null;
   depois: { bloqueado: boolean | null; desativado: boolean | null } | null;
   campos_vistos?: unknown;
 };
 
+// ⚠️ DESATIVAR NÃO DESLIGA NA HORA, e o texto tem que dizer isso. Medido em
+// 01/09/2026 na Pizzaria Beda: o OEM aceitou, marcou "Desativa em: 30/09/2026"
+// no portal e manteve a licença ativa. Prometer que o cliente perde o acesso
+// agora faria alguém desativar achando que resolveu o caso do dia.
 const TEXTO: Record<Acao, { titulo: string; efeito: string }> = {
   ativar: {
     titulo: "Ativar a licença no OEM?",
@@ -64,7 +69,7 @@ const TEXTO: Record<Acao, { titulo: string; efeito: string }> = {
   },
   desativar: {
     titulo: "Desativar a licença no OEM?",
-    efeito: "A licença sai do ar no parceiro e deixa de entrar na cobrança dele. O cliente perde o acesso ao sistema.",
+    efeito: "O OEM marca a baixa para o fim do mês de cobrança, não desliga agora. Até a data marcada a licença fica de pé e continua sendo cobrada pelo parceiro.",
   },
   bloquear: {
     titulo: "Bloquear a licença no OEM?",
@@ -96,6 +101,10 @@ async function chamar(body: Record<string, unknown>) {
 }
 
 const sim = (v: boolean | null | undefined) => (v === true ? "Sim" : v === false ? "Não" : "sem leitura");
+const dataBR = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
+// O "hoje" da operação, não o do navegador em UTC: às 21h de 30/09 no Brasil o
+// UTC já é 01/10 e uma baixa marcada para hoje apareceria como vencida.
+const hojeSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 
 export default function OemLicencaEstadoBotoes({
   clienteId, licenca,
@@ -116,6 +125,15 @@ export default function OemLicencaEstadoBotoes({
     licenca.status_oem === "Desativado" ? true : licenca.status_oem === "Ativo" ? false : null;
   const bloqueado = licenca.bloqueado_oem;
 
+  // TRÊS ESTADOS, NÃO DOIS. Entre "ativa" e "desativada" existe "ativa com
+  // baixa marcada": o OEM não desliga na hora, agenda para o fim do mês. Sem
+  // reconhecer esse meio, a licença que acabou de receber a baixa continuava
+  // oferecendo "Desativar" e não havia como desfazer pela tela.
+  const baixaMarcada = !!licenca.desativa_em && licenca.desativa_em >= hojeSP() && desativado === false;
+  // Ativar serve para os dois: religar a que caiu e cancelar a baixa da que
+  // ainda está de pé. Nos dois casos o pedido ao parceiro é o mesmo.
+  const acaoEstado: Acao = desativado || baixaMarcada ? "ativar" : "desativar";
+
   const simulacaoMut = useMutation({
     mutationFn: (a: Acao) => chamar({ recon_id: licenca.id, cliente_id: clienteId, acao: a, simular: true }),
     onSuccess: (d) => setSimulacao(d as Simulacao),
@@ -130,7 +148,14 @@ export default function OemLicencaEstadoBotoes({
       // O aviso âmbar manda conferir no portal em vez de dizer que deu errado.
       toast(
         d?.sem_mudanca
-          ? { title: "A licença já estava nesse estado", description: "Nada foi enviado ao OEM." }
+          ? { title: "A licença já estava nesse estado", description: d?.mensagem ?? "Nada foi enviado ao OEM." }
+          : d?.confirmado === true && d?.baixa_em
+            // Desativação é AGENDADA. Dizer "desativada" aqui contradiria o
+            // portal do parceiro, que segue mostrando a licença de pé até a data.
+            ? {
+                title: `Baixa marcada para ${dataBR(d.baixa_em)}`,
+                description: "O OEM não desliga na hora: a licença fica de pé e continua sendo cobrada até essa data.",
+              }
           : d?.confirmado === true
             ? { title: "Licença alterada no OEM", description: "O parceiro confirmou o novo estado." }
             : {
@@ -173,16 +198,22 @@ export default function OemLicencaEstadoBotoes({
           variant="outline"
           className={
             "h-7 px-2.5 text-xs gap-1.5 " +
-            (desativado === true
+            (acaoEstado === "ativar"
               ? "text-emerald-600 dark:text-emerald-400 hover:text-emerald-600"
               : "text-muted-foreground")
           }
           disabled={desativado === null || gravando}
-          title={desativado === null ? "O OEM não informou o status desta licença na última leitura." : undefined}
-          onClick={() => abrir(desativado ? "ativar" : "desativar")}
+          title={
+            desativado === null
+              ? "O OEM não informou o status desta licença na última leitura."
+              : baixaMarcada
+                ? `Baixa marcada para ${dataBR(licenca.desativa_em!)}. Ativar cancela a baixa.`
+                : undefined
+          }
+          onClick={() => abrir(acaoEstado)}
         >
-          {desativado ? <Power className="h-3.5 w-3.5" /> : <PowerOff className="h-3.5 w-3.5" />}
-          {desativado ? "Ativar" : "Desativar"}
+          {acaoEstado === "ativar" ? <Power className="h-3.5 w-3.5" /> : <PowerOff className="h-3.5 w-3.5" />}
+          {acaoEstado === "ativar" ? "Ativar" : "Desativar"}
         </Button>
 
         <Button
@@ -234,8 +265,16 @@ export default function OemLicencaEstadoBotoes({
                     Agora no OEM
                   </span>
                   <span className="tabular-nums">
-                    Desativada: <strong>{sim(simulacao.antes?.desativado)}</strong> · Bloqueada:{" "}
-                    <strong>{sim(simulacao.antes?.bloqueado)}</strong>
+                    Desativada: <strong>{sim(simulacao.antes?.desativado)}</strong>
+                    {/* A baixa marcada é a terceira informação do estado: sem
+                        ela, "Desativada: Não" mente para uma licença que cai
+                        no fim do mês. */}
+                    {simulacao.antes?.baixa_em && (
+                      <> <span className="text-amber-600 dark:text-amber-400">
+                        (baixa em <strong>{dataBR(simulacao.antes.baixa_em)}</strong>)
+                      </span></>
+                    )}{" "}
+                    · Bloqueada: <strong>{sim(simulacao.antes?.bloqueado)}</strong>
                   </span>
                 </div>
                 <div className="flex items-center justify-between px-3 py-2">
@@ -251,7 +290,9 @@ export default function OemLicencaEstadoBotoes({
 
               {simulacao.sem_mudanca && (
                 <p className="text-sm text-muted-foreground">
-                  A licença já está nesse estado no OEM. Nada será enviado.
+                  {simulacao.antes?.baixa_em && acao === "desativar"
+                    ? `A baixa desta licença já está marcada para ${dataBR(simulacao.antes.baixa_em)} no OEM. Nada será enviado.`
+                    : "A licença já está nesse estado no OEM. Nada será enviado."}
                 </p>
               )}
 
@@ -272,7 +313,11 @@ export default function OemLicencaEstadoBotoes({
               )}
 
               {simulacao.pode_gravar && !simulacao.sem_mudanca && acao && (
-                <p className="text-sm text-muted-foreground">{TEXTO[acao].efeito}</p>
+                <p className="text-sm text-muted-foreground">
+                  {acao === "ativar" && simulacao.antes?.baixa_em && simulacao.antes?.desativado === false
+                    ? `Cancela a baixa marcada para ${dataBR(simulacao.antes.baixa_em)}. A licença passa a valer sem prazo.`
+                    : TEXTO[acao].efeito}
+                </p>
               )}
             </div>
           )}
