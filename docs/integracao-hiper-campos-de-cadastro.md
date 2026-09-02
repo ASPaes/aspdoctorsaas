@@ -22,22 +22,66 @@ qt_caixas, qt_filiais}` · `cliente_desde` · `cancelada_em` · `cancelada_por` 
 
 ## O que falta
 
-Conferido no JSON cru das 994 contas: **nenhuma** traz qualquer um dos campos
-abaixo, em nenhuma grafia (`telefone`, `fone`, `celular`, `whatsapp`, `email`,
-`endereco`, `cep`, `logradouro`, `bairro`, `contato`, `responsavel`, `dominio`,
-`site`, `url`).
+Os dados **já existem na tela** do PortalHiper (bloco "Dados cadastrais",
+confirmado em 02/09), mas o endpoint que o DoctorSaaS consome ainda não os
+devolve: conferido no JSON cru das 994 contas, nenhuma traz qualquer um deles,
+em nenhuma grafia.
 
-| Campo pedido | Destino no DoctorSaaS | Formato esperado |
+### O que a tela mostra hoje
+
+Exemplo real da conta 2 YOU STORE:
+
+```
+E-MAIL              2youstoreoficial@gmail.com
+TELEFONE            (43) 9-9682-3785
+DOMÍNIO             2youstore.hiper.com.br
+INSCRIÇÃO ESTADUAL  9105230742
+ENDEREÇO            AV THEODORO VICTORELLI, 150, HELENA, LONDRINA - PR, 86027-750
+CONTATO RESPONSÁVEL Felipe Soares de Oliveira Gabriel / 2youstoreoficial@gmail.com / 43 996823785
+ATENDIMENTO         Hiperador, Hotfix
+```
+
+### Mande separado, não como está na tela
+
+**Este é o pedido que mais importa.** Três desses campos são concatenações
+feitas para o olho humano, e desmontá-las depois é adivinhação:
+
+- `AV THEODORO VICTORELLI, 150, HELENA, LONDRINA - PR, 86027-750` — a vírgula
+  separa cinco coisas aqui, mas não em endereço sem número, e o hífen de
+  `LONDRINA - PR` também aparece em `SÃO JOSÉ DO RIO PRETO`.
+- `Felipe … / e-mail / 43 996823785` — a barra funciona até um contato ter duas
+  barras ou nenhum telefone.
+- `(43) 9-9682-3785` — o nono dígito sai separado por hífen, formato que nenhuma
+  máscara comum reconhece.
+
+Quem raspa a página tem os campos ainda separados, antes de virarem uma linha.
+É lá que a separação é confiável.
+
+### Contrato pedido
+
+| Campo na API | Destino no DoctorSaaS | Formato |
 |---|---|---|
-| `telefone` | `clientes.telefone_whatsapp` | string só com dígitos, com DDD: `47999991111`. Sem `+55`; se o portal tiver o país junto, mandar assim mesmo que o DoctorSaaS normaliza |
-| `email` | `clientes.email` | string, minúscula, um único endereço |
-| `cep` | resolve `clientes.cep`, `endereco`, `bairro`, `cidade_id` | string só com dígitos: `88350000`. **Só o CEP basta** — o DoctorSaaS já busca logradouro, bairro e cidade a partir dele |
-| `endereco`, `numero`, `bairro` | `clientes.endereco`, `numero`, `bairro` | strings. Opcionais se o CEP vier; servem para o número, que o CEP não dá |
-| `contato_nome` | `clientes.contato_nome` | string, nome da pessoa |
-| `dominio` | `clientes.observacao_cliente` | string, domínio sem protocolo: `empresa.com.br` |
+| `email` | `clientes.email` | string minúscula, um único endereço |
+| `telefone` | `clientes.telefone_whatsapp` | **só dígitos, com DDD**: `43996823785`. Nada de máscara |
+| `cep` | `clientes.cep` + resolve cidade | só dígitos: `86027750` |
+| `logradouro` | `clientes.endereco` | `AV THEODORO VICTORELLI` |
+| `numero` | `clientes.numero` | `150` — é o único que o CEP não dá |
+| `bairro` | `clientes.bairro` | `HELENA` |
+| `contato_nome` | `clientes.contato_nome` | `Felipe Soares de Oliveira Gabriel` |
+| `contato_email` | (usado só para conferir) | opcional |
+| `contato_telefone` | `clientes.contato_fone` | só dígitos com DDD |
+| `dominio` | `clientes.observacao_cliente` | sem protocolo: `2youstore.hiper.com.br` |
 
-Nulo é aceito em todos: o DoctorSaaS trata ausência como "o portal não sabe" e
-não sobrescreve o que já existe aqui.
+Nulo é aceito em todos: ausência é tratada como "o portal não sabe" e não
+sobrescreve o que já existe aqui.
+
+**Cidade e UF já vêm** nos campos `cidade`/`uf` que a API entrega hoje — e, com
+o CEP, o DoctorSaaS resolve cidade e estado sozinho pelo ViaCEP, que já é usado
+no cadastro e na importação. Basta o CEP; logradouro e bairro são conferência.
+
+**Sem destino no DoctorSaaS:** `INSCRIÇÃO ESTADUAL` e `ATENDIMENTO` não têm
+campo correspondente. Pode mandar, mas hoje não há onde gravar — só caberiam na
+observação, junto do domínio.
 
 ## Uma exigência que vale para tudo
 
