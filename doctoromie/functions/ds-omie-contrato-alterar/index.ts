@@ -3,6 +3,78 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // vencimento + observacao), preservando o item inteiro (consultar->preservar->alterar).
 // DETECTA troca de produto e BLOQUEIA. Auth por API key.
 //
+// v19 (01/09/2026) - A CONFIRMACAO DE VALOR COMPARAVA CONTRA O LIQUIDO. CONTRATO COM DESCONTO
+//     NUNCA CONFIRMAVA.
+//     CASO MEDIDO (BURGUER SMASH, CT-2026-2582, contrato Omie 7626271548, upsell de 28/08/2026):
+//       o DS enviou 344,70 -- o MRR do DS e o BRUTO. O Omie gravou certo (valorUnit 344,70,
+//       valorDesconto 87,45 preservado) e devolveu nValTotMes = 257,25, que e o LIQUIDO (Total
+//       do Contrato). A releitura comparava 257,25 com 344,70, declarava "Escrita nao
+//       confirmou", a fila voltava para pendente e, 14 tentativas depois, virava erro + alerta
+//       mandando o operador "corrigir a causa" de uma escrita que DEU CERTO. Cada retentativa
+//       disparou um AlterarContrato real no contrato.
+//     POR QUE O nValTotMes NAO SERVE DE PROVA: o Omie nao manda bloco de totais. O desconto mora
+//     so no item (itemCabecalho.valorDesconto / aliqDesconto / cTpDesconto) e
+//     nValTotMes = Sum(itens.valorTotal), ja liquido. Em contrato com desconto ele NUNCA vai
+//     bater com o que o DS envia -- nao e falha eventual como a da v11, e aritmetica.
+//     A PROVA CERTA e o campo que esta funcao escreve: itemCabecalho.valorUnit. Se o valorUnit
+//     relido e o que mandamos, a escrita pegou -- com ou sem desconto.
+//     REGRA: confirma se bater o LIQUIDO (nValTotMes -- caso sem desconto, que e a maioria) OU o
+//     BRUTO (Sum quant x valorUnit) OU se todo item voltar com valorUnit igual ao enviado.
+//     O ESPELHO CONTINUA GRAVANDO O LIQUIDO. omie_contratos.valor_total_mes e, por contrato com a
+//     Conferencia, o Total do Contrato -- ele nao pode passar a mentir sobre o que esta no Omie.
+//     Quem escolhe a base da conferencia e omie_integration.base_valor_conferencia, no
+//     DoctorSaaS, e a Conferencia ja resolve isso sozinha (valor_omie_efetivo). Esta funcao nao
+//     enxerga aquela tabela e nao precisa: ela so responde "a escrita pegou?".
+
+// v18 (25/08/2026) - dVigFinal NUNCA ANTES DE dVigInicial. O Omie recusa, e quem paga e o churn.
+//     CASO MEDIDO (BEDA PIZZARIA, CT-2026-5681, contrato Omie 7686557372, 25/08/2026):
+//       venda 12/08/2026 -> o ds-omie-contrato-criar (v11) escreve dVigInicial = 01/09/2026
+//       (1o dia do mes seguinte a venda, para nao faturar o mes da venda).
+//       cancelado 25/08/2026 -> o montar_payload_omie manda vigencia_final = cancelado_em.
+//       Resultado: dVigFinal 25/08 < dVigInicial 01/09 e o Omie devolve
+//       "Data de Vigencia Inicial [dVigInicial] maior que a Data de Vigencia Final [dVigFinal]!".
+//       A fila travou em 'erro' com 5 tentativas e o alerta mandou o operador "corrigir a causa"
+//       numa tela do DS onde as duas datas estao certas (venda 12/08 < cancelamento 25/08).
+//       A combinacao invalida so existe DEPOIS da traducao para o Omie -- por isso o conserto e
+//       aqui, no ultimo portao, e nao no montar_payload: aqui (e so aqui) se conhece a
+//       dVigInicial real e fresca, lida do Omie na mesma chamada. O DS so tem o espelho.
+//     REGRA: se a vigencia final pedida for anterior a dVigInicial que o Omie acabou de
+//     devolver, grava a PROPRIA dVigInicial (contrato que nasce e morre antes de vigorar dura
+//     um dia -- e a verdade mais proxima que o Omie aceita) e devolve aviso + o de-para em
+//     `vigencia_final_ajustada`. Vale para todo caminho: churn, reajuste e botao manual.
+//     FALHA ABERTA de proposito: dVigInicial ausente ou ilegivel => nao mexe em nada, escreve o
+//     que foi pedido. Nunca inventa data a partir de palpite.
+//
+// v17 (10/08/2026) - O ESPELHO GRAVAVA O VALOR QUE A PROPRIA FUNCAO ACABARA DE DECLARAR ERRADO.
+//     CASO MEDIDO (contrato 11713392937, "Vinicius de Melo", Digi Up, 11/08 00:38:05):
+//       00:35:43  criado no Omie com nValTotMes=10.
+//       00:38:05  upsell de 10 -> 15. AlterarContrato responde "alterado com sucesso" (cCodStatus 0).
+//       +0s       releitura #1 devolve 10 (consistencia eventual do Omie -- a v11 ja documenta isso).
+//       +1,5s     releitura #2 morre em "Consumo redundante detectado. Aguarde 58 segundos".
+//       00:38:05  grava omie_contratos.valor_total_mes = 10.
+//     A funcao montou `divergenciaDetectada = "Omie confirmou 10 mas o DS enviou 15"`, logou
+//     status='erro' -- e UMA LINHA DEPOIS gravou os 10 no espelho assim mesmo, porque a condicao
+//     era so `if (valorConfirmadoOmie !== null)`. A Conferencia le o espelho, nunca o Omie: dai em
+//     diante ela mostra "DS 15 x Omie 10" para sempre, e o operador le isso como "o DS nao mandou".
+//     O envio tinha funcionado. Quem escreveu 10 foi o DS.
+//
+//     (1) SO GRAVA O ESPELHO QUANDO A LEITURA CONFIRMA. `divergenciaDetectada === null` entra na
+//         condicao. Leitura que nao bate com o que mandamos nao e fonte para nada -- e justamente
+//         o caso em que ela e suspeita. Sem confirmacao, o espelho fica como esta.
+//     (2) ESPERA ANTES DA PRIMEIRA LEITURA, nao so entre as retentativas. A escada da v11
+//         (0s, 1,5s, 3s) nao podia funcionar: o Omie bloqueia a MESMA chamada por ~60s
+//         (REDUNDANT), entao a leitura util e sempre a primeira -- e a primeira era a 0s, a mais
+//         propensa a vir velha. Sao as duas pontas do mesmo erro: ler cedo demais e nao poder
+//         reler. Agora a primeira leitura espera RELEITURA_ESPERA_INICIAL_MS.
+//     (3) Quem retenta de verdade e a fila (omie-sync-processar v16), minutos depois, fora da
+//         janela do REDUNDANT. Por isso (1) e seguro: nao confirmar nao perde o dado, adia.
+//
+//     NAO MEXI no laco de releitura da REATIVACAO (querReativar). Ele hoje quase sempre pega
+//     REDUNDANT -- porque o laco de valor acabou de consumir a chamada -- e cai em leitura
+//     inconclusiva, que POR DESENHO nao bloqueia (caso MONTOVANE, 03/08). Reaproveitar a leitura
+//     do valor daria `leituraOk=true` com situacao possivelmente velha e voltaria a bloquear
+//     reativacao que deu certo. Fica como esta, de proposito.
+//
 // v12 (24/07/2026) - GUARD: RECUSA de/para que aponta para contrato CANCELADO no Omie.
 //     Ate a v11, o passo 1 resolvia o de/para e seguia direto para o AlterarContrato sem olhar a
 //     situacao do contrato-alvo. Se contracts_mapping apontava para um contrato em situacao '99'
@@ -110,6 +182,15 @@ const corsHeaders = {
 // v11: releitura com espera crescente. Ver cabecalho.
 const RELEITURA_TENTATIVAS = 3;
 const RELEITURA_ESPERA_MS = 1500;
+// v17: espera ANTES da primeira leitura. So a primeira leitura pode dar certo (o REDUNDANT do Omie
+// bloqueia a repeticao por ~60s), entao e ela que precisa do intervalo -- nao as retentativas.
+// So e paga quando ha valor a confirmar: cancelamento nao espera.
+const RELEITURA_ESPERA_INICIAL_MS = 5000;
+// v19: leitura numerica tolerante (o Omie manda numero, string e vazio no mesmo campo) e
+// comparacao em centavos. Ver cabecalho v19.
+const num = (x)=>x === undefined || x === null || x === "" || isNaN(Number(x)) ? null : Number(x);
+const round2 = (x)=>Math.round(x * 100) / 100;
+const bateEmCentavos = (a, b)=>a !== null && b !== null && Math.abs(a - b) <= 0.01;
 const sleep = (ms)=>new Promise((r)=>setTimeout(r, ms));
 function json(b, status = 200) {
   return new Response(JSON.stringify(b), {
@@ -126,6 +207,12 @@ function toOmieDate(v) {
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
+}
+// v18: dd/mm/aaaa -> aaaammdd (numero) so para COMPARAR. Devolve null no que nao for data
+// reconhecivel -- e o null que faz a v18 falhar aberta em vez de chutar.
+function omieDateToNum(v) {
+  const m = String(v ?? "").trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? Number(`${m[3]}${m[2]}${m[1]}`) : null;
 }
 async function omieCall(endpoint, call, param, creds) {
   const res = await fetch(`${OMIE_BASE}${endpoint}`, {
@@ -344,7 +431,6 @@ Deno.serve(async (req)=>{
     if (situacaoAlvo) param.cabecalho.cCodSit = situacaoAlvo;
     const novoValor = !ehCancelamento && dados.valor_mensal !== undefined && dados.valor_mensal !== null && dados.valor_mensal !== "" ? Number(dados.valor_mensal) : null;
     if (novoValor !== null) param.cabecalho.nValTotMes = novoValor;
-
     // v14: a categoria do contrato acompanha a do produto atual. So quando muda de fato --
     // reescrever o mesmo valor a cada sync poluiria o historico do contrato no Omie.
     if (trocaDeProduto && novaCateg) {
@@ -353,10 +439,9 @@ Deno.serve(async (req)=>{
         cCodCateg: novaCateg
       };
     }
-
     // UM unico map sobre os itens. O valor tinha o seu proprio map; com categoria e servico
     // entrando aqui, dois maps separados fariam o segundo descartar o primeiro.
-    if (Array.isArray(param.itensContrato) && (novoValor !== null || (trocaDeProduto && novaCateg) || novoServico)) {
+    if (Array.isArray(param.itensContrato) && (novoValor !== null || trocaDeProduto && novaCateg || novoServico)) {
       param.itensContrato = param.itensContrato.map((it)=>{
         const ic = {
           ...it.itemCabecalho ?? {}
@@ -385,7 +470,23 @@ Deno.serve(async (req)=>{
     // dVigFinal segue sendo escrita: ela muda de verdade (reajuste/churn).
     // ========================================================================
     const vIniRecebidaEIgnorada = toOmieDate(dados.vigencia_inicial) ?? null;
-    const vFim = toOmieDate(dados.vigencia_final);
+    let vFim = toOmieDate(dados.vigencia_final);
+    // v18: dVigFinal nunca antes da dVigInicial que o Omie acabou de devolver. Ver cabecalho.
+    const vIniOmie = cc?.cabecalho?.dVigInicial ?? null;
+    let vigencia_final_ajustada = null;
+    if (vFim && vIniOmie) {
+      const nFim = omieDateToNum(vFim);
+      const nIni = omieDateToNum(vIniOmie);
+      if (nFim !== null && nIni !== null && nFim < nIni) {
+        vigencia_final_ajustada = {
+          pedida: vFim,
+          aplicada: vIniOmie,
+          motivo: "vigencia final anterior a vigencia inicial do contrato no Omie"
+        };
+        avisos.push(`Vigência final pedida (${vFim}) é anterior à vigência inicial do contrato no Omie (${vIniOmie}) -- o Omie recusa essa combinação. Foi gravada ${vIniOmie}. Acontece quando o contrato é cancelado antes de começar a vigorar (a vigência inicial no Omie é o 1º dia do mês seguinte à venda).`);
+        vFim = vIniOmie;
+      }
+    }
     if (vFim) param.cabecalho.dVigFinal = vFim;
     // v7(B): observacoes.cObsContrato
     if (temObservacao) {
@@ -432,6 +533,7 @@ Deno.serve(async (req)=>{
         vigencia_inicial_preservada: true,
         vigencia_final_atual_omie: cc?.cabecalho?.dVigFinal ?? null,
         vigencia_final_nova: vFim ?? null,
+        vigencia_final_ajustada,
         observacao_atual_omie: cc?.observacoes?.cObsContrato ?? null,
         observacao_nova: temObservacao ? observacao : null,
         observacao_sera_escrita: temObservacao,
@@ -478,11 +580,24 @@ Deno.serve(async (req)=>{
     // Entao: nao grava valor_total_mes, registra o motivo, e o incremental (10min) corrige.
     // ========================================================================
     let valorConfirmadoOmie = null;
+    // v19: o bruto (Sum quant x valorUnit), o desconto e o veredito do item, relidos na MESMA
+    // resposta do ConsultarContrato -- uma segunda chamada cairia no REDUNDANT do Omie.
+    // O liquido acima continua sendo o unico que vai para o espelho.
+    let valorBrutoConfirmadoOmie = null;
+    let descontoConfirmadoOmie = null;
+    let unitBateComEnviado = false;
     let releituraFalhou = null;
     let divergenciaDetectada = null;
     let releituraTentativas = 0;
+    // v19: a regra unica de "a escrita de valor pegou?". Fecha sobre as variaveis acima de
+    // proposito -- ela e consultada dentro do laco (para sair cedo) e depois dele (para
+    // decidir a divergencia), e duas copias da regra e como nasce um falso positivo.
+    const escritaDeValorConfirmada = ()=>bateEmCentavos(valorConfirmadoOmie, novoValor) || bateEmCentavos(valorBrutoConfirmadoOmie, novoValor) || unitBateComEnviado;
     for(let tentativa = 0; tentativa < RELEITURA_TENTATIVAS; tentativa++){
-      if (tentativa > 0) await sleep(RELEITURA_ESPERA_MS * tentativa); // 1,5s e depois 3s
+      // v17: a espera que importa e esta, antes da PRIMEIRA leitura -- ver cabecalho v17 (2).
+      if (tentativa === 0) {
+        if (novoValor !== null) await sleep(RELEITURA_ESPERA_INICIAL_MS);
+      } else await sleep(RELEITURA_ESPERA_MS * tentativa); // 1,5s e depois 3s
       releituraTentativas = tentativa + 1;
       releituraFalhou = null;
       try {
@@ -500,8 +615,29 @@ Deno.serve(async (req)=>{
           releituraFalhou = `HTTP ${confirma.status}`;
           continue;
         }
-        const v = confirma.body?.contratoCadastro?.cabecalho?.nValTotMes;
+        const cadastroRelido = confirma.body?.contratoCadastro;
+        const v = cadastroRelido?.cabecalho?.nValTotMes;
         valorConfirmadoOmie = v === undefined || v === null ? null : Number(v);
+        // v19: o item e a prova da escrita -- ver cabecalho v19.
+        const itensRelidos = Array.isArray(cadastroRelido?.itensContrato) ? cadastroRelido.itensContrato : [];
+        if (itensRelidos.length) {
+          valorBrutoConfirmadoOmie = round2(itensRelidos.reduce((acc, it)=>{
+            const q = num(it?.itemCabecalho?.quant);
+            const u = num(it?.itemCabecalho?.valorUnit);
+            return acc + (q === null || u === null ? 0 : q * u);
+          }, 0));
+          descontoConfirmadoOmie = round2(itensRelidos.reduce((acc, it)=>acc + (num(it?.itemCabecalho?.valorDesconto) ?? 0), 0));
+          // O passo 5 escreve valorUnit = novoValor em TODO item. Entao "todo item voltou com
+          // o valor enviado" e a prova direta -- e a unica que sobrevive a contrato de varios
+          // itens, onde a soma do bruto seria N x novoValor. (Medido em 01/09/2026: os 1726
+          // contratos do espelho tem 1 item e quant = 1; a regra existe para nao quebrar se
+          // isso mudar.)
+          unitBateComEnviado = novoValor !== null && itensRelidos.every((it)=>bateEmCentavos(num(it?.itemCabecalho?.valorUnit), novoValor));
+        } else {
+          valorBrutoConfirmadoOmie = null;
+          descontoConfirmadoOmie = null;
+          unitBateComEnviado = false;
+        }
         if (valorConfirmadoOmie === null) {
           releituraFalhou = "nValTotMes ausente na releitura";
           continue;
@@ -512,12 +648,16 @@ Deno.serve(async (req)=>{
       }
       // Nada a comparar, ou ja bateu: encerra.
       if (novoValor === null) break;
-      if (Math.abs(valorConfirmadoOmie - novoValor) <= 0.01) break;
+      if (escritaDeValorConfirmada()) break;
     }
     // O Omie disse "alterado com sucesso" mas o valor nao e o que eu mandei, mesmo depois de
     // tres leituras espacadas? Ai sim e escrita silenciosa que nao pegou.
-    if (novoValor !== null && valorConfirmadoOmie !== null && Math.abs(valorConfirmadoOmie - novoValor) > 0.01) {
-      divergenciaDetectada = `Omie confirmou ${valorConfirmadoOmie} mas o DS enviou ${novoValor} (apos ${releituraTentativas} leituras)`;
+    if (novoValor !== null && valorConfirmadoOmie !== null && !escritaDeValorConfirmada()) {
+      // v19: a mensagem vai inteira para o alerta do operador. Sem o bruto e o desconto ao
+      // lado, "Omie confirmou 257,25 mas o DS enviou 344,70" e indistinguivel de escrita
+      // perdida -- e foi lida como tal.
+      const detalhe = valorBrutoConfirmadoOmie === null ? "" : ` (bruto lido ${valorBrutoConfirmadoOmie}, desconto ${descontoConfirmadoOmie ?? 0})`;
+      divergenciaDetectada = `Omie confirmou ${valorConfirmadoOmie}${detalhe} mas o DS enviou ${novoValor} (apos ${releituraTentativas} leituras)`;
     }
     // v13: PROVA da reativacao (99->10). O AlterarContrato acima ja rodou; aqui confirmo que o
     // Omie realmente reativou. Se NAO mudou (rejeitou/ignorou), volto BLOQUEADO -> o DS mantem a
@@ -577,7 +717,13 @@ Deno.serve(async (req)=>{
     };
     // So grava o que veio do Omie. Releitura falhou => NAO inventa: deixa como esta e o
     // incremental resolve. `raw` nao e tocado -- e do incremental, e o diff fica minimo.
-    if (valorConfirmadoOmie !== null) espelhoUpd.valor_total_mes = valorConfirmadoOmie;
+    //
+    // v17: `divergenciaDetectada === null` E PARTE DA CONDICAO. Sem isso a funcao gravava no
+    // espelho exatamente o valor que ela acabou de declarar errado na linha de cima -- e como a
+    // Conferencia le o espelho e nunca o Omie, isso fabricava uma divergencia permanente a partir
+    // de uma escrita que DEU CERTO. Ver cabecalho v17. Nao confirmou nao e "confirmou o antigo":
+    // e nao sei. E nao sei nao se grava.
+    if (divergenciaDetectada === null && valorConfirmadoOmie !== null) espelhoUpd.valor_total_mes = valorConfirmadoOmie;
     await supa.from("omie_contratos").update(espelhoUpd).eq("tenant_id", tenant_id).eq("codigo_contrato_omie", nCodCtr);
     await supa.from("integrations_log").insert({
       tenant_id,
@@ -592,6 +738,8 @@ Deno.serve(async (req)=>{
         ...alt.body,
         nCodCtr,
         valor_confirmado_omie: valorConfirmadoOmie,
+        valor_bruto_confirmado_omie: valorBrutoConfirmadoOmie,
+        desconto_confirmado_omie: descontoConfirmadoOmie,
         releitura_falhou: releituraFalhou,
         releitura_tentativas: releituraTentativas,
         // v14: troca de categoria fica no log. E mudanca de classificacao contabil -- tem que dar
@@ -613,6 +761,7 @@ Deno.serve(async (req)=>{
         situacao: situacaoAlvo,
         valor: novoValor,
         vigencia_final: vFim ?? null,
+        vigencia_final_ajustada,
         dia_vencimento: dia_venc_sincronizado ? novoDiaVenc : null,
         observacao: temObservacao ? observacao : null,
         // v14
@@ -623,6 +772,8 @@ Deno.serve(async (req)=>{
       avisos: avisos.length ? avisos : null,
       // v9, novos no retorno. O omie-sync-processar so olha alt.ok -- campo novo nao quebra caller.
       valor_confirmado_omie: valorConfirmadoOmie,
+      valor_bruto_confirmado_omie: valorBrutoConfirmadoOmie,
+      desconto_confirmado_omie: descontoConfirmadoOmie,
       valor_confirmado: divergenciaDetectada === null && valorConfirmadoOmie !== null,
       divergencia_detectada: divergenciaDetectada,
       releitura_falhou: releituraFalhou,

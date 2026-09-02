@@ -15,7 +15,6 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 ### 01/09
 
 - 🆕 **Importar para a base o cliente que só existe no Hiper** — Na aba **Divergências**, as contas marcadas como *Conta sem cliente aqui* ganharam o botão **Importar**. Razão social, CNPJ, cidade, plano, tipo de contrato e custo vêm do portal; o que ele não tem — mensalidade, e-mail, WhatsApp — você preenche na hora, e unidade, origem da venda, vendedor, forma de pagamento e data de início valem para o lote todo. O cliente entra com contrato e módulos já montados. Conta cujo CNPJ já tem cadastro aqui fica de fora, com link para o cadastro que existe: importar criaria um cliente repetido.
-
 - 🆕 **Divergências do Hiper agora ficam dentro de Clientes** — A mesma tela de conferência que vivia em Configurações › Integrações › Hiper ganhou uma aba ao lado de **Reajustes**, na página de **Clientes**, com o número de pendências no rótulo. Mesmos filtros, mesmo detalhe e as mesmas correções em lote. A aba só aparece para quem usa a integração. Gerentes também passam a enxergar e corrigir; as ações que dependem de administrador continuam só com ele.
 
 - 🆕 **Corrigir o cadastro pelo portal, num clique ou em lote** — Na aba **Divergências**, o botão **Atualizar no DoctorSaaS** grava aqui o que o Hiper diz: tipo de contrato, custo, mensalidade, razão social e os módulos. Dá para marcar vários clientes e escolher **o que** atualizar em cada um — atualizar só o custo e deixar a mensalidade de fora, por exemplo. Quem não puder receber alguma coisa é pulado com o motivo, e o resto grava normalmente.
@@ -41,6 +40,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 - ⬆️ **Integração OEM — de qual fornecedor é cada divergência** — Em *Configurações › Integrações › OEM › Divergências*, a linha de cada cliente passa a mostrar o **fornecedor** ao lado do CNPJ, e o topo ganhou o seletor **Todos os fornecedores**, com quantos clientes cada um tem. Dá para olhar só o **PDV Legal**, só o **Gula Menu** ou só a **Base BM** em vez de percorrer a lista inteira procurando de quem é cada linha. O fornecedor vem do **produto do cliente**, o mesmo que o Dashboard usa para filtrar.
 
 - ⬆️ **Integração OEM — o nome do cliente aparece inteiro** — Na mesma lista, razão social comprida era cortada e não havia como ler o resto. Agora, ao **abrir o cliente**, o nome aparece por completo, quebrando em mais de uma linha; fechado ele continua cortado, para as linhas manterem o mesmo tamanho e a lista seguir legível de cima a baixo.
+
+- 🔧 **Aviso falso de contrato não sincronizado no OMIE** — Contrato que tem desconto no OMIE disparava o alerta "OMIE não sincronizou" mesmo depois de o valor ter entrado certo lá, e a linha ficava parada em erro na fila. O DoctorSaaS conferia o envio contra o total já com desconto, que nunca ia bater com o valor cheio que ele manda. A conferência passou a olhar o valor do serviço no contrato, então o alerta só aparece quando a gravação realmente não passou.
 
 ## Agosto / 2026
 
