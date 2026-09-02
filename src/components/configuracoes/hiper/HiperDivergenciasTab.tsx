@@ -329,9 +329,15 @@ export default function HiperDivergenciasTab({
     } finally { setOcupado(null); }
   };
 
-  /** Relê ESTA conta no portal e reconcilia. Para quando o dado de lá mudou e
-   *  não vale esperar a sincronização da carteira inteira. */
-  const rebuscar = async (idPortal: string) => {
+  /**
+   * Relê ESTA conta no portal e refaz a comparação dos dois lados.
+   *
+   * A parte local roda mesmo se o portal falhar: quando alguém reativa ou
+   * corrige um cliente aqui dentro, é só o lado de cá que mudou, e amarrar a
+   * reconciliação ao sucesso da leitura remota deixava a linha divergindo sem
+   * motivo aparente.
+   */
+  const compararDados = async (idPortal: string) => {
     setOcupado(`portal-${idPortal}`);
     try {
       const { data, error } = await supabase.functions.invoke("hiper-integration-call", {
@@ -340,15 +346,23 @@ export default function HiperDivergenciasTab({
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error || "Falhou.");
       const res = data.resultado ?? {};
-      toast({
-        title: "Conta relida do portal",
-        description: res.portal_atualizado === false
+      const diag = res.diagnostico ?? null;
+
+      // O que o portal trouxe é rodapé; o que importa é o veredito da conta.
+      const doPortal = res.portal_erro
+        ? `O portal não respondeu: ${res.portal_erro}`
+        : res.portal_atualizado === false
           ? "O portal ainda é a versão sem módulos e filiais — só o cadastro foi atualizado."
-          : `${num(res.modulos)} módulos · ${num(res.filiais)} filiais`,
+          : `Portal relido: ${num(res.modulos)} módulos · ${num(res.filiais)} filiais.`;
+
+      toast({
+        title: diag?.estado === "ok" ? "Conferido: nada divergindo" : "Dados comparados",
+        description: [diag?.resumo, doPortal].filter(Boolean).join(" "),
+        variant: res.portal_erro && !diag ? "destructive" : undefined,
       });
-      qc.invalidateQueries({ queryKey: ["hiper_recon"] });
+      ["hiper_recon", "hiper_log"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
     } catch (e: any) {
-      toast({ title: "Não foi possível rebuscar", description: e.message, variant: "destructive" });
+      toast({ title: "Não foi possível comparar", description: e.message, variant: "destructive" });
     } finally { setOcupado(null); }
   };
 
@@ -900,11 +914,12 @@ export default function HiperDivergenciasTab({
 
                       {r.id_portal && podeAcoesAdmin && (
                         <Button size="sm" variant="outline" disabled={!!ocupado}
-                          onClick={() => rebuscar(r.id_portal as string)}>
+                          title="Relê esta conta no portal e refaz a verificação dos dois lados"
+                          onClick={() => compararDados(r.id_portal as string)}>
                           {ocupado === `portal-${r.id_portal}`
                             ? <Loader2 className="h-3 w-3 animate-spin" />
                             : <RefreshCw className="h-3 w-3" />}
-                          Rebuscar no portal
+                          Comparar dados
                         </Button>
                       )}
 

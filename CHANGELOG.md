@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 02/09
+
+- ⬆️ **"Rebuscar no portal" virou "Comparar dados"** — O botão passou a refazer a verificação completa daquele cliente dos dois lados, e agora **diz o resultado**: se ficou tudo certo, ou o que continua divergindo e por quê. Quando a conta segue como *sem cliente aqui*, ele aponta o motivo — cadastro com o CNPJ em branco, CNPJ já cadastrado sem contrato do Hiper, ou nenhum cadastro correspondente. A conferência do lado daqui passou a rodar **mesmo quando o portal não responde**: era por isso que um cliente reativado aqui dentro continuava aparecendo como divergente por mais que você sincronizasse.
+
 ### 01/09
 
 - 🆕 **Ativar, desativar, bloquear e desbloquear a licença do OEM pela ficha do cliente** — No card **Integração**, a licença ganhou dois botões que agem direto no OEM, cada um mostrando o inverso do estado atual: **Ativar** ou **Desativar**, e **Bloquear** ou **Desbloquear**. São coisas diferentes: a licença desativada sai do ar e deixa de ser cobrada pelo parceiro; a bloqueada tira o acesso do cliente e continua sendo cobrada. Antes de gravar, a tela lê a licença no OEM na hora e mostra o estado atual e o que vai mudar, para a confirmação não sair em cima do que o espelho tinha guardado. Depois de enviar, ela confere relendo no parceiro. **Bloquear vale na hora; desativar o OEM marca para o fim do mês de cobrança** — a tela avisa disso antes e mostra a data depois, e a licença passa a aparecer como *Ativo até 30/09/2026*. Enquanto a baixa está marcada, o botão vira **Ativar**, que cancela a baixa. Quem já tem a permissão de **módulos** enxerga os botões.

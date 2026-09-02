@@ -141,13 +141,22 @@ serve(async (req) => {
       });
     }
 
-    // Rebuscar UMA conta no portal. A API é paginada por cursor e não tem filtro
-    // por conta, então varre as páginas e fica só com a que interessa — a
-    // carteira inteira leva ~4s, e o que importa aqui é não regravar as outras
-    // 993 contas para conferir uma.
+    // Comparar UMA conta: relê no portal e refaz a verificação daquele cliente
+    // dos dois lados. A API do portal é paginada por cursor e não tem filtro por
+    // conta, então varre as páginas e fica só com a que interessa — a carteira
+    // inteira leva ~4s, e o que importa aqui é não regravar as outras 993.
+    //
+    // A parte LOCAL roda mesmo quando o portal falha. Antes, um erro de rede
+    // abortava a função antes do hiper_reconciliar — e uma reativação feita aqui
+    // dentro nunca era reavaliada, que era o sintoma de "sincronizei e não
+    // atualizou".
     if (acao === "puxar_um") {
       const alvo = String(req_id_portal ?? "").trim();
       if (!alvo) return json({ ok: false, error: "Informe a conta do portal a rebuscar." });
+
+      // Motivo pelo qual o lado do portal não pôde ser atualizado. Vira aviso no
+      // retorno, não erro: o lado de cá ainda tem o que dizer.
+      let portalErro: string | null = null;
 
       let achado: Record<string, unknown> | null = null;
       let cursor: string | null = null;
@@ -158,7 +167,7 @@ serve(async (req) => {
           u.searchParams.set("limit", String(PAGE_SIZE));
           if (cursor) u.searchParams.set("cursor", cursor);
           const resp = await fetch(u.toString(), { headers: auth });
-          if (!resp.ok) return json({ ok: false, error: `PortalHiper recusou (HTTP ${resp.status})` });
+          if (!resp.ok) throw new Error(`PortalHiper recusou (HTTP ${resp.status})`);
           const body = await resp.json();
           const lista = Array.isArray(body?.clientes) ? body.clientes : [];
           achado = lista.find((c: Record<string, unknown>) => String(c.id_portal ?? "") === alvo) ?? null;
@@ -166,16 +175,16 @@ serve(async (req) => {
           paginas++;
         } while (!achado && cursor && paginas < MAX_PAGES);
       } catch (e) {
-        return json({ ok: false, error: `Falha de rede ao rebuscar: ${(e as Error).message}` });
+        portalErro = `Falha de rede ao ler o portal: ${(e as Error).message}`;
       }
 
-      if (!achado) {
-        return json({
-          ok: false,
-          error: "Esta conta não está mais na carteira do portal. Rode a sincronização completa para o espelho refletir isso.",
-        });
+      if (!portalErro && !achado) {
+        portalErro = "Esta conta não está mais na carteira do portal. Rode a sincronização completa para o espelho refletir isso.";
       }
 
+      let mods = 0, fils = 0, portalAtualizado = false;
+
+      if (achado) {
       const c = achado as Record<string, any>;
       const plano = c.plano_detalhe ?? null;
       const cad = c.cadastro ?? null;
@@ -236,11 +245,10 @@ serve(async (req) => {
         raw: c,
         pulled_at: new Date().toISOString(),
       }).eq("tenant_id", targetTenantId).eq("id_portal", alvo);
-      if (upErr) return json({ ok: false, error: `Falha ao gravar o espelho: ${upErr.message}` });
+      if (upErr) portalErro = `Falha ao gravar o espelho: ${upErr.message}`;
 
       // Módulos e filiais só são substituídos quando o portal REALMENTE mandou
       // os campos: um portal desatualizado zeraria o que já tínhamos.
-      let mods = 0, fils = 0;
       if (Array.isArray(c.modulos)) {
         await supabase.from("hiper_espelho_modulo").delete()
           .eq("tenant_id", targetTenantId).eq("id_portal", alvo);
@@ -266,17 +274,32 @@ serve(async (req) => {
         if (linhas.length) await supabase.from("hiper_espelho_filial").insert(linhas);
         fils = linhas.length;
       }
+      portalAtualizado = Array.isArray(c.modulos) && Array.isArray(c.filiais);
+      }
 
+      // Sempre, mesmo sem o portal: é o lado de cá que muda quando alguém
+      // reativa, cadastra ou corrige um cliente aqui dentro.
       const { data: rec, error: recErr } = await supabase.rpc("hiper_reconciliar", {
         p_tenant_id: targetTenantId,
       });
-      if (recErr) return json({ ok: false, error: `Espelho atualizado, mas a reconciliação falhou: ${recErr.message}` });
+      if (recErr) {
+        return json({ ok: false, error: `A comparação falhou: ${recErr.message}` });
+      }
+
+      // O veredito desta conta. Sem ele o botão devolvia um "ok" mudo e a linha
+      // continuava divergindo sem dizer por quê.
+      const { data: diag } = await supabase.rpc("hiper_diagnostico_conta", {
+        p_tenant_id: targetTenantId,
+        p_id_portal: alvo,
+      });
 
       return json({
         ok: true,
         resultado: {
           id_portal: alvo, paginas, modulos: mods, filiais: fils,
-          portal_atualizado: Array.isArray(c.modulos) && Array.isArray(c.filiais),
+          portal_atualizado: portalAtualizado,
+          portal_erro: portalErro,
+          diagnostico: diag ?? null,
           recon: rec,
         },
       });

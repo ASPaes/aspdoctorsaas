@@ -443,7 +443,7 @@ describe("Divergências: ações que o head não pode executar", () => {
     const txt = container.textContent ?? "";
     expect(txt).toContain("Ignorar");
     expect(txt).toContain("Já resolvi por fora");
-    expect(txt).toContain("Rebuscar no portal");
+    expect(txt).toContain("Comparar dados");
     expect(txt).toContain("Paga a própria conta");
   });
 
@@ -453,7 +453,7 @@ describe("Divergências: ações que o head não pode executar", () => {
     const txt = container.textContent ?? "";
     expect(txt).not.toContain("Ignorar");
     expect(txt).not.toContain("Já resolvi por fora");
-    expect(txt).not.toContain("Rebuscar no portal");
+    expect(txt).not.toContain("Comparar dados");
     expect(txt).not.toContain("Paga a própria conta");
     // O que continua: aplicar a correção passa por RPC SECURITY DEFINER, que o
     // head executa. E a filial some como BOTÃO, não como informação.
