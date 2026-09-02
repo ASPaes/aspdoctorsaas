@@ -16,6 +16,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 - 🔧 **Aviso de risco de churn apontava frase de dias atrás** — Quando o cliente mandava uma mensagem nova, a análise podia rodar antes de o atendimento existir, e nesse caso ela lia a conversa inteira em vez do atendimento do momento. O resultado era um aviso que chegava hoje citando uma reclamação de dias antes — e você abria o chat e não achava a frase. Agora a análise só olha o atendimento em andamento; sem atendimento aberto, no máximo as últimas 6 horas. Dos avisos já enviados com trecho citado, 2 em 12 vinham dessa falha.
 
+- 🔧 **Nomes com "&" voltaram ao normal** — Razão social com **&** vinha do Hiper como `THEISS &amp; MORAIS` e, ao atualizar o cadastro pelo portal, o nome errado era gravado por cima do certo. Agora o sistema converte isso na entrada, e os **20 cadastros** que já tinham sido afetados foram corrigidos. Some junto um efeito colateral: esses clientes apareciam com uma divergência de razão social que não existia de verdade.
+
 - ⬆️ **"Rebuscar no portal" virou "Comparar dados"** — O botão passou a refazer a verificação completa daquele cliente dos dois lados, e agora **diz o resultado**: se ficou tudo certo, ou o que continua divergindo e por quê. Quando a conta segue como *sem cliente aqui*, ele aponta o motivo — cadastro com o CNPJ em branco, CNPJ já cadastrado sem contrato do Hiper, ou nenhum cadastro correspondente. A conferência do lado daqui passou a rodar **mesmo quando o portal não responde**: era por isso que um cliente reativado aqui dentro continuava aparecendo como divergente por mais que você sincronizasse.
 
 ### 01/09

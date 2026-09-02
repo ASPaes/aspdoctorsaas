@@ -19,6 +19,34 @@ const LOTE_INSERT = 500;
 const soDigitos = (v: unknown) => String(v ?? "").replace(/\D/g, "");
 const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 
+/**
+ * Devolve o texto do portal como texto, não como HTML.
+ *
+ * O PortalHiper raspa a tela da Hiper e entrega o que leu, entidade e tudo:
+ * "THEISS &amp; MORAIS LTDA". Medido em 02/09: das 33 contas com "&" na razão
+ * social, as 33 chegavam assim — e o botão Atualizar gravou a versão quebrada
+ * por cima de 20 cadastros que estavam certos.
+ *
+ * Não é só cosmético. A normalização de nomes vira "THEISS AMP MORAIS", que
+ * nunca casa com "THEISS MORAIS": enquanto o cadastro estivesse certo, a tela
+ * acusava divergência de razão social falsa — e "corrigir" essa divergência era
+ * exatamente o que estragava o nome.
+ *
+ * `&amp;` sai por último, senão "&amp;lt;" viraria "<" em vez de "&lt;".
+ */
+const txt = (v: unknown): string | null => {
+  if (v === null || v === undefined) return null;
+  const s = String(v)
+    .replace(/&(?:nbsp|#160);/gi, " ")
+    .replace(/&(?:quot|#34);/gi, '"')
+    .replace(/&(?:apos|#39);/gi, "'")
+    .replace(/&(?:lt|#60);/gi, "<")
+    .replace(/&(?:gt|#62);/gi, ">")
+    .replace(/&(?:amp|#38);/gi, "&")
+    .trim();
+  return s === "" ? null : s;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -192,9 +220,9 @@ serve(async (req) => {
       const { error: upErr } = await supabase.from("hiper_espelho_cadastro").update({
         cnpj: c.cnpj ?? null,
         cnpj_norm: soDigitos(c.cnpj) || null,
-        razao_social: c.razao_social ?? null,
-        nome_fantasia: c.nome_fantasia ?? null,
-        cidade: c.cidade ?? null,
+        razao_social: txt(c.razao_social),
+        nome_fantasia: txt(c.nome_fantasia),
+        cidade: txt(c.cidade),
         uf: c.uf ?? null,
         situacao: c.situacao ?? null,
         responsavel_tipo: c.responsavel_tipo ?? null,
@@ -255,7 +283,7 @@ serve(async (req) => {
         const linhas = (c.modulos as any[])
           .filter((m) => String(m.nome ?? "").trim())
           .map((m) => ({
-            tenant_id: targetTenantId, id_portal: alvo, app_nome: String(m.nome).trim(),
+            tenant_id: targetTenantId, id_portal: alvo, app_nome: txt(m.nome) ?? String(m.nome).trim(),
             custo: num(m.custo) ?? 0, comprado_por: m.comprado_por ?? null, ativo: m.ativo !== false,
           }));
         if (linhas.length) await supabase.from("hiper_espelho_modulo").insert(linhas);
@@ -269,7 +297,7 @@ serve(async (req) => {
           .filter((f) => f.cnpj_norm.length === 14)
           .map((f) => ({
             tenant_id: targetTenantId, id_portal: alvo, cnpj: f.cnpj ?? null, cnpj_norm: f.cnpj_norm,
-            nome: f.nome ?? null, cidade: f.cidade ?? null, uf: f.uf ?? null, ativo: f.ativo !== false,
+            nome: txt(f.nome), cidade: txt(f.cidade), uf: f.uf ?? null, ativo: f.ativo !== false,
           }));
         if (linhas.length) await supabase.from("hiper_espelho_filial").insert(linhas);
         fils = linhas.length;
@@ -374,9 +402,9 @@ serve(async (req) => {
               id_portal: idPortal,
               cnpj: c.cnpj ?? null,
               cnpj_norm: soDigitos(c.cnpj) || null,
-              razao_social: c.razao_social ?? null,
-              nome_fantasia: c.nome_fantasia ?? null,
-              cidade: c.cidade ?? null,
+              razao_social: txt(c.razao_social),
+              nome_fantasia: txt(c.nome_fantasia),
+              cidade: txt(c.cidade),
               uf: c.uf ?? null,
               situacao: c.situacao ?? null,
               responsavel_tipo: c.responsavel_tipo ?? null,
@@ -431,7 +459,7 @@ serve(async (req) => {
             // Portal antigo não manda estes campos. Ausente ≠ vazio: sem eles o
             // espelho de módulo/filial simplesmente não é tocado nesta conta.
             for (const m of Array.isArray(c.modulos) ? c.modulos : []) {
-              const nome = String(m.nome ?? "").trim();
+              const nome = txt(m.nome) ?? "";
               if (!nome) continue;
               modulos.set(`${idPortal}|${nome}`, {
                 tenant_id: targetTenantId,
@@ -451,8 +479,8 @@ serve(async (req) => {
                 id_portal: idPortal,
                 cnpj: f.cnpj ?? null,
                 cnpj_norm: cnpj,
-                nome: f.nome ?? null,
-                cidade: f.cidade ?? null,
+                nome: txt(f.nome),
+                cidade: txt(f.cidade),
                 uf: f.uf ?? null,
                 ativo: f.ativo !== false,
                 pull_run_id: runId,
