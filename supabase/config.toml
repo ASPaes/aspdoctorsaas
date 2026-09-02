@@ -225,6 +225,14 @@ verify_jwt = true
 [functions.oem-atualizar-cadastro-licenca]
 verify_jwt = true
 
+# Liga/desliga e bloqueia/desbloqueia a licença da filial no OEM, pela ficha do
+# cliente. Chamada pelo NAVEGADOR com o token da pessoa — é ela que assina a
+# ação no log, e é o token dela que responde `get_my_permissions` —, por isso
+# verify_jwt = true. Sem esta entrada o CI publicaria com false e mudaria a
+# autenticação em silêncio.
+[functions.oem-licenca-estado]
+verify_jwt = true
+
 # Apaga do Storage a mídia de chat vencida (documento/vídeo/imagem; áudio nunca).
 # Chamada pelo pg_cron, que manda a anon key no Authorization — a mesma receita
 # do check-csat-timeout. `true` de propósito: sem JWT válido do projeto ninguém

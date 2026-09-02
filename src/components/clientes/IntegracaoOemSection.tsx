@@ -5,6 +5,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useOemIntegracaoAtiva } from "@/hooks/useOemIntegracaoAtiva";
 import { Badge } from "@/components/ui/badge";
 import { Cpu, Lock, TrendingDown } from "lucide-react";
+import OemLicencaEstadoBotoes from "./OemLicencaEstadoBotoes";
 
 // ============================================================================
 // As licenças do OEM deste cliente.
@@ -173,13 +174,14 @@ export default function IntegracaoOemSection({ clienteId }: { clienteId: string 
 
   if (!visivel) return null;
 
-  const cabecalho = (extra?: ReactNode) => (
+  const cabecalho = (extra?: ReactNode, acoes?: ReactNode) => (
     <div className="flex flex-wrap items-center gap-2 mb-2.5">
       <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
       <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         OEM
       </span>
       {extra}
+      {acoes && <div className="ml-auto">{acoes}</div>}
     </div>
   );
 
@@ -214,7 +216,14 @@ export default function IntegracaoOemSection({ clienteId }: { clienteId: string 
 
   return (
     <section className="px-6 py-4">
-      {/* Linha 1: o que é e quantas são. */}
+      {/* Linha 1: o que é, quantas são e o que dá para fazer com elas.
+
+          Os botões de estado só ficam no cabeçalho quando há UMA licença. Com
+          duas ou mais, um botão aqui em cima não diz em qual filial ele age, e
+          desligar a loja errada é o erro que não se desfaz com um clique: nesse
+          caso eles descem para a linha de cada licença. Medido em 01/09/2026:
+          dos 880 clientes com licença vinculada, todos têm exatamente uma, então
+          o caminho normal é o do cabeçalho. */}
       {cabecalho(
         <>
           <Badge variant="secondary">
@@ -226,6 +235,9 @@ export default function IntegracaoOemSection({ clienteId }: { clienteId: string 
             </Badge>
           )}
         </>,
+        licencas.length === 1 ? (
+          <OemLicencaEstadoBotoes clienteId={clienteId} licenca={licencas[0]} />
+        ) : undefined,
       )}
 
       {/* Linha 2: o dinheiro. Um ponto menor e mais junto que o resto porque agora divide a
@@ -271,20 +283,20 @@ export default function IntegracaoOemSection({ clienteId }: { clienteId: string 
                 </p>
               </div>
 
-              <div className="shrink-0 text-right leading-tight">
-                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Status</p>
-                <p className={`text-xs font-medium whitespace-nowrap ${st.classe}`}>{st.texto}</p>
+              <div className="shrink-0 text-left leading-tight">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-foreground/80">Status</p>
+                <p className={`text-[13px] font-medium whitespace-nowrap ${st.classe}`}>{st.texto}</p>
               </div>
 
-              <div className="shrink-0 w-[68px] text-right leading-tight">
-                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <div className="shrink-0 w-[76px] text-left leading-tight">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-foreground/80">
                   Bloqueado
                 </p>
                 {/* `null` é o OEM não ter respondido essa filial na última leitura — não é "não".
                     Dizer "Não" aí seria afirmar o que ninguém verificou. */}
                 <p
                   className={
-                    "text-xs font-medium " +
+                    "text-[13px] font-medium " +
                     (l.bloqueado_oem === true
                       ? "text-destructive"
                       : l.bloqueado_oem === false
@@ -307,6 +319,13 @@ export default function IntegracaoOemSection({ clienteId }: { clienteId: string 
               <span className="tabular-nums text-muted-foreground w-24 text-right">
                 {l.status_oem === "Ativo" ? brl(l.custo_oem) : "—"}
               </span>
+
+              {/* Só quando o cabeçalho não pôde levá-los: com mais de uma
+                  licença, a ação precisa estar do lado da filial em que ela
+                  age. */}
+              {licencas.length > 1 && (
+                <OemLicencaEstadoBotoes clienteId={clienteId} licenca={l} />
+              )}
             </div>
           );
         })}

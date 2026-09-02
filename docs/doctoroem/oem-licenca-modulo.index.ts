@@ -1,12 +1,14 @@
 // ============================================================================
-// oem-licenca-modulo — escreve na licença de UMA filial do OEM: dá baixa (ou
-// reduz a quantidade) de UM módulo, e desde 24/08/2026 também corrige o
-// CADASTRO da filial (nome da loja e CNPJ).
+// oem-licenca-modulo — escreve na licença de UMA filial do OEM. Três modos:
 //
-// Os dois casos passam pelo mesmo ler-modificar-gravar porque a API do
-// parceiro tem uma rota só, que salva a filial inteira. Quem manda
-// novo_nome/novo_cnpj sem modulo_codigo cai no modo cadastro: os módulos
-// voltam idênticos aos lidos e só os campos pedidos mudam.
+//   módulo   modulo_codigo + nova_quantidade      dá baixa ou muda a quantidade
+//   cadastro novo_nome / novo_cnpj                (desde 24/08/2026)
+//   estado   novo_bloqueado / novo_desativado     (desde 01/09/2026)
+//
+// Os três passam pelo mesmo ler-modificar-gravar porque a API do parceiro tem
+// uma rota só, que salva a filial inteira. Quem manda os campos de cadastro ou
+// de estado sem modulo_codigo cai no modo correspondente: os módulos voltam
+// idênticos aos lidos e só os campos pedidos mudam.
 //
 // POR QUE ELA É ASSIM
 //
@@ -263,10 +265,27 @@ Deno.serve(async (req)=>{
     const novoNome = corpo.novo_nome === undefined || corpo.novo_nome === null ? undefined : String(corpo.novo_nome).trim();
     const novoCnpj = corpo.novo_cnpj === undefined || corpo.novo_cnpj === null ? undefined : String(corpo.novo_cnpj).replace(/\D/g, "");
     const modoCadastro = moduloCodigo === undefined && (novoNome !== undefined || novoCnpj !== undefined);
-    if (!empresa || !filial || (moduloCodigo === undefined && !modoCadastro)) {
+    // Modo estado: liga/desliga a licença inteira. Só aceita booleano — mandar
+    // "true" em texto e ver o campo virar false é o tipo de erro que só
+    // aparece na licença do cliente.
+    const boolPedido = (v)=>v === undefined || v === null ? undefined : v === true ? true : v === false ? false : "invalido";
+    const novoBloqueado = boolPedido(corpo.novo_bloqueado);
+    const novoDesativado = boolPedido(corpo.novo_desativado);
+    const modoEstado = moduloCodigo === undefined && !modoCadastro && (novoBloqueado !== undefined || novoDesativado !== undefined);
+    if (novoBloqueado === "invalido" || novoDesativado === "invalido") {
       return Response.json({
         ok: false,
-        mensagem: 'Informe empresa e filial, mais modulo_codigo (módulo) ou novo_nome/novo_cnpj (cadastro). Ex.: {"empresa":"32801","filial":"39751","modulo_codigo":10,"nova_quantidade":1}'
+        etapa: "entrada",
+        mensagem: "novo_bloqueado e novo_desativado precisam ser true ou false. Nada foi enviado."
+      }, {
+        status: 400,
+        headers: cors
+      });
+    }
+    if (!empresa || !filial || (moduloCodigo === undefined && !modoCadastro && !modoEstado)) {
+      return Response.json({
+        ok: false,
+        mensagem: 'Informe empresa e filial, mais modulo_codigo (módulo), novo_nome/novo_cnpj (cadastro) ou novo_bloqueado/novo_desativado (estado). Ex.: {"empresa":"32801","filial":"39751","modulo_codigo":10,"nova_quantidade":1}'
       }, {
         status: 400,
         headers: cors
@@ -323,6 +342,21 @@ Deno.serve(async (req)=>{
     // licença de cliente real se prova em etapas, e a primeira é simular.
     // ========================================================================
     if (corpo.par_documentado === true) {
+      // O par documentado é sobre MÓDULO: ele existe porque só a leitura do
+      // tabletcloud enxerga `datavalidade`. Bloqueio e desativação são da
+      // licença e vivem no host do portal (pdvlegal), que é de onde a carga já
+      // lê o `bloqueado`. Aceitar a combinação aqui gravaria o estado pelo
+      // caminho que nunca foi medido para ele.
+      if (modoEstado) {
+        return Response.json({
+          ok: false,
+          etapa: "entrada",
+          mensagem: "O modo estado não usa o par documentado. Chame sem par_documentado. Nada foi enviado."
+        }, {
+          status: 400,
+          headers: cors
+        });
+      }
       const LEITURA = (Deno.env.get("OEM_API_LEITURA_URL") ?? "https://api.tabletcloud.com.br").replace(/\/+$/, "");
 
       // -------------------------------------------------- de qual produto é
@@ -586,6 +620,175 @@ Deno.serve(async (req)=>{
           valorUnitario: unitDe(m) ?? 0,
           valorTotal: totalDe(m)
         }));
+    // --------------------------------------------------------- modo estado
+    //
+    // Liga e desliga a LICENÇA INTEIRA: `bloquearLicenca` e `desativarLicenca`.
+    // São duas dimensões independentes — desativado não cobra, bloqueado cobra
+    // — e a rota salva a filial inteira, então o flag que NÃO está sendo
+    // trocado é regravado com o que a leitura trouxe.
+    //
+    // ⚠️ A GUARDA AQUI É MAIS ESTRITA QUE NO RESTO DO ARQUIVO, E TEM MOTIVO.
+    //
+    // O `payload` montado acima calcula os dois flags com `=== true`, o que
+    // transforma "o campo não veio" em `false`. Isso nunca apareceu porque
+    // todas as gravações feitas até 01/09/2026 foram em licença ATIVA e
+    // DESBLOQUEADA, onde `false` acerta por acidente. E ninguém nunca conferiu
+    // que este GET devolve o estado de desativação: a carga (`oem-sync-passo`)
+    // lê daqui só o `bloqueado` e tira o Ativo/Desativado da listagem do
+    // tabletcloud, anotando que o `ativo` do pdvlegal é inconsistente.
+    //
+    // Num modo cujo assunto É o flag, ausente virando `false` desativaria ou
+    // reativaria a licença de um cliente sem ninguém pedir. Então os dois são
+    // lidos SEM colapsar ausente em false, e a gravação só acontece com os dois
+    // presentes. `campos_vistos` vai junto na recusa e na simulação: é o que
+    // resolve um nome de campo divergente numa tentativa, em vez de tentar
+    // nome por nome no escuro.
+    if (modoEstado) {
+      const boolEstrito = (v)=>typeof v === "boolean" ? v : undefined;
+      const lidoBloqueado = boolEstrito(pega(f, "bloquearLicenca", "bloqueado", "bloquear"));
+      const ativoLido = boolEstrito(pega(f, "ativo"));
+      const lidoDesativado = boolEstrito(pega(f, "desativarLicenca", "desativado")) ?? (ativoLido === undefined ? undefined : !ativoLido);
+      const faltaEstado = [];
+      if (lidoBloqueado === undefined) faltaEstado.push("bloquearLicenca / bloqueado / bloquear");
+      if (lidoDesativado === undefined) faltaEstado.push("desativarLicenca / desativado / ativo");
+      const podeGravar = faltaEstado.length === 0;
+      const antes = {
+        bloqueado: lidoBloqueado ?? null,
+        desativado: lidoDesativado ?? null
+      };
+      const depois = {
+        bloqueado: novoBloqueado ?? lidoBloqueado ?? null,
+        desativado: novoDesativado ?? lidoDesativado ?? null
+      };
+      // As chaves que o parceiro devolveu, nos dois níveis: a resposta às vezes
+      // aninha em `filial` e às vezes não, e saber ONDE o campo está vale tanto
+      // quanto saber o nome dele.
+      const camposVistos = {
+        filial: Object.keys(f ?? {}),
+        raiz: Object.keys(cru ?? {})
+      };
+      const montarCorpo = ()=>{
+        const p = {
+          ...payload,
+          modulos: espelharModulos()
+        };
+        p.bloquearLicenca = depois.bloqueado;
+        p.desativarLicenca = depois.desativado;
+        return p;
+      };
+      if (simular) {
+        return Response.json({
+          ok: true,
+          simulado: true,
+          modo: "estado",
+          pode_gravar: podeGravar,
+          faltando: faltaEstado,
+          campos_vistos: camposVistos,
+          antes,
+          depois,
+          sem_mudanca: podeGravar && antes.bloqueado === depois.bloqueado && antes.desativado === depois.desativado,
+          payload: podeGravar ? montarCorpo() : null,
+          leitura_crua: cru
+        }, {
+          headers: cors
+        });
+      }
+      if (!podeGravar) {
+        return Response.json({
+          ok: false,
+          etapa: "mapeamento",
+          modo: "estado",
+          mensagem: `A leitura da filial não trouxe ${faltaEstado.join(" nem ")}. Gravar decidiria por conta própria o estado da licença. Nada foi enviado ao OEM.`,
+          faltando: faltaEstado,
+          campos_vistos: camposVistos,
+          leitura_crua: cru
+        }, {
+          status: 422,
+          headers: cors
+        });
+      }
+      if (antes.bloqueado === depois.bloqueado && antes.desativado === depois.desativado) {
+        return Response.json({
+          ok: true,
+          modo: "estado",
+          sem_mudanca: true,
+          antes,
+          mensagem: "A licença já está nesse estado no OEM. Nada foi enviado."
+        }, {
+          headers: cors
+        });
+      }
+      const corpoEstado = montarCorpo();
+      const rEst = await fetch(`${creds.baseUrl}/v1/licenciamento/filial`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        },
+        body: JSON.stringify(corpoEstado)
+      });
+      const txtEst = await rEst.text().catch(()=>"");
+      let respEst = txtEst;
+      try {
+        respEst = JSON.parse(txtEst);
+      } catch  {}
+      // A conferência, com a mesma regra do modo módulo: RELER, TENTAR MAIS DE
+      // UMA VEZ e NÃO AFIRMAR CAUSA. Medido em 28/08/2026: a releitura atrasa,
+      // e não de forma constante. `confirmado: false` quer dizer "não deu para
+      // confirmar", não "falhou" — quem consome marca e deixa à vista.
+      let conferencia = null;
+      if (rEst.ok) {
+        for(let i = 0; i < 3; i++){
+          if (i > 0) await new Promise((r)=>setTimeout(r, 1500));
+          try {
+            const rConf = await fetch(`${creds.baseUrl}/v1/licenciamento/${empresa}/${filial}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json"
+              }
+            });
+            if (!rConf.ok) throw new Error(`HTTP ${rConf.status}`);
+            const lidoDepois = await rConf.json().catch(()=>null);
+            if (!lidoDepois) throw new Error("a releitura não devolveu JSON");
+            const d = lidoDepois.filial ?? lidoDepois;
+            const aLido = boolEstrito(pega(d, "ativo"));
+            const achado = {
+              bloqueado: boolEstrito(pega(d, "bloquearLicenca", "bloqueado", "bloquear")) ?? null,
+              desativado: boolEstrito(pega(d, "desativarLicenca", "desativado")) ?? (aLido === undefined ? null : !aLido)
+            };
+            const bate = achado.bloqueado === depois.bloqueado && achado.desativado === depois.desativado;
+            conferencia = {
+              tentativas: i + 1,
+              esperado: depois,
+              encontrado: achado,
+              confirmado: bate,
+              mensagem: bate ? "Relido no OEM: confere." : `Gravado, mas a licença ainda mostra bloqueado=${achado.bloqueado} / desativado=${achado.desativado}. A releitura do parceiro atrasa, então isto não afirma que não aplicou.`
+            };
+            if (bate) break;
+          } catch (e) {
+            conferencia = {
+              tentativas: i + 1,
+              confirmado: null,
+              mensagem: `Não deu para reler: ${e instanceof Error ? e.message : String(e)}`
+            };
+          }
+        }
+      }
+      return Response.json({
+        ok: rEst.ok,
+        http: rEst.status,
+        modo: "estado",
+        antes,
+        depois,
+        payload: corpoEstado,
+        resposta: respEst,
+        conferencia
+      }, {
+        status: rEst.ok ? 200 : 502,
+        headers: cors
+      });
+    }
     // ------------------------------------------------------- modo cadastro
     //
     // Corrige nome da loja e/ou CNPJ, sem tocar em módulo nenhum. A guarda

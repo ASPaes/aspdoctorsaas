@@ -43,7 +43,7 @@ supabase functions download oem-licenca-modulo --project-ref furohpfhukwajhvnnbi
 
 | Arquivo | O que é |
 |---|---|
-| `oem-licenca-modulo.index.ts` | Escreve na licença de uma filial: baixa/quantidade de módulo e, desde 24/08/2026, o cadastro (nome da loja e CNPJ). Ler‑modificar‑gravar, porque a rota do parceiro salva a filial inteira. |
+| `oem-licenca-modulo.index.ts` | Escreve na licença de uma filial: baixa/quantidade de módulo; desde 24/08/2026 o cadastro (nome da loja e CNPJ); desde 01/09/2026 o estado da licença (`novo_bloqueado` / `novo_desativado`). Ler‑modificar‑gravar, porque a rota do parceiro salva a filial inteira. |
 
 As outras três (`oem-exportar`, `oem-diagnostico-filial`, `oem-sync-passo`)
 continuam só na plataforma.
