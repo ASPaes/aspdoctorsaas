@@ -32,7 +32,10 @@ type LinhaFalta = {
   cliente_id: string;
   codigo: number | null;
   cliente_nome: string;
+  /** O produto (ou o CEP, em cidade e estado) — o contexto do próprio campo. */
   detalhe: string;
+  /** A unidade do cliente. Sem ela, escolher o vendedor é adivinhação. */
+  unidade: string;
   total: number;
 };
 
@@ -209,7 +212,8 @@ export default function CadastroIncompletoTab() {
           <p>
             Cada linha é um <strong>campo</strong> que alimenta indicador do painel e está vazio em
             parte da carteira. Comece pelo campo, filtre até sobrar o grupo que tem a{" "}
-            <strong>mesma resposta</strong>, e preencha o grupo de uma vez.
+            <strong>mesma resposta</strong>, e preencha o grupo de uma vez. A lista mostra o
+            sistema e a unidade de cada cliente, e já vem agrupada por eles.
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
             Isto é saneamento de base: encolhe devagar e não chega a zero, porque cadastro antigo
@@ -380,11 +384,16 @@ export default function CadastroIncompletoTab() {
                 </span>
               )}
               <span className="min-w-0 flex-1 truncate">{l.cliente_nome}</span>
-              <span className="text-xs text-muted-foreground truncate max-w-[14rem]">
+              <span className="hidden sm:block text-xs text-muted-foreground truncate max-w-[16rem]">
                 {ehGeo && /^\d{8}$/.test(l.detalhe)
                   ? `CEP ${l.detalhe.slice(0, 5)}-${l.detalhe.slice(5)}`
                   : l.detalhe}
               </span>
+              {/* A unidade fecha a decisão: o produto diz o sistema, a unidade
+                  diz quem atende. A lista já vem agrupada por ela. */}
+              <Badge variant="outline" className="shrink-0 text-[10px] font-normal">
+                {l.unidade}
+              </Badge>
               <a href={`/clientes/${l.cliente_id}`} target="_blank" rel="noreferrer"
                 className="shrink-0 text-muted-foreground hover:text-foreground" title="Abrir a ficha">
                 <ExternalLink className="h-3.5 w-3.5" />
