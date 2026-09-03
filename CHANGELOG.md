@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 03/09
 
+- 🆕 **Atualizar um campo só, em todos de uma vez** — Marque uma família no filtro de **Divergências** — por exemplo *Telefone diferente* — e aparece o botão **Atualizar Telefone em 181**. Um clique grava só aquele campo em todos os clientes do filtro; o que mais estiver divergente neles continua como está, e eles seguem na lista pelos outros motivos. Com duas famílias marcadas, as duas vêm juntas. Acima de 500 clientes o lote é dividido, e a tela diz quantos ficaram para a rodada seguinte.
+
 - 🆕 **Telefone, e-mail, endereço, contato e domínio agora são conferidos com o Hiper** — O portal passou a informar esses dados e a aba **Divergências** passou a compará-los com a ficha do cliente. O botão **Atualizar no DoctorSaaS** grava cada um: o endereço entra completo pelo CEP e já resolve a cidade, o contato traz nome e telefone juntos, e o domínio é **acrescentado** à observação sem apagar o que você já tinha escrito. Duas proteções: quando o telefone do portal é o mesmo número só sem o nono dígito, a gravação é recusada e o daqui é mantido; e **Domínio** e **Contato** não entram no contador da aba, porque são preenchimento de cadastro em massa e esconderiam as divergências de dinheiro — você chega neles pelo filtro de famílias.
 
 - 🆕 **Sincronização automática do Hiper, 10:00 de segunda a sexta** — A carteira passa a ser puxada e conferida sozinha toda manhã. Antes, a lista de divergências só era atualizada quando alguém clicava em Sincronizar, e ficava congelada no meio.

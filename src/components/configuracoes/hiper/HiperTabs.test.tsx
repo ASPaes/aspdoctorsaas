@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import HiperVisaoGeralTab from "./HiperVisaoGeralTab";
 import HiperCustosTab from "./HiperCustosTab";
-import HiperDivergenciasTab from "./HiperDivergenciasTab";
+import HiperDivergenciasTab, { montarLoteDaFamilia } from "./HiperDivergenciasTab";
 import type { LinhaRecon } from "./useHiperDados";
 
 /** Sem @testing-library/react: o peer @testing-library/dom não está instalado. */
@@ -491,5 +491,56 @@ describe("Divergências: preenchimento em massa não soterra a conferência", ()
     render(<HiperDivergenciasTab tid="t1" recon={[so_leve, leve_e_dinheiro]} />);
     // "1 clientes · página 1 de 1" — o de domínio sozinho não entra
     expect(container.textContent).toContain("1 clientes");
+  });
+});
+
+/**
+ * Atualizar uma informação só, em todo mundo que a tem divergente, deixando as
+ * outras divergências do mesmo cliente como estão.
+ */
+describe("Divergências: lote por família", () => {
+  const linha = (id: string, divs: string[]): LinhaRecon =>
+    ({ ...base, id, razao_social_ds: `Cliente ${id}`, divergencias: divs, detalhe: {} });
+
+  it("sem família no filtro, não oferece lote por família", () => {
+    expect(montarLoteDaFamilia(new Set(), [linha("a", ["telefone_divergente"])])).toBeNull();
+  });
+
+  it("uma família: pega quem a tem e nomeia o campo que vai gravar", () => {
+    const lote = montarLoteDaFamilia(new Set(["telefone_divergente"]), [
+      linha("a", ["telefone_divergente"]),
+      linha("b", ["telefone_divergente", "custo_divergente"]),
+      linha("c", ["custo_divergente"]),
+    ]);
+    expect(lote?.total).toBe(2);
+    expect(lote?.linhas.map((l) => l.id)).toEqual(["a", "b"]);
+    // grava SÓ o telefone: o custo do cliente "b" continua divergente
+    expect(lote?.chaves).toEqual(["telefone"]);
+    expect(lote?.rotulo).toContain("Telefone");
+  });
+
+  it("duas famílias: marca as duas e conta cliente uma vez só", () => {
+    const lote = montarLoteDaFamilia(new Set(["telefone_divergente", "email_divergente"]), [
+      linha("a", ["telefone_divergente", "email_divergente"]),
+      linha("b", ["email_divergente"]),
+    ]);
+    expect(lote?.total).toBe(2);
+    expect(new Set(lote?.chaves)).toEqual(new Set(["telefone", "email"]));
+    expect(lote?.rotulo).toBe("2 campos");
+  });
+
+  it("família que o botão não sabe gravar não oferece nada", () => {
+    // filial mexe na árvore de cadastro; conta sem dono não tem onde escrever
+    expect(montarLoteDaFamilia(new Set(["filial_faltando_no_ds"]),
+      [linha("a", ["filial_faltando_no_ds"])])).toBeNull();
+    expect(montarLoteDaFamilia(new Set(["sem_dono"]), [linha("a", ["sem_dono"])])).toBeNull();
+  });
+
+  it("acima de 500 corta o lote e diz quantos ficaram de fora", () => {
+    const muitos = Array.from({ length: 629 }, (_, i) => linha(`c${i}`, ["dominio_ausente"]));
+    const lote = montarLoteDaFamilia(new Set(["dominio_ausente"]), muitos);
+    expect(lote?.total).toBe(629);
+    expect(lote?.linhas).toHaveLength(500);
+    expect(lote?.deFora).toBe(129);
   });
 });

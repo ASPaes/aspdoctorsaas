@@ -203,6 +203,41 @@ const ACAO = Object.fromEntries(ACOES.map((a) => [a.acao, a]));
 const acoesDe = (r: LinhaRecon) =>
   ACOES.filter((a) => a.divs.some((d) => r.divergencias.includes(d))).map((a) => a.acao);
 
+/** A RPC recusa lote acima disso. Cortar aqui é melhor que ela recusar tudo. */
+const LOTE_MAXIMO = 500;
+
+/**
+ * Atualizar UMA informação em todo mundo que a tem divergente.
+ *
+ * O caminho antigo existia, mas era longo: filtrar a família, selecionar, abrir
+ * o diálogo e desmarcar as outras cinco ações — porque o padrão dele é "tudo
+ * marcado", o oposto do que se quer depois de filtrar. Aqui a família do filtro
+ * já decide o que grava.
+ *
+ * Pega o filtro INTEIRO, não a página: com 181 telefones em duas páginas, a
+ * pessoa faria o mesmo mutirão duas vezes sem perceber que faltava metade.
+ *
+ * Devolve null quando não há o que oferecer — sem família marcada, ou família
+ * que o botão não sabe gravar (filial mexe em árvore de cadastro, conta sem
+ * dono não tem onde escrever).
+ */
+export function montarLoteDaFamilia(familias: Set<string>, linhas: LinhaRecon[]) {
+  if (familias.size === 0) return null;
+  const acoes = ACOES.filter((a) => a.divs.some((d) => familias.has(d)));
+  if (acoes.length === 0) return null;
+  const chaves = acoes.map((a) => a.acao);
+  const alvo = linhas.filter((l) => acoesDe(l).some((a) => chaves.includes(a)));
+  if (alvo.length === 0) return null;
+  return {
+    acoes,
+    chaves,
+    linhas: alvo.slice(0, LOTE_MAXIMO),
+    deFora: Math.max(0, alvo.length - LOTE_MAXIMO),
+    total: alvo.length,
+    rotulo: acoes.length === 1 ? acoes[0].rotulo : `${acoes.length} campos`,
+  };
+}
+
 export default function HiperDivergenciasTab({
   tid, recon, motivos = [], podeAcoesAdmin = true,
 }: {
@@ -234,7 +269,8 @@ export default function HiperDivergenciasTab({
   const [pagina, setPagina] = useState(1);
   const POR_PAGINA = 100;
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
-  const [confirmar, setConfirmar] = useState<{ linhas: LinhaRecon[]; escolhidas: Set<string> } | null>(null);
+  const [confirmar, setConfirmar] = useState<
+    { linhas: LinhaRecon[]; escolhidas: Set<string>; deFora?: number } | null>(null);
   const [baixar, setBaixar] = useState<LinhaRecon | null>(null);
   const [motivoId, setMotivoId] = useState("");
 
@@ -346,6 +382,8 @@ export default function HiperDivergenciasTab({
    * todas de uma vez, e paginar a importação faria a pessoa importar metade.
    */
   const semDono = useMemo(() => linhas.filter((l) => l.divergencias.includes("sem_dono")), [linhas]);
+
+  const loteDaFamilia = useMemo(() => montarLoteDaFamilia(familias, linhas), [familias, linhas]);
 
   const marcar = async (id: string, novo: "resolvido" | "ignorado" | "pendente") => {
     setOcupado(id);
@@ -608,6 +646,19 @@ export default function HiperDivergenciasTab({
               caminho dela é virar cadastro, e por isso o botão é separado do
               lote de correção — juntar os dois abriria a porta para aplicar
               mensalidade numa linha e criar cliente na outra sem perceber. */}
+          {podeAcoesAdmin && loteDaFamilia && (
+            <Button size="sm" variant="secondary"
+              title="Grava só este campo, em todos os clientes do filtro. As outras divergências deles ficam como estão."
+              onClick={() => setConfirmar({
+                linhas: loteDaFamilia.linhas,
+                escolhidas: new Set(loteDaFamilia.chaves),
+                deFora: loteDaFamilia.deFora,
+              })}>
+              <Wand2 className="h-3 w-3" />
+              Atualizar {loteDaFamilia.rotulo} em {num(loteDaFamilia.total)}
+            </Button>
+          )}
+
           {podeAcoesAdmin && semDono.length > 0 && (
             <Button size="sm" variant="outline" onClick={() => setImportar(semDono)}>
               <Download className="h-3 w-3" />
@@ -1151,6 +1202,13 @@ export default function HiperDivergenciasTab({
                       );
                     })}
                 </ul>
+                {!!confirmar?.deFora && (
+                  <p className="text-xs font-medium text-foreground">
+                    São mais do que cabe num lote: entram {num(confirmar.linhas.length)} agora e
+                    ficam {num(confirmar.deFora)} para a próxima rodada. Repita a operação depois
+                    de esta terminar.
+                  </p>
+                )}
                 <p className="text-xs">
                   Quem não puder receber uma dessas — contrato anual, mais de um contrato Hiper —
                   é pulado com o motivo, e o resto grava normalmente.
