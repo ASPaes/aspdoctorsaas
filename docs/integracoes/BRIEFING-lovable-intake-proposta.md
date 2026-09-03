@@ -306,7 +306,11 @@ obrigatórios — os valores vêm de `alteracao` ou `avulso`, ou não existem.
 | `nome_fantasia` | texto | não | Faltando, o DoctorSaaS busca pelo CNPJ. |
 | `tipo` | texto | não | `PJ` ou `PF`. |
 | `email` | texto | não | |
-| `telefone` | texto | não | Só dígitos, com DDD. **Não** mande o `55` na frente. |
+| `telefone` | texto | não | Só dígitos, **com** o `55` na frente: `55` + DDD + número. Corrigido em 03/09/2026 — este campo pedia o contrário. A base tem 1.533 clientes com o `55` contra 25 sem, e o DoctorSaaS não normaliza: o que você mandar é o que fica gravado. |
+| `contato_fone` | texto | não | O telefone de quem fala pelo cliente, mesmo formato. Campo separado do `telefone`. |
+| `data_cadastro` | data | não | `AAAA-MM-DD`. |
+| `observacao_cliente` | texto | não | Texto livre. Serve para o detalhamento da mensalidade; monte pronto — o DoctorSaaS não compõe. |
+| `area_atuacao_id` | inteiro | não | Do catálogo `areas_atuacao`. |
 | `contato_nome` | texto | não | Quem fala pelo cliente. Também aceito como `nome_responsavel`. |
 | `segmento_id` | inteiro | não | Do catálogo. |
 | `endereco`, `numero`, `bairro`, `complemento`, `cep` | texto | não | CEP só dígitos. `endereco` também aceito como `logradouro`. |
@@ -323,7 +327,7 @@ obrigatórios — os valores vêm de `alteracao` ou `avulso`, ou não existem.
 | `vlr_mensal` | decimal | **sim** | Mensalidade total da proposta. Serve de **conferência**: se não bater com a soma dos módulos, a chamada é recusada. |
 | `vlr_ativacao` | decimal | **sim** | Setup total, mesma conferência. |
 | `data_inicio_prevista` | data | não | `AAAA-MM-DD`. Planeja a implantação; **não** adia o faturamento. |
-| `prazo_meses`, `dia_vencimento` | inteiro | não | |
+| `prazo_meses`, `dia_vencimento` | inteiro | não | Vigência em branco é o padrão da Digi Office: **não** mande `prazo_meses` fixo. |
 
 ### Bloco `produtos` — lista, mínimo 1
 
@@ -340,6 +344,19 @@ carregam preço. Ver a armadilha nº 1.
 | `modulos[].quantidade` | inteiro | **sim** | Mínimo 1. |
 | `modulos[].vlr_mensal` | decimal | **não enviar** | Deixe de fora. Ver armadilha nº 1 — mandar preço aqui **sobrescreve** o valor do contrato. |
 | `modulos[].vlr_ativacao` | decimal | **não enviar** | Mesma regra. |
+| `vlr_custo` | decimal | não | O "Custo Operação" da tela do produto. |
+| `data_venda` | data | não | `AAAA-MM-DD`. Faltando, o DoctorSaaS usa a data de hoje. |
+| `data_ativacao` | data | não | `AAAA-MM-DD`. É dela que saem as datas derivadas do contrato. |
+| `data_fim` | data | não | `AAAA-MM-DD`. Normalmente vazio. |
+| `data_proximo_reajuste` | data | não | `AAAA-MM-DD`. **Informada, vence o cálculo automático.** |
+| `recorrencia` | texto | não | `mensal`, `anual`, `semestral` ou `semanal`. Lista fixa, sem catálogo. |
+| `fornecedor_id` | inteiro | não | Do catálogo `fornecedores`. |
+| `codigo_fornecedor`, `link_portal_fornecedor` | texto | não | |
+| `modelo_contrato_id` | inteiro | não | Do catálogo `modelos_contrato`. |
+| `observacoes_contratuais` | texto | não | |
+
+Os campos de contrato acima também são aceitos em `comercial`. Vindo nos dois, o
+do produto vence.
 
 A soma dos `produtos[].vlr_mensal` tem que bater com `comercial.vlr_mensal`, e a soma dos
 `vlr_ativacao` com `comercial.vlr_ativacao`. Se não bater, a chamada é recusada.
