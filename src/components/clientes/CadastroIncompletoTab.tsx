@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, ExternalLink, Loader2, Wand2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, Loader2, MapPin, Wand2 } from "lucide-react";
 
 /**
  * Saneamento de cadastro, por campo.
@@ -91,6 +91,78 @@ export default function CadastroIncompletoTab() {
 
   const ehData = campo?.campo === "data_venda" || campo?.campo === "data_ativacao";
   const podeGravar = !!campo?.em_lote && sel.size > 0 && !!valor && !gravando;
+
+  /**
+   * Cidade e estado não se preenchem com um valor igual para todos — mas se
+   * resolvem sozinhos pelo CEP de cada cliente. A tela consulta o CEP e o banco
+   * resolve nome -> id, na mesma régua da importação do Hiper.
+   */
+  const ehGeo = campo?.campo === "cidade_id" || campo?.campo === "estado_id";
+  const comCep = useMemo(
+    () => linhas.filter((l) => /^\d{8}$/.test(l.detalhe)),
+    [linhas],
+  );
+  const selComCep = useMemo(
+    () => comCep.filter((l) => sel.has(l.registro_id)),
+    [comCep, sel],
+  );
+
+  const preencherPeloCep = async () => {
+    if (!campo || selComCep.length === 0) return;
+    setGravando(true);
+    try {
+      // De 5 em 5: o ViaCEP é serviço público e gratuito, e despejar 150
+      // requisições de uma vez é a melhor forma de ser bloqueado.
+      const itens: { cliente_id: string; cidade: string; uf: string }[] = [];
+      let semResposta = 0;
+      for (let i = 0; i < selComCep.length; i += 5) {
+        const fatia = selComCep.slice(i, i + 5);
+        const res = await Promise.all(fatia.map(async (l) => {
+          try {
+            const r = await fetch(`https://viacep.com.br/ws/${l.detalhe}/json/`);
+            const j = await r.json();
+            if (!j?.localidade || !j?.uf) return null;
+            return { cliente_id: l.cliente_id, cidade: String(j.localidade), uf: String(j.uf) };
+          } catch { return null; }
+        }));
+        for (const r of res) { if (r) itens.push(r); else semResposta++; }
+      }
+
+      if (itens.length === 0) {
+        toast({
+          title: "Nenhum CEP foi reconhecido",
+          description: "Os CEPs selecionados não retornaram cidade. Confira na ficha de cada um.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data, error } = await (supabase.rpc as any)("fn_cadastro_preencher_cidade", {
+        p_tenant_id: tid,
+        p_itens: itens,
+      });
+      if (error) throw error;
+      const r = data as any;
+      if (!r?.ok) throw new Error(r?.erro || "Não foi possível preencher.");
+
+      const recusados = (r.recusados ?? []) as { motivo: string }[];
+      const partes: string[] = [];
+      if (semResposta > 0) partes.push(`${num(semResposta)} com CEP que o ViaCEP não conhece`);
+      if (recusados.length > 0) partes.push(`${num(recusados.length)} com cidade que não casa com o cadastro`);
+      toast({
+        title: r.gravados === 0
+          ? "Nada foi preenchido"
+          : `${num(r.gravados)} ${r.gravados === 1 ? "cidade preenchida" : "cidades preenchidas"} pelo CEP`,
+        description: partes.length ? `Ficaram de fora: ${partes.join(" · ")}.` : undefined,
+        variant: r.gravados === 0 ? "destructive" : undefined,
+      });
+      setSel(new Set());
+      ["cadastro_incompleto_resumo", "cadastro_incompleto_lista", "clientes"]
+        .forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+    } catch (e: any) {
+      toast({ title: "Não foi possível preencher pelo CEP", description: e.message, variant: "destructive" });
+    } finally { setGravando(false); }
+  };
 
   const aplicar = async () => {
     if (!campo) return;
@@ -183,11 +255,30 @@ export default function CadastroIncompletoTab() {
         <span className="text-xs text-muted-foreground">{campo.indicador}</span>
       </div>
 
-      {!campo.em_lote && (
+      {!campo.em_lote && !ehGeo && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
           <strong>{campo.rotulo}</strong> tem valor próprio em cada cliente, então não há o que
           preencher em lote — um valor igual para todos estragaria o cadastro. Abra a ficha de cada
           um pela lista abaixo.
+        </div>
+      )}
+
+      {ehGeo && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border p-3">
+          <div className="min-w-0 flex-1 text-sm">
+            <p>
+              <strong>{campo.rotulo}</strong> não tem um valor igual para todos, mas sai do{" "}
+              <strong>CEP</strong> de cada cliente. {num(comCep.length)} de {num(linhas.length)} na
+              lista têm CEP.
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              O estado só é gravado em quem está sem ele: o CEP confirma, não corrige.
+            </p>
+          </div>
+          <Button disabled={selComCep.length === 0 || gravando} onClick={preencherPeloCep}>
+            {gravando ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+            Preencher {selComCep.length > 0 ? num(selComCep.length) : ""} pelo CEP
+          </Button>
         </div>
       )}
 
@@ -254,13 +345,14 @@ export default function CadastroIncompletoTab() {
         </p>
       ) : (
         <div className="rounded-lg border divide-y">
-          {campo.em_lote && (
+          {(campo.em_lote || ehGeo) && (
             <label className="flex items-center gap-2 bg-muted/30 px-3 py-2 text-sm">
               <input type="checkbox"
-                checked={linhas.length > 0 && linhas.every((l) => sel.has(l.registro_id))}
+                checked={(ehGeo ? comCep : linhas).length > 0
+                  && (ehGeo ? comCep : linhas).every((l) => sel.has(l.registro_id))}
                 onChange={(e) => setSel(e.target.checked
-                  ? new Set(linhas.map((l) => l.registro_id)) : new Set())} />
-              Selecionar os {num(linhas.length)} desta lista
+                  ? new Set((ehGeo ? comCep : linhas).map((l) => l.registro_id)) : new Set())} />
+              Selecionar {ehGeo ? `os ${num(comCep.length)} com CEP` : `os ${num(linhas.length)} desta lista`}
               {total > linhas.length && (
                 <span className="text-xs text-muted-foreground">
                   (de {num(total)} — refine os filtros para alcançar o resto)
@@ -270,21 +362,29 @@ export default function CadastroIncompletoTab() {
           )}
           {linhas.map((l) => (
             <div key={l.registro_id} className="flex items-center gap-3 px-3 py-2 text-sm">
-              {campo.em_lote && (
+              {(campo.em_lote || (ehGeo && /^\d{8}$/.test(l.detalhe))) ? (
                 <input type="checkbox" className="shrink-0" checked={sel.has(l.registro_id)}
                   onChange={() => setSel((s) => {
                     const n = new Set(s);
                     n.has(l.registro_id) ? n.delete(l.registro_id) : n.add(l.registro_id);
                     return n;
                   })} />
-              )}
+              ) : ehGeo ? (
+                // Sem CEP não há como resolver, mas o espaço fica: sem isto a
+                // linha desalinha das outras e a lista parece quebrada.
+                <span className="w-[13px] shrink-0" aria-hidden />
+              ) : null}
               {l.codigo != null && (
                 <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
                   {l.codigo}
                 </span>
               )}
               <span className="min-w-0 flex-1 truncate">{l.cliente_nome}</span>
-              <span className="text-xs text-muted-foreground truncate max-w-[14rem]">{l.detalhe}</span>
+              <span className="text-xs text-muted-foreground truncate max-w-[14rem]">
+                {ehGeo && /^\d{8}$/.test(l.detalhe)
+                  ? `CEP ${l.detalhe.slice(0, 5)}-${l.detalhe.slice(5)}`
+                  : l.detalhe}
+              </span>
               <a href={`/clientes/${l.cliente_id}`} target="_blank" rel="noreferrer"
                 className="shrink-0 text-muted-foreground hover:text-foreground" title="Abrir a ficha">
                 <ExternalLink className="h-3.5 w-3.5" />

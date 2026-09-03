@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 03/09
 
+- 🆕 **Cidade preenchida pelo CEP, em lote** — Na aba **Cadastro incompleto**, o campo **Cidade** ganhou o botão **Preencher pelo CEP**: marque os clientes e o sistema busca a cidade do CEP de cada um. Cada cliente recebe a sua — não é um valor igual para todos. Quem está sem CEP não entra, e o sistema avisa quando algum CEP não é reconhecido. O estado só é gravado em quem está sem ele: o CEP confirma, não corrige.
+
 - 🆕 **Aba Cadastro incompleto** — Uma aba nova em **Clientes**, que só aparece quando há o que corrigir. Ela mostra, por **campo**, quantos registros estão sem preencher e qual indicador do painel aquele campo alimenta — *"561 sem vendedor · Vendas e carteira por vendedor"*. Escolhendo o campo você filtra por unidade, produto ou busca até sobrar o grupo que tem a mesma resposta, marca os registros e preenche todos de uma vez. Campos que têm valor próprio em cada cliente — cidade, WhatsApp, razão social — não oferecem preenchimento em lote, só o atalho para a ficha. Quem já tinha valor nunca é sobrescrito, e cada gravação fica registrada com quem fez.
 
 - 🔧 **Razão social não é mais divergência, e sai do botão Atualizar** — O nome do cliente passa a ter uma fonte só: a **consulta de CNPJ** na ficha, que busca na Receita. O portal Hiper costuma estar desatualizado e sem o apelido comercial, e a tela pedia para trocar o nome bom pelo dele — `LORIVALDO DA SILVA LTDA - Cia Fix Matriz` virava `LORIVALDO DA SILVA LTDA`. A diferença entre os dois lados pode existir e não conta mais como pendência.
