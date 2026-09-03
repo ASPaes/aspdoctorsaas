@@ -1,6 +1,10 @@
 // onboarding-catalogo — devolve os catálogos de um tenant para o sistema comercial
 // externo montar os selects do vendedor.
 //
+// 03/09/2026: entraram areas_atuacao, fornecedores, modelos_contrato e a lista
+// de recorrencias. Eram os quatro selects que faltavam para o cadastro do
+// cliente e do contrato chegar completo pela integração.
+//
 // Só leitura. Nunca escreve.
 //
 // Existe porque o sistema de propostas precisa mandar ID, não texto: dos 3 itens do
@@ -33,6 +37,15 @@ function json(obj: unknown, status = 200) {
 // para o bug não aparecer quando o cadastro crescer.
 const PAGE = 1000;
 const MAX_PAGES = 20;
+
+// Espelha o enum recorrencia_tipo (mensal, anual, semestral, semanal). Ver o
+// comentário na resposta: quem valida de verdade é a fn_intake_proposta.
+const RECORRENCIAS = [
+  { valor: 'mensal',    nome: 'Mensal' },
+  { valor: 'anual',     nome: 'Anual' },
+  { valor: 'semestral', nome: 'Semestral' },
+  { valor: 'semanal',   nome: 'Semanal' },
+];
 
 async function fetchAll<T>(build: (from: number, to: number) => any): Promise<T[]> {
   const out: T[] = [];
@@ -83,6 +96,7 @@ Deno.serve(async (req) => {
     const [
       produtos, modulos, segmentos, origens_venda,
       formas_pagamento, vendedores, unidades_base, demand_types,
+      areas_atuacao, fornecedores, modelos_contrato,
     ] = await Promise.all([
       fetchAll(t('produtos', 'id, nome')),
       // produto_id junto: o módulo só vale dentro do produto a que pertence.
@@ -95,6 +109,13 @@ Deno.serve(async (req) => {
       // sem erro, e o vendedor fica sem select.
       fetchAll(tAtivo('unidades_base', 'id, nome', 'is_active')),
       fetchAll(tAtivo('onboarding_demand_types', 'id, nome', 'ativo')),
+      // Os três abaixo entraram em 03/09/2026. Sem eles o sistema de propostas
+      // não tinha ID para mandar em area_atuacao_id, fornecedor_id e
+      // modelo_contrato_id — e nome no lugar do ID é recusado pela
+      // fn_intake_proposta. Nenhuma das três tem coluna de ativo/inativo.
+      fetchAll(t('areas_atuacao', 'id, nome')),
+      fetchAll(t('fornecedores', 'id, nome')),
+      fetchAll(t('modelos_contrato', 'id, nome')),
     ]);
 
     return json({
@@ -109,6 +130,16 @@ Deno.serve(async (req) => {
       vendedores,
       unidades_base,
       demand_types,
+      areas_atuacao,
+      fornecedores,
+      modelos_contrato,
+      // recorrencia NÃO é cadastro: é o enum recorrencia_tipo do Postgres, e
+      // pg_catalog não é exposto pelo PostgREST. Vai como lista fixa, e a
+      // fn_intake_proposta valida contra o enum de verdade — se um valor novo
+      // for criado no banco, o pior que acontece é ele faltar neste select,
+      // nunca uma gravação errada.
+      // Não tem `id`: o payload manda o próprio texto em produtos[].recorrencia.
+      recorrencias: RECORRENCIAS,
     });
   } catch (e: any) {
     console.error('[onboarding-catalogo] fatal:', e);
