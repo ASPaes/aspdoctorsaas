@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 03/09
 
+- 🆕 **Aba Cadastro incompleto** — Uma aba nova em **Clientes**, que só aparece quando há o que corrigir. Ela mostra, por **campo**, quantos registros estão sem preencher e qual indicador do painel aquele campo alimenta — *"561 sem vendedor · Vendas e carteira por vendedor"*. Escolhendo o campo você filtra por unidade, produto ou busca até sobrar o grupo que tem a mesma resposta, marca os registros e preenche todos de uma vez. Campos que têm valor próprio em cada cliente — cidade, WhatsApp, razão social — não oferecem preenchimento em lote, só o atalho para a ficha. Quem já tinha valor nunca é sobrescrito, e cada gravação fica registrada com quem fez.
+
 - 🔧 **Razão social não é mais divergência, e sai do botão Atualizar** — O nome do cliente passa a ter uma fonte só: a **consulta de CNPJ** na ficha, que busca na Receita. O portal Hiper costuma estar desatualizado e sem o apelido comercial, e a tela pedia para trocar o nome bom pelo dele — `LORIVALDO DA SILVA LTDA - Cia Fix Matriz` virava `LORIVALDO DA SILVA LTDA`. A diferença entre os dois lados pode existir e não conta mais como pendência.
 
 - 🆕 **Atualizar um campo só, em todos de uma vez** — Marque uma família no filtro de **Divergências** — por exemplo *Telefone diferente* — e aparece o botão **Atualizar Telefone em 181**. Um clique grava só aquele campo em todos os clientes do filtro; o que mais estiver divergente neles continua como está, e eles seguem na lista pelos outros motivos. Com duas famílias marcadas, as duas vêm juntas. Acima de 500 clientes o lote é dividido, e a tela diz quantos ficaram para a rodada seguinte.

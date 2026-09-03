@@ -24,14 +24,18 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle, Check, Percent, Download, ShieldCheck, GitCompareArrows } from "lucide-react";
+import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle, Check, Percent, Download, ShieldCheck, GitCompareArrows, ClipboardList } from "lucide-react";
 import MovimentosMrrTab from "@/components/clientes/MovimentosMrrTab";
 import ReajustesTab from "@/components/clientes/ReajustesTab";
 import AprovacaoOemTab from "@/components/clientes/AprovacaoOemTab";
 // Sob demanda: a tela de divergências pesa ~10 kB gzip e hoje só uma empresa a
 // enxerga. Importada direto, ela entraria no bundle inicial de todo mundo.
 const DivergenciasHiperTab = lazy(() => import("@/components/clientes/DivergenciasHiperTab"));
+// Sob demanda pelo mesmo motivo: a tela de saneamento só interessa a quem tem
+// cadastro incompleto, e no bundle inicial ela custaria a todos.
+const CadastroIncompletoTab = lazy(() => import("@/components/clientes/CadastroIncompletoTab"));
 import { useAprovacaoOemVisivel, useAprovacaoOemStatus } from "@/hooks/useAprovacaoOem";
+import { useCadastroIncompleto } from "@/hooks/useCadastroIncompleto";
 import { useHiperDivergenciasVisivel, useHiperDivergenciasPendentes } from "@/hooks/useHiperDivergencias";
 import { useAbaNaUrl } from "@/hooks/useDeepLinkIntegracao";
 import { exportClientesXlsx } from "@/lib/exportClientesXlsx";
@@ -103,14 +107,20 @@ export default function Clientes() {
   const divergenciasHiperVisivel = useHiperDivergenciasVisivel();
   const divergenciasHiperPendentes =
     Number(useHiperDivergenciasPendentes(divergenciasHiperVisivel === true).data) || 0;
+  // No rótulo vai o número de CAMPOS com pendência, não de clientes: somando os
+  // clientes dá 589 no ASP, um número verdadeiro sobre o qual ninguém age. Já
+  // "13 campos" é a lista do que atacar.
+  const cadastro = useCadastroIncompleto();
   // A URL é digitável e a aba vem dela. Valor desconhecido, ou link para uma aba
   // que ESTE usuário não tem, deixaria o Tabs com um `value` sem par e a página
   // abriria em branco. Cai na primeira aba em vez de não desenhar nada.
-  const abasValidas = ["clientes", "movimentos", "reajustes", "divergencias-hiper", "aprovacao-oem"];
+  const abasValidas = ["clientes", "movimentos", "reajustes", "divergencias-hiper",
+                       "cadastro-incompleto", "aprovacao-oem"];
   const aba =
     !abasValidas.includes(abaAtiva) ||
     (abaAtiva === "aprovacao-oem" && aprovacaoOemVisivel !== true) ||
-    (abaAtiva === "divergencias-hiper" && divergenciasHiperVisivel !== true)
+    (abaAtiva === "divergencias-hiper" && divergenciasHiperVisivel !== true) ||
+    (abaAtiva === "cadastro-incompleto" && cadastro.visivel !== true)
       ? "clientes"
       : abaAtiva;
 
@@ -819,6 +829,17 @@ export default function Clientes() {
               )}
             </TabsTrigger>
           )}
+          {/* Só aparece quando há campo com pendência (ver useCadastroIncompleto).
+              O número são os CAMPOS, não os clientes. */}
+          {cadastro.visivel === true && (
+            <TabsTrigger value="cadastro-incompleto">
+              <ClipboardList className="h-4 w-4 mr-1" />
+              Cadastro incompleto
+              <Badge className="ml-1.5 h-5 min-w-5 justify-center px-1.5 text-[10px]">
+                {cadastro.campos.length}
+              </Badge>
+            </TabsTrigger>
+          )}
           {/* Só para admin de empresa que usa o OEM, e só com um tenant escolhido
               (ver useAprovacaoOemVisivel). O número é o que faz a fila ser
               descoberta sem ninguém precisar abrir a aba. */}
@@ -1298,6 +1319,14 @@ export default function Clientes() {
           <TabsContent value="divergencias-hiper" className="mt-4">
             <Suspense fallback={<Skeleton className="h-64 w-full" />}>
               <DivergenciasHiperTab />
+            </Suspense>
+          </TabsContent>
+        )}
+
+        {cadastro.visivel === true && (
+          <TabsContent value="cadastro-incompleto" className="mt-4">
+            <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+              <CadastroIncompletoTab />
             </Suspense>
           </TabsContent>
         )}
