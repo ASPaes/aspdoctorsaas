@@ -59,23 +59,63 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser(
-      authHeader.replace("Bearer ", ""),
-    );
-    if (userError || !user) return json({ ok: false, error: "Usuário não autenticado" });
+    const { acao, tenant_id, id_portal: req_id_portal } = await req.json();
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("tenant_id, role, is_super_admin")
-      .eq("user_id", user.id)
-      .single();
-
-    if (!profile || (profile.role !== "admin" && !profile.is_super_admin)) {
-      return json({ ok: false, error: "Acesso negado: apenas admins podem operar integrações" });
+    /**
+     * Segunda porta de entrada: o cron da sincronização diária.
+     *
+     * Tudo aqui exige um admin logado, e cron não tem sessão. Em vez de
+     * duplicar a rotina de puxar numa função só dele — ou movê-la para
+     * `_shared`, o que faria o CI redeployar as 66 functions do repo —, o cron
+     * entra por aqui com um segredo próprio, guardado no Vault.
+     *
+     * Duas restrições que fazem esta porta ser estreita: ela só aceita a ação
+     * `puxar`, e exige o tenant explícito. Conectar, aplicar correção ou
+     * cancelar continuam pedindo admin de verdade.
+     *
+     * O `Authorization` continua obrigatório porque o gateway do Supabase o
+     * exige (verify_jwt = true) — o cron manda a chave anon lá, que é pública,
+     * e o que autentica de fato é este segundo header.
+     */
+    const cronSecret = req.headers.get("x-cron-secret");
+    let ehCron = false;
+    if (cronSecret) {
+      const { data: ok } = await supabase.rpc("hiper_cron_secret_ok", { p_secret: cronSecret });
+      if (ok !== true) return json({ ok: false, error: "Segredo de cron inválido" });
+      if (acao !== "puxar") {
+        return json({ ok: false, error: "O cron só pode sincronizar." });
+      }
+      if (!tenant_id) return json({ ok: false, error: "O cron precisa informar o tenant." });
+      ehCron = true;
     }
 
-    const { acao, tenant_id, id_portal: req_id_portal } = await req.json();
-    const targetTenantId = profile.is_super_admin && tenant_id ? tenant_id : profile.tenant_id;
+    let perfilTenantId: string | null = null;
+    let ehSuperAdmin = false;
+    let usuarioId: string | null = null;
+
+    if (!ehCron) {
+      const { data: { user }, error: userError } = await supabase.auth.getUser(
+        authHeader.replace("Bearer ", ""),
+      );
+      if (userError || !user) return json({ ok: false, error: "Usuário não autenticado" });
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("tenant_id, role, is_super_admin")
+        .eq("user_id", user.id)
+        .single();
+
+      if (!profile || (profile.role !== "admin" && !profile.is_super_admin)) {
+        return json({ ok: false, error: "Acesso negado: apenas admins podem operar integrações" });
+      }
+      perfilTenantId = profile.tenant_id;
+      ehSuperAdmin = profile.is_super_admin === true;
+      usuarioId = user.id;
+    }
+
+    const targetTenantId = ehCron
+      ? tenant_id
+      : (ehSuperAdmin && tenant_id ? tenant_id : perfilTenantId);
     if (!targetTenantId) return json({ ok: false, error: "tenant_id não encontrado" });
 
     // Reconciliar não fala com o portal: recalcula sobre o espelho que já está aqui.
@@ -350,9 +390,17 @@ serve(async (req) => {
         });
       }
 
+      // O CHECK de `origem` já previa 'cron'; `disparado_por` fica nulo porque
+      // não houve pessoa. É por essas duas colunas que a aba Sincronização
+      // distingue o que você rodou do que rodou sozinho.
       const { data: run, error: runErr } = await supabase
         .from("hiper_sync_run")
-        .insert({ tenant_id: targetTenantId, disparado_por: user.id, origem: "manual", status: "rodando" })
+        .insert({
+          tenant_id: targetTenantId,
+          disparado_por: ehCron ? null : usuarioId,
+          origem: ehCron ? "cron" : "manual",
+          status: "rodando",
+        })
         .select("id")
         .single();
       if (runErr) return json({ ok: false, error: `Falha ao abrir a execução: ${runErr.message}` });
