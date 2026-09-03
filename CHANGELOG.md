@@ -14,6 +14,12 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 03/09
 
+- 🔧 **Venda importada da calculadora não mostrava tudo o que o vendedor respondeu** — As respostas do formulário da proposta — Segmento, Instagram, Adquirente, Homologadas, Vendedor, Origem da venda, Já utiliza sistema e **todos os campos de implantação** — chegavam ao DoctorSaaS mas ficavam escondidas na aba **Resumo da venda**. Agora aparecem, com as respostas longas em bloco próprio para não espremer a leitura. As datas também deixaram de aparecer no formato `2026-09-03` e saem como `03/09/2026`.
+
+- 🆕 **Jornada da venda importada já nasce pronta** — Ticket criado pela integração com a calculadora passa a vir com a tag **Pendente Faturamento**, os **dados da contabilidade** já preenchidos com o que o vendedor coletou, os **módulos da jornada** já lançados e a primeira linha da **Timeline** dizendo de onde o ticket veio. Antes tudo isso era redigitado à mão em cada venda.
+
+- ⬆️ **Cadastro do cliente e do contrato vindo completo da calculadora** — A venda importada passou a gravar data de cadastro, razão social e nome fantasia separados, área de atuação, fone do contato, observação com a composição da mensalidade, fornecedor, custo de operação, modelo de contrato, recorrência, formas de pagamento e as datas de venda, ativação e próximo reajuste. Quando algum campo não vem, o sistema avisa quais faltaram em vez de deixar a lacuna passar despercebida.
+
 - 🆕 **Data do próximo reajuste calculada de uma vez** — O campo entrou na aba **Cadastro incompleto** com o botão **Calcular todos**: a data sai da **data de ativação** de cada produto — mesmo dia e mês, no próximo aniversário que ainda não passou. Não precisa marcar registro nenhum; vale para todos os do filtro. Quem já tem data não é tocado, e produto sem data de ativação fica de fora, com aviso.
 
 - 🔧 **Reajuste era adiado em um ano quando a data estava próxima** — O cálculo do próximo reajuste tratava mês como 30 dias e arredondava para cima. Um cliente ativado em 14/09/2022 recebia 14/09/**2027** em vez de 14/09/**2026**, quando faltavam 11 dias para o aniversário. Isso valia para **todo produto novo cadastrado**, não só para o cálculo em lote.
