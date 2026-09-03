@@ -28,6 +28,35 @@ está.
 
 ---
 
+## Resultado do primeiro teste — 03/09/2026, 20h28
+
+**A venda nova passou.** O cliente foi criado com razão social da Receita e nome
+fantasia separados, data de cadastro, área de atuação, segmento, fone do contato
+e a observação com a composição da mensalidade. O contrato entrou com a vigência
+em branco e o próximo reajuste em 01/09/2027, exatamente como enviado. Telefone
+chegou com o `55`. **14 dos 18 campos.**
+
+Dois acertos importantes de vocês: o aviso que apareceu na tela dizendo "sem
+razão social (consulta de CNPJ)" era **falso alarme** — a razão social chegou
+correta e completa. E o bloqueio de "Itens sem mapeamento: Implantação Presencial
+(serviço) · soma do setup 1300 ≠ total 1550" foi resolvido no envio final, que
+veio com os 1550 certos. Ver a regra na Tarefa 7 para não voltar.
+
+**Falta o seguinte** (nenhum é problema do DoctorSaaS, simplesmente não vem no
+payload):
+
+| Campo | Onde |
+|---|---|
+| `fornecedor_id` | `produtos[]` |
+| `modelo_contrato_id` | `produtos[]` |
+| `vlr_custo` | `produtos[]` — gravou 0 |
+| anexo com `campo_label: "Contrato assinado"` | `anexos[]` — vieram 4 anexos, nenhum com esse rótulo |
+
+**Os dois up-sells foram recusados.** Causa na Tarefa 6 — é a mudança mais
+importante desta versão.
+
+---
+
 ## Tarefa 1 — enviar o ID dos campos que a tela já pergunta
 
 Estas quatro perguntas já existem no formulário e a resposta já vai no bloco
@@ -218,6 +247,85 @@ com o motivo. Mostrem esse aviso na tela.
 Só a **venda nova** aceita contrato por esse caminho. Em up-sell, down-sell e
 cobrança avulsa o arquivo iria substituir o contrato assinado que o cliente já
 tem — então ele fica no ticket, com o mesmo aviso.
+
+---
+
+## Tarefa 6 — no up-sell, o produto vem do CLIENTE
+
+Os dois up-sells do teste foram recusados com `produto_nao_contratado`:
+
+| Cliente | Vocês mandaram | O cliente tem |
+|---|---|---|
+| DEGUST BAR E RESTAURANTE | PDV Legal - **Servidor** (18) | PDV Legal - **Raspberry** (20) |
+| CASCA BAR E RESTAURANTE | PDV **Legal** (13) | PDV Legal - **Servidor** (18) |
+
+O `produto_id` está saindo do campo "Produto" da proposta, que é a linha
+comercial. **Num up-sell o produto não é escolha** — é o que o cliente já
+assinou. Aplicar o acréscimo no produto errado cobraria de um contrato que não
+existe, então a chamada é recusada inteira.
+
+### O endpoint que resolve
+
+O GET de catálogo aceita agora um `cnpj` opcional:
+
+```http
+GET /functions/v1/onboarding-catalogo?tenant_id=<fixo>&cnpj=58692597000162
+x-webhook-secret: <segredo>
+```
+
+A resposta ganha um bloco `cliente` (só quando o `cnpj` é enviado):
+
+```json
+"cliente": {
+  "encontrado": true,
+  "cliente_id": "…",
+  "razao_social": "DEGUST BAR E RESTAURANTE LTDA",
+  "nome_fantasia": "DEGUST CONCEITO",
+  "cancelado": false,
+  "produtos": [
+    { "produto_id": 20, "nome": "PDV Legal - Raspberry",
+      "modulos": [ { "modulo_id": "…", "nome": "Licença PDV", "quantidade": 2 } ] }
+  ]
+}
+```
+
+CNPJ que não existe volta `{ "encontrado": false, "cnpj": "…" }`.
+
+**Como usar**, em qualquer proposta que não seja venda nova:
+
+1. Ao informar o CNPJ, chame o catálogo com `?cnpj=`.
+2. Se `encontrado` for `false`, avise na tela — modos de up-sell, down-sell e
+   cobrança avulsa **exigem** cliente já cadastrado, e a chamada seria recusada
+   com `cliente_nao_encontrado`.
+3. O select de produto do up-sell passa a listar **apenas** `cliente.produtos`.
+   Se houver só um, use-o direto.
+4. O select de módulo passa a usar os módulos **daquele produto**, e `modulos`
+   dentro do bloco `cliente` já diz quais o cliente tem e em que quantidade —
+   é o que faz o `quantidade_delta` fazer sentido.
+
+Enquanto isso não estiver pronto, o erro ficou útil: `produto_nao_contratado`
+passa a devolver `produtos_do_cliente` com o que o cliente realmente tem, então
+dá para corrigir na hora sem abrir o DoctorSaaS.
+
+---
+
+## Tarefa 7 — item que não é módulo continua tendo valor
+
+O bloqueio "Itens sem mapeamento: Implantação Presencial (serviço)" apontou uma
+regra que vale fixar.
+
+**Módulo diz *o que* foi vendido. Quem carrega preço é o produto.** Um item da
+proposta que não corresponde a nenhum módulo do DoctorSaaS — um serviço, uma
+implantação presencial, uma taxa — **não** entra em `produtos[].modulos[]`, mas o
+valor dele **entra normalmente** em `produtos[].vlr_mensal` e
+`produtos[].vlr_ativacao`.
+
+Tirar o valor junto com o item é o que fez a soma dar 1300 contra 1550 de total.
+A conferência do DoctorSaaS compara a soma dos produtos com `comercial.vlr_mensal`
+e `comercial.vlr_ativacao`: os dois lados têm que incluir esses itens.
+
+O item não se perde: ele continua aparecendo em `proposta.itens` e no PDF do
+resumo, que ficam anexados ao ticket.
 
 ---
 
