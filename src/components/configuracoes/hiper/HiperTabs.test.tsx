@@ -129,7 +129,7 @@ describe("abas da integração Hiper", () => {
     // dois lados batem.
     render(<HiperDivergenciasTab tid="t1" recon={[{
       ...base, recorrencia_ds: "anual", custo_hiper: 51.09, custo_ds: 51.09,
-      mrr_hiper: 92.76, mensalidade_ds: 92.76, divergencias: ["razao_social_divergente"],
+      mrr_hiper: 92.76, mensalidade_ds: 92.76, divergencias: ["custo_divergente"],
     }]} />);
     abrirLinha();
     const txt = (container.textContent ?? "").replace(/\u00a0/g, " ");
@@ -235,7 +235,7 @@ describe("abas da integração Hiper", () => {
     const linhas = [
       { ...base, id: "a", id_portal: "1", razao_social_ds: "So custo", divergencias: ["custo_divergente"] },
       { ...base, id: "b", id_portal: "2", razao_social_ds: "So filial", divergencias: ["filial_com_valor"] },
-      { ...base, id: "c", id_portal: "3", razao_social_ds: "So razao", divergencias: ["razao_social_divergente"] },
+      { ...base, id: "c", id_portal: "3", razao_social_ds: "So email", divergencias: ["email_divergente"] },
     ];
     render(<HiperDivergenciasTab tid="t1" recon={linhas} />);
     act(() => {
@@ -254,7 +254,7 @@ describe("abas da integração Hiper", () => {
     const txt = container.textContent ?? "";
     expect(txt).toContain("So custo");
     expect(txt).toContain("So filial");   // OU, não interseção
-    expect(txt).not.toContain("So razao");
+    expect(txt).not.toContain("So email");
     expect(txt).toContain("2 famílias");
   });
 

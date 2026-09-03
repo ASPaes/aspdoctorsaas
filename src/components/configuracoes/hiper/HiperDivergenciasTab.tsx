@@ -58,7 +58,6 @@ const FAMILIAS: { chave: string; rotulo: string; explica: string; peso: number }
     explica: "O produto é do Hiper, mas o contrato aqui está com o fornecedor vazio ou apontando para outra empresa. O cruzamento passa por cima disso — o produto também serve de âncora —, mas o cadastro continua errado: esse cliente some de qualquer filtro por fornecedor no resto do sistema." },
   { chave: "sem_valor_no_portal", rotulo: "Portal sem valor do mês", peso: 5,
     explica: "A conta está ativa no Hiper, mas o portal não enviou valor nenhum do mês — normalmente porque o último extrato dela é de um mês anterior ao do lote. Sem valor não há o que comparar, e comparar contra zero zeraria o custo do cliente. A linha fica na lista para você conferir na mão ou rebuscar no portal." },
-  { chave: "razao_social_divergente", rotulo: "Razão social diferente", peso: 6, explica: "Comparação já ignora acento, pontuação e sufixo societário." },
   { chave: "email_divergente", rotulo: "E-mail diferente", peso: 7,
     explica: "O e-mail do portal não é o que está na ficha daqui. Comparação ignora maiúsculas e espaços." },
   { chave: "telefone_divergente", rotulo: "Telefone diferente", peso: 7,
@@ -188,13 +187,19 @@ const ACOES: {
     },
     efeito: "Insere no contrato os módulos que o portal cobra e os que o plano implica (o Hiper Caixa vem do número de caixas da conta), e acerta quantidade e custo dos que já existem. Módulo do Hiper entra sem preço de venda — só custo.",
   },
-  {
-    acao: "razao_social",
-    rotulo: "Razão social",
-    divs: ["razao_social_divergente"],
-    detalhe: (r) => `usar “${r.razao_social_hiper}”`,
-    efeito: "Enfileira sincronismo do cadastro para o Omie.",
-  },
+  /*
+   * A razão social NÃO entra aqui, de propósito.
+   *
+   * A fonte dela é a consulta de CNPJ na Receita — decisão do Alexandre em
+   * 03/09 —, e não a tela do portal. Medido antes de tirar: das 10
+   * divergências de nome, em 7 o cadastro daqui era o melhor, porque carrega o
+   * apelido comercial que a operação usa. Aplicadas em lote, elas viraram
+   * "LORIVALDO DA SILVA LTDA - Cia Fix Matriz" em "LORIVALDO DA SILVA LTDA" e
+   * "Livraria e Papelaria Lapel LTDA" em "LAPEL PAPELARIA".
+   *
+   * A RPC hiper_aplicar_uma ainda aceita a ação 'razao_social' — quem chamar
+   * por fora continua funcionando —, mas a tela não a oferece mais.
+   */
 ];
 
 const ACAO = Object.fromEntries(ACOES.map((a) => [a.acao, a]));
