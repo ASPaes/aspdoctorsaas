@@ -140,9 +140,21 @@ Deno.serve(async (req) => {
       const nomeProduto = new Map((produtos as any[]).map((p) => [p.id, p.nome]));
       const nomeModulo = new Map((modulos as any[]).map((m) => [m.id, m.nome]));
 
-      const { data: cli } = await supabase
-        .from('clientes').select('id, razao_social, nome_fantasia, cancelado')
-        .eq('tenant_id', tenantId).eq('cnpj_digits', cnpj).maybeSingle();
+      // CNPJ repetido existe nesta base — um deles tem 12 linhas, e não há
+      // índice único em (tenant_id, cnpj_digits). maybeSingle() daria ERRO nesse
+      // caso e o cliente apareceria como "não encontrado", que é o pior
+      // resultado possível: mentira silenciosa.
+      //
+      // Ordena por created_at para ser determinístico. ⚠️ A fn_intake_proposta
+      // faz o mesmo lookup com LIMIT 1 e SEM ORDER BY, então num CNPJ duplicado
+      // ela pode gravar noutra linha. Por isso o `duplicados` vai na resposta:
+      // com mais de um, a tela tem que avisar em vez de confiar na escolha.
+      const { data: achados } = await supabase
+        .from('clientes').select('id, razao_social, nome_fantasia, cancelado, created_at')
+        .eq('tenant_id', tenantId).eq('cnpj_digits', cnpj)
+        .order('created_at', { ascending: true }).limit(20);
+
+      const cli = (achados ?? [])[0];
 
       if (!cli) {
         cliente = { encontrado: false, cnpj };
@@ -164,6 +176,9 @@ Deno.serve(async (req) => {
           razao_social: cli.razao_social,
           nome_fantasia: cli.nome_fantasia,
           cancelado: cli.cancelado === true,
+          // > 1 significa CNPJ repetido no cadastro. Os produtos abaixo são só
+          // os do cadastro mais antigo; avise na tela em vez de seguir.
+          duplicados: (achados ?? []).length,
           produtos: (cps ?? []).map((c: any) => ({
             produto_id: c.produto_id,
             nome: nomeProduto.get(c.produto_id) ?? null,
