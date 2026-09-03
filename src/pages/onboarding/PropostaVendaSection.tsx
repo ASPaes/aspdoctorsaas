@@ -15,6 +15,18 @@ import { supabase } from "@/integrations/supabase/client";
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+// O payload manda data em ISO (2026-09-03) porque é o formato do contrato da
+// integração. Mostrar o ISO cru na tela é ruído: quem lê é brasileiro.
+// Confere mês e dia para não estragar um código que só se parece com data.
+const ISO_DATA = /^(\d{4})-(\d{2})-(\d{2})(?:[T ]|$)/;
+function dataBR(s: string): string | null {
+  const m = ISO_DATA.exec(s);
+  if (!m) return null;
+  const [, a, mes, dia] = m;
+  if (+mes < 1 || +mes > 12 || +dia < 1 || +dia > 31) return null;
+  return `${dia}/${mes}/${a}`;
+}
+
 // snake_case -> "Snake case", com os rotulos que valem a pena traduzir
 const ROTULOS: Record<string, string> = {
   cnpj: "CNPJ", cep: "CEP", uf: "UF", email: "E-mail",
@@ -47,7 +59,11 @@ const OCULTOS = new Set([
   "id", "completion_percentage", "snapshot", "row", "path", "size",
   // Renderizados em bloco proprio, com nome legivel
   "itens", "modulos", "produtos", "anexos",
-  // 66 respostas com chave UUID: ilegivel enquanto a origem nao mandar rotulo
+  // Idem: tem bloco proprio, agrupado por secao. Ficou escondido daqui ate
+  // 03/09/2026 por um comentario que envelheceu ("chave UUID, ilegivel") — a
+  // origem passou a mandar {pergunta, resposta} e ninguem reparou. Era por isso
+  // que Segmento, Instagram, Adquirente e TODA a implantacao pareciam nao ter
+  // sido puxados: chegavam e a tela escondia.
   "respostas_ticket",
 ]);
 
@@ -60,6 +76,8 @@ function Valor({ k, v }: { k: string; v: unknown }) {
   if (Array.isArray(v)) return <span>{v.length ? v.map(String).join(", ") : "—"}</span>;
   if (typeof v === "number" && /vlr|valor|mensal|ativacao/.test(k)) return <span>{brl(v)}</span>;
   const s = String(v);
+  const d = dataBR(s);
+  if (d) return <span>{d}</span>;
   if (/^https?:\/\//.test(s)) {
     return (
       <a href={s} target="_blank" rel="noopener noreferrer" className="text-primary underline break-all">
@@ -93,6 +111,69 @@ function Grupo({ titulo, dados }: { titulo: string; dados: Record<string, unknow
         <Grupo key={k} titulo={rotulo(k)} dados={v as Record<string, unknown>} />
       ))}
     </div>
+  );
+}
+
+// O que o vendedor levantou no formulário, agrupado como ele preencheu.
+//
+// A ordem do array é a ordem da tela de origem e é preservada. O agrupamento sai
+// de `secao`, que o sistema de propostas manda em cada resposta; enquanto ele
+// não mandar, tudo cai num bloco só. Deduzir a seção pelo texto da pergunta
+// seria pior do que não agrupar: quebra em silêncio no dia em que alguém
+// renomear um campo lá, e ninguém descobre porque a tela continua desenhando.
+function Respostas({ itens }: { itens: any[] }) {
+  const grupos: { nome: string; linhas: { pergunta: string; resposta: unknown }[] }[] = [];
+  for (const r of itens) {
+    const pergunta = String(r?.pergunta ?? "").trim();
+    if (!pergunta) continue;
+    const nome = String(r?.secao ?? "").trim() || "Respostas do formulário";
+    let g = grupos.find((x) => x.nome === nome);
+    if (!g) {
+      g = { nome, linhas: [] };
+      grupos.push(g);
+    }
+    g.linhas.push({ pergunta, resposta: r?.resposta });
+  }
+  if (!grupos.length) return null;
+
+  // Resposta longa ("Conte tudo sobre o cliente" é um parágrafo) numa célula de
+  // grade de duas colunas estica a linha inteira e deixa um buraco ao lado. Vai
+  // em largura cheia, depois das curtas. É regra de tamanho, não de significado
+  // — nada aqui tenta adivinhar o que a pergunta quer dizer.
+  const ehLonga = (v: unknown) => String(v ?? "").length > 120;
+
+  return (
+    <>
+      {grupos.map((g) => {
+        const curtas = g.linhas.filter((l) => !ehLonga(l.resposta));
+        const longas = g.linhas.filter((l) => ehLonga(l.resposta));
+        return (
+          <div key={g.nome} className="space-y-2">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {g.nome}
+            </h4>
+            {curtas.length > 0 && (
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+                {curtas.map((l, i) => (
+                  <div key={`${l.pergunta}-${i}`} className="flex gap-2 min-w-0">
+                    <dt className="text-muted-foreground shrink-0">{l.pergunta}:</dt>
+                    <dd className="min-w-0"><Valor k={l.pergunta} v={l.resposta} /></dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            {longas.map((l, i) => (
+              <div key={`${l.pergunta}-longa-${i}`} className="text-sm space-y-0.5">
+                <div className="text-muted-foreground">{l.pergunta}:</div>
+                <div className="rounded border border-border bg-muted/30 p-2">
+                  <Valor k={l.pergunta} v={l.resposta} />
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -245,6 +326,11 @@ export default function PropostaVendaSection({
 
           {alteracao && <Grupo titulo="Alteração de contrato" dados={alteracao} />}
           {avulso && <Grupo titulo="Cobrança avulsa" dados={avulso} />}
+
+          {Array.isArray(proposta.respostas_ticket) && proposta.respostas_ticket.length > 0 && (
+            <Respostas itens={proposta.respostas_ticket} />
+          )}
+
           <Grupo titulo="Detalhes da proposta" dados={proposta} />
 
           {anexos.length > 0 && (

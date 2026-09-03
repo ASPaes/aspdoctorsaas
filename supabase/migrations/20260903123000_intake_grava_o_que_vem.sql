@@ -55,6 +55,7 @@ DECLARE
   v_pl jsonb; v_fila uuid; v_filas jsonb := '[]'::jsonb;
   -- conferencia de catalogo e de formato, e o aviso das lacunas do cadastro
   v_chk jsonb; v_chks jsonb; v_ok boolean; v_faltando text[] := '{}';
+  v_ticket uuid;
 BEGIN
   PERFORM set_config('doctorsaas.intake_hold_omie', 'true', true);
   -- Nada do que esta função escreve tem gente por trás: `auth.uid()` é NULL sob
@@ -693,6 +694,64 @@ BEGIN
   );
 
   UPDATE onboarding_journeys SET proposta_payload = p_payload WHERE id = v_journey;
+
+  ------------------------------------------------- complementos da jornada
+  -- Nada daqui para baixo mexe em dinheiro: e o que a jornada precisa para
+  -- nascer pronta em vez de o especialista redigitar o que o vendedor ja
+  -- respondeu. Tudo idempotente, para o reenvio de uma proposta nao duplicar.
+  SELECT j.ticket_id INTO v_ticket FROM onboarding_journeys j WHERE j.id = v_journey;
+
+  -- Tag de controle, por NOME e nunca por id fixo: vale para qualquer tenant
+  -- que tenha a tag e e no-op silencioso para quem nao tem.
+  INSERT INTO onboarding_journey_tags (tenant_id, journey_id, tag_id)
+  SELECT v_tenant, v_journey, t.id
+    FROM onboarding_tags t
+   WHERE t.tenant_id = v_tenant AND t.is_active AND t.name = 'Pendente Faturamento'
+  ON CONFLICT (journey_id, tag_id) DO NOTHING;
+
+  -- Dados da contabilidade. Os campos cadastrados batem LITERALMENTE com o
+  -- texto das perguntas da proposta ("Nome Contabilidade", "CSC NFC-e", "Token
+  -- IBPT"...), entao o casamento e por nome exato — sem de-para e sem
+  -- adivinhacao. Pergunta sem campo correspondente fica de fora e continua
+  -- aparecendo no Resumo da venda; campo sem resposta continua em branco.
+  INSERT INTO onboarding_journey_accounting (tenant_id, journey_id, field_id, valor, coletado)
+  SELECT v_tenant, v_journey, f.id, r.resposta, true
+    FROM onboarding_accounting_fields f
+    JOIN LATERAL (
+      SELECT btrim(e->>'resposta') AS resposta
+        FROM jsonb_array_elements(coalesce(p_payload->'proposta'->'respostas_ticket','[]'::jsonb)) e
+       WHERE btrim(coalesce(e->>'pergunta','')) = f.nome
+         AND nullif(btrim(coalesce(e->>'resposta','')),'') IS NOT NULL
+       LIMIT 1
+    ) r ON true
+   WHERE f.tenant_id = v_tenant AND f.ativo
+  ON CONFLICT (journey_id, field_id) DO NOTHING;
+
+  -- Modulos da jornada ja lancados. So na venda nova: num up-sell isto listaria
+  -- tudo o que o cliente ja tem, e a jornada e sobre o que entrou agora.
+  -- A coluna origem nao tem CHECK (conferido antes de usar 'intake').
+  IF v_modo = 'venda_nova' THEN
+    INSERT INTO onboarding_journey_modules (tenant_id, journey_id, nome, produto_modulo_id, origem, position)
+    SELECT v_tenant, v_journey, pm.nome, pm.id, 'intake',
+           row_number() OVER (ORDER BY pm.nome)
+      FROM cliente_produto_modulos m
+      JOIN produto_modulos pm ON pm.id = m.modulo_id
+     WHERE m.ativo
+       AND m.cliente_produto_id IN (
+             SELECT cp.id FROM cliente_produtos cp
+              WHERE cp.cliente_id = v_cliente AND cp.ativo)
+       AND NOT EXISTS (SELECT 1 FROM onboarding_journey_modules x
+                        WHERE x.journey_id = v_journey AND x.produto_modulo_id = pm.id);
+  END IF;
+
+  -- A primeira linha da Timeline passa a dizer de onde o ticket veio. Concatena
+  -- em vez de sobrescrever: o texto original distingue a jornada que nasce
+  -- direto na Implantacao, e isso continua importando.
+  UPDATE support_ticket_events
+     SET content = content || ' · Ticket criado pela integração com a calculadora de vendas'
+   WHERE ticket_id = v_ticket
+     AND event_type = 'onboarding_criado'
+     AND content NOT LIKE '%calculadora de vendas%';
 
   SELECT st.ticket_code INTO v_ticket_code
     FROM onboarding_journeys j JOIN support_tickets st ON st.id = j.ticket_id WHERE j.id = v_journey;
