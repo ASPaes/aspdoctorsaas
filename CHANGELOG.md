@@ -14,6 +14,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 03/09
 
+- 🆕 **Data do próximo reajuste calculada de uma vez** — O campo entrou na aba **Cadastro incompleto** com o botão **Calcular todos**: a data sai da **data de ativação** de cada produto — mesmo dia e mês, no próximo aniversário que ainda não passou. Não precisa marcar registro nenhum; vale para todos os do filtro. Quem já tem data não é tocado, e produto sem data de ativação fica de fora, com aviso.
+
+- 🔧 **Reajuste era adiado em um ano quando a data estava próxima** — O cálculo do próximo reajuste tratava mês como 30 dias e arredondava para cima. Um cliente ativado em 14/09/2022 recebia 14/09/**2027** em vez de 14/09/**2026**, quando faltavam 11 dias para o aniversário. Isso valia para **todo produto novo cadastrado**, não só para o cálculo em lote.
+
 - 🆕 **Cidade preenchida pelo CEP, em lote** — Na aba **Cadastro incompleto**, o campo **Cidade** ganhou o botão **Preencher pelo CEP**: marque os clientes e o sistema busca a cidade do CEP de cada um. Cada cliente recebe a sua — não é um valor igual para todos. Quem está sem CEP não entra, e o sistema avisa quando algum CEP não é reconhecido. O estado só é gravado em quem está sem ele: o CEP confirma, não corrige.
 
 - 🆕 **Aba Cadastro incompleto** — Uma aba nova em **Clientes**, que só aparece quando há o que corrigir. Ela mostra, por **campo**, quantos registros estão sem preencher e qual indicador do painel aquele campo alimenta — *"561 sem vendedor · Vendas e carteira por vendedor"*. Escolhendo o campo você filtra por unidade, produto ou busca até sobrar o grupo que tem a mesma resposta, marca os registros e preenche todos de uma vez. Campos que têm valor próprio em cada cliente — cidade, WhatsApp, razão social — não oferecem preenchimento em lote, só o atalho para a ficha. Quem já tinha valor nunca é sobrescrito, e cada gravação fica registrada com quem fez.

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, ExternalLink, Loader2, MapPin, Wand2 } from "lucide-react";
+import { ArrowLeft, CalendarClock, ExternalLink, Loader2, MapPin, Wand2 } from "lucide-react";
 
 /**
  * Saneamento de cadastro, por campo.
@@ -36,7 +36,28 @@ type LinhaFalta = {
   detalhe: string;
   /** A unidade do cliente. Sem ela, escolher o vendedor é adivinhação. */
   unidade: string;
+  /** Quando o cliente entrou: diz quem estava vendendo naquela época. */
+  data_cadastro: string | null;
   total: number;
+};
+
+/**
+ * Data como dd/mm/aaaa, marcando a que é impossível.
+ *
+ * Existem 40 clientes com data anterior a 2000 — 39 da Delvale entre 1906 e
+ * 1933, todos com o mesmo dia e mês, e um do ASP em 0004. É erro de
+ * importação, e contamina coorte, tempo de casa e early churn. Aqui a data
+ * aparece destacada em vez de passar como se fosse verdade.
+ */
+const dataBR = (v: string | null) => {
+  if (!v) return { texto: "—", suspeita: false };
+  const d = new Date(`${v}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return { texto: v, suspeita: true };
+  const ano = d.getFullYear();
+  return {
+    texto: d.toLocaleDateString("pt-BR"),
+    suspeita: ano < 2000 || d > new Date(),
+  };
 };
 
 export default function CadastroIncompletoTab() {
@@ -101,6 +122,51 @@ export default function CadastroIncompletoTab() {
    * resolve nome -> id, na mesma régua da importação do Hiper.
    */
   const ehGeo = campo?.campo === "cidade_id" || campo?.campo === "estado_id";
+
+  /**
+   * A data do próximo reajuste sai da data de ativação de cada produto — não é
+   * um valor igual para todos. Usa a mesma calc_proximo_reajuste que a criação
+   * de produto usa, para a tela não prometer uma data e o cadastro gravar outra.
+   */
+  const ehReajuste = campo?.campo === "data_proximo_reajuste";
+
+  /**
+   * Sem seleção, age sobre TODOS os pendentes do filtro atual.
+   *
+   * O valor não é escolhido por ninguém — sai da data de ativação de cada
+   * produto. Exigir que alguém marque 710 caixas para aplicar uma regra
+   * determinística é transformar em trabalho manual o que o sistema faz
+   * sozinho, e é aí que o erro humano entra.
+   */
+  const calcularReajuste = async () => {
+    if (!campo) return;
+    setGravando(true);
+    try {
+      const { data, error } = await (supabase.rpc as any)("fn_cadastro_calcular_reajuste", {
+        p_tenant_id: tid,
+        p_ids: sel.size > 0 ? Array.from(sel) : null,
+        p_unidades: unidade ? [Number(unidade)] : null,
+        p_produto_id: produto ? Number(produto) : null,
+      });
+      if (error) throw error;
+      const r = data as any;
+      if (!r?.ok) throw new Error(r?.erro || "Não foi possível calcular.");
+      toast({
+        title: r.gravados === 0
+          ? "Nada foi preenchido"
+          : `${num(r.gravados)} ${r.gravados === 1 ? "data calculada" : "datas calculadas"}`,
+        description: r.sem_ativacao > 0
+          ? `${num(r.sem_ativacao)} ficaram de fora por não ter data de ativação — sem ela não há de onde derivar.`
+          : undefined,
+        variant: r.gravados === 0 ? "destructive" : undefined,
+      });
+      setSel(new Set());
+      ["cadastro_incompleto_resumo", "cadastro_incompleto_lista", "clientes"]
+        .forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+    } catch (e: any) {
+      toast({ title: "Não foi possível calcular", description: e.message, variant: "destructive" });
+    } finally { setGravando(false); }
+  };
   const comCep = useMemo(
     () => linhas.filter((l) => /^\d{8}$/.test(l.detalhe)),
     [linhas],
@@ -259,7 +325,30 @@ export default function CadastroIncompletoTab() {
         <span className="text-xs text-muted-foreground">{campo.indicador}</span>
       </div>
 
-      {!campo.em_lote && !ehGeo && (
+      {ehReajuste && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border p-3">
+          <div className="min-w-0 flex-1 text-sm">
+            <p>
+              A data do próximo reajuste sai da <strong>data de ativação</strong> de cada produto:
+              mesmo dia e mês, no próximo aniversário que ainda não passou.
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Ativação em 14/09/2022 vira 14/09/2026 se a data ainda não chegou este ano, e
+              14/09/2027 se já passou. Produto sem data de ativação fica de fora, e quem já tem
+              data não é tocado. <strong>Sem marcar nada, vale para todos os do filtro</strong> —
+              não só os {num(linhas.length)} desta página.
+            </p>
+          </div>
+          <Button disabled={gravando} onClick={calcularReajuste}>
+            {gravando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}
+            {sel.size > 0
+              ? `Calcular os ${num(sel.size)} selecionados`
+              : `Calcular todos os ${num(total)}`}
+          </Button>
+        </div>
+      )}
+
+      {!campo.em_lote && !ehGeo && !ehReajuste && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
           <strong>{campo.rotulo}</strong> tem valor próprio em cada cliente, então não há o que
           preencher em lote — um valor igual para todos estragaria o cadastro. Abra a ficha de cada
@@ -349,7 +438,7 @@ export default function CadastroIncompletoTab() {
         </p>
       ) : (
         <div className="rounded-lg border divide-y">
-          {(campo.em_lote || ehGeo) && (
+          {(campo.em_lote || ehGeo || ehReajuste) && (
             <label className="flex items-center gap-2 bg-muted/30 px-3 py-2 text-sm">
               <input type="checkbox"
                 checked={(ehGeo ? comCep : linhas).length > 0
@@ -366,7 +455,7 @@ export default function CadastroIncompletoTab() {
           )}
           {linhas.map((l) => (
             <div key={l.registro_id} className="flex items-center gap-3 px-3 py-2 text-sm">
-              {(campo.em_lote || (ehGeo && /^\d{8}$/.test(l.detalhe))) ? (
+              {(campo.em_lote || ehReajuste || (ehGeo && /^\d{8}$/.test(l.detalhe))) ? (
                 <input type="checkbox" className="shrink-0" checked={sel.has(l.registro_id)}
                   onChange={() => setSel((s) => {
                     const n = new Set(s);
@@ -394,6 +483,17 @@ export default function CadastroIncompletoTab() {
               <Badge variant="outline" className="shrink-0 text-[10px] font-normal">
                 {l.unidade}
               </Badge>
+              {(() => {
+                const d = dataBR(l.data_cadastro);
+                return (
+                  <span
+                    title={d.suspeita ? "Data de cadastro impossível — provável erro de importação" : "Data de cadastro"}
+                    className={`shrink-0 text-xs tabular-nums ${
+                      d.suspeita ? "text-amber-500 font-medium" : "text-muted-foreground"}`}>
+                    {d.texto}
+                  </span>
+                );
+              })()}
               <a href={`/clientes/${l.cliente_id}`} target="_blank" rel="noreferrer"
                 className="shrink-0 text-muted-foreground hover:text-foreground" title="Abrir a ficha">
                 <ExternalLink className="h-3.5 w-3.5" />
