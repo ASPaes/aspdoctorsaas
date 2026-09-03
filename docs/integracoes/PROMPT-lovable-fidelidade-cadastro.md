@@ -186,13 +186,38 @@ planilha de produtos) chegaram e entraram corretamente. O problema é só o
 contrato.
 
 O que fazer: baixar o PDF assinado do D4Sign e enviá-lo em `anexos[]`, como os
-outros, com `campo_label` identificando que é o contrato. O rótulo exato eu
-confirmo na próxima versão deste documento — o DoctorSaaS vai precisar reconhecer
-esse anexo para guardá-lo no lugar certo, que não é o mesmo dos demais.
+outros, com:
 
-Restrições desse destino, diferentes das do anexo comum: **até 10 MB** e somente
-**PDF, JPG ou PNG**. Um arquivo de 12 MB como o "Resumo da venda" não caberia
-ali — mais uma razão para ser um anexo à parte, e não o mesmo.
+```json
+{ "campo_label": "Contrato assinado",
+  "nome_arquivo": "Contrato - <cliente>.pdf",
+  "content_type": "application/pdf",
+  "url": "<url que o DoctorSaaS baixe sem login>",
+  "tamanho_bytes": 123456 }
+```
+
+**O rótulo `campo_label` tem que ser exatamente `Contrato assinado`.** É ele que
+manda o arquivo para o campo "Anexo do contrato" do produto em vez da aba de
+Anexos do ticket. A comparação ignora caixa, acento e espaço nas bordas, e nada
+mais — qualquer outro rótulo continua indo para o ticket.
+
+Restrições desse destino, diferentes das do anexo comum:
+
+- **até 10 MB** (o anexo de ticket aceita 25 MB);
+- somente **PDF, JPG ou PNG**;
+- o nome do arquivo precisa ter extensão e ao menos uma letra ou número — o
+  DoctorSaaS normaliza acento, espaço e parêntese sozinho.
+
+Um arquivo de 12 MB como o "Resumo da venda" não caberia ali. Por isso é um
+anexo à parte, e não o mesmo.
+
+Se alguma dessas regras não bater, **o arquivo não se perde**: ele vai para a
+aba de Anexos do ticket e a resposta traz o aviso `contrato_ficou_no_ticket`
+com o motivo. Mostrem esse aviso na tela.
+
+Só a **venda nova** aceita contrato por esse caminho. Em up-sell, down-sell e
+cobrança avulsa o arquivo iria substituir o contrato assinado que o cliente já
+tem — então ele fica no ticket, com o mesmo aviso.
 
 ---
 
