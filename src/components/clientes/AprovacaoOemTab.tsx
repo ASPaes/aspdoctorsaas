@@ -5,6 +5,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { useAprovacaoOemStatus } from "@/hooks/useAprovacaoOem";
 import { useLinhaDestacada, CLASSE_DESTAQUE } from "@/hooks/useDeepLinkIntegracao";
+import { rotuloDaFonte } from "@/lib/fonteDoPedido";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,8 @@ type Pedido = {
   valor_downsell: number | null;
   motivo: string | null;
   pedido_por: string | null;
+  // De onde veio o pedido quando nao foi gente: hoje so "calculadora".
+  fonte: string | null;
   enfileirado_em: string;
   decidido_por: string | null;
   decidido_em: string | null;
@@ -463,7 +466,10 @@ export default function AprovacaoOemTab() {
                           <div className="text-xs text-muted-foreground">Motivo: {p.motivo}</div>
                         )}
                         <div className="text-[11px] text-muted-foreground">
-                          Pedido por {p.pedido_por ?? "—"} em {dataHora(p.enfileirado_em)}
+                          {/* Pedido sem usuário não é pedido sem dono: quando veio
+                              de fora, dizer de onde veio é o que permite conferir
+                              a venda antes de mandar para o parceiro. */}
+                          Pedido por {p.pedido_por ?? rotuloDaFonte(p.fonte) ?? "—"} em {dataHora(p.enfileirado_em)}
                         </div>
                       </div>
                     </div>

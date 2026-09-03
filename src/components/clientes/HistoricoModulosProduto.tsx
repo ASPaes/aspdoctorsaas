@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { History, ChevronDown, ChevronRight } from "lucide-react";
+import { rotuloDaFonte } from "@/lib/fonteDoPedido";
 
 // ============================================================================
 // O histórico de módulos de UM produto do cliente.
@@ -21,6 +22,10 @@ type Evento = {
   acao: string;
   quantidade: number | null;
   origem: string;
+  // `origem` é da LINHA do módulo; `fonte` é de quem pediu ESTE evento. Uma
+  // venda da calculadora numa linha que o espelho criou tem origem 'oem' e
+  // fonte 'calculadora' — sem a segunda, a tela diria que foi a sincronização.
+  fonte: string | null;
   usuario_nome: string | null;
   usuario_id: string | null;
   motivo: string | null;
@@ -63,7 +68,7 @@ export default function HistoricoModulosProduto({ clienteProdutoId }: { clienteP
     enabled: aberto,
     queryFn: async () => {
       const { data, error } = await (supabase.from("cliente_produto_modulo_eventos" as any) as any)
-        .select("id, modulo_nome, acao, quantidade, origem, usuario_nome, usuario_id, motivo, created_at, vlr_custo, vlr_custo_anterior")
+        .select("id, modulo_nome, acao, quantidade, origem, fonte, usuario_nome, usuario_id, motivo, created_at, vlr_custo, vlr_custo_anterior")
         .eq("cliente_produto_id", clienteProdutoId)
         .order("created_at", { ascending: false })
         .limit(300);
@@ -135,14 +140,18 @@ export default function HistoricoModulosProduto({ clienteProdutoId }: { clienteP
                             sozinha — a carga do espelho. Evento com dono, mesmo
                             sem nome resolvido, teve gente por trás: dizer que
                             foi a sincronização mentia sobre quem mexeu na
-                            licença de um cliente. */}
+                            licença de um cliente.
+
+                            A fonte vem ANTES da origem pelo mesmo motivo: uma
+                            venda que a calculadora mandou numa linha criada
+                            pelo espelho tem origem 'oem', e sem esta ordem ela
+                            apareceria como carga da máquina. */}
                         {e.usuario_nome
                           ? e.usuario_nome
                           : e.usuario_id
                             ? "Usuário sem nome cadastrado"
-                            : e.origem === "oem"
-                              ? "Sincronização OEM"
-                              : "—"}
+                            : rotuloDaFonte(e.fonte)
+                              ?? (e.origem === "oem" ? "Sincronização OEM" : "—")}
                       </TableCell>
                       {/* Motivo é opcional e só existe em cancelamento: a
                           coluna fica vazia no resto em vez de repetir traço. */}

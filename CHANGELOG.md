@@ -14,6 +14,16 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 03/09
 
+- 🔧 **Módulo vendido pela calculadora não chegava ao OEM** — Up-sell e cancelamento vindos da calculadora entravam direto na ficha do cliente e **nunca eram enviados ao parceiro**: o cliente passava a ser cobrado por um módulo que a licença dele não tinha, e a carga do espelho desfazia a mudança no dia seguinte. Agora eles seguem o mesmo caminho de quem lança pelo DoctorSaaS — vão para a **fila de aprovação**, e o módulo, a licença e o MRR só mudam depois que um admin aprova e o OEM aceita. Quem aprova vê de onde veio o pedido.
+
+- 🔧 **Módulo da calculadora entrava sem valor** — A linha do módulo nascia com mensalidade e ativação zeradas, mesmo com os valores certos aparecendo no movimento de MRR. Agora os dois valores entram na ficha, e o movimento passa a se chamar pelo módulo (*"Adição de Estoque"*) em vez do texto da proposta, e fica amarrado a ele — o que faz um cancelamento futuro saber quanto baixar.
+
+- 🔧 **Histórico de módulos não dizia quem tinha mexido** — A coluna **Quem** ficava vazia nas ações que vinham da calculadora. Agora mostra **Integração Calculadora**, inclusive nas que já estavam registradas.
+
+- 🔧 **Data errada nos movimentos de MRR da ficha do cliente** — Um movimento do dia 31 aparecia como dia 30 na janela de Movimentos MRR aberta pelo cliente, e batia com a data certa na tela geral de Movimentos. Valia para todos os movimentos, não só os importados.
+
+- 🔧 **Proposta que se contradiz é recusada em vez de aplicada** — Uma venda chegou marcada como up-sell no cabeçalho e com valores negativos no corpo; o DoctorSaaS obedeceu ao corpo e cancelou módulos de um cliente que estava comprando. Agora esse tipo de contradição é barrado e devolvido para correção.
+
 - 🔧 **Venda importada da calculadora não mostrava tudo o que o vendedor respondeu** — As respostas do formulário da proposta — Segmento, Instagram, Adquirente, Homologadas, Vendedor, Origem da venda, Já utiliza sistema e **todos os campos de implantação** — chegavam ao DoctorSaaS mas ficavam escondidas na aba **Resumo da venda**. Agora aparecem, com as respostas longas em bloco próprio para não espremer a leitura. As datas também deixaram de aparecer no formato `2026-09-03` e saem como `03/09/2026`.
 
 - 🆕 **Jornada da venda importada já nasce pronta** — Ticket criado pela integração com a calculadora passa a vir com a tag **Pendente Faturamento**, os **dados da contabilidade** já preenchidos com o que o vendedor coletou, os **módulos da jornada** já lançados e a primeira linha da **Timeline** dizendo de onde o ticket veio. Antes tudo isso era redigitado à mão em cada venda.

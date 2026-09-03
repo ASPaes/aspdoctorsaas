@@ -6,7 +6,11 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+// `parseISO` e não `new Date` para `data_movimento`: a coluna é `date`, chega
+// como "2026-08-31", e `new Date` de uma data sem hora é meia-noite UTC — que
+// em Brasília é o dia ANTERIOR às 21h. Um movimento do dia 31 aparecia como 30.
+// `parseISO` lê data sem hora no fuso local, que é o que a tela quer dizer.
+import { format, parseISO } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -875,7 +879,7 @@ export function MovimentosMrrModal({
                     return (
                       <TableRow key={m.id} className={cn((isInativo || isEstornado) && "opacity-50 bg-muted/30")}>
                         <TableCell className="font-mono text-sm">
-                          {format(new Date(m.data_movimento), 'dd/MM/yyyy')}
+                          {format(parseISO(m.data_movimento), 'dd/MM/yyyy')}
                         </TableCell>
                         <TableCell>
                           <Badge className={cn("text-white", TIPO_LABELS[m.tipo]?.color)}>
@@ -993,7 +997,7 @@ export function MovimentosMrrModal({
                   <div className="bg-muted p-3 rounded-md text-sm">
                     <p><strong>Tipo:</strong> {TIPO_LABELS[deactivateConfirm.movimento.tipo]?.label}</p>
                     <p><strong>Valor:</strong> {formatCurrency(Math.abs(deactivateConfirm.movimento.valor_delta))}</p>
-                    <p><strong>Data:</strong> {format(new Date(deactivateConfirm.movimento.data_movimento), 'dd/MM/yyyy')}</p>
+                    <p><strong>Data:</strong> {format(parseISO(deactivateConfirm.movimento.data_movimento), 'dd/MM/yyyy')}</p>
                   </div>
                   <p className="text-destructive font-medium">
                     O valor de {formatCurrency(Math.abs(deactivateConfirm.movimento.valor_delta))} será removido do MRR e contabilizado como churn.
