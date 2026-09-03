@@ -440,7 +440,33 @@ BEGIN
         INSERT INTO cliente_produto_modulos (tenant_id, cliente_produto_id, modulo_id, quantidade, vlr_mensal, vlr_ativacao, ativo, origem)
         VALUES (v_tenant, v_cp, (v_mod->>'modulo_id')::uuid, (v_mod->>'quantidade')::int, 0, 0, true, 'intake');
       END LOOP;
+
+      -- Mesmo aviso do cadastro, agora para o contrato. Sem ele, uma venda com
+      -- fornecedor, modelo e custo em branco volta SEM aviso nenhum e a lacuna
+      -- so aparece quando alguem abre a ficha — foi o que aconteceu no teste de
+      -- 03/09: zero avisos e quatro campos faltando. Nenhum destes quatro tem
+      -- fallback: em branco no payload = em branco na tela.
+      v_faltando := '{}';
+      IF nullif(coalesce(v_prod->>'fornecedor_id',      v_com->>'fornecedor_id'),'')      IS NULL THEN v_faltando := array_append(v_faltando, 'fornecedor_id'); END IF;
+      IF nullif(coalesce(v_prod->>'modelo_contrato_id', v_com->>'modelo_contrato_id'),'') IS NULL THEN v_faltando := array_append(v_faltando, 'modelo_contrato_id'); END IF;
+      IF nullif(coalesce(v_prod->>'recorrencia',        v_com->>'recorrencia'),'')        IS NULL THEN v_faltando := array_append(v_faltando, 'recorrencia'); END IF;
+      IF nullif(v_prod->>'vlr_custo','') IS NULL THEN v_faltando := array_append(v_faltando, 'vlr_custo'); END IF;
+      IF array_length(v_faltando,1) > 0 THEN
+        v_avisos := v_avisos || jsonb_build_object('campo','produtos[]','produto_id',v_prod->>'produto_id',
+          'aviso','contrato_incompleto: o produto entrou sem ' || array_to_string(v_faltando, ', ') ||
+                  '. O payload nao trouxe esses campos e nada e preenchido por conta propria');
+      END IF;
     END LOOP;
+
+    -- O anexo do contrato tem rotulo proprio. Sem ele o campo "Anexo do
+    -- contrato" da tela do produto fica vazio, e ate agora isso nao aparecia
+    -- em lugar nenhum.
+    IF NOT EXISTS (
+         SELECT 1 FROM jsonb_array_elements(coalesce(p_payload->'anexos','[]'::jsonb)) a
+          WHERE lower(btrim(coalesce(a->>'campo_label',''))) = 'contrato assinado') THEN
+      v_avisos := v_avisos || jsonb_build_object('campo','anexos',
+        'aviso','sem_contrato_assinado: nenhum anexo veio com campo_label "Contrato assinado", entao o campo Anexo do contrato do produto fica vazio');
+    END IF;
   END IF;
 
   ------------------------------------------------- modo B: fila do OEM ou ficha
@@ -451,8 +477,16 @@ BEGIN
       FROM cliente_produtos cp
      WHERE cp.cliente_id = v_cliente AND cp.produto_id = v_prod_alvo AND cp.ativo LIMIT 1;
     IF v_cp IS NULL THEN
+      -- Devolve o que o cliente TEM. Sem essa lista o erro e um beco sem saida:
+      -- num up-sell o produto nao e escolha, e o que ja esta contratado, e a
+      -- proposta estava mandando a linha comercial dela (medido em 03/09: pediu
+      -- PDV Legal - Servidor num cliente que tem PDV Legal - Raspberry).
       RAISE EXCEPTION '%', jsonb_build_object('error','produto_nao_contratado','produto_id',v_prod_alvo,
-        'detail','o cliente nao tem esse produto ativo; up-sell precisa de contrato vigente')::text;
+        'detail','o cliente nao tem esse produto ativo. Num up-sell o produto e o que o cliente ja tem contratado, nao o da linha comercial da proposta',
+        'produtos_do_cliente', coalesce((
+          SELECT jsonb_agg(jsonb_build_object('produto_id', cp2.produto_id, 'nome', p2.nome) ORDER BY p2.nome)
+            FROM cliente_produtos cp2 JOIN produtos p2 ON p2.id = cp2.produto_id
+           WHERE cp2.cliente_id = v_cliente AND cp2.ativo), '[]'::jsonb))::text;
     END IF;
     SELECT ci.contrato_id INTO v_contrato FROM contrato_itens ci
       JOIN contratos c ON c.id = ci.contrato_id AND c.status='ativo'

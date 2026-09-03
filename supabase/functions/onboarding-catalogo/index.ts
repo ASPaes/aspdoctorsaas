@@ -5,6 +5,10 @@
 // de recorrencias. Eram os quatro selects que faltavam para o cadastro do
 // cliente e do contrato chegar completo pela integração.
 //
+// 03/09/2026, mais tarde: `?cnpj=` opcional devolve o bloco `cliente` com os
+// produtos ativos daquele cliente e os módulos que ele já tem. É o que o
+// up-sell precisa — ver o comentário na leitura do parâmetro.
+//
 // Só leitura. Nunca escreve.
 //
 // Existe porque o sistema de propostas precisa mandar ID, não texto: dos 3 itens do
@@ -71,8 +75,19 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: 'unauthorized' }, 401);
   }
 
-  const tenantId = new URL(req.url).searchParams.get('tenant_id');
+  const params = new URL(req.url).searchParams;
+  const tenantId = params.get('tenant_id');
   if (!tenantId) return json({ ok: false, error: 'tenant_id_required' }, 400);
+
+  // CNPJ opcional. Com ele a resposta ganha o bloco `cliente` com os produtos
+  // que ESTE cliente tem ativos e os módulos que já estão na ficha.
+  //
+  // Existe por causa do teste de 03/09/2026: nos dois up-sells a proposta mandou
+  // o produto da linha comercial dela (PDV Legal - Servidor) num cliente que
+  // tinha outro (PDV Legal - Raspberry), e os dois foram recusados com
+  // produto_nao_contratado. Num up-sell o produto NÃO é escolha — é o que o
+  // cliente já assinou, e só o DoctorSaaS sabe qual é.
+  const cnpj = (params.get('cnpj') ?? '').replace(/\D/g, '');
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -118,10 +133,58 @@ Deno.serve(async (req) => {
       fetchAll(t('modelos_contrato', 'id, nome')),
     ]);
 
+    // Nomes de produto e de módulo saem das listas já carregadas acima — o
+    // cliente só acrescenta 2 consultas curtas, nenhuma em tabela de volume.
+    let cliente: unknown = undefined;
+    if (cnpj.length >= 11) {
+      const nomeProduto = new Map((produtos as any[]).map((p) => [p.id, p.nome]));
+      const nomeModulo = new Map((modulos as any[]).map((m) => [m.id, m.nome]));
+
+      const { data: cli } = await supabase
+        .from('clientes').select('id, razao_social, nome_fantasia, cancelado')
+        .eq('tenant_id', tenantId).eq('cnpj_digits', cnpj).maybeSingle();
+
+      if (!cli) {
+        cliente = { encontrado: false, cnpj };
+      } else {
+        const { data: cps } = await supabase
+          .from('cliente_produtos').select('id, produto_id')
+          .eq('cliente_id', cli.id).eq('ativo', true);
+
+        const ids = (cps ?? []).map((c: any) => c.id);
+        const { data: mods } = ids.length
+          ? await supabase
+              .from('cliente_produto_modulos').select('cliente_produto_id, modulo_id, quantidade')
+              .in('cliente_produto_id', ids).eq('ativo', true)
+          : { data: [] as any[] };
+
+        cliente = {
+          encontrado: true,
+          cliente_id: cli.id,
+          razao_social: cli.razao_social,
+          nome_fantasia: cli.nome_fantasia,
+          cancelado: cli.cancelado === true,
+          produtos: (cps ?? []).map((c: any) => ({
+            produto_id: c.produto_id,
+            nome: nomeProduto.get(c.produto_id) ?? null,
+            modulos: (mods ?? [])
+              .filter((m: any) => m.cliente_produto_id === c.id)
+              .map((m: any) => ({
+                modulo_id: m.modulo_id,
+                nome: nomeModulo.get(m.modulo_id) ?? null,
+                quantidade: m.quantidade,
+              })),
+          })),
+        };
+      }
+    }
+
     return json({
       ok: true,
       tenant_id: tenantId,
       gerado_em: new Date().toISOString(),
+      // Só aparece quando a chamada mandou ?cnpj=
+      ...(cliente ? { cliente } : {}),
       produtos,
       modulos,
       segmentos,
