@@ -59,16 +59,16 @@ export function useHiperDivergenciasPendentes(habilitado: boolean) {
     queryKey: ["hiper_recon", tid, "pendentes"],
     enabled: habilitado && !!tid,
     queryFn: async (): Promise<number> => {
-      const { count, error } = await (supabase
-        .from("reconciliacao_hiper" as any) as any)
-        .select("id", { count: "exact", head: true })
-        .eq("tenant_id", tid as string)
-        .eq("status_usuario", "pendente")
-        // Linha sem divergência existe (é o cliente conferido e certo); ela não
-        // é pendência e não pode entrar no número.
-        .neq("divergencias", "{}");
+      // A regra de o que conta como pendência vive no banco
+      // (hiper_pendentes_contagem), não aqui: a lista da tela precisa concordar
+      // com este número, e duas cópias divergiriam na primeira família nova.
+      // Hoje ela exclui quem só tem "domínio fora da observação" ou "contato
+      // responsável" — preenchimento em massa, que soterraria o resto.
+      const { data, error } = await (supabase.rpc as any)("hiper_pendentes_contagem", {
+        p_tenant_id: tid,
+      });
       if (error) throw error;
-      return count ?? 0;
+      return Number(data) || 0;
     },
   });
 }

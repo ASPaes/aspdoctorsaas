@@ -34,6 +34,18 @@ const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
  *
  * `&amp;` sai por último, senão "&amp;lt;" viraria "<" em vez de "&lt;".
  */
+/**
+ * Telefone como o Alexandre pediu em 03/09: só os dígitos, sem máscara.
+ *
+ * O portal manda "(43) 9-9682-3785" — o nono dígito sai separado por hífen,
+ * formato que nenhuma máscara comum lê. Guardar assim obrigaria toda
+ * comparação a desmontar a string de novo.
+ */
+const fone = (v: unknown): string | null => {
+  const d = String(v ?? "").replace(/\D/g, "");
+  return d === "" ? null : d;
+};
+
 const txt = (v: unknown): string | null => {
   if (v === null || v === undefined) return null;
   const s = String(v)
@@ -264,6 +276,19 @@ serve(async (req) => {
         nome_fantasia: txt(c.nome_fantasia),
         cidade: txt(c.cidade),
         uf: c.uf ?? null,
+        telefone: fone(c.telefone),
+        email: txt(c.email),
+        dominio: txt(c.dominio),
+        ie: txt(c.ie),
+        contato_nome: txt(c.contato?.nome),
+        contato_email: txt(c.contato?.email),
+        contato_telefone: fone(c.contato?.telefone),
+        end_cep: fone(c.endereco?.cep),
+        end_logradouro: txt(c.endereco?.logradouro),
+        end_numero: txt(c.endereco?.numero),
+        end_bairro: txt(c.endereco?.bairro),
+        end_cidade: txt(c.endereco?.cidade),
+        end_uf: txt(c.endereco?.uf),
         situacao: c.situacao ?? null,
         responsavel_tipo: c.responsavel_tipo ?? null,
         plano: c.plano ?? null,
@@ -454,6 +479,19 @@ serve(async (req) => {
               nome_fantasia: txt(c.nome_fantasia),
               cidade: txt(c.cidade),
               uf: c.uf ?? null,
+              telefone: fone(c.telefone),
+              email: txt(c.email),
+              dominio: txt(c.dominio),
+              ie: txt(c.ie),
+              contato_nome: txt(c.contato?.nome),
+              contato_email: txt(c.contato?.email),
+              contato_telefone: fone(c.contato?.telefone),
+              end_cep: fone(c.endereco?.cep),
+              end_logradouro: txt(c.endereco?.logradouro),
+              end_numero: txt(c.endereco?.numero),
+              end_bairro: txt(c.endereco?.bairro),
+              end_cidade: txt(c.endereco?.cidade),
+              end_uf: txt(c.endereco?.uf),
               situacao: c.situacao ?? null,
               responsavel_tipo: c.responsavel_tipo ?? null,
               plano: c.plano ?? null,

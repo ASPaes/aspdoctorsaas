@@ -59,9 +59,34 @@ const FAMILIAS: { chave: string; rotulo: string; explica: string; peso: number }
   { chave: "sem_valor_no_portal", rotulo: "Portal sem valor do mês", peso: 5,
     explica: "A conta está ativa no Hiper, mas o portal não enviou valor nenhum do mês — normalmente porque o último extrato dela é de um mês anterior ao do lote. Sem valor não há o que comparar, e comparar contra zero zeraria o custo do cliente. A linha fica na lista para você conferir na mão ou rebuscar no portal." },
   { chave: "razao_social_divergente", rotulo: "Razão social diferente", peso: 6, explica: "Comparação já ignora acento, pontuação e sufixo societário." },
+  { chave: "email_divergente", rotulo: "E-mail diferente", peso: 7,
+    explica: "O e-mail do portal não é o que está na ficha daqui. Comparação ignora maiúsculas e espaços." },
+  { chave: "telefone_divergente", rotulo: "Telefone diferente", peso: 7,
+    explica: "A comparação já ignora o 55 do país e o nono dígito: quando a única diferença é o 9, a linha nem aparece, porque nesses casos o portal é que está velho e aplicar quebraria o WhatsApp do cliente." },
+  { chave: "endereco_divergente", rotulo: "Endereço diferente", peso: 7,
+    explica: "O CEP do portal não é o daqui. Aplicar grava CEP, logradouro, número, bairro e resolve a cidade." },
+  { chave: "contato_divergente", rotulo: "Contato responsável", peso: 8,
+    explica: "O nome do contato do portal não é o daqui — na maioria das vezes porque a ficha está sem contato nenhum. Aplicar traz nome e telefone juntos." },
+  { chave: "dominio_ausente", rotulo: "Domínio fora da observação", peso: 8,
+    explica: "O domínio do cliente no Hiper ainda não aparece na observação da ficha. Aplicar ACRESCENTA: a anotação que já estiver lá é preservada." },
 ];
 
 const META = Object.fromEntries(FAMILIAS.map((f) => [f.chave, f]));
+
+/**
+ * Preenchimento em massa, não conferência.
+ *
+ * Medido em 03/09, quando o portal passou a mandar esses campos: 629 clientes
+ * sem o domínio na observação e 516 com o contato diferente (489 deles com a
+ * ficha simplesmente vazia). Contadas como as outras, elas levariam a lista de
+ * 41 para ~640 e esconderiam custo, MRR, módulos e filiais.
+ *
+ * Então uma linha cuja ÚNICA divergência está nesta lista fica fora da lista
+ * padrão — e é alcançada marcando a família no filtro, que é como se faz o
+ * mutirão de preenchimento. A mesma régua está em hiper_pendentes_contagem,
+ * que alimenta o número da aba.
+ */
+const FAMILIAS_LEVES = ["dominio_ausente", "contato_divergente"];
 
 /**
  * O portal deixou de informar o que ele DEVERIA informar para este tipo.
@@ -110,6 +135,44 @@ const ACOES: {
     divs: ["mrr_divergente"],
     detalhe: (r) => `${brl(r.mensalidade_ds)} → ${brl(r.mrr_hiper)} por mês`,
     efeito: "Muda a mensalidade do cliente e o MRR da base. Não gera movimento de upsell/downsell, então o Net New do mês não vai explicar essa diferença. Nos tenants com Omie ativo, o novo valor vai para o ERP.",
+  },
+  {
+    acao: "email",
+    rotulo: "E-mail",
+    divs: ["email_divergente"],
+    detalhe: (r) => `${r.detalhe?.cadastro?.email?.ds ?? "vazio"} → ${r.detalhe?.cadastro?.email?.hiper ?? "—"}`,
+    efeito: "Substitui o e-mail da ficha pelo do portal.",
+  },
+  {
+    acao: "telefone",
+    rotulo: "Telefone (WhatsApp)",
+    divs: ["telefone_divergente"],
+    detalhe: (r) => `${r.detalhe?.cadastro?.telefone?.ds ?? "vazio"} → ${r.detalhe?.cadastro?.telefone?.hiper ?? "—"}`,
+    efeito: "Substitui o WhatsApp da ficha. Quando é o mesmo número e só falta o nono dígito no portal, a gravação é recusada e o daqui fica.",
+  },
+  {
+    acao: "endereco",
+    rotulo: "Endereço",
+    divs: ["endereco_divergente"],
+    detalhe: (r) => {
+      const h = r.detalhe?.cadastro?.endereco?.hiper;
+      return h ? `${h.logradouro ?? ""}, ${h.numero ?? "s/n"} — ${h.bairro ?? ""} · CEP ${h.cep ?? ""}` : "—";
+    },
+    efeito: "Grava CEP, logradouro, número e bairro, e resolve a cidade pelo nome que o portal manda.",
+  },
+  {
+    acao: "contato",
+    rotulo: "Contato responsável",
+    divs: ["contato_divergente"],
+    detalhe: (r) => `${r.detalhe?.cadastro?.contato?.ds?.nome ?? "vazio"} → ${r.detalhe?.cadastro?.contato?.hiper?.nome ?? "—"}`,
+    efeito: "Grava o nome e o telefone do contato juntos — são a mesma pessoa.",
+  },
+  {
+    acao: "dominio",
+    rotulo: "Domínio na observação",
+    divs: ["dominio_ausente"],
+    detalhe: (r) => `acrescenta "${r.detalhe?.cadastro?.dominio?.hiper ?? "—"}"`,
+    efeito: "ACRESCENTA o domínio ao fim da observação. Nada do que já estava escrito é apagado.",
   },
   {
     acao: "modulos",
@@ -218,6 +281,10 @@ export default function HiperDivergenciasTab({
       // filtra por "filial sem matriz" e "filial com valor" quer os dois montes
       // juntos, não a interseção deles.
       .filter((r) => familias.size === 0 || r.divergencias.some((d) => familias.has(d)))
+      // Sem família marcada, esconde quem só tem divergência leve. Marcar a
+      // família traz de volta: é assim que se chega ao mutirão de preenchimento.
+      .filter((r) => familias.size > 0
+        || r.divergencias.some((d) => !FAMILIAS_LEVES.includes(d)))
       // Vazio = todos. Marcar mais de um soma os montes: "Central de Leads" com
       // "Central de Cobrança" é o recorte de quem a Hiper fatura, e é natural
       // olhar os dois juntos contra o Hiperador.

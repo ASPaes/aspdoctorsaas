@@ -461,3 +461,35 @@ describe("Divergências: ações que o head não pode executar", () => {
     expect(txt).toContain("Cine Gracher (Indaial)");
   });
 });
+
+/**
+ * Os campos de cadastro que o portal passou a mandar em 03/09 trouxeram duas
+ * famílias de volume alto — 629 clientes sem o domínio na observação e 516 com
+ * o contato diferente. Contadas como as outras, elas levariam a lista de 41
+ * para ~640 e esconderiam custo, MRR e módulos.
+ */
+describe("Divergências: preenchimento em massa não soterra a conferência", () => {
+  const so_leve: LinhaRecon = {
+    ...base, id: "leve", razao_social_ds: "So Dominio Ltda",
+    divergencias: ["dominio_ausente"], detalhe: {},
+  };
+  const leve_e_dinheiro: LinhaRecon = {
+    ...base, id: "misto", razao_social_ds: "Custo E Dominio Ltda",
+    divergencias: ["custo_divergente", "dominio_ausente"], detalhe: {},
+  };
+
+  it("cliente cujo ÚNICO problema é o domínio fica fora da lista padrão", () => {
+    render(<HiperDivergenciasTab tid="t1" recon={[so_leve, leve_e_dinheiro]} />);
+    const txt = container.textContent ?? "";
+    expect(txt).not.toContain("So Dominio Ltda");
+    // e quem tem dinheiro divergindo continua aparecendo, com as duas etiquetas
+    expect(txt).toContain("Custo E Dominio Ltda");
+    expect(txt).toContain("Custo diferente");
+  });
+
+  it("a contagem da tela não conta o cliente que só tem divergência leve", () => {
+    render(<HiperDivergenciasTab tid="t1" recon={[so_leve, leve_e_dinheiro]} />);
+    // "1 clientes · página 1 de 1" — o de domínio sozinho não entra
+    expect(container.textContent).toContain("1 clientes");
+  });
+});

@@ -12,6 +12,12 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 03/09
+
+- 🆕 **Telefone, e-mail, endereço, contato e domínio agora são conferidos com o Hiper** — O portal passou a informar esses dados e a aba **Divergências** passou a compará-los com a ficha do cliente. O botão **Atualizar no DoctorSaaS** grava cada um: o endereço entra completo pelo CEP e já resolve a cidade, o contato traz nome e telefone juntos, e o domínio é **acrescentado** à observação sem apagar o que você já tinha escrito. Duas proteções: quando o telefone do portal é o mesmo número só sem o nono dígito, a gravação é recusada e o daqui é mantido; e **Domínio** e **Contato** não entram no contador da aba, porque são preenchimento de cadastro em massa e esconderiam as divergências de dinheiro — você chega neles pelo filtro de famílias.
+
+- 🆕 **Sincronização automática do Hiper, 10:00 de segunda a sexta** — A carteira passa a ser puxada e conferida sozinha toda manhã. Antes, a lista de divergências só era atualizada quando alguém clicava em Sincronizar, e ficava congelada no meio.
+
 ### 02/09
 
 - 🔧 **Aviso de risco de churn apontava frase de dias atrás** — Quando o cliente mandava uma mensagem nova, a análise podia rodar antes de o atendimento existir, e nesse caso ela lia a conversa inteira em vez do atendimento do momento. O resultado era um aviso que chegava hoje citando uma reclamação de dias antes — e você abria o chat e não achava a frase. Agora a análise só olha o atendimento em andamento; sem atendimento aberto, no máximo as últimas 6 horas. Dos avisos já enviados com trecho citado, 2 em 12 vinham dessa falha.
