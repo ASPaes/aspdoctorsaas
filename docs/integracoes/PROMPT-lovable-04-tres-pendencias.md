@@ -1,7 +1,8 @@
-# Prompt 4 para o Lovable — três pendências
+# Prompt 4 para o Lovable — duas pendências (revisado em 04/09)
 
 > Cole este documento inteiro no Lovable do sistema de propostas (Calculadora).
-> Continuação dos prompts 1, 2 e 3. **São só três itens.** Data: 04/09/2026.
+> Continuação dos prompts 1, 2 e 3. **São dois itens** — o terceiro foi cancelado,
+> ver o Item B. Revisado em 04/09/2026.
 
 ---
 
@@ -38,25 +39,20 @@ devolve. Para a Digi Office hoje são três opções: `Cobrança Direta` (12),
 
 ---
 
-## Item B — `vlr_custo` está chegando como zero
+## Item B — ~~`vlr_custo`~~ · **CANCELADO**
 
-Vocês enviam o campo, mas com valor `0`:
+> **Correção de 04/09/2026.** A versão anterior deste documento pedia para tornar
+> o **Custo Operação** um campo obrigatório no formulário. **Ignorem esse pedido.**
 
-```json
-"produtos": [ { "vlr_custo": 0 } ]
-```
+O Custo Operação **não** é responsabilidade de vocês: ele é informado depois, por
+outro caminho, dentro do DoctorSaaS. Não criem campo obrigatório, não segurem
+venda por causa dele e não peçam esse número ao vendedor.
 
-**Zero é um valor válido, não é "vazio".** O DoctorSaaS grava 0 e não avisa nada,
-porque não tem como distinguir "custo zero" de "ninguém preencheu".
+Podem continuar enviando `produtos[].vlr_custo` quando tiverem o valor. Se não
+tiverem, **omitam o campo** — não mandem `0` para dizer "não sei", porque zero é
+um valor válido e o DoctorSaaS vai gravar zero.
 
-É o campo **Custo Operação** da ficha do produto. Duas possibilidades, e vocês
-sabem qual é:
-
-- se a pergunta existe no formulário e o vendedor não preencheu, **tornem-na
-  obrigatória** — é um número que o financeiro usa;
-- se a pergunta ainda não existe, ela é a que falta criar.
-
-Se o custo for realmente zero em alguma venda, mandem `0` mesmo — aí está certo.
+Desculpem o vai-e-vem.
 
 ---
 
@@ -108,14 +104,18 @@ Numa venda nova de teste, a resposta do DoctorSaaS tem que vir com:
 { "ok": true, "ticket_code": "TK-2026-….", "avisos": [] }
 ```
 
-**`avisos` vazio é o critério.** Enquanto faltar qualquer um dos três itens, ele
-vem preenchido dizendo exatamente qual:
-
 | Aviso | Falta |
 |---|---|
-| `contrato_incompleto` | `modelo_contrato_id` (lista os campos) |
+| `contrato_incompleto` | lista os campos do contrato que ficaram em branco |
 | `sem_contrato_assinado` | o anexo do item C |
 | `cadastro_incompleto` | algum campo do cadastro do cliente |
+
+**Só dois avisos dependem de vocês:** `contrato_incompleto` citando
+`modelo_contrato_id` (item A) e `sem_contrato_assinado` (item C).
+
+Se o `contrato_incompleto` citar **`fornecedor_id`** ou **`vlr_custo`**,
+**ignorem** — esses dois são preenchidos do lado do DoctorSaaS e o aviso está
+sendo ajustado aqui para parar de citá-los.
 
 ---
 
