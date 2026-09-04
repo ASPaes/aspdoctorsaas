@@ -125,14 +125,36 @@ Deno.serve(async (req) => {
     // A linha NÃO é reivindicada: simular não pode consumir uma tentativa nem
     // tirar a linha da fila.
     if (corpo.simular === true) {
-      if (!filaId) return json({ ok: false, mensagem: "Informe fila_id para simular." }, 400);
+      // `fila_id` simula uma linha. `fila_ids` simula VÁRIAS como elas de fato
+      // seriam enviadas: um corpo só para a filial. Sem essa forma, a simulação
+      // provaria o caminho antigo e deixaria justamente o novo sem teste.
+      const filaIds = Array.isArray(corpo.fila_ids)
+        ? corpo.fila_ids.filter((x: unknown): x is string => typeof x === "string")
+        : (filaId ? [filaId] : []);
+      if (filaIds.length === 0) return json({ ok: false, mensagem: "Informe fila_id ou fila_ids para simular." }, 400);
 
-      const { data: l, error: errL } = await ds
+      const { data: rows, error: errL } = await ds
         .from("oem_sync_fila")
-        .select("tenant_id, conta_integration_id, empresa_codigo, filial_codigo, oem_modulo_codigo, quantidade, valor_unitario")
-        .eq("id", filaId)
-        .maybeSingle();
-      if (errL || !l) return json({ ok: false, mensagem: "Linha não encontrada." }, 404);
+        .select("id, tenant_id, conta_integration_id, empresa_codigo, filial_codigo, oem_modulo_codigo, quantidade, valor_unitario")
+        .in("id", filaIds);
+      if (errL || !rows || rows.length === 0) return json({ ok: false, mensagem: "Linha não encontrada." }, 404);
+      // Ordem pedida, não a ordem que o banco devolveu: num lote a ordem das
+      // alterações é parte do que se está conferindo.
+      const ls = filaIds.map((id) => rows.find((r) => r.id === id)).filter(Boolean) as typeof rows;
+      const l = ls[0];
+
+      // Simular um lote que a gravação recusaria não prova nada. As duas
+      // guardas são as mesmas do processamento.
+      if (ls.some((x) =>
+        x.conta_integration_id !== l.conta_integration_id ||
+        x.empresa_codigo !== l.empresa_codigo ||
+        x.filial_codigo !== l.filial_codigo
+      )) {
+        return json({ ok: false, mensagem: "As linhas não são todas da mesma conta/empresa/filial. Um lote é sempre de uma filial só." }, 409);
+      }
+      if (new Set(ls.map((x) => x.oem_modulo_codigo)).size !== ls.length) {
+        return json({ ok: false, mensagem: "O mesmo módulo aparece duas vezes no lote. A segunda ordem apagaria a primeira." }, 409);
+      }
 
       // Pela conta DA LINHA. Simular contra a chave de outra unidade responderia
       // sobre uma licença que não é esta.
@@ -155,9 +177,21 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           empresa: l.empresa_codigo,
           filial: l.filial_codigo,
-          modulo_codigo: l.oem_modulo_codigo,
-          nova_quantidade: Number(l.quantidade ?? 0),
-          ...(l.valor_unitario != null ? { valor_unitario: Number(l.valor_unitario) } : {}),
+          // O mesmo corpo que a gravação montaria: uma linha vai na forma
+          // antiga, várias vão como lote.
+          ...(ls.length === 1
+            ? {
+                modulo_codigo: l.oem_modulo_codigo,
+                nova_quantidade: Number(l.quantidade ?? 0),
+                ...(l.valor_unitario != null ? { valor_unitario: Number(l.valor_unitario) } : {}),
+              }
+            : {
+                alteracoes: ls.map((x) => ({
+                  modulo_codigo: x.oem_modulo_codigo,
+                  nova_quantidade: Number(x.quantidade ?? 0),
+                  ...(x.valor_unitario != null ? { valor_unitario: Number(x.valor_unitario) } : {}),
+                })),
+              }),
           simular: true,
           // A simulação passa a mostrar o caminho DOCUMENTADO do parceiro
           // (`minhaslicencas/modulos` + `saveFilial`), que é o único que enxerga
@@ -174,14 +208,51 @@ Deno.serve(async (req) => {
       return json({ ok: resp.ok, simulado: true, http: resp.status, resposta: corpoResp });
     }
 
+    // Devolve uma linha reivindicada para a fila sem queimar tentativa: ela não
+    // chegou a ir ao parceiro, então gastar uma das quatro seria cobrar dela um
+    // erro que não houve.
+    async function devolverParaPendente(x: Linha) {
+      await ds.from("oem_sync_fila").update({
+        status: "pendente",
+        tentativas: Math.max(x.tentativas - 1, 0),
+        proxima_tentativa_em: new Date().toISOString(),
+      }).eq("id", x.id);
+    }
+
     const { data: linhas, error: errC } = await ds.rpc("fn_oem_fila_claim", {
       p_limite: filaId ? 1 : limite,
       p_id: filaId,
     });
     if (errC) return json({ ok: false, mensagem: `Não deu para pegar a fila: ${errC.message}` }, 500);
 
-    const fila = (linhas ?? []) as Linha[];
+    let fila = (linhas ?? []) as Linha[];
     if (fila.length === 0) return json({ ok: true, processadas: 0, ok_count: 0, erros: 0 });
+
+    // ⚠️ O CLIQUE TAMBÉM LEVA O RESTO DA FILIAL, E ISSO NÃO É OTIMIZAÇÃO.
+    //
+    // Pedindo `fila_id`, a tela processava aquela linha e só. Quem cancela dois
+    // módulos em sequência gera duas gravações na mesma filial, e a segunda
+    // apaga a `datavalidade` que a primeira acabou de registrar — foi o que
+    // aconteceu na DEGUST CONCEITO em 03/09/2026. Levar junto o que estiver
+    // pendente para a MESMA filial faz as duas irem num corpo só, e reafirma o
+    // cancelamento anterior em vez de apagá-lo.
+    //
+    // O que for de outra filial volta para 'pendente' na hora: o clique não tem
+    // por que esperar pelo trabalho dos outros, e o cron pega em ≤ 2 min.
+    if (filaId && fila.length === 1) {
+      const alvo = fila[0];
+      const { data: extras } = await ds.rpc("fn_oem_fila_claim", { p_limite: limite, p_id: null });
+      const mesmaFilial: Linha[] = [];
+      for (const x of (extras ?? []) as Linha[]) {
+        if (
+          x.conta_integration_id === alvo.conta_integration_id &&
+          x.empresa_codigo === alvo.empresa_codigo &&
+          x.filial_codigo === alvo.filial_codigo
+        ) mesmaFilial.push(x);
+        else await devolverParaPendente(x);
+      }
+      fila = [alvo, ...mesmaFilial];
+    }
 
     // Cache por CONTA, não por tenant. Era por tenant, e o tenant com duas
     // unidades conectadas mandava tudo pela chave da primeira: a alteração de um
@@ -206,6 +277,27 @@ Deno.serve(async (req) => {
     }
 
     let okCount = 0, erros = 0;
+
+    // ===================================================================
+    // UMA GRAVAÇÃO POR FILIAL
+    //
+    // A rota do parceiro (`saveFilial`) grava a filial INTEIRA, e o OEM
+    // registra cancelamento como `datavalidade` — o módulo continua ativo,
+    // com uma data futura, e é ela que o desliga. A gravação seguinte reenvia
+    // esse módulo como ativo e o OEM APAGA a data.
+    //
+    // Medido em 04/09/2026 na filial 28533 (DEGUST CONCEITO): quatro linhas
+    // desta fila, 4 segundos entre uma e outra, cada gravação apagando a baixa
+    // registrada pela anterior. Os três cancelamentos voltaram `ok` com HTTP
+    // 200 e nenhum ficou de pé. No mesmo lote, as filiais que receberam uma
+    // linha só e nenhuma gravação depois (20314, 19744) estão com a baixa
+    // marcada até hoje. O que decidia se um cancelamento valia era o azar de
+    // ter outra linha atrás dele.
+    //
+    // Por isso as linhas da mesma filial viram UM pedido. Enviar uma por vez
+    // não é mais lento: é errado.
+    // ===================================================================
+    const grupos = new Map<string, { c: { api_url: string; chave: string }; linhas: Linha[] }>();
 
     for (const l of fila) {
       // Falta de dado não é falha temporária: repetir não conserta. A linha para
@@ -243,6 +335,35 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // A conta entra na chave junto com empresa/filial: duas contas do OEM
+      // podem numerar a mesma filial, e juntá-las mandaria a alteração de uma
+      // com a chave da outra.
+      const chaveGrupo = `${l.conta_integration_id}|${l.empresa_codigo}|${l.filial_codigo}`;
+      const g = grupos.get(chaveGrupo);
+      if (g) g.linhas.push(l);
+      else grupos.set(chaveGrupo, { c, linhas: [l] });
+    }
+
+    for (const { c, linhas: doGrupo } of grupos.values()) {
+      // ⚠️ DUAS ORDENS PARA O MESMO MÓDULO NÃO CABEM NA MESMA GRAVAÇÃO.
+      // A segunda apagaria a primeira dentro do próprio corpo, sem deixar
+      // rastro — a forma exata do defeito que se está consertando. A mais
+      // antiga vai agora (a fila é FIFO e a ordem entre elas é o que o
+      // usuário pediu); as outras voltam para 'pendente' e pegam o ciclo
+      // seguinte, sem queimar tentativa.
+      const linhas: Linha[] = [];
+      const adiadas: Linha[] = [];
+      const jaNoLote = new Set<number>();
+      for (const l of doGrupo) {
+        if (jaNoLote.has(l.oem_modulo_codigo!)) adiadas.push(l);
+        else { jaNoLote.add(l.oem_modulo_codigo!); linhas.push(l); }
+      }
+      for (const x of adiadas) await devolverParaPendente(x);
+
+      // A primeira linha responde pelos dados que são da FILIAL (empresa,
+      // filial, conta). Quantidade e módulo continuam sendo de cada linha.
+      const l = linhas[0];
+
       const novaQtd = Number(l.quantidade ?? 0);
       let resposta: unknown = null;
       let http: number | null = null;
@@ -256,11 +377,24 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             empresa: l.empresa_codigo,
             filial: l.filial_codigo,
-            modulo_codigo: l.oem_modulo_codigo,
-            nova_quantidade: novaQtd,
-            // Só serve para acrescentar módulo que ainda não está na licença; o
-            // parceiro recusa incluir sem preço.
-            ...(l.valor_unitario != null ? { valor_unitario: Number(l.valor_unitario) } : {}),
+            // Com uma linha só, o corpo é o de sempre. O lote é a forma nova, e
+            // manter a antiga intacta para o caso comum é o que deixa dizer,
+            // se algo quebrar, que foi o lote e não a troca.
+            ...(linhas.length === 1
+              ? {
+                  modulo_codigo: l.oem_modulo_codigo,
+                  nova_quantidade: novaQtd,
+                  // Só serve para acrescentar módulo que ainda não está na licença; o
+                  // parceiro recusa incluir sem preço.
+                  ...(l.valor_unitario != null ? { valor_unitario: Number(l.valor_unitario) } : {}),
+                }
+              : {
+                  alteracoes: linhas.map((x) => ({
+                    modulo_codigo: x.oem_modulo_codigo,
+                    nova_quantidade: Number(x.quantidade ?? 0),
+                    ...(x.valor_unitario != null ? { valor_unitario: Number(x.valor_unitario) } : {}),
+                  })),
+                }),
             par_documentado: GRAVAR_PELO_PAR_DOCUMENTADO,
           }),
         });
@@ -277,18 +411,24 @@ Deno.serve(async (req) => {
 
       // O log de tentativas já existia para o cancelamento; a fila escreve nele
       // também, para não haver dois históricos contando a mesma coisa.
-      await ds.from("oem_baixa_modulo_log").insert({
-        tenant_id: l.tenant_id,
-        cliente_produto_id: l.cliente_produto_id,
-        empresa_codigo: l.empresa_codigo,
-        filial_codigo: l.filial_codigo,
-        oem_modulo_codigo: l.oem_modulo_codigo,
-        nova_quantidade: novaQtd,
-        simulado: false,
-        ok: sucesso,
-        http,
-        resposta: resposta as Record<string, unknown> | null,
-      });
+      //
+      // Uma entrada POR MÓDULO, mesmo sendo uma gravação só: quem vai ao log
+      // procura o que aconteceu com um módulo, e uma linha só com o primeiro
+      // deles esconderia os outros do histórico.
+      await ds.from("oem_baixa_modulo_log").insert(
+        linhas.map((x) => ({
+          tenant_id: x.tenant_id,
+          cliente_produto_id: x.cliente_produto_id,
+          empresa_codigo: x.empresa_codigo,
+          filial_codigo: x.filial_codigo,
+          oem_modulo_codigo: x.oem_modulo_codigo,
+          nova_quantidade: Number(x.quantidade ?? 0),
+          simulado: false,
+          ok: sucesso,
+          http,
+          resposta: resposta as Record<string, unknown> | null,
+        })),
+      );
 
       // ------------------------------------------------- o parceiro CONFERIU?
       // Desde 28/08/2026 a `oem-licenca-modulo` relê a filial depois de gravar
@@ -309,64 +449,79 @@ Deno.serve(async (req) => {
       // Quem for reintroduzir bloqueio aqui: só com um sinal que distinga
       // "atrasou" de "não aplicou". O status HTTP não distingue, e a releitura
       // imediata também não.
+      // O resultado é da GRAVAÇÃO, então vale igual para todas as linhas do
+      // grupo: uma só foi ao parceiro. Cada linha, porém, tem a sua ficha para
+      // atualizar e o seu contador de tentativas.
       if (sucesso) {
-        // O parceiro aceitou. SÓ AGORA a ficha muda — é esta ordem que impede
-        // as duas bases de divergirem, e é a mesma de antes da fila existir.
-        //
-        // Se a gravação daqui falhar, a linha NÃO volta para 'erro': repetir
-        // reenviaria ao OEM uma baixa que ele já fez. Fica 'invalido' com o
-        // motivo, para gente decidir.
-        const { data: aplic, error: errA } = await ds.rpc("fn_oem_fila_aplicar", { p_id: l.id });
-        if (errA) {
-          erros++;
+        for (const x of linhas) {
+          // O parceiro aceitou. SÓ AGORA a ficha muda — é esta ordem que impede
+          // as duas bases de divergirem, e é a mesma de antes da fila existir.
+          //
+          // Se a gravação daqui falhar, a linha NÃO volta para 'erro': repetir
+          // reenviaria ao OEM uma baixa que ele já fez. Fica 'invalido' com o
+          // motivo, para gente decidir.
+          const { data: aplic, error: errA } = await ds.rpc("fn_oem_fila_aplicar", { p_id: x.id });
+          if (errA) {
+            erros++;
+            await ds.from("oem_sync_fila").update({
+              status: "invalido",
+              ultimo_erro: `O OEM aceitou, mas a ficha não foi atualizada: ${errA.message}`,
+              resposta: resposta as Record<string, unknown> | null,
+              http,
+              processado_em: new Date().toISOString(),
+            }).eq("id", x.id);
+            continue;
+          }
+          okCount++;
           await ds.from("oem_sync_fila").update({
-            status: "invalido",
-            ultimo_erro: `O OEM aceitou, mas a ficha não foi atualizada: ${errA.message}`,
-            resposta: resposta as Record<string, unknown> | null,
+            status: "ok",
+            ultimo_erro: null,
+            resposta: {
+              oem: resposta as Record<string, unknown> | null,
+              ficha: aplic as Record<string, unknown> | null,
+              // Quantas linhas foram nesta mesma gravação. Sem isso, olhar a
+              // aba Fila depois não distingue "quatro gravações" de "uma com
+              // quatro módulos", e é essa diferença que decide se o
+              // cancelamento fica de pé.
+              ...(linhas.length > 1 ? { lote_da_filial: linhas.length } : {}),
+            },
             http,
             processado_em: new Date().toISOString(),
-          }).eq("id", l.id);
-          continue;
+          }).eq("id", x.id);
         }
-        okCount++;
-        await ds.from("oem_sync_fila").update({
-          status: "ok",
-          ultimo_erro: null,
-          resposta: {
-            oem: resposta as Record<string, unknown> | null,
-            ficha: aplic as Record<string, unknown> | null,
-          },
-          http,
-          processado_em: new Date().toISOString(),
-        }).eq("id", l.id);
         continue;
       }
 
-      erros++;
-      const espera = ESPERA[l.tentativas - 1];
-      if (espera === undefined) {
-        // Esgotou. Fica visível e parada, esperando decisão de gente — repetir
-        // para sempre só enche o log e a fatura.
-        await ds.from("oem_sync_fila").update({
-          status: "invalido",
-          ultimo_erro: `${motivo} (desistiu após ${l.tentativas} tentativas)`,
-          resposta: resposta as Record<string, unknown> | null,
-          http,
-          processado_em: new Date().toISOString(),
-        }).eq("id", l.id);
-      } else {
-        await ds.from("oem_sync_fila").update({
-          status: "erro",
-          ultimo_erro: motivo,
-          resposta: resposta as Record<string, unknown> | null,
-          http,
-          proxima_tentativa_em: new Date(Date.now() + espera * 60_000).toISOString(),
-          processado_em: new Date().toISOString(),
-        }).eq("id", l.id);
+      for (const x of linhas) {
+        erros++;
+        const espera = ESPERA[x.tentativas - 1];
+        if (espera === undefined) {
+          // Esgotou. Fica visível e parada, esperando decisão de gente — repetir
+          // para sempre só enche o log e a fatura.
+          await ds.from("oem_sync_fila").update({
+            status: "invalido",
+            ultimo_erro: `${motivo} (desistiu após ${x.tentativas} tentativas)`,
+            resposta: resposta as Record<string, unknown> | null,
+            http,
+            processado_em: new Date().toISOString(),
+          }).eq("id", x.id);
+        } else {
+          await ds.from("oem_sync_fila").update({
+            status: "erro",
+            ultimo_erro: motivo,
+            resposta: resposta as Record<string, unknown> | null,
+            http,
+            proxima_tentativa_em: new Date(Date.now() + espera * 60_000).toISOString(),
+            processado_em: new Date().toISOString(),
+          }).eq("id", x.id);
+        }
       }
     }
 
-    return json({ ok: true, processadas: fila.length, ok_count: okCount, erros });
+    // `gravacoes` < `processadas` é o sinal de que o agrupamento pegou: são
+    // linhas que antes teriam ido em chamadas separadas, cada uma apagando a
+    // baixa da anterior.
+    return json({ ok: true, processadas: fila.length, gravacoes: grupos.size, ok_count: okCount, erros });
   } catch (e) {
     return json({ ok: false, mensagem: e instanceof Error ? e.message : String(e) }, 500);
   }

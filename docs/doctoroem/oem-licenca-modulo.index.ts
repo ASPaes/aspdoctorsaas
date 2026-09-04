@@ -175,22 +175,59 @@ function pega(obj, ...nomes) {
 }
 /**
  * Monta o corpo do `saveFilial` a partir do que a leitura documentada devolveu,
- * aplicando UMA alteração.
+ * aplicando TODAS as alterações pedidas para esta filial de uma vez.
  *
  * O payload NASCE do que foi lido — inclusive `datavalidade` e `datacadastro` de
- * cada módulo. Só o alvo muda. É exatamente isso que o caminho antigo não fazia:
- * ele remontava cada módulo com 5 campos, e tudo o que a leitura não trouxe
- * sumia. Como a rota salva a filial INTEIRA, o que some da requisição some da
- * licença.
+ * cada módulo. Só os alvos mudam. É exatamente isso que o caminho antigo não
+ * fazia: ele remontava cada módulo com 5 campos, e tudo o que a leitura não
+ * trouxe sumia. Como a rota salva a filial INTEIRA, o que some da requisição
+ * some da licença.
+ *
+ * ⚠️ POR QUE É UMA LISTA, E NÃO UMA ALTERAÇÃO POR CHAMADA
+ * O OEM registra cancelamento como `datavalidade`: o módulo continua
+ * `ativo: true`, com uma data futura, e é ela que o desliga. A gravação
+ * SEGUINTE reenvia esse módulo como ativo e o OEM APAGA a data.
+ *
+ * Medido em 04/09/2026 na filial 28533 (DEGUST CONCEITO): quatro gravações em
+ * 12 segundos — reduzir PDV, cancelar IFood, cancelar 99 Food, ativar Servidor
+ * Legal. A leitura de cada uma mostrava a data posta pela anterior, e a
+ * gravação a apagava. Resultado: nenhum dos três cancelamentos ficou de pé, e
+ * os três voltaram `ok` com HTTP 200. No MESMO lote, as filiais 20314 e 19744
+ * receberam um cancelamento e nenhuma gravação depois: as duas estão com a
+ * baixa marcada para 30/09 até hoje.
+ *
+ * Ou seja: o que decidia se um cancelamento valia não era o cancelamento, era
+ * o azar de ter outra gravação atrás dele. Uma gravação por filial fecha isso.
  *
  * Função separada de propósito: é o miolo da mudança, e é ela que o teste
  * exercita. Deixá-la embutida no handler significaria testar uma cópia.
  *
- * Devolve `{novo, alvo, diferencas}` ou `{erro}`.
+ * `alteracoes`: `[{ codigo, quantidade }]`, aplicadas na ordem recebida.
+ * Devolve `{novo, alvos, diferencas, completados}` ou `{erro}`.
  */
-function montarPayloadDocumentado(lido, escalares, moduloCodigo, novaQtd) {
-  if (moduloCodigo === 8) {
+function montarPayloadDocumentado(lido, escalares, alteracoes) {
+  if (!Array.isArray(alteracoes) || alteracoes.length === 0) {
+    return { erro: { status: 400, mensagem: "Nenhuma alteração de módulo foi pedida. Nada foi enviado." } };
+  }
+  if (alteracoes.some((a)=>a.codigo === 8)) {
     return { erro: { status: 400, mensagem: "O código 8 é o produto da licença, não um módulo. Nada foi enviado." } };
+  }
+  if (alteracoes.some((a)=>a.codigo === undefined || a.codigo === null)) {
+    return { erro: { status: 400, mensagem: "Alteração sem código de módulo. Nada foi enviado." } };
+  }
+  // Duas ordens para o MESMO módulo no mesmo corpo: a segunda apagaria a
+  // primeira sem deixar rastro, que é a forma do defeito que esta função
+  // existe para evitar. Quem chama tem que separar em gravações distintas —
+  // e, sabendo o que se sabe hoje, decidir qual das duas ainda vale.
+  const vistos = new Set();
+  for (const a of alteracoes) {
+    if (vistos.has(a.codigo)) {
+      return { erro: {
+        status: 409,
+        mensagem: `O módulo ${a.codigo} aparece duas vezes no mesmo pedido. Nada foi enviado.`
+      } };
+    }
+    vistos.add(a.codigo);
   }
 
   // ⚠️ A LEITURA DOCUMENTADA VEM INCOMPLETA, e isso foi medido em 28/08/2026 na
@@ -231,40 +268,42 @@ function montarPayloadDocumentado(lido, escalares, moduloCodigo, novaQtd) {
     novo[k] = escalares[k];
   }
 
-  // Nesta rota, 9 e 10 SÃO módulos da lista, com a quantidade certa — ao
-  // contrário da rota antiga, onde eles só existem como campo próprio. Mexer
-  // neles aqui é mexer na lista; o campo de topo acompanha, para as duas
-  // representações não divergirem dentro do mesmo corpo.
-  const CAMPO_ESPELHO = { 9: "usuariosAdicionais", 10: "pdvComandas" };
-
-  const idx = novo.modulos.findIndex((m)=>num(pega(m, "codigo", "codModulo", "cod")) === moduloCodigo);
-  if (idx < 0) {
-    return { erro: {
-      status: 404,
-      mensagem: `A licença não tem o módulo ${moduloCodigo}. Nada foi enviado.`,
-      modulos_na_licenca: novo.modulos.map((m)=>pega(m, "codigo"))
-    } };
+  // Uma passada por alteração, todas no MESMO objeto. A licença que sai daqui
+  // é a filial com tudo o que foi pedido já aplicado — não a filial com uma
+  // mudança, gravada N vezes.
+  const alvos = [];
+  for (const { codigo: moduloCodigo, quantidade: novaQtd } of alteracoes) {
+    const idx = novo.modulos.findIndex((m)=>num(pega(m, "codigo", "codModulo", "cod")) === moduloCodigo);
+    if (idx < 0) {
+      // Falta UM módulo, não grava NENHUM. Gravar o resto deixaria o pedido
+      // metade feito com resposta de sucesso, que é pior do que não gravar.
+      return { erro: {
+        status: 404,
+        mensagem: `A licença não tem o módulo ${moduloCodigo}. Nada foi enviado.`,
+        modulos_na_licenca: novo.modulos.map((m)=>pega(m, "codigo"))
+      } };
+    }
+    const antesMod = JSON.parse(JSON.stringify(novo.modulos[idx]));
+    const unit = num(pega(novo.modulos[idx], "valorUnitario")) ?? 0;
+    if (novaQtd > 0) {
+      novo.modulos[idx].ativo = true;
+      novo.modulos[idx].quantidade = novaQtd;
+      novo.modulos[idx].valorTotal = Math.round(unit * novaQtd * 100) / 100;
+      // O CONSERTO. Módulo cancelado carrega uma data futura, e é ela que o
+      // mantém desligado para o cliente — não o `ativo`. Reativar sem limpá-la
+      // foi o que falhou em 28/08 no CAMPINA VERDE. Limpar sem ligar seria pior,
+      // então as duas coisas andam juntas.
+      novo.modulos[idx].datavalidade = null;
+    } else {
+      novo.modulos[idx].ativo = false;
+      novo.modulos[idx].quantidade = 0;
+      novo.modulos[idx].valorTotal = 0;
+      // A data da baixa quem põe é o parceiro. Inventar uma aqui seria decidir
+      // por ele quando o cliente deixa de ter o módulo.
+    }
+    if (CAMPO_ESPELHO[moduloCodigo]) novo[CAMPO_ESPELHO[moduloCodigo]] = novaQtd;
+    alvos.push({ tipo: "modulo", codigo: moduloCodigo, de: antesMod, para: novo.modulos[idx] });
   }
-  const antesMod = JSON.parse(JSON.stringify(novo.modulos[idx]));
-  const unit = num(pega(novo.modulos[idx], "valorUnitario")) ?? 0;
-  if (novaQtd > 0) {
-    novo.modulos[idx].ativo = true;
-    novo.modulos[idx].quantidade = novaQtd;
-    novo.modulos[idx].valorTotal = Math.round(unit * novaQtd * 100) / 100;
-    // O CONSERTO. Módulo cancelado carrega uma data futura, e é ela que o
-    // mantém desligado para o cliente — não o `ativo`. Reativar sem limpá-la
-    // foi o que falhou em 28/08 no CAMPINA VERDE. Limpar sem ligar seria pior,
-    // então as duas coisas andam juntas.
-    novo.modulos[idx].datavalidade = null;
-  } else {
-    novo.modulos[idx].ativo = false;
-    novo.modulos[idx].quantidade = 0;
-    novo.modulos[idx].valorTotal = 0;
-    // A data da baixa quem põe é o parceiro. Inventar uma aqui seria decidir
-    // por ele quando o cliente deixa de ter o módulo.
-  }
-  if (CAMPO_ESPELHO[moduloCodigo]) novo[CAMPO_ESPELHO[moduloCodigo]] = novaQtd;
-  const alvo = { tipo: "modulo", codigo: moduloCodigo, de: antesMod, para: novo.modulos[idx] };
 
   // O que muda ALÉM do que foi pedido e do que foi completado. Esta lista tem
   // que ficar com a alteração pedida e nada mais: qualquer outra entrada é
@@ -288,7 +327,7 @@ function montarPayloadDocumentado(lido, escalares, moduloCodigo, novaQtd) {
     }
   }
 
-  return { novo, alvo, diferencas, completados };
+  return { novo, alvos, diferencas, completados };
 }
 
 const num = (v)=>{
@@ -329,9 +368,28 @@ Deno.serve(async (req)=>{
     const corpo = await req.json().catch(()=>({}));
     const empresa = String(corpo.empresa ?? "").replace(/\D/g, "");
     const filial = String(corpo.filial ?? "").replace(/\D/g, "");
-    const moduloCodigo = num(corpo.modulo_codigo);
-    // null/0 = desliga o módulo. Número > 0 = fica ligado com essa quantidade.
-    const novaQtd = num(corpo.nova_quantidade) ?? 0;
+    // Duas formas de pedir a mesma coisa, e a antiga continua valendo:
+    //   {modulo_codigo, nova_quantidade}                    -> uma alteração
+    //   {alteracoes: [{modulo_codigo, nova_quantidade}, …]}  -> várias, UMA gravação
+    //
+    // A forma em lista é a que fecha o buraco do `datavalidade` (ver
+    // `montarPayloadDocumentado`). A forma antiga fica porque a ficha do
+    // cliente e a simulação chamam com um módulo só, e trocar as duas coisas
+    // no mesmo passo é como se perde a chance de saber qual delas quebrou.
+    const alteracoes = Array.isArray(corpo.alteracoes) && corpo.alteracoes.length
+      ? corpo.alteracoes.map((a)=>({
+          codigo: num(pega(a ?? {}, "modulo_codigo", "codigo")),
+          // null/0 = desliga o módulo. Número > 0 = fica ligado com essa quantidade.
+          quantidade: num(pega(a ?? {}, "nova_quantidade", "quantidade")) ?? 0
+        }))
+      : (num(corpo.modulo_codigo) === undefined
+          ? []
+          : [{ codigo: num(corpo.modulo_codigo), quantidade: num(corpo.nova_quantidade) ?? 0 }]);
+    // O resto do arquivo (o caminho antigo do pdvlegal, cadastro e estado)
+    // continua raciocinando sobre UM módulo. Ele recebe o primeiro; o lote em
+    // si é recusado mais abaixo, porque aquele caminho não sabe gravar dois.
+    const moduloCodigo = alteracoes[0]?.codigo;
+    const novaQtd = alteracoes[0]?.quantidade ?? 0;
     const simular = corpo.simular === true;
     // Modo cadastro: sem modulo_codigo e com pelo menos um campo de cadastro.
     const novoNome = corpo.novo_nome === undefined || corpo.novo_nome === null ? undefined : String(corpo.novo_nome).trim();
@@ -380,6 +438,19 @@ Deno.serve(async (req)=>{
         ok: false,
         etapa: "entrada",
         mensagem: "novo_nome vazio apagaria o nome da loja no OEM. Nada foi enviado."
+      }, {
+        status: 400,
+        headers: cors
+      });
+    }
+    // O lote só existe no caminho documentado. O do pdvlegal grava um módulo
+    // por vez, e gravar o primeiro devolvendo sucesso deixaria o resto por
+    // fazer sem ninguém saber — exatamente o que se está consertando.
+    if (alteracoes.length > 1 && !(corpo.par_documentado === true)) {
+      return Response.json({
+        ok: false,
+        etapa: "entrada",
+        mensagem: "Lote de módulos só pelo caminho documentado. Envie par_documentado: true. Nada foi enviado."
       }, {
         status: 400,
         headers: cors
@@ -836,14 +907,18 @@ Deno.serve(async (req)=>{
       }
 
       // --------------------------------------------------------- modificar
-      const montado = montarPayloadDocumentado(lido, escalares, moduloCodigo, novaQtd);
+      const montado = montarPayloadDocumentado(lido, escalares, alteracoes);
       if (montado.erro) {
         return Response.json({
           ok: false, etapa: "modulo", ...montado.erro
         }, { status: montado.erro.status ?? 400, headers: cors });
       }
       const novo = montado.novo;
-      const alvoDescrito = montado.alvo;
+      const alvos = montado.alvos;
+      // `alvo` no singular continua saindo na resposta: a aba Fila e o log
+      // guardam esse campo desde antes do lote, e sumir com ele quebraria a
+      // leitura do que já está gravado. Com um módulo só, é o mesmo de sempre.
+      const alvoDescrito = alvos.length === 1 ? alvos[0] : alvos;
       const diferencas = montado.diferencas;
       const completados = montado.completados;
 
@@ -853,6 +928,7 @@ Deno.serve(async (req)=>{
           codproduto: codProdutoDoc, url_leitura: urlLer,
           url_gravacao: `${LEITURA}/licenciamento/minhaslicencas/saveFilial`,
           alvo: alvoDescrito,
+          alvos,
           completados,
           diferencas,
           leitura: lido,
@@ -871,31 +947,54 @@ Deno.serve(async (req)=>{
       try { respSave = JSON.parse(txtSave); } catch {}
 
       // Releitura pelo MESMO caminho, que é o único que enxerga `datavalidade`.
+      //
+      // Uma releitura só, conferindo TODOS os módulos do lote. O critério de
+      // "confirmado" continua o de antes (quantidade batendo, sem data quando
+      // se pediu quantidade) e ele ainda erra no cancelamento, porque o OEM
+      // registra baixa como data e devolve o módulo ativo — está no passo 2,
+      // separado de propósito. O que muda aqui é que ela RODA: lia `CAMPO_DOC`,
+      // que nunca foi definido, e desde 28/08/2026 toda gravação documentada
+      // caía no catch com "CAMPO_DOC is not defined".
       let conferencia = null;
+      let conferencias = null;
       if (rSave.ok) {
         try {
           const rConf = await fetch(urlLer, { headers: { Authorization: `Bearer ${tk}`, Accept: "application/json" } });
           const depois = await rConf.json().catch(()=>null);
           if (depois) {
-            const mod = (pega(depois, "modulos") ?? []).find((m)=>num(pega(m, "codigo")) === moduloCodigo);
-            const campo = CAMPO_DOC[moduloCodigo];
-            const encontrado = campo
-              ? num(pega(depois, campo)) ?? 0
-              : (mod === undefined ? 0 : (pega(mod, "ativo") === false ? 0 : num(pega(mod, "quantidade")) ?? 0));
-            const dataDepois = mod ? pega(mod, "datavalidade") : null;
-            conferencia = {
+            conferencias = alteracoes.map(({ codigo, quantidade })=>{
+              const mod = (pega(depois, "modulos") ?? []).find((m)=>num(pega(m, "codigo")) === codigo);
+              const campo = CAMPO_ESPELHO[codigo];
+              const encontrado = campo
+                ? num(pega(depois, campo)) ?? 0
+                : (mod === undefined ? 0 : (pega(mod, "ativo") === false ? 0 : num(pega(mod, "quantidade")) ?? 0));
+              const dataDepois = mod ? pega(mod, "datavalidade") : null;
+              return {
+                par: "documentado",
+                codigo,
+                campo: campo ?? `modulos[${codigo}]`,
+                esperado: quantidade,
+                encontrado,
+                // Agora dá para conferir o que de fato manda: a data.
+                datavalidade: dataDepois ?? null,
+                confirmado: encontrado === quantidade && (quantidade === 0 || !dataDepois),
+                mensagem: encontrado !== quantidade
+                  ? `Gravado, mas a licença mostra ${encontrado} e não ${quantidade}.`
+                  : (quantidade > 0 && dataDepois)
+                    ? `Quantidade certa, mas o módulo ficou com validade até ${String(dataDepois).slice(0,10)}, e ele seria desativado nessa data.`
+                    : "Relido no OEM pelo caminho documentado: confere."
+              };
+            });
+            conferencia = conferencias.length === 1 ? conferencias[0] : {
               par: "documentado",
-              campo: campo ?? `modulos[${moduloCodigo}]`,
-              esperado: novaQtd,
-              encontrado,
-              // Agora dá para conferir o que de fato manda: a data.
-              datavalidade: dataDepois ?? null,
-              confirmado: encontrado === novaQtd && (novaQtd === 0 || !dataDepois),
-              mensagem: encontrado !== novaQtd
-                ? `Gravado, mas a licença mostra ${encontrado} e não ${novaQtd}.`
-                : (novaQtd > 0 && dataDepois)
-                  ? `Quantidade certa, mas o módulo ficou com validade até ${String(dataDepois).slice(0,10)} — ele seria desativado nessa data.`
-                  : "Relido no OEM pelo caminho documentado: confere."
+              // Num lote, "confirmado" é o E de todos: um módulo que não bateu
+              // é o lote que não bateu. Somar como "quase certo" esconderia
+              // justamente a linha que precisa de gente.
+              confirmado: conferencias.every((c)=>c.confirmado),
+              itens: conferencias,
+              mensagem: conferencias.every((c)=>c.confirmado)
+                ? `Relidos no OEM pelo caminho documentado: os ${conferencias.length} conferem.`
+                : conferencias.filter((c)=>!c.confirmado).map((c)=>`módulo ${c.codigo}: ${c.mensagem}`).join(" ")
             };
           }
         } catch (e) {
@@ -905,8 +1004,8 @@ Deno.serve(async (req)=>{
 
       return Response.json({
         ok: rSave.ok, http: rSave.status, par: "documentado",
-        codproduto: codProdutoDoc, alvo: alvoDescrito, completados, diferencas,
-        payload: novo, resposta: respSave, conferencia
+        codproduto: codProdutoDoc, alvo: alvoDescrito, alvos, completados, diferencas,
+        payload: novo, resposta: respSave, conferencia, conferencias
       }, { status: rSave.ok ? 200 : 502, headers: cors });
     }
 
