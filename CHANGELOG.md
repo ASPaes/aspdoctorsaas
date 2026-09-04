@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 04/09
 
+- 🔧 **Módulo vindo da calculadora entrava com custo zerado** — Na ficha do cliente o *Vlr Custo* aparecia R$ 0,00 num módulo que o OEM cobra, porque a proposta não informa custo e quem informa é o campo do diálogo de *Adicionar Módulo*. Agora o DoctorSaaS pergunta o preço ao próprio OEM: o que o parceiro cobra **daquele cliente** primeiro, e a tabela de preços como reserva. Unidade que o parceiro dá de cortesia continua valendo zero, e o valor digitado na tela continua mandando.
+
 - 🔧 **Up-sell da calculadora era recusado por causa do produto** — A proposta manda o produto da linha comercial, mas num up-sell o produto não é escolha: é o que o cliente já tem contratado. Quatro vendas foram recusadas por isso e precisaram ser lançadas à mão. Agora o DoctorSaaS acha sozinho em qual produto do cliente a venda entra e traduz os módulos para o catálogo certo, avisando no registro da proposta o que foi corrigido. Quando duas fichas do cliente poderiam receber a venda, ele continua recusando e mostra as opções, em vez de escolher no escuro.
 
 - 🔧 **Cliente com CNPJ repetido podia receber a venda na ficha errada** — A busca pegava uma das fichas ao acaso. Numa alteração, quem decide passou a ser qual das fichas tem o produto; nos outros casos a proposta é recusada com a lista das fichas, para alguém consolidar antes. Hoje há 69 CNPJs com mais de um cadastro na Digi Office.
