@@ -174,6 +174,19 @@ function pega(obj, ...nomes) {
   return undefined;
 }
 /**
+ * Nesta rota, 9 e 10 SÃO módulos da lista, com a quantidade certa — ao
+ * contrário da rota antiga, onde eles só existem como campo próprio. Mexer
+ * neles é mexer na lista; o campo de topo acompanha, para as duas
+ * representações não divergirem dentro do mesmo corpo.
+ *
+ * Fica no escopo do ARQUIVO porque a conferência também precisa dele. Ela lia
+ * um `CAMPO_DOC` que nunca existiu e, como nome só se resolve na execução,
+ * toda gravação pelo caminho documentado caía no catch com "CAMPO_DOC is not
+ * defined" desde 28/08/2026: a rede de segurança da gravação nunca rodou.
+ */
+const CAMPO_ESPELHO = { 9: "usuariosAdicionais", 10: "pdvComandas" };
+
+/**
  * Monta o corpo do `saveFilial` a partir do que a leitura documentada devolveu,
  * aplicando TODAS as alterações pedidas para esta filial de uma vez.
  *
