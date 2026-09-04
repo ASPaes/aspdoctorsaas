@@ -98,7 +98,9 @@ function Grupo({ titulo, dados }: { titulo: string; dados: Record<string, unknow
   if (!linhas.length && !objetos.length) return null;
   return (
     <div className="space-y-2">
-      <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</h4>
+      {titulo && (
+        <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</h4>
+      )}
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
         {linhas.map(([k, v]) => (
           <div key={k} className="flex gap-2 min-w-0">
@@ -114,14 +116,41 @@ function Grupo({ titulo, dados }: { titulo: string; dados: Record<string, unknow
   );
 }
 
+// Ordem de leitura do resumo em PDF que o vendedor gera na origem — é o
+// documento que o especialista de implantação já usa para se alinhar, e a tela
+// segue a mesma sequência para as duas coisas serem conferíveis lado a lado.
+// Seção que não estiver nesta lista entra depois, na ordem em que chegou.
+const SECAO_ORDEM = [
+  "Classificação", "Dados Cliente", "Dados Comerciais",
+  "Implantação", "Dados Contabilidade", "Outras Informações",
+];
+const posicaoSecao = (nome: string) => {
+  const i = SECAO_ORDEM.indexOf(nome);
+  return i === -1 ? SECAO_ORDEM.length : i;
+};
+
+// Faixa de seção. O mesmo device do PDF de origem: título curto em caixa alta
+// sobre uma barra, para o olho achar a seção sem ler.
+function FaixaSecao({ children }: { children: React.ReactNode }) {
+  return (
+    <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/90
+                   bg-muted/70 border-y border-border px-2.5 py-1.5 rounded-sm">
+      {children}
+    </h4>
+  );
+}
+
 // O que o vendedor levantou no formulário, agrupado como ele preencheu.
 //
-// A ordem do array é a ordem da tela de origem e é preservada. O agrupamento sai
-// de `secao`, que o sistema de propostas manda em cada resposta; enquanto ele
-// não mandar, tudo cai num bloco só. Deduzir a seção pelo texto da pergunta
-// seria pior do que não agrupar: quebra em silêncio no dia em que alguém
-// renomear um campo lá, e ninguém descobre porque a tela continua desenhando.
-function Respostas({ itens }: { itens: any[] }) {
+// A ordem do array é a ordem da tela de origem e é preservada dentro de cada
+// seção. O agrupamento sai de `secao`, que o sistema de propostas manda em cada
+// resposta; sem ele, tudo cai num bloco só. Deduzir a seção pelo texto da
+// pergunta seria pior do que não agrupar: quebra em silêncio no dia em que
+// renomearem um campo lá, e ninguém descobre porque a tela continua desenhando.
+//
+// `apos` injeta um bloco logo depois de uma seção — é como a tabela de módulos
+// cai entre Implantação e Contabilidade, igual ao PDF.
+function Respostas({ itens, apos }: { itens: any[]; apos?: Record<string, React.ReactNode> }) {
   const grupos: { nome: string; linhas: { pergunta: string; resposta: unknown }[] }[] = [];
   for (const r of itens) {
     const pergunta = String(r?.pergunta ?? "").trim();
@@ -135,6 +164,7 @@ function Respostas({ itens }: { itens: any[] }) {
     g.linhas.push({ pergunta, resposta: r?.resposta });
   }
   if (!grupos.length) return null;
+  grupos.sort((a, b) => posicaoSecao(a.nome) - posicaoSecao(b.nome));
 
   // Resposta longa ("Conte tudo sobre o cliente" é um parágrafo) numa célula de
   // grade de duas colunas estica a linha inteira e deixa um buraco ao lado. Vai
@@ -148,32 +178,124 @@ function Respostas({ itens }: { itens: any[] }) {
         const curtas = g.linhas.filter((l) => !ehLonga(l.resposta));
         const longas = g.linhas.filter((l) => ehLonga(l.resposta));
         return (
-          <div key={g.nome} className="space-y-2">
-            <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {g.nome}
-            </h4>
+          <div key={g.nome} className="space-y-3">
+            <FaixaSecao>{g.nome}</FaixaSecao>
             {curtas.length > 0 && (
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {curtas.map((l, i) => (
-                  <div key={`${l.pergunta}-${i}`} className="flex gap-2 min-w-0">
-                    <dt className="text-muted-foreground shrink-0">{l.pergunta}:</dt>
-                    <dd className="min-w-0"><Valor k={l.pergunta} v={l.resposta} /></dd>
+                  <div key={`${l.pergunta}-${i}`}
+                       className="min-w-0 rounded-sm bg-muted/35 border-l-2 border-primary/45 px-2.5 py-1.5">
+                    <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {l.pergunta}
+                    </dt>
+                    <dd className="text-sm min-w-0"><Valor k={l.pergunta} v={l.resposta} /></dd>
                   </div>
                 ))}
               </dl>
             )}
             {longas.map((l, i) => (
-              <div key={`${l.pergunta}-longa-${i}`} className="text-sm space-y-0.5">
-                <div className="text-muted-foreground">{l.pergunta}:</div>
-                <div className="rounded border border-border bg-muted/30 p-2">
-                  <Valor k={l.pergunta} v={l.resposta} />
+              <div key={`${l.pergunta}-longa-${i}`}
+                   className="rounded-sm bg-muted/35 border-l-2 border-primary/45 px-2.5 py-1.5">
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {l.pergunta}
                 </div>
+                <div className="text-sm leading-relaxed"><Valor k={l.pergunta} v={l.resposta} /></div>
               </div>
             ))}
+            {apos?.[g.nome]}
           </div>
         );
       })}
     </>
+  );
+}
+
+// Cabeçalho: quem é o cliente e quanto vale. É a primeira coisa que o
+// especialista procura, e hoje ele tinha que caçar isso no meio das chaves.
+function CabecalhoVenda({ cliente, proposta, respostas }: {
+  cliente: Record<string, any>; proposta: Record<string, any>; respostas: any[];
+}) {
+  const nome = cliente.nome_fantasia || cliente.razao_social || cliente.nome || "—";
+  const resposta = (p: string) =>
+    respostas.find((r) => String(r?.pergunta ?? "").trim().toLowerCase() === p)?.resposta;
+  const vendedor = resposta("vendedor");
+  const linha = [
+    cliente.cnpj ? `CNPJ ${cliente.cnpj}` : null,
+    cliente.contato_nome || null,
+    cliente.email || null,
+    vendedor ? `Vendedor: ${vendedor}` : null,
+  ].filter(Boolean).join(" · ");
+
+  const mrr = Number(proposta.valor_mrr);
+  const setup = Number(proposta.valor_setup);
+
+  return (
+    <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-base font-semibold leading-tight break-words">{nome}</div>
+          {linha && <div className="text-xs text-muted-foreground mt-1 break-words">{linha}</div>}
+        </div>
+        <div className="flex gap-2 shrink-0">
+          {Number.isFinite(mrr) && (
+            <div className="rounded-md border border-border bg-background px-3 py-1.5 text-right">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Mensalidade</div>
+              <div className="text-sm font-semibold tabular-nums">{brl(mrr)}</div>
+            </div>
+          )}
+          {Number.isFinite(setup) && (
+            <div className="rounded-md border border-border bg-background px-3 py-1.5 text-right">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Implantação</div>
+              <div className="text-sm font-semibold tabular-nums">{brl(setup)}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Os itens como o vendedor os vendeu, com total. Vira tabela porque são números
+// para conferir: em lista corrida ninguém compara coluna nenhuma.
+function TabelaModulos({ itens }: { itens: any[] }) {
+  if (!Array.isArray(itens) || itens.length === 0) return null;
+  const somaMrr = itens.reduce((s, i) => s + (Number(i?.mrr) || 0), 0);
+  const somaSetup = itens.reduce((s, i) => s + (Number(i?.setup) || 0), 0);
+
+  return (
+    <div className="space-y-3">
+      <FaixaSecao>Módulos contratados</FaixaSecao>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <th className="text-left font-medium pb-1.5 pr-3">Módulo / item</th>
+              <th className="text-right font-medium pb-1.5 px-3 w-14">Qnt</th>
+              <th className="text-right font-medium pb-1.5 px-3">MRR</th>
+              <th className="text-right font-medium pb-1.5 pl-3">Setup</th>
+            </tr>
+          </thead>
+          <tbody>
+            {itens.map((it, i) => (
+              <tr key={i} className="border-t border-border">
+                <td className="py-1.5 pr-3">{it?.nome ?? "—"}</td>
+                <td className="py-1.5 px-3 text-right tabular-nums text-muted-foreground">
+                  {Number(it?.quantidade) > 0 ? `x${it.quantidade}` : "—"}
+                </td>
+                <td className="py-1.5 px-3 text-right tabular-nums">{brl(Number(it?.mrr) || 0)}</td>
+                <td className="py-1.5 pl-3 text-right tabular-nums">{brl(Number(it?.setup) || 0)}</td>
+              </tr>
+            ))}
+            <tr className="border-t-2 border-border font-semibold">
+              <td className="py-1.5 pr-3">Total</td>
+              <td />
+              <td className="py-1.5 px-3 text-right tabular-nums">{brl(somaMrr)}</td>
+              <td className="py-1.5 pl-3 text-right tabular-nums">{brl(somaSetup)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
@@ -265,35 +387,34 @@ export default function PropostaVendaSection({
         </span>
       </div>
 
-      <div className="space-y-5">
-          <Grupo titulo="Cliente" dados={cliente} />
-          <Grupo titulo="Comercial" dados={comercial} />
+      <div className="space-y-6">
+          <CabecalhoVenda
+            cliente={cliente}
+            proposta={proposta}
+            respostas={Array.isArray(proposta.respostas_ticket) ? proposta.respostas_ticket : []}
+          />
 
-          {Array.isArray(proposta.itens) && proposta.itens.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Itens da venda
-              </h4>
-              <div className="rounded border border-border divide-y divide-border">
-                {proposta.itens.map((it: any, i: number) => (
-                  <div key={i} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 p-2 text-sm">
-                    <span className="font-medium flex-1 min-w-0">{it.nome ?? "—"}</span>
-                    {Number(it.quantidade) > 1 && <span className="text-muted-foreground">{it.quantidade}x</span>}
-                    {it.mrr != null && <span>{brl(Number(it.mrr))}/mês</span>}
-                    {it.setup != null && Number(it.setup) > 0 && (
-                      <span className="text-muted-foreground">setup {brl(Number(it.setup))}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+          {/* As seções na ordem do PDF que a origem gera, com a tabela de
+              módulos caindo entre Implantação e Contabilidade, como lá. */}
+          {Array.isArray(proposta.respostas_ticket) && proposta.respostas_ticket.length > 0 ? (
+            <Respostas
+              itens={proposta.respostas_ticket}
+              apos={{ "Implantação": <TabelaModulos itens={proposta.itens} /> }}
+            />
+          ) : (
+            <TabelaModulos itens={proposta.itens} />
+          )}
+
+          {/* Sem `secao`, a tabela ja saiu acima; com `secao`, ela saiu no meio.
+              Aqui so entra o caso em que a secao Implantacao nao veio. */}
+          {Array.isArray(proposta.respostas_ticket) && proposta.respostas_ticket.length > 0 &&
+           !proposta.respostas_ticket.some((r: any) => String(r?.secao ?? "").trim() === "Implantação") && (
+            <TabelaModulos itens={proposta.itens} />
           )}
 
           {produtos.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Registrado no contrato
-              </h4>
+            <div className="space-y-3">
+              <FaixaSecao>Registrado no contrato</FaixaSecao>
               {produtos.map((p, i) => (
                 <div key={i} className="rounded border border-border p-2 text-sm space-y-1">
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -324,20 +445,22 @@ export default function PropostaVendaSection({
             </div>
           )}
 
-          {alteracao && <Grupo titulo="Alteração de contrato" dados={alteracao} />}
-          {avulso && <Grupo titulo="Cobrança avulsa" dados={avulso} />}
-
-          {Array.isArray(proposta.respostas_ticket) && proposta.respostas_ticket.length > 0 && (
-            <Respostas itens={proposta.respostas_ticket} />
+          {alteracao && (
+            <div className="space-y-3">
+              <FaixaSecao>Alteração de contrato</FaixaSecao>
+              <Grupo titulo="" dados={alteracao} />
+            </div>
+          )}
+          {avulso && (
+            <div className="space-y-3">
+              <FaixaSecao>Cobrança avulsa</FaixaSecao>
+              <Grupo titulo="" dados={avulso} />
+            </div>
           )}
 
-          <Grupo titulo="Detalhes da proposta" dados={proposta} />
-
           {anexos.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Anexos da proposta
-              </h4>
+            <div className="space-y-3">
+              <FaixaSecao>Anexos da proposta</FaixaSecao>
               <ul className="space-y-1 text-sm">
                 {anexos.map((a, i) => (
                   <li key={i} className="flex items-center gap-2 min-w-0">
@@ -354,6 +477,25 @@ export default function PropostaVendaSection({
               </p>
             </div>
           )}
+
+          {/* O payload como chegou. Fica fechado porque repete, em nome de
+              campo, o que as seções acima já dizem em português — mas nada some:
+              é aqui que aparece o que a origem manda sem ter virado pergunta,
+              como a razão social da Receita e a composição da mensalidade. */}
+          <details className="group">
+            <summary className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground
+                                cursor-pointer select-none hover:text-foreground
+                                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">
+              Dados do envio
+            </summary>
+            <div className="mt-3 space-y-4 pl-1 border-l border-border">
+              <div className="pl-3 space-y-4">
+                <Grupo titulo="Cliente" dados={cliente} />
+                <Grupo titulo="Comercial" dados={comercial} />
+                <Grupo titulo="Proposta" dados={proposta} />
+              </div>
+            </div>
+          </details>
       </div>
     </div>
   );
