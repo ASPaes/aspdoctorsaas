@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 03/09
 
+- 🆕 **Fornecedor amarrado ao produto** — O cadastro do produto (**Configurações → Produtos e Módulos**) ganhou o campo **Fornecedor**, que também aparece como coluna na lista. Ao lançar esse produto num cliente, o fornecedor já vem preenchido sozinho — mas só quando o campo está em branco: se você escolheu outro fornecedor à mão, a sua escolha é respeitada. Os produtos já cadastrados nascem sem fornecedor; preencha os que quiser e o automático passa a valer das próximas vendas em diante.
+
 - 🔧 **Módulo vendido pela calculadora não chegava ao OEM** — Up-sell e cancelamento vindos da calculadora entravam direto na ficha do cliente e **nunca eram enviados ao parceiro**: o cliente passava a ser cobrado por um módulo que a licença dele não tinha, e a carga do espelho desfazia a mudança no dia seguinte. Agora eles seguem o mesmo caminho de quem lança pelo DoctorSaaS — vão para a **fila de aprovação**, e o módulo, a licença e o MRR só mudam depois que um admin aprova e o OEM aceita. Quem aprova vê de onde veio o pedido.
 
 - 🔧 **Módulo da calculadora entrava sem valor** — A linha do módulo nascia com mensalidade e ativação zeradas, mesmo com os valores certos aparecendo no movimento de MRR. Agora os dois valores entram na ficha, e o movimento passa a se chamar pelo módulo (*"Adição de Estoque"*) em vez do texto da proposta, e fica amarrado a ele — o que faz um cancelamento futuro saber quanto baixar.

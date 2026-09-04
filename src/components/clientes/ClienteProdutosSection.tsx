@@ -470,11 +470,11 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   });
   const lookupTenantId: string | null = (clienteTenantQuery.data?.tenant_id ?? tid) ?? null;
 
-  const produtosLookup = useQuery<{ id: number; nome: string }[]>({
+  const produtosLookup = useQuery<{ id: number; nome: string; fornecedor_id: number | null }[]>({
     queryKey: ["produtos_lookup", lookupTenantId],
     enabled: !!lookupTenantId,
     queryFn: async () => {
-      let q = (supabase.from("produtos" as any) as any).select("id, nome").order("nome");
+      let q = (supabase.from("produtos" as any) as any).select("id, nome, fornecedor_id").order("nome");
       if (lookupTenantId) q = q.eq("tenant_id", lookupTenantId);
       const { data, error } = await q;
       if (error) throw error;
@@ -1714,7 +1714,7 @@ function ProdutoDialog({
   onClose: () => void;
   clienteId: string;
   tid: string | null;
-  produtos: { id: number; nome: string }[];
+  produtos: { id: number; nome: string; fornecedor_id?: number | null }[];
   fornecedores: { id: number; nome: string }[];
   onSaved: () => void;
   modulosNomesForEdit: string[];
@@ -1755,6 +1755,16 @@ function ProdutoDialog({
   const [formaPagAtivacaoId, setFormaPagAtivacaoId] = useState<string>("");
   const [formaPagMensalidadeId, setFormaPagMensalidadeId] = useState<string>("");
   const [observacoesContratuais, setObservacoesContratuais] = useState("");
+
+  // Fornecedor padrão do cadastro do produto. Só preenche campo VAZIO: quem já
+  // escolheu um fornecedor à mão não tem a escolha reescrita — na base há
+  // produto atendido por mais de um fornecedor (PDV Legal, ASP Sistemas).
+  const handleProdutoChange = (v: string) => {
+    setProdutoId(v);
+    if (fornecedorId) return;
+    const padrao = produtos.find(p => String(p.id) === v)?.fornecedor_id;
+    if (padrao != null) setFornecedorId(String(padrao));
+  };
 
   const produtoIdOriginal = edit?.produto_id ? String(edit.produto_id) : "";
   const produtoTrocou = isEdit && produtoId !== "" && produtoId !== produtoIdOriginal;
@@ -2284,7 +2294,7 @@ function ProdutoDialog({
             </div>
             <div className="space-y-1">
               <Label>Produto *</Label>
-              <Select value={produtoId} onValueChange={setProdutoId} disabled={isEdit && !canSwapProduto}>
+              <Select value={produtoId} onValueChange={handleProdutoChange} disabled={isEdit && !canSwapProduto}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
                   {produtos.map(p => {

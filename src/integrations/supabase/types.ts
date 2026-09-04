@@ -7198,6 +7198,7 @@ export type Database = {
       }
       produtos: {
         Row: {
+          fornecedor_id: number | null
           id: number
           nome: string
           omie_conta_corrente_codigo: number | null
@@ -7209,6 +7210,7 @@ export type Database = {
           tenant_id: string | null
         }
         Insert: {
+          fornecedor_id?: number | null
           id?: number
           nome: string
           omie_conta_corrente_codigo?: number | null
@@ -7220,6 +7222,7 @@ export type Database = {
           tenant_id?: string | null
         }
         Update: {
+          fornecedor_id?: number | null
           id?: number
           nome?: string
           omie_conta_corrente_codigo?: number | null
@@ -7230,7 +7233,15 @@ export type Database = {
           omie_tipo_faturamento_codigo?: string | null
           tenant_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "produtos_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profile_unidades: {
         Row: {

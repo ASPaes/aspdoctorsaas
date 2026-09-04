@@ -28,6 +28,7 @@ interface Produto {
   id: number;
   nome: string;
   tenant_id: string;
+  fornecedor_id?: number | null;
   omie_servico_codigo?: number | null;
   omie_conta_corrente_codigo?: number | null;
   omie_tipo_faturamento_codigo?: string | null;
@@ -62,6 +63,7 @@ export default function ProdutosModulosTab() {
   const [produtoDialogOpen, setProdutoDialogOpen] = useState(false);
   const [editingProduto, setEditingProduto] = useState<Produto | null>(null);
   const [produtoNome, setProdutoNome] = useState("");
+  const [produtoFornecedorId, setProdutoFornecedorId] = useState<string>("");
   const [savingProduto, setSavingProduto] = useState(false);
   // Omie fields (only used when integration is active)
   const [omieServico, setOmieServico] = useState<string>("");
@@ -100,6 +102,20 @@ export default function ProdutosModulosTab() {
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as Produto[];
+    },
+  });
+
+  // O fornecedor amarrado ao produto é só o PADRÃO: quando o produto entra no
+  // cliente ele já vem preenchido, mas continua editável lá — na base existem
+  // produtos com mais de um fornecedor (PDV Legal, ASP Sistemas).
+  const fornecedoresQ = useQuery({
+    queryKey: ["fornecedores_lookup", tid],
+    queryFn: async () => {
+      let q = (supabase.from("fornecedores" as any) as any).select("id, nome").order("nome");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as { id: number; nome: string }[];
     },
   });
 
@@ -254,6 +270,11 @@ export default function ProdutosModulosTab() {
   });
 
   const selectedProduto = produtosQ.data?.find(p => p.id === selectedProdutoId) ?? null;
+  const fornecedorNomePorId = useMemo(() => {
+    const m = new Map<number, string>();
+    (fornecedoresQ.data ?? []).forEach(f => m.set(f.id, f.nome));
+    return m;
+  }, [fornecedoresQ.data]);
 
   // Produto handlers
   const resetOmieFields = (p?: Produto | null) => {
@@ -265,10 +286,12 @@ export default function ProdutosModulosTab() {
     setOmiePermiteNuvem(p?.omie_permite_servidor_nuvem === true);
   };
   const openNewProduto = () => {
-    setEditingProduto(null); setProdutoNome(""); resetOmieFields(null); setProdutoDialogOpen(true);
+    setEditingProduto(null); setProdutoNome(""); setProdutoFornecedorId(""); resetOmieFields(null); setProdutoDialogOpen(true);
   };
   const openEditProduto = (p: Produto) => {
-    setEditingProduto(p); setProdutoNome(p.nome); resetOmieFields(p); setProdutoDialogOpen(true);
+    setEditingProduto(p); setProdutoNome(p.nome);
+    setProdutoFornecedorId(p.fornecedor_id != null ? String(p.fornecedor_id) : "");
+    resetOmieFields(p); setProdutoDialogOpen(true);
   };
 
   const saveProduto = async () => {
@@ -292,23 +315,25 @@ export default function ProdutosModulosTab() {
       omie_numero_parcelas: parseIntOrNull(omieNumParcelas),
       omie_permite_servidor_nuvem: !!omiePermiteNuvem,
     } : {};
+    const fornecedorPayload = { fornecedor_id: produtoFornecedorId ? Number(produtoFornecedorId) : null };
     setSavingProduto(true);
     try {
       if (editingProduto) {
         const { error } = await (supabase.from("produtos" as any) as any)
-          .update({ nome: produtoNome.trim(), ...omiePayload })
+          .update({ nome: produtoNome.trim(), ...fornecedorPayload, ...omiePayload })
           .eq("id", editingProduto.id)
           .eq("tenant_id", tid as string);
         if (error) throw error;
         toast({ title: "Produto atualizado" });
       } else {
         const { error } = await (supabase.from("produtos" as any) as any)
-          .insert({ nome: produtoNome.trim(), tenant_id: tid, ...omiePayload });
+          .insert({ nome: produtoNome.trim(), tenant_id: tid, ...fornecedorPayload, ...omiePayload });
         if (error) throw error;
         toast({ title: "Produto criado" });
       }
       setProdutoDialogOpen(false);
       qc.invalidateQueries({ queryKey: ["crud_produtos_master", tid] });
+      qc.invalidateQueries({ queryKey: ["produtos_lookup"] });
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
@@ -421,16 +446,17 @@ export default function ProdutosModulosTab() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
+                <TableHead className="w-[220px]">Fornecedor</TableHead>
                 <TableHead className="w-[220px] text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {produtosQ.isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={i}><TableCell colSpan={2}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                  <TableRow key={i}><TableCell colSpan={3}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                 ))
               ) : (produtosQ.data ?? []).length === 0 ? (
-                <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground py-6">Nenhum produto cadastrado.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Nenhum produto cadastrado.</TableCell></TableRow>
               ) : (
                 produtosQ.data!.map(p => (
                   <TableRow
@@ -438,6 +464,9 @@ export default function ProdutosModulosTab() {
                     className={selectedProdutoId === p.id ? "bg-muted/50" : ""}
                   >
                     <TableCell className="font-medium">{p.nome}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {p.fornecedor_id != null ? (fornecedorNomePorId.get(p.fornecedor_id) ?? "—") : "—"}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button
@@ -626,9 +655,24 @@ export default function ProdutosModulosTab() {
             <DialogTitle>{editingProduto ? "Editar Produto" : "Novo Produto"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="produto-nome">Nome</Label>
-              <Input id="produto-nome" value={produtoNome} onChange={(e) => setProdutoNome(e.target.value)} autoFocus />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="produto-nome">Nome</Label>
+                <Input id="produto-nome" value={produtoNome} onChange={(e) => setProdutoNome(e.target.value)} autoFocus />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Fornecedor</Label>
+                <Select value={produtoFornecedorId || "__none__"} onValueChange={(v) => setProdutoFornecedorId(v === "__none__" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Nenhum —</SelectItem>
+                    {(fornecedoresQ.data ?? []).map(f => (
+                      <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Sugerido automaticamente ao lançar este produto num cliente.</p>
+              </div>
             </div>
 
             {omieAtivo && (
