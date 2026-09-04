@@ -14,6 +14,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 04/09
 
+- 🔧 **Quem abriu o chamado não aparecia na tela** — No detalhe do chamado, o painel da direita mostrava a data de abertura, mas não quem abriu. Como o responsável pode ser trocado depois, não havia como saber na tela quem tinha registrado o chamado. O dado sempre esteve guardado. Agora aparece **Criado por**, logo abaixo de *Aberto em*.
+
+- 🔧 **Mudança de status na história do chamado mostrava código em vez de nome** — Na lista de ocorrências, o registro de troca de status exibia dois códigos internos no lugar dos nomes, e não dava para entender qual foi a mudança. Agora aparece **Aguardando Análise → Em Andamento**, com a cor de cada status, como já acontecia na troca de setor.
+
 - 🆕 **Dá para ver quais atendimentos formaram o tempo médio** — No painel de atendimento, aba **Velocidade / SLA**, os quadros de **TME, 1ª Resposta, TMA e TMR** passaram a abrir a lista dos atendimentos por trás do número: código, data de abertura, contato e cliente, agente e o tempo de cada um, do maior para o menor. Clicar numa linha abre o histórico daquela conversa. A lista mostra também os casos muito longos que ficam de fora do cálculo da mediana, justamente os que antes não apareciam em lugar nenhum, e quantos atendimentos foram assumidos na hora, sem espera. Vale os mesmos filtros da tela.
 
 - ⬆️ **Campo de ocorrência cresce junto com o texto** — No detalhe do chamado, o campo **Registrar ocorrência** tinha altura fixa de duas linhas: ao colar um resumo longo da conversa com o cliente, o texto ficava preso numa janelinha com barra de rolagem e só dava para conferir duas linhas por vez antes de enviar. Agora o campo cresce conforme você escreve, até uma altura confortável, e volta ao tamanho normal depois do envio.

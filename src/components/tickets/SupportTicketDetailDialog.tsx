@@ -755,6 +755,23 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     }
   };
 
+  /** Chip com o nome do status. Os eventos guardam o id do status, nunca o nome. */
+  const renderStatusChip = (value: string | null) => {
+    const found = value ? ticketStatuses.find((s) => s.id === value) : null;
+    if (!found) {
+      return <Badge variant="outline" className="text-[10px]">{resolveValueLabel("status_id", value)}</Badge>;
+    }
+    return (
+      <Badge
+        variant="outline"
+        className="text-[10px] border"
+        style={{ background: found.color + "1A", color: found.color, borderColor: found.color + "33" }}
+      >
+        {found.name}
+      </Badge>
+    );
+  };
+
   const { data: departamentos = [] } = useQuery({
     queryKey: ["ticket_detail_departamentos", tid],
     enabled: !!tid,
@@ -1717,9 +1734,9 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs text-muted-foreground">{getAgentName(evt.user_id)}</span>
                     <span className="text-xs">alterou status:</span>
-                    <Badge variant="outline" className="text-[10px]">{evt.old_value ?? "—"}</Badge>
+                    {renderStatusChip(evt.old_value)}
                     <span className="text-[10px]">→</span>
-                    <Badge variant="outline" className="text-[10px]">{evt.new_value ?? "—"}</Badge>
+                    {renderStatusChip(evt.new_value)}
                     <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
                   </div>
                 ) : evt.event_type === "ai_summary" ? (
@@ -2241,10 +2258,10 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                       <span className="text-muted-foreground">Aberto em</span>
                       <span className="font-medium text-right">{ticket?.aberto_em ? formatDateTime(ticket.aberto_em) : "—"}</span>
                     </div>
-                    {ticket?.created_by_user_id && (
+                    {ticket?.criado_por && (
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-muted-foreground">Criado por</span>
-                        <span className="font-medium text-right truncate">{getAgentName(ticket.created_by_user_id)}</span>
+                        <span className="font-medium text-right truncate">{getAgentName(ticket.criado_por)}</span>
                       </div>
                     )}
                     <div className="flex items-center justify-between gap-2">
