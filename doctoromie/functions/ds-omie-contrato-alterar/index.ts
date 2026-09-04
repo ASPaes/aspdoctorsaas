@@ -3,6 +3,50 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // vencimento + observacao), preservando o item inteiro (consultar->preservar->alterar).
 // DETECTA troca de produto e BLOQUEIA. Auth por API key.
 //
+// v20 (03/09/2026) - LEITURA QUE NAO PODE SER FEITA NAO E LEITURA QUE DISCORDA.
+//     CASO MEDIDO (PEITASSO, CT-2026-2011, contrato Omie 7248345418, tenant Digi Office):
+//       02/09 14:32  downsell de -30 (retirada de 1 ponto adicional). MRR 349,42 -> 319,42.
+//       02/09 14:34  esta funcao envia 319,42. O Omie ACEITA e grava.
+//                    releitura #1 (t+5s) devolve 349,42 -- o valor VELHO (consistencia eventual).
+//                    releitura #2 (t+6,5s) morre em "Consumo redundante detectado".
+//                    veredito: "Omie confirmou 349.42 mas o DS enviou 319.42 (apos 2 leituras)".
+//       02/09 14:36  a fila retenta e REESCREVE 319,42 no Omie. Agora confirma.
+//       03/09 10:25  o downsell foi inativado no DS -> 349,42. Mesma sequencia, mesma reescrita.
+//     O operador abriu o "Historico de Alteracoes" do contrato no Omie e viu a integracao mexendo
+//     no contrato duas vezes por mudanca, com o valor caindo e subindo. Perguntou o que a
+//     integracao estava fazendo consultando o contrato em loop. Nao havia loop nenhum: eram duas
+//     acoes humanas, cada uma escrita DUAS vezes.
+//     ESCALA: ~110 "Escrita nao confirmou" em 30 dias no integrations_log, ~50 contratos.
+//
+//     A CAUSA: `valorConfirmadoOmie` guarda a ULTIMA leitura que voltou -- e, quando o laco
+//     quebra em faultstring (REDUNDANT), essa leitura e a VELHA, da tentativa anterior. O
+//     veredito usava esse numero como se fosse uma leitura definitiva. Ou seja: "nao consegui
+//     reler" era relatado como "o Omie esta com outro valor". A v11 ja tinha consertado o falso
+//     positivo do eco de 0s; a v17 ja tinha impedido que esse numero fosse para o espelho.
+//     Faltou a ultima ponta: ele nao pode virar DIVERGENCIA.
+//
+//     (1) INCONCLUSIVO != DIVERGENTE. So e divergencia quando a releitura foi CONCLUSIVA (sem
+//         faultstring, sem HTTP ruim, com nValTotMes) e ainda assim nao bateu. Releitura
+//         bloqueada pelo Omie vira `releitura_inconclusiva` e o log volta a status='sucesso'
+//         (a escrita foi aceita; o que faltou foi a prova).
+//     (2) `valor_confirmado` passa a ser a PROVA, nao a ausencia de divergencia. Antes era
+//         `divergenciaDetectada === null && valorConfirmadoOmie !== null`: com (1) sozinha, uma
+//         leitura velha viraria "confirmado". Agora e escritaDeValorConfirmada() e mais nada.
+//     (3) O ESPELHO so recebe leitura PROVADA. A condicao da v17 (`divergenciaDetectada === null`)
+//         deixaria passar o inconclusivo depois de (1) -- que e exatamente o valor velho que a
+//         v17 existe para barrar. Agora exige releitura limpa E o valor conferido.
+//     (4) O dry_run passa a devolver a conferencia do valor (`valor_confere` + liquido/bruto/
+//         desconto/unit). E o que permite a fila VERIFICAR antes de reescrever -- ver
+//         omie-sync-processar v17. A regra de conferencia virou UMA funcao
+//         (conferirValorNoOmie), usada pela releitura e pelo dry_run: a v19 avisa que duas
+//         copias da regra e como nasce um falso positivo.
+//
+//     O QUE ISSO CUSTA, DITO NA CARA: com o REDUNDANT bloqueando a 2a leitura quase sempre, o
+//     alarme de escrita perdida some DAQUI. Ele nao desaparece do sistema -- muda de lugar: a
+//     fila retenta minutos depois, fora da janela dos ~60s, faz um dry_run e ai sim a leitura e
+//     conclusiva. Se ela discordar, e divergencia de verdade. Esta funcao sozinha nao consegue
+//     provar nada dentro da janela do REDUNDANT, e fingir que consegue foi o defeito.
+//
 // v19 (01/09/2026) - A CONFIRMACAO DE VALOR COMPARAVA CONTRA O LIQUIDO. CONTRATO COM DESCONTO
 //     NUNCA CONFIRMAVA.
 //     CASO MEDIDO (BURGUER SMASH, CT-2026-2582, contrato Omie 7626271548, upsell de 28/08/2026):
@@ -192,6 +236,32 @@ const num = (x)=>x === undefined || x === null || x === "" || isNaN(Number(x)) ?
 const round2 = (x)=>Math.round(x * 100) / 100;
 const bateEmCentavos = (a, b)=>a !== null && b !== null && Math.abs(a - b) <= 0.01;
 const sleep = (ms)=>new Promise((r)=>setTimeout(r, ms));
+// v20: A REGRA UNICA de "o Omie esta com o valor que o DS quer", extraida do laco de releitura.
+// Recebe um contratoCadastro (de qualquer ConsultarContrato -- o do passo 3 ou o da releitura) e
+// o valor alvo. Devolve os tres numeros que vao para o log/resposta e o veredito.
+// So existe UMA copia porque a releitura pos-escrita e o dry_run precisam responder a mesma
+// pergunta: divergir na regra e como nasce um falso positivo (ver v19).
+// confere = null quando nao ha alvo (nada a conferir), nunca false.
+function conferirValorNoOmie(cadastro, alvo) {
+  const itens = Array.isArray(cadastro?.itensContrato) ? cadastro.itensContrato : [];
+  const liquido = num(cadastro?.cabecalho?.nValTotMes);
+  const bruto = itens.length ? round2(itens.reduce((acc, it)=>{
+    const q = num(it?.itemCabecalho?.quant);
+    const u = num(it?.itemCabecalho?.valorUnit);
+    return acc + (q === null || u === null ? 0 : q * u);
+  }, 0)) : null;
+  const desconto = itens.length ? round2(itens.reduce((acc, it)=>acc + (num(it?.itemCabecalho?.valorDesconto) ?? 0), 0)) : null;
+  // v19: o item e a prova direta -- sobrevive a desconto e a contrato de varios itens, onde a
+  // soma do bruto seria N x alvo.
+  const unitBate = alvo !== null && itens.length > 0 && itens.every((it)=>bateEmCentavos(num(it?.itemCabecalho?.valorUnit), alvo));
+  return {
+    liquido,
+    bruto,
+    desconto,
+    unitBate,
+    confere: alvo === null ? null : bateEmCentavos(liquido, alvo) || bateEmCentavos(bruto, alvo) || unitBate
+  };
+}
 function json(b, status = 200) {
   return new Response(JSON.stringify(b), {
     status,
@@ -511,10 +581,20 @@ Deno.serve(async (req)=>{
       }
     }
     if (modo === "dry_run") {
+      // v20: a conferencia do valor CONTRA A LEITURA AO VIVO do passo 3. E o que permite a fila
+      // perguntar "o Omie ja esta com o valor que eu quero?" sem escrever nada -- ver
+      // omie-sync-processar v17. Aqui nao existe janela de REDUNDANT nem consistencia eventual:
+      // nada foi escrito nesta chamada, entao esta leitura e conclusiva por construcao.
+      const confDry = conferirValorNoOmie(cc, novoValor);
       return json({
         ok: true,
         modo: "dry_run",
         nCodCtr,
+        valor_confere: confDry.confere,
+        valor_liquido_omie: confDry.liquido,
+        valor_bruto_omie: confDry.bruto,
+        desconto_omie: confDry.desconto,
+        valor_unit_bate: confDry.unitBate,
         // v14: deixou de ser sempre false. Agora diz a verdade e mostra o de-para da categoria,
         // para a tela poder avisar ANTES da escrita que a receita vai mudar de categoria no DRE.
         troca_de_produto: trocaDeProduto,
@@ -616,28 +696,15 @@ Deno.serve(async (req)=>{
           continue;
         }
         const cadastroRelido = confirma.body?.contratoCadastro;
-        const v = cadastroRelido?.cabecalho?.nValTotMes;
-        valorConfirmadoOmie = v === undefined || v === null ? null : Number(v);
-        // v19: o item e a prova da escrita -- ver cabecalho v19.
-        const itensRelidos = Array.isArray(cadastroRelido?.itensContrato) ? cadastroRelido.itensContrato : [];
-        if (itensRelidos.length) {
-          valorBrutoConfirmadoOmie = round2(itensRelidos.reduce((acc, it)=>{
-            const q = num(it?.itemCabecalho?.quant);
-            const u = num(it?.itemCabecalho?.valorUnit);
-            return acc + (q === null || u === null ? 0 : q * u);
-          }, 0));
-          descontoConfirmadoOmie = round2(itensRelidos.reduce((acc, it)=>acc + (num(it?.itemCabecalho?.valorDesconto) ?? 0), 0));
-          // O passo 5 escreve valorUnit = novoValor em TODO item. Entao "todo item voltou com
-          // o valor enviado" e a prova direta -- e a unica que sobrevive a contrato de varios
-          // itens, onde a soma do bruto seria N x novoValor. (Medido em 01/09/2026: os 1726
-          // contratos do espelho tem 1 item e quant = 1; a regra existe para nao quebrar se
-          // isso mudar.)
-          unitBateComEnviado = novoValor !== null && itensRelidos.every((it)=>bateEmCentavos(num(it?.itemCabecalho?.valorUnit), novoValor));
-        } else {
-          valorBrutoConfirmadoOmie = null;
-          descontoConfirmadoOmie = null;
-          unitBateComEnviado = false;
-        }
+        // v20: a mesma regra do dry_run. O passo 5 escreve valorUnit = novoValor em TODO item;
+        // "todo item voltou com o valor enviado" e a prova direta. (Medido em 01/09/2026: os
+        // 1726 contratos do espelho tem 1 item e quant = 1; a regra existe para nao quebrar se
+        // isso mudar.)
+        const conf = conferirValorNoOmie(cadastroRelido, novoValor);
+        valorConfirmadoOmie = conf.liquido;
+        valorBrutoConfirmadoOmie = conf.bruto;
+        descontoConfirmadoOmie = conf.desconto;
+        unitBateComEnviado = conf.unitBate;
         if (valorConfirmadoOmie === null) {
           releituraFalhou = "nValTotMes ausente na releitura";
           continue;
@@ -652,12 +719,24 @@ Deno.serve(async (req)=>{
     }
     // O Omie disse "alterado com sucesso" mas o valor nao e o que eu mandei, mesmo depois de
     // tres leituras espacadas? Ai sim e escrita silenciosa que nao pegou.
-    if (novoValor !== null && valorConfirmadoOmie !== null && !escritaDeValorConfirmada()) {
-      // v19: a mensagem vai inteira para o alerta do operador. Sem o bruto e o desconto ao
-      // lado, "Omie confirmou 257,25 mas o DS enviou 344,70" e indistinguivel de escrita
-      // perdida -- e foi lida como tal.
-      const detalhe = valorBrutoConfirmadoOmie === null ? "" : ` (bruto lido ${valorBrutoConfirmadoOmie}, desconto ${descontoConfirmadoOmie ?? 0})`;
-      divergenciaDetectada = `Omie confirmou ${valorConfirmadoOmie}${detalhe} mas o DS enviou ${novoValor} (apos ${releituraTentativas} leituras)`;
+    // v20: leitura CONCLUSIVA = terminou sem faultstring/HTTP ruim E trouxe o valor. Quando o
+    // laco quebra em REDUNDANT, `valorConfirmadoOmie` e a leitura VELHA da tentativa anterior:
+    // usa-la como veredito e relatar "nao consegui reler" como "o Omie esta com outro valor".
+    // Ver cabecalho v20.
+    let releituraInconclusiva = null;
+    if (novoValor !== null && !escritaDeValorConfirmada()) {
+      if (releituraFalhou === null && valorConfirmadoOmie !== null && releituraTentativas >= RELEITURA_TENTATIVAS) {
+        // v19: a mensagem vai inteira para o alerta do operador. Sem o bruto e o desconto ao
+        // lado, "Omie confirmou 257,25 mas o DS enviou 344,70" e indistinguivel de escrita
+        // perdida -- e foi lida como tal.
+        const detalhe = valorBrutoConfirmadoOmie === null ? "" : ` (bruto lido ${valorBrutoConfirmadoOmie}, desconto ${descontoConfirmadoOmie ?? 0})`;
+        divergenciaDetectada = `Omie confirmou ${valorConfirmadoOmie}${detalhe} mas o DS enviou ${novoValor} (apos ${releituraTentativas} leituras)`;
+      } else {
+        // A escrita foi ACEITA pelo Omie (sem faultstring no AlterarContrato). O que faltou foi a
+        // prova. Quem confirma e a fila, minutos depois, com um dry_run fora da janela do
+        // REDUNDANT -- sem reescrever nada.
+        releituraInconclusiva = releituraFalhou ?? `leitura ainda com ${valorConfirmadoOmie} apos ${releituraTentativas} leituras`;
+      }
     }
     // v13: PROVA da reativacao (99->10). O AlterarContrato acima ja rodou; aqui confirmo que o
     // Omie realmente reativou. Se NAO mudou (rejeitou/ignorou), volto BLOQUEADO -> o DS mantem a
@@ -723,7 +802,12 @@ Deno.serve(async (req)=>{
     // Conferencia le o espelho e nunca o Omie, isso fabricava uma divergencia permanente a partir
     // de uma escrita que DEU CERTO. Ver cabecalho v17. Nao confirmou nao e "confirmou o antigo":
     // e nao sei. E nao sei nao se grava.
-    if (divergenciaDetectada === null && valorConfirmadoOmie !== null) espelhoUpd.valor_total_mes = valorConfirmadoOmie;
+    //
+    // v20: `divergenciaDetectada === null` DEIXOU DE BASTAR. Com a v20, releitura inconclusiva
+    // tambem sai daqui com divergencia null -- e o valor que ela carrega e justamente o VELHO,
+    // que e o que a v17 existe para barrar. Agora a condicao e a prova: releitura limpa E (nada
+    // a conferir OU o valor conferido).
+    if (valorConfirmadoOmie !== null && releituraFalhou === null && (novoValor === null || escritaDeValorConfirmada())) espelhoUpd.valor_total_mes = valorConfirmadoOmie;
     await supa.from("omie_contratos").update(espelhoUpd).eq("tenant_id", tenant_id).eq("codigo_contrato_omie", nCodCtr);
     await supa.from("integrations_log").insert({
       tenant_id,
@@ -741,6 +825,7 @@ Deno.serve(async (req)=>{
         valor_bruto_confirmado_omie: valorBrutoConfirmadoOmie,
         desconto_confirmado_omie: descontoConfirmadoOmie,
         releitura_falhou: releituraFalhou,
+        releitura_inconclusiva: releituraInconclusiva,
         releitura_tentativas: releituraTentativas,
         // v14: troca de categoria fica no log. E mudanca de classificacao contabil -- tem que dar
         // para responder depois "quando esse contrato mudou de categoria, e por quem".
@@ -749,7 +834,11 @@ Deno.serve(async (req)=>{
         servico_novo: novoServico ? Number(novoServico.codigo) : null,
         avisos: avisos.length ? avisos : null
       },
-      error_message: divergenciaDetectada ? `Escrita nao confirmou: ${divergenciaDetectada}` : releituraFalhou ? `Alterado, mas releitura falhou (${releituraFalhou}); espelho sera corrigido pelo incremental.` : null
+      // v20: inconclusivo entra como AVISO em linha de sucesso. "Escrita nao confirmou" com
+      // status='erro' era o alarme falso que o operador lia como escrita perdida -- e que
+      // convidava a corrigir o valor a mao no Omie, que e como divergencia de mentira vira
+      // divergencia de verdade.
+      error_message: divergenciaDetectada ? `Escrita nao confirmou: ${divergenciaDetectada}` : releituraInconclusiva ? `Alterado; releitura inconclusiva (${releituraInconclusiva}). A fila confere na proxima passada, sem reescrever.` : releituraFalhou ? `Alterado, mas releitura falhou (${releituraFalhou}); espelho sera corrigido pelo incremental.` : null
     });
     return json({
       ok: true,
@@ -774,9 +863,15 @@ Deno.serve(async (req)=>{
       valor_confirmado_omie: valorConfirmadoOmie,
       valor_bruto_confirmado_omie: valorBrutoConfirmadoOmie,
       desconto_confirmado_omie: descontoConfirmadoOmie,
-      valor_confirmado: divergenciaDetectada === null && valorConfirmadoOmie !== null,
+      // v20: PROVA, nao ausencia de divergencia. Com o inconclusivo saindo com divergencia null,
+      // a formula antiga (`divergenciaDetectada === null && valorConfirmadoOmie !== null`)
+      // devolveria `true` para uma leitura VELHA -- a fila daria 'ok' numa escrita nao provada.
+      // false aqui nao significa mais "deu errado": significa "nao provei". Quem separa os dois
+      // e a fila, com o dry_run da retentativa.
+      valor_confirmado: novoValor === null ? valorConfirmadoOmie !== null && releituraFalhou === null : escritaDeValorConfirmada(),
       divergencia_detectada: divergenciaDetectada,
       releitura_falhou: releituraFalhou,
+      releitura_inconclusiva: releituraInconclusiva,
       releitura_tentativas: releituraTentativas,
       vigencia_inicial: "preservada (v7: o alterar nao escreve dVigInicial)",
       dia_venc_aviso

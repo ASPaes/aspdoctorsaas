@@ -1,4 +1,35 @@
-// omie-sync-processar — PROCESSADOR DA FILA (peca 3 final, Caminho D) — v16
+// omie-sync-processar — PROCESSADOR DA FILA (peca 3 final, Caminho D) — v17
+//
+// v17 (03/09/2026) — A RETENTATIVA DE valor_nao_confirmado REESCREVIA O QUE JA ESTAVA LA.
+//     O cabecalho da v16 abaixo descreve a retentativa como "ela roda minutos depois, fora da
+//     janela de ~60s do REDUNDANT, e A LEITURA CONFIRMA o valor que ja esta no Omie". A intencao
+//     estava certa e a implementacao nunca foi essa: a retentativa refaz o item INTEIRO, e a
+//     primeira coisa que ela faz e um AlterarContrato. A leitura vem depois, como efeito colateral
+//     de uma segunda escrita.
+//     RESULTADO MEDIDO (PEITASSO, CT-2026-2011, Digi Office): cada mudanca de valor virou DUAS
+//     escritas no Omie. O operador abriu o "Historico de Alteracoes" do contrato, viu a integracao
+//     mexendo duas vezes por mudanca e perguntou o que ela estava fazendo em loop. Nao havia loop:
+//     havia uma acao humana e uma reescrita nossa. ~110 casos em 30 dias.
+//     Reescrever nao e inocente: o ds-omie-contrato-alterar ZERA DESCONTO (escreve valorUnit =
+//     valorTotal = nValTotMes), entao toda reescrita repete esse efeito num contrato com desconto.
+//
+//     Agora, quando o item volta com `ultimo_erro` comecando em 'valor_nao_confirmado:', a fila
+//     PERGUNTA ANTES: um `modo: "dry_run"` no mesmo endpoint, que consulta o Omie ao vivo e nao
+//     escreve nada. Se o Omie ja esta com o valor que iriamos mandar, a linha fecha em 'ok' sem
+//     escrita nenhuma. Se nao esta, segue o caminho normal e escreve -- ai a reescrita e o
+//     conserto de verdade, nao ruido.
+//     Casado com o ds-omie-contrato-alterar v20, que (a) parou de chamar de DIVERGENCIA a
+//     releitura que o Omie bloqueou e (b) passou a devolver `valor_confere` no dry_run.
+//
+//     POR QUE CONFERIR O VALOR BASTA COMO PROVA: a linha so chega em 'valor_nao_confirmado' depois
+//     de o AlterarContrato ter sido ACEITO pelo Omie (faultstring aborta antes). O AlterarContrato
+//     e uma chamada so -- valor, vigencia, dia de vencimento e observacao viajam juntos. Se o
+//     valor esta la, a chamada pegou inteira. A situacao entra na conferencia junto porque ela e
+//     o unico campo que pode ter sido RECUSADO com a chamada aceita (reativacao 99 -> 10).
+//
+//     ORDEM DE DEPLOY: se este arquivo subir antes do ds-omie-contrato-alterar v20, o dry_run
+//     volta sem `valor_confere`, a verificacao nao confirma nada e cai no comportamento de hoje.
+//     Degrada para o antigo, nao quebra.
 //
 // v16 (10/08/2026) — A FILA DIZIA 'ok' PARA ESCRITA NAO CONFIRMADA.
 //     O ds-omie-contrato-alterar devolve tres campos justamente para isto -- valor_confirmado,
@@ -174,6 +205,10 @@ const ORIGENS_COM_SITUACAO = [
 ];
 const CAMPO_OBSERVACAO = "observacao_contrato";
 const CAMPO_VIGENCIA = "vigencia_final"; // v10. Ver cabecalho.
+// v17: o carimbo que a propria v16 grava em ultimo_erro. E o unico sinal de que esta passada e
+// uma retentativa de escrita ja aceita pelo Omie -- e, portanto, de que cabe conferir antes de
+// reescrever. Se mudar la, muda aqui.
+const PREFIXO_VALOR_NAO_CONFIRMADO = "valor_nao_confirmado:";
 function json(b, status = 200) {
   return new Response(JSON.stringify(b), {
     status,
@@ -270,7 +305,7 @@ Deno.serve(async (req)=>{
       const listaTeste = Array.isArray(t.sync_contratos_teste) && t.sync_contratos_teste.length > 0 ? t.sync_contratos_teste : null;
       // v13: por CONTA. Filtrar por tenant faria as duas voltas do loop pegarem os mesmos itens
       // e mandarem contrato de uma unidade com a chave da outra.
-      let q = service.from("omie_sync_fila").select("id, contrato_id, tentativas, origem, campos_alterados").eq("tenant_id", t.tenant_id).eq("conta_integration_id", t.id).in("status", [
+      let q = service.from("omie_sync_fila").select("id, contrato_id, tentativas, origem, campos_alterados, ultimo_erro").eq("tenant_id", t.tenant_id).eq("conta_integration_id", t.id).in("status", [
         "pendente",
         "erro"
       ]).lte("proxima_tentativa_em", agora);
@@ -311,7 +346,7 @@ Deno.serve(async (req)=>{
       }).in("id", candidatos.map((i)=>i.id)).in("status", [
         "pendente",
         "erro"
-      ]).select("id, contrato_id, tentativas, origem, campos_alterados");
+      ]).select("id, contrato_id, tentativas, origem, campos_alterados, ultimo_erro");
       if (claimErr) {
         console.error("ERRO_CLAIM:", claimErr.message);
         resumo.push({
@@ -331,7 +366,7 @@ Deno.serve(async (req)=>{
         continue;
       }
       const claimedIds = claimed.map((i)=>i.id);
-      let ok = 0, bloqueados = 0, invalidos = 0, ignorados = 0, retentar = 0, falhaDef = 0, cancelados = 0, observacoes = 0, vigencias = 0, cadastroPulado = 0, convergidos = 0, parou425 = false;
+      let ok = 0, bloqueados = 0, invalidos = 0, ignorados = 0, retentar = 0, falhaDef = 0, cancelados = 0, observacoes = 0, vigencias = 0, cadastroPulado = 0, convergidos = 0, confirmadosSemEscrita = 0, parou425 = false;
       for (const item of claimed){
         try {
           const incluirSituacao = ORIGENS_COM_SITUACAO.indexOf(item.origem ?? "") !== -1;
@@ -410,6 +445,53 @@ Deno.serve(async (req)=>{
             nosCancelamos = Array.isArray(churnOk) && churnOk.length > 0;
           }
           const permitirReativacao = item.origem === "reativacao" && (reconConfiavel || nosCancelamos);
+          // ====================================================================================
+          // v17: CONFERE ANTES DE REESCREVER. Ver cabecalho v17.
+          // So nesta situacao exata: item que ja voltou com 'valor_nao_confirmado' e que vai
+          // mandar valor de novo. Em regime normal (1a passada) nao acrescenta chamada nenhuma.
+          //
+          // O CADASTRO NAO FICA PARA TRAS quando o atalho fecha a linha: o carimbo
+          // 'valor_nao_confirmado' e gravado DEPOIS do upsert de cliente (ver o bloco 2b abaixo),
+          // entao a passada anterior ja mandou o cadastro. Medido no PEITASSO: 02/09 17:34:11
+          // contrato 'erro', 17:34:12 cliente 'sucesso'. O atalho tira uma escrita de contrato E
+          // uma de cliente do Omie.
+          // ====================================================================================
+          const valorEnviado = !ehCancelamento && contrato?.valor_mensal !== undefined && contrato?.valor_mensal !== null;
+          if (valorEnviado && String(item.ultimo_erro ?? "").startsWith(PREFIXO_VALOR_NAO_CONFIRMADO)) {
+            const ver = await chamar(EP_ALTERAR, chave, {
+              modo: "dry_run",
+              dados: contrato
+            });
+            if (ver.status === 425) {
+              // Mesmo tratamento do alterar: o 425 e da CONTA, e a linha volta intacta.
+              await service.from("omie_sync_fila").update({
+                status: "pendente"
+              }).eq("id", item.id);
+              await service.from("omie_integration").update({
+                omie_bloqueado_ate: new Date(Date.now() + BLOQUEIO_425_MIN * 60_000).toISOString()
+              }).eq("id", t.id);
+              parou425 = true;
+              break;
+            }
+            // A situacao entra na conferencia porque e o unico campo que o Omie pode ter RECUSADO
+            // com o AlterarContrato aceito (reativacao 99 -> 10). Sem alvo de situacao, nada a
+            // conferir. Ver cabecalho v17.
+            const situNova = ver.body?.situacao_nova ?? null;
+            const situBate = !situNova || String(ver.body?.situacao_atual_omie ?? "") === String(situNova);
+            if (ver.body?.ok === true && ver.body?.valor_confere === true && situBate) {
+              await service.from("omie_sync_fila").update({
+                status: "ok",
+                ultimo_erro: null,
+                processado_em: new Date().toISOString()
+              }).eq("id", item.id);
+              ok++;
+              confirmadosSemEscrita++;
+              await sleep(300);
+              continue;
+            }
+          // Nao confirmou (ou o dry_run e de uma versao sem `valor_confere`): segue e escreve,
+          // que e o comportamento de sempre.
+          }
           // 1) PORTEIRO: alterar contrato PRIMEIRO. Sem de/para => ignora, NADA no Omie.
           const alt = await chamar(EP_ALTERAR, chave, {
             modo: "alterar",
@@ -553,7 +635,7 @@ Deno.serve(async (req)=>{
           // quando a releitura no Omie nao bateu com o que mandamos (ou nao pode ser feita). Isso
           // NAO e sucesso -- e "nao sei". Retentar minutos depois sai da janela do REDUNDANT e
           // resolve; declarar 'ok' aqui enterra o caso.
-          const valorEnviado = !ehCancelamento && contrato?.valor_mensal !== undefined && contrato?.valor_mensal !== null;
+          // v17: `valorEnviado` agora e calculado antes do alterar (a verificacao precisa dele).
           if (valorEnviado && alt.body?.valor_confirmado === false) {
             const tent = (item.tentativas ?? 0) + 1;
             const vira_erro = tent >= maxTent;
@@ -610,6 +692,9 @@ Deno.serve(async (req)=>{
         cancelados,
         // v12: quantos dos 'cancelados' foram estado ja convergido (Omie ja estava em 99).
         convergidos,
+        // v17: quantos fecharam com o dry_run confirmando o valor -- reescritas que NAO
+        // aconteceram. Numero subindo aqui e ruido saindo do historico do contrato no Omie.
+        confirmados_sem_escrita: confirmadosSemEscrita,
         observacoes,
         vigencias,
         cadastro_pulado: cadastroPulado,
