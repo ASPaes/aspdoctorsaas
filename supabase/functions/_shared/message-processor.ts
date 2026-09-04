@@ -5,6 +5,7 @@ import { getAdapter } from './providers/index.ts';
 import { NormalizedInboundMessage, SendContext, PhoneParseResult, UNSUPPORTED_MESSAGE_LABEL } from './message-types.ts';
 import { normalizeBRPhone, phoneSearchVariants } from './phone.ts';
 import { isGoodbyeOnlyMessage } from './goodbye.ts';
+import { extractLocation } from './location.ts';
 
 const AUTO_SENTIMENT_THRESHOLD = 5;
 const AUTO_CATEGORIZATION_THRESHOLD = 5;
@@ -1948,6 +1949,14 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
             || rawMsg.viewOnceMessageV2?.message || rawMsg.documentWithCaptionMessage?.message || null;
           if (inner) base.unsupportedInnerKeys = Object.keys(inner);
         } catch { /* ignore */ }
+      }
+
+      // Localização: as coordenadas só existem no payload bruto. Sem isto o chat
+      // mostra um rótulo sem mapa (Evolution) ou dois números soltos (Meta), e o
+      // atendente copia à mão pro Google Maps.
+      if (msg.rawPayload) {
+        const loc = extractLocation(msg.rawPayload);
+        if (loc) base.location = loc;
       }
 
       if ((messageType === 'contact' || messageType === 'contacts') && msg.rawPayload) {
