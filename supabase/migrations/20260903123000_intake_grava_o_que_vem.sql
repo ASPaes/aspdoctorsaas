@@ -527,9 +527,10 @@ BEGIN
           'funcionario_id',     nullif(v_com->>'funcionario_id','')::bigint,
           'origem_venda_id',    nullif(v_com->>'origem_venda_id','')::bigint,
           'origem_venda',       v_origem_txt,
-          -- A linha nasce marcada como veio: a ficha e o historico precisam
-          -- saber que foi venda, nao carga do espelho.
-          'origem',             'intake',
+          -- Sem 'origem' de proposito: a linha e de um modulo LICENCIADO, e quem
+          -- a mantem daqui para a frente e a carga do espelho, que so enxerga
+          -- 'oem'. A procedencia da venda vai em 'fonte', que o gatilho do
+          -- historico le. Ver 20260903100000.
           'fonte',              'calculadora');
 
         BEGIN
