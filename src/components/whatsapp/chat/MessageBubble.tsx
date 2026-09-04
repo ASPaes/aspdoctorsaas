@@ -9,6 +9,8 @@ import { renderMentions, renderMessageText } from "./mentionUtils";
 import { MediaContent } from "./MediaContent";
 import { hasRenderableMedia, isMediaPlaceholderContent } from "@/utils/whatsapp/mediaGate";
 import { ContactCard } from "./ContactCard";
+import { LocationCard } from "./LocationCard";
+import { getMessageLocation, isLocationPlaceholderContent } from "@/utils/whatsapp/location";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { formatTime as formatTzTime } from "@/lib/formatDateWithTimezone";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -107,6 +109,7 @@ export function MessageBubble({
   const isPending = deleteStatus === 'pending';
   const isFailed = deleteStatus === 'failed';
   const sendError = isFromMe && msg.status === 'failed' ? getSendErrorInfo(msg.metadata) : null;
+  const location = isDeleted ? null : getMessageLocation(msg);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -433,6 +436,8 @@ export function MessageBubble({
         />
       )}
 
+      {location && <LocationCard location={location} isFromMe={isFromMe} />}
+
       {hasRenderableMedia(msg) && (
         <div className="min-w-0">
           <MediaContent messageId={msg.id} messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} mediaFilename={msg.media_filename} mediaExt={msg.media_ext} mediaSizeBytes={msg.media_size_bytes} mediaKind={msg.media_kind} mediaMimetype={msg.media_mimetype} mediaPath={msg.media_path} mediaPurgedAt={msg.media_purged_at} />
@@ -498,6 +503,7 @@ export function MessageBubble({
           && msg.message_type !== 'contact'
           && msg.message_type !== 'contacts'
           && !(hasRenderableMedia(msg) && isMediaPlaceholderContent(msg.content))
+          && !(location && isLocationPlaceholderContent(msg.content))
           && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{renderMessageText(msg.content, groupParticipants)}</p>
       )}
 
