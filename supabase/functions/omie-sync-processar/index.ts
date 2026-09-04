@@ -10,8 +10,11 @@
 //     escritas no Omie. O operador abriu o "Historico de Alteracoes" do contrato, viu a integracao
 //     mexendo duas vezes por mudanca e perguntou o que ela estava fazendo em loop. Nao havia loop:
 //     havia uma acao humana e uma reescrita nossa. ~110 casos em 30 dias.
-//     Reescrever nao e inocente: o ds-omie-contrato-alterar ZERA DESCONTO (escreve valorUnit =
-//     valorTotal = nValTotMes), entao toda reescrita repete esse efeito num contrato com desconto.
+//     Reescrever nao e de graca: cada AlterarContrato deixa linha no historico do contrato no
+//     Omie (e e esse historico que o cliente le), e num contrato com desconto o Omie recalcula o
+//     aliqDesconto sobre a nova base a cada escrita. O desconto em si NAO se perde -- medido em
+//     01/09/2026 no BURGUER SMASH: o Omie ignora o valorTotal enviado e refaz
+//     valorTotal = quant x valorUnit - valorDesconto, preservando o valorDesconto.
 //
 //     Agora, quando o item volta com `ultimo_erro` comecando em 'valor_nao_confirmado:', a fila
 //     PERGUNTA ANTES: um `modo: "dry_run"` no mesmo endpoint, que consulta o Omie ao vivo e nao
