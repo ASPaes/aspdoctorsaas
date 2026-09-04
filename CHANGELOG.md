@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 04/09
 
+- ⬆️ **Campo de ocorrência cresce junto com o texto** — No detalhe do chamado, o campo **Registrar ocorrência** tinha altura fixa de duas linhas: ao colar um resumo longo da conversa com o cliente, o texto ficava preso numa janelinha com barra de rolagem e só dava para conferir duas linhas por vez antes de enviar. Agora o campo cresce conforme você escreve, até uma altura confortável, e volta ao tamanho normal depois do envio.
+
 - 🔧 **Mensagem para telefone fixo não chegava (WhatsApp oficial da Meta)** — Ao enviar conversa ou modelo de mensagem por uma conta do WhatsApp oficial (Meta), o sistema acrescentava por conta própria o nono dígito em números de telefone fixo: `51 3762-8181` saía como `51 93762-8181`. A Meta aceitava o envio, mas a mensagem nunca era entregue (ficava com um tique só) e ainda nascia um contato repetido com o número alterado. Reeditar ou recadastrar o número não adiantava, porque o cadastro estava certo e a troca acontecia na hora do envio. Agora o número fixo vai para a Meta exatamente como está cadastrado. Celular antigo sem o 9 continua recebendo o 9 normalmente.
 
 - 🔧 **Aviso de "Aguardando você" ficava aceso depois da resposta** — Na lista de conversas, o alerta vermelho de cliente esperando resposta continuava no chat mesmo depois de o operador responder, às vezes por vários minutos, e só saía ao recarregar a página. A resposta sempre foi registrada certo: era a tela que demorava a se atualizar. Agora o alerta apaga no instante em que a mensagem sai.

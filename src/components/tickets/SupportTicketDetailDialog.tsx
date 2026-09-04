@@ -110,6 +110,18 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [rightPanelWidth, setRightPanelWidth] = useState(300);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const newCommentRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize do campo de nova ocorrência: cresce com o texto até o teto,
+  // e volta ao tamanho mínimo quando o campo é limpo após o envio.
+  useEffect(() => {
+    const textarea = newCommentRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    const maxAutoHeight = 280;
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxAutoHeight)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxAutoHeight ? "auto" : "hidden";
+  }, [newComment, mobileView]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -1658,10 +1670,11 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         {/* Formulário de nova ocorrência */}
         <div className="flex gap-2">
           <Textarea
+            ref={newCommentRef}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             placeholder="Registrar ocorrência..."
-            className="min-h-[60px] text-sm flex-1"
+            className="min-h-[60px] max-h-[280px] text-sm flex-1 resize-none"
             rows={2}
           />
           <Button
