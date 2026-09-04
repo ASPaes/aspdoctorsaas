@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 04/09
 
+- ⬆️ **Resumo da venda no formato do documento da proposta** — A aba **Resumo da venda** do ticket passou a seguir a organização do PDF que o vendedor gera: cabeçalho com o cliente, o contato, o vendedor e os dois valores; as respostas separadas por seção — **Classificação, Dados Cliente, Dados Comerciais, Implantação, Contabilidade e Outras Informações** — na mesma ordem do documento; e os módulos numa **tabela com quantidade, mensalidade, implantação e total**. Dá para conferir os dois lado a lado. O que a proposta envia sem virar pergunta continua disponível em **Dados do envio**, recolhido no fim.
+
 - 🔧 **Módulo vindo da calculadora entrava com custo zerado** — Na ficha do cliente o *Vlr Custo* aparecia R$ 0,00 num módulo que o OEM cobra, porque a proposta não informa custo e quem informa é o campo do diálogo de *Adicionar Módulo*. Agora o DoctorSaaS pergunta o preço ao próprio OEM: o que o parceiro cobra **daquele cliente** primeiro, e a tabela de preços como reserva. Unidade que o parceiro dá de cortesia continua valendo zero, e o valor digitado na tela continua mandando.
 
 - 🔧 **Up-sell da calculadora era recusado por causa do produto** — A proposta manda o produto da linha comercial, mas num up-sell o produto não é escolha: é o que o cliente já tem contratado. Quatro vendas foram recusadas por isso e precisaram ser lançadas à mão. Agora o DoctorSaaS acha sozinho em qual produto do cliente a venda entra e traduz os módulos para o catálogo certo, avisando no registro da proposta o que foi corrigido. Quando duas fichas do cliente poderiam receber a venda, ele continua recusando e mostra as opções, em vez de escolher no escuro.
