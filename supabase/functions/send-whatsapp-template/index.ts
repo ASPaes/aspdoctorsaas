@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
+import { normalizeBRPhone } from '../_shared/phone.ts';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
 import {
   findOrCreateContact,
@@ -149,11 +150,11 @@ Deno.serve(async (req) => {
     if (!cleanTo || cleanTo.length < 10) {
       return jsonResponse({ error: 'invalid phone number' }, 400);
     }
-    let normalizedTo = cleanTo;
-    if (!normalizedTo.startsWith('55') && (normalizedTo.length === 10 || normalizedTo.length === 11)) {
-      normalizedTo = '55' + normalizedTo;
-    }
-    if (normalizedTo.startsWith('55') && normalizedTo.length === 12) {
+    // Normalizacao central em _shared/phone.ts. O 9 so entra em celular antigo:
+    // fixo BR (digito apos o DDD entre 2-5) vai para a Meta como esta cadastrado.
+    const { phone: basePhone, isLandline } = normalizeBRPhone(cleanTo);
+    let normalizedTo = basePhone;
+    if (!isLandline && normalizedTo.startsWith('55') && normalizedTo.length === 12) {
       normalizedTo = normalizedTo.slice(0, 4) + '9' + normalizedTo.slice(4);
     }
 

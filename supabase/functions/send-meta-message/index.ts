@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
+import { normalizeBRPhone } from '../_shared/phone.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,16 +21,14 @@ interface SendMetaRequest {
   systemMessage?: boolean;
 }
 
+// Normalizacao central em _shared/phone.ts. O 9 so entra em celular antigo:
+// fixo BR (digito apos o DDD entre 2-5) vai para a Meta como esta cadastrado.
 function normalizePhone(raw: string): string {
-  let digits = raw.replace(/\D/g, '');
-  digits = digits.replace(/^0+/, '');
-  if (digits.length >= 10 && digits.length <= 11 && !digits.startsWith('55')) {
-    digits = '55' + digits;
+  const { phone, isLandline } = normalizeBRPhone(raw);
+  if (!isLandline && phone.startsWith('55') && phone.length === 12) {
+    return phone.slice(0, 4) + '9' + phone.slice(4);
   }
-  if (digits.startsWith('55') && digits.length === 12) {
-    digits = digits.slice(0, 4) + '9' + digits.slice(4);
-  }
-  return digits;
+  return phone;
 }
 
 function getExtFromMime(mime: string): string {
