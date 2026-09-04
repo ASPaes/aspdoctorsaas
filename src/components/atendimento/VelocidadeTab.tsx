@@ -4,6 +4,8 @@ import { useAtendimentoVelocidade } from "./useAtendimentoVelocidade";
 import { fmtEspera } from "./TempoRealTab";
 import { VelocidadeTimeline } from "./VelocidadeTimeline";
 import { NaoAtendidosDialog } from "./NaoAtendidosDialog";
+import { VelocidadeListaDialog } from "./VelocidadeListaDialog";
+import type { VelocidadeMetrica } from "./useAtendimentoVelocidadeLista";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 import { cn } from "@/lib/utils";
@@ -17,6 +19,7 @@ const SLA_OPCOES = [
 export function VelocidadeTab() {
   const [slaSeconds, setSlaSeconds] = useState(900);
   const [verVacuo, setVerVacuo] = useState(false);
+  const [verLista, setVerLista] = useState<VelocidadeMetrica | null>(null);
   const { data, isLoading, isError, error } = useAtendimentoVelocidade(slaSeconds);
   const dur = (s: number | null | undefined) => (s && s > 0 ? fmtEspera(s) : "—");
 
@@ -70,6 +73,8 @@ export function VelocidadeTab() {
               value={dur(data.tme_p50)}
               subtitle={`p90: ${dur(data.tme_p90)}`}
               icon={<Gauge className="h-4 w-4" />}
+              onClick={() => setVerLista("tme")}
+              onClickLabel="Ver os atendimentos que formaram o TME"
             />
             <KPICardEnhanced
               label="1ª Resposta"
@@ -77,6 +82,8 @@ export function VelocidadeTab() {
               value={dur(data.frt_p50)}
               subtitle={`p90: ${dur(data.frt_p90)}`}
               icon={<Gauge className="h-4 w-4" />}
+              onClick={() => setVerLista("frt")}
+              onClickLabel="Ver os atendimentos que formaram a 1ª resposta"
             />
             <KPICardEnhanced
               label="TMA"
@@ -84,6 +91,8 @@ export function VelocidadeTab() {
               value={dur(data.tma_p50)}
               subtitle={`p90: ${dur(data.tma_p90)}`}
               icon={<Gauge className="h-4 w-4" />}
+              onClick={() => setVerLista("tma")}
+              onClickLabel="Ver os atendimentos que formaram o TMA"
             />
             <KPICardEnhanced
               label="TMR"
@@ -91,6 +100,8 @@ export function VelocidadeTab() {
               value={dur(data.tmr_p50)}
               subtitle={`p90: ${dur(data.tmr_p90)}`}
               icon={<Gauge className="h-4 w-4" />}
+              onClick={() => setVerLista("tmr")}
+              onClickLabel="Ver os atendimentos que formaram o TMR"
             />
             <KPICardEnhanced
               label="% dentro do SLA"
@@ -166,6 +177,10 @@ export function VelocidadeTab() {
       )}
 
       <NaoAtendidosDialog open={verVacuo} onOpenChange={setVerVacuo} />
+      <VelocidadeListaDialog
+        metrica={verLista}
+        onOpenChange={(aberto) => !aberto && setVerLista(null)}
+      />
     </div>
   );
 }
