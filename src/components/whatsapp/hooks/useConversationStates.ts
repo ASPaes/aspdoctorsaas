@@ -82,6 +82,53 @@ export function useConversationStates(conversationIds: string[]) {
       }, 3000);
     };
 
+    // Patch local, sem request: o UPDATE que apaga o alerta chega aqui inteiro.
+    //
+    // A resposta do operador limpa awaiting_agent_since no mesmo UPDATE que
+    // carimba last_operator_message_at (trigger fn_track_awaiting_agent). O
+    // banco apaga o alerta no ato — mas este cache só relia a view no
+    // refetchInterval, porque as duas invalidações usam refetchType: "none".
+    // Enquanto isso o badge "Aguardando você" seguia aceso sobre uma conversa
+    // já respondida (DEM-0359; medido em 03/09 no atendimento 06976/26, com a
+    // resposta na tela havia 9 min). Basta zerar agent_alert_due_at na entrada
+    // da conversa: é o único campo que o badge lê.
+    //
+    // Só o APAGAR entra aqui. Acender depende de fn_business_due_at (horário
+    // útil por setor), que não existe no cliente — quem acende continua sendo a
+    // releitura da view, e um alerta que demora 60s para aparecer custa menos
+    // que um alerta falso que não sai da tela.
+    //
+    // support_attendances é REPLICA IDENTITY FULL, então payload.old vem
+    // completo: dá para exigir que o alerta estivesse aceso ANTES. Sem isso,
+    // qualquer UPDATE em atendimento já fechado (ai_summary, sentiment_at)
+    // apagaria o alerta do atendimento ativo da mesma conversa.
+    const patchAlertOff = (convId: string) => {
+      queryClient.setQueriesData<Map<string, ConversationStateRow>>(
+        { queryKey: ["conversation-states"] },
+        (oldMap) => {
+          if (!oldMap) return oldMap;
+          const prev = oldMap.get(convId);
+          if (!prev || prev.agent_alert_due_at == null) return oldMap;
+          const next = new Map(oldMap);
+          next.set(convId, { ...prev, agent_alert_due_at: null });
+          return next;
+        }
+      );
+    };
+
+    const handleAttendanceChange = (payload: any) => {
+      const oldRow = (payload.old ?? {}) as Record<string, any>;
+      const newRow = (payload.new ?? {}) as Record<string, any>;
+      const convId = newRow.conversation_id;
+      const estavaAceso = oldRow.awaiting_agent_since != null;
+      const apagou = newRow.awaiting_agent_since == null
+        || newRow.status === "closed" || newRow.status === "inactive_closed";
+      if (convId && payload.eventType === "UPDATE" && estavaAceso && apagou) {
+        patchAlertOff(convId);
+      }
+      debouncedInvalidate();
+    };
+
     const handleConversationChange = (payload: any) => {
       if (payload.eventType !== 'UPDATE') {
         debouncedInvalidate();
@@ -108,7 +155,7 @@ export function useConversationStates(conversationIds: string[]) {
           schema: "public",
           table: "support_attendances",
           filter: `tenant_id=eq.${tid}`,
-        }, debouncedInvalidate);
+        }, handleAttendanceChange);
       }
     );
 
