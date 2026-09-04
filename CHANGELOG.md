@@ -12,6 +12,12 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 04/09
+
+- 🔧 **Up-sell da calculadora era recusado por causa do produto** — A proposta manda o produto da linha comercial, mas num up-sell o produto não é escolha: é o que o cliente já tem contratado. Quatro vendas foram recusadas por isso e precisaram ser lançadas à mão. Agora o DoctorSaaS acha sozinho em qual produto do cliente a venda entra e traduz os módulos para o catálogo certo, avisando no registro da proposta o que foi corrigido. Quando duas fichas do cliente poderiam receber a venda, ele continua recusando e mostra as opções, em vez de escolher no escuro.
+
+- 🔧 **Cliente com CNPJ repetido podia receber a venda na ficha errada** — A busca pegava uma das fichas ao acaso. Numa alteração, quem decide passou a ser qual das fichas tem o produto; nos outros casos a proposta é recusada com a lista das fichas, para alguém consolidar antes. Hoje há 69 CNPJs com mais de um cadastro na Digi Office.
+
 ### 03/09
 
 - 🆕 **Fornecedor amarrado ao produto** — O cadastro do produto (**Configurações → Produtos e Módulos**) ganhou o campo **Fornecedor**, que também aparece como coluna na lista. Ao lançar esse produto num cliente, o fornecedor já vem preenchido sozinho — mas só quando o campo está em branco: se você escolheu outro fornecedor à mão, a sua escolha é respeitada. Os produtos já cadastrados nascem sem fornecedor; preencha os que quiser e o automático passa a valer das próximas vendas em diante.

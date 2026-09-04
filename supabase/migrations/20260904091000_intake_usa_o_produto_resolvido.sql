@@ -1,0 +1,791 @@
+-- ============================================================================
+-- `fn_intake_proposta` passa a usar o resolvedor de 20260904090000.
+--
+-- Duas mudanças, as duas no caminho do cliente:
+--
+-- 1. **Modo `alteracao` resolve cliente e produto juntos.** O `v_cp` e o
+--    `produto_id` já chegam decididos ao bloco B, e quando o produto resolvido
+--    é diferente do pedido os `modulo_id` do payload são reescritos para o
+--    catálogo certo. A venda entra com um aviso dizendo o que foi corrigido, em
+--    vez de ser recusada.
+--
+-- 2. **CNPJ duplicado deixa de ser sorteio nos outros modos.** A busca era
+--    `LIMIT 1` sem `ORDER BY`; agora, com mais de uma ficha para o mesmo CNPJ,
+--    a proposta é recusada com a lista das candidatas. São 69 CNPJs repetidos
+--    só no Digi Office, e gravar a venda na ficha errada é pior do que recusar:
+--    ninguém descobre.
+--
+-- O bloco antigo de `produto_nao_contratado` sai daqui: quem recusa agora é o
+-- resolvedor, antes, e com a lista completa de candidatos.
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.fn_intake_proposta(p_payload jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_tenant uuid; v_ext text; v_demand uuid; v_unidade bigint; v_assunto text;
+  v_modo text; v_blocos int := 0; v_erros jsonb := '[]'::jsonb; v_avisos jsonb := '[]'::jsonb;
+  v_cli jsonb; v_com jsonb; v_alt jsonb; v_avu jsonb; v_cnpj text;
+  v_cliente uuid; v_reusado boolean := false;
+  v_cidade_id bigint; v_estado_id bigint;
+  v_prod jsonb; v_mod jsonb; v_cp uuid; v_contrato uuid;
+  v_soma_m numeric := 0; v_soma_a numeric := 0;
+  v_tot_m numeric; v_tot_a numeric;
+  v_journey uuid; v_ticket_code text; v_primeiro_produto bigint;
+  v_data_inicio timestamptz; v_pm numeric; v_pa numeric;
+  v_delta numeric; v_tipo text; v_mov uuid; v_origem_txt text;
+  v_prod_alvo bigint; v_cpm uuid; v_qtd_atual int; v_qd int;
+  -- modo B pela fila do OEM
+  v_tem_lic boolean := false; v_n_mod int := 0; v_ativ_tot numeric := 0;
+  v_tipo_prop text; v_qtd_pos int := 0; v_soma_mod numeric := 0;
+  v_todos_com_valor boolean := false;
+  v_mvm numeric; v_mva numeric; v_nome_mod text;
+  v_data_venda date; v_motivo_txt text; v_motivo_id bigint;
+  v_pl jsonb; v_fila uuid; v_filas jsonb := '[]'::jsonb;
+  -- resolucao de cliente+produto da alteracao
+  v_alvo jsonb; v_prod_novo bigint; v_clientes uuid[];
+  -- conferencia de catalogo e de formato, e o aviso das lacunas do cadastro
+  v_chk jsonb; v_chks jsonb; v_ok boolean; v_faltando text[] := '{}';
+  v_ticket uuid;
+BEGIN
+  PERFORM set_config('doctorsaas.intake_hold_omie', 'true', true);
+  -- Nada do que esta função escreve tem gente por trás: `auth.uid()` é NULL sob
+  -- service_role. A fonte é o que sobra para o histórico não ter que escolher
+  -- entre mentir ("Sincronização OEM") e ficar em branco.
+  PERFORM set_config('doctorsaas.acting_source', 'calculadora', true);
+
+  ---------------------------------------------------------------- raiz
+  BEGIN
+    v_tenant  := nullif(p_payload->>'tenant_id','')::uuid;
+    v_demand  := nullif(p_payload->>'demand_type_id','')::uuid;
+    v_unidade := nullif(p_payload->>'unidade_base_id','')::bigint;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE EXCEPTION '%', jsonb_build_object('error','payload_mal_formatado','detail',SQLERRM)::text;
+  END;
+  v_ext     := nullif(btrim(coalesce(p_payload->>'external_ticket_id','')),'');
+  v_assunto := nullif(btrim(coalesce(p_payload->>'assunto','')),'');
+  v_cli     := coalesce(p_payload->'cliente','{}'::jsonb);
+  v_com     := coalesce(p_payload->'comercial','{}'::jsonb);
+  v_alt     := p_payload->'alteracao';
+  v_avu     := p_payload->'avulso';
+
+  IF v_tenant IS NULL OR NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_tenant) THEN
+    RAISE EXCEPTION '%', jsonb_build_object('error','tenant_not_found')::text;
+  END IF;
+  IF v_ext IS NULL THEN
+    v_erros := v_erros || jsonb_build_object('campo','external_ticket_id','motivo','obrigatorio');
+  END IF;
+
+  ---------------------------------------------------------------- modo
+  IF coalesce(jsonb_array_length(p_payload->'produtos'),0) > 0 THEN v_blocos := v_blocos+1; v_modo := 'venda_nova'; END IF;
+  IF p_payload ? 'alteracao' THEN v_blocos := v_blocos+1; v_modo := 'alteracao'; END IF;
+  IF p_payload ? 'avulso'    THEN v_blocos := v_blocos+1; v_modo := 'avulso';    END IF;
+  IF v_blocos = 0 THEN v_modo := 'jornada'; END IF;
+  IF v_blocos > 1 THEN
+    RAISE EXCEPTION '%', jsonb_build_object('error','blocos_conflitantes',
+      'detail','enviar no maximo um entre produtos, alteracao e avulso')::text;
+  END IF;
+
+  ---------------------------------------------------------- catalogos
+  IF v_demand IS NULL OR NOT EXISTS (
+       SELECT 1 FROM onboarding_demand_types WHERE id = v_demand AND tenant_id = v_tenant AND ativo) THEN
+    v_erros := v_erros || jsonb_build_object('campo','demand_type_id','valor',p_payload->>'demand_type_id','motivo','nao_existe_no_tenant');
+  END IF;
+  IF v_unidade IS NOT NULL AND NOT EXISTS (
+       SELECT 1 FROM unidades_base WHERE id = v_unidade AND tenant_id = v_tenant AND is_active) THEN
+    v_erros := v_erros || jsonb_build_object('campo','unidade_base_id','valor',p_payload->>'unidade_base_id','motivo','nao_existe_no_tenant');
+  END IF;
+  -- clientes tem CHECK (unidade_base_id IS NOT NULL). Sem esta linha, venda nova
+  -- sem unidade estoura no INSERT e volta 500 cru, sem dizer o que faltou.
+  IF v_modo = 'venda_nova' AND v_unidade IS NULL THEN
+    v_erros := v_erros || jsonb_build_object('campo','unidade_base_id','motivo','obrigatorio_no_modo_venda_nova');
+  END IF;
+
+  -- Os outros catalogos, num lugar so. A lista de tabelas e literal aqui — o
+  -- format(%I) nunca ve texto de payload.
+  v_chks := jsonb_build_array(
+    jsonb_build_object('campo','cliente.segmento_id',      'valor',v_cli->>'segmento_id',      'tabela','segmentos'),
+    jsonb_build_object('campo','cliente.area_atuacao_id',  'valor',v_cli->>'area_atuacao_id',  'tabela','areas_atuacao'),
+    jsonb_build_object('campo','comercial.funcionario_id', 'valor',v_com->>'funcionario_id',   'tabela','funcionarios'),
+    jsonb_build_object('campo','comercial.origem_venda_id','valor',v_com->>'origem_venda_id',  'tabela','origens_venda'),
+    jsonb_build_object('campo','comercial.forma_pagamento_ativacao_id',    'valor',v_com->>'forma_pagamento_ativacao_id',    'tabela','formas_pagamento'),
+    jsonb_build_object('campo','comercial.forma_pagamento_mensalidade_id', 'valor',v_com->>'forma_pagamento_mensalidade_id', 'tabela','formas_pagamento')
+  );
+  FOR v_prod IN SELECT jsonb_array_elements(coalesce(p_payload->'produtos','[]'::jsonb)) LOOP
+    v_chks := v_chks
+      || jsonb_build_object('campo','produtos[].fornecedor_id',      'valor',v_prod->>'fornecedor_id',      'tabela','fornecedores')
+      || jsonb_build_object('campo','produtos[].modelo_contrato_id', 'valor',v_prod->>'modelo_contrato_id', 'tabela','modelos_contrato')
+      || jsonb_build_object('campo','produtos[].funcionario_id',     'valor',v_prod->>'funcionario_id',     'tabela','funcionarios')
+      || jsonb_build_object('campo','produtos[].origem_venda_id',    'valor',v_prod->>'origem_venda_id',    'tabela','origens_venda')
+      || jsonb_build_object('campo','produtos[].forma_pagamento_ativacao_id',    'valor',v_prod->>'forma_pagamento_ativacao_id',    'tabela','formas_pagamento')
+      || jsonb_build_object('campo','produtos[].forma_pagamento_mensalidade_id', 'valor',v_prod->>'forma_pagamento_mensalidade_id', 'tabela','formas_pagamento');
+
+    IF nullif(btrim(coalesce(v_prod->>'recorrencia','')),'') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+                        WHERE t.typname = 'recorrencia_tipo' AND e.enumlabel = v_prod->>'recorrencia') THEN
+      v_erros := v_erros || jsonb_build_object('campo','produtos[].recorrencia','valor',v_prod->>'recorrencia',
+        'motivo','valor_invalido: aceita mensal, anual, semestral ou semanal');
+    END IF;
+  END LOOP;
+
+  FOR v_chk IN SELECT jsonb_array_elements(v_chks) LOOP
+    CONTINUE WHEN nullif(btrim(coalesce(v_chk->>'valor','')),'') IS NULL;
+    IF (v_chk->>'valor') !~ '^[0-9]+$' THEN
+      v_erros := v_erros || jsonb_build_object('campo',v_chk->>'campo','valor',v_chk->>'valor',
+        'motivo','id_invalido: envie o ID numerico do catalogo, nao o nome');
+      CONTINUE;
+    END IF;
+    EXECUTE format('SELECT EXISTS (SELECT 1 FROM public.%I WHERE id = $1 AND tenant_id = $2)', v_chk->>'tabela')
+      INTO v_ok USING (v_chk->>'valor')::bigint, v_tenant;
+    IF NOT v_ok THEN
+      v_erros := v_erros || jsonb_build_object('campo',v_chk->>'campo','valor',v_chk->>'valor','motivo','nao_existe_no_tenant');
+    END IF;
+  END LOOP;
+
+  -- Formato de data e de numero. Sem isto, um "31/08/2026" ou um "1.234,00"
+  -- estoura no cast e volta 500, sem dizer qual campo.
+  v_chks := jsonb_build_array(
+    jsonb_build_object('campo','cliente.data_cadastro',        'valor',v_cli->>'data_cadastro',        'tipo','data'),
+    jsonb_build_object('campo','comercial.data_inicio_prevista','valor',v_com->>'data_inicio_prevista','tipo','data')
+  );
+  FOR v_prod IN SELECT jsonb_array_elements(coalesce(p_payload->'produtos','[]'::jsonb)) LOOP
+    v_chks := v_chks
+      || jsonb_build_object('campo','produtos[].data_venda',            'valor',v_prod->>'data_venda',            'tipo','data')
+      || jsonb_build_object('campo','produtos[].data_ativacao',         'valor',v_prod->>'data_ativacao',         'tipo','data')
+      || jsonb_build_object('campo','produtos[].data_fim',              'valor',v_prod->>'data_fim',              'tipo','data')
+      || jsonb_build_object('campo','produtos[].data_proximo_reajuste', 'valor',v_prod->>'data_proximo_reajuste', 'tipo','data')
+      || jsonb_build_object('campo','produtos[].vlr_custo',             'valor',v_prod->>'vlr_custo',             'tipo','numero');
+  END LOOP;
+
+  FOR v_chk IN SELECT jsonb_array_elements(v_chks) LOOP
+    CONTINUE WHEN nullif(btrim(coalesce(v_chk->>'valor','')),'') IS NULL;
+    BEGIN
+      IF v_chk->>'tipo' = 'data'
+        THEN PERFORM (v_chk->>'valor')::date;
+        ELSE PERFORM (v_chk->>'valor')::numeric;
+      END IF;
+    EXCEPTION WHEN OTHERS THEN
+      v_erros := v_erros || jsonb_build_object('campo',v_chk->>'campo','valor',v_chk->>'valor',
+        'motivo', CASE WHEN v_chk->>'tipo' = 'data'
+                       THEN 'data_invalida: use AAAA-MM-DD'
+                       ELSE 'numero_invalido: use ponto decimal, sem separador de milhar' END);
+    END;
+  END LOOP;
+
+  v_cnpj := regexp_replace(coalesce(v_cli->>'cnpj',''), '\D', '', 'g');
+  IF length(v_cnpj) < 11 THEN
+    v_erros := v_erros || jsonb_build_object('campo','cliente.cnpj','valor',v_cli->>'cnpj','motivo','documento_invalido');
+  END IF;
+
+  ------------------------------------------------------ validacao modo A
+  IF v_modo = 'venda_nova' THEN
+    IF EXISTS (
+         SELECT 1 FROM jsonb_array_elements(p_payload->'produtos') e
+         GROUP BY e->>'produto_id' HAVING count(*) > 1)
+    THEN
+      v_erros := v_erros || jsonb_build_object('campo','produtos[].produto_id','motivo',
+        'produto_repetido: o mesmo produto aparece mais de uma vez. Envie UM produto com o valor total e cada item da venda como um modulo dele');
+    END IF;
+
+    FOR v_prod IN SELECT jsonb_array_elements(p_payload->'produtos') LOOP
+      IF NOT EXISTS (SELECT 1 FROM produtos WHERE id = (v_prod->>'produto_id')::bigint AND tenant_id = v_tenant) THEN
+        v_erros := v_erros || jsonb_build_object('campo','produtos[].produto_id','valor',v_prod->>'produto_id','motivo','nao_existe_no_tenant');
+        CONTINUE;
+      END IF;
+      v_pm := (v_prod->>'vlr_mensal')::numeric;
+      v_pa := (v_prod->>'vlr_ativacao')::numeric;
+      IF v_pm IS NULL OR v_pa IS NULL THEN
+        v_erros := v_erros || jsonb_build_object('campo','produtos[].vlr_mensal/vlr_ativacao','valor',v_prod->>'produto_id','motivo','produto_sem_valor');
+      END IF;
+      v_soma_m := v_soma_m + coalesce(v_pm,0);
+      v_soma_a := v_soma_a + coalesce(v_pa,0);
+      IF coalesce(jsonb_array_length(v_prod->'modulos'),0) = 0 THEN
+        v_avisos := v_avisos || jsonb_build_object('campo','produtos[].modulos','produto_id',v_prod->>'produto_id','aviso','sem_modulo: o contrato foi criado, mas nao registra o que foi vendido. Se havia itens, o de-para item->modulo esta vazio para eles');
+      END IF;
+      FOR v_mod IN SELECT jsonb_array_elements(coalesce(v_prod->'modulos','[]'::jsonb)) LOOP
+        IF (v_mod ? 'vlr_mensal') OR (v_mod ? 'vlr_ativacao') THEN
+          v_erros := v_erros || jsonb_build_object('campo','produtos[].modulos[].vlr_mensal','valor',v_mod->>'modulo_id',
+            'motivo','modulo_com_valor: o preco vai no produto, nunca no modulo');
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM produto_modulos WHERE id = (v_mod->>'modulo_id')::uuid
+                        AND tenant_id = v_tenant AND produto_id = (v_prod->>'produto_id')::bigint AND ativo) THEN
+          v_erros := v_erros || jsonb_build_object('campo','produtos[].modulos[].modulo_id','valor',v_mod->>'modulo_id','motivo','nao_existe_neste_produto');
+        END IF;
+        IF coalesce((v_mod->>'quantidade')::int,0) < 1 THEN
+          v_erros := v_erros || jsonb_build_object('campo','produtos[].modulos[].quantidade','valor',v_mod->>'quantidade','motivo','minimo_1');
+        END IF;
+      END LOOP;
+    END LOOP;
+
+    v_tot_m := (v_com->>'vlr_mensal')::numeric;
+    v_tot_a := (v_com->>'vlr_ativacao')::numeric;
+    IF v_tot_m IS NULL OR v_tot_a IS NULL THEN
+      v_erros := v_erros || jsonb_build_object('campo','comercial.vlr_mensal/vlr_ativacao','motivo','obrigatorio_no_modo_venda_nova');
+    ELSE
+      IF round(v_soma_m,2) <> round(v_tot_m,2) THEN
+        v_erros := v_erros || jsonb_build_object('campo','comercial.vlr_mensal','motivo','total_nao_confere',
+          'soma_dos_produtos',round(v_soma_m,2),'total_declarado',round(v_tot_m,2));
+      END IF;
+      IF round(v_soma_a,2) <> round(v_tot_a,2) THEN
+        v_erros := v_erros || jsonb_build_object('campo','comercial.vlr_ativacao','motivo','total_nao_confere',
+          'soma_dos_produtos',round(v_soma_a,2),'total_declarado',round(v_tot_a,2));
+      END IF;
+    END IF;
+  END IF;
+
+  ------------------------------------------------------ validacao modo B
+  IF v_modo = 'alteracao' THEN
+    v_prod_alvo := nullif(v_alt->>'produto_id','')::bigint;
+    v_delta     := nullif(v_alt->>'valor_delta','')::numeric;
+    v_ativ_tot  := coalesce(nullif(v_alt->>'vlr_ativacao','')::numeric, 0);
+    v_n_mod     := coalesce(jsonb_array_length(v_alt->'modulos'), 0);
+    v_tipo_prop := lower(nullif(btrim(coalesce(p_payload->'proposta'->>'ticket_type','')),''));
+    v_todos_com_valor := (v_n_mod > 0);
+
+    IF v_prod_alvo IS NULL OR NOT EXISTS (SELECT 1 FROM produtos WHERE id=v_prod_alvo AND tenant_id=v_tenant) THEN
+      v_erros := v_erros || jsonb_build_object('campo','alteracao.produto_id','valor',v_alt->>'produto_id','motivo','nao_existe_no_tenant');
+    END IF;
+    IF v_delta IS NULL OR v_delta = 0 THEN
+      v_erros := v_erros || jsonb_build_object('campo','alteracao.valor_delta','valor',v_alt->>'valor_delta',
+        'motivo','valor_zerado: se nao ha variacao de mensalidade, omita o bloco alteracao');
+    END IF;
+    IF nullif(btrim(coalesce(v_alt->>'descricao','')),'') IS NULL THEN
+      v_erros := v_erros || jsonb_build_object('campo','alteracao.descricao','motivo','obrigatorio');
+    END IF;
+    IF v_ativ_tot < 0 THEN
+      v_erros := v_erros || jsonb_build_object('campo','alteracao.vlr_ativacao','motivo','nao_pode_ser_negativo');
+    END IF;
+
+    -- O cabecalho da proposta e o bloco tem que contar a mesma historia.
+    IF v_tipo_prop IN ('upsell','up-sell','up_sell') AND coalesce(v_delta,0) < 0 THEN
+      v_erros := v_erros || jsonb_build_object('campo','alteracao.valor_delta','valor',v_alt->>'valor_delta',
+        'motivo','sinal_contradiz_a_proposta: proposta.ticket_type diz up-sell e o valor_delta e negativo. Um dos dois esta errado e aplicar qualquer um cancela ou cobra o que nao foi vendido');
+    END IF;
+    IF v_tipo_prop IN ('downsell','down-sell','down_sell') AND coalesce(v_delta,0) > 0 THEN
+      v_erros := v_erros || jsonb_build_object('campo','alteracao.valor_delta','valor',v_alt->>'valor_delta',
+        'motivo','sinal_contradiz_a_proposta: proposta.ticket_type diz down-sell e o valor_delta e positivo');
+    END IF;
+
+    FOR v_mod IN SELECT jsonb_array_elements(coalesce(v_alt->'modulos','[]'::jsonb)) LOOP
+      v_qd := coalesce((v_mod->>'quantidade_delta')::int, 0);
+
+      IF v_qd = 0 THEN
+        v_erros := v_erros || jsonb_build_object('campo','alteracao.modulos[].quantidade_delta','valor',v_mod->>'quantidade_delta','motivo','nao_pode_ser_zero');
+      END IF;
+      IF v_qd > 0 THEN v_qtd_pos := v_qtd_pos + 1; END IF;
+      IF v_tipo_prop IN ('upsell','up-sell','up_sell') AND v_qd < 0 THEN
+        v_erros := v_erros || jsonb_build_object('campo','alteracao.modulos[].quantidade_delta','valor',v_mod->>'quantidade_delta',
+          'motivo','sinal_contradiz_a_proposta: proposta.ticket_type diz up-sell e a quantidade_delta e negativa (cancelaria o modulo)');
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM produto_modulos WHERE id=(v_mod->>'modulo_id')::uuid
+                      AND tenant_id=v_tenant AND produto_id=v_prod_alvo AND ativo) THEN
+        v_erros := v_erros || jsonb_build_object('campo','alteracao.modulos[].modulo_id','valor',v_mod->>'modulo_id','motivo','nao_existe_neste_produto');
+      END IF;
+
+      v_mvm := nullif(v_mod->>'vlr_mensal','')::numeric;
+      IF v_mvm IS NULL THEN
+        v_todos_com_valor := false;
+        IF v_n_mod = 1 AND v_qd <> 0 AND v_delta IS NOT NULL THEN
+          v_mvm := round(abs(v_delta) / abs(v_qd), 2);
+        END IF;
+      END IF;
+      IF v_mvm IS NULL THEN
+        v_erros := v_erros || jsonb_build_object('campo','alteracao.modulos[].vlr_mensal','valor',v_mod->>'modulo_id',
+          'motivo','valor_por_modulo_obrigatorio: com mais de um modulo o payload precisa dizer o vlr_mensal UNITARIO de cada um. Dividir o total pela quantidade seria inventar preco, e e esse numero que fica na ficha e no cancelamento futuro');
+      ELSIF v_mvm <= 0 THEN
+        v_erros := v_erros || jsonb_build_object('campo','alteracao.modulos[].vlr_mensal','valor',v_mod->>'vlr_mensal','motivo','valor_zerado');
+      ELSE
+        v_soma_mod := v_soma_mod + v_mvm * v_qd;
+      END IF;
+    END LOOP;
+
+    -- So confere quando o payload informou TODOS os valores: no caso derivado a
+    -- soma e o proprio valor_delta, a menos do arredondamento do unitario.
+    IF v_n_mod > 0 AND v_todos_com_valor AND v_delta IS NOT NULL
+       AND round(v_soma_mod,2) <> round(v_delta,2) THEN
+      v_erros := v_erros || jsonb_build_object('campo','alteracao.valor_delta','motivo','total_nao_confere',
+        'soma_dos_modulos',round(v_soma_mod,2),'total_declarado',round(v_delta,2));
+    END IF;
+
+    -- Setup so entra junto de modulo que ENTRA. Numa alteracao que so cancela
+    -- nao existe linha onde lanca-lo, e gravar mesmo assim inventa faturamento.
+    IF v_ativ_tot > 0 AND v_n_mod > 0 AND v_qtd_pos = 0 THEN
+      v_erros := v_erros || jsonb_build_object('campo','alteracao.vlr_ativacao','valor',v_alt->>'vlr_ativacao',
+        'motivo','ativacao_sem_modulo_novo: nenhum modulo entra nesta alteracao. Se ha setup a cobrar, mande o bloco avulso');
+    END IF;
+  END IF;
+
+  ------------------------------------------------------ validacao modo C
+  IF v_modo = 'avulso' THEN
+    IF coalesce((v_avu->>'valor')::numeric,0) <= 0 THEN
+      v_erros := v_erros || jsonb_build_object('campo','avulso.valor','valor',v_avu->>'valor',
+        'motivo','valor_zerado: se nao ha cobranca, omita o bloco avulso');
+    END IF;
+    IF nullif(btrim(coalesce(v_avu->>'descricao','')),'') IS NULL THEN
+      v_erros := v_erros || jsonb_build_object('campo','avulso.descricao','motivo','obrigatorio');
+    END IF;
+  END IF;
+
+  IF jsonb_array_length(v_erros) > 0 THEN
+    RAISE EXCEPTION '%', jsonb_build_object('error','validacao','invalidos',v_erros)::text;
+  END IF;
+
+  ---------------------------------------------------------------- cliente
+  -- Alteracao resolve cliente E produto de uma vez: com o mesmo CNPJ em duas
+  -- fichas, quem desempata e qual delas pode receber a venda.
+  IF v_modo = 'alteracao' THEN
+    v_alvo := public.fn_intake_alvo_da_alteracao(
+                v_tenant, v_cnpj, v_prod_alvo, coalesce(v_alt->'modulos','[]'::jsonb));
+    IF NOT coalesce((v_alvo->>'ok')::boolean, false) THEN
+      RAISE EXCEPTION '%', (v_alvo - 'ok')::text;
+    END IF;
+    v_cliente   := (v_alvo->>'cliente_id')::uuid;
+    v_cp        := (v_alvo->>'cliente_produto_id')::uuid;
+    v_prod_novo := (v_alvo->>'produto_id')::bigint;
+  ELSE
+    SELECT array_agg(c.id ORDER BY c.created_at) INTO v_clientes
+      FROM clientes c
+     WHERE c.tenant_id = v_tenant
+       AND regexp_replace(coalesce(c.cnpj,''),'\D','','g') = v_cnpj;
+
+    -- Era `LIMIT 1` sem `ORDER BY`: com duas fichas para o mesmo CNPJ o
+    -- Postgres devolvia uma qualquer. Sao 69 CNPJs repetidos so no Digi Office,
+    -- e gravar a venda na ficha errada e pior do que recusar — ninguem descobre.
+    IF coalesce(array_length(v_clientes,1),0) > 1 THEN
+      RAISE EXCEPTION '%', jsonb_build_object('error','validacao','invalidos',
+        jsonb_build_array(jsonb_build_object('campo','cliente.cnpj','valor',v_cnpj,
+          'motivo','cnpj_duplicado: ha mais de um cliente com este CNPJ neste tenant e o DoctorSaaS nao escolhe por conta propria',
+          'clientes', (SELECT jsonb_agg(jsonb_build_object('cliente_id', c.id,
+                                 'nome', coalesce(c.nome_fantasia, c.razao_social)))
+                         FROM clientes c WHERE c.id = ANY(v_clientes)))))::text;
+    END IF;
+    v_cliente := v_clientes[1];
+  END IF;
+
+  IF v_cliente IS NOT NULL THEN
+    v_reusado := true;
+  ELSIF v_modo <> 'venda_nova' THEN
+    RAISE EXCEPTION '%', jsonb_build_object('error','cliente_nao_encontrado','cnpj',v_cnpj,
+      'detail','so venda nova cria cliente')::text;
+  ELSE
+    IF nullif(btrim(coalesce(v_cli->>'cidade','')),'') IS NOT NULL THEN
+      SELECT c.id, c.estado_id INTO v_cidade_id, v_estado_id
+        FROM cidades c JOIN estados e ON e.id = c.estado_id
+       WHERE extensions.unaccent(lower(c.nome)) = extensions.unaccent(lower(btrim(v_cli->>'cidade')))
+         AND upper(e.sigla) = upper(coalesce(v_cli->>'uf','')) LIMIT 1;
+    END IF;
+    INSERT INTO clientes (
+      tenant_id, cnpj, razao_social, nome_fantasia, email, contato_nome,
+      telefone_contato, telefone_whatsapp, segmento_id, unidade_base_id,
+      endereco, numero, bairro, complemento, cep, cidade_id, estado_id, cancelado,
+      -- gravados a partir de 03/09/2026; antes a tela mostrava em branco mesmo
+      -- quando o dado existia do outro lado
+      data_cadastro, contato_fone, observacao_cliente, area_atuacao_id
+    ) VALUES (
+      v_tenant, v_cnpj,
+      nullif(btrim(coalesce(v_cli->>'razao_social', v_cli->>'nome', '')),''),
+      nullif(btrim(coalesce(v_cli->>'nome_fantasia', v_cli->>'fantasia', '')),''),
+      nullif(btrim(coalesce(v_cli->>'email','')),''),
+      nullif(btrim(coalesce(v_cli->>'contato_nome', v_cli->>'nome_responsavel', '')),''),
+      nullif(regexp_replace(coalesce(v_cli->>'telefone',''),'\D','','g'),''),
+      nullif(regexp_replace(coalesce(v_cli->>'telefone',''),'\D','','g'),''),
+      nullif(v_cli->>'segmento_id','')::bigint, v_unidade,
+      nullif(btrim(coalesce(v_cli->>'endereco', v_cli->>'logradouro', '')),''),
+      nullif(btrim(coalesce(v_cli->>'numero','')),''),
+      nullif(btrim(coalesce(v_cli->>'bairro','')),''),
+      nullif(btrim(coalesce(v_cli->>'complemento','')),''),
+      nullif(regexp_replace(coalesce(v_cli->>'cep',''),'\D','','g'),''),
+      v_cidade_id, v_estado_id, false,
+      nullif(v_cli->>'data_cadastro','')::date,
+      -- so a pontuacao sai; o numero e o que veio, digito por digito
+      nullif(regexp_replace(coalesce(v_cli->>'contato_fone', v_cli->>'contato_telefone', ''),'\D','','g'),''),
+      nullif(btrim(coalesce(v_cli->>'observacao_cliente', v_cli->>'observacao', '')),''),
+      nullif(v_cli->>'area_atuacao_id','')::bigint
+    ) RETURNING id INTO v_cliente;
+
+    -- Lacuna do cadastro fica visivel no log em vez de virar campo em branco
+    -- descoberto semanas depois. Nao e erro: a venda entra.
+    IF nullif(v_cli->>'data_cadastro','')      IS NULL THEN v_faltando := array_append(v_faltando, 'data_cadastro'); END IF;
+    IF nullif(btrim(coalesce(v_cli->>'nome_fantasia', v_cli->>'fantasia','')),'') IS NULL THEN v_faltando := array_append(v_faltando, 'nome_fantasia'); END IF;
+    IF nullif(v_cli->>'segmento_id','')        IS NULL THEN v_faltando := array_append(v_faltando, 'segmento_id'); END IF;
+    IF nullif(v_cli->>'area_atuacao_id','')    IS NULL THEN v_faltando := array_append(v_faltando, 'area_atuacao_id'); END IF;
+    IF nullif(btrim(coalesce(v_cli->>'observacao_cliente', v_cli->>'observacao','')),'') IS NULL THEN v_faltando := array_append(v_faltando, 'observacao_cliente'); END IF;
+    IF nullif(btrim(coalesce(v_cli->>'contato_fone', v_cli->>'contato_telefone','')),'') IS NULL THEN v_faltando := array_append(v_faltando, 'contato_fone'); END IF;
+    IF array_length(v_faltando,1) > 0 THEN
+      v_avisos := v_avisos || jsonb_build_object('campo','cliente','aviso',
+        'cadastro_incompleto: o cliente foi criado sem ' || array_to_string(v_faltando, ', ') ||
+        '. O payload nao trouxe esses campos e nada e preenchido por conta propria');
+    END IF;
+  END IF;
+
+  SELECT o.nome INTO v_origem_txt FROM origens_venda o
+   WHERE o.id = nullif(v_com->>'origem_venda_id','')::bigint AND o.tenant_id = v_tenant;
+
+  ------------------------------------------------- modo A: contrato + modulos
+  IF v_modo = 'venda_nova' THEN
+    v_data_inicio := nullif(v_com->>'data_inicio_prevista','')::timestamptz;
+    FOR v_prod IN SELECT jsonb_array_elements(p_payload->'produtos') LOOP
+      -- Campo de contrato pode vir no produto ou em comercial; o produto vence.
+      -- A create_cliente_produto_with_contract sempre soube ler as 20 chaves —
+      -- e o intake que passava 9.
+      v_cp := public.create_cliente_produto_with_contract(
+        v_cliente, (v_prod->>'produto_id')::bigint,
+        jsonb_build_object(
+          'vlr_mensal',(v_prod->>'vlr_mensal')::numeric,
+          'vlr_ativacao',(v_prod->>'vlr_ativacao')::numeric,
+          'descricao',v_prod->>'descricao',
+          'funcionario_id',                 nullif(coalesce(v_prod->>'funcionario_id',                 v_com->>'funcionario_id'),'')::bigint,
+          'origem_venda_id',                nullif(coalesce(v_prod->>'origem_venda_id',                v_com->>'origem_venda_id'),'')::bigint,
+          'forma_pagamento_ativacao_id',    nullif(coalesce(v_prod->>'forma_pagamento_ativacao_id',    v_com->>'forma_pagamento_ativacao_id'),'')::bigint,
+          'forma_pagamento_mensalidade_id', nullif(coalesce(v_prod->>'forma_pagamento_mensalidade_id', v_com->>'forma_pagamento_mensalidade_id'),'')::bigint,
+          'prazo_meses',                    nullif(coalesce(v_prod->>'prazo_meses',                    v_com->>'prazo_meses'),'')::int,
+          'dia_vencimento',                 nullif(coalesce(v_prod->>'dia_vencimento',                 v_com->>'dia_vencimento'),'')::int,
+          'fornecedor_id',                  nullif(coalesce(v_prod->>'fornecedor_id',                  v_com->>'fornecedor_id'),'')::bigint,
+          'codigo_fornecedor',              nullif(btrim(coalesce(v_prod->>'codigo_fornecedor',        v_com->>'codigo_fornecedor','')),''),
+          'link_portal_fornecedor',         nullif(btrim(coalesce(v_prod->>'link_portal_fornecedor',   v_com->>'link_portal_fornecedor','')),''),
+          'modelo_contrato_id',             nullif(coalesce(v_prod->>'modelo_contrato_id',             v_com->>'modelo_contrato_id'),'')::bigint,
+          'recorrencia',                    nullif(btrim(coalesce(v_prod->>'recorrencia',              v_com->>'recorrencia','')),''),
+          'vlr_custo',                      nullif(v_prod->>'vlr_custo','')::numeric,
+          'data_venda',                     nullif(coalesce(v_prod->>'data_venda',                     v_com->>'data_venda'),'')::date,
+          'data_ativacao',                  nullif(coalesce(v_prod->>'data_ativacao',                  v_com->>'data_ativacao'),'')::date,
+          'data_fim',                       nullif(coalesce(v_prod->>'data_fim',                       v_com->>'data_fim'),'')::date,
+          'data_proximo_reajuste',          nullif(coalesce(v_prod->>'data_proximo_reajuste',          v_com->>'data_proximo_reajuste'),'')::date,
+          'observacoes_contratuais',        nullif(btrim(coalesce(v_prod->>'observacoes_contratuais',  v_com->>'observacoes_contratuais','')),'')),
+        v_contrato);
+      IF v_contrato IS NULL THEN
+        SELECT ci.contrato_id INTO v_contrato FROM contrato_itens ci WHERE ci.cliente_produto_id = v_cp LIMIT 1;
+      END IF;
+      IF v_primeiro_produto IS NULL THEN v_primeiro_produto := (v_prod->>'produto_id')::bigint; END IF;
+      FOR v_mod IN SELECT jsonb_array_elements(v_prod->'modulos') LOOP
+        INSERT INTO cliente_produto_modulos (tenant_id, cliente_produto_id, modulo_id, quantidade, vlr_mensal, vlr_ativacao, ativo, origem)
+        VALUES (v_tenant, v_cp, (v_mod->>'modulo_id')::uuid, (v_mod->>'quantidade')::int, 0, 0, true, 'intake');
+      END LOOP;
+
+      -- Mesmo aviso do cadastro, agora para o contrato. Sem ele, uma venda com
+      -- fornecedor, modelo e custo em branco volta SEM aviso nenhum e a lacuna
+      -- so aparece quando alguem abre a ficha — foi o que aconteceu no teste de
+      -- 03/09: zero avisos e quatro campos faltando. Nenhum destes quatro tem
+      -- fallback: em branco no payload = em branco na tela.
+      v_faltando := '{}';
+      IF nullif(coalesce(v_prod->>'fornecedor_id',      v_com->>'fornecedor_id'),'')      IS NULL THEN v_faltando := array_append(v_faltando, 'fornecedor_id'); END IF;
+      IF nullif(coalesce(v_prod->>'modelo_contrato_id', v_com->>'modelo_contrato_id'),'') IS NULL THEN v_faltando := array_append(v_faltando, 'modelo_contrato_id'); END IF;
+      IF nullif(coalesce(v_prod->>'recorrencia',        v_com->>'recorrencia'),'')        IS NULL THEN v_faltando := array_append(v_faltando, 'recorrencia'); END IF;
+      IF nullif(v_prod->>'vlr_custo','') IS NULL THEN v_faltando := array_append(v_faltando, 'vlr_custo'); END IF;
+      IF array_length(v_faltando,1) > 0 THEN
+        v_avisos := v_avisos || jsonb_build_object('campo','produtos[]','produto_id',v_prod->>'produto_id',
+          'aviso','contrato_incompleto: o produto entrou sem ' || array_to_string(v_faltando, ', ') ||
+                  '. O payload nao trouxe esses campos e nada e preenchido por conta propria');
+      END IF;
+    END LOOP;
+
+    -- O anexo do contrato tem rotulo proprio. Sem ele o campo "Anexo do
+    -- contrato" da tela do produto fica vazio, e ate agora isso nao aparecia
+    -- em lugar nenhum.
+    IF NOT EXISTS (
+         SELECT 1 FROM jsonb_array_elements(coalesce(p_payload->'anexos','[]'::jsonb)) a
+          WHERE lower(btrim(coalesce(a->>'campo_label',''))) = 'contrato assinado') THEN
+      v_avisos := v_avisos || jsonb_build_object('campo','anexos',
+        'aviso','sem_contrato_assinado: nenhum anexo veio com campo_label "Contrato assinado", entao o campo Anexo do contrato do produto fica vazio');
+    END IF;
+  END IF;
+
+  ------------------------------------------------- modo B: fila do OEM ou ficha
+  IF v_modo = 'alteracao' THEN
+    -- v_cp e v_prod_novo vieram do resolvedor, junto com o cliente.
+    v_primeiro_produto := v_prod_novo;
+    SELECT (cp.oem_codigo_filial IS NOT NULL) INTO v_tem_lic
+      FROM cliente_produtos cp WHERE cp.id = v_cp;
+
+    -- Produto corrigido: os `modulo_id` do payload sao do catalogo do produto
+    -- que a proposta pediu. Troca pelos do catalogo certo com o de-para que o
+    -- resolvedor ja calculou — recalcular aqui abriria espaco para a escolha e
+    -- a traducao discordarem.
+    IF v_prod_novo IS DISTINCT FROM v_prod_alvo THEN
+      v_alt := jsonb_set(v_alt, '{modulos}', coalesce((
+        SELECT jsonb_agg(m || jsonb_build_object('modulo_id', v_alvo->'modulos'->>(m->>'modulo_id')))
+          FROM jsonb_array_elements(coalesce(v_alt->'modulos','[]'::jsonb)) m), '[]'::jsonb));
+      v_avisos := v_avisos || jsonb_build_object(
+        'campo','alteracao.produto_id','valor',v_prod_alvo,
+        'aviso', format('produto_corrigido: a proposta pediu o produto %s, o cliente tem o %s. A alteracao entrou na ficha do %s e os modulos foram casados pelo nome',
+                        v_prod_alvo, v_prod_novo, v_prod_novo));
+    END IF;
+
+    SELECT ci.contrato_id INTO v_contrato FROM contrato_itens ci
+      JOIN contratos c ON c.id = ci.contrato_id AND c.status='ativo'
+     WHERE ci.cliente_produto_id = v_cp LIMIT 1;
+
+    v_tipo       := CASE WHEN v_delta > 0 THEN 'upsell' ELSE 'downsell' END;
+    v_data_venda := coalesce(nullif(v_alt->>'data_venda','')::date, current_date);
+    v_motivo_txt := coalesce(nullif(btrim(coalesce(v_alt->>'motivo','')),''),
+                             left(btrim(v_alt->>'descricao'), 2000));
+    v_motivo_id  := nullif(v_alt->>'motivo_cancelamento_id','')::bigint;
+
+    FOR v_mod IN SELECT jsonb_array_elements(coalesce(v_alt->'modulos','[]'::jsonb)) LOOP
+      v_qd  := (v_mod->>'quantidade_delta')::int;
+      v_mvm := coalesce(nullif(v_mod->>'vlr_mensal','')::numeric,
+                        round(abs(v_delta) / abs(v_qd), 2));
+      v_mva := coalesce(nullif(v_mod->>'vlr_ativacao','')::numeric,
+                        CASE WHEN v_n_mod = 1 THEN v_ativ_tot ELSE 0 END);
+
+      SELECT m.id, m.quantidade INTO v_cpm, v_qtd_atual
+        FROM cliente_produto_modulos m
+       WHERE m.cliente_produto_id = v_cp
+         AND m.modulo_id = (v_mod->>'modulo_id')::uuid
+         AND m.ativo
+       LIMIT 1;
+
+      IF v_tem_lic THEN
+        -- ------------------------------------------------------------------
+        -- Produto COM licenca: OEM primeiro, ficha depois. Nada e gravado aqui
+        -- e nenhum movimento e lancado — quem faz as duas coisas e a
+        -- fn_oem_fila_aplicar, depois que um admin aprovar e o parceiro aceitar.
+        -- ------------------------------------------------------------------
+        v_pl := jsonb_build_object(
+          'vlr_mensal',         v_mvm,
+          'vlr_ativacao',       v_mva,
+          'vlr_ativacao_somar', v_mva,
+          'data_venda',         v_data_venda,
+          'funcionario_id',     nullif(v_com->>'funcionario_id','')::bigint,
+          'origem_venda_id',    nullif(v_com->>'origem_venda_id','')::bigint,
+          'origem_venda',       v_origem_txt,
+          -- Sem 'origem' de proposito: a linha e de um modulo LICENCIADO, e quem
+          -- a mantem daqui para a frente e a carga do espelho, que so enxerga
+          -- 'oem'. A procedencia da venda vai em 'fonte', que o gatilho do
+          -- historico le. Ver 20260903100000.
+          'fonte',              'calculadora');
+
+        BEGIN
+          IF v_qd > 0 THEN
+            IF v_cpm IS NULL THEN
+              v_fila := public.fn_oem_enfileirar_novo(v_cp, (v_mod->>'modulo_id')::uuid, v_qd, v_pl);
+            ELSE
+              v_fila := public.fn_oem_enfileirar(v_cpm, 'quantidade', coalesce(v_qtd_atual,0) + v_qd, v_pl);
+            END IF;
+          ELSE
+            IF v_cpm IS NULL THEN
+              RAISE EXCEPTION '%', jsonb_build_object('error','validacao','invalidos',
+                jsonb_build_array(jsonb_build_object('campo','alteracao.modulos[].modulo_id',
+                  'valor', v_mod->>'modulo_id',
+                  'motivo','modulo_nao_contratado: nao ha o que cancelar nesta ficha')))::text;
+            END IF;
+            v_fila := public.fn_oem_enfileirar(v_cpm, 'cancelar', abs(v_qd),
+                        v_pl || jsonb_build_object(
+                          'quantidade_cancelar', abs(v_qd),
+                          'motivo',              v_motivo_txt,
+                          'motivo_id',           v_motivo_id,
+                          'data',                v_data_venda,
+                          'valor_downsell',      v_mvm * abs(v_qd)));
+          END IF;
+        EXCEPTION WHEN OTHERS THEN
+          -- A mensagem ja e o nosso JSON quando fomos nos que a levantamos.
+          IF SQLERRM LIKE '{%' THEN RAISE; END IF;
+          RAISE EXCEPTION '%', jsonb_build_object('error','validacao','invalidos',
+            jsonb_build_array(jsonb_build_object('campo','alteracao.modulos[].modulo_id',
+              'valor', v_mod->>'modulo_id', 'motivo','oem_fila: ' || SQLERRM)))::text;
+        END;
+
+        -- O unico NULL legitimo e o de produto sem licenca, e aqui ele tem uma.
+        -- Seguir sem a linha de fila gravaria na ficha um modulo que o parceiro
+        -- nunca vai ter — a divergencia que este caminho existe para impedir.
+        IF v_fila IS NULL THEN
+          RAISE EXCEPTION '%', jsonb_build_object('error','validacao','invalidos',
+            jsonb_build_array(jsonb_build_object('campo','alteracao.modulos[].modulo_id',
+              'valor', v_mod->>'modulo_id',
+              'motivo','oem_fila: o produto tem licenca e o pedido nao entrou na fila')))::text;
+        END IF;
+        v_filas := v_filas || to_jsonb(v_fila);
+
+      ELSE
+        -- ------------------------------------------------------------------
+        -- Sem licenca no parceiro: grava aqui, no mesmo desenho da tela do
+        -- cliente — valor na linha, movimento ligado ao modulo, descricao dita
+        -- pelo nome do modulo e nao pelo texto da proposta.
+        -- ------------------------------------------------------------------
+        SELECT pm.nome INTO v_nome_mod FROM produto_modulos pm WHERE pm.id = (v_mod->>'modulo_id')::uuid;
+
+        IF v_qd > 0 THEN
+          IF v_cpm IS NULL THEN
+            INSERT INTO cliente_produto_modulos (
+              tenant_id, cliente_produto_id, modulo_id, quantidade,
+              vlr_mensal, vlr_custo, vlr_ativacao, data_venda,
+              funcionario_id, origem_venda_id, ativo, origem)
+            VALUES (
+              v_tenant, v_cp, (v_mod->>'modulo_id')::uuid, v_qd,
+              v_mvm, 0, v_mva, v_data_venda,
+              nullif(v_com->>'funcionario_id','')::bigint,
+              nullif(v_com->>'origem_venda_id','')::bigint, true, 'intake')
+            RETURNING id INTO v_cpm;
+          ELSE
+            UPDATE cliente_produto_modulos
+               SET quantidade        = coalesce(quantidade,0) + v_qd,
+                   quantidade_manual = coalesce(quantidade,0) + v_qd,
+                   vlr_ativacao      = coalesce(vlr_ativacao,0) + v_mva,
+                   updated_at        = now()
+             WHERE id = v_cpm;
+          END IF;
+
+          -- Medido DEPOIS de gravar: e o modulo novo que pode mudar a resposta.
+          -- Se todos os modulos ativos passarem a ter valor, o gatilho de
+          -- sincronia ja reescreveu a receita do produto com a soma deles e o
+          -- movimento contaria a mesma venda duas vezes.
+          IF NOT public.fn_receita_vem_dos_modulos(v_cp) THEN
+            INSERT INTO movimentos_mrr (
+              tenant_id, cliente_id, tipo, data_movimento, valor_delta, custo_delta,
+              vlr_ativacao, descricao, cliente_produto_modulo_id, funcionario_id,
+              origem_venda, contrato_id, status)
+            VALUES (
+              v_tenant, v_cliente, 'upsell', v_data_venda, v_mvm * v_qd, 0,
+              coalesce(v_mva, 0),
+              CASE WHEN v_qd > 1
+                   THEN format('Adição de %s %s', v_qd::text, coalesce(v_nome_mod,'módulo'))
+                   ELSE format('Adição de %s', coalesce(v_nome_mod,'módulo')) END,
+              v_cpm, nullif(v_com->>'funcionario_id','')::bigint,
+              v_origem_txt, v_contrato, 'ativo')
+            RETURNING id INTO v_mov;
+          END IF;
+
+        ELSE
+          IF v_cpm IS NULL THEN
+            RAISE EXCEPTION '%', jsonb_build_object('error','validacao','invalidos',
+              jsonb_build_array(jsonb_build_object('campo','alteracao.modulos[].modulo_id',
+                'valor', v_mod->>'modulo_id',
+                'motivo','modulo_nao_contratado: nao ha o que cancelar nesta ficha')))::text;
+          END IF;
+          -- O miolo do cancelamento: baixa a linha, carimba motivo e autoria e
+          -- lanca o downsell com o valor que a proposta declarou.
+          PERFORM public.fn_cancelar_modulo_aplicar(
+            v_cpm, abs(v_qd), v_motivo_txt, v_motivo_id, v_data_venda, v_mvm * abs(v_qd));
+        END IF;
+      END IF;
+    END LOOP;
+
+    -- Alteracao sem modulo e mudanca de preco pura: continua virando um
+    -- movimento so, com a descricao que veio. Com modulos, cada um lanca o seu
+    -- (aqui ou depois da aprovacao) e um movimento de cabecalho contaria a mesma
+    -- venda duas vezes.
+    IF v_n_mod = 0 THEN
+      INSERT INTO movimentos_mrr (
+        cliente_id, tenant_id, tipo, data_movimento, valor_delta, vlr_ativacao,
+        descricao, funcionario_id, origem_venda, contrato_id, status
+      ) VALUES (
+        v_cliente, v_tenant, v_tipo::text::"public"."movimento_mrr_tipo", v_data_venda, v_delta,
+        v_ativ_tot,
+        left(btrim(v_alt->>'descricao'),2000),
+        nullif(v_com->>'funcionario_id','')::bigint, v_origem_txt, v_contrato, 'ativo'
+      ) RETURNING id INTO v_mov;
+    END IF;
+
+    IF jsonb_array_length(v_filas) > 0 THEN
+      v_avisos := v_avisos || jsonb_build_object(
+        'campo','alteracao.modulos',
+        'aviso', format('aguardando_aprovacao: %s pedido(s) entraram na fila do OEM. O modulo, a licenca e o MRR so mudam depois que um admin aprovar em Integracoes > OEM > Aprovacao e o parceiro aceitar.',
+                        jsonb_array_length(v_filas)));
+    END IF;
+  END IF;
+
+  ------------------------------------------------- modo C: cobranca avulsa
+  IF v_modo = 'avulso' THEN
+    v_primeiro_produto := nullif(v_avu->>'produto_id','')::bigint;
+    IF v_primeiro_produto IS NOT NULL THEN
+      SELECT ci.contrato_id INTO v_contrato FROM cliente_produtos cp
+        JOIN contrato_itens ci ON ci.cliente_produto_id = cp.id
+        JOIN contratos c ON c.id = ci.contrato_id AND c.status='ativo'
+       WHERE cp.cliente_id = v_cliente AND cp.produto_id = v_primeiro_produto AND cp.ativo LIMIT 1;
+    END IF;
+    -- valor_delta ZERO de proposito: avulso nao muda a mensalidade.
+    INSERT INTO movimentos_mrr (
+      cliente_id, tenant_id, tipo, data_movimento, valor_delta, valor_venda_avulsa,
+      descricao, funcionario_id, origem_venda, contrato_id, status
+    ) VALUES (
+      v_cliente, v_tenant, 'venda_avulsa'::text::"public"."movimento_mrr_tipo", current_date, 0,
+      (v_avu->>'valor')::numeric, left(btrim(v_avu->>'descricao'),2000),
+      nullif(v_com->>'funcionario_id','')::bigint, v_origem_txt, v_contrato, 'ativo'
+    ) RETURNING id INTO v_mov;
+  END IF;
+
+  ---------------------------------------------------------------- jornada
+  v_journey := public.create_onboarding_journey(
+    p_tenant_id             => v_tenant,
+    p_cliente_id            => v_cliente,
+    p_assunto               => coalesce(v_assunto, 'Implantacao'),
+    p_produto_id            => v_primeiro_produto,
+    p_data_inicio_planejado => coalesce(v_data_inicio, nullif(v_com->>'data_inicio_prevista','')::timestamptz),
+    p_descricao             => nullif(btrim(coalesce(p_payload->'proposta'->>'sobre_o_cliente','')),''),
+    p_demand_type_id        => v_demand,
+    p_unidade_base_id       => NULL   -- a unidade vem do CLIENTE, nunca do ticket
+  );
+
+  UPDATE onboarding_journeys SET proposta_payload = p_payload WHERE id = v_journey;
+
+  ------------------------------------------------- complementos da jornada
+  -- Nada daqui para baixo mexe em dinheiro: e o que a jornada precisa para
+  -- nascer pronta em vez de o especialista redigitar o que o vendedor ja
+  -- respondeu. Tudo idempotente, para o reenvio de uma proposta nao duplicar.
+  SELECT j.ticket_id INTO v_ticket FROM onboarding_journeys j WHERE j.id = v_journey;
+
+  -- Tag de controle, por NOME e nunca por id fixo: vale para qualquer tenant
+  -- que tenha a tag e e no-op silencioso para quem nao tem.
+  INSERT INTO onboarding_journey_tags (tenant_id, journey_id, tag_id)
+  SELECT v_tenant, v_journey, t.id
+    FROM onboarding_tags t
+   WHERE t.tenant_id = v_tenant AND t.is_active AND t.name = 'Pendente Faturamento'
+  ON CONFLICT (journey_id, tag_id) DO NOTHING;
+
+  -- Dados da contabilidade. Os campos cadastrados batem LITERALMENTE com o
+  -- texto das perguntas da proposta ("Nome Contabilidade", "CSC NFC-e", "Token
+  -- IBPT"...), entao o casamento e por nome exato — sem de-para e sem
+  -- adivinhacao. Pergunta sem campo correspondente fica de fora e continua
+  -- aparecendo no Resumo da venda; campo sem resposta continua em branco.
+  INSERT INTO onboarding_journey_accounting (tenant_id, journey_id, field_id, valor, coletado)
+  SELECT v_tenant, v_journey, f.id, r.resposta, true
+    FROM onboarding_accounting_fields f
+    JOIN LATERAL (
+      SELECT btrim(e->>'resposta') AS resposta
+        FROM jsonb_array_elements(coalesce(p_payload->'proposta'->'respostas_ticket','[]'::jsonb)) e
+       WHERE btrim(coalesce(e->>'pergunta','')) = f.nome
+         AND nullif(btrim(coalesce(e->>'resposta','')),'') IS NOT NULL
+       LIMIT 1
+    ) r ON true
+   WHERE f.tenant_id = v_tenant AND f.ativo
+  ON CONFLICT (journey_id, field_id) DO NOTHING;
+
+  -- Modulos da jornada ja lancados. So na venda nova: num up-sell isto listaria
+  -- tudo o que o cliente ja tem, e a jornada e sobre o que entrou agora.
+  -- A coluna origem nao tem CHECK (conferido antes de usar 'intake').
+  IF v_modo = 'venda_nova' THEN
+    INSERT INTO onboarding_journey_modules (tenant_id, journey_id, nome, produto_modulo_id, origem, position)
+    SELECT v_tenant, v_journey, pm.nome, pm.id, 'intake',
+           row_number() OVER (ORDER BY pm.nome)
+      FROM cliente_produto_modulos m
+      JOIN produto_modulos pm ON pm.id = m.modulo_id
+     WHERE m.ativo
+       AND m.cliente_produto_id IN (
+             SELECT cp.id FROM cliente_produtos cp
+              WHERE cp.cliente_id = v_cliente AND cp.ativo)
+       AND NOT EXISTS (SELECT 1 FROM onboarding_journey_modules x
+                        WHERE x.journey_id = v_journey AND x.produto_modulo_id = pm.id);
+  END IF;
+
+  -- A primeira linha da Timeline passa a dizer de onde o ticket veio. Concatena
+  -- em vez de sobrescrever: o texto original distingue a jornada que nasce
+  -- direto na Implantacao, e isso continua importando.
+  UPDATE support_ticket_events
+     SET content = content || ' · Ticket criado pela integração com a calculadora de vendas'
+   WHERE ticket_id = v_ticket
+     AND event_type = 'onboarding_criado'
+     AND content NOT LIKE '%calculadora de vendas%';
+
+  SELECT st.ticket_code INTO v_ticket_code
+    FROM onboarding_journeys j JOIN support_tickets st ON st.id = j.ticket_id WHERE j.id = v_journey;
+
+  RETURN jsonb_build_object(
+    'ok', true, 'modo', v_modo,
+    'cliente_id', v_cliente, 'cliente_reusado', v_reusado,
+    'contrato_id', v_contrato, 'movimento_id', v_mov,
+    'fila_ids', v_filas,
+    'journey_id', v_journey, 'ticket_code', v_ticket_code, 'avisos', v_avisos
+  );
+END $function$;
