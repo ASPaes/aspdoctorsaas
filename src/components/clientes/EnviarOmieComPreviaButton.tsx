@@ -223,6 +223,13 @@ export default function EnviarOmieComPreviaButton({
   // Fica AQUI, com os outros hooks: mais abaixo há um early return (contrato.sincronizado), e um
   // useState depois dele muda a contagem de hooks entre renders.
   const [corteDispensado, setCorteDispensado] = useState(false);
+  // Mesmo desenho da dispensa de data de corte, para outra trava: o CNPJ já tem cadastro no Omie
+  // e ele é de OUTRO cliente do DoctorSaaS. Aproveitá-lo sobrescreveria os dados do outro (foi o
+  // que aconteceu com YOUR COFFEE em 04/09), então o backend recusa e oferece a saída legítima:
+  // cadastro próprio no Omie para o mesmo CNPJ. Duas lojas no mesmo CNPJ é caso real.
+  const [cadastroProprio, setCadastroProprio] = useState<{ codigo_cliente_omie?: number } | null>(null);
+  const [cadastroProprioCiente, setCadastroProprioCiente] = useState(false);
+  const [cadastroProprioEscolhido, setCadastroProprioEscolhido] = useState(false);
   // Confirmação inline do "Vincular a este": era window.confirm, destoando de todo o resto e sem
   // dizer a consequência inteira. Inline em vez de outro AlertDialog para não aninhar diálogo.
   const [confirmandoVinculo, setConfirmandoVinculo] = useState<number | string | null>(null);
@@ -330,12 +337,26 @@ export default function EnviarOmieComPreviaButton({
         : null,
     );
     setDispensaCiente(false);
+    setCadastroProprio(
+      corpo?.cadastro_proprio_disponivel === true ||
+        corpo?.detalhe?.cadastro_proprio_disponivel === true ||
+        corpo?.cliente_resultado?.cadastro_proprio_disponivel === true
+        ? {
+            codigo_cliente_omie:
+              corpo?.codigo_cliente_omie ??
+              corpo?.detalhe?.codigo_cliente_omie ??
+              corpo?.cliente_resultado?.codigo_cliente_omie,
+          }
+        : null,
+    );
+    setCadastroProprioCiente(false);
     setBloqueioOpen(true);
   };
 
-  const handleClick = async (dispensarCorte = false) => {
+  const handleClick = async (dispensarCorte = false, pedirCadastroProprio = false) => {
     setLoading(true);
     if (dispensarCorte) setCorteDispensado(true);
+    if (pedirCadastroProprio) setCadastroProprioEscolhido(true);
     try {
       const { data, error } = await supabase.functions.invoke("recon-omie-escrever", {
         body: {
@@ -343,6 +364,9 @@ export default function EnviarOmieComPreviaButton({
           ds_contract_id: contrato.id,
           modo: "dry_run",
           ...(dispensarCorte || corteDispensado ? { permitir_anterior_ao_corte: true } : {}),
+          ...(pedirCadastroProprio || cadastroProprioEscolhido
+            ? { criar_cadastro_proprio: true }
+            : {}),
         },
       });
       if (error) {
@@ -392,6 +416,9 @@ export default function EnviarOmieComPreviaButton({
           // A dispensa vale para as duas chamadas: sem repeti-la aqui, o dry_run passaria e o
           // criar bateria na mesma trava.
           ...(corteDispensado ? { permitir_anterior_ao_corte: true } : {}),
+          // A escolha do cadastro próprio vale para as duas chamadas, igual à dispensa de corte:
+          // sem repetir aqui, o dry_run passaria e o criar bateria na mesma trava.
+          ...(cadastroProprioEscolhido ? { criar_cadastro_proprio: true } : {}),
         },
       });
       if (error) {
@@ -712,7 +739,47 @@ export default function EnviarOmieComPreviaButton({
             </div>
           )}
 
+          {cadastroProprio && (
+            <div className="space-y-2 rounded border border-sky-300 dark:border-sky-900 bg-sky-50 dark:bg-sky-950/30 px-3 py-2.5">
+              <div className="text-xs text-sky-800 dark:text-sky-300">
+                O cadastro
+                {cadastroProprio.codigo_cliente_omie
+                  ? ` ${cadastroProprio.codigo_cliente_omie} `
+                  : " "}
+                do Omie já é de outro cliente do DoctorSaaS. Enviar por cima trocaria a fantasia, o
+                e-mail, o telefone e o endereço dele. Se este aqui é outro estabelecimento no mesmo
+                CNPJ, o caminho certo é dar a ele um cadastro próprio no Omie.
+              </div>
+              <label className="flex items-start gap-2 text-xs cursor-pointer text-sky-800 dark:text-sky-300">
+                <Checkbox
+                  checked={cadastroProprioCiente}
+                  onCheckedChange={(v) => setCadastroProprioCiente(v === true)}
+                  className="mt-0.5"
+                />
+                <span>
+                  Confirmo que este é <strong>outro estabelecimento</strong> no mesmo CNPJ e deve
+                  ter cadastro próprio no Omie. A decisão fica registrada no histórico com meu nome.
+                </span>
+              </label>
+            </div>
+          )}
+
           <AlertDialogFooter>
+            {cadastroProprio && (
+              <Button
+                type="button"
+                variant="outline"
+                className="border-sky-400 text-sky-700 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-950/40"
+                disabled={!cadastroProprioCiente || loading || vinculando != null}
+                onClick={() => {
+                  setBloqueioOpen(false);
+                  void handleClick(false, true);
+                }}
+              >
+                {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Criar cadastro próprio no Omie
+              </Button>
+            )}
             {dispensa && (
               <Button
                 type="button"
