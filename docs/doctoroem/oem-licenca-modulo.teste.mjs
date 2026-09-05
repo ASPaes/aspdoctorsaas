@@ -126,5 +126,40 @@ ok("reativar limpa a datavalidade do próprio módulo",
   !montarPayloadDocumentado(lido, escalares, [{ codigo: 61, quantidade: 1 }]).erro &&
   acha(montarPayloadDocumentado(lido, escalares, [{ codigo: 61, quantidade: 1 }]).novo, 61).datavalidade === null);
 
+// ---------------------------------------------------------------------------
+console.log("\n5) Afirmar em vez de ecoar: o cancelamento não se desfaz sozinho");
+// A leitura do parceiro devolve IFood e 99 Food como ativos, porque no OEM
+// quem os desliga é a data. Ecoar isso os reativa. Aqui a ficha diz que os
+// dois estão cancelados, e o corpo tem que sair dizendo o mesmo.
+const r5 = montarPayloadDocumentado(lido, escalares, [{ codigo: 72, quantidade: 1 }], [21, 61]);
+ok("montou sem erro", !r5.erro, JSON.stringify(r5.erro));
+if (!r5.erro) {
+  ok("IFood sai desligado mesmo sem ter sido pedido",
+    acha(r5.novo, 21).ativo === false && acha(r5.novo, 21).quantidade === 0);
+  ok("99 Food idem", acha(r5.novo, 61).ativo === false && acha(r5.novo, 61).quantidade === 0);
+  ok("o módulo pedido não foi afetado", acha(r5.novo, 72).ativo === true);
+  ok("os dois aparecem em reafirmados", r5.reafirmados.length === 2);
+  // `diferencas` tem que continuar significando "campo se perdendo".
+  ok("reafirmação não polui diferencas",
+    r5.diferencas.filter((d) => /codigo (21|61)\)/.test(d.campo)).length === 0);
+}
+
+console.log("\n6) O que a reafirmação NÃO pode fazer");
+const r6 = montarPayloadDocumentado(lido, escalares, [{ codigo: 61, quantidade: 1 }], [61]);
+ok("reativar vence a ficha antiga (o pedido de agora manda)",
+  !r6.erro && acha(r6.novo, 61).ativo === true && acha(r6.novo, 61).datavalidade === null);
+ok("não desliga a licença pelo código 8",
+  !montarPayloadDocumentado(lido, escalares, [{ codigo: 72, quantidade: 1 }], [8]).erro &&
+  acha(montarPayloadDocumentado(lido, escalares, [{ codigo: 72, quantidade: 1 }], [8]).novo, 8).ativo === true);
+ok("módulo que não está na licença é ignorado, não inventado",
+  montarPayloadDocumentado(lido, escalares, [{ codigo: 72, quantidade: 1 }], [999]).novo.modulos.length === lido.modulos.length);
+ok("módulo já desligado não entra em reafirmados (a lista é auditoria)",
+  montarPayloadDocumentado(lido, escalares, [{ codigo: 72, quantidade: 1 }], [13]).reafirmados.length === 0);
+ok("sem lista de cancelados, nada muda além do pedido",
+  montarPayloadDocumentado(lido, escalares, [{ codigo: 72, quantidade: 1 }]).reafirmados.length === 0);
+// Códigos 9 e 10 têm campo de topo espelhando a lista.
+ok("reafirmar o PDV zera também o pdvComandas do topo",
+  montarPayloadDocumentado(lido, escalares, [{ codigo: 72, quantidade: 1 }], [10]).novo.pdvComandas === 0);
+
 console.log(falhas === 0 ? "\nTUDO PASSOU\n" : `\n${falhas} FALHA(S)\n`);
 process.exit(falhas === 0 ? 0 : 1);

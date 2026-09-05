@@ -116,6 +116,40 @@ Deno.serve(async (req) => {
     // um módulo não pode esperar os 2 minutos do cron para saber o resultado.
     const filaId = typeof corpo.fila_id === "string" ? corpo.fila_id : null;
 
+    /**
+     * Os módulos que a FICHA dá como cancelados nestes produtos do cliente.
+     *
+     * ⚠️ ELES VÃO EM TODA GRAVAÇÃO, E É ISSO QUE IMPEDE UM CANCELAMENTO DE SER
+     * DESFEITO DEPOIS. O OEM registra cancelamento como `datavalidade` e segue
+     * devolvendo o módulo como ativo; como o corpo do parceiro nasce da leitura
+     * dele, qualquer gravação posterior nesta filial reenviava o módulo
+     * cancelado como ATIVO e o OEM apagava a data. A cobrança voltava, sem erro
+     * e sem aviso. Agrupar por filial resolveu os cancelamentos do mesmo
+     * momento; isto resolve os de ontem, e faz a filial que já divergiu voltar
+     * ao lugar sozinha na próxima escrita.
+     *
+     * `cancelado_manual` é o critério porque é o mesmo marcador que impede o
+     * espelho de ressuscitar o módulo aqui: as duas coisas são a mesma
+     * afirmação, "gente cancelou isto". Manter dois critérios para ela é como
+     * as duas bases voltam a divergir.
+     */
+    async function canceladosDaFicha(cpIds: (string | null)[]): Promise<number[]> {
+      const ids = [...new Set(cpIds.filter(Boolean))] as string[];
+      if (!ids.length) return [];
+      const { data } = await ds
+        .from("cliente_produto_modulos")
+        .select("oem_modulo_codigo")
+        .in("cliente_produto_id", ids)
+        .eq("ativo", false)
+        .eq("cancelado_manual", true)
+        .not("oem_modulo_codigo", "is", null);
+      const codigos = new Set<number>();
+      for (const m of (data ?? []) as { oem_modulo_codigo: number | null }[]) {
+        if (m.oem_modulo_codigo != null) codigos.add(m.oem_modulo_codigo);
+      }
+      return [...codigos];
+    }
+
     // ------------------------------------------------------------- simular
     // Mostra o payload que IRIA para a licença, sem gravar nada — nem no
     // parceiro, nem na fila, nem no log. A rota do parceiro tem `simular` e é
@@ -135,7 +169,7 @@ Deno.serve(async (req) => {
 
       const { data: rows, error: errL } = await ds
         .from("oem_sync_fila")
-        .select("id, tenant_id, conta_integration_id, empresa_codigo, filial_codigo, oem_modulo_codigo, quantidade, valor_unitario")
+        .select("id, tenant_id, conta_integration_id, cliente_produto_id, empresa_codigo, filial_codigo, oem_modulo_codigo, quantidade, valor_unitario")
         .in("id", filaIds);
       if (errL || !rows || rows.length === 0) return json({ ok: false, mensagem: "Linha não encontrada." }, 404);
       // Ordem pedida, não a ordem que o banco devolveu: num lote a ordem das
@@ -171,6 +205,8 @@ Deno.serve(async (req) => {
       const { data: chave } = await ds.rpc("obter_chave_oem_por_conta", { p_integration_id: c.id });
       if (!chave) return json({ ok: false, mensagem: "Chave do OEM não encontrada no Vault." }, 409);
 
+      const canceladosSim = await canceladosDaFicha(ls.map((x) => x.cliente_produto_id));
+
       const resp = await fetch(`${String(c.api_url).replace(/\/+$/, "")}/oem-licenca-modulo`, {
         method: "POST",
         headers: { "x-api-key": String(chave), "Content-Type": "application/json" },
@@ -192,6 +228,10 @@ Deno.serve(async (req) => {
                   ...(x.valor_unitario != null ? { valor_unitario: Number(x.valor_unitario) } : {}),
                 })),
               }),
+          // A simulação precisa mostrar as reafirmações também: elas DESLIGAM
+          // módulo na licença. Simular sem elas mostraria um corpo mais manso
+          // do que o que vai ser gravado, que é o pior tipo de simulação.
+          ...(canceladosSim.length ? { cancelados: canceladosSim } : {}),
           simular: true,
           // A simulação passa a mostrar o caminho DOCUMENTADO do parceiro
           // (`minhaslicencas/modulos` + `saveFilial`), que é o único que enxerga
@@ -364,6 +404,10 @@ Deno.serve(async (req) => {
       // filial, conta). Quantidade e módulo continuam sendo de cada linha.
       const l = linhas[0];
 
+      // Ver `canceladosDaFicha`: vão em toda gravação, e é isso que impede um
+      // cancelamento de ser desfeito por uma escrita futura nesta filial.
+      const cancelados = await canceladosDaFicha(linhas.map((x) => x.cliente_produto_id));
+
       const novaQtd = Number(l.quantidade ?? 0);
       let resposta: unknown = null;
       let http: number | null = null;
@@ -395,6 +439,7 @@ Deno.serve(async (req) => {
                     ...(x.valor_unitario != null ? { valor_unitario: Number(x.valor_unitario) } : {}),
                   })),
                 }),
+            ...(cancelados.length ? { cancelados } : {}),
             par_documentado: GRAVAR_PELO_PAR_DOCUMENTADO,
           }),
         });

@@ -187,6 +187,64 @@ function pega(obj, ...nomes) {
 const CAMPO_ESPELHO = { 9: "usuariosAdicionais", 10: "pdvComandas" };
 
 /**
+ * AFIRMA no corpo os módulos que o DoctorSaaS considera cancelados, em vez de
+ * ecoar o que a leitura devolveu.
+ *
+ * ⚠️ É ISTO QUE IMPEDE UM CANCELAMENTO DE SER APAGADO POR UMA GRAVAÇÃO FUTURA.
+ * O OEM registra cancelamento como `datavalidade` e continua devolvendo o
+ * módulo como `ativo: true`, com a quantidade de antes — só a data diz que ele
+ * está cancelado. Como o corpo nasce da leitura, qualquer gravação posterior
+ * nesta filial (outro módulo, o estado da licença) reenviava o módulo
+ * cancelado como ATIVO, e o OEM apagava a data: o módulo voltava a valer, sem
+ * erro e sem aviso.
+ *
+ * Medido em 03/09/2026 na filial 28533: reenviar a `datavalidade` junto NÃO
+ * preserva. A gravação mandou o PDV com a data 30/09 e a leitura seguinte
+ * voltou sem data nenhuma. O que o OEM lê é o par ativo/quantidade; a data ele
+ * decide. Então a única forma de manter um módulo desligado é continuar
+ * pedindo que ele fique desligado, em toda gravação.
+ *
+ * Efeito colateral bom, e é de propósito: uma filial que já divergiu volta ao
+ * lugar sozinha na próxima escrita, sem ninguém ir atrás dela.
+ *
+ * `jaTratados` são os códigos que a alteração pedida já resolveu — quem pediu
+ * agora manda mais do que a ficha lembra, senão reativar um módulo cancelado
+ * seria desfeito na linha seguinte.
+ *
+ * Devolve só o que MUDOU, para a lista servir de auditoria em vez de repetir a
+ * licença inteira.
+ */
+function reafirmarCancelados(novo, cancelados, jaTratados) {
+  const reafirmados = [];
+  if (!Array.isArray(cancelados) || cancelados.length === 0) return reafirmados;
+  for (const bruto of cancelados) {
+    const codigo = num(bruto);
+    // O 8 é o produto da licença, não um módulo: desligá-lo seria desligar a
+    // licença inteira por um caminho que ninguém pediu.
+    if (codigo === undefined || codigo === 8 || jaTratados.has(codigo)) continue;
+    const idx = novo.modulos.findIndex((m)=>num(pega(m, "codigo", "codModulo", "cod")) === codigo);
+    // Módulo que não está na licença não se afirma: não há o que desligar, e
+    // inventar uma linha aqui criaria módulo do nada numa rota que grava tudo.
+    if (idx < 0) continue;
+    const m = novo.modulos[idx];
+    // Já desligado no parceiro: não há o que afirmar. E não force a quantidade
+    // para 0 aqui — a licença guarda `quantidade: 1` em TODO módulo inativo (é
+    // o valor de prateleira dele), então zerar seria mexer em dado do parceiro
+    // à toa e encher a lista de auditoria com linha que não mudou nada.
+    if (pega(m, "ativo") === false) continue;
+    reafirmados.push({
+      codigo,
+      de: { ativo: m.ativo, quantidade: m.quantidade, datavalidade: pega(m, "datavalidade") ?? null },
+    });
+    m.ativo = false;
+    m.quantidade = 0;
+    m.valorTotal = 0;
+    if (CAMPO_ESPELHO[codigo]) novo[CAMPO_ESPELHO[codigo]] = 0;
+  }
+  return reafirmados;
+}
+
+/**
  * Monta o corpo do `saveFilial` a partir do que a leitura documentada devolveu,
  * aplicando TODAS as alterações pedidas para esta filial de uma vez.
  *
@@ -218,7 +276,7 @@ const CAMPO_ESPELHO = { 9: "usuariosAdicionais", 10: "pdvComandas" };
  * `alteracoes`: `[{ codigo, quantidade }]`, aplicadas na ordem recebida.
  * Devolve `{novo, alvos, diferencas, completados}` ou `{erro}`.
  */
-function montarPayloadDocumentado(lido, escalares, alteracoes) {
+function montarPayloadDocumentado(lido, escalares, alteracoes, cancelados) {
   if (!Array.isArray(alteracoes) || alteracoes.length === 0) {
     return { erro: { status: 400, mensagem: "Nenhuma alteração de módulo foi pedida. Nada foi enviado." } };
   }
@@ -318,6 +376,9 @@ function montarPayloadDocumentado(lido, escalares, alteracoes) {
     alvos.push({ tipo: "modulo", codigo: moduloCodigo, de: antesMod, para: novo.modulos[idx] });
   }
 
+  // Depois das alterações, e sem tocar no que elas resolveram.
+  const reafirmados = reafirmarCancelados(novo, cancelados, new Set(alteracoes.map((a)=>a.codigo)));
+
   // O que muda ALÉM do que foi pedido e do que foi completado. Esta lista tem
   // que ficar com a alteração pedida e nada mais: qualquer outra entrada é
   // campo se perdendo, e é para isso que ela existe — a rota grava a filial
@@ -330,17 +391,24 @@ function montarPayloadDocumentado(lido, escalares, alteracoes) {
       diferencas.push({ campo: k, de: lido[k], para: novo[k] });
     }
   }
+  // Módulo reafirmado sai de `diferencas` e vai para a lista própria. As duas
+  // coisas são diferentes: `diferencas` existe para denunciar campo se
+  // perdendo, e afogar isso em reafirmações rotineiras é perder o sinal que
+  // custou caro para existir.
+  const reafirmadosSet = new Set(reafirmados.map((r)=>r.codigo));
   const antes = Array.isArray(lido.modulos) ? lido.modulos : [];
   for (let i = 0; i < Math.max(antes.length, novo.modulos.length); i++) {
     if (JSON.stringify(antes[i]) !== JSON.stringify(novo.modulos[i])) {
+      const cod = num(pega(antes[i] ?? novo.modulos[i] ?? {}, "codigo"));
+      if (reafirmadosSet.has(cod)) continue;
       diferencas.push({
-        campo: `modulos[${i}] (codigo ${pega(antes[i] ?? novo.modulos[i] ?? {}, "codigo")})`,
+        campo: `modulos[${i}] (codigo ${cod})`,
         de: antes[i], para: novo.modulos[i]
       });
     }
   }
 
-  return { novo, alvos, diferencas, completados };
+  return { novo, alvos, diferencas, completados, reafirmados };
 }
 
 const num = (v)=>{
@@ -404,6 +472,13 @@ Deno.serve(async (req)=>{
     const moduloCodigo = alteracoes[0]?.codigo;
     const novaQtd = alteracoes[0]?.quantidade ?? 0;
     const simular = corpo.simular === true;
+    // Os módulos que o DoctorSaaS dá como cancelados nesta filial. Toda
+    // gravação pelo caminho documentado os reafirma desligados, porque a
+    // leitura do parceiro os devolve como ativos e ecoá-la apaga a baixa.
+    // Quem sabe disso é a ficha, não esta função — por isso vem no corpo.
+    const cancelados = Array.isArray(corpo.cancelados)
+      ? corpo.cancelados.map((v)=>num(v)).filter((v)=>v !== undefined)
+      : [];
     // Modo cadastro: sem modulo_codigo e com pelo menos um campo de cadastro.
     const novoNome = corpo.novo_nome === undefined || corpo.novo_nome === null ? undefined : String(corpo.novo_nome).trim();
     const novoCnpj = corpo.novo_cnpj === undefined || corpo.novo_cnpj === null ? undefined : String(corpo.novo_cnpj).replace(/\D/g, "");
@@ -711,6 +786,13 @@ Deno.serve(async (req)=>{
             }
           }
 
+          // O estado da licença grava a filial inteira igual ao módulo, então
+          // ele apagava a baixa dos módulos cancelados do mesmo jeito. Vem
+          // DEPOIS do laço acima de propósito: se o "Ativar" limpou a data de
+          // um módulo que a ficha dá como cancelado, isto o desliga de novo.
+          // Ativar a licença não é ressuscitar venda que alguém cancelou.
+          const reafirmados = reafirmarCancelados(novo, cancelados, new Set());
+
           // O que muda ALÉM do pedido e do que foi completado. Mais de zero
           // aqui é campo se perdendo, e é para isso que a lista existe.
           const jaContados = new Set([
@@ -726,7 +808,7 @@ Deno.serve(async (req)=>{
               diferencas.push({ campo: k, de: lido[k], para: novo[k] });
             }
           }
-          return { novo, completados, diferencas, datas_limpas: datasLimpas };
+          return { novo, completados, diferencas, datas_limpas: datasLimpas, reafirmados };
         };
 
         // Os obrigatórios da gravação, os mesmos do modo módulo: sem eles a
@@ -910,6 +992,7 @@ Deno.serve(async (req)=>{
           completados: mont.completados,
           diferencas: mont.diferencas,
           datas_limpas: mont.datas_limpas,
+          reafirmados: mont.reafirmados,
           payload: mont.novo,
           resposta: respEst,
           conferencia
@@ -920,7 +1003,7 @@ Deno.serve(async (req)=>{
       }
 
       // --------------------------------------------------------- modificar
-      const montado = montarPayloadDocumentado(lido, escalares, alteracoes);
+      const montado = montarPayloadDocumentado(lido, escalares, alteracoes, cancelados);
       if (montado.erro) {
         return Response.json({
           ok: false, etapa: "modulo", ...montado.erro
@@ -943,6 +1026,10 @@ Deno.serve(async (req)=>{
           alvo: alvoDescrito,
           alvos,
           completados,
+          // O que a gravação vai DESLIGAR além do pedido, por a ficha dar como
+          // cancelado. É a lista mais importante de conferir antes de gravar
+          // em licença de cliente: cada linha aqui é uma cobrança que para.
+          reafirmados: montado.reafirmados,
           diferencas,
           leitura: lido,
           payload: novo
@@ -1018,6 +1105,7 @@ Deno.serve(async (req)=>{
       return Response.json({
         ok: rSave.ok, http: rSave.status, par: "documentado",
         codproduto: codProdutoDoc, alvo: alvoDescrito, alvos, completados, diferencas,
+        reafirmados: montado.reafirmados,
         payload: novo, resposta: respSave, conferencia, conferencias
       }, { status: rSave.ok ? 200 : 502, headers: cors });
     }
