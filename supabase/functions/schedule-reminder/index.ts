@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { getAdapter, getInstanceSecrets } from '../_shared/providers/index.ts';
+import { previewCut } from '../_shared/preview.ts';
 
 Deno.serve(async (req) => {
   // Warmup
@@ -120,7 +121,7 @@ Deno.serve(async (req) => {
           .from('whatsapp_conversations')
           .update({
             last_message_at: now,
-            last_message_preview: messageText.substring(0, 200),
+            last_message_preview: previewCut(messageText),
             is_last_message_from_me: true,
             updated_at: now,
           })

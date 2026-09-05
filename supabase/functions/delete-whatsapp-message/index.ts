@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
+import { previewCut } from '../_shared/preview.ts';
 
 const FUNCTION_NAME = 'delete-whatsapp-message';
 // Providers cujo backend (Evolution) suporta apagar-para-todos. Meta Cloud e Z-API não têm revoke.
@@ -72,7 +73,7 @@ async function refreshConversationPreview(supabase: any, conversationId: string,
       await supabase
         .from('whatsapp_conversations')
         .update({
-          last_message_preview: (lastMsg.content || '').substring(0, 200),
+          last_message_preview: previewCut(lastMsg.content),
           last_message_at: lastMsg.timestamp,
           is_last_message_from_me: lastMsg.is_from_me,
         })

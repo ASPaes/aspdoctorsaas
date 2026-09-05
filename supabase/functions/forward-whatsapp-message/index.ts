@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
+import { previewCut } from '../_shared/preview.ts';
 
 const FUNCTION_NAME = 'forward-whatsapp-message';
 const corsHeaders = {
@@ -229,7 +230,7 @@ Deno.serve(async (req) => {
         // Update conversation
         await supabase.from('whatsapp_conversations').update({
           last_message_at: msgTimestamp,
-          last_message_preview: content.substring(0, 200),
+          last_message_preview: previewCut(content),
           is_last_message_from_me: true,
           updated_at: msgTimestamp,
         }).eq('id', targetConversationId);

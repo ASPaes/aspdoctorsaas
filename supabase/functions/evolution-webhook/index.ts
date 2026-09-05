@@ -8,6 +8,7 @@ import {
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
 import { applyDeliveryStatus } from '../_shared/apply-delivery-status.ts';
 import { normalizeBRPhone, phoneSearchVariants } from '../_shared/phone.ts';
+import { previewCut } from '../_shared/preview.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -238,7 +239,7 @@ async function refreshConversationPreviewAfterRevoke(supabase: any, conversation
     .limit(1).maybeSingle();
   if (lastMsg) {
     await supabase.from('whatsapp_conversations').update({
-      last_message_preview: lastMsg.content?.substring(0, 200) || '',
+      last_message_preview: previewCut(lastMsg.content),
       last_message_at: lastMsg.timestamp,
       is_last_message_from_me: lastMsg.is_from_me,
     }).eq('id', conversationId);
@@ -316,7 +317,7 @@ async function processMessageEdit(payload: EvolutionWebhookPayload, supabase: an
       .limit(1).maybeSingle();
     if (lastMsg?.id === row.id) {
       await supabase.from('whatsapp_conversations').update({
-        last_message_preview: (newContent || '').substring(0, 200),
+        last_message_preview: previewCut(newContent),
         last_message_at: row.timestamp,
         is_last_message_from_me: row.is_from_me,
       }).eq('id', row.conversation_id);
@@ -760,7 +761,7 @@ async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supa
       .limit(1).maybeSingle();
     if (lastMsg?.id === row.id) {
       await supabase.from('whatsapp_conversations').update({
-        last_message_preview: (newContent || '').substring(0, 200),
+        last_message_preview: previewCut(newContent),
         last_message_at: row.timestamp,
         is_last_message_from_me: row.is_from_me,
       }).eq('id', row.conversation_id);
@@ -927,7 +928,7 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
 
       await supabase.from('whatsapp_conversations').update({
         last_message_at: timestamp,
-        last_message_preview: content.substring(0, 200) || '📤 Mensagem enviada',
+        last_message_preview: previewCut(content) || '📤 Mensagem enviada',
         is_last_message_from_me: true,
         updated_at: new Date().toISOString(),
         // Se só tem mensagens outbound, manter/forçar fechado

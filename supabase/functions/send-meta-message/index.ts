@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { normalizeBRPhone } from '../_shared/phone.ts';
+import { previewCut } from '../_shared/preview.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -493,7 +494,7 @@ Deno.serve(async (req) => {
         .from('whatsapp_conversations')
         .update({
           last_message_at: messageTimestamp,
-          last_message_preview: messageContent.substring(0, 200),
+          last_message_preview: previewCut(messageContent),
           is_last_message_from_me: true,
           updated_at: messageTimestamp,
         })

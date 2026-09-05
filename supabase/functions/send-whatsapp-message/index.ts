@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { getAdapter, getInstanceSecrets } from '../_shared/providers/index.ts';
+import { previewCut } from '../_shared/preview.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -823,14 +824,24 @@ Deno.serve(async (req) => {
       (async () => {
         const updateData: Record<string, any> = {
           last_message_at: messageTimestamp,
-          last_message_preview: messageContent.substring(0, 200),
+          last_message_preview: previewCut(messageContent),
           is_last_message_from_me: persistedIsFromMe,
           updated_at: messageTimestamp,
         };
-        await supabase
+        // O erro era descartado aqui dentro. Quando este UPDATE falha, a mensagem
+        // sai e é salva, mas o card da barra lateral fica na mensagem anterior
+        // até a próxima gravação que der certo — e não há log nenhum dizendo
+        // isso. Foi o DEM-0363: 4h14 de cartão parado por um 400 invisível.
+        const { error: convErr } = await supabase
           .from('whatsapp_conversations')
           .update(updateData)
           .eq('id', body.conversationId);
+        if (convErr) {
+          console.error(
+            `[send-whatsapp-message] FALHA ao atualizar resumo da conversa ${body.conversationId} — o card da lista vai ficar atrasado:`,
+            convErr
+          );
+        }
       })(),
     ]);
 

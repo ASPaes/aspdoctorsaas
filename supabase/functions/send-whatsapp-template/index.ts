@@ -13,6 +13,7 @@ import {
   buildBodyComponent,
   renderTemplateText,
 } from '../_shared/meta-template-params.ts';
+import { previewCut } from '../_shared/preview.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -272,7 +273,7 @@ Deno.serve(async (req) => {
 
     await supabase.from('whatsapp_conversations').update({
       last_message_at: nowIso,
-      last_message_preview: messageContent.substring(0, 200),
+      last_message_preview: previewCut(messageContent),
       is_last_message_from_me: true,
       status: 'active',
       first_agent_message_at: nowIso,

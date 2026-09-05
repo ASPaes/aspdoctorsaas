@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { previewCut } from '../_shared/preview.ts';
 
 const FUNCTION_NAME = 'check-csat-timeout';
 
@@ -357,7 +358,7 @@ async function sendAndPersistAutoMessage(
   });
   await supabase.from('whatsapp_conversations').update({
     last_message_at: nowIso,
-    last_message_preview: text.substring(0, 200),
+    last_message_preview: previewCut(text),
     is_last_message_from_me: true,
   }).eq('id', conversationId);
 }

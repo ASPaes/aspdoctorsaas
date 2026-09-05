@@ -6,6 +6,7 @@ import { NormalizedInboundMessage, SendContext, PhoneParseResult, UNSUPPORTED_ME
 import { normalizeBRPhone, phoneSearchVariants } from './phone.ts';
 import { isGoodbyeOnlyMessage } from './goodbye.ts';
 import { extractLocation } from './location.ts';
+import { previewCut } from './preview.ts';
 
 const AUTO_SENTIMENT_THRESHOLD = 5;
 const AUTO_CATEGORIZATION_THRESHOLD = 5;
@@ -350,7 +351,7 @@ export async function sendAndPersistAutoMessage(
 
     await supabase.from('whatsapp_conversations').update({
       last_message_at: nowIso,
-      last_message_preview: text.substring(0, 200),
+      last_message_preview: previewCut(text),
       is_last_message_from_me: true,
     }).eq('id', conversationId);
   } catch (err) {
@@ -2029,7 +2030,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   const { data: currentConv } = await supabase.from('whatsapp_conversations').select('last_message_at, unread_count, auto_reply_disabled').eq('id', conversationId).single();
   const isNewer = !currentConv?.last_message_at || timestamp >= currentConv.last_message_at;
   const upd: Record<string, any> = {};
-  if (isNewer) { upd.last_message_at = timestamp; upd.last_message_preview = content.substring(0, 200); upd.is_last_message_from_me = fromMe; }
+  if (isNewer) { upd.last_message_at = timestamp; upd.last_message_preview = previewCut(content); upd.is_last_message_from_me = fromMe; }
   if (!fromMe) upd.unread_count = (currentConv?.unread_count || 0) + 1;
   if (Object.keys(upd).length > 0) await supabase.from('whatsapp_conversations').update(upd).eq('id', conversationId);
 

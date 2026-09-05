@@ -6,6 +6,7 @@
 // tentativas manuais e cooldown de 60s. Isso é gate do handler HTTP e continua lá.
 // Aqui é só "pegue esta linha e mande de novo".
 import { getAdapter, getInstanceSecrets } from './providers/index.ts';
+import { previewCut } from './preview.ts';
 
 const LOG = '[resend-message]';
 
@@ -117,7 +118,7 @@ export async function resendMessage(
       .from('whatsapp_conversations')
       .update({
         last_message_at: nowIso,
-        last_message_preview: (msg.content || '').substring(0, 200),
+        last_message_preview: previewCut(msg.content),
         is_last_message_from_me: true,
         updated_at: nowIso,
       })
