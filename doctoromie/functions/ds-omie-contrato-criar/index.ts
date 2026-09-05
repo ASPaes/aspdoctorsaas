@@ -1,6 +1,20 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // ds-omie-contrato-criar
 //
+// ============================== v15 (25/08/2026) ==============================
+// VIGENCIA INVERTIDA E BARRADA NA CRIACAO.
+// Irmao do conserto do ds-omie-contrato-alterar v18 (BEDA PIZZARIA, CT-2026-5681): dVigFinal
+// anterior a dVigInicial faz o Omie devolver "Data de Vigencia Inicial [dVigInicial] maior que a
+// Data de Vigencia Final [dVigFinal]!" e a fila de sync trava em 'erro'. Aqui a combinacao
+// aparece quando a Data do Proximo Reajuste do DS cai ANTES do 1o dia do mes seguinte a venda --
+// que e a dVigInicial que esta funcao calcula desde a v11.
+// No ALTERAR a mesma situacao vira AJUSTE (o contrato esta morrendo, nao ha o que faturar).
+// Aqui vira BLOQUEIO (409, bloqueado='vigencia_invertida'): contrato nascendo com vigencia de um
+// dia NAO FATURA, e um contrato que nao fatura em silencio e pior do que um contrato que nao foi
+// criado com alarme.
+// Falha aberta: data ilegivel dos dois lados => nao bloqueia nada, segue como antes.
+// ==============================================================================
+//
 // ============================== v14 (17/07/2026) ==============================
 // ANTI-DUP CAMADA 3: o cliente ja tem contrato ATIVO no Omie? Entao nao se cria, se VINCULA.
 //
@@ -111,6 +125,12 @@ function primeiroDiaMesSeguinte(v) {
   return `01/${String(mes).padStart(2, "0")}/${ano}`;
 }
 const simNao = (v, padraoSeNulo)=>(v === null || v === undefined ? padraoSeNulo : v === true) ? "S" : "N";
+// v15: dd/mm/aaaa -> aaaammdd (numero) so para COMPARAR. null no que nao for data reconhecivel --
+// e o null que faz a guarda de vigencia invertida falhar ABERTA em vez de chutar.
+function omieDateToNum(v) {
+  const m = String(v ?? "").trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? Number(`${m[3]}${m[2]}${m[1]}`) : null;
+}
 function limparNumero(numero) {
   let s = String(numero).trim().replace(/^CT-/i, "");
   if (s.length > 20) s = s.slice(0, 20);
@@ -384,7 +404,16 @@ Deno.serve(async (req)=>{
             valor_total_mes: c.valor_total_mes ?? null,
             codigo_contrato_integracao: c.codigo_contrato_integracao ?? null
           }));
-        const error = `Este cliente já tem ${lista.length} contrato(s) ATIVO(s) no Omie (nCodCli ${nCodCli}): ` + lista.map((c)=>`nCodCtr ${c.codigo_contrato_omie}` + (c.valor_total_mes != null ? ` (R$ ${c.valor_total_mes})` : "")).join(", ") + `. Criar outro geraria cobrança em duplicidade. Este contrato do DoctorSaaS deve ser ` + `VINCULADO ao contrato existente pela Conferência, não criado.`;
+        // v16 (05/09/2026): POR QUE o cliente "ja tem contrato ativo" muda o que se deve fazer.
+        // Se o nCodCli deste contrato esta no de/para de MAIS DE UM cliente do DoctorSaaS, o
+        // contrato ativo que aparece aqui nao e deste cliente -- e do outro, que dividiu o cadastro
+        // do Omie com ele. Mandar "vincule pela Conferencia" nesse caso e conselho errado: vincular
+        // faria dois clientes do DS dividirem o MESMO contrato do Omie. O certo e cadastro proprio.
+        // Foi exatamente o CT-2026-6977 (YOUR COFFEE - HOSPITAL) contra o contrato da loja
+        // BANDEIRANTES. Ver a v15 do ds-omie-cliente-upsert.
+        const { data: donosDoCadastro } = await supa.from("customers_mapping").select("ds_customer_id").eq("tenant_id", tenant_id).eq("omie_customer_id", String(nCodCli)).limit(5);
+        const cadastroCompartilhado = Array.isArray(donosDoCadastro) && donosDoCadastro.filter((m)=>String(m.ds_customer_id) !== String(d.ds_customer_id)).length > 0;
+        const error = cadastroCompartilhado ? `O cadastro ${nCodCli} do Omie esta sendo usado por MAIS DE UM cliente do DoctorSaaS, e o ` + `contrato ativo que existe nele (` + lista.map((c)=>`nCodCtr ${c.codigo_contrato_omie}` + (c.valor_total_mes != null ? ` R$ ${c.valor_total_mes}` : "")).join(", ") + `) e do OUTRO cliente, nao deste. Vincular juntaria os dois no mesmo contrato do Omie. ` + `Se este e outro estabelecimento no mesmo CNPJ, ele precisa de cadastro proprio no Omie.` : `Este cliente já tem ${lista.length} contrato(s) ATIVO(s) no Omie (nCodCli ${nCodCli}): ` + lista.map((c)=>`nCodCtr ${c.codigo_contrato_omie}` + (c.valor_total_mes != null ? ` (R$ ${c.valor_total_mes})` : "")).join(", ") + `. Criar outro geraria cobrança em duplicidade. Este contrato do DoctorSaaS deve ser ` + `VINCULADO ao contrato existente pela Conferência, não criado.`;
         if (modo === "criar") {
           await logRow(tenant_id, "ignorado", {
             referencia: String(ds_contract_id),
@@ -392,7 +421,8 @@ Deno.serve(async (req)=>{
             response: {
               bloqueado: "cliente_ja_tem_contrato_ativo",
               contratos_no_omie: lista,
-              nCodCli
+              nCodCli,
+              cadastro_compartilhado: cadastroCompartilhado
             },
             error_message: error
           });
@@ -403,7 +433,10 @@ Deno.serve(async (req)=>{
           bloqueado: "cliente_ja_tem_contrato_ativo",
           error,
           nCodCli,
-          contratos_no_omie: lista
+          contratos_no_omie: lista,
+          // A tela usa este par para oferecer "Criar cadastro proprio no Omie" em vez de so avisar.
+          cadastro_proprio_disponivel: cadastroCompartilhado,
+          codigo_cliente_omie: nCodCli
         }, 409);
       }
     }
@@ -440,6 +473,36 @@ Deno.serve(async (req)=>{
       avisos.push(`Não foi possível calcular o 1º dia do mês seguinte a partir de "${d.vigencia_inicial}"; enviando a data como veio.`);
     }
     const dVigFinal = toOmieDate(d.vigencia_final);
+    // ========================================================================
+    // v15 (25/08/2026): VIGENCIA INVERTIDA NAO VAI PARA O OMIE. Ver cabecalho.
+    // Aqui o BLOQUEIO e o certo (no ds-omie-contrato-alterar a mesma situacao vira ajuste):
+    // um contrato NASCENDO com vigencia final antes da inicial e data errada no DS, e o Omie
+    // recusa. Ajustar em silencio criaria um contrato que comeca e termina no mesmo dia --
+    // ou seja, que NAO FATURA -- e ninguem ficaria sabendo. Barrar e alto: a fila alerta e
+    // alguem corrige a data no DS.
+    // ========================================================================
+    const nVigIni = omieDateToNum(dVigInicial);
+    const nVigFim = omieDateToNum(dVigFinal);
+    if (nVigIni !== null && nVigFim !== null && nVigFim < nVigIni) {
+      const error = `Vigência final (${dVigFinal}) é anterior à vigência inicial (${dVigInicial}). ` +
+        `A vigência inicial no Omie é o 1º dia do mês seguinte à Data da Venda (${dVigInicialRecebida ?? "?"}), ` +
+        `e a final vem da Data do Próximo Reajuste. O Omie recusa essa combinação. ` +
+        `Corrija a Data do Próximo Reajuste do contrato no DS e envie de novo.`;
+      await logRow(tenant_id, "ignorado", {
+        referencia: String(ds_contract_id),
+        payload: body,
+        error_message: error
+      });
+      return json({
+        ok: false,
+        modo,
+        bloqueado: "vigencia_invertida",
+        error,
+        vigencia_inicial_enviada: dVigInicial,
+        vigencia_inicial_recebida: dVigInicialRecebida ?? null,
+        vigencia_final: dVigFinal ?? null
+      }, 409);
+    }
     const cabecalho = {
       cCodIntCtr,
       cCodSit: "10",

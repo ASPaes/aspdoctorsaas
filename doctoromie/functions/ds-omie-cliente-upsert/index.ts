@@ -21,6 +21,22 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 //      Agora: criar -> 'criar' | assumir/atualizar -> 'atualizar' | nada a enviar -> status 'ignorado'.
 //      O CHECK da tabela ja aceita (criar, atualizar, cancelar, reativar, testar): sem migration.
 //
+// v15 (05/09/2026): o cadastro do Omie achado por CNPJ pode JA SER de outro cliente do DS. Ate
+//      aqui a busca por CNPJ assumia ele mesmo assim, e o de/para virava 1:N -- dois clientes do
+//      DS apontando para o MESMO nCodCli. A partir do 2o envio o dono novo entra pelo ramo
+//      "DS e fonte da verdade" e reescreve o cadastro inteiro do dono antigo: fantasia, e-mail,
+//      telefone, endereco, contato. Foi o que aconteceu com YOUR COFFEE (CNPJ 31.556.276/0001-84):
+//      a loja HOSPITAL assumiu o cadastro da loja BANDEIRANTES (nCodCli 7248327711) e a fantasia
+//      dela virou "YOUR COFFEE - HOSPITAL" no Omie, em 4 envios. Medido no mesmo dia: 18 cadastros
+//      do Omie ja estavam com 2+ clientes do DS pendurados -- nao era caso isolado.
+//      Agora: candidato por CNPJ que JA TEM dono no de/para nao e assumido -- 409
+//      'cadastro_omie_ja_vinculado'. Com body.criar_cadastro_proprio=true (decisao explicita do
+//      operador na tela, para o caso legitimo de duas lojas no mesmo CNPJ) a busca por CNPJ e
+//      ignorada e o cliente cai no ramo UpsertCliente, que cria cadastro PROPRIO no Omie com
+//      codigo_cliente_integracao = ds_customer_id. Que o Omie aceita CNPJ repetido nesse caminho
+//      esta provado nesta base: os 8 cadastros "Teste N Calculadora" tem o mesmo CNPJ
+//      00475698000100 e codigo_cliente_integracao distinto (DIGI-<ts>), todos criados pela API.
+//
 // v12: honra body.campos_alterados (peca final do "C"). Gatilho marca so o que o usuario editou;
 //      aqui manda so isso. Sem a lista (churn/reajuste/envio manual) = manda tudo.
 // v11/v10: assumindo cliente achado por CNPJ, so PREENCHE LACUNA (nunca sobrescreve). Motivo: 99%
@@ -184,6 +200,8 @@ Deno.serve(async (req)=>{
     }
     const ds_customer_id = body?.ds_customer_id;
     const cliente = body?.cliente ?? {};
+    // v15: so o chamador decide. Sem o flag, cadastro ja vinculado a outro cliente do DS bloqueia.
+    const criarCadastroProprio = body?.criar_cadastro_proprio === true;
     if (!ds_customer_id) {
       await logRow(tenant_id, "erro", {
         payload: body,
@@ -227,7 +245,70 @@ Deno.serve(async (req)=>{
     let alvoOmieId = mapExist?.omie_customer_id ? Number(mapExist.omie_customer_id) : null;
     let comoResolveu = alvoOmieId ? "de_para" : "";
     let cadastroAtual = null;
-    if (!alvoOmieId) {
+    // ========================================================================
+    // v15: A GUARDA QUE ALCANCA O ESTRAGO JA GRAVADO.
+    // A guarda de baixo (na busca por CNPJ) impede de/para 1:N NOVO. Mas quando o de/para errado
+    // JA existe -- e existiam 18 assim em 05/09/2026 -- alvoOmieId vem dele e a busca por CNPJ nem
+    // roda: o cliente entra direto no ramo "DS e fonte da verdade" e reescreve o cadastro alheio.
+    // Era esse o caminho do YOUR COFFEE a partir do 2o envio. Entao a pergunta certa nao e "achei
+    // por CNPJ?", e sim "este cadastro do Omie e SO deste cliente?". Enquanto nao for, nao se
+    // escreve nele -- nem pelo ramo cirurgico dos campos_alterados, que tambem corromperia o dado
+    // do outro (a fantasia e do cadastro, nao do contrato).
+    // ========================================================================
+    let cadastroCompartilhado = false;
+    if (alvoOmieId) {
+      const { data: coDonos, error: coErr } = await supa.from("customers_mapping").select("ds_customer_id").eq("tenant_id", tenant_id).eq("omie_customer_id", String(alvoOmieId)).neq("ds_customer_id", String(ds_customer_id)).limit(1);
+      if (coErr) {
+        const error = "Nao foi possivel conferir se este cadastro do Omie e exclusivo deste cliente " + "(falha ao ler o de/para). Envio abortado por seguranca -- reexecutar e seguro.";
+        console.error("ERRO_DEPARA_EXCLUSIVO:", JSON.stringify(coErr));
+        await logRow(tenant_id, "erro", {
+          referencia: String(ds_customer_id),
+          payload: body,
+          error_message: error
+        });
+        return json({
+          ok: false,
+          bloqueado: "depara_indisponivel",
+          error,
+          detalhe: coErr.message
+        }, 503);
+      }
+      cadastroCompartilhado = Array.isArray(coDonos) && coDonos.length > 0;
+    }
+    if (cadastroCompartilhado) {
+      if (criarCadastroProprio) {
+        // O de/para atual e o errado -- foi ele que juntou dois clientes num cadastro so. Zerar o
+        // alvo joga o fluxo no ramo UpsertCliente, que cria cadastro PROPRIO e, no fim, faz o
+        // upsert do de/para repontando ESTE cliente para o cadastro novo. O outro cliente fica
+        // com o cadastro original, intacto.
+        alvoOmieId = null;
+        comoResolveu = "";
+      } else {
+        const donoOutro = String((await supa.from("customers_mapping").select("ds_customer_id").eq("tenant_id", tenant_id).eq("omie_customer_id", String(alvoOmieId)).neq("ds_customer_id", String(ds_customer_id)).limit(1)).data?.[0]?.ds_customer_id ?? "");
+        const error = `O cadastro ${alvoOmieId} do Omie esta vinculado a MAIS DE UM cliente do ` + `DoctorSaaS. Escrever nele por aqui trocaria a fantasia, o e-mail, o telefone e o endereco ` + `do outro cliente. Se este e outro estabelecimento no mesmo CNPJ, ele precisa de cadastro ` + `proprio no Omie.`;
+        await logRow(tenant_id, "ignorado", {
+          referencia: String(ds_customer_id),
+          payload: body,
+          response: {
+            bloqueado: "cadastro_omie_ja_vinculado",
+            codigo_cliente_omie: alvoOmieId,
+            ds_customer_id_dono: donoOutro || null
+          },
+          error_message: error
+        });
+        return json({
+          ok: false,
+          bloqueado: "cadastro_omie_ja_vinculado",
+          error,
+          codigo_cliente_omie: alvoOmieId,
+          ds_customer_id_dono: donoOutro || null,
+          cadastro_proprio_disponivel: true
+        }, 409);
+      }
+    }
+    // v15: com criar_cadastro_proprio a busca por CNPJ nem roda -- o pedido E "nao aproveite
+    // cadastro nenhum, faca um meu".
+    if (!alvoOmieId && !criarCadastroProprio) {
       const achados = await buscarClientesPorCnpj(String(cliente.cnpj_cpf), creds);
       if (achados.length > 1) {
         const lista = achados.map((c)=>({
@@ -252,7 +333,49 @@ Deno.serve(async (req)=>{
         }, 409);
       }
       if (achados.length === 1) {
-        alvoOmieId = Number(achados[0].codigo_cliente_omie);
+        const candidato = Number(achados[0].codigo_cliente_omie);
+        // v15: o candidato ja e de outro cliente do DS? Entao ele NAO e deste. Assumir aqui e o
+        // que transformava o de/para em 1:N e fazia o proximo envio reescrever o cadastro alheio.
+        const { data: donoAtual, error: donoErr } = await supa.from("customers_mapping").select("ds_customer_id").eq("tenant_id", tenant_id).eq("omie_customer_id", String(candidato)).neq("ds_customer_id", String(ds_customer_id)).limit(1);
+        if (donoErr) {
+          // FALHA FECHADA, mesma logica da camada 3 do contrato-criar: nao da para provar que o
+          // cadastro esta livre, e assumir errado reescreve dado de cliente real sem desfazer.
+          const error = "Nao foi possivel conferir se este cadastro do Omie ja e de outro cliente " + "(falha ao ler o de/para). Envio abortado por seguranca -- reexecutar e seguro.";
+          console.error("ERRO_DONO_DEPARA:", JSON.stringify(donoErr));
+          await logRow(tenant_id, "erro", {
+            referencia: String(ds_customer_id),
+            payload: body,
+            error_message: error
+          });
+          return json({
+            ok: false,
+            bloqueado: "depara_indisponivel",
+            error,
+            detalhe: donoErr.message
+          }, 503);
+        }
+        const donoOutro = Array.isArray(donoAtual) && donoAtual.length > 0 ? String(donoAtual[0].ds_customer_id) : null;
+        if (donoOutro) {
+          await logRow(tenant_id, "ignorado", {
+            referencia: String(ds_customer_id),
+            payload: body,
+            response: {
+              bloqueado: "cadastro_omie_ja_vinculado",
+              codigo_cliente_omie: candidato,
+              ds_customer_id_dono: donoOutro
+            },
+            error_message: `O cadastro ${candidato} do Omie ja e de outro cliente do DoctorSaaS (${donoOutro}).`
+          }, "atualizar");
+          return json({
+            ok: false,
+            bloqueado: "cadastro_omie_ja_vinculado",
+            error: `Este CNPJ ja tem cadastro no Omie (nCodCli ${candidato}), e ele pertence a OUTRO ` + `cliente do DoctorSaaS. Aproveitar esse cadastro sobrescreveria os dados do outro cliente ` + `(fantasia, e-mail, telefone, endereco). Se este e outro estabelecimento com o mesmo CNPJ, ` + `peca um cadastro proprio no Omie.`,
+            codigo_cliente_omie: candidato,
+            ds_customer_id_dono: donoOutro,
+            cadastro_proprio_disponivel: true
+          }, 409);
+        }
+        alvoOmieId = candidato;
         cadastroAtual = achados[0];
         comoResolveu = "encontrado_por_cnpj";
       }
@@ -321,7 +444,15 @@ Deno.serve(async (req)=>{
         camposEnviados.push(k);
       }
     } else {
-      call = "UpsertCliente";
+      // v15: IncluirCliente, NAO UpsertCliente, quando o pedido e cadastro proprio.
+      // O UpsertCliente casa tambem por CNPJ: num CNPJ que ja tem cadastro no Omie ele ALTERARIA
+      // o existente em vez de criar -- ou seja, faria exatamente o estrago que este caminho existe
+      // para evitar, e faria calado. O IncluirCliente nao tem esse fallback: ou nasce um cadastro
+      // novo, ou o Omie recusa e a recusa aparece. Falha aberta e barulhenta e melhor que sucesso
+      // que sobrescreve dado de cliente real.
+      // Que o Omie aceita CNPJ repetido em cadastros distintos esta provado nesta base: os 8
+      // "Teste N Calculadora" tem o mesmo 00475698000100 com codigo_cliente_integracao distinto.
+      call = criarCadastroProprio ? "IncluirCliente" : "UpsertCliente";
       param = {
         cnpj_cpf: String(cliente.cnpj_cpf),
         razao_social: String(cliente.razao_social),
@@ -331,10 +462,10 @@ Deno.serve(async (req)=>{
         param[k] = String(cliente[k]);
         camposEnviados.push(k);
       }
-      comoResolveu = "criado_novo";
+      comoResolveu = criarCadastroProprio ? "cadastro_proprio" : "criado_novo";
     }
     // v13: o evento do log sai daqui -- do que a operacao REALMENTE e.
-    const evento = comoResolveu === "criado_novo" ? "criar" : "atualizar";
+    const evento = comoResolveu === "criado_novo" || comoResolveu === "cadastro_proprio" ? "criar" : "atualizar";
     // ===== 3) Executa (ou pula) =====
     let resp = {
       pulado: true,
@@ -391,7 +522,7 @@ Deno.serve(async (req)=>{
       },
       synced_at: nowIso
     };
-    if (comoResolveu === "criado_novo") espelho.codigo_cliente_integracao = String(ds_customer_id);
+    if (comoResolveu === "criado_novo" || comoResolveu === "cadastro_proprio") espelho.codigo_cliente_integracao = String(ds_customer_id);
     const { error: espErr } = await supa.from("omie_clientes").upsert(espelho, {
       onConflict: "tenant_id,codigo_cliente_omie"
     });

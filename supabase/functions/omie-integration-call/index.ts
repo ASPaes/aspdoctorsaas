@@ -309,6 +309,9 @@ Deno.serve(async (req)=>{
     if (acao === "criar_cliente_contrato") {
       const modo = body?.modo === "criar" ? "criar" : "dry_run";
       const contratoId = typeof body?.contrato_id === "string" ? body.contrato_id : null;
+      // v17: decisao explicita do operador -- "este e outro estabelecimento no mesmo CNPJ, faca
+      // um cadastro proprio no Omie em vez de aproveitar o que ja esta la". Vem da tela.
+      const criarCadastroProprio = body?.criar_cadastro_proprio === true;
       if (!contratoId) return json({
         ok: false,
         error: "contrato_id \u00e9 obrigat\u00f3rio"
@@ -376,6 +379,21 @@ Deno.serve(async (req)=>{
             ds_contract_id: contrato.ds_contract_id,
             dados: contrato
           });
+          // v17 (05/09/2026): este ramo ignorava o 'bloqueado' que o contrato-criar devolve, e o
+          // dry_run voltava ok:true / operacao 'criar'. A previa dizia "o contrato seria criado"
+          // em cima de uma recusa -- foi assim que o CT-2026-6977 (YOUR COFFEE - HOSPITAL) foi
+          // confirmado 5 vezes contra um 'cliente_ja_tem_contrato_ativo', e cada confirmacao
+          // reescreveu o cadastro do Omie antes de o contrato ser recusado. O bloqueio do ramo
+          // 'alterar' ja subia; o do ramo 'criar' morria aqui.
+          const bloqCriar = cri.body?.bloqueado ?? null;
+          if (bloqCriar) {
+            return {
+              operacao: "bloqueado",
+              body: cri.body,
+              ok: false,
+              bloqueado: bloqCriar
+            };
+          }
           return {
             operacao: "criar",
             body: cri.body,
@@ -397,6 +415,22 @@ Deno.serve(async (req)=>{
         };
       }
       if (modo === "dry_run") {
+        // v17: com cadastro proprio pedido, a prova a seco do contrato nao tem contra o que rodar
+        // -- o de/para ainda aponta para o cadastro alheio, e o contrato-criar recusaria por causa
+        // dos contratos DELE. A previa entao descreve o que vai acontecer, sem consultar.
+        if (criarCadastroProprio) {
+          return json({
+            ok: true,
+            modo: "dry_run",
+            acao,
+            operacao: "criar",
+            cliente_seria_enviado: cliente,
+            contrato_seria_enviado: contrato,
+            cliente_pendente_no_omie: true,
+            cadastro_proprio: true,
+            aviso: "Será criado um cadastro NOVO no Omie para este cliente (mesmo CNPJ, cadastro próprio), " + "e o contrato será criado dentro dele. O cadastro do outro cliente não é tocado."
+          }, 200);
+        }
         const dec = await decidirContrato("dry_run");
         if (dec.operacao === "bloqueado") {
           return json({
@@ -405,7 +439,10 @@ Deno.serve(async (req)=>{
             acao,
             bloqueado: dec.bloqueado,
             error: dec.body?.error ?? "Bloqueado.",
-            detalhe: dec.body?.detalhe ?? null
+            detalhe: dec.body?.detalhe ?? null,
+            // v17: sobe o convite ao cadastro proprio; sem isto a tela so avisa e nao oferece saida.
+            cadastro_proprio_disponivel: dec.body?.cadastro_proprio_disponivel === true,
+            codigo_cliente_omie: dec.body?.codigo_cliente_omie ?? null
           }, 409);
         }
         const erroContrato = dec.body?.error ?? null;
@@ -422,9 +459,44 @@ Deno.serve(async (req)=>{
           aviso: dec.operacao === "alterar" ? "Este contrato J\u00c1 existe no Omie e ser\u00e1 ATUALIZADO com os dados atuais do DoctorSaaS." : clientePendente ? "No modo criar, o cliente ser\u00e1 criado/atualizado no Omie ANTES do contrato." : "Cliente j\u00e1 sincronizado; o contrato seria criado com o payload acima."
         }, 200);
       }
+      // ====================================================================
+      // v17: ORDEM. Ate aqui o cliente era escrito no Omie e SO DEPOIS o contrato era avaliado.
+      // Contrato recusado deixava o cadastro do Omie ja alterado, e nada desfaz isso -- foi o
+      // estrago no YOUR COFFEE. Agora o contrato passa por uma prova a seco primeiro; so com ela
+      // limpa e que o cliente e tocado.
+      // EXCECAO: criar_cadastro_proprio. Nesse caminho o de/para ainda aponta para o cadastro
+      // ERRADO (e por isso que o operador pediu um cadastro proprio), entao a prova a seco leria
+      // os contratos do cadastro alheio e recusaria justamente o caso que o flag existe para
+      // destravar. Ali o cliente vai primeiro, o de/para passa a ser o novo, e o contrato e
+      // avaliado contra o cadastro certo logo abaixo.
+      // ====================================================================
+      if (!criarCadastroProprio) {
+        const prova = await decidirContrato("dry_run");
+        if (prova.operacao === "bloqueado") {
+          return json({
+            ok: false,
+            modo: "criar",
+            acao,
+            etapa: "contrato",
+            bloqueado: prova.bloqueado,
+            error: prova.body?.error ?? "Contrato bloqueado.",
+            detalhe: prova.body?.detalhe ?? null,
+            cadastro_proprio_disponivel: prova.body?.cadastro_proprio_disponivel === true,
+            codigo_cliente_omie: prova.body?.codigo_cliente_omie ?? null,
+            cliente: {
+              ok: true,
+              nao_enviado: true,
+              motivo: "Contrato recusado na conferência prévia; o cadastro do Omie não foi tocado."
+            }
+          }, 409);
+        }
+      }
       const clienteResp = await chamarDoctorOmie(EP_CLIENTE, chave, {
         ds_customer_id: cliente.ds_customer_id,
-        cliente
+        cliente,
+        ...(criarCadastroProprio ? {
+          criar_cadastro_proprio: true
+        } : {})
       });
       if (!clienteResp.ok) {
         return json({
@@ -447,6 +519,8 @@ Deno.serve(async (req)=>{
           bloqueado: dec.bloqueado,
           error: dec.body?.error ?? "Contrato bloqueado.",
           detalhe: dec.body?.detalhe ?? null,
+          cadastro_proprio_disponivel: dec.body?.cadastro_proprio_disponivel === true,
+          codigo_cliente_omie: dec.body?.codigo_cliente_omie ?? null,
           cliente: {
             ok: true,
             omie_customer_id,

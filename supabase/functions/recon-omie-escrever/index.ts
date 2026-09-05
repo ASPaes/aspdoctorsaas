@@ -567,7 +567,11 @@ Deno.serve(async (req)=>{
       acao: "criar_cliente_contrato",
       tenant_id: tenantDs,
       contrato_id: dsContractId,
-      modo
+      modo,
+      // v9 (05/09/2026): repassa a decisao do operador de dar cadastro proprio no Omie a este
+      // cliente, em vez de aproveitar o cadastro que ja existe para o mesmo CNPJ. Ver a v15 do
+      // ds-omie-cliente-upsert -- e ela que decide; aqui so trafega.
+      criar_cadastro_proprio: body?.criar_cadastro_proprio === true
     })
   });
   const motorJson = await motorResp.json().catch(()=>({}));
