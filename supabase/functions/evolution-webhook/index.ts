@@ -882,21 +882,36 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
     if (!contactId) return;
 
     const { data: existingConv } = await supabase.from('whatsapp_conversations')
-      .select('id').eq('tenant_id', resolved.tenantId).eq('instance_id', resolved.instanceId)
+      .select('id, metadata').eq('tenant_id', resolved.tenantId).eq('instance_id', resolved.instanceId)
       .eq('contact_id', contactId).maybeSingle();
 
+    // O vínculo com o cliente mora em metadata.cliente_id. NÃO existe coluna
+    // cliente_id em whatsapp_conversations — é o que o frontend lê (DetailsSidebar,
+    // ConfirmClienteModal) e o que a UI grava, sempre mesclando o metadata.
+    //
+    // Até 05/09/2026 estas duas escritas usavam uma coluna `cliente_id` inexistente.
+    // O PostgREST recusava as duas com 400 e ninguém via: o UPDATE tinha
+    // `.catch(() => {})` e o INSERT descartava o erro no destructuring. Medido nos
+    // edge_logs de 04/09: 731 PATCHes recusados em 24h — o vínculo por eco de
+    // send.message nunca funcionou desde que foi escrito. E o INSERT era pior que
+    // inofensivo: falhando, `conversationId` ficava undefined, a função saía no
+    // early-return abaixo e a MENSAGEM SE PERDIA (1 caso no mesmo dia).
     let conversationId = existingConv?.id;
     if (!conversationId) {
-      const { data: newConv } = await supabase.from('whatsapp_conversations').insert({
+      const { data: newConv, error: convErr } = await supabase.from('whatsapp_conversations').insert({
         instance_id: resolved.instanceId, contact_id: contactId,
         status: 'closed', tenant_id: resolved.tenantId,
-        ...(clienteId ? { cliente_id: clienteId } : {}),
+        metadata: clienteId ? { cliente_id: clienteId } : {},
       }).select('id').single();
+      if (convErr) console.error(`${LOG} Falha ao criar conversa para o contato ${contactId} — mensagem descartada:`, convErr);
       conversationId = newConv?.id;
-    } else if (clienteId) {
-      // Atualizar cliente_id na conversa existente se ainda não vinculado
-      supabase.from('whatsapp_conversations').update({ cliente_id: clienteId })
-        .eq('id', conversationId).is('cliente_id', null).then(() => {}).catch(() => {});
+    } else if (clienteId && !(existingConv?.metadata as any)?.cliente_id) {
+      // Só preenche a lacuna: vínculo já existente (inclusive apontando para outro
+      // cliente, corrigido à mão na tela) não é sobrescrito pelo telefone.
+      const { error: linkErr } = await supabase.from('whatsapp_conversations')
+        .update({ metadata: { ...((existingConv?.metadata as any) || {}), cliente_id: clienteId } })
+        .eq('id', conversationId);
+      if (linkErr) console.error(`${LOG} Falha ao vincular cliente ${clienteId} à conversa ${conversationId}:`, linkErr);
     }
     if (!conversationId) return;
 
