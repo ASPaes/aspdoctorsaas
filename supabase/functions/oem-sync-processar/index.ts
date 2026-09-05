@@ -136,16 +136,35 @@ Deno.serve(async (req) => {
     async function canceladosDaFicha(cpIds: (string | null)[]): Promise<number[]> {
       const ids = [...new Set(cpIds.filter(Boolean))] as string[];
       if (!ids.length) return [];
+      // Uma linha por módulo é o caso simples, mas NÃO é o único: cancelar e
+      // vender de novo deixa as DUAS linhas na ficha, a velha cancelada e a
+      // nova ativa. Perguntar só pelas canceladas responde "o IFood está
+      // cancelado" para um cliente que voltou a pagar por ele.
+      //
+      // ⚠️ MEDIDO NA NECTAR DA SERRA VALEMAR (filial 26981), 28/08/2026: IFood
+      // ativado a R$ 48, cancelado como "erro no lançamento" 3h depois, e
+      // reativado a R$ 18 em linha nova no mesmo dia. Sem esta subtração, a
+      // reafirmação desligaria no parceiro um módulo que está sendo cobrado.
+      // Foi por um triz: a primeira versão desta função tinha esse buraco.
       const { data } = await ds
         .from("cliente_produto_modulos")
-        .select("oem_modulo_codigo")
+        .select("oem_modulo_codigo, ativo, cancelado_manual")
         .in("cliente_produto_id", ids)
-        .eq("ativo", false)
-        .eq("cancelado_manual", true)
         .not("oem_modulo_codigo", "is", null);
+      const linhas = (data ?? []) as
+        { oem_modulo_codigo: number | null; ativo: boolean | null; cancelado_manual: boolean | null }[];
+      // Vivo vence cancelado, sempre. É a mesma regra que já vale para a
+      // alteração pedida agora: o estado mais recente é o que manda.
+      const vivos = new Set<number>();
+      for (const m of linhas) {
+        if (m.oem_modulo_codigo != null && m.ativo === true) vivos.add(m.oem_modulo_codigo);
+      }
       const codigos = new Set<number>();
-      for (const m of (data ?? []) as { oem_modulo_codigo: number | null }[]) {
-        if (m.oem_modulo_codigo != null) codigos.add(m.oem_modulo_codigo);
+      for (const m of linhas) {
+        if (m.oem_modulo_codigo == null) continue;
+        if (m.ativo !== false || m.cancelado_manual !== true) continue;
+        if (vivos.has(m.oem_modulo_codigo)) continue;
+        codigos.add(m.oem_modulo_codigo);
       }
       return [...codigos];
     }
