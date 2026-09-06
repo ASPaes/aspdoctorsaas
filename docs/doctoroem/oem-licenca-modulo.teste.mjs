@@ -21,8 +21,8 @@ const fonte = readFileSync(fileURLToPath(new URL("./oem-licenca-modulo.index.ts"
 const corte = fonte.indexOf("\nDeno.serve(");
 if (corte < 0) throw new Error("Não achei o Deno.serve para cortar o arquivo.");
 const miolo = fonte.slice(0, corte).split("\n").filter((l) => !l.startsWith("import ")).join("\n");
-const { montarPayloadDocumentado } = await import(
-  "data:text/javascript," + encodeURIComponent(miolo + "\nexport { montarPayloadDocumentado };")
+const { montarPayloadDocumentado, conferirModulo } = await import(
+  "data:text/javascript," + encodeURIComponent(miolo + "\nexport { montarPayloadDocumentado, conferirModulo };")
 );
 
 const mod = (codigo, nome, ativo, quantidade, valorUnitario, datavalidade = null) => ({
@@ -160,6 +160,42 @@ ok("sem lista de cancelados, nada muda além do pedido",
 // Códigos 9 e 10 têm campo de topo espelhando a lista.
 ok("reafirmar o PDV zera também o pdvComandas do topo",
   montarPayloadDocumentado(lido, escalares, [{ codigo: 72, quantidade: 1 }], [10]).novo.pdvComandas === 0);
+
+// ---------------------------------------------------------------------------
+console.log("\n7) O critério da conferência, com as respostas REAIS do parceiro");
+// Estas quatro leituras são as que o OEM devolveu na filial 28533 em
+// 05/09/2026, logo depois da gravação. O critério antigo reprovava as três
+// primeiras, e as três estavam certas no portal.
+const releitura = (mods) => ({ modulos: mods });
+
+const cancelComData = releitura([mod(61, "99 Food", true, 1, 0, "2026-09-30T00:00:00")]);
+const c1 = conferirModulo(cancelComData, 61, 0);
+ok("cancelamento com data 30/09 é CONFIRMADO", c1.confirmado === true, c1.mensagem);
+ok("e a mensagem diz até quando o cliente ainda paga", /30\/09|2026-09-30/.test(c1.mensagem), c1.mensagem);
+
+const c2 = conferirModulo(releitura([mod(21, "IFood", false, 1, 0)]), 21, 0);
+ok("cancelamento que veio inativo é confirmado", c2.confirmado === true, c2.mensagem);
+
+const c3 = conferirModulo(releitura([]), 44, 0);
+ok("módulo que sumiu da licença conta como desligado", c3.confirmado === true, c3.mensagem);
+
+const c4 = conferirModulo(releitura([mod(61, "99 Food", true, 1, 0)]), 61, 0);
+ok("cancelamento SEM data e ativo é reprovado, que é o alarme legítimo", c4.confirmado === false, c4.mensagem);
+
+// O código 10 é o que o critério antigo lia do topo da leitura, sempre zero.
+const pdvReduzido = releitura([mod(10, "PDV/Comandas", true, 5, 6, "2026-09-30T00:00:00")]);
+const c5 = conferirModulo(pdvReduzido, 10, 4);
+ok("PDV lido de modulos[], não do pdvComandas do topo", c5.encontrado === 5, JSON.stringify(c5));
+ok("redução virando baixa do módulo inteiro é reprovada", c5.confirmado === false);
+ok("e a mensagem diz que o cliente perde as 5, não 1",
+  /baixa do módulo inteiro/.test(c5.mensagem) && /as 5/.test(c5.mensagem), c5.mensagem);
+
+const c6 = conferirModulo(releitura([mod(9, "Usuário Cloud", true, 3, 0)]), 9, 3);
+ok("quantidade batendo e sem data é confirmado", c6.confirmado === true, c6.mensagem);
+const c7 = conferirModulo(releitura([mod(9, "Usuário Cloud", true, 2, 0)]), 9, 3);
+ok("quantidade que não bateu é reprovada", c7.confirmado === false);
+ok("mas a mensagem lembra que a leitura do parceiro atrasa",
+  /atrasa/.test(c7.mensagem), c7.mensagem);
 
 console.log(falhas === 0 ? "\nTUDO PASSOU\n" : `\n${falhas} FALHA(S)\n`);
 process.exit(falhas === 0 ? 0 : 1);

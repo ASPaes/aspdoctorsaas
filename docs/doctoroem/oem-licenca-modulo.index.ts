@@ -245,6 +245,67 @@ function reafirmarCancelados(novo, cancelados, jaTratados) {
 }
 
 /**
+ * Confere UM módulo na releitura documentada, depois de gravar.
+ *
+ * ⚠️ DUAS COISAS QUE O CRITÉRIO ANTIGO ERRAVA, E AS DUAS DAVAM FALSO ALARME.
+ *
+ * 1. Ele julgava por QUANTIDADE. No OEM, cancelar não zera nada: registra
+ *    `datavalidade` e devolve o módulo `ativo: true` com a quantidade de
+ *    antes. Todo cancelamento CERTO aparecia como `confirmado: false` — foi o
+ *    que aconteceu com os três da DEGUST em 05/09/2026, que estavam corretos
+ *    no portal. Alarme que dispara com tudo certo ensina a ignorar alarme.
+ * 2. Para os códigos 9 e 10 ele lia `usuariosAdicionais`/`pdvComandas` do
+ *    TOPO da leitura documentada — e ela devolve esses cinco campos SEMPRE
+ *    ZERADOS (é justamente por isso que existe a leitura complementar).
+ *    Falso negativo garantido. Nesta rota 9 e 10 são módulos da lista, então
+ *    é de `modulos[]` que se lê, como todos os outros.
+ *
+ * Continua NÃO BARRANDO NADA, e isso é decisão do Alexandre de 28/08/2026: a
+ * leitura do parceiro atrasa, então ela serve para confirmar, nunca para
+ * condenar. Ler o valor antigo não distingue "não aplicou" de "ainda não
+ * alcançou".
+ */
+function conferirModulo(depois, codigo, quantidadePedida) {
+  const mod = (pega(depois, "modulos") ?? []).find((m)=>num(pega(m, "codigo")) === codigo);
+  const ativo = mod === undefined ? false : pega(mod, "ativo") !== false;
+  const quantidade = mod === undefined ? 0 : num(pega(mod, "quantidade")) ?? 0;
+  const bruto = mod ? pega(mod, "datavalidade", "dataValidade", "data_validade") : null;
+  const datavalidade = typeof bruto === "string" ? bruto : null;
+  const ate = datavalidade ? String(datavalidade).slice(0, 10) : null;
+  // Desligado para o cliente é: sumiu da licença, veio inativo, OU tem data de
+  // baixa. A terceira é a que o OEM usa de verdade e a que faltava aqui.
+  const desligado = mod === undefined || !ativo || datavalidade !== null;
+
+  const base = { codigo, campo: `modulos[${codigo}]`, esperado: quantidadePedida, encontrado: quantidade, ativo, datavalidade };
+
+  if (quantidadePedida === 0) {
+    return { ...base, desligado, confirmado: desligado, mensagem: desligado
+      ? (ate ? `Baixa registrada no OEM para ${ate}. O módulo fica de pé e continua sendo cobrado até lá.`
+             : "Módulo desligado no OEM: confere.")
+      : "Gravado, mas o módulo continua ativo e sem data de baixa no OEM." };
+  }
+
+  if (desligado) {
+    // Pediu quantidade e o módulo saiu desligado. Acontece quando o OEM
+    // interpreta uma REDUÇÃO como baixa do módulo inteiro (medido nas filiais
+    // 28533, 20314 e 19744 em 04/09/2026: pedir 5 para 4 marcou 30/09 no
+    // módulo todo, com a quantidade ainda em 5). Não é o mesmo que "não
+    // aplicou", e chamar as duas coisas de erro esconde a que precisa de
+    // decisão de gente.
+    return { ...base, desligado, confirmado: false, mensagem: ate
+      ? `Pedi quantidade ${quantidadePedida} e o OEM marcou baixa do módulo inteiro para ${ate}. No dia, o cliente perde as ${quantidade} e não só a diferença.`
+      : "Pedi quantidade e o módulo veio desligado no OEM." };
+  }
+
+  if (quantidade !== quantidadePedida) {
+    return { ...base, desligado, confirmado: false,
+      mensagem: `Gravado, mas a licença mostra ${quantidade} e não ${quantidadePedida}. A releitura do parceiro atrasa, então isto não afirma que não aplicou.` };
+  }
+
+  return { ...base, desligado, confirmado: true, mensagem: "Relido no OEM pelo caminho documentado: confere." };
+}
+
+/**
  * Monta o corpo do `saveFilial` a partir do que a leitura documentada devolveu,
  * aplicando TODAS as alterações pedidas para esta filial de uma vez.
  *
@@ -1047,14 +1108,9 @@ Deno.serve(async (req)=>{
       try { respSave = JSON.parse(txtSave); } catch {}
 
       // Releitura pelo MESMO caminho, que é o único que enxerga `datavalidade`.
-      //
-      // Uma releitura só, conferindo TODOS os módulos do lote. O critério de
-      // "confirmado" continua o de antes (quantidade batendo, sem data quando
-      // se pediu quantidade) e ele ainda erra no cancelamento, porque o OEM
-      // registra baixa como data e devolve o módulo ativo — está no passo 2,
-      // separado de propósito. O que muda aqui é que ela RODA: lia `CAMPO_DOC`,
-      // que nunca foi definido, e desde 28/08/2026 toda gravação documentada
-      // caía no catch com "CAMPO_DOC is not defined".
+      // Uma releitura só, conferindo TODOS os módulos do lote — o pedido e as
+      // reafirmações, que também desligam módulo e por isso também se conferem.
+      // O critério mora em `conferirModulo`.
       let conferencia = null;
       let conferencias = null;
       if (rSave.ok) {
@@ -1062,29 +1118,12 @@ Deno.serve(async (req)=>{
           const rConf = await fetch(urlLer, { headers: { Authorization: `Bearer ${tk}`, Accept: "application/json" } });
           const depois = await rConf.json().catch(()=>null);
           if (depois) {
-            conferencias = alteracoes.map(({ codigo, quantidade })=>{
-              const mod = (pega(depois, "modulos") ?? []).find((m)=>num(pega(m, "codigo")) === codigo);
-              const campo = CAMPO_ESPELHO[codigo];
-              const encontrado = campo
-                ? num(pega(depois, campo)) ?? 0
-                : (mod === undefined ? 0 : (pega(mod, "ativo") === false ? 0 : num(pega(mod, "quantidade")) ?? 0));
-              const dataDepois = mod ? pega(mod, "datavalidade") : null;
-              return {
-                par: "documentado",
-                codigo,
-                campo: campo ?? `modulos[${codigo}]`,
-                esperado: quantidade,
-                encontrado,
-                // Agora dá para conferir o que de fato manda: a data.
-                datavalidade: dataDepois ?? null,
-                confirmado: encontrado === quantidade && (quantidade === 0 || !dataDepois),
-                mensagem: encontrado !== quantidade
-                  ? `Gravado, mas a licença mostra ${encontrado} e não ${quantidade}.`
-                  : (quantidade > 0 && dataDepois)
-                    ? `Quantidade certa, mas o módulo ficou com validade até ${String(dataDepois).slice(0,10)}, e ele seria desativado nessa data.`
-                    : "Relido no OEM pelo caminho documentado: confere."
-              };
-            });
+            conferencias = [
+              ...alteracoes.map(({ codigo, quantidade })=>
+                ({ par: "documentado", pedido: "alteracao", ...conferirModulo(depois, codigo, quantidade) })),
+              ...(montado.reafirmados ?? []).map((r)=>
+                ({ par: "documentado", pedido: "reafirmacao", ...conferirModulo(depois, r.codigo, 0) })),
+            ];
             conferencia = conferencias.length === 1 ? conferencias[0] : {
               par: "documentado",
               // Num lote, "confirmado" é o E de todos: um módulo que não bateu
