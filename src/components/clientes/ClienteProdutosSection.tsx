@@ -110,6 +110,12 @@ interface PendenciaOem {
   ultimo_erro: string | null;
   motivo_recusa: string | null;
   decidido_em: string | null;
+  // A hora da próxima tentativa é o que separa "falhou" de "está tentando de
+  // novo". Sem ela na tela, quem está com o cliente na linha refaz no portal
+  // do parceiro — foi o que aconteceu na CONFRARIA em 04/09/2026.
+  proxima_tentativa_em: string | null;
+  tentativas: number | null;
+  http: number | null;
 }
 
 interface ClienteProdutoModulo {
@@ -176,6 +182,7 @@ const custoLinhaModulo = (m: { vlr_custo?: number | null; vlr_custo_total?: numb
 const seloPendencia = (p: {
   status: string; acao?: string; quantidade?: number | null;
   ultimo_erro?: string | null; motivo_recusa?: string | null;
+  proxima_tentativa_em?: string | null; tentativas?: number | null; http?: number | null;
 }) => {
   if (p.status === "invalido") {
     return {
@@ -206,11 +213,39 @@ const seloPendencia = (p: {
       title: "Nada foi enviado ao OEM. Um admin precisa aprovar em Clientes › Aprovação OEM.",
     };
   }
+  // Falhou e VAI TENTAR DE NOVO. O selo tem que dizer a hora.
+  //
+  // ⚠️ Ele dizia "OEM recusou — na fila", e as duas metades enganavam. Em
+  // 04/09/2026, na CONFRARIA DO CAFE GOURMET, quem devolveu HTTP 500 quatro
+  // vezes foi a NOSSA função, não o parceiro; e "na fila" não conta que a
+  // próxima tentativa é daqui a uma hora. A operadora leu "falhou", esperou o
+  // que achou razoável e cadastrou o módulo à mão no portal. A quinta
+  // tentativa funcionou sozinha 25 minutos depois.
+  //
+  // Sem a hora na tela, quem está do lado do cliente não tem como escolher
+  // entre esperar e refazer. Ele escolhe refazer, e é o certo a fazer com a
+  // informação que tinha.
   if (p.status === "erro") {
+    // 4xx é recusa do parceiro: repetir dificilmente resolve. 5xx, ou nenhum
+    // status, é chamada que quebrou no caminho — é o que a retentativa
+    // conserta sozinha. Pôr a culpa no OEM nos dois casos sugere ação manual
+    // onde bastava esperar.
+    const recusa = typeof p.http === "number" && p.http >= 400 && p.http < 500;
+    const quando = p.proxima_tentativa_em ? new Date(p.proxima_tentativa_em) : null;
+    const futura = quando && quando.getTime() > Date.now();
+    const hora = quando
+      ? quando.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+      : null;
     return {
-      texto: "OEM recusou — na fila",
+      texto: futura
+        ? `${recusa ? "OEM recusou" : "falhou"} · tenta de novo às ${hora}`
+        : `${recusa ? "OEM recusou" : "falhou"} · tentando de novo`,
       classe: espera,
-      title: p.ultimo_erro ?? "O parceiro recusou. A fila tenta de novo.",
+      title: [
+        p.ultimo_erro ?? (recusa ? "O parceiro recusou o pedido." : "A chamada ao parceiro não completou."),
+        p.tentativas ? `Tentativa ${p.tentativas} de 5.` : null,
+        "Não refaça no portal do parceiro: a fila continua tentando sozinha.",
+      ].filter(Boolean).join(" "),
     };
   }
   return {
