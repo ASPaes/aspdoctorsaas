@@ -16,6 +16,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 - 🆕 **Histórico de envios agora mostra também o OEM** — O botão *Histórico de envios*, no card Integração da ficha do cliente, só contava o que tinha ido para o Omie. Agora ele tem uma aba para cada sistema. Na aba **OEM** aparecem os módulos ativados, as mudanças de quantidade e os cancelamentos, mais as ações sobre a licença: ativar, desativar, bloquear e desbloquear. Cada linha diz quem pediu, o dia e a hora, e o que o parceiro respondeu quando recusou. As simulações que o sistema faz antes de gravar ficam escondidas por padrão, atrás do filtro.
 
+### 05/09
+
+- 🔧 **Aviso de "contato já em atendimento" falhava por causa do nono dígito** — Ao iniciar uma conversa, o sistema avisa quando aquele contato já está sendo atendido por outro colega. O aviso não aparecia quando o número digitado tinha o 9 e o número salvo no WhatsApp não tinha (ou o contrário): a verificação procurava o telefone escrito exatamente daquele jeito, enquanto o envio procurava as duas formas. Na prática o sistema liberava o início, e a mensagem caía dentro da conversa que já estava em andamento com outro atendente. Agora a verificação e o envio usam o mesmo critério, e a conversa também deixa de nascer duplicada quando o mesmo cliente é aberto ora com o 9, ora sem.
+
 ### 04/09
 
 - 🔧 **Quem abriu o chamado não aparecia na tela** — No detalhe do chamado, o painel da direita mostrava a data de abertura, mas não quem abriu. Como o responsável pode ser trocado depois, não havia como saber na tela quem tinha registrado o chamado. O dado sempre esteve guardado. Agora aparece **Criado por**, logo abaixo de *Aberto em*.
