@@ -21,12 +21,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import OemFilaSincronizacaoPanel from "./OemFilaSincronizacaoPanel";
 import EscolherLicencaOemDialog from "./EscolherLicencaOemDialog";
+import OemHistoricoTab from "./OemHistoricoTab";
 import { useAbaNaUrl } from "@/hooks/useDeepLinkIntegracao";
 import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
   Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
   ArrowUpDown, ArrowUp, ArrowDown, Boxes, Plus, CalendarClock, ArrowDownToLine, ArrowUpFromLine,
-  Clock, Copy, Check,
+  Clock, Copy, Check, History,
 } from "lucide-react";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
@@ -2429,6 +2430,11 @@ export default function OemIntegrationTab() {
               </Badge>
             )}
           </TabsTrigger>
+          {/* A trilha do que esta tela fez. Fica depois de Divergências porque é
+              de lá que sai a maior parte do que ela registra. */}
+          <TabsTrigger value="historico" disabled={semConta} title={travada}>
+            <History className="h-3.5 w-3.5 mr-1.5" /> Histórico
+          </TabsTrigger>
         </TabsList>
 
         {/* --------------------------------------------------------------- fila */}
@@ -3755,6 +3761,11 @@ export default function OemIntegrationTab() {
               </div>
             </>
           )}
+        </TabsContent>
+
+        {/* ---------------------------------------------------------- histórico */}
+        <TabsContent value="historico" className="space-y-3">
+          <OemHistoricoTab tid={tid} />
         </TabsContent>
       </Tabs>
 

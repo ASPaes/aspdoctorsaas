@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 06/09
 
+- 🆕 **A aba OEM ganhou um Histórico, com desfazer** — Em Configurações › Integrações › OEM, ao lado de *Divergências*, agora existe a aba **Histórico**: tudo o que aquela tela fez fica registrado, agrupado por clique, com quem fez, o dia e a hora. Abrindo a linha aparece cliente a cliente o que mudou, com o valor de **antes** e o de **depois**. E, quando dá para voltar, existe o botão **Desfazer**: custo aplicado volta ao anterior, licença vinculada volta para quem a tinha, código de filial removido é regravado, divergência marcada como certa volta para a lista. Desfazer não apaga nada do histórico: a linha fica marcada como desfeita. O que foi gravado dentro do OEM aparece como registro, sem botão, porque desfazer lá é outra gravação lá.
+
 - 🆕 **Histórico de envios agora mostra também o OEM** — O botão *Histórico de envios*, no card Integração da ficha do cliente, só contava o que tinha ido para o Omie. Agora ele tem uma aba para cada sistema. Na aba **OEM** aparecem os módulos ativados, as mudanças de quantidade e os cancelamentos, mais as ações sobre a licença: ativar, desativar, bloquear e desbloquear. Cada linha diz quem pediu, o dia e a hora, e o que o parceiro respondeu quando recusou. As simulações que o sistema faz antes de gravar ficam escondidas por padrão, atrás do filtro.
 
 ### 05/09
