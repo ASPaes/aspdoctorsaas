@@ -285,15 +285,26 @@ function conferirModulo(depois, codigo, quantidadePedida) {
       : "Gravado, mas o módulo continua ativo e sem data de baixa no OEM." };
   }
 
+  // Pediu quantidade e o módulo voltou com data futura: é a REDUÇÃO AGENDADA
+  // para o fim do mês de cobrança, que é como o OEM aplica tudo. A quantidade
+  // antiga continua até lá porque o cliente pagou o mês.
+  //
+  // ⚠️ NÃO É FALHA, E CHAMAR DE FALHA JÁ CUSTOU CARO AQUI. Duas vezes se
+  // concluiu, de amostra pequena, que o parceiro estaria transformando redução
+  // em baixa do módulo inteiro — em 28/08/2026 e de novo em 05/09/2026. As
+  // duas vezes o dado derrubou: a redução vale, ela só vale a partir da data.
+  // Reprovar isto encheria a tela de vermelho em cima de gravação certa.
+  if (ate && quantidade > quantidadePedida) {
+    return { ...base, desligado, confirmado: true,
+      mensagem: `Redução aceita e agendada para ${ate}. Até lá a licença segue com ${quantidade}, que é o mês já pago.` };
+  }
+
   if (desligado) {
-    // Pediu quantidade e o módulo saiu desligado. Acontece quando o OEM
-    // interpreta uma REDUÇÃO como baixa do módulo inteiro (medido nas filiais
-    // 28533, 20314 e 19744 em 04/09/2026: pedir 5 para 4 marcou 30/09 no
-    // módulo todo, com a quantidade ainda em 5). Não é o mesmo que "não
-    // aplicou", e chamar as duas coisas de erro esconde a que precisa de
-    // decisão de gente.
+    // Aqui sim: pediu quantidade e o módulo está inativo, sem ser redução
+    // agendada. Não é o mesmo que "não aplicou" — pode ser desativação da
+    // licença inteira —, mas é caso para gente olhar.
     return { ...base, desligado, confirmado: false, mensagem: ate
-      ? `Pedi quantidade ${quantidadePedida} e o OEM marcou baixa do módulo inteiro para ${ate}. No dia, o cliente perde as ${quantidade} e não só a diferença.`
+      ? `Pedi quantidade ${quantidadePedida} e o módulo está marcado para ${ate}. Confira se a licença não foi desativada inteira.`
       : "Pedi quantidade e o módulo veio desligado no OEM." };
   }
 

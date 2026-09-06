@@ -186,9 +186,18 @@ ok("cancelamento SEM data e ativo é reprovado, que é o alarme legítimo", c4.c
 const pdvReduzido = releitura([mod(10, "PDV/Comandas", true, 5, 6, "2026-09-30T00:00:00")]);
 const c5 = conferirModulo(pdvReduzido, 10, 4);
 ok("PDV lido de modulos[], não do pdvComandas do topo", c5.encontrado === 5, JSON.stringify(c5));
-ok("redução virando baixa do módulo inteiro é reprovada", c5.confirmado === false);
-ok("e a mensagem diz que o cliente perde as 5, não 1",
-  /baixa do módulo inteiro/.test(c5.mensagem) && /as 5/.test(c5.mensagem), c5.mensagem);
+// ⚠️ Este teste já esteve invertido. Duas vezes se concluiu, de amostra
+// pequena, que o parceiro transformava redução em baixa do módulo inteiro —
+// e as duas vezes o dado derrubou. O OEM aplica tudo no fim do mês de
+// cobrança: pedir 5 para 4 devolve quantidade 5 com data 30/09, e em outubro
+// vira 4. Reprovar isto seria pintar de vermelho uma gravação certa.
+ok("redução com data futura é CONFIRMADA, não reprovada", c5.confirmado === true, c5.mensagem);
+ok("e a mensagem diz a partir de quando vale",
+  /agendada para 2026-09-30/.test(c5.mensagem), c5.mensagem);
+
+// O que continua sendo alarme: pedir quantidade e o módulo estar INATIVO.
+const c5b = conferirModulo(releitura([mod(10, "PDV/Comandas", false, 5, 6)]), 10, 4);
+ok("pedir quantidade e o módulo vir inativo continua reprovado", c5b.confirmado === false, c5b.mensagem);
 
 const c6 = conferirModulo(releitura([mod(9, "Usuário Cloud", true, 3, 0)]), 9, 3);
 ok("quantidade batendo e sem data é confirmado", c6.confirmado === true, c6.mensagem);

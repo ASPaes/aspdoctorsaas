@@ -81,8 +81,7 @@ licenca as (
          -- silêncio. Medido: com o NULL solto, as 12 divergências de
          -- quantidade sumiram do resultado e a view anunciou "está tudo certo".
          -- É o mesmo NULL que já abriu portão de permissão neste projeto.
-         coalesce((m->>'ativo')::boolean is false
-                  or nullif(m->>'datavalidade', '')::timestamptz > now(), false) as desligado_no_oem
+         coalesce(nullif(m->>'datavalidade', '')::timestamptz > now(), false) as baixa_futura
     from public.oem_espelho_filial e
     cross join lateral jsonb_array_elements(e.modulos) m
    where jsonb_typeof(e.modulos) = 'array'
@@ -97,23 +96,37 @@ select f.tenant_id,
        l.conta_integration_id,
        l.last_sync_oem,
        f.qtd_ficha, f.vivo_na_ficha, f.cancelado_na_ficha, f.cancelado_em,
-       l.qtd_oem, l.ativo_no_oem, l.baixa_em, l.desligado_no_oem,
+       l.qtd_oem, l.ativo_no_oem, l.baixa_em, l.baixa_futura,
        case
          -- 1. Cancelado aqui e vivo lá: o cliente segue sendo cobrado.
+         --    "Vivo lá" precisa das DUAS metades: ativo E sem baixa marcada.
+         --    Só `not baixa_futura` acusaria um módulo que o OEM já desligou —
+         --    aconteceu com o IFood da CAMPINA VERDE, em que os dois lados
+         --    concordam e a view dizia que não.
          when f.cancelado_na_ficha and not f.vivo_na_ficha
-              and not l.desligado_no_oem
+              and l.ativo_no_oem and not l.baixa_futura
            then 'cancelado_ativo_no_oem'
-         -- 2. Vivo aqui e desligado lá: o cliente PERDE um módulo que paga.
+         -- 2. Vivo aqui e INATIVO lá: o cliente perde um módulo que paga.
          --    Vira reclamação, não prejuízo, e por isso conta tanto quanto.
          --
-         --    Fora quando a data do módulo é a da baixa da LICENÇA: aí não é
+         --    ⚠️ Repare que aqui é `not ativo_no_oem`, e não `desligado_no_oem`.
+         --    Data futura no módulo NÃO significa que ele vai morrer: o OEM
+         --    aplica tudo no fim do mês de cobrança, então uma redução de 5
+         --    para 4 aparece como quantidade 5 com data 30/09 até virar o mês.
+         --    Tratar isso como perda pintaria de vermelho uma gravação certa —
+         --    conclusão errada que já foi tirada duas vezes neste projeto, em
+         --    28/08 e 05/09/2026, e derrubada pelo dado nas duas.
+         --
+         --    E fora quando a data é a da baixa da LICENÇA: aí não é
          --    divergência, é a desativação que alguém pediu, e ela carimba
          --    todos os módulos de uma vez.
-         when f.vivo_na_ficha and l.desligado_no_oem
+         when f.vivo_na_ficha and not l.ativo_no_oem
               and l.baixa_em::date is distinct from l.desativa_em
            then 'ativo_desligado_no_oem'
-         -- 3. Os dois vivos, contando diferente.
-         when f.vivo_na_ficha and not l.desligado_no_oem
+         -- 3. Os dois vivos, contando diferente E SEM NADA AGENDADO.
+         --    Com data futura, a diferença é esperada: é a mudança que ainda
+         --    não virou o mês. Cobrar coerência antes da data é alarme falso.
+         when f.vivo_na_ficha and l.ativo_no_oem and not l.baixa_futura
               and f.qtd_ficha <> l.qtd_oem
            then 'quantidade_divergente'
        end as tipo
