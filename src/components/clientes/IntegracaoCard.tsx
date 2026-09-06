@@ -3,7 +3,7 @@ import { Plug } from "lucide-react";
 import { useOmieContaDoCliente } from "@/hooks/useOmieContaDoCliente";
 import IntegracaoOmieSection from "./IntegracaoOmieSection";
 import IntegracaoOemSection, { useOemDoCliente } from "./IntegracaoOemSection";
-import OmieHistoricoEnviosButton from "./OmieHistoricoEnviosDialog";
+import HistoricoEnviosButton from "./HistoricoEnviosDialog";
 
 /**
  * Card único "Integração" da ficha do cliente.
@@ -39,7 +39,7 @@ export default function IntegracaoCard({ clienteId }: { clienteId: string }) {
             Integração
           </CardTitle>
           <div className="justify-self-end">
-            <OmieHistoricoEnviosButton clienteId={clienteId} />
+            <HistoricoEnviosButton clienteId={clienteId} />
           </div>
         </div>
       </CardHeader>

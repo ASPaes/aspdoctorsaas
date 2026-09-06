@@ -5,13 +5,6 @@ import { mapaVinculoOmie } from "@/lib/omieVinculo";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useOmieContaDoCliente } from "@/hooks/useOmieContaDoCliente";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -26,7 +19,6 @@ import {
   AlertCircle,
   Ban,
   FileText,
-  History,
   Clock,
   Link2,
   AlertTriangle,
@@ -230,14 +222,19 @@ function VinculoDetalhe({ log }: { log: LogItem }) {
 }
 
 /**
- * O histórico de envios ao Omie, em modal.
+ * O histórico de envios ao Omie.
  *
  * Era o terceiro card empilhado na ficha do cliente ("Histórico de envios"), com 320px de lista
  * aberta o tempo todo. Virou um botão no cabeçalho do card "Integração": a ficha ficou legível e a
  * `omie-integration-call` só é chamada quando alguém abre o histórico, em vez de a cada abertura
  * de ficha de cliente de tenant com Omie.
+ *
+ * Desde 05/09/2026 este é o painel do Omie DENTRO do modal, que ganhou uma aba por sistema. A
+ * moldura (botão, diálogo, troca de aba) mora em `HistoricoEnviosDialog.tsx`; aqui ficou só o que
+ * é do Omie. O `aberto` continua chegando de fora porque é ele que segura as consultas até o
+ * modal existir.
  */
-function HistoricoConteudo({ clienteId, aberto }: Props & { aberto: boolean }) {
+export function OmieHistoricoConteudo({ clienteId, aberto }: Props & { aberto: boolean }) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [filtro, setFiltro] = useState<FiltroTipo>("todos");
 
@@ -439,51 +436,6 @@ function HistoricoConteudo({ clienteId, aberto }: Props & { aberto: boolean }) {
           </ScrollArea>
         )}
       </div>
-    </>
-  );
-}
-
-/**
- * O botão que abre o histórico. Some junto com a integração: sem conta Omie que atenda este
- * cliente não há o que listar.
- */
-export default function OmieHistoricoEnviosButton({ clienteId }: Props) {
-  const { effectiveTenantId: tid } = useTenantFilter();
-  const [aberto, setAberto] = useState(false);
-  const contaOmieQuery = useOmieContaDoCliente(clienteId);
-
-  if (!tid || contaOmieQuery.data?.ativo !== true) return null;
-
-  return (
-    <>
-      <Button type="button" variant="outline" size="sm" onClick={() => setAberto(true)}>
-        <History className="h-4 w-4 sm:mr-2" />
-        <span className="hidden sm:inline">Histórico de envios</span>
-      </Button>
-
-      <Dialog open={aberto} onOpenChange={setAberto}>
-        {/*
-          O DialogContent do projeto é `overflow-y-auto` com teto de altura. Com a lista dentro
-          dele, o modal inteiro virava um segundo rolável — e, como o Radix leva o foco para o
-          primeiro campo ao abrir (o filtro), o navegador rolava até lá e o título sumia para fora
-          da tela. Aqui o modal não rola: ele é uma coluna com teto de altura e só a lista rola.
-          O foco fica no próprio diálogo (Esc e Tab seguem funcionando) em vez de no filtro.
-        */}
-        <DialogContent
-          className="max-w-2xl max-h-[85dvh] flex flex-col overflow-hidden"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          <DialogHeader className="shrink-0">
-            <DialogTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Histórico de envios
-            </DialogTitle>
-          </DialogHeader>
-          {/* Montado só com o modal aberto: assim as consultas nascem junto com ele e o estado do
-              filtro volta ao padrão a cada abertura. */}
-          {aberto && <HistoricoConteudo clienteId={clienteId} aberto={aberto} />}
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

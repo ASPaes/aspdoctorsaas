@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 06/09
+
+- 🆕 **Histórico de envios agora mostra também o OEM** — O botão *Histórico de envios*, no card Integração da ficha do cliente, só contava o que tinha ido para o Omie. Agora ele tem uma aba para cada sistema. Na aba **OEM** aparecem os módulos ativados, as mudanças de quantidade e os cancelamentos, mais as ações sobre a licença: ativar, desativar, bloquear e desbloquear. Cada linha diz quem pediu, o dia e a hora, e o que o parceiro respondeu quando recusou. As simulações que o sistema faz antes de gravar ficam escondidas por padrão, atrás do filtro.
+
 ### 04/09
 
 - 🔧 **Quem abriu o chamado não aparecia na tela** — No detalhe do chamado, o painel da direita mostrava a data de abertura, mas não quem abriu. Como o responsável pode ser trocado depois, não havia como saber na tela quem tinha registrado o chamado. O dado sempre esteve guardado. Agora aparece **Criado por**, logo abaixo de *Aberto em*.
