@@ -43,9 +43,18 @@ with ficha as (
          sum(case when cpm.ativo then greatest(coalesce(cpm.quantidade, 1), 1) else 0 end) as qtd_ficha,
          bool_or(cpm.ativo)          as vivo_na_ficha,
          bool_or(coalesce(cpm.cancelado_manual, false) and not cpm.ativo) as cancelado_na_ficha,
-         max(cpm.data_inativacao) filter (where not cpm.ativo) as cancelado_em
+         max(cpm.data_inativacao) filter (where not cpm.ativo) as cancelado_em,
+         -- ⚠️ O NOME VEM DAQUI, do módulo que a ficha de fato aponta.
+         -- Buscá-lo lá fora por (produto × código do OEM) MULTIPLICA a linha,
+         -- porque o catálogo tem mais de um módulo com o mesmo código: em
+         -- "PDV Legal - Raspberry" existem `Licença PDV` e `PDV/Comandas`, os
+         -- dois com código 10. A primeira versão desta view anunciou 14
+         -- divergências onde havia 12, e as duas sobrando eram a mesma linha
+         -- com dois nomes.
+         min(pmf.nome)               as modulo
     from public.cliente_produto_modulos cpm
     join public.cliente_produtos cp on cp.id = cpm.cliente_produto_id
+    left join public.produto_modulos pmf on pmf.id = cpm.modulo_id
    where cpm.oem_modulo_codigo is not null
      and cp.oem_codigo_filial is not null
    group by 1, 2, 3, 4, 5
@@ -91,7 +100,7 @@ select f.tenant_id,
        f.cliente_produto_id,
        f.filial_codigo,
        f.codigo,
-       pm.nome                as modulo,
+       f.modulo,
        c.nome_fantasia        as cliente,
        l.conta_integration_id,
        l.last_sync_oem,
@@ -136,9 +145,6 @@ select f.tenant_id,
    and l.filial_codigo = f.filial_codigo
    and l.codigo = f.codigo
   left join public.clientes c on c.id = f.cliente_id
-  left join public.produto_modulos pm
-    on pm.oem_modulo_codigo = f.codigo
-   and pm.produto_id = (select produto_id from public.cliente_produtos where id = f.cliente_produto_id)
  where
    -- O código 8 é o produto da licença, não um módulo: ele não se cancela nem
    -- se conta, e compará-lo só produziria ruído.

@@ -18,11 +18,15 @@ Stack: React + Vite + TS + Tailwind + shadcn/ui · Supabase (Postgres + RLS + Ed
 
 **Auditoria de 06/08/2026 (79 functions em prod):** 62 vieram do deploy-all de 06/08 00:14 · **4 deployadas a mão 26 min depois** (`evolution-webhook`, `zapi-webhook`, `send-whatsapp-message`, `check-inactivity-timeout` — a entrega de inatividade em grupo, cujo código nunca voltou ao repo; trazido em `1b0f7c6f`) · 17 só em produção. As 66 do repo estão **todas alinhadas com prod** — nenhuma reverteria num deploy-all.
 
-**Receita para refazer essa auditoria** (é ela que destrava o push quando `_shared` muda):
-1. `supabase functions list --project-ref vbngjzovjhkmietztffo -o json` — o `updated_at` que se repete em dezenas é o deploy-all.
-2. **Toda function com `updated_at` maior foi deployada a mão depois** e é a candidata a reverter. Só essas precisam de diff.
-3. Baixar só elas com `functions download` num diretório **isolado** (o comando escreve em `supabase/functions/<slug>` a partir do cwd — rodando no repo, ele sobrescreve seu trabalho).
-4. Diffar **normalizando CRLF**: o download sempre volta com `\r\n` e todo arquivo aparece como diferente. `diff <(sed 's/\r$//' prod) <(sed 's/\r$//' repo)`.
+**Receita para refazer essa auditoria** (é ela que destrava o push quando `_shared` muda) — **`./scripts/auditar-edge-functions.sh`**, que compara o `ezbr_sha256` de produção com `docs/edge-functions-baseline.json`. Rode antes e depois do push; `--atualizar` regrava o baseline quando as mudanças forem as esperadas.
+
+⚠️ **NÃO tente auditar diffando o código, e esta é uma correção de 06/09/2026 — a receita anterior aqui mandava fazer exatamente isso e não funciona.** Ela dizia para baixar as functions e diffar normalizando CRLF. O `functions download` devolve o código **transpilado**: sem os tipos do TypeScript e reformatado pela plataforma. Diff contra fonte `.ts` acusa diferença SEMPRE. Medido: **74 de 86 "divergentes"**, e a primeira da lista era uma function publicada minutos antes a partir daquele mesmo arquivo. Ignorar espaço em branco não salva — a diferença desce a parênteses redundantes (`(data ?? [])` virando `data ?? []`). Uma receita que responde "74 problemas" quando não há nenhum é pior do que não ter receita.
+
+O `ezbr_sha256` é a única comparação que fecha, e ela é entre **dois estados de produção** — por isso o baseline existe, e por isso ele precisa estar atualizado ANTES do deploy-all. Sem baseline anterior, o que o deploy-all reverteu é **impossível de saber depois**: os hashes antigos já foram sobrescritos. Foi o que aconteceu em 05/09/2026, quando um commit de chat tocou 3 arquivos de `_shared` e republicou as 86 sem que ninguém soubesse o que ia junto.
+
+Duas armadilhas do `functions download`, que continua servindo para LER o código de produção (só não para auditar):
+- Ele escreve em `supabase/functions/<slug>` a partir do cwd e **sobe a árvore para achar a pasta `supabase/`** — rodando de qualquer lugar dentro do repo, ele despeja no repo. Monte um diretório isolado com seu próprio `supabase/functions` e rode de lá.
+- No Git Bash, **não use `mktemp`** para o arquivo de saída: ele devolve `/tmp/...`, que o `supabase.exe` não enxerga, e a falha aparece como `Access token not provided`. Use `$TEMP`.
 
 Regras que continuam valendo:
 - **Antes de editar qualquer function, baixe a de produção**: `supabase functions download <slug> --project-ref vbngjzovjhkmietztffo` (DoctorOMIE: `vqrytdntynxuqozehals`) e mescle sobre ela. Nunca edite uma cópia baixada antes. Já houve deploy perdido por sobreposição (03/08, `ds-omie-contrato-alterar`).

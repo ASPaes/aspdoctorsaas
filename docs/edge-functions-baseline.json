@@ -1,0 +1,462 @@
+{
+  "capturado_em": "2026-09-06T02:09:46.511Z",
+  "project_ref": "vbngjzovjhkmietztffo",
+  "motivo": "baseline apos o deploy-all de 05/09/2026 disparado por _shared no commit c36ed40f",
+  "functions": {
+    "admin-db-actions": {
+      "sha": "f8369a6374d04f434e2d0470292cb4d1ac82180baf5c98cb6c139e73d6e67438",
+      "version": 255,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "ai-admin-commands": {
+      "sha": "8f447ea87921b00c8360fee1cf773dc2171ba36b6b866661d91ac33f209c953b",
+      "version": 347,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "analyze-csat": {
+      "sha": "50b6e3cedc55a215f25c56edfcb92d159bae8a26631287c56f4609c08532e09d",
+      "version": 122,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "analyze-whatsapp-sentiment": {
+      "sha": "f1ab67ded2d7ed4fc897cfaba1316a1bfb43d67d9874ff63b80962203f562e73",
+      "version": 520,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "backfill-contact-pictures": {
+      "sha": "87a18c72fa69ba5133d564d5135e23f8da5581738b658f9b704a9575139779d1",
+      "version": 8,
+      "updated_at": "2026-04-28T13:00:55.031Z"
+    },
+    "categorize-whatsapp-conversation": {
+      "sha": "7fb21ee39a736c7b8eb80c0b0dea25de45def38ee72b31dab0c334c57c7a40b9",
+      "version": 511,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "check-ai-usage-alert": {
+      "sha": "882a7c680cbd6b698aac2d2105bed8ee67627bd99d1f28e98ed966a0387f705d",
+      "version": 351,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "check-csat-timeout": {
+      "sha": "14e05f4de36d06e2a35921afa49636ea0f85ed78343cffda559991d4d7782df4",
+      "version": 452,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "check-db-health": {
+      "sha": "417b00530457ed1d66b21ac5b01134836605bf0ecb3ed4d8e2e8ab7e4f17a870",
+      "version": 270,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "check-inactivity-timeout": {
+      "sha": "a03f9ec589b0290c55b3fd9cb8fb1330b4edb9c12b606e1fef7899f5e11ad40e",
+      "version": 302,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "check-instances-status": {
+      "sha": "a555814f5b514919f5a587b831c0b7fac0099b060a0ca2e349eb61b5c597ab43",
+      "version": 539,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "check-whatsapp-number": {
+      "sha": "5eb50e414922a78420ce0ef523e3bc8c83834130e6566373004adf436547f6f3",
+      "version": 257,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "compose-whatsapp-message": {
+      "sha": "b16e4e4953c214312d8c161b95bfabfcb1a26757ad2e4dda079846aa905575aa",
+      "version": 515,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "conselho-ds-analyze": {
+      "sha": "57866ad29cce5f53f13a0bca8d65445609dbb080664e8ae90f6bf04e72c642af",
+      "version": 123,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "conselho-ds-suggest-foco": {
+      "sha": "42fb250021d8ebe3e31248d0091590c30d8b50af97a9a1c0281d0ee888fb23f6",
+      "version": 123,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "create-whatsapp-instance": {
+      "sha": "363f252b1235f311381d8d0f172fbd17487705f9cc8c764aed0106cb6a00f1f7",
+      "version": 300,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "deactivate-whatsapp-instance": {
+      "sha": "8ab81e9afe223016936ee6b692d98b46441a205e80dad3309fbd8b7cb7bf2319",
+      "version": 215,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "delete-conversation-note": {
+      "sha": "86f994f442c2b77950150cf78464f1e9b776782fcf134289378226239cf89cb2",
+      "version": 77,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "delete-ticket-attachment": {
+      "sha": "aa8b77e80da8ea1576901d84116c73793c3a0b5c2e48a3a67e45092ee7811162",
+      "version": 61,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "delete-whatsapp-message": {
+      "sha": "12cd61bf7ae3614b8d681e24da8260a37d0fd60765f61b5e3c66b40568cbfbe4",
+      "version": 509,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "diagnose-contact-history": {
+      "sha": "c75b97aea775bdd1a397981865e3a4301183fcaadb8c6b79eda88ba6f018faa5",
+      "version": 423,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "ds-enviar-whatsapp-externo": {
+      "sha": "9d2072d66cfe924e3c123361ac1fdaeefdfec552097410c753059595869ed149",
+      "version": 54,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "ds-omie-anexo-enviar": {
+      "sha": "a68803a09724cecd09323ef26bc57f6f873dd6e19f24315a84a88d43928992e4",
+      "version": 53,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "edit-whatsapp-message": {
+      "sha": "0923ffd65b0b40dba7b3135d2a9daf46fb95001bb58f2a1586f35d2dcf98aecf",
+      "version": 501,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "evolution-webhook": {
+      "sha": "49fe006c98b59972647e5834c90a9a5e7bd6b12caf75056ba0d04aed69fedcc2",
+      "version": 709,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "fetch-evolution-history": {
+      "sha": "e2d8552172052c27875c6a06746947b270dcde5ea3f9e73f92450f7288fee776",
+      "version": 17,
+      "updated_at": "2026-05-12T19:32:59.535Z"
+    },
+    "fetch-zapi-history": {
+      "sha": "6f999db22af667c652ed6f2ed599b706e4aff3398bcd26c4543318a66b157bd0",
+      "version": 7,
+      "updated_at": "2026-05-12T19:00:08.491Z"
+    },
+    "finalize-attendance": {
+      "sha": "2b43b7b84405f975dba37ee3c910a72f67f53b4fdc9d1efaf3bdf96e3cb59a82",
+      "version": 450,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "forward-whatsapp-message": {
+      "sha": "22ddd00ec5f9e6936f5054c71b004e005b30eba6c71f53774822ef36e1dc6c17",
+      "version": 478,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "generate-conversation-summary": {
+      "sha": "25fae84ae700a09ef0d5ab4700bc1469ba3d471d1ba1b7c0baa0faceea112225",
+      "version": 515,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "generate-onboarding-blueprint": {
+      "sha": "5795885e2ccac05031b06a2844c3df908eb340182aa7b6f512c0a2d0ce1e9e54",
+      "version": 82,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "generate-sso-token": {
+      "sha": "d6e43c9b6b1aedfb82210b345d28fddc7cac9d27c2a812339b8cef8a56ad697a",
+      "version": 223,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "get-group-participants": {
+      "sha": "b7c1cc64366bf4cd10bab8b2aeed3e40e6c4877e1eadad115ceb746931d1b934",
+      "version": 72,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "get-media-upload-url": {
+      "sha": "8fede4639cc0130fdf088b72b7727197c603e4e5776de35278c106dba89c374c",
+      "version": 144,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "get-note-media-url": {
+      "sha": "2ff96409c044d0e320a56cbb8030da5d63258a1730689445f61b151a9d8b0034",
+      "version": 77,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "hiper-integration-call": {
+      "sha": "e003fb750d03322b6306e1fc84464cc179600a4fa29ac0a05647aa5af5e73f0b",
+      "version": 77,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "hiper-integration-save": {
+      "sha": "acaed51ec5cdf46f0b9f7d76eddb98cd6c51cfc053124ca3c44906cd8629f763",
+      "version": 67,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "lookup-cnpj": {
+      "sha": "c0f82dc7cb7f1772c5c432ac6eb2d45037edce2866425ab0c350af27be0e8f54",
+      "version": 245,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "manage-group-participants": {
+      "sha": "1a265bcf136932f4a9b1661ff93df6638486da9ea1360e9c21397a156be5ff67",
+      "version": 64,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "meta-webhook": {
+      "sha": "55dcfa8e04d29969fe5e901ec6ce24f7d65efda5bb83ef1a4459b4ef7b4fb0bb",
+      "version": 494,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "oem-atualizar-cadastro-licenca": {
+      "sha": "2f76b5cb0fe4e835d6d6330e7134c873bfccf858faa61233329e454b848baad6",
+      "version": 29,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "oem-cancelar-modulo": {
+      "sha": "ec838941c74a28ba76306122c449b0d6e86f4c45cd644ce2c699d1784012bec4",
+      "version": 42,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "oem-espelho-sync": {
+      "sha": "31f0cbca628b758bce7170f856c35f883ab4c7e8520c66ef1972969592340fe0",
+      "version": 71,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "oem-licenca-estado": {
+      "sha": "5ac8fca4a36c86f8001c8da8225c4fe6ddfb1856a18e229713901f79b7158af9",
+      "version": 16,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "oem-sync-processar": {
+      "sha": "76d8a4b50142ea4aa0c68de74a16375d0bb94b2d674d0e6ba9d6531a38b0adb2",
+      "version": 44,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "omie-integration-call": {
+      "sha": "a4cf8c898007dd208aa6010b7ce052e42f18522c327406493adad3d3280e2e09",
+      "version": 73,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "omie-integration-save": {
+      "sha": "be64021477676b8125b58265f7842069694e844e076ca3a0fcd6729fd8df00a9",
+      "version": 60,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "omie-sync-processar": {
+      "sha": "a5dd4ecfa41e2c2c1d7ae43d6ca391fc067efed07361d6529c513068a8a6c905",
+      "version": 77,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "onboarding-catalogo": {
+      "sha": "78dd6d90b8b5a1231fbf6d8a2b3e6cff9a7a62157121fbc7d00afc28e9ab5a18",
+      "version": 19,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "onboarding-intake-anexos": {
+      "sha": "e7f54696c48ffc088dbe0bb34c9f5003fd2c548eeb25bf69de58c5a5126eab97",
+      "version": 16,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "onboarding-intake-webhook": {
+      "sha": "f1e57c039aa82797645d4ef07322f338927bce2a777c0ba100e3696dc5a9af67",
+      "version": 80,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "onboarding-send-welcome": {
+      "sha": "315029e5424f3cac6ef5321dfbe31b4995d7c17c9001fb5fb28291d41dbbdda5",
+      "version": 80,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "populate-cidades": {
+      "sha": "7d9dded0bb0c704bf0ad154d264b697892977a9f39e851e8960a14d43b416947",
+      "version": 515,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "process-finalize-queue": {
+      "sha": "9efcf1bcd9b6cceaac7f3b1d1ac8ecc727c3ce85848e5af6d9b74c03b32d1818",
+      "version": 139,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "process-notification-outbox": {
+      "sha": "69eb953ee50bf064c658bc05454794ce964b8f59919cd5763517b82456781b84",
+      "version": 127,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "purge-chat-media": {
+      "sha": "9556d2447019dbe0e125929b7265651fe1ced4ca718acfee4af2f9f2e7788599",
+      "version": 43,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "recon-atribuir-modelo-lote": {
+      "sha": "eb059ca00c8f1484439b9a623134b3e65e225ac4c93856f7f5315fb49a5c1054",
+      "version": 58,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "recon-atualizar-valor-ds": {
+      "sha": "c084beff8d14428f4479ba1e05a6d9da0d944732891db390716ead159de2e182",
+      "version": 60,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "recon-candidato-confirmar": {
+      "sha": "85dc7cfd69d30d5362f4938358f9abb342e82da87a995ba1c577e70d8f40a8e4",
+      "version": 60,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "recon-candidatos-listar": {
+      "sha": "bd85878269896b06d5d99ee9f020494596c739a258ddc5cf97d978613c988c05",
+      "version": 62,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "recon-espelho-pull": {
+      "sha": "67b48ff9205352878fc029b9c0e1249d66ffb407de26f6927304504d4519a64b",
+      "version": 61,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "recon-espelho-pull-cron": {
+      "sha": "1b78de8499a19b42425bd00b1e357b8c783b9659cb422c3875a6ac95b838c0fa",
+      "version": 58,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "recon-omie-escrever": {
+      "sha": "d099d53eeccd70e7a32cd76fc961435c94c226452d2281367d80cd1ba49a1424",
+      "version": 67,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "recon-vincular-lote": {
+      "sha": "faead5b41874c7b6ca5522bc4551cabc1037b36f7fbb99a619a342299fee4416",
+      "version": 58,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "recon-vincular-unitario": {
+      "sha": "9ef07cf228cc30ec8f283ae0a66d9f8ec1258886bd1511ed005aa79998c61e6f",
+      "version": 59,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "reconnect-whatsapp-instance": {
+      "sha": "4c8b943e8455559c54d1d2fe85c10012634adb393e2a3b339b409771a9a6b1cf",
+      "version": 8,
+      "updated_at": "2026-06-03T12:40:59.753Z"
+    },
+    "recover-instance-messages": {
+      "sha": "990f5cc066e4ac50f4d35d00f02f9a55da7ff27b2d896916ef9331771fab8c27",
+      "version": 99,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "resend-failed-message": {
+      "sha": "14df5bd5b0ee254315349563a6066e5010985021a6e31defefcc7cc0a2a946fd",
+      "version": 199,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "restart-whatsapp-instance": {
+      "sha": "83a19a4e62959b4cda0c6edf6a9efdceb0716cacdd246d17bd18bd907a7763b9",
+      "version": 99,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "save-ai-settings": {
+      "sha": "9fce05d4b415127d2f652b7e7cf9abf5bdf3a293ef5c47723f0b45f865841ff2",
+      "version": 480,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "schedule-reminder": {
+      "sha": "4335a924a5a341693fe2e8783220d2d4d714599f414acd5d93739c87678ec95e",
+      "version": 205,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "send-meta-message": {
+      "sha": "29ac6da3ac33d5315d68be0b7b2e97232f2ba237631ed1edb7c11cf37a3320a7",
+      "version": 393,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "send-whatsapp-message": {
+      "sha": "3d8afdadef962bfb26d4e9deb503ee4fceb19b45d51a5f498945f8967b785361",
+      "version": 536,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "send-whatsapp-template": {
+      "sha": "2adb96700b664b74fa3e55d46d34cdc215e5892db658d106050838756446ff58",
+      "version": 228,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "suggest-smart-replies": {
+      "sha": "095fc9a05c5804dcdbcc1ff304fa69f2e2995afc30739f61e6305f3e5c93ee90",
+      "version": 515,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "summarize-ticket": {
+      "sha": "ca8122bd5de90e8c5a8b4ed171c0f7c4af68283656755bf96ae54f26be1311ab",
+      "version": 114,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "sync-contact-picture": {
+      "sha": "d34a96d4ff482e371b409dff2c4eb793500aee3bb647d1c33db4524767d85799",
+      "version": 10,
+      "updated_at": "2026-04-28T02:48:58.198Z"
+    },
+    "sync-meta-templates": {
+      "sha": "2addb1182d17f2c50d58b23e12d6584a529efb6b11fa4405632d8e0e4d5fa582",
+      "version": 212,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "sync-whatsapp-groups": {
+      "sha": "2c97f0bb51944243a4092ef5aaaae2d7bb2887d00957730b5642892f795aec65",
+      "version": 273,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "test-ai-config": {
+      "sha": "525714411cc6f041d5bb3421f7679e1bf9dceb302068028489025d8b1160dea8",
+      "version": 118,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "test-ai-config-v2": {
+      "sha": "668b8a8b171ef82357abaf31e01bad51afe6203e9bf07b2cdfbf87e2ea10e18c",
+      "version": 120,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "test-evolution-connection": {
+      "sha": "b580da0b6cb0a50520ffaeb719ea120e620f66325ad4a735249baa2201995650",
+      "version": 482,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "test-instance-connection": {
+      "sha": "ef71795599fbb0eee0821d4b0e96f204e37efff601334c780032232f14b4e849",
+      "version": 527,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "theo-dispatch": {
+      "sha": "2f948cf5ed3b0649f5b7172a6699fb49fecd1767f1c5f299ad8d8c27baffee49",
+      "version": 115,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "transcribe-whatsapp-audio": {
+      "sha": "325cabc7df84575d0ceb7019b27bb5411cef45473510f59a1c52dca7283b89b3",
+      "version": 510,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "upload-ticket-attachment": {
+      "sha": "15f6b26128167b3d0298974e4879a91b80cc01c9ae1877ce6183a68871bb5c0c",
+      "version": 204,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "upsert-instance-secrets": {
+      "sha": "90955d6e1c963537b028d9e2bc7b3b93ab947637cb72f90c7431b457d85f4a19",
+      "version": 330,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "verify-failed-deliveries": {
+      "sha": "3a6aee0a25455f630b654cc65853fba4eb50af7691ff8c59537f9f214b524396",
+      "version": 55,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "watchdog-instance-silence": {
+      "sha": "24aa246246e54ba0652c66abbac370798e08e05d6cddd676d88925111058c45b",
+      "version": 105,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "whatsapp-media-proxy": {
+      "sha": "c4a3bf4502e2b199036dc3237826c7ccdb580bf2a666d2ae461681aa6508a199",
+      "version": 475,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    },
+    "zapi-webhook": {
+      "sha": "b358f0072a7122d1a1560d45b00d446d53dcf98adb6ae9138fb8fa0b1f1d1b98",
+      "version": 437,
+      "updated_at": "2026-09-06T01:37:33.761Z"
+    }
+  }
+}
