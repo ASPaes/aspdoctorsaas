@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ExternalLink, Building2, MessageSquareText, Clock, HardDrive } from "lucide-react";
+import { ExternalLink, Building2, MessageSquareText, Clock, HardDrive, Moon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,7 +49,7 @@ export default function SetoresInstanciasTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_departments")
-        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message, auto_close_inactivity_minutes, inactivity_warning_before_minutes, agent_alert_minutes, agent_alert_enabled, agent_no_response_close_minutes, agent_no_response_close_enabled, media_retention_enabled, media_retention_days, is_default_fallback")
+        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message, auto_close_inactivity_minutes, inactivity_warning_before_minutes, agent_alert_minutes, agent_alert_enabled, agent_no_response_close_minutes, agent_no_response_close_enabled, media_retention_enabled, media_retention_days, is_default_fallback, off_hours_release_to_queue")
         .eq("tenant_id", tid!)
         .eq("is_active", true)
         .order("name");
@@ -261,6 +261,27 @@ export default function SetoresInstanciasTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
       toast.success("Preferência de encerramento salva");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const saveOffHoursRelease = useMutation({
+    mutationFn: async (value: boolean) => {
+      if (!selectedId) return;
+      const { error } = await supabase
+        .from("support_departments")
+        .update({ off_hours_release_to_queue: value } as any)
+        .eq("id", selectedId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, value) => {
+      queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
+      queryClient.invalidateQueries({ queryKey: ["support_departments"] });
+      toast.success(
+        value
+          ? "Os chats fora do horário passam para a fila na abertura"
+          : "Os chats fora do horário ficam na aba até alguém abrir",
+      );
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -578,6 +599,32 @@ export default function SetoresInstanciasTab() {
                   );
                 })()}
 
+
+                <div className="pt-4 border-t">
+                  <h4 className="text-sm font-medium">Fora do horário</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    O que acontece com o chat que chega depois do expediente deste setor.
+                  </p>
+                </div>
+
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <Moon className="h-4 w-4 text-muted-foreground" />
+                      <Label>Passar para a fila quando o setor abrir</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Desligado, o chat fica na aba <strong>Fora do horário</strong> até alguém abrir, que é o
+                      comportamento padrão. Ligado, ele entra na fila sozinho no início do expediente, marcado
+                      com um selo de que o cliente chamou fora do horário.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={selectedDept?.off_hours_release_to_queue ?? false}
+                    disabled={saveOffHoursRelease.isPending}
+                    onCheckedChange={(v) => saveOffHoursRelease.mutate(v)}
+                  />
+                </div>
 
                 <div className="space-y-2 pt-4 border-t">
                   <div className="flex items-center gap-2">

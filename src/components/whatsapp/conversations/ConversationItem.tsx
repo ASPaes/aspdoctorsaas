@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Archive, CheckCheck, AlertTriangle, CalendarClock, Ban, Clock } from "lucide-react";
+import { Archive, CheckCheck, AlertTriangle, CalendarClock, Ban, Clock, Moon } from "lucide-react";
 import { formatBRPhone } from "@/lib/phoneBR";
 
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
@@ -25,6 +25,8 @@ interface Props {
   departmentName?: string | null;
   produtos?: string[];
   /** DEM-0227 — posição na FILA (1 = próximo a ser atendido). Só na pill "Fila". */
+  /** O setor deste chat libera para a fila na abertura (support_departments.off_hours_release_to_queue). */
+  deptReleasesOffHours?: boolean;
   queuePosition?: number;
   /** DEM-0227 — chegada na fila, base do tempo de espera exibido. */
   queueSince?: string | null;
@@ -32,7 +34,7 @@ interface Props {
   nowMs?: number;
 }
 
-export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance, isAgentAlert, showDepartment, departmentName, produtos, queuePosition, queueSince, nowMs }: Props) {
+export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance, isAgentAlert, showDepartment, departmentName, produtos, deptReleasesOffHours, queuePosition, queueSince, nowMs }: Props) {
   const contact = conv.contact;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
   const sentimentData = conv.sentiment as any;
@@ -142,6 +144,21 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
 
   const isOutOfHours = conv.opened_out_of_hours === true;
   const hasActiveAttendance = !!attendance && (attendance.status === "waiting" || attendance.status === "in_progress");
+
+  // Selo do chat que chegou fora do expediente e já foi liberado para a fila.
+  //
+  // Depois da liberação o `opened_out_of_hours` some (é ele que tira o chat da
+  // aba laranja), então a origem só sobrevive no atendimento. `reopened_from`
+  // entra no OR porque reabertura de madrugada não mexe no `created_from`: são
+  // 55 atendimentos em 30 dias que ficariam sem selo.
+  //
+  // Só aparece para setor que ligou a liberação. Sem esse portão o selo surgiria
+  // em tenant que nem usa o recurso, marcando chat que ninguém liberou.
+  const cameFromOutOfHours =
+    deptReleasesOffHours === true &&
+    !isOutOfHours &&
+    hasActiveAttendance &&
+    (attendance?.created_from === "out_of_hours" || attendance?.reopened_from === "out_of_hours");
 
   const attendanceBadge = (() => {
     // Prioridade máxima: agendado (sobrescreve outros estados visuais)
@@ -342,6 +359,16 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
           <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 gap-0.5 border-red-500/70 text-red-600 dark:text-red-400 animate-pulse">
             <Clock className="h-2.5 w-2.5" />
             Aguardando você
+          </Badge>
+        )}
+        {cameFromOutOfHours && (
+          <Badge
+            variant="outline"
+            title="O cliente chamou fora do horário de atendimento. O chat foi liberado para a fila na abertura do setor."
+            className="text-[9px] px-1 py-0 h-4 gap-0.5 border-violet-500/50 text-violet-600 dark:text-violet-400"
+          >
+            <Moon className="h-2.5 w-2.5" />
+            Fora do horário
           </Badge>
         )}
         {attendanceBadge}

@@ -205,6 +205,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     [departments]
   );
 
+  // Portão do selo "Fora do horário" no card: só os setores que ligaram a
+  // liberação na abertura marcam o chat que chegou de madrugada.
+  const deptReleasesOffHoursMap = useMemo(
+    () => new Map(departments.map((d) => [d.id, d.off_hours_release_to_queue === true])),
+    [departments]
+  );
+
   const { data: agentOptionsData } = useAgentOptions();
   const agentLabelMap = useMemo(() => new Map((agentOptionsData ?? []).map(a => [a.userId, a.label])), [agentOptionsData]);
 
@@ -717,6 +724,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       isAgentAlert={(() => { const d = getStateForConv(conv).agent_alert_due_at; return d != null && nowMs >= new Date(d).getTime(); })()}
       showDepartment={!selectedDepartmentId && !isSearching}
       departmentName={conv.department_id ? (departmentNameMap.get(conv.department_id) ?? null) : null}
+      deptReleasesOffHours={conv.department_id ? (deptReleasesOffHoursMap.get(conv.department_id) ?? false) : false}
       produtos={conv.contact?.id ? produtosByContact?.get(conv.contact.id) : undefined}
     />
   );

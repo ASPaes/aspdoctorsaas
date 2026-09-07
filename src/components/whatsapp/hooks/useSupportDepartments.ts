@@ -11,6 +11,12 @@ export interface SupportDepartment {
   is_default_fallback: boolean;
   default_instance_id: string | null;
   tenant_id: string;
+  /**
+   * Libera para a fila o chat que chegou fora do expediente, na abertura do setor.
+   * Opcional só no tipo: a coluna é NOT NULL no banco, mas o `types.ts` gerado ainda
+   * não a conhece e o cast de `select("*")` quebraria.
+   */
+  off_hours_release_to_queue?: boolean;
 }
 
 export function useSupportDepartments() {
