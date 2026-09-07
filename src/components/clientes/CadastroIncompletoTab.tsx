@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, CalendarClock, ExternalLink, Loader2, MapPin, Wand2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, CalendarClock, ExternalLink, Loader2, MapPin, Wand2 } from "lucide-react";
 
 /**
  * Saneamento de cadastro, por campo.
@@ -73,12 +73,36 @@ export default function CadastroIncompletoTab() {
   const [produto, setProduto] = useState("");
   const [valor, setValor] = useState("");
   const [sel, setSel] = useState<Set<string>>(new Set());
+  /** Ordenação escolhida no cabeçalho. `null` = a ordem padrão do campo. */
+  const [ordem, setOrdem] = useState<{ col: string; dir: "asc" | "desc" } | null>(null);
   const [gravando, setGravando] = useState(false);
 
-  const limparFiltros = () => { setBusca(""); setUnidade(""); setProduto(""); setValor(""); setSel(new Set()); };
+  const limparFiltros = () => {
+    setBusca(""); setUnidade(""); setProduto(""); setValor(""); setSel(new Set()); setOrdem(null);
+  };
+
+  /**
+   * Clique no cabeçalho: crescente -> decrescente -> ordem padrão.
+   *
+   * O terceiro clique volta ao padrão de propósito. No escopo produto a ordem
+   * padrão agrupa por unidade, produto e época — é ela que faz o bloco marcado
+   * coincidir com o grupo que teve o mesmo vendedor. Sem caminho de volta,
+   * ordenar por nome custaria o agrupamento para sempre.
+   *
+   * A seleção é limpa junto: mudar a ordem muda QUAIS 300 vêm, e as marcadas
+   * poderiam nem estar mais na lista.
+   */
+  const ordenarPor = (col: string) => {
+    setSel(new Set());
+    setOrdem((o) =>
+      o?.col !== col ? { col, dir: "asc" }
+      : o.dir === "asc" ? { col, dir: "desc" }
+      : null);
+  };
 
   const { data: linhas = [], isPending: listando } = useQuery({
-    queryKey: ["cadastro_incompleto_lista", tid, campo?.campo, busca, unidade, produto],
+    queryKey: ["cadastro_incompleto_lista", tid, campo?.campo, busca, unidade, produto,
+               ordem?.col ?? null, ordem?.dir ?? null],
     enabled: !!tid && !!campo,
     queryFn: async (): Promise<LinhaFalta[]> => {
       const { data, error } = await (supabase.rpc as any)("fn_cadastro_incompleto_lista", {
@@ -89,6 +113,11 @@ export default function CadastroIncompletoTab() {
         p_busca: busca.trim() || null,
         p_limite: 300,
         p_offset: 0,
+        // A ordenação é do banco, não da tela: a lista corta em 300 e a fila é
+        // maior. Ordenar as 300 já carregadas responderia "o mais antigo das
+        // 300", que não é o mais antigo da fila.
+        p_ordem: ordem?.col ?? null,
+        p_dir: ordem?.dir ?? "asc",
       });
       if (error) throw error;
       return (data ?? []) as LinhaFalta[];
@@ -265,6 +294,31 @@ export default function CadastroIncompletoTab() {
   };
 
   const selectCls = "h-9 w-full rounded-md border bg-background px-3 text-sm";
+
+  // Larguras fixas por coluna: o cabeçalho só fica sobre a coluna certa se as
+  // duas linhas usarem exatamente a mesma classe.
+  const colCodigo = "w-14 shrink-0";
+  const colNome = "min-w-0 flex-1";
+  const colDetalhe = "hidden sm:block sm:w-44 lg:w-56 shrink-0 overflow-hidden";
+  const colUnidade = "w-28 shrink-0 overflow-hidden";
+  const colData = "w-20 shrink-0 justify-end text-right";
+
+  const th = (col: string, rotulo: string, cls: string) => {
+    const ativo = ordem?.col === col;
+    return (
+      <button type="button" onClick={() => ordenarPor(col)}
+        title={!ativo ? "Ordenar por esta coluna"
+          : ordem!.dir === "asc" ? "Clique para inverter"
+          : "Clique para voltar à ordem padrão"}
+        className={`flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide transition-colors hover:text-foreground ${
+          ativo ? "text-foreground" : "text-muted-foreground"} ${cls}`}>
+        <span className="truncate">{rotulo}</span>
+        {!ativo ? <ArrowUpDown className="h-3 w-3 shrink-0 opacity-40" />
+          : ordem!.dir === "asc" ? <ArrowUp className="h-3 w-3 shrink-0" />
+          : <ArrowDown className="h-3 w-3 shrink-0" />}
+      </button>
+    );
+  };
 
   if (carregando) {
     return <div className="space-y-3"><Skeleton className="h-20 w-full" /><Skeleton className="h-40 w-full" /></div>;
@@ -453,6 +507,15 @@ export default function CadastroIncompletoTab() {
               )}
             </label>
           )}
+          <div className="flex items-center gap-3 bg-muted/10 px-3 py-1.5">
+            {(campo.em_lote || ehGeo || ehReajuste) && <span className="w-[13px] shrink-0" aria-hidden />}
+            {th("codigo", "Cód.", colCodigo)}
+            {th("nome", "Cliente", colNome)}
+            {th("detalhe", ehGeo ? "CEP" : campo.escopo === "produto" ? "Produto" : "Produtos ativos", colDetalhe)}
+            {th("unidade", "Unidade", colUnidade)}
+            {th("data", "Cadastro", colData)}
+            <span className="w-3.5 shrink-0" aria-hidden />
+          </div>
           {linhas.map((l) => (
             <div key={l.registro_id} className="flex items-center gap-3 px-3 py-2 text-sm">
               {(campo.em_lote || ehReajuste || (ehGeo && /^\d{8}$/.test(l.detalhe))) ? (
@@ -467,28 +530,32 @@ export default function CadastroIncompletoTab() {
                 // linha desalinha das outras e a lista parece quebrada.
                 <span className="w-[13px] shrink-0" aria-hidden />
               ) : null}
-              {l.codigo != null && (
-                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-                  {l.codigo}
-                </span>
-              )}
-              <span className="min-w-0 flex-1 truncate">{l.cliente_nome}</span>
-              <span className="hidden sm:block text-xs text-muted-foreground truncate max-w-[16rem]">
+              <span className={colCodigo}>
+                {l.codigo != null && (
+                  <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                    {l.codigo}
+                  </span>
+                )}
+              </span>
+              <span className={`${colNome} truncate`}>{l.cliente_nome}</span>
+              <span className={`${colDetalhe} truncate text-xs text-muted-foreground`}>
                 {ehGeo && /^\d{8}$/.test(l.detalhe)
                   ? `CEP ${l.detalhe.slice(0, 5)}-${l.detalhe.slice(5)}`
                   : l.detalhe}
               </span>
               {/* A unidade fecha a decisão: o produto diz o sistema, a unidade
                   diz quem atende. A lista já vem agrupada por ela. */}
-              <Badge variant="outline" className="shrink-0 text-[10px] font-normal">
-                {l.unidade}
-              </Badge>
+              <span className={colUnidade}>
+                <Badge variant="outline" className="max-w-full text-[10px] font-normal">
+                  <span className="truncate">{l.unidade}</span>
+                </Badge>
+              </span>
               {(() => {
                 const d = dataBR(l.data_cadastro);
                 return (
                   <span
                     title={d.suspeita ? "Data de cadastro impossível — provável erro de importação" : "Data de cadastro"}
-                    className={`shrink-0 text-xs tabular-nums ${
+                    className={`${colData} text-xs tabular-nums ${
                       d.suspeita ? "text-amber-500 font-medium" : "text-muted-foreground"}`}>
                     {d.texto}
                   </span>
