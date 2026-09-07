@@ -25,7 +25,7 @@ export function useInactivityHold(attendanceId: string | null) {
     queryFn: async () => {
       const { data } = await supabase
         .from("support_attendances")
-        .select("inactivity_hold")
+        .select("inactivity_hold, inactivity_hold_until, inactivity_hold_reason")
         .eq("id", attendanceId as string)
         .maybeSingle();
       return data ?? null;
@@ -65,10 +65,55 @@ export function useInactivityHold(attendanceId: string | null) {
     },
   });
 
+  /**
+   * Pausa AUTOMÁTICA (DEM-0353): o gatilho trg_inactivity_autohold grava
+   * inactivity_hold_until quando o atendente pede para aguardar. Só existe
+   * enquanto não vence — depois disso a régua volta a correr sozinha, então a
+   * UI não deve mostrar nada.
+   */
+  const autoHoldUntilRaw = (data as any)?.inactivity_hold_until as string | null | undefined;
+  const autoHoldUntil = autoHoldUntilRaw ? new Date(autoHoldUntilRaw) : null;
+  const autoHoldActive = !!autoHoldUntil && autoHoldUntil.getTime() > Date.now();
+
+  const clearAuto = useMutation({
+    mutationFn: async () => {
+      if (!attendanceId) throw new Error("Sem atendimento em andamento");
+      const { error } = await supabase
+        .from("support_attendances")
+        .update({ inactivity_hold_until: null, inactivity_hold_reason: null } as any)
+        .eq("id", attendanceId);
+      if (error) throw error;
+    },
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: inactivityHoldKey(attendanceId) });
+      const prev = qc.getQueryData(inactivityHoldKey(attendanceId));
+      qc.setQueryData(inactivityHoldKey(attendanceId), (old: any) => ({
+        ...(old ?? {}),
+        inactivity_hold_until: null,
+        inactivity_hold_reason: null,
+      }));
+      return { prev };
+    },
+    onSuccess: () => {
+      toast.success("Contagem de inatividade retomada");
+      qc.invalidateQueries({ queryKey: inactivityHoldKey(attendanceId) });
+    },
+    onError: (e: any, _v, ctx) => {
+      qc.setQueryData(inactivityHoldKey(attendanceId), ctx?.prev);
+      toast.error(e?.message ?? "Falha ao retomar");
+    },
+  });
+
   return {
     enabled: !!attendanceId && (data as any)?.inactivity_hold === true,
     isLoading,
     isSaving: mutation.isPending,
     setHold: mutation.mutate,
+
+    autoHoldActive,
+    autoHoldUntil: autoHoldActive ? autoHoldUntil : null,
+    autoHoldReason: autoHoldActive ? ((data as any)?.inactivity_hold_reason as string | null) : null,
+    isClearingAutoHold: clearAuto.isPending,
+    clearAutoHold: clearAuto.mutate,
   };
 }

@@ -46,6 +46,7 @@ import { InterruptAutoReplyDialog } from "./InterruptAutoReplyDialog";
 import { CleanupConversationDialog } from "./CleanupConversationDialog";
 import { GroupLinkClienteModal } from "./GroupLinkClienteModal";
 import { ChatQuickRuleToggles } from "./ChatQuickRuleToggles";
+import { InactivityAutoHoldBadge } from "./InactivityAutoHoldBadge";
 import { AcessoFastButton } from "./AcessoFastButton";
 import { useContactRulesDisabled } from "../hooks/useContactRulesDisabled";
 
@@ -1072,6 +1073,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               <TooltipContent side="bottom" className="text-xs">Clique para marcar como tratado</TooltipContent>
             </Tooltip>
           )}
+
+          <InactivityAutoHoldBadge attendanceId={activeAttendanceId} />
 
           <ClimaResolucaoBadge
             conversationId={conversation.id}

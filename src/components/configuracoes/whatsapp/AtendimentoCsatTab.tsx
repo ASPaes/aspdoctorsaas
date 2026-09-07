@@ -38,6 +38,10 @@ const schema = z.object({
   support_inactivity_eod_enabled: z.boolean(),
   support_inactivity_eod_warning_template: z.string().min(1, "Obrigatório"),
   support_inactivity_eod_close_template: z.string().min(1, "Obrigatório"),
+  // Pausa automática quando o atendente pede para aguardar
+  support_inactivity_autohold_enabled: z.boolean(),
+  support_inactivity_autohold_minutes: z.number().min(1).max(240),
+  support_inactivity_autohold_extra_terms: z.string(),
 
   // Grupos: mesma régua do 1:1, com prazos e texto próprios
   support_group_inactivity_enabled: z.boolean(),
@@ -90,6 +94,9 @@ export default function AtendimentoCsatTab() {
       support_inactivity_eod_enabled: true,
       support_inactivity_eod_warning_template: "",
       support_inactivity_eod_close_template: "",
+      support_inactivity_autohold_enabled: false,
+      support_inactivity_autohold_minutes: 30,
+      support_inactivity_autohold_extra_terms: "",
 
       support_group_inactivity_enabled: false,
       support_group_auto_close_inactivity_minutes: 30,
@@ -141,7 +148,7 @@ export default function AtendimentoCsatTab() {
     queryKey: ["configuracoes-atendimento", tid],
     queryFn: async () => {
       let q = supabase.from("configuracoes").select(
-        "id, support_reopen_window_minutes, support_auto_close_inactivity_minutes, support_send_inactivity_warning, support_inactivity_enabled, support_inactivity_warning_before_minutes, support_inactivity_warning_template, support_inactivity_eod_enabled, support_inactivity_eod_warning_template, support_inactivity_eod_close_template, support_group_inactivity_enabled, support_group_auto_close_inactivity_minutes, support_group_send_inactivity_warning, support_group_inactivity_warning_before_minutes, support_group_inactivity_warning_template, support_agent_alert_enabled, support_agent_alert_minutes, support_agent_no_response_close_enabled, support_agent_no_response_close_minutes, support_csat_enabled, support_csat_prompt_template, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template, support_ura_enabled, support_ura_welcome_template, support_ura_invalid_option_template, support_ura_confirmation_template, support_waiting_ack_limit, support_ura_timeout_minutes, support_ura_default_department_id"
+        "id, support_reopen_window_minutes, support_auto_close_inactivity_minutes, support_send_inactivity_warning, support_inactivity_enabled, support_inactivity_warning_before_minutes, support_inactivity_warning_template, support_inactivity_eod_enabled, support_inactivity_eod_warning_template, support_inactivity_eod_close_template, support_inactivity_autohold_enabled, support_inactivity_autohold_minutes, support_inactivity_autohold_extra_terms, support_group_inactivity_enabled, support_group_auto_close_inactivity_minutes, support_group_send_inactivity_warning, support_group_inactivity_warning_before_minutes, support_group_inactivity_warning_template, support_agent_alert_enabled, support_agent_alert_minutes, support_agent_no_response_close_enabled, support_agent_no_response_close_minutes, support_csat_enabled, support_csat_prompt_template, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template, support_ura_enabled, support_ura_welcome_template, support_ura_invalid_option_template, support_ura_confirmation_template, support_waiting_ack_limit, support_ura_timeout_minutes, support_ura_default_department_id"
       );
       if (tid) q = q.eq("tenant_id", tid);
       const { data, error } = await q.limit(1).maybeSingle();
@@ -162,6 +169,9 @@ export default function AtendimentoCsatTab() {
         support_inactivity_eod_enabled: config.support_inactivity_eod_enabled ?? true,
         support_inactivity_eod_warning_template: config.support_inactivity_eod_warning_template ?? "",
         support_inactivity_eod_close_template: config.support_inactivity_eod_close_template ?? "",
+        support_inactivity_autohold_enabled: (config as any).support_inactivity_autohold_enabled ?? false,
+        support_inactivity_autohold_minutes: (config as any).support_inactivity_autohold_minutes ?? 30,
+        support_inactivity_autohold_extra_terms: (config as any).support_inactivity_autohold_extra_terms ?? "",
 
         support_group_inactivity_enabled: config.support_group_inactivity_enabled ?? false,
         support_group_auto_close_inactivity_minutes: config.support_group_auto_close_inactivity_minutes ?? 30,
@@ -225,6 +235,7 @@ export default function AtendimentoCsatTab() {
   const warningEnabled = form.watch("support_send_inactivity_warning");
   const inactivityEnabled = form.watch("support_inactivity_enabled");
   const eodEnabled = form.watch("support_inactivity_eod_enabled");
+  const autoholdEnabled = form.watch("support_inactivity_autohold_enabled");
   const groupInactivityEnabled = form.watch("support_group_inactivity_enabled");
   const groupWarningEnabled = form.watch("support_group_send_inactivity_warning");
   const agentAlertEnabled = form.watch("support_agent_alert_enabled");
@@ -367,6 +378,52 @@ export default function AtendimentoCsatTab() {
                           <Textarea {...field} rows={3} placeholder="Use {{end}} e {{code}}" />
                         </FormControl>
                         <FormDescription>Variáveis: {"{{end}}"} e {"{{code}}"}</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                )}
+
+                <Separator />
+
+                <FormField control={form.control} name="support_inactivity_autohold_enabled" render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel>Pausar quando o atendente pedir para aguardar</FormLabel>
+                      <FormDescription>
+                        Se o atendente escrever "um momento", "aguarde", "já retorno" ou "vou verificar", a contagem para pelo tempo abaixo e recomeça do zero depois. Vale só para o que o atendente digita: mensagem automática da URA ou de fora de expediente não pausa nada.
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )} />
+
+                {autoholdEnabled && (
+                  <div className="grid grid-cols-1 gap-4">
+                    <FormField control={form.control} name="support_inactivity_autohold_minutes" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Pausar por (min)</FormLabel>
+                        <FormControl>
+                          <NumericInput value={field.value} onChange={field.onChange} placeholder="30" suffix="min" />
+                        </FormControl>
+                        <FormDescription>
+                          Como a contagem recomeça do zero ao fim da pausa, 30 aqui dão cerca de 1 hora de folga real. Abaixo de 30 o efeito é pequeno: a maioria dos encerramentos indevidos acontece cerca de 32 minutos depois do pedido de espera.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="support_inactivity_autohold_extra_terms" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Expressões extras (opcional)</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} rows={2} placeholder="deixa comigo, vou falar com o time" />
+                        </FormControl>
+                        <FormDescription>
+                          Separe por vírgula. Somam à lista de fábrica, não a substituem. Cada expressão precisa de pelo menos 4 letras e é procurada como texto, não como padrão.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )} />
