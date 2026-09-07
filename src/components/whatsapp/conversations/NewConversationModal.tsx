@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAgentDisplayName } from "@/hooks/useAgentDisplayName";
 import { AlertTriangle, Info } from "lucide-react";
 import { MetaTemplatePicker } from "@/components/whatsapp/templates/MetaTemplatePicker";
 
@@ -77,6 +78,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const createConversation = useCreateConversation();
   const { selectedDepartmentId } = useDepartmentFilter();
   const { user } = useAuth();
+  const agentName = useAgentDisplayName();
   const [instanceId, setInstanceId] = useState("");
   // Vazio, não "55": com o campo pré-preenchido, digitar/colar um número que já
   // traz o código de país (ou o DDD 55) empilhava um segundo "55" — a máscara não
@@ -748,6 +750,8 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             onOpenChange={setShowTemplatePicker}
             instanceId={instanceId}
             to={normalizedPhone}
+            operatorName={agentName}
+            contactName={name.trim() || selectedContact?.name || null}
             onSent={async (result) => {
               if (clienteIdForCreate) {
                 try {

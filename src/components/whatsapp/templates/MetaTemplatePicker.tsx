@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,7 @@ import {
   parseTemplateParams,
   hasInvalidParamChars,
   renderTemplateText,
+  inferParamSources,
   type TemplateParamSpec,
 } from '@/lib/metaTemplateParams';
 
@@ -31,6 +32,10 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   instanceId: string;
   to: string;
+  /** Nome de quem está enviando, para preencher "Olá, sou {{1}}". */
+  operatorName?: string | null;
+  /** Nome do contato do outro lado, para preencher "Olá {{nome}},". */
+  contactName?: string | null;
   onSent?: (result: { conversation_id: string; message_id: string }) => void;
 }
 
@@ -39,6 +44,8 @@ export function MetaTemplatePicker({
   onOpenChange,
   instanceId,
   to,
+  operatorName,
+  contactName,
   onSent,
 }: Props) {
   const [selected, setSelected] = useState<MetaTemplate | null>(null);
@@ -57,6 +64,27 @@ export function MetaTemplatePicker({
 
   const spec = selected ? specById.get(selected.id) ?? null : null;
 
+  const hoje = useMemo(
+    () => new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    [],
+  );
+
+  /** Os valores que o sistema já conhece, na ordem em que aparecem nos atalhos. */
+  const sugestoes = useMemo(
+    () =>
+      [
+        { rotulo: 'Meu nome', valor: operatorName?.trim() || '' },
+        { rotulo: 'Nome do contato', valor: contactName?.trim() || '' },
+        { rotulo: 'Hoje', valor: hoje },
+      ].filter((s) => s.valor.length > 0),
+    [operatorName, contactName, hoje],
+  );
+
+  // O preenchimento roda ao ESCOLHER o template. Ler os nomes de um ref evita que
+  // a chegada tardia de uma das queries do pai reescreva o que já foi digitado.
+  const contextoRef = useRef({ operatorName, contactName });
+  contextoRef.current = { operatorName, contactName };
+
   useEffect(() => {
     if (!open) {
       setSelected(null);
@@ -67,10 +95,29 @@ export function MetaTemplatePicker({
 
   useEffect(() => {
     const s = selected ? specById.get(selected.id) : null;
-    setParameters(s ? new Array(s.names.length).fill('') : []);
+    if (!s) {
+      setParameters([]);
+      return;
+    }
+    const { operatorName: op, contactName: ct } = contextoRef.current;
+    const fontes = inferParamSources(selected?.body_text, s);
+    setParameters(
+      s.names.map((_, i) => {
+        if (fontes[i] === 'operator') return op?.trim() || '';
+        if (fontes[i] === 'contact') return ct?.trim() || '';
+        return '';
+      }),
+    );
     // dep só em selected?.id de propósito: refetch não pode limpar o que o usuário digitou
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id]);
+
+  const setParam = (idx: number, valor: string) =>
+    setParameters((atual) => {
+      const next = [...atual];
+      next[idx] = valor;
+      return next;
+    });
 
   const readErrorBody = async (err: any): Promise<string | null> => {
     try {
@@ -259,7 +306,8 @@ export function MetaTemplatePicker({
                         )}
                         {varCount > 0 && (
                           <p className="mt-1 text-xs text-muted-foreground">
-                            {varCount} variável(is): {tplSpec!.names.join(', ')}
+                            {varCount === 1 ? '1 variável' : `${varCount} variáveis`}:{' '}
+                            {tplSpec!.names.map((n) => `{{${n}}}`).join(', ')}
                           </p>
                         )}
                       </CardContent>
@@ -280,20 +328,46 @@ export function MetaTemplatePicker({
           {spec && spec.names.length > 0 && spec.unsupported.length === 0 && (
             <div className="space-y-2 border-t pt-3">
               <p className="text-sm font-medium">Variáveis do template</p>
-              {spec.names.map((name, idx) => (
-                <div key={name} className="space-y-1">
-                  <Label className="text-xs">{`{{${name}}}`}</Label>
-                  <Input
-                    value={parameters[idx] ?? ''}
-                    onChange={(e) => {
-                      const next = [...parameters];
-                      next[idx] = e.target.value;
-                      setParameters(next);
-                    }}
-                    placeholder={spec.examples[idx] || `Valor para ${name}`}
-                  />
-                </div>
-              ))}
+              <div className="space-y-3">
+                {spec.names.map((name, idx) => {
+                  const vazio = (parameters[idx] ?? '').trim().length === 0;
+                  return (
+                    <div key={name} className="space-y-1">
+                      <Label className="text-xs">{`{{${name}}}`}</Label>
+                      <Input
+                        value={parameters[idx] ?? ''}
+                        onChange={(e) => setParam(idx, e.target.value)}
+                        placeholder={`Valor para {{${name}}}`}
+                      />
+                      {sugestoes.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                          <span className="text-[11px] text-muted-foreground">Preencher com:</span>
+                          {sugestoes.map((s) => (
+                            <button
+                              key={s.rotulo}
+                              type="button"
+                              onClick={() => setParam(idx, s.valor)}
+                              title={s.valor}
+                              className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            >
+                              {s.rotulo}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {/* A "amostra de variável" da Meta costuma ser um literal sem sentido
+                          para quem envia (nos templates da Delvale é "1"). Ela fica como
+                          dica, e só enquanto o campo está vazio — depois de preenchido
+                          vira ruído embaixo da resposta certa. */}
+                      {vazio && spec.examples[idx] && (
+                        <p className="text-[11px] text-muted-foreground">
+                          Exemplo cadastrado na Meta: {spec.examples[idx]}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
               <div className="mt-3 rounded-md border bg-muted/40 p-3">
                 <p className="text-xs font-medium text-muted-foreground mb-1">Prévia</p>
                 <p className="text-sm whitespace-pre-wrap">
