@@ -32,15 +32,21 @@ set -euo pipefail
 REF="${SUPABASE_PROJECT_REF:-vbngjzovjhkmietztffo}"
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASE="$RAIZ/docs/edge-functions-baseline.json"
-# ⚠️ NÃO use `mktemp` aqui. No Git Bash do Windows ele devolve `/tmp/...`, que
-# o `supabase.exe` — binário nativo — não enxerga, e a falha aparece como
-# "Access token not provided". O erro fala de credencial e o problema é o
-# caminho; perdi tempo nisso em 06/09/2026. `$TEMP` é o caminho que os dois
-# lados entendem.
-TMP="${TMPDIR:-${TEMP:-/tmp}}/edge-fn-audit.$$.json"
-trap 'rm -f "$TMP"' EXIT
+# Duas armadilhas do Windows, as duas medidas em 06/09/2026, e as duas se
+# disfarçam do MESMO erro: `Access token not provided`. Ele fala de credencial
+# e o problema nunca é a credencial.
+#
+# 1. Não use `mktemp`: no Git Bash ele devolve `/tmp/...`, caminho que o
+#    `supabase.exe` — binário nativo do Windows — não enxerga.
+# 2. ⚠️ Não chame esta variável de `TMP`. No Windows `TMP` é a variável de
+#    ambiente que aponta o DIRETÓRIO temporário do sistema; sobrescrevê-la com
+#    o caminho de um ARQUIVO tira o chão da CLI, que não consegue mais criar os
+#    temporários dela. Foi assim que este script nasceu quebrado, e o erro
+#    mandou duas pessoas conferirem um login que estava certo.
+SAIDA="${TMPDIR:-${TEMP:-/tmp}}/edge-fn-audit.$$.json"
+trap 'rm -f "$SAIDA"' EXIT
 
-supabase functions list --project-ref "$REF" -o json > "$TMP"
+supabase functions list --project-ref "$REF" -o json > "$SAIDA"
 
 if [ "${1:-}" = "--atualizar" ]; then
   node -e '
@@ -56,7 +62,7 @@ if [ "${1:-}" = "--atualizar" ]; then
                                 updated_at: new Date(f.updated_at).toISOString() }])),
     }, null, 2) + "\n");
     console.log(`baseline regravado com ${j.length} functions`);
-  ' "$TMP" "$BASE" "$REF"
+  ' "$SAIDA" "$BASE" "$REF"
   exit 0
 fi
 
@@ -85,4 +91,4 @@ node -e '
   console.log(mudou.length || nova.length || sumiu.length
     ? "Confira se cada uma acima era esperada. Se sim, rode com --atualizar."
     : "Nada mudou desde o baseline.");
-' "$TMP" "$BASE"
+' "$SAIDA" "$BASE"
