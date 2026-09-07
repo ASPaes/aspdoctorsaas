@@ -100,6 +100,15 @@ describe("ZoomableImageLightbox — clique fora", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("não fecha ao usar os controles de rotação", () => {
+    const onClose = vi.fn();
+    act(() => root.render(<ZoomableImageLightbox src="blob:fake" onClose={onClose} />));
+
+    click(container.querySelector('[title="Girar para a direita (R)"]')!);
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("não fecha quando o clique é um arrasto", () => {
     const onClose = vi.fn();
     act(() => root.render(<ZoomableImageLightbox src="blob:fake" onClose={onClose} />));
@@ -115,5 +124,72 @@ describe("ZoomableImageLightbox — clique fora", () => {
     });
 
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+const pressKey = (key: string, shiftKey = false) =>
+  act(() => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key, shiftKey, bubbles: true }));
+  });
+
+const rotationOf = () => container.querySelector("img")!.style.transform;
+
+describe("ZoomableImageLightbox — rotação", () => {
+  it("gira 90° a cada clique no botão horário", () => {
+    act(() => root.render(<ZoomableImageLightbox src="blob:fake" onClose={() => {}} />));
+    expect(rotationOf()).toBe("rotate(0deg)");
+
+    const btn = container.querySelector('[title="Girar para a direita (R)"]')! as HTMLElement;
+    act(() => btn.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(rotationOf()).toBe("rotate(90deg)");
+
+    act(() => btn.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(rotationOf()).toBe("rotate(180deg)");
+  });
+
+  // Sem o + 360 o anti-horário partiria para -90deg e o cálculo do quadro
+  // invertido (rotation % 180) deixaria de bater.
+  it("volta para 270° no anti-horário, nunca para ângulo negativo", () => {
+    act(() => root.render(<ZoomableImageLightbox src="blob:fake" onClose={() => {}} />));
+
+    const btn = container.querySelector('[title="Girar para a esquerda (Shift+R)"]')! as HTMLElement;
+    act(() => btn.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+
+    expect(rotationOf()).toBe("rotate(270deg)");
+  });
+
+  it("gira pelo teclado com R e Shift+R", () => {
+    act(() => root.render(<ZoomableImageLightbox src="blob:fake" onClose={() => {}} />));
+
+    pressKey("r");
+    expect(rotationOf()).toBe("rotate(90deg)");
+
+    pressKey("R", true);
+    expect(rotationOf()).toBe("rotate(0deg)");
+  });
+
+  // O overlay cobre o campo de mensagem, mas o foco pode ter ficado lá: o "r"
+  // seria digitado na conversa ao mesmo tempo em que giraria a imagem.
+  it("ignora o R quando o foco está num campo de texto", () => {
+    const input = document.createElement("textarea");
+    document.body.appendChild(input);
+    act(() => root.render(<ZoomableImageLightbox src="blob:fake" onClose={() => {}} />));
+
+    act(() => {
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true }));
+    });
+
+    expect(rotationOf()).toBe("rotate(0deg)");
+    input.remove();
+  });
+
+  it("zera a rotação ao abrir outra imagem", () => {
+    act(() => root.render(<ZoomableImageLightbox src="blob:um" onClose={() => {}} />));
+    pressKey("r");
+    expect(rotationOf()).toBe("rotate(90deg)");
+
+    act(() => root.render(<ZoomableImageLightbox src="blob:dois" onClose={() => {}} />));
+
+    expect(rotationOf()).toBe("rotate(0deg)");
   });
 });

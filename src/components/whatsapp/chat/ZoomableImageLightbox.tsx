@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Download, ZoomIn, ZoomOut, Maximize2, Copy, Check, ExternalLink } from "lucide-react";
+import {
+  X,
+  Download,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Copy,
+  Check,
+  ExternalLink,
+  RotateCcw,
+  RotateCw,
+} from "lucide-react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { toast } from "sonner";
 
@@ -29,6 +40,15 @@ export function ZoomableImageLightbox({
   const downPos = useRef<{ x: number; y: number } | null>(null);
 
   const [copied, setCopied] = useState(false);
+  // Rotação é só de visualização: vive em memória e zera ao trocar de imagem.
+  const [rotation, setRotation] = useState(0);
+  const quarterTurn = rotation % 180 !== 0;
+
+  const rotate = (deg: number) => setRotation((r) => (r + deg + 360) % 360);
+
+  useEffect(() => {
+    setRotation(0);
+  }, [src]);
 
   const handleCopyImage = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -39,14 +59,17 @@ export function ZoomableImageLightbox({
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement("canvas");
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
+          // A cópia sai como o usuário está vendo: em 90°/270° o quadro inverte.
+          canvas.width = quarterTurn ? img.naturalHeight : img.naturalWidth;
+          canvas.height = quarterTurn ? img.naturalWidth : img.naturalHeight;
           const ctx = canvas.getContext("2d");
           if (!ctx) {
             reject(new Error("no 2d context"));
             return;
           }
-          ctx.drawImage(img, 0, 0);
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate((rotation * Math.PI) / 180);
+          ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
           canvas.toBlob(
             (b) => (b ? resolve(b) : reject(new Error("toBlob returned null"))),
             "image/png"
@@ -67,7 +90,18 @@ export function ZoomableImageLightbox({
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      // "R" é caractere imprimível: se o foco ficou no campo de mensagem atrás do
+      // overlay, a tecla seria digitada lá ao mesmo tempo. Ignorar nesse caso.
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.("input, textarea, [contenteditable='true']")) return;
+      if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        rotate(e.shiftKey ? -90 : 90);
+      }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
@@ -162,13 +196,27 @@ export function ZoomableImageLightbox({
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{ touchAction: "none" }}
             >
-              <img
-                data-lightbox-keep
-                src={src}
-                alt={alt ?? "Visualização"}
-                draggable={false}
-                className="max-w-[90vw] max-h-[85vh] object-contain select-none"
-              />
+              {/* Em 90°/270° o giro é só visual: o espaço que a imagem ocupa no
+                  layout continua sendo o de antes do giro. Sem esta moldura com o
+                  quadro invertido, uma foto deitada estouraria a altura da tela. */}
+              <div
+                className="flex items-center justify-center"
+                style={quarterTurn ? { width: "90vw", height: "85vh" } : undefined}
+              >
+                <img
+                  data-lightbox-keep
+                  src={src}
+                  alt={alt ?? "Visualização"}
+                  draggable={false}
+                  className="object-contain select-none"
+                  style={{
+                    transform: `rotate(${rotation}deg)`,
+                    transition: "transform 250ms cubic-bezier(0.16,1,0.3,1)",
+                    maxWidth: quarterTurn ? "85vh" : "90vw",
+                    maxHeight: quarterTurn ? "90vw" : "85vh",
+                  }}
+                />
+              </div>
             </TransformComponent>
 
             <div
@@ -207,6 +255,29 @@ export function ZoomableImageLightbox({
                 title="Aumentar zoom"
               >
                 <ZoomIn className="h-5 w-5" />
+              </button>
+
+              <span aria-hidden className="my-2 w-px self-stretch bg-white/20" />
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  rotate(-90);
+                }}
+                className={controlBtn}
+                title="Girar para a esquerda (Shift+R)"
+              >
+                <RotateCcw className="h-5 w-5" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  rotate(90);
+                }}
+                className={controlBtn}
+                title="Girar para a direita (R)"
+              >
+                <RotateCw className="h-5 w-5" />
               </button>
             </div>
           </>
