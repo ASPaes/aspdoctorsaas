@@ -895,7 +895,7 @@ async function resolveDepartmentBusinessHours(
   }
 }
 
-async function isAnyDepartmentOpen(
+export async function isAnyDepartmentOpen(
   supabase: any,
   tenantId: string,
   msgDate: Date,
@@ -908,6 +908,28 @@ async function isAnyDepartmentOpen(
       timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
     }).formatToParts(msgDate);
     const currentTime = `${(tParts.find(p => p.type === 'hour')?.value || '00').padStart(2, '0')}:${(tParts.find(p => p.type === 'minute')?.value || '00').padStart(2, '0')}`;
+
+    // A exceção do dia vence a grade semanal — em TODOS os setores de uma vez.
+    // Sem isto, num feriado marcado "fechado o dia todo" a grade de segunda
+    // continuava dizendo "aberto", este portão respondia "sim" e o bloco inteiro
+    // de horário comercial era pulado: o cliente recebia o menu da URA e entrava
+    // na fila em vez da mensagem de feriado. Foi o que aconteceu em 07/09/2026.
+    // Mesma regra de checkBusinessHours, na ordem dele: template primeiro
+    // (exceção com horário reduzido), depois fechado o dia todo.
+    // Exceção de setor específico não entra aqui de propósito: a pergunta é
+    // "algum setor está aberto?", que é tenant-wide. Quando a conversa já tem
+    // setor, quem decide é checkBusinessHours, que lê a exceção do setor.
+    const exc = await getBusinessHoursExceptions(supabase, tenantId, msgDate, tz, 0, null);
+    if (exc.today?.use_template && exc.template) {
+      const t = exc.template;
+      const open = t.open_at.slice(0, 5);
+      const close = t.close_at.slice(0, 5);
+      const inTurn = currentTime >= open && currentTime < close;
+      const inBreak = !!(t.has_break && t.break_start && t.break_end &&
+        currentTime >= t.break_start.slice(0, 5) && currentTime < t.break_end.slice(0, 5));
+      return inTurn && !inBreak;
+    }
+    if (exc.today?.is_closed) return false;
 
     // Busca todos os setores ativos com horário próprio
     const { data: depts } = await supabase
