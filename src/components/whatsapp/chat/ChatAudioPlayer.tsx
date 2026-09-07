@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { useAudioPlaybackRate } from "./audioPlaybackRate";
 
 // Mudar a velocidade no player nativo custa três cliques (3 pontinhos →
 // velocidade da reprodução → opção). A pílula ao lado cicla 1x → 1,5x → 2x → 1x
@@ -16,23 +17,29 @@ interface ChatAudioPlayerProps {
 
 export function ChatAudioPlayer({ src }: ChatAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [rate, setRate] = useState(1);
+  // Preferência do agente, não estado da bolha: sobrevive a refresh e a troca de
+  // conversa, e vale para os outros áudios já montados na tela.
+  const [rate, setRate] = useAudioPlaybackRate();
+
+  // O <audio> nasce sempre em 1x e volta ao default a cada load da mídia: a
+  // preferência só existe no elemento se a gente escrever nela. Este efeito é o
+  // único ponto que toca o DOM — tanto na montagem quanto quando a troca veio de
+  // outro player.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.defaultPlaybackRate = rate;
+    // A folga de 0,001 evita reescrever por erro de ponto flutuante.
+    if (Math.abs(audio.playbackRate - rate) > 0.001) audio.playbackRate = rate;
+  }, [rate]);
 
   const cycleRate = useCallback(() => {
-    const audio = audioRef.current;
-    const current = audio?.playbackRate ?? rate;
+    const current = audioRef.current?.playbackRate ?? rate;
     // Procura o próximo da lista acima do atual em vez de avançar um índice:
     // o menu nativo pode ter deixado o áudio em 0,75 ou 1,75, valores que não
-    // estão no ciclo. A folga de 0,001 evita erro de ponto flutuante.
-    const next = RATES.find((r) => r > current + 0.001) ?? RATES[0];
-    if (audio) {
-      audio.playbackRate = next;
-      // `playbackRate` volta ao default a cada load; sem isto a velocidade se
-      // perderia quando o browser recarregasse a mídia.
-      audio.defaultPlaybackRate = next;
-    }
-    setRate(next);
-  }, [rate]);
+    // estão no ciclo.
+    setRate(RATES.find((r) => r > current + 0.001) ?? RATES[0]);
+  }, [rate, setRate]);
 
   return (
     <div className="mb-1 flex max-w-full items-center gap-1.5">
@@ -41,7 +48,8 @@ export function ChatAudioPlayer({ src }: ChatAudioPlayerProps) {
         controls
         preload="metadata"
         className="min-w-0 max-w-full"
-        // Mantém a pílula fiel quando a troca vem do menu de 3 pontinhos.
+        // Troca vinda do menu de 3 pontinhos também é escolha do agente: vira
+        // preferência como qualquer outra.
         onRateChange={(e) => setRate(e.currentTarget.playbackRate)}
       >
         <source src={src} />
