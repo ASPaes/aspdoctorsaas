@@ -27,7 +27,7 @@ import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
   Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
   ArrowUpDown, ArrowUp, ArrowDown, Boxes, Plus, CalendarClock, ArrowDownToLine, ArrowUpFromLine,
-  Clock, Copy, Check, History,
+  Clock, Copy, Check, History, ArrowLeftRight, Unlink,
 } from "lucide-react";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
@@ -326,6 +326,39 @@ function Origem({ lado }: { lado: "oem" | "ds" }) {
   );
 }
 
+// A metade da linha da conciliação que não tem cadastro. Um espaço em branco
+// leria como "ainda carregando"; a moldura tracejada com o motivo escrito diz
+// que a ausência É o resultado, e é ela que a pessoa veio ver.
+function LadoVazio({ texto, dica }: { texto: string; dica?: string }) {
+  return (
+    <div
+      title={dica}
+      className="flex h-full min-h-[62px] items-center justify-center rounded-md border border-dashed border-border/70 px-3 text-center text-xs text-muted-foreground"
+    >
+      {texto}
+    </div>
+  );
+}
+
+// O selo do meio da linha: em que estado os dois cadastros estão um em relação
+// ao outro. "Deduzido" não é erro — é vínculo que o espelho achou por CNPJ ou
+// nome e que ninguém confirmou gravando o código na ficha. Ele conta como par
+// aqui e NÃO conta na tabela de Custos, que é onde o número vira dinheiro.
+const SELO_CONC = {
+  casado: { rotulo: "Vinculado", cor: "text-emerald-600 dark:text-emerald-400", Icone: ArrowLeftRight,
+    dica: "Licença e cliente vinculados, com o código da filial gravado na ficha" },
+  deduzido: { rotulo: "Deduzido", cor: "text-amber-600 dark:text-amber-400", Icone: ArrowLeftRight,
+    dica: "O espelho casou os dois por CNPJ ou nome, mas o código da filial não está na ficha do cliente" },
+  so_oem: { rotulo: "Só no OEM", cor: "text-amber-600 dark:text-amber-400", Icone: Unlink,
+    dica: "Licença ativa no OEM sem nenhum cliente correspondente no DoctorSaaS" },
+  so_ds: { rotulo: "Só no DS", cor: "text-amber-600 dark:text-amber-400", Icone: Unlink,
+    dica: "Cliente com produto do OEM no DoctorSaaS e nenhuma licença no OEM" },
+  desativada: { rotulo: "Desativada", cor: "text-amber-600 dark:text-amber-400", Icone: CalendarClock,
+    dica: "O cliente está ativo aqui, mas a licença dele no OEM está desativada" },
+  cancelado: { rotulo: "Cancelado aqui", cor: "text-destructive", Icone: AlertTriangle,
+    dica: "A licença continua ativa no OEM e o cliente já foi cancelado no DoctorSaaS: é custo saindo sem receita" },
+} as const;
+
 // Contar não resolve: com 342 casos, o número sozinho não diz em qual cliente
 // mexer. A lista é o que transforma o diagnóstico em trabalho.
 function ListaSemCodigo({
@@ -437,6 +470,17 @@ export default function OemIntegrationTab() {
   // que alguém conferiu, quando o que houve foi o valor bater com o do OEM.
   const [filtroCusto, setFiltroCusto] = useState<"todos" | "corrigir" | "emdia">("todos");
   const [custoDir, setCustoDir] = useState<"asc" | "desc">("asc");
+  // A aba Custos tem duas leituras do mesmo assunto, e elas têm ESCOPOS
+  // OPOSTOS: a tabela de custos só olha par confirmado com licença ativa (é
+  // dela que sai o markup), e a conciliação existe justamente para mostrar
+  // quem NÃO tem par. Uma não podia virar coluna da outra — a tabela ganharia
+  // linhas com metade das células vazias, e a conciliação perderia o caso que
+  // ela veio responder. Duas visões, um seletor.
+  const [custoView, setCustoView] = useState<"custos" | "conciliacao">("custos");
+  const [buscaConc, setBuscaConc] = useState("");
+  const [paginaConc, setPaginaConc] = useState(0);
+  const [filtroConc, setFiltroConc] =
+    useState<"todos" | "casado" | "so_oem" | "so_ds" | "desativada" | "cancelado">("todos");
   // Controlado para que os atalhos "Resolver em Divergências" das abas de
   // resumo consigam levar a pessoa até onde a decisão acontece.
   // Na URL (e não em useState) desde 23/08/2026: é assim que a notificação de
@@ -1242,6 +1286,154 @@ export default function OemIntegrationTab() {
     };
   }, [linhas, filiaisComCodigo, custoDsPorFilial]);
 
+  // ------------------------------------------------------- Conciliação
+  // Os dois cadastros um de frente para o outro, na mesma linha. A pergunta
+  // que ela responde é de CONTAGEM, não de valor: o que o OEM cobra tem
+  // cliente aqui, e o que está cadastrado aqui tem licença lá?
+  //
+  // O GRÃO DA ESQUERDA É A FILIAL, e isso muda como os dois totais se leem.
+  // Medido em 06/09/2026 na conta da Digi Office: 857 filiais ativas para 850
+  // clientes do DoctorSaaS — 6 clientes têm mais de uma licença. Os dois
+  // números nunca vão fechar 1:1, e por isso o cabeçalho diz o que cada um
+  // conta em vez de mostrar só a diferença, que leria como erro.
+  //
+  // ESCOPO: entra quem está vivo de pelo menos UM dos lados. Licença
+  // desativada em cliente cancelado é acordo encerrado nos dois cadastros, e
+  // são 1.720 linhas assim contra 877 vivas — deixá-las na lista afogaria o
+  // que se veio conferir. Os totais do cabeçalho seguem o mesmo corte.
+  const conciliacao = useMemo(() => {
+    const temFilial = (l: Recon) => !!l.filial_codigo;
+    const licencaAtiva = (l: Recon) => l.status_oem === "Ativo";
+    const clienteVivo = (l: Recon) => !!l.ds_customer_id && l.cancelado_ds === false;
+
+    const noEscopo = linhas.filter((l) =>
+      temFilial(l) ? licencaAtiva(l) || clienteVivo(l) : clienteVivo(l));
+
+    // Markup é do CLIENTE, não da filial: a mensalidade é uma só e o custo
+    // soma todas as licenças dele. Numa linha de cliente com 2 filiais, o
+    // markup calculado com o custo daquela filial diria que ele rende o dobro
+    // do que rende. Mesma régua da tabela de Custos e da ficha do cliente —
+    // divisor sempre o custo do OEM.
+    const custoDoCliente = new Map<string, number>();
+    const filiaisDoCliente = new Map<string, number>();
+    for (const l of noEscopo) {
+      if (!l.ds_customer_id || !temFilial(l) || !licencaAtiva(l)) continue;
+      const k = l.ds_customer_id;
+      custoDoCliente.set(k, (custoDoCliente.get(k) ?? 0) + Number(l.custo_oem || 0));
+      filiaisDoCliente.set(k, (filiaisDoCliente.get(k) ?? 0) + 1);
+    }
+
+    // O que a FICHA do cliente diz, que é o lado direito do confronto: para
+    // qual filial ela aponta e quanto ela diz que custa. Sem isso, a metade da
+    // direita mostrava só o que o cliente paga — e a pergunta "o cadastro daqui
+    // aponta para a mesma licença que o OEM cobra?" não tinha resposta na tela.
+    //
+    // Conferido em 06/09/2026: nenhum código de filial está gravado na ficha de
+    // um cliente que não seja o da linha (0 de 877). Por isso o custo pode ser
+    // buscado pela filial, sem desempate por cliente.
+    const codigosDoCliente = new Map<string, Set<string>>();
+    for (const p of produtosOem) {
+      if (!p.cliente_id || !p.oem_codigo_filial) continue;
+      const k = String(p.cliente_id);
+      if (!codigosDoCliente.has(k)) codigosDoCliente.set(k, new Set());
+      codigosDoCliente.get(k)!.add(String(p.oem_codigo_filial));
+    }
+
+    type Estado = "casado" | "so_oem" | "so_ds" | "desativada" | "cancelado";
+    const lista = noEscopo.map((l) => {
+      const estado: Estado =
+        !temFilial(l) ? "so_ds"
+        : !l.ds_customer_id ? "so_oem"
+        : l.cancelado_ds ? "cancelado"
+        : !licencaAtiva(l) ? "desativada"
+        : "casado";
+      const custoCli = l.ds_customer_id ? custoDoCliente.get(l.ds_customer_id) ?? 0 : 0;
+      const nFiliais = l.ds_customer_id ? filiaisDoCliente.get(l.ds_customer_id) ?? 0 : 0;
+      const mensalidade = Number(l.mensalidade_ds || 0);
+      const filial = l.filial_codigo ? String(l.filial_codigo) : null;
+      const codsFicha = l.ds_customer_id
+        ? [...(codigosDoCliente.get(l.ds_customer_id) ?? [])]
+        : [];
+      return {
+        id: l.id,
+        estado,
+        clienteId: l.ds_customer_id,
+        // Lado OEM
+        nomeOem: l.razao_social_oem ?? l.razao_oem ?? null,
+        grupo: l.empresa_codigo,
+        filial: l.filial_codigo,
+        // `cnpj_norm` é o documento da LINHA, não do lado do OEM: na linha de
+        // cliente sem licença (que não tem filial nenhuma) ele é o CNPJ do
+        // cadastro DAQUI, e `cnpj_ds` vem nulo. Sem esta separação, as 14
+        // linhas "Só no DS" apareciam sem documento nenhum na tela — e é
+        // justamente por ele que se procura a loja no portal do parceiro.
+        cnpjOem: temFilial(l) ? l.cnpj_norm : null,
+        custoOem: Number(l.custo_oem || 0),
+        statusOem: l.status_oem,
+        desativaEm: l.desativa_em,
+        candidatos: l.qtd_candidatos_ds ?? 0,
+        // Lado DoctorSaaS
+        nomeDs: l.razao_ds ?? l.razao_social_ds ?? null,
+        cnpjDs: l.cnpj_ds ?? (temFilial(l) ? null : l.cnpj_norm),
+        // O código gravado na ficha DESTE cliente que bate com a licença da
+        // esquerda. Quando é null e a ficha tem outros, o vínculo é deduzido e
+        // `outrosCodigosFicha` diz para onde a ficha aponta de verdade — é o
+        // que explica o selo "Deduzido" sem obrigar a abrir outra aba.
+        codigoFicha: filial && codsFicha.includes(filial) ? filial : null,
+        outrosCodigosFicha: codsFicha.filter((c) => c !== filial),
+        // Custo digitado na ficha do produto. `null` é "não há o que ler"
+        // (nenhum produto ativo com este código), e é diferente de zero — zero
+        // afirmaria que a ficha diz que custa nada. São 6 linhas assim hoje,
+        // as mesmas 6 sem código na ficha.
+        custoDs: filial && custoDsPorFilial.has(filial)
+          ? custoDsPorFilial.get(filial)!
+          : null,
+        mensalidade,
+        // O par existe, mas o código está gravado na ficha do cliente? Sem
+        // isso o vínculo foi DEDUZIDO (por CNPJ ou nome) e ninguém confirmou.
+        // É a mesma linha de corte que a tabela de Custos usa para decidir de
+        // quem ela fala; aqui ela não exclui a linha, só marca.
+        confirmado: !!l.filial_codigo && filiaisComCodigo.has(String(l.filial_codigo)),
+        // Só há markup onde há os dois lados vivos e custo para dividir.
+        markup: custoCli > 0 && mensalidade > 0 ? mensalidade / custoCli : null,
+        custoCliente: custoCli,
+        nFiliais,
+      };
+    });
+
+    // Contagem de CLIENTES VIVOS: o cliente cancelado tem `ds_customer_id` e
+    // entraria aqui, inflando o lado direito com cadastro morto. Ele continua
+    // na lista (a licença dele ainda cobra) e no seu próprio balde, mas não é
+    // "cliente com produto do OEM" para efeito de conferir os dois totais.
+    const clientesDe = (f: (x: (typeof lista)[number]) => boolean) =>
+      new Set(
+        lista.filter((x) => x.clienteId && x.estado !== "cancelado" && f(x))
+          .map((x) => x.clienteId!),
+      ).size;
+
+    return {
+      lista,
+      // Contagens do CABEÇALHO. Cada uma é de um grão e o rótulo diz qual.
+      licencasAtivas: lista.filter((x) => x.filial && x.statusOem === "Ativo").length,
+      clientesDs: clientesDe(() => true),
+      clientesComLicenca: clientesDe((x) => !!x.filial),
+      casado: lista.filter((x) => x.estado === "casado").length,
+      soOem: lista.filter((x) => x.estado === "so_oem").length,
+      soDs: lista.filter((x) => x.estado === "so_ds").length,
+      desativada: lista.filter((x) => x.estado === "desativada").length,
+      cancelado: lista.filter((x) => x.estado === "cancelado").length,
+      naoConfirmados: lista.filter((x) => x.estado === "casado" && !x.confirmado).length,
+      custoAtivo: lista
+        .filter((x) => x.statusOem === "Ativo")
+        .reduce((a, x) => a + x.custoOem, 0),
+      // Sem contador de custo divergente aqui de propósito: a visão de Custos
+      // já tem um, agregado POR CLIENTE, e o daqui sairia por LICENÇA. Dois
+      // números com o mesmo nome e grãos diferentes viram duas respostas para
+      // a mesma pergunta. O valor em âmbar na linha diz o caso; quantos são é
+      // assunto da outra visão.
+    };
+  }, [linhas, filiaisComCodigo, produtosOem, custoDsPorFilial]);
+
   // ------------------------------------------------------- Divergências
   // Uma linha por CLIENTE, e dentro dela tudo o que está errado com ele —
   // venha de onde vier. Antes, o mesmo cliente aparecia em Conferência pelo
@@ -1792,6 +1984,44 @@ export default function OemIntegrationTab() {
       return dir * (na - nb);
     });
   }, [custos.lista, buscaCusto, filtroCusto, custoSort, custoDir]);
+
+  // Ordem: primeiro o que não tem par, depois o que tem. Quem abre a
+  // conciliação vem procurar o que sobra de um lado; com 877 linhas em ordem
+  // alfabética, as 21 que importam ficariam espalhadas por 36 páginas. As
+  // pílulas continuam existindo para isolar um balde só.
+  const PESO_ESTADO: Record<string, number> = {
+    so_oem: 0, so_ds: 1, cancelado: 2, desativada: 3, casado: 4,
+  };
+  const concVisiveis = useMemo(() => {
+    const q = buscaConc.trim().toLowerCase();
+    const porEstado = filtroConc === "todos"
+      ? conciliacao.lista
+      : conciliacao.lista.filter((c) => c.estado === filtroConc);
+    const base = q
+      // `outrosCodigosFicha` entra na busca porque é um código de filial que
+      // aparece NA TELA: quem copia o número que está na linha e cola aqui
+      // precisa cair de volta nela, e não em "nada encontrado".
+      ? porEstado.filter((c) =>
+          combina(q, [
+            c.nomeOem, c.nomeDs, c.cnpjOem, c.cnpjDs, c.filial, c.grupo,
+            ...c.outrosCodigosFicha,
+          ]))
+      : porEstado;
+    return [...base].sort((a, b) => {
+      const pa = PESO_ESTADO[a.estado] ?? 9;
+      const pb = PESO_ESTADO[b.estado] ?? 9;
+      if (pa !== pb) return pa - pb;
+      return String(a.nomeDs ?? a.nomeOem ?? "")
+        .localeCompare(String(b.nomeDs ?? b.nomeOem ?? ""), "pt-BR");
+    });
+  }, [conciliacao.lista, buscaConc, filtroConc]);
+
+  const totalPaginasConc = Math.max(1, Math.ceil(concVisiveis.length / POR_PAGINA));
+  const paginaConcAtual = Math.min(paginaConc, totalPaginasConc - 1);
+  const concPagina = concVisiveis.slice(
+    paginaConcAtual * POR_PAGINA,
+    paginaConcAtual * POR_PAGINA + POR_PAGINA,
+  );
 
   const totalPaginasCusto = Math.max(1, Math.ceil(custosVisiveis.length / POR_PAGINA));
   const paginaCustoAtual = Math.min(paginaCusto, totalPaginasCusto - 1);
@@ -2893,6 +3123,452 @@ export default function OemIntegrationTab() {
 
         {/* ------------------------------------------------------------ custos */}
         <TabsContent value="custos" className="space-y-3">
+          {/* Duas perguntas diferentes sobre o mesmo par de cadastros: "quanto"
+              (a tabela de custos, só onde o vínculo está confirmado) e "quem"
+              (a conciliação, que existe para mostrar quem NÃO tem par). */}
+          <div className="inline-flex rounded-md border p-0.5">
+            {([
+              ["custos", "Custos", custos.lista.length],
+              ["conciliacao", "Conciliação", conciliacao.soOem + conciliacao.soDs
+                + conciliacao.desativada + conciliacao.cancelado],
+            ] as const).map(([v, rot, n]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setCustoView(v)}
+                className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                  custoView === v
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                title={v === "custos"
+                  ? "O custo da ficha contra o que a licença cobra, cliente a cliente"
+                  : "Os dois cadastros um de frente para o outro, incluindo quem não tem par"}
+              >
+                {rot}{" "}
+                <span
+                  className={`tabular-nums ${
+                    v === "conciliacao" && n > 0 && custoView !== v
+                      ? "text-amber-600 dark:text-amber-400"
+                      : "opacity-70"
+                  }`}
+                >
+                  {n}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {custoView === "conciliacao" ? (
+          <>
+          <Explica>
+            Os dois cadastros um de frente para o outro: à esquerda a{" "}
+            <strong>licença do OEM</strong> (nome, código do grupo, código da filial, CNPJ e o{" "}
+            <strong>custo</strong> que ela cobra), à direita o{" "}
+            <strong>cliente do DoctorSaaS</strong> com o{" "}
+            <strong>código de filial gravado na ficha dele</strong>, o{" "}
+            <strong>custo digitado nessa ficha</strong>, a mensalidade e o markup. Serve para
+            responder uma pergunta só: <strong>o que está de um lado tem par do outro?</strong>
+            <br /><br />
+            Os dois <strong>códigos de filial</strong> ficam na mesma altura porque é lendo um
+            contra o outro que se vê se o cadastro daqui aponta para a licença que o OEM está
+            cobrando. Em verde, é o mesmo código; em âmbar, a ficha aponta para{" "}
+            <strong>outra filial</strong> (ou não tem código nenhum) e o vínculo foi{" "}
+            <strong>deduzido</strong> por CNPJ ou nome. Os dois <strong>custos</strong> seguem a
+            mesma ideia: em âmbar quando a ficha diz um valor e a licença cobra outro, e{" "}
+            <strong>—</strong> quando nenhum produto ativo do cliente tem aquele código, que é
+            diferente de custar zero.
+            <br /><br />
+            Os dois totais do topo <strong>não fecham 1:1, e isso está certo</strong>: à esquerda
+            se conta <strong>licença</strong> e à direita <strong>cliente</strong>, e um cliente
+            pode ter várias filiais. O que aponta sobra de um lado são as pílulas:{" "}
+            <strong>Só no OEM</strong> é licença ativa sem nenhum cliente aqui (custo saindo sem
+            dono) e <strong>Só no DS</strong> é cliente com produto do OEM e nenhuma licença lá.
+            <br /><br />
+            Entra na lista quem está <strong>vivo de pelo menos um dos lados</strong>. Licença
+            desativada em cliente já cancelado é acordo encerrado nos dois cadastros e ficaria
+            enterrando o que se veio conferir. O <strong>Markup</strong> é o do cliente
+            (mensalidade dividida pelo custo do OEM, somando todas as licenças dele), a mesma
+            régua da visão de Custos e da ficha do cliente. Esta tela é{" "}
+            <strong>só leitura</strong>: quem decide vínculo é a aba <strong>Divergências</strong>.
+          </Explica>
+
+          <Numero
+            valor={String(conciliacao.licencasAtivas)}
+            rotulo="Licenças ativas no OEM"
+            // As parcelas TÊM que somar o número grande, senão a primeira coisa
+            // que acontece é alguém somar 856 + 1, achar 857 contra 859 e vir
+            // perguntar onde estão as duas. As licenças em cliente cancelado
+            // são justamente essas duas: continuam ativas, continuam cobrando.
+            sub={
+              <>
+                {conciliacao.casado} com cliente ativo aqui
+                {conciliacao.cancelado > 0 && (
+                  <> · <span className="text-destructive">
+                    {conciliacao.cancelado} em cliente cancelado
+                  </span></>
+                )}
+                {conciliacao.soOem > 0 && (
+                  <> · <span className="text-amber-600 dark:text-amber-400">
+                    {conciliacao.soOem} sem cliente
+                  </span></>
+                )}
+                <span className="block mt-0.5">
+                  {brl(conciliacao.custoAtivo)} de custo por mês
+                </span>
+              </>
+            }
+            ao_lado={{
+              valor: String(conciliacao.clientesDs),
+              rotulo: "Clientes com produto do OEM",
+              title:
+                `${conciliacao.clientesComLicenca} têm licença no OEM e ${conciliacao.soDs} não têm. `
+                + "Clientes vivos, nas unidades desta conta, com pelo menos um produto vinculado ao OEM.",
+            }}
+          />
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                {conciliacao.lista.length} linha(s) de conciliação
+              </CardTitle>
+              <CardDescription>
+                Uma linha por licença do OEM, mais uma por cliente daqui que não tem licença
+                nenhuma.
+                {conciliacao.naoConfirmados > 0 && (
+                  <> · <span className="text-amber-600 dark:text-amber-400">
+                    {conciliacao.naoConfirmados} par(es) deduzido(s)
+                  </span>, sem o código da filial na ficha do cliente</>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="px-6 pb-3 flex flex-wrap items-center gap-3">
+                <div className="relative w-full max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    className="pl-9"
+                    placeholder="Buscar por nome, CNPJ, filial ou grupo…"
+                    value={buscaConc}
+                    onChange={(e) => { setBuscaConc(e.target.value); setPaginaConc(0); }}
+                  />
+                </div>
+                <div className="inline-flex flex-wrap rounded-md border p-0.5">
+                  {([
+                    ["todos", "Todos", conciliacao.lista.length, false],
+                    ["casado", "Nos dois", conciliacao.casado, false],
+                    ["so_oem", "Só no OEM", conciliacao.soOem, true],
+                    ["so_ds", "Só no DS", conciliacao.soDs, true],
+                    ["desativada", "Licença desativada", conciliacao.desativada, true],
+                    ["cancelado", "Cliente cancelado", conciliacao.cancelado, true],
+                  ] as const).map(([v, rot, n, alerta]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => { setFiltroConc(v); setPaginaConc(0); }}
+                      className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                        filtroConc === v
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {rot}{" "}
+                      <span
+                        className={`tabular-nums ${
+                          alerta && n > 0 && filtroConc !== v
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "opacity-70"
+                        }`}
+                      >
+                        {n}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* A linha tem duas metades com nome, três selos e dinheiro em
+                  cada uma. Abaixo desta largura os selos quebram em três
+                  linhas de um lado e duas do outro, e as duas metades — que só
+                  se leem uma contra a outra — saem da mesma altura. Rolagem
+                  horizontal, como na tabela de Custos ao lado. */}
+              <div className="overflow-x-auto">
+              <div className="min-w-[980px]">
+              {/* Cabeçalho de quem é cada metade. Sem ele, as duas colunas de
+                  nome parecem repetição do mesmo cadastro. */}
+              <div className="flex items-center border-y bg-muted/50 px-6 py-2 text-xs font-medium text-muted-foreground">
+                <span className="min-w-0 flex-1">Licença no OEM</span>
+                <span className="w-28 shrink-0 text-center">Vínculo</span>
+                <span className="min-w-0 flex-1 pl-4">Cliente no DoctorSaaS</span>
+              </div>
+
+              {concPagina.length === 0 ? (
+                <p className="px-6 py-8 text-sm text-muted-foreground text-center">
+                  {conciliacao.lista.length === 0
+                    ? "Nenhuma licença ativa nem cliente com produto do OEM nesta conta."
+                    : buscaConc.trim()
+                      ? "Nenhuma linha encontrada para esta busca."
+                      : "Nenhuma linha neste filtro."}
+                </p>
+              ) : (
+                <div className="divide-y">
+                  {concPagina.map((c) => {
+                    const selo = SELO_CONC[
+                      c.estado === "casado" && !c.confirmado ? "deduzido" : c.estado
+                    ];
+                    const Icone = selo.Icone;
+                    return (
+                      <div key={c.id} className="flex items-stretch px-6 py-3 text-sm">
+                        {/* ------------------------------------------ OEM */}
+                        <div className="min-w-0 flex-1 pr-4">
+                          {c.filial ? (
+                            <>
+                              <div className="flex min-w-0 items-center gap-2">
+                                <Origem lado="oem" />
+                                <p className="truncate font-medium" title={c.nomeOem ?? undefined}>
+                                  {c.nomeOem ?? "Sem nome no OEM"}
+                                </p>
+                              </div>
+                              {/* Grupo e filial no mesmo card do nome, que é
+                                  como se procura a loja no portal do parceiro:
+                                  o nome não é único, o par de códigos é. */}
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                                <span
+                                  className="rounded bg-muted px-1.5 py-0.5 tabular-nums"
+                                  title="Código do grupo (empresa) no OEM"
+                                >
+                                  grupo {c.grupo ?? "—"}
+                                </span>
+                                <span
+                                  className="rounded bg-muted px-1.5 py-0.5 tabular-nums"
+                                  title="Código da filial no OEM"
+                                >
+                                  filial {c.filial}
+                                </span>
+                                <CnpjCopiavel valor={c.cnpjOem} />
+                              </div>
+                              <p className="mt-1 flex flex-wrap items-center gap-2">
+                                {/* Rotulado desde que a ficha ganhou o custo
+                                    dela do outro lado: dois valores em dinheiro
+                                    frente a frente, um deles sem nome, seriam
+                                    lidos como coisas diferentes. */}
+                                <span
+                                  className="tabular-nums font-medium text-sky-600 dark:text-sky-400"
+                                  title="Custo que esta licença cobra no OEM"
+                                >
+                                  <span className="font-normal text-muted-foreground">custo </span>
+                                  {brl(c.custoOem)}
+                                </span>
+                                {c.statusOem !== "Ativo" && (
+                                  <span className="text-xs text-muted-foreground">
+                                    licença desativada
+                                  </span>
+                                )}
+                                {/* Baixa agendada não é divergência: a licença
+                                    fica ativa até a data e cobra até lá. Quem
+                                    concilia precisa saber até quando. */}
+                                {c.desativaEm && (
+                                  <span className="text-xs text-muted-foreground">
+                                    desativa em {dataBR(c.desativaEm)}
+                                  </span>
+                                )}
+                              </p>
+                            </>
+                          ) : (
+                            <LadoVazio
+                              // "Sem licença" seria falso quando o espelho
+                              // achou licenças e o que faltou foi ESCOLHER
+                              // qual é a dele (o CNPJ do grupo não desempata).
+                              // São duas saídas diferentes, e o rótulo tem que
+                              // dizer qual das duas é.
+                              texto={
+                                c.candidatos > 0
+                                  ? `Sem licença escolhida · ${c.candidatos} candidata(s)`
+                                  : "Sem licença no OEM"
+                              }
+                              dica={
+                                c.candidatos > 0
+                                  ? "O mesmo CNPJ tem mais de uma licença no OEM e ninguém escolheu qual é a deste cliente. A escolha acontece na aba Divergências."
+                                  : "Este cliente tem produto do OEM no DoctorSaaS, mas o espelho não achou nenhuma licença para ele"
+                              }
+                            />
+                          )}
+                        </div>
+
+                        {/* -------------------------------------- vínculo */}
+                        <div
+                          className="flex w-28 shrink-0 flex-col items-center justify-center gap-1 border-x px-2"
+                          title={selo.dica}
+                        >
+                          <Icone className={`h-4 w-4 ${selo.cor}`} />
+                          <span className={`text-[11px] text-center leading-tight ${selo.cor}`}>
+                            {selo.rotulo}
+                          </span>
+                        </div>
+
+                        {/* ------------------------------------------- DS */}
+                        <div className="min-w-0 flex-1 pl-4">
+                          {c.clienteId ? (
+                            <>
+                              <div className="flex min-w-0 items-center gap-2">
+                                <Origem lado="ds" />
+                                <p className="truncate font-medium" title={c.nomeDs ?? undefined}>
+                                  {c.nomeDs ?? "Sem nome no DoctorSaaS"}
+                                </p>
+                              </div>
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                                {/* O código gravado na ficha, na mesma posição
+                                    e no mesmo formato do badge da esquerda: é
+                                    lendo os dois na mesma altura que se vê se
+                                    o cadastro daqui aponta para a licença que
+                                    o OEM está cobrando. */}
+                                {c.codigoFicha ? (
+                                  <span
+                                    className="rounded bg-emerald-500/15 px-1.5 py-0.5 tabular-nums text-emerald-600 dark:text-emerald-400"
+                                    title="Código da filial gravado na ficha deste cliente, igual ao da licença ao lado"
+                                  >
+                                    filial {c.codigoFicha}
+                                  </span>
+                                ) : c.filial ? (
+                                  <span
+                                    className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-600 dark:text-amber-400"
+                                    title={
+                                      c.outrosCodigosFicha.length
+                                        ? `A ficha deste cliente aponta para a filial ${c.outrosCodigosFicha.join(", ")}, e não para a ${c.filial} desta linha. O vínculo foi deduzido por CNPJ ou nome.`
+                                        : `O código ${c.filial} não está gravado em nenhum produto ativo deste cliente. O vínculo foi deduzido por CNPJ ou nome.`
+                                    }
+                                  >
+                                    {c.outrosCodigosFicha.length
+                                      ? `ficha aponta filial ${c.outrosCodigosFicha.join(", ")}`
+                                      : "sem código na ficha"}
+                                  </span>
+                                ) : c.outrosCodigosFicha.length ? (
+                                  // Cliente sem licença no espelho mas com
+                                  // código na ficha: o código aponta para uma
+                                  // filial que o OEM não devolveu.
+                                  <span
+                                    className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-600 dark:text-amber-400"
+                                    title={`A ficha aponta para a filial ${c.outrosCodigosFicha.join(", ")}, que não veio no espelho do OEM.`}
+                                  >
+                                    ficha aponta filial {c.outrosCodigosFicha.join(", ")}
+                                  </span>
+                                ) : null}
+                                <CnpjCopiavel valor={c.cnpjDs} />
+                                {/* O CNPJ dos dois lados aparece por inteiro e
+                                    lado a lado de propósito: quando eles
+                                    divergem, é o sinal forte de que o par está
+                                    errado, e resumir num "ok" esconderia isso. */}
+                                {c.cnpjOem && c.cnpjDs && c.cnpjOem !== c.cnpjDs && (
+                                  <span className="text-amber-600 dark:text-amber-400">
+                                    CNPJ diferente do OEM
+                                  </span>
+                                )}
+                                {c.nFiliais > 1 && (
+                                  <span title="Este cliente tem mais de uma licença ativa no OEM, e ele aparece uma vez por licença">
+                                    {c.nFiliais} licenças
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-1 flex flex-wrap items-center gap-2">
+                                {/* O custo da ficha de frente para o custo da
+                                    licença, na mesma altura. "—" quando não há
+                                    produto ativo com aquele código: zero diria
+                                    que a ficha afirma que não custa nada, e o
+                                    que houve foi não ter onde ler. */}
+                                <span
+                                  className={`tabular-nums ${
+                                    c.custoDs == null
+                                      ? "text-muted-foreground"
+                                      : Math.abs(c.custoDs - c.custoOem) >= 0.01
+                                        ? "font-medium text-amber-600 dark:text-amber-400"
+                                        : "font-medium"
+                                  }`}
+                                  title={
+                                    c.custoDs == null
+                                      ? "Nenhum produto ativo deste cliente tem o código desta filial, então não há custo digitado para ler"
+                                      : Math.abs(c.custoDs - c.custoOem) >= 0.01
+                                        ? `A ficha diz ${brl(c.custoDs)} e a licença cobra ${brl(c.custoOem)}. O reajuste da ficha se aplica na visão de Custos.`
+                                        : "O custo da ficha é igual ao que a licença cobra"
+                                  }
+                                >
+                                  <span className="font-normal text-muted-foreground">custo </span>
+                                  {c.custoDs == null ? "—" : brl(c.custoDs)}
+                                </span>
+                                <span
+                                  className="tabular-nums font-medium text-emerald-600 dark:text-emerald-400"
+                                  title="Mensalidade do cliente no DoctorSaaS (MRR atual)"
+                                >
+                                  <span className="font-normal text-muted-foreground">mensalidade </span>
+                                  {brl(c.mensalidade)}
+                                </span>
+                                {c.markup != null && (
+                                  <span
+                                    className={`text-xs tabular-nums ${
+                                      c.markup < 1
+                                        ? "text-destructive"
+                                        : "text-muted-foreground"
+                                    }`}
+                                    title={`${brl(c.mensalidade)} ÷ ${brl(c.custoCliente)}${
+                                      c.nFiliais > 1
+                                        ? ` (soma das ${c.nFiliais} licenças do cliente)`
+                                        : " (custo do OEM)"
+                                    }`}
+                                  >
+                                    markup {num2(c.markup)}
+                                  </span>
+                                )}
+                                {c.estado === "cancelado" && (
+                                  <span className="text-xs text-destructive">
+                                    cancelado no DoctorSaaS
+                                  </span>
+                                )}
+                              </p>
+                            </>
+                          ) : (
+                            <LadoVazio
+                              texto={
+                                c.candidatos > 0
+                                  ? `Sem cliente vinculado · ${c.candidatos} candidato(s)`
+                                  : "Sem cliente no DoctorSaaS"
+                              }
+                              dica={
+                                c.candidatos > 0
+                                  ? "O espelho achou mais de um cliente possível e ninguém escolheu. A escolha acontece na aba Divergências."
+                                  : "Licença cobrada no OEM sem nenhum cliente correspondente aqui"
+                              }
+                            />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              </div>
+              </div>
+
+              {totalPaginasConc > 1 && (
+                <div className="flex items-center justify-between border-t px-6 py-3 text-sm">
+                  <span className="text-muted-foreground">
+                    {concVisiveis.length} linha(s) · página {paginaConcAtual + 1} de {totalPaginasConc}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" disabled={paginaConcAtual === 0}
+                      onClick={() => setPaginaConc(paginaConcAtual - 1)}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={paginaConcAtual >= totalPaginasConc - 1}
+                      onClick={() => setPaginaConc(paginaConcAtual + 1)}>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          </>
+          ) : (
+          <>
           <Explica>
             Os dois custos da mesma licença, lado a lado. O <strong>Custo DS</strong> é o valor
             digitado na ficha do produto, dentro do DoctorSaaS; o <strong>Custo OEM</strong> é o
@@ -3150,6 +3826,8 @@ export default function OemIntegrationTab() {
               )}
             </CardContent>
           </Card>
+          </>
+          )}
         </TabsContent>
 
         {/* -------------------------------------------------------- pendências */}
