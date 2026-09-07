@@ -17,6 +17,9 @@ export interface ContactSearchResult {
 /**
  * Busca no diretório de contatos (whatsapp_contacts) por nome ou telefone.
  * Grupos ficam de fora: o jid de grupo não abre conversa nova.
+ * Contato inativo também: esta busca só alimenta a abertura de conversa, e o
+ * ponto da inativação (DEM-0365) é justamente não deixar mandar mensagem para
+ * um número que o cliente trocou. O histórico dele continua na tela de Contatos.
  * Os índices trgm de name/phone_number cobrem o ilike '%termo%'.
  */
 export function useContactSearch(searchTerm: string, limit = 20) {
@@ -46,6 +49,7 @@ export function useContactSearch(searchTerm: string, limit = 20) {
         .select('id, name, phone_number, profile_picture_url, instance_id, cliente_id, clientes(nome_fantasia, razao_social)')
         .eq('tenant_id', tid)
         .eq('is_group', false)
+        .eq('is_active', true)
         .or(`${byName}${byPhone}`)
         .order('name', { ascending: true })
         .limit(limit);

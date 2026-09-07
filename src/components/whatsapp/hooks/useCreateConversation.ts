@@ -33,7 +33,9 @@ export const useCreateConversation = () => {
       if (error) throw error;
 
       return {
-        status: data?.status as 'created' | 'reused' | 'blocked',
+        // 'inactive_contact': contato inativado no diretório (DEM-0365). Vem sem
+        // conversa nova; quando já existia uma, o id vem junto só como informação.
+        status: data?.status as 'created' | 'reused' | 'blocked' | 'inactive_contact',
         conversationId: data?.conversation_id as string,
         techName: data?.tech_name as string | undefined,
       };

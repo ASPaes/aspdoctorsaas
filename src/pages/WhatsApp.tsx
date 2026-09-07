@@ -188,7 +188,14 @@ function WhatsAppContent() {
       phoneNumber: params.phone,
       contactName: params.clienteName || params.phone,
       clienteId: params.clienteId ?? undefined,
-    }).then(async ({ conversationId }) => {
+    }).then(async ({ status, conversationId }) => {
+      // Contato inativado no diretório (DEM-0365): a RPC não abre nem retoma.
+      // O histórico dele continua na lista de conversas e na tela de Contatos.
+      if (status === 'inactive_contact') {
+        toast.error("Contato inativo. Reative em Contatos para abrir uma conversa.");
+        return;
+      }
+
       const { data } = await supabase
         .from("whatsapp_conversations")
         .select("*, contact:whatsapp_contacts(*)")

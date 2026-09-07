@@ -10177,7 +10177,11 @@ export type Database = {
           cliente_id: string | null
           created_at: string
           id: string
+          inactivated_at: string | null
+          inactivated_by: string | null
+          inactivated_reason: string | null
           instance_id: string | null
+          is_active: boolean
           is_group: boolean
           name: string | null
           notes: string | null
@@ -10197,7 +10201,11 @@ export type Database = {
           cliente_id?: string | null
           created_at?: string
           id?: string
+          inactivated_at?: string | null
+          inactivated_by?: string | null
+          inactivated_reason?: string | null
           instance_id?: string | null
+          is_active?: boolean
           is_group?: boolean
           name?: string | null
           notes?: string | null
@@ -10217,7 +10225,11 @@ export type Database = {
           cliente_id?: string | null
           created_at?: string
           id?: string
+          inactivated_at?: string | null
+          inactivated_by?: string | null
+          inactivated_reason?: string | null
           instance_id?: string | null
+          is_active?: boolean
           is_group?: boolean
           name?: string | null
           notes?: string | null

@@ -2,9 +2,21 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Search, Users, MessageSquare, Clock, TrendingUp, ChevronLeft, ChevronRight, SmilePlus, ThumbsUp, ThumbsDown, Minus, Building2, Mail, ExternalLink, Phone, Send, User, UserPlus, Pencil, MessageSquarePlus } from "lucide-react";
+import { ArrowLeft, Search, Users, MessageSquare, Clock, TrendingUp, ChevronLeft, ChevronRight, SmilePlus, ThumbsUp, ThumbsDown, Minus, Building2, Mail, ExternalLink, Phone, Send, User, UserPlus, Pencil, MessageSquarePlus, UserX, UserCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useWhatsAppContacts, type ContactSortOption, type ContactClienteFilter } from "@/components/whatsapp/hooks/useWhatsAppContacts";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
+import { useSetContactActive } from "@/components/whatsapp/hooks/useSetContactActive";
+import { useWhatsAppContacts, type ContactSortOption, type ContactClienteFilter, type ContactStatusFilter } from "@/components/whatsapp/hooks/useWhatsAppContacts";
 import { useContactDetails } from "@/components/whatsapp/hooks/useContactDetails";
 import { useLinkedCliente } from "@/components/whatsapp/hooks/useLinkedCliente";
 import { ContactDirectoryDialog, type EditableContact } from "@/components/whatsapp/contatos/ContactDirectoryDialog";
@@ -31,7 +43,10 @@ export default function WhatsAppContatos() {
   const [newConvOpen, setNewConvOpen] = useState(false);
   const [vinculo, setVinculo] = useState<"all" | "none" | "cliente">("all");
   const [filterCliente, setFilterCliente] = useState<SelectedCliente | null>(null);
+  const [statusFilter, setStatusFilter] = useState<ContactStatusFilter>("active");
+  const [confirmInativar, setConfirmInativar] = useState(false);
   const { instances } = useWhatsAppInstances();
+  const setContactActive = useSetContactActive();
 
   const clienteFilter: ContactClienteFilter =
     vinculo === "none"
@@ -40,13 +55,32 @@ export default function WhatsAppContatos() {
       ? { mode: "cliente", clienteId: filterCliente.id }
       : { mode: "all" };
 
-  const { data: contactsData, isLoading } = useWhatsAppContacts(instanceId, search, sortBy, page, 30, clienteFilter);
+  const { data: contactsData, isLoading } = useWhatsAppContacts(instanceId, search, sortBy, page, 30, clienteFilter, statusFilter);
   const contacts = contactsData?.contacts || [];
   const totalPages = contactsData?.totalPages || 1;
   const totalCount = contactsData?.totalCount || 0;
   const { data: details, isLoading: detailsLoading } = useContactDetails(selectedContactId);
   const selectedContact = contacts.find((c: any) => c.id === selectedContactId);
   const { data: linkedCliente } = useLinkedCliente(selectedContactId, selectedContact?.phone_number || null);
+
+  // O contato aberto pode não estar mais na lista (acabou de ser inativado com o
+  // filtro em "Ativos"), então a situação vem do detalhe, não da linha da lista.
+  const contactAtivo = details?.contact?.is_active !== false;
+
+  const handleToggleActive = async (proximo: boolean) => {
+    if (!details?.contact) return;
+    try {
+      await setContactActive.mutateAsync({ contactId: details.contact.id, active: proximo });
+      setConfirmInativar(false);
+      toast.success(proximo ? "Contato reativado" : "Contato inativado");
+    } catch (e: any) {
+      toast.error(
+        e?.message === "not_authorized"
+          ? "Você não tem permissão para alterar este contato."
+          : "Não foi possível alterar a situação do contato."
+      );
+    }
+  };
 
   const sentimentIcon = (s: string) => {
     if (s === "positive") return <ThumbsUp className="h-3 w-3 text-green-500" />;
@@ -98,19 +132,34 @@ export default function WhatsAppContatos() {
               </SelectContent>
             </Select>
           </div>
-          <Select
-            value={vinculo}
-            onValueChange={(v) => { setVinculo(v as "all" | "none" | "cliente"); setFilterCliente(null); setPage(1); }}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os contatos</SelectItem>
-              <SelectItem value="none">Sem cliente vinculado</SelectItem>
-              <SelectItem value="cliente">Cliente específico</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Select
+              value={vinculo}
+              onValueChange={(v) => { setVinculo(v as "all" | "none" | "cliente"); setFilterCliente(null); setPage(1); }}
+            >
+              <SelectTrigger className="h-8 text-xs flex-1 min-w-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os contatos</SelectItem>
+                <SelectItem value="none">Sem cliente vinculado</SelectItem>
+                <SelectItem value="cliente">Cliente específico</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => { setStatusFilter(v as ContactStatusFilter); setPage(1); }}
+            >
+              <SelectTrigger className="h-8 text-xs w-[104px] shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Ativos</SelectItem>
+                <SelectItem value="inactive">Inativos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           {vinculo === "cliente" && (
             <ClienteSearchSelect
               value={filterCliente}
@@ -149,15 +198,20 @@ export default function WhatsAppContatos() {
                       : "border-l-transparent hover:bg-muted/60"
                   }`}
                 >
-                  <Avatar className="h-10 w-10">
+                  <Avatar className={`h-10 w-10 ${c.is_active === false ? "opacity-50 grayscale" : ""}`}>
                     {c.profile_picture_url && <AvatarImage src={c.profile_picture_url} />}
                     <AvatarFallback className="text-xs">{(c.name || c.phone_number).substring(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{c.name || c.phone_number}</p>
+                    {/* Inativo (DEM-0365): só aparece quando o filtro de situação
+                        pede. Riscado + cinza para não parecer contato disponível. */}
+                    <p className={`text-sm font-medium truncate ${c.is_active === false ? "line-through text-muted-foreground decoration-muted-foreground/60" : ""}`}>
+                      {c.name || c.phone_number}
+                    </p>
                     <p className="text-xs text-muted-foreground truncate">{c.phone_number}</p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
+                    {c.is_active === false && <UserX className="h-3.5 w-3.5 text-amber-500" aria-label="Contato inativo" />}
                     {c.cliente_id && <Building2 className="h-3.5 w-3.5 text-emerald-500" aria-label="Vinculado a cliente" />}
                     {c.total_conversations > 0 && (
                       <Badge variant="outline" className="text-[10px]">{c.total_conversations}</Badge>
@@ -214,7 +268,15 @@ export default function WhatsAppContatos() {
                     <AvatarFallback>{(details.contact?.name || "?").substring(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <h2 className="text-lg font-semibold truncate">{details.contact?.name || details.contact?.phone_number}</h2>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h2 className="text-lg font-semibold truncate">{details.contact?.name || details.contact?.phone_number}</h2>
+                      {!contactAtivo && (
+                        <Badge variant="outline" className="shrink-0 gap-1 border-amber-500/50 text-amber-600 dark:text-amber-400">
+                          <UserX className="h-3 w-3" />
+                          Inativo
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">{details.contact?.phone_number}</p>
                     {details.contact?.tags?.length > 0 && (
                       <div className="flex gap-1 mt-1 flex-wrap">
@@ -224,8 +286,10 @@ export default function WhatsAppContatos() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {/* Grupo não tem telefone — o jid não serve para abrir conversa nova */}
-                  {!details.contact?.is_group && (
+                  {/* Grupo não tem telefone — o jid não serve para abrir conversa nova.
+                      Inativo (DEM-0365) também não abre: a RPC recusa, o botão some
+                      para o atendente não bater numa porta fechada. */}
+                  {!details.contact?.is_group && contactAtivo && (
                     <Button
                       size="sm"
                       className="h-8 gap-1.5"
@@ -255,8 +319,48 @@ export default function WhatsAppContatos() {
                     <Pencil className="h-3.5 w-3.5" />
                     Editar
                   </Button>
+                  {contactAtivo ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 text-amber-600 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-400"
+                      disabled={setContactActive.isPending}
+                      onClick={() => setConfirmInativar(true)}
+                    >
+                      <UserX className="h-3.5 w-3.5" />
+                      Inativar
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5"
+                      disabled={setContactActive.isPending}
+                      onClick={() => handleToggleActive(true)}
+                    >
+                      <UserCheck className="h-3.5 w-3.5" />
+                      Reativar
+                    </Button>
+                  )}
                 </div>
               </div>
+
+              {!contactAtivo && (
+                <Card className="border-amber-500/40 bg-amber-500/5">
+                  <CardContent className="p-3 flex items-start gap-2">
+                    <UserX className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                    <div className="text-xs">
+                      <p className="font-medium">Contato inativo</p>
+                      <p className="text-muted-foreground">
+                        Não aparece na busca de contatos nem abre conversa nova. O histórico abaixo continua completo.
+                        {details.contact?.inactivated_at && (
+                          <> Inativado em {new Date(details.contact.inactivated_at).toLocaleDateString("pt-BR")}.</>
+                        )}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Notes */}
               {details.contact?.notes && (
@@ -569,6 +673,32 @@ export default function WhatsAppContatos() {
         initialInstanceId={details?.contact?.instance_id ?? undefined}
         onCreated={(convId) => navigate(`/whatsapp?conversation=${convId}`)}
       />
+
+      <AlertDialog open={confirmInativar} onOpenChange={(o) => !setContactActive.isPending && setConfirmInativar(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Inativar {details?.contact?.name || details?.contact?.phone_number}?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>O contato sai da busca e ninguém consegue abrir uma conversa nova com ele.</p>
+                <p>
+                  Nada é apagado: conversas, mensagens, atendimentos e avaliações continuam disponíveis para consulta,
+                  e você pode reativar o contato a qualquer momento.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={setContactActive.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={setContactActive.isPending}
+              onClick={(e) => { e.preventDefault(); handleToggleActive(false); }}
+            >
+              {setContactActive.isPending ? "Inativando..." : "Inativar contato"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

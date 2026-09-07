@@ -11,6 +11,12 @@ export type ContactClienteFilter =
   | { mode: 'none' }
   | { mode: 'cliente'; clienteId: string };
 
+/**
+ * Situação do contato (DEM-0365). O padrão da tela é 'active' — inativo só
+ * aparece quando pedido, que é o ponto da inativação.
+ */
+export type ContactStatusFilter = 'active' | 'inactive' | 'all';
+
 export interface ContactWithMetrics {
   id: string;
   name: string;
@@ -20,6 +26,7 @@ export interface ContactWithMetrics {
   instance_id: string;
   cliente_id: string | null;
   is_group: boolean;
+  is_active: boolean;
   total_conversations: number;
   total_messages: number;
   last_interaction: string | null;
@@ -37,7 +44,8 @@ export const useWhatsAppContacts = (
   sortBy: ContactSortOption = 'last_interaction',
   page: number = 1,
   pageSize: number = 20,
-  clienteFilter: ContactClienteFilter = { mode: 'all' }
+  clienteFilter: ContactClienteFilter = { mode: 'all' },
+  statusFilter: ContactStatusFilter = 'active'
 ) => {
   const { effectiveTenantId: tid } = useTenantFilter();
 
@@ -51,16 +59,25 @@ export const useWhatsAppContacts = (
     return q;
   };
 
+  // Idem para a situação: se ficar só na query dos dados, o contador do topo
+  // conta o que a lista não mostra e a paginação erra o número de páginas.
+  const applyStatusFilter = (q: any) => {
+    if (statusFilter === 'active') return q.eq('is_active', true);
+    if (statusFilter === 'inactive') return q.eq('is_active', false);
+    return q;
+  };
+
   return useQuery({
-    queryKey: ['whatsapp-contacts', instanceId, searchTerm, sortBy, page, pageSize, tid, clienteFilterKey],
+    queryKey: ['whatsapp-contacts', instanceId, searchTerm, sortBy, page, pageSize, tid, clienteFilterKey, statusFilter],
     queryFn: async (): Promise<ContactsResult> => {
       let query = supabase
         .from('whatsapp_contacts')
-        .select('id, name, phone_number, profile_picture_url, notes, instance_id, cliente_id, is_group');
+        .select('id, name, phone_number, profile_picture_url, notes, instance_id, cliente_id, is_group, is_active');
 
       if (tid) query = query.eq('tenant_id', tid);
       if (instanceId) query = query.eq('instance_id', instanceId);
       query = applyClienteFilter(query);
+      query = applyStatusFilter(query);
       if (searchTerm && searchTerm.length > 0) {
         const escaped = escapeLike(searchTerm);
         query = query.or(`name.ilike.%${escaped}%,phone_number.ilike.%${escaped}%`);
@@ -71,6 +88,7 @@ export const useWhatsAppContacts = (
       if (tid) countQuery = countQuery.eq('tenant_id', tid);
       if (instanceId) countQuery = countQuery.eq('instance_id', instanceId);
       countQuery = applyClienteFilter(countQuery);
+      countQuery = applyStatusFilter(countQuery);
       if (searchTerm && searchTerm.length > 0) {
         const escaped = escapeLike(searchTerm);
         countQuery = countQuery.or(`name.ilike.%${escaped}%,phone_number.ilike.%${escaped}%`);

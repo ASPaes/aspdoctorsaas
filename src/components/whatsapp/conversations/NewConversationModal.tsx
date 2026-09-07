@@ -288,6 +288,10 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
               { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined, clienteId: clienteIdForCreate },
               {
                 onSuccess: (d) => {
+                  if (d.status === 'inactive_contact') {
+                    toast.error("Contato inativo. Reative em Contatos para abrir uma conversa.");
+                    return;
+                  }
                   if (d.status === 'blocked') {
                     toast.error(`Este contato já está em atendimento com ${d.techName || 'outro atendente'}`);
                     return;
@@ -320,6 +324,10 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
       { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined, clienteId: clienteIdForCreate },
       {
         onSuccess: (d) => {
+          if (d.status === 'inactive_contact') {
+            toast.error("Contato inativo. Reative em Contatos para abrir uma conversa.");
+            return;
+          }
           if (d.status === 'blocked') {
             toast.error(`Este contato já está em atendimento com ${d.techName || 'outro atendente'}`);
             return;
