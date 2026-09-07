@@ -75,7 +75,12 @@ function extractContent(msg: any): string {
   if (t === 'sticker') return '\u{1F3A8} Sticker';
   if (t === 'contacts') { const c = msg.contacts?.length || 0; return `\u{1F464} ${c} contato${c !== 1 ? 's' : ''}`; }
   if (t === 'location') return `\u{1F4CD} Localiza\u{E7}\u{E3}o: ${msg.location?.latitude},${msg.location?.longitude}`;
-  if (t === 'reaction') return msg.reaction?.emoji || META_UNSUPPORTED_LABEL;
+  // Reacao e a unica excecao a invariante acima, e de proposito: ela nunca vira bolha
+  // (ChatMessages tira message_type='reaction' da timeline e so agrega o emoji na bolha
+  // alvo), entao string vazia aqui nao deixa bolha em branco. Emoji vazio = o cliente
+  // RETIROU a reacao; devolver o rotulo de nao suportado imprimiria o texto inteiro
+  // dentro do chip de reacao. E a mesma forma que a evolution-webhook grava.
+  if (t === 'reaction') return msg.reaction?.emoji || '';
   // Resposta interativa: o texto E a escolha do cliente, nao um rotulo.
   if (t === 'interactive') {
     const i = msg.interactive || {};
@@ -293,11 +298,19 @@ Deno.serve(async (req) => {
 
       // === Processar mensagens ===
       for (const msg of value.messages || []) {
-        if (msg.type === 'reaction') { console.log(`${LOG} Reaction ignorada`); continue; }
-
         const normalizedPhone = normalizePhone(msg.from);
         const ts = msg.timestamp ? new Date(parseInt(msg.timestamp, 10) * 1000).toISOString() : new Date().toISOString();
         const { mediaId, mimetype, filename } = extractMediaMeta(msg);
+
+        // Alvo da reacao. A Meta manda o wamid da mensagem reagida em
+        // `reaction.message_id`, que e exatamente o valor gravado em
+        // whatsapp_messages.message_id nos dois sentidos (inbound e outbound) — o
+        // front casa reacao com bolha por esse campo, igual ja faz no Evolution
+        // (la o alvo vem em reactionMessage.key.id). Sem isto a reacao entraria no
+        // banco orfa e nao apareceria em bolha nenhuma.
+        const quotedMessageId = msg.type === 'reaction'
+          ? (msg.reaction?.message_id || null)
+          : null;
 
         const normalized: NormalizedInboundMessage = {
           instanceId: instance.id,
@@ -316,6 +329,7 @@ Deno.serve(async (req) => {
           mediaMimetype: mimetype,
           mediaFilename: filename,
           mediaStoragePath: null,
+          quotedMessageId,
           rawPayload: msg,
         };
 
