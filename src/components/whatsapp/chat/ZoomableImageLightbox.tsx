@@ -29,6 +29,19 @@ const roundBtn =
 const controlBtn =
   "flex items-center justify-center h-10 w-10 rounded-full bg-black/70 hover:bg-black/90 text-white transition-colors";
 
+/** Seta circular com o ângulo escrito no miolo, como nos botões de avançar de player. */
+function RotateIcon({ direction }: { direction: "ccw" | "cw" }) {
+  const Arrow = direction === "ccw" ? RotateCcw : RotateCw;
+  return (
+    <span className="relative inline-flex h-[22px] w-[22px] items-center justify-center">
+      <Arrow className="h-[22px] w-[22px]" />
+      {/* O miolo livre da seta do lucide tem ~14px com o ícone em 22px: 9px de
+          fonte com tracking apertado é o maior "90" que cabe sem tocar o traço. */}
+      <span className="absolute text-[9px] font-semibold leading-none tracking-tighter">90</span>
+    </span>
+  );
+}
+
 export function ZoomableImageLightbox({
   src,
   onClose,
@@ -197,12 +210,13 @@ export function ZoomableImageLightbox({
               contentStyle={{ touchAction: "none" }}
             >
               {/* Em 90°/270° o giro é só visual: o espaço que a imagem ocupa no
-                  layout continua sendo o de antes do giro. Sem esta moldura com o
-                  quadro invertido, uma foto deitada estouraria a altura da tela. */}
-              <div
-                className="flex items-center justify-center"
-                style={quarterTurn ? { width: "90vw", height: "85vh" } : undefined}
-              >
+                  layout continua sendo o de antes do giro. Sem esta moldura, uma
+                  foto deitada estouraria a altura da tela.
+                  A moldura tem tamanho fixo de propósito: o centerOnInit centra
+                  uma única vez, na montagem. Se ela mudasse de tamanho ao girar,
+                  a centralização de origem ficaria valendo para o quadro antigo e
+                  a imagem sairia jogada para o canto. */}
+              <div className="flex items-center justify-center" style={{ width: "90vw", height: "85vh" }}>
                 <img
                   data-lightbox-keep
                   src={src}
@@ -267,7 +281,7 @@ export function ZoomableImageLightbox({
                 className={controlBtn}
                 title="Girar para a esquerda (Shift+R)"
               >
-                <RotateCcw className="h-5 w-5" />
+                <RotateIcon direction="ccw" />
               </button>
               <button
                 onClick={(e) => {
@@ -277,7 +291,7 @@ export function ZoomableImageLightbox({
                 className={controlBtn}
                 title="Girar para a direita (R)"
               >
-                <RotateCw className="h-5 w-5" />
+                <RotateIcon direction="cw" />
               </button>
             </div>
           </>
