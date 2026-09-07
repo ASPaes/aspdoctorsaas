@@ -7,6 +7,14 @@
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
+  # /assets/ é build do Vite. Arquivo que não existe ali é 404 de verdade, nunca
+  # index.html: sem esta linha o servidor devolvia 200 + text/html para um chunk
+  # com hash antigo (já removido pelo deploy) e o browser recusava o HTML como
+  # módulo — era o "Failed to fetch dynamically imported module" que aparecia na
+  # tela de erro. Quem recupera disso é o app (src/lib/staleChunkReload.ts);
+  # aqui a resposta só deixa de mentir.
+  RewriteRule ^assets/ - [R=404,L]
+
   # SPA (BrowserRouter): qualquer outra rota cai no index.html
   RewriteRule ^ index.html [L]
 </IfModule>

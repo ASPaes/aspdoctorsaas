@@ -1,4 +1,5 @@
-import { useMemo, useCallback, useEffect, useState, lazy, Suspense } from "react";
+import { useMemo, useCallback, useEffect, useState, Suspense } from "react";
+import { lazyWithReload } from "@/lib/staleChunkReload";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,10 +31,10 @@ import ReajustesTab from "@/components/clientes/ReajustesTab";
 import AprovacaoOemTab from "@/components/clientes/AprovacaoOemTab";
 // Sob demanda: a tela de divergências pesa ~10 kB gzip e hoje só uma empresa a
 // enxerga. Importada direto, ela entraria no bundle inicial de todo mundo.
-const DivergenciasHiperTab = lazy(() => import("@/components/clientes/DivergenciasHiperTab"));
+const DivergenciasHiperTab = lazyWithReload(() => import("@/components/clientes/DivergenciasHiperTab"));
 // Sob demanda pelo mesmo motivo: a tela de saneamento só interessa a quem tem
 // cadastro incompleto, e no bundle inicial ela custaria a todos.
-const CadastroIncompletoTab = lazy(() => import("@/components/clientes/CadastroIncompletoTab"));
+const CadastroIncompletoTab = lazyWithReload(() => import("@/components/clientes/CadastroIncompletoTab"));
 import { useAprovacaoOemVisivel, useAprovacaoOemStatus } from "@/hooks/useAprovacaoOem";
 import { useCadastroIncompleto } from "@/hooks/useCadastroIncompleto";
 import { useHiperDivergenciasVisivel, useHiperDivergenciasPendentes } from "@/hooks/useHiperDivergencias";

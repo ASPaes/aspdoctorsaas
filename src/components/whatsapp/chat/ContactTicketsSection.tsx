@@ -1,4 +1,5 @@
-import { lazy, Suspense, useState } from "react";
+import { Suspense, useState } from "react";
+import { lazyWithReload } from "@/lib/staleChunkReload";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDet
 import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 
 // Pesado (~3k linhas) e só usado quando o ticket é de onboarding — fora do chunk do chat.
-const JourneyDetailSheet = lazy(() => import("@/pages/onboarding/JourneyDetailSheet"));
+const JourneyDetailSheet = lazyWithReload(() => import("@/pages/onboarding/JourneyDetailSheet"));
 
 interface Props {
   clienteId: string | null | undefined;

@@ -1,4 +1,5 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
+import { lazyWithReload } from "@/lib/staleChunkReload";
 import AppToasters from "@/components/AppToasters";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
@@ -25,32 +26,32 @@ import WhatsApp from "@/pages/WhatsApp";
 import Login from "@/pages/Login";
 
 // Lazy-loaded: less-visited pages
-const Signup = lazy(() => import("@/pages/Signup"));
-const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
-const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
-const Cadastros = lazy(() => import("@/pages/Cadastros"));
-const Configuracoes = lazy(() => import("@/pages/Configuracoes"));
-const CertificadosA1 = lazy(() => import("@/pages/CertificadosA1"));
-const NotFound = lazy(() => import("@/pages/NotFound"));
-const Onboarding = lazy(() => import("@/pages/Onboarding"));
-const AccessPending = lazy(() => import("@/pages/AccessPending"));
-const AccessBlocked = lazy(() => import("@/pages/AccessBlocked"));
-const SettingsUsers = lazy(() => import("@/pages/SettingsUsers"));
-const SuperTenants = lazy(() => import("@/pages/SuperTenants"));
-const SuperTenantDetail = lazy(() => import("@/pages/SuperTenantDetail"));
-const SuperMonitor = lazy(() => import("@/pages/SuperMonitor"));
-const SuperCatalogTemplates = lazy(() => import("@/pages/SuperCatalogTemplates"));
-const PainelUso = lazy(() => import("@/pages/painel-uso/PainelUso"));
-const LimpezaUras = lazy(() => import("@/pages/admin/LimpezaUras"));
-const WhatsAppContatos = lazy(() => import("@/pages/WhatsAppContatos"));
-const AtendimentoDashboard = lazy(() => import("@/pages/AtendimentoDashboard"));
-const OnboardingPage = lazy(() => import("@/pages/onboarding/OnboardingPage"));
-const OnboardingConfigPage = lazy(() => import("@/pages/onboarding/OnboardingConfigPage"));
-const OnboardingDashboardPage = lazy(() => import("@/pages/onboarding/OnboardingDashboardPage"));
+const Signup = lazyWithReload(() => import("@/pages/Signup"));
+const ForgotPassword = lazyWithReload(() => import("@/pages/ForgotPassword"));
+const ResetPassword = lazyWithReload(() => import("@/pages/ResetPassword"));
+const Cadastros = lazyWithReload(() => import("@/pages/Cadastros"));
+const Configuracoes = lazyWithReload(() => import("@/pages/Configuracoes"));
+const CertificadosA1 = lazyWithReload(() => import("@/pages/CertificadosA1"));
+const NotFound = lazyWithReload(() => import("@/pages/NotFound"));
+const Onboarding = lazyWithReload(() => import("@/pages/Onboarding"));
+const AccessPending = lazyWithReload(() => import("@/pages/AccessPending"));
+const AccessBlocked = lazyWithReload(() => import("@/pages/AccessBlocked"));
+const SettingsUsers = lazyWithReload(() => import("@/pages/SettingsUsers"));
+const SuperTenants = lazyWithReload(() => import("@/pages/SuperTenants"));
+const SuperTenantDetail = lazyWithReload(() => import("@/pages/SuperTenantDetail"));
+const SuperMonitor = lazyWithReload(() => import("@/pages/SuperMonitor"));
+const SuperCatalogTemplates = lazyWithReload(() => import("@/pages/SuperCatalogTemplates"));
+const PainelUso = lazyWithReload(() => import("@/pages/painel-uso/PainelUso"));
+const LimpezaUras = lazyWithReload(() => import("@/pages/admin/LimpezaUras"));
+const WhatsAppContatos = lazyWithReload(() => import("@/pages/WhatsAppContatos"));
+const AtendimentoDashboard = lazyWithReload(() => import("@/pages/AtendimentoDashboard"));
+const OnboardingPage = lazyWithReload(() => import("@/pages/onboarding/OnboardingPage"));
+const OnboardingConfigPage = lazyWithReload(() => import("@/pages/onboarding/OnboardingConfigPage"));
+const OnboardingDashboardPage = lazyWithReload(() => import("@/pages/onboarding/OnboardingDashboardPage"));
 
 
-const SupportTickets = lazy(() => import("@/pages/SupportTickets"));
-const ConfiguracoesNotificacoes = lazy(() => import("@/pages/ConfiguracoesNotificacoes"));
+const SupportTickets = lazyWithReload(() => import("@/pages/SupportTickets"));
+const ConfiguracoesNotificacoes = lazyWithReload(() => import("@/pages/ConfiguracoesNotificacoes"));
 
 import SuperAdminGuard from "@/components/SuperAdminGuard";
 import OnboardingGuard from "@/components/OnboardingGuard";
