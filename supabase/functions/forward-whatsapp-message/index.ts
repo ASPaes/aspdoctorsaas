@@ -3,6 +3,12 @@ import { getInstanceSecrets } from '../_shared/providers/index.ts';
 import { previewCut } from '../_shared/preview.ts';
 
 const FUNCTION_NAME = 'forward-whatsapp-message';
+
+// Tipos que só fazem sentido com o arquivo em mãos. Sem media_path/media_url
+// eles NÃO podem virar sendText: o destinatário receberia apenas o rótulo
+// ("🎥 Vídeo") achando que recebeu a mídia. Acontece quando o arquivo passou do
+// teto de download do webhook (12 MB) ou já foi removido pela retenção.
+const MEDIA_TYPES = new Set(['image', 'video', 'audio', 'document', 'sticker', 'albumMessage']);
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -58,7 +64,7 @@ Deno.serve(async (req) => {
     // Fetch messages to forward
     const { data: messages, error: msgError } = await supabase
       .from('whatsapp_messages')
-      .select('id, content, message_type, media_url, media_path, media_mimetype, media_filename, media_ext, media_size_bytes, media_kind')
+      .select('id, content, message_type, media_url, media_path, media_mimetype, media_filename, media_ext, media_size_bytes, media_kind, media_purged_at')
       .in('id', messageIds)
       .order('timestamp', { ascending: true });
 
@@ -137,6 +143,7 @@ Deno.serve(async (req) => {
     const authHeaders = { apikey: secrets.api_key };
 
     const forwarded: string[] = [];
+    const skipped: { id: string; reason: string }[] = [];
 
     for (const msg of messages) {
       try {
@@ -144,7 +151,14 @@ Deno.serve(async (req) => {
         let reqBody: any;
         const forwardPrefix = '↪ *Encaminhado*';
 
-        if (msg.message_type === 'text' || (!msg.media_path && !msg.media_url)) {
+        if (MEDIA_TYPES.has(msg.message_type) && !msg.media_path && !msg.media_url) {
+          const reason = msg.media_purged_at ? 'media_purged' : 'media_unavailable';
+          console.warn(`[${FUNCTION_NAME}][${requestId}] Msg ${msg.id} (${msg.message_type}) sem arquivo armazenado — não encaminha (${reason})`);
+          skipped.push({ id: msg.id, reason });
+          continue;
+        }
+
+        if (!MEDIA_TYPES.has(msg.message_type)) {
           endpoint = `${baseUrl}/message/sendText/${instanceIdentifier}`;
           reqBody = { number: destNumber, text: `${forwardPrefix}\n${msg.content || ''}` };
         } else {
@@ -162,6 +176,7 @@ Deno.serve(async (req) => {
 
           if (!mediaLink) {
             console.error(`[${FUNCTION_NAME}][${requestId}] No media URL for msg ${msg.id}`);
+            skipped.push({ id: msg.id, reason: 'media_unavailable' });
             continue;
           }
 
@@ -192,6 +207,7 @@ Deno.serve(async (req) => {
         if (!resp.ok) {
           const err = await resp.text();
           console.error(`[${FUNCTION_NAME}][${requestId}] Forward failed for ${msg.id}: ${err}`);
+          skipped.push({ id: msg.id, reason: 'send_failed' });
           continue;
         }
 
@@ -239,12 +255,13 @@ Deno.serve(async (req) => {
         console.log(`[${FUNCTION_NAME}][${requestId}] Forwarded msg ${msg.id} -> ${targetConversationId}`);
       } catch (err) {
         console.error(`[${FUNCTION_NAME}][${requestId}] Error forwarding ${msg.id}:`, err);
+        skipped.push({ id: msg.id, reason: 'send_failed' });
       }
     }
 
-    console.log(`[${FUNCTION_NAME}][${requestId}] Done. Forwarded ${forwarded.length}/${messages.length}`);
+    console.log(`[${FUNCTION_NAME}][${requestId}] Done. Forwarded ${forwarded.length}/${messages.length} (skipped ${skipped.length})`);
 
-    return new Response(JSON.stringify({ success: true, forwarded, total: messages.length }), {
+    return new Response(JSON.stringify({ success: true, forwarded, skipped, total: messages.length }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

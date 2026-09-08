@@ -18,7 +18,30 @@ export function useForwardMessages() {
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', variables.targetConversationId] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       const count = data.forwarded?.length || 0;
-      toast.success(`${count} mensagem${count !== 1 ? 'ns' : ''} encaminhada${count !== 1 ? 's' : ''}`);
+      const skipped: { id: string; reason: string }[] = data.skipped ?? [];
+
+      // Mídia sem arquivo guardado não é encaminhada: antes virava um texto
+      // "🎥 Vídeo" e o operador achava que tinha mandado o arquivo.
+      const semArquivo = skipped.filter((s) => s.reason === 'media_purged' || s.reason === 'media_unavailable').length;
+      const falhou = skipped.length - semArquivo;
+
+      const plural = (n: number) => `${n} mensagem${n !== 1 ? 'ns' : ''}`;
+      const motivos = [
+        semArquivo > 0 ? `${plural(semArquivo)} sem o arquivo guardado — abra a original e encaminhe pelo WhatsApp` : null,
+        falhou > 0 ? `${plural(falhou)} não pôde ser enviada` : null,
+      ].filter(Boolean).join('. ');
+
+      if (count === 0) {
+        toast.error('Nada foi encaminhado', { description: motivos || undefined, duration: 8000 });
+        return;
+      }
+
+      if (skipped.length > 0) {
+        toast.warning(`${plural(count)} encaminhada${count !== 1 ? 's' : ''}`, { description: motivos, duration: 8000 });
+        return;
+      }
+
+      toast.success(`${plural(count)} encaminhada${count !== 1 ? 's' : ''}`);
     },
     onError: (error: any) => {
       toast.error(error.message || 'Erro ao encaminhar mensagens');
