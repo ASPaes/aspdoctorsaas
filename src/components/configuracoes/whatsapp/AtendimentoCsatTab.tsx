@@ -29,6 +29,9 @@ import {
 const schema = z.object({
   // Atendimento
   support_reopen_window_minutes: z.number().min(1).max(1440),
+  // Mensagem enviada ao cliente quando o atendimento QUE ELE ABRIU ganha um dono
+  support_assignment_greeting_enabled: z.boolean(),
+  support_assignment_greeting_template: z.string(),
   support_auto_close_inactivity_minutes: z.number().min(1).max(1440),
   support_send_inactivity_warning: z.boolean(),
   support_inactivity_enabled: z.boolean(),
@@ -73,6 +76,15 @@ const schema = z.object({
   support_waiting_ack_limit: z.number().min(0).max(20),
   support_ura_timeout_minutes: z.number().min(1).max(60),
   support_ura_default_department_id: z.string().nullable(),
+}).superRefine((v, ctx) => {
+  // Ligado sem texto salva uma configuração que nunca envia nada e não avisa.
+  if (v.support_assignment_greeting_enabled && !v.support_assignment_greeting_template.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["support_assignment_greeting_template"],
+      message: "Escreva a mensagem ou desligue a opção.",
+    });
+  }
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -86,6 +98,8 @@ export default function AtendimentoCsatTab() {
     resolver: zodResolver(schema),
     defaultValues: {
       support_reopen_window_minutes: 10,
+      support_assignment_greeting_enabled: false,
+      support_assignment_greeting_template: "",
       support_auto_close_inactivity_minutes: 30,
       support_send_inactivity_warning: true,
       support_inactivity_enabled: true,
@@ -148,7 +162,7 @@ export default function AtendimentoCsatTab() {
     queryKey: ["configuracoes-atendimento", tid],
     queryFn: async () => {
       let q = supabase.from("configuracoes").select(
-        "id, support_reopen_window_minutes, support_auto_close_inactivity_minutes, support_send_inactivity_warning, support_inactivity_enabled, support_inactivity_warning_before_minutes, support_inactivity_warning_template, support_inactivity_eod_enabled, support_inactivity_eod_warning_template, support_inactivity_eod_close_template, support_inactivity_autohold_enabled, support_inactivity_autohold_minutes, support_inactivity_autohold_extra_terms, support_group_inactivity_enabled, support_group_auto_close_inactivity_minutes, support_group_send_inactivity_warning, support_group_inactivity_warning_before_minutes, support_group_inactivity_warning_template, support_agent_alert_enabled, support_agent_alert_minutes, support_agent_no_response_close_enabled, support_agent_no_response_close_minutes, support_csat_enabled, support_csat_prompt_template, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template, support_ura_enabled, support_ura_welcome_template, support_ura_invalid_option_template, support_ura_confirmation_template, support_waiting_ack_limit, support_ura_timeout_minutes, support_ura_default_department_id"
+        "id, support_reopen_window_minutes, support_assignment_greeting_enabled, support_assignment_greeting_template, support_auto_close_inactivity_minutes, support_send_inactivity_warning, support_inactivity_enabled, support_inactivity_warning_before_minutes, support_inactivity_warning_template, support_inactivity_eod_enabled, support_inactivity_eod_warning_template, support_inactivity_eod_close_template, support_inactivity_autohold_enabled, support_inactivity_autohold_minutes, support_inactivity_autohold_extra_terms, support_group_inactivity_enabled, support_group_auto_close_inactivity_minutes, support_group_send_inactivity_warning, support_group_inactivity_warning_before_minutes, support_group_inactivity_warning_template, support_agent_alert_enabled, support_agent_alert_minutes, support_agent_no_response_close_enabled, support_agent_no_response_close_minutes, support_csat_enabled, support_csat_prompt_template, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template, support_ura_enabled, support_ura_welcome_template, support_ura_invalid_option_template, support_ura_confirmation_template, support_waiting_ack_limit, support_ura_timeout_minutes, support_ura_default_department_id"
       );
       if (tid) q = q.eq("tenant_id", tid);
       const { data, error } = await q.limit(1).maybeSingle();
@@ -161,6 +175,8 @@ export default function AtendimentoCsatTab() {
     if (config) {
       form.reset({
         support_reopen_window_minutes: config.support_reopen_window_minutes,
+        support_assignment_greeting_enabled: config.support_assignment_greeting_enabled ?? false,
+        support_assignment_greeting_template: config.support_assignment_greeting_template ?? "",
         support_auto_close_inactivity_minutes: config.support_auto_close_inactivity_minutes,
         support_send_inactivity_warning: config.support_send_inactivity_warning,
         support_inactivity_enabled: config.support_inactivity_enabled ?? true,
@@ -241,6 +257,7 @@ export default function AtendimentoCsatTab() {
   const agentAlertEnabled = form.watch("support_agent_alert_enabled");
   const agentCloseEnabled = form.watch("support_agent_no_response_close_enabled");
   const uraEnabled = form.watch("support_ura_enabled");
+  const greetingEnabled = form.watch("support_assignment_greeting_enabled");
 
   return (
     <Form {...form}>
@@ -262,6 +279,56 @@ export default function AtendimentoCsatTab() {
                 <FormMessage />
               </FormItem>
             )} />
+          </CardContent>
+        </Card>
+
+        {/* ── Mensagem ao assumir o atendimento (DEM-0195) ── */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Mensagem ao assumir o atendimento</CardTitle>
+            <CardDescription>
+              Enviada ao cliente assim que o atendimento ganha um responsável.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FormField control={form.control} name="support_assignment_greeting_enabled" render={({ field }) => (
+              <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5 pr-4">
+                  <FormLabel>Enviar mensagem padrão</FormLabel>
+                  <FormDescription>
+                    Vale só para o atendimento que o <strong>cliente</strong> abriu, na fila. Quando o
+                    operador é quem inicia a conversa, nada é enviado: ele escreve a própria mensagem.
+                    Grupos ficam de fora.
+                  </FormDescription>
+                </div>
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+              </FormItem>
+            )} />
+
+            {greetingEnabled && (
+              <FormField control={form.control} name="support_assignment_greeting_template" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mensagem</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      rows={3}
+                      placeholder="Olá {nome}, aqui é o {operador} do {setor}. Como posso ajudar?"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Variáveis disponíveis: <code className="text-xs">{"{nome}"}</code> (primeiro nome do
+                    cliente), <code className="text-xs">{"{operador}"}</code>,{" "}
+                    <code className="text-xs">{"{setor}"}</code>,{" "}
+                    <code className="text-xs">{"{atendimento}"}</code> (código do atendimento).
+                    Variável sem valor sai em branco.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
           </CardContent>
         </Card>
 
