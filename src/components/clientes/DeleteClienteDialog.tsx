@@ -20,6 +20,16 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -67,6 +77,23 @@ const VINCULO_LABELS: Record<string, string> = {
   certificado_a1_vendas: "venda(s) de Cert. A1",
 };
 
+// Recusas de admin_delete_cliente que o "Excluir tudo" pode atropelar com p_forcar.
+// Sao as 3 guardas de conteudo vivo (ticket aberto, atendimento em andamento,
+// conversa recente). Matriz com filial e falta de permissao NAO estao aqui de
+// proposito: p_forcar nao passa por cima delas.
+const GUARDA_PURGE =
+  /ticket\(s\) em aberto|atendimento\(s\) em andamento|conversa\(s\) de WhatsApp ativa/i;
+
+// A recusa do banco termina sugerindo transferir ou desligar o switch. No 2o passo
+// essa saida ja foi recusada — fica so o que vai ser apagado.
+const limparMotivo = (m: string) =>
+  m
+    .replace(
+      /\s*(Encerre antes,\s*)?(Desligue "[^"]*",\s*)?(ou\s*)?[Uu]se "Transferir para outro cliente"\.?\s*$/,
+      ""
+    )
+    .trim();
+
 const fmtBRL = (n: number) =>
   (n ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -103,6 +130,11 @@ export default function DeleteClienteDialog({
   // explicita, nao o que acontece quando ninguem mexe no switch.
   const [includeChat, setIncludeChat] = useState(false);
   const [executing, setExecuting] = useState<"transfer" | "purge" | null>(null);
+  // 2o passo do purge. A RPC ja recusa sozinha quando ha ticket aberto, atendimento
+  // em andamento ou conversa viva — o texto da recusa vira o aviso desta tela, para
+  // nao ter uma segunda contagem no frontend divergindo da do banco. Confirmando
+  // aqui, a mesma chamada volta com p_forcar = true e apaga tudo.
+  const [forcarMotivo, setForcarMotivo] = useState<string | null>(null);
 
   const loadPreview = async (target?: string | null) => {
     setLoading(true);
@@ -127,6 +159,7 @@ export default function DeleteClienteDialog({
       setTargetId(null);
       setTargetLabel("");
       setIncludeChat(false);
+      setForcarMotivo(null);
       loadPreview(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -187,7 +220,7 @@ export default function DeleteClienteDialog({
     }
   };
 
-  const handlePurge = async () => {
+  const handlePurge = async (forcar = false) => {
     if (!confirmPurgeOk || blockedByMatriz) return;
     setExecuting("purge");
     try {
@@ -196,14 +229,24 @@ export default function DeleteClienteDialog({
         p_mode: "purge",
         p_confirm: true,
         p_incluir_chat: includeChat,
+        p_forcar: forcar,
       });
       if (error) throw error;
+      setForcarMotivo(null);
       toast({ title: "Cliente excluído" });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       onOpenChange(false);
       navigate("/clientes");
     } catch (e: any) {
-      toast({ title: "Erro ao excluir", description: e.message, variant: "destructive" });
+      const msg = e?.message ?? "";
+      // Recusa das guardas = pergunta, nao erro: o usuario decide no 2o passo.
+      // Matriz com filial e permissao continuam barrando de verdade (p_forcar
+      // nao passa por cima delas), entao seguem como erro.
+      if (!forcar && GUARDA_PURGE.test(msg)) {
+        setForcarMotivo(limparMotivo(msg));
+      } else {
+        toast({ title: "Erro ao excluir", description: msg, variant: "destructive" });
+      }
     } finally {
       setExecuting(null);
     }
@@ -215,6 +258,7 @@ export default function DeleteClienteDialog({
     .map(([k, n]) => ({ key: k, count: Number(n), label: VINCULO_LABELS[k] ?? k }));
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -407,7 +451,7 @@ export default function DeleteClienteDialog({
                     variant="destructive"
                     className="w-full"
                     disabled={!confirmPurgeOk || blockedByMatriz || executing !== null}
-                    onClick={handlePurge}
+                    onClick={() => handlePurge(false)}
                   >
                     {executing === "purge" && <Loader2 className="h-4 w-4 animate-spin" />}
                     Excluir tudo
@@ -428,7 +472,55 @@ export default function DeleteClienteDialog({
             Cancelar
           </Button>
         </DialogFooter>
+
       </DialogContent>
     </Dialog>
+
+      {/* 2o passo: "excluir tudo" e excluir tudo mesmo. A guarda do banco vira
+          aviso, nao parede — quem confirma aqui leva ticket aberto, atendimento
+          em andamento e conversa recente junto. */}
+      <AlertDialog
+        open={forcarMotivo !== null}
+        onOpenChange={(o) => {
+          if (!o && executing !== "purge") setForcarMotivo(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Excluir mesmo assim?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-foreground">
+                  {forcarMotivo}
+                </div>
+                <p>
+                  Confirmando, o cadastro de{" "}
+                  <span className="font-medium text-foreground">{clienteNome}</span> e tudo que
+                  está ligado a ele são apagados permanentemente — inclusive o que está em
+                  aberto. Não há como desfazer.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={executing === "purge"}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handlePurge(true);
+              }}
+              disabled={executing === "purge"}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {executing === "purge" && <Loader2 className="h-4 w-4 animate-spin" />}
+              Sim, apagar tudo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

@@ -24,6 +24,17 @@ Stack: React + Vite + TS + Tailwind + shadcn/ui · Supabase (Postgres + RLS + Ed
 
 O `ezbr_sha256` é a única comparação que fecha, e ela é entre **dois estados de produção** — por isso o baseline existe, e por isso ele precisa estar atualizado ANTES do deploy-all. Sem baseline anterior, o que o deploy-all reverteu é **impossível de saber depois**: os hashes antigos já foram sobrescritos. Foi o que aconteceu em 05/09/2026, quando um commit de chat tocou 3 arquivos de `_shared` e republicou as 86 sem que ninguém soubesse o que ia junto.
 
+⚠️ **Mas o hash vale numa direção só, e isto é uma correção de 08/09/2026.** Hash **igual ⇒ mesmo código**, sempre. Hash **diferente NÃO prova que o código mudou**. Medido na reconciliação de 08/09 (baseline de 06/09 × produção): das 50 divergências, **só 6 eram código** — `forward-whatsapp-message` e os 5 que importam `_shared/message-processor.ts` (`meta-webhook`, `evolution-webhook`, `zapi-webhook`, `check-inactivity-timeout`, `send-whatsapp-template`), mais a nova `send-assignment-greeting`. **As outras 44 eram re-bundle, sem uma linha alterada.**
+
+O que separa os dois grupos é o **import remoto**: as 50 que mudaram trazem `esm.sh/@supabase/supabase-js@2` (major **flutuante**, re-resolvido a cada bundle), `@2.39.3` ou `deno.land/std@0.168.0`; as 36 que voltaram **idênticas** trazem `@2.85.0` pinado. Soma-se o `version: latest` do `supabase/setup-cli` no workflow. A prova que isola: **`populate-cidades` mudou de hash, não importa `_shared` e o último commit no código dela é de 11/04/2026** — não existe caminho pelo qual ela tenha mudado.
+
+O que prova que republicar, sozinho, **não** mexe no hash: as 87 do repo foram todas republicadas naquele deploy-all e **36 voltaram com bundle idêntico**; as 5 que não mudaram nem de `version` são exatamente as 5 prod-only.
+
+**Como ler a saída da auditoria depois de um deploy-all** — a lista crua é 88% ruído. Filtre antes de decidir:
+1. `git log --since=<capturado_em do baseline> --name-only -- supabase/functions/` → quem teve arquivo próprio alterado.
+2. Se `_shared` mudou, o **fecho reverso de imports** do arquivo que mudou → quem carrega aquele código no bundle.
+3. O que sobra na lista e não caiu em (1) nem (2) é re-bundle. Só investigue nome que aparece na auditoria **e** em (1)/(2).
+
 Duas armadilhas do `functions download`, que continua servindo para LER o código de produção (só não para auditar):
 - Ele escreve em `supabase/functions/<slug>` a partir do cwd e **sobe a árvore para achar a pasta `supabase/`** — rodando de qualquer lugar dentro do repo, ele despeja no repo. Monte um diretório isolado com seu próprio `supabase/functions` e rode de lá.
 - No Git Bash, **não use `mktemp`** para o arquivo de saída: ele devolve `/tmp/...`, que o `supabase.exe` não enxerga, e a falha aparece como `Access token not provided`. Use `$TEMP`.
@@ -33,9 +44,9 @@ Regras que continuam valendo:
 - **Ao trazer uma function prod-only para o repo, DECLARE o `verify_jwt` no `supabase/config.toml` — sempre, mesmo que seja `true`.** Sem a entrada, o CI deploya com **`false`** e **muda a autenticação da function em silêncio**. Confira o valor de produção antes com `supabase functions list --project-ref …`.
   **Corrigido em 07/08/2026 — esta linha dizia o contrário ("o CI deploya com o padrão `true`") e induziu ao erro.** Medido no push da F2b do Omie: as 10 functions que entraram no repo sem entrada no config.toml (`omie-integration-call`, `omie-integration-save` e 8 `recon-*`) estavam `true` em produção e saíram do deploy `false`; as 73 já declaradas não se mexeram. `verify_jwt=true` no projeto caiu de 16 para 6. Todas autenticam por dentro (`auth.getUser`, papel, tenant), então não houve acesso a dado — mas o portão do gateway sumiu sem decisão de ninguém. Reposto declarando `true` explícito.
   **Não use `version` da `functions list` como sinal de deploy.** A plataforma bumpa o `version` e o `updated_at` das 83 de uma vez, sozinha, sem mudar código. O sinal confiável é o **`ezbr_sha256`** (hash do bundle): igual = mesmo código. Foi o que separou "o CI deployou 77 por engano" (falso) de "deployou as 9 certas" (verdadeiro).
-- **Se `_shared` mudar**, o push deploya todas as 65 do repo: auditar repo vs prod antes.
+- **Se `_shared` mudar**, o push deploya todas as 87 do repo: auditar repo vs prod antes.
 
-Em 04/08/2026 o `omie-sync-processar` foi a **primeira das 18 prod-only a voltar** para o repo. Faltam 17.
+**Números conferidos em 08/09/2026:** **87** functions no repo, **92** em produção, **0** no repo que não estejam em prod. As prod-only caíram de 18 para **5** — `backfill-contact-pictures`, `fetch-evolution-history`, `fetch-zapi-history`, `reconnect-whatsapp-instance`, `sync-contact-picture`. As `recon-*` e `omie-*` **já voltaram** para o repo; os textos acima que as citam como prod-only são do histórico de ago/2026 e não valem mais.
 
 ### 2. `supabase/migrations/` NÃO é a fonte de verdade do schema
 Não existe CI de migrations. Muita coisa foi aplicada via `apply_migration` / SQL Editor e nunca foi versionada. **O schema real vive no banco.**
@@ -317,7 +328,7 @@ Regra do Alexandre: toda mudança avaliada por latência/egress/carga **antes** 
 
 **No ar e estável:** WhatsApp/atendimento (multi-provider, distribuição, CSAT, macros, grupos, URA battle) · Support Tickets (TK-YYYY-NNNN, categorias N:N por produto, closure flow) · Contratos/MRR/cancelamento/reativação · Onboarding & Implantação (kanban, gerador de pipeline por IA via Edge Function `generate-onboarding-blueprint`) · Théo (agente IA) · Painel de Uso · Controles de custo de IA · Quiet hours · SSO DoctorDev.
 
-65 edge functions em `supabase/functions/` (66 diretórios, sendo `_shared` código compartilhado). Produção tem **82**: as outras **17** (`recon-*`, `omie-*`, `ds-omie-anexo-enviar`, `fetch-zapi-history`, `sync-contact-picture`, `reconnect-whatsapp-instance`) só existem em prod e nunca voltaram pro repo. Trazer as que faltam é seguro desde que o CI deploya só o que mudou — uma de cada vez, conferindo `verify_jwt` antes (ver seção ⚠️ 1).
+**87** edge functions em `supabase/functions/` (88 diretórios, sendo `_shared` código compartilhado) — conferido em 08/09/2026. Produção tem **92**: as outras **5** (`backfill-contact-pictures`, `fetch-evolution-history`, `fetch-zapi-history`, `reconnect-whatsapp-instance`, `sync-contact-picture`) só existem em prod. Trazer as que faltam é seguro desde que o CI deploya só o que mudou — uma de cada vez, conferindo `verify_jwt` antes (ver seção ⚠️ 1).
 
 **Bugs conhecidos em aberto:**
 - `fn_block_close_without_cliente` bloqueando `csat_completed` / `csat_timeout` / `ura_encerrado`
