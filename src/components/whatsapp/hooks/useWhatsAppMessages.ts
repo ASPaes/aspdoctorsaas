@@ -3,6 +3,7 @@ import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { subscribeSharedChannel } from '@/lib/realtimeChannelPool';
 import { patchConversationInCache } from './conversationsCache';
+import { patchMetaWindowFromInbound } from '@/hooks/useMetaWindow';
 
 export type MessageUiType = 'text' | 'media' | 'audio' | 'document' | 'image' | 'system' | string;
 
@@ -339,6 +340,11 @@ export const useWhatsAppMessages = (
         // acende "Novas mensagens" se o atendente estava lendo mais acima.
         newMessageCallbackRef.current?.(msg);
         patchConversationPreview(queryClient, conversationId, msg, true);
+        // Mesmo motivo do Realtime: se a inbound veio por aqui, e por aqui que a
+        // janela de 24h abre.
+        if (!msg.is_from_me) {
+          patchMetaWindowFromInbound(queryClient, conversationId, msg.timestamp);
+        }
       }
     } finally {
       catchUpInFlightRef.current = false;
@@ -390,6 +396,10 @@ export const useWhatsAppMessages = (
           newMessageCallbackRef.current?.(incoming);
           patchConversationPreview(queryClient, conversationId, incoming, true);
           if (!incoming.is_from_me) {
+            // Meta Cloud: esta mensagem acabou de reabrir a janela de 24h. Sem
+            // isto o campo de digitacao ficava travado ate o proximo ciclo de
+            // 60s do useMetaWindow, com a resposta do cliente ja na tela.
+            patchMetaWindowFromInbound(queryClient, conversationId, incoming.timestamp);
             // Throttle: o cache local já mostra a conversa como lida (patch
             // acima), então atrasar a escrita 1,5s não muda nada na tela e
             // colapsa a rajada num único UPDATE.

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface MetaWindowState {
@@ -12,9 +12,59 @@ export interface MetaWindowState {
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 
+export const metaWindowQueryKey = (conversationId: string | null | undefined) =>
+  ['meta-window', conversationId] as const;
+
+// Abre a janela de 24h no MESMO instante em que a mensagem do cliente aparece no
+// chat, em vez de esperar o proximo ciclo de 60s do refetch.
+//
+// O atendente via a resposta chegar e continuava com o campo travado em "Janela
+// de 24h fechada" por ate um minuto; so o F5 adiantava. Quem sabe primeiro que a
+// janela abriu e o Realtime, entao e ele quem tem que contar.
+//
+// Patch de cache e nao invalidate: invalidar refaria as duas consultas (conversa
+// + ultima inbound) so para descobrir o que a mensagem recebida ja diz, e o campo
+// continuaria travado ate a ida ao banco voltar.
+//
+// O criterio aqui e o mesmo do queryFn (is_from_me = false, sem filtro de tipo)
+// de proposito: divergir faria o campo destravar e travar de novo assim que o
+// refetch seguinte chegasse.
+export function patchMetaWindowFromInbound(
+  queryClient: QueryClient,
+  conversationId: string | null | undefined,
+  inboundAt: string | null | undefined,
+) {
+  if (!conversationId || !inboundAt) return;
+  const inboundMs = new Date(inboundAt).getTime();
+  if (!Number.isFinite(inboundMs)) return;
+
+  queryClient.setQueryData<MetaWindowState>(
+    metaWindowQueryKey(conversationId),
+    (prev) => {
+      // Sem cache ainda, ou instancia que nao e Meta: nada a destravar. Devolver
+      // prev (inclusive undefined) faz o setQueryData desistir sem escrever.
+      if (!prev || !prev.isMeta) return prev;
+
+      const knownMs = prev.lastInboundAt ? new Date(prev.lastInboundAt).getTime() : -Infinity;
+      if (!(inboundMs > knownMs)) return prev; // mais velha que a inbound ja conhecida
+
+      const elapsed = Date.now() - inboundMs;
+      if (elapsed >= WINDOW_MS) return prev; // historico antigo chegando pelo catch-up
+
+      return {
+        ...prev,
+        windowOpen: true,
+        requiresTemplate: false,
+        lastInboundAt: inboundAt,
+        hoursRemaining: Math.max(0, (WINDOW_MS - elapsed) / (60 * 60 * 1000)),
+      };
+    },
+  );
+}
+
 export function useMetaWindow(conversationId: string | null | undefined) {
   return useQuery<MetaWindowState>({
-    queryKey: ['meta-window', conversationId],
+    queryKey: metaWindowQueryKey(conversationId),
     enabled: !!conversationId,
     refetchInterval: 60_000,
     queryFn: async () => {
