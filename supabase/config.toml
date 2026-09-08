@@ -273,3 +273,9 @@ verify_jwt = true
 
 [functions.hiper-integration-call]
 verify_jwt = true
+
+[functions.send-assignment-greeting]
+# Chamada só por pg_net, com o anon key no Authorization (mesmo padrão de
+# fn_onboarding_send_welcome). Declarado explicitamente: sem entrada aqui o CI
+# deploya com false e abre a function para qualquer um.
+verify_jwt = true
