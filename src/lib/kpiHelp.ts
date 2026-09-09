@@ -1001,13 +1001,13 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   // ── Atendimento — Velocidade / SLA ──
   atendimento_tme: {
     title: "Tempo de Espera (TME)",
-    definition: "Quanto tempo o cliente fica na fila até um agente assumir. Mostramos a mediana (p50) e a cauda (p90).",
+    definition: "Quanto tempo o cliente fica na fila até um agente assumir. Conta tanto quem assume pela tela quanto quem responde direto pelo WhatsApp do celular. Mostramos a mediana (p50) e a cauda (p90).",
     why_it_matters: "Fila longa frustra e gera abandono. A mediana mostra o típico; o p90 mostra o pior caso recorrente.",
     formula: "mediana e p90 de (assumido − aberto), excluindo zeros e outliers acima de 2h",
   },
   atendimento_frt: {
     title: "1ª Resposta",
-    definition: "Tempo até a primeira resposta de um agente ao cliente. Mediana (p50) e cauda (p90).",
+    definition: "Tempo até a primeira resposta de um agente ao cliente — pela tela ou pelo WhatsApp do celular, conta igual. A saudação automática não conta. Mediana (p50) e cauda (p90).",
     why_it_matters: "É a métrica de SLA que o cliente mais percebe — o silêncio inicial define a impressão do atendimento.",
     formula: "mediana e p90 de first_response_time_seconds, excluindo zeros e outliers acima de 4h",
     market_benchmark: "Em chat, 1–2 min é o ideal de mercado; em suporte técnico B2B, alguns minutos é realista.",
@@ -1182,9 +1182,9 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   },
   atendimento_nao_atendido: {
     title: "Não Atendido",
-    definition: "% de atendimentos encerrados que nunca foram assumidos por um agente.",
-    why_it_matters: "Cliente chamou e ninguém pegou — encerrado no vácuo (auto-close por inatividade ou abandono). Quanto maior, pior a cobertura.",
-    formula: "encerrados sem assumed_at ÷ encerrados, no período",
+    definition: "% de atendimentos encerrados em que o time nunca respondeu o cliente.",
+    why_it_matters: "Cliente chamou e ficou no vácuo — ninguém assumiu, ninguém escreveu e não virou ticket. A saudação automática não conta como resposta. Quanto maior, pior a cobertura.",
+    formula: "encerrados sem assumed_at, sem ticket e sem mensagem do time ÷ encerrados, no período",
   },
   atendimento_agentes_online: {
     title: "Agentes Online",

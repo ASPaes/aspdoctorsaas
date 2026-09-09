@@ -71,7 +71,7 @@ export function NaoAtendidosDialog({ open, onOpenChange }: Props) {
               )}
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Encerrados sem ninguém assumir, nos filtros do período.
+              Encerrados sem ninguém do time responder, nos filtros do período.
               {recortes.length > 1 && (
                 <span data-testid="resumo" className="mt-1 block">
                   {recortes.map(([qtd, rotulo]) => `${n(qtd)} ${rotulo}`).join(" · ")}

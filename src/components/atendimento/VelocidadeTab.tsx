@@ -121,7 +121,7 @@ export function VelocidadeTab() {
               label="Não Atendido"
               helpKey="atendimento_nao_atendido"
               value={data.nao_atendido_pct !== null ? `${data.nao_atendido_pct}%` : "—"}
-              subtitle={`${data.nao_atendido}/${data.total_encerrados} sem assumir`}
+              subtitle={`${data.nao_atendido}/${data.total_encerrados} sem resposta do time`}
               variant={data.nao_atendido_pct !== null && data.nao_atendido_pct > 5 ? "warning" : "dark"}
               icon={<UserX className="h-4 w-4" />}
               onClick={data.nao_atendido > 0 ? () => setVerVacuo(true) : undefined}
