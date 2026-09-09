@@ -18,6 +18,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnidadeFilter } from '@/contexts/UnidadeFilterContext';
 import { NotificationSetupBanner } from '@/components/NotificationSetupBanner';
+import { MeuPainelTab } from '@/components/meuPainel/MeuPainelTab';
+import { podeVerMeuPainel } from '@/lib/meuPainelAcesso';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 export default function Dashboard() {
   const { selectedUnidadeId, unidadeFilterReady } = useUnidadeFilter();
@@ -33,6 +36,19 @@ export default function Dashboard() {
   }, [profile, isAdmin, navigate]);
   const [tvMode, setTvMode] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(0);
+  const [abaAtiva, setAbaAtiva] = useState('visao-geral');
+
+  /** Meu Painel: piloto fechado, ver src/lib/meuPainelAcesso.ts. */
+  const { effectiveTenantId, isSuperAdmin } = useTenantFilter();
+  const temMeuPainel = podeVerMeuPainel({
+    tenantId: effectiveTenantId,
+    role: profile?.role,
+    isSuperAdmin,
+  });
+  /** A barra global (Fornecedor + Período) some SÓ na aba Meu Painel: lá cada
+   *  seção tem o filtro da própria área, e um card de Atendimento embaixo de
+   *  um filtro de Fornecedor seria mentira visual. As outras 7 abas não mudam. */
+  const mostrarFiltroGlobal = abaAtiva !== 'meu-painel';
 
   const { loading, metrics, timeSeries, distributions, canceladosList, novosClientesList, downsellList, refetch } = useDashboardData(filters, unidadeFilterReady);
   const { data: mcData } = useMargemContribuicaoDashboard(filters);
@@ -55,6 +71,7 @@ export default function Dashboard() {
       <NotificationSetupBanner />
 
 
+      {mostrarFiltroGlobal && (
       <DashboardFilters
         filters={filters}
         onFiltersChange={setFilters}
@@ -67,13 +84,14 @@ export default function Dashboard() {
         autoRefreshInterval={autoRefreshInterval}
         onAutoRefreshChange={setAutoRefreshInterval}
       />
+      )}
 
       {loading && !metrics.clientesAtivos ? (
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-32" />)}
         </div>
       ) : (
-        <Tabs defaultValue="visao-geral">
+        <Tabs value={abaAtiva} onValueChange={setAbaAtiva}>
           <div className="overflow-x-auto pb-1">
             <TabsList>
               <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
@@ -83,6 +101,7 @@ export default function Dashboard() {
               <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>
               <TabsTrigger value="cs">Customer Success</TabsTrigger>
               <TabsTrigger value="cohort">Cohort</TabsTrigger>
+              {temMeuPainel && <TabsTrigger value="meu-painel">Meu Painel</TabsTrigger>}
             </TabsList>
           </div>
 
@@ -104,6 +123,11 @@ export default function Dashboard() {
           <TabsContent value="cs">
             <CSTab tvMode={tvMode} periodoInicio={filters.periodoInicio} periodoFim={filters.periodoFim} />
           </TabsContent>
+          {temMeuPainel && (
+            <TabsContent value="meu-painel">
+              <MeuPainelTab />
+            </TabsContent>
+          )}
           <TabsContent value="cohort">
             <CohortTab tvMode={tvMode} fornecedorId={filters.fornecedorId} fornecedorIds={filters.fornecedorIds} unidadeBaseId={filters.unidadeBaseId} />
           </TabsContent>

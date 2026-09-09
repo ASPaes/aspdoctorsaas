@@ -81,10 +81,8 @@ function paramsAtendimento(
   return base;
 }
 
-/** Busca UM provider de Atendimento. A seção chama este hook uma vez por
- *  provider; a lista vem do layout salvo e é estável entre renders, então a
- *  ordem dos hooks nunca muda. */
-export function useProviderAtendimento(provider: ProviderId, filtros: FiltrosSecao) {
+/** Busca UM provider de Atendimento. `ativo` falso não dispara consulta. */
+function useProviderAtendimento(provider: ProviderId, filtros: FiltrosSecao, ativo: boolean) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const rpc = RPC_ATENDIMENTO[provider];
@@ -92,7 +90,7 @@ export function useProviderAtendimento(provider: ProviderId, filtros: FiltrosSec
 
   return useQuery<unknown>({
     queryKey: ["meu-painel", provider, tid, viewKey, params],
-    enabled: !!rpc && !!tid && unidadeFilterReady,
+    enabled: ativo && !!rpc && !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)(rpc!, params);
@@ -100,6 +98,41 @@ export function useProviderAtendimento(provider: ProviderId, filtros: FiltrosSec
       return data ?? {};
     },
   });
+}
+
+/** Os 11 providers de Atendimento, em ordem fixa. Cada seção precisa de um
+ *  subconjunto diferente, mas o NÚMERO de hooks tem que ser constante entre
+ *  renders — chamar hook dentro de um `map` sobre a lista da seção quebra as
+ *  regras do React no instante em que o gestor edita o painel. Os que a
+ *  seção não usa ficam com `enabled: false` e não geram consulta nenhuma. */
+const PROVIDERS_ATENDIMENTO = Object.keys(RPC_ATENDIMENTO).sort() as ProviderId[];
+
+export function useDadosAtendimento(
+  necessarios: ReadonlySet<ProviderId>,
+  filtros: FiltrosSecao,
+): DadosDaSecao & { carregando: boolean } {
+  const p = PROVIDERS_ATENDIMENTO;
+  const queries = [
+    useProviderAtendimento(p[0], filtros, necessarios.has(p[0])),
+    useProviderAtendimento(p[1], filtros, necessarios.has(p[1])),
+    useProviderAtendimento(p[2], filtros, necessarios.has(p[2])),
+    useProviderAtendimento(p[3], filtros, necessarios.has(p[3])),
+    useProviderAtendimento(p[4], filtros, necessarios.has(p[4])),
+    useProviderAtendimento(p[5], filtros, necessarios.has(p[5])),
+    useProviderAtendimento(p[6], filtros, necessarios.has(p[6])),
+    useProviderAtendimento(p[7], filtros, necessarios.has(p[7])),
+    useProviderAtendimento(p[8], filtros, necessarios.has(p[8])),
+    useProviderAtendimento(p[9], filtros, necessarios.has(p[9])),
+    useProviderAtendimento(p[10], filtros, necessarios.has(p[10])),
+  ];
+
+  const dados: DadosDaSecao = {};
+  p.forEach((id, i) => {
+    if (necessarios.has(id)) dados[id] = queries[i].data;
+  });
+
+  const carregando = p.some((id, i) => necessarios.has(id) && queries[i].isLoading);
+  return { ...dados, carregando };
 }
 
 /** Monta o `DashboardFilters` que os hooks do Financeiro esperam, a partir
