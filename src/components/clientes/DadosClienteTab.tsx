@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Users, Loader2, MessageCircle, X, Search, Star, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
+import { Users, Loader2, MessageCircle, X, Search, Star, ChevronDown, ChevronUp, Sparkles, AlertTriangle } from "lucide-react";
 import { maskCNPJ, maskCPF, maskCEP } from "@/lib/masks";
 import { normalizeBRPhone } from "@/lib/phoneBR";
 import { PhoneInputBR } from "@/components/ui/PhoneInputBR";
@@ -19,7 +19,17 @@ import ContatosAdicionaisModal from "@/components/clientes/ContatosAdicionaisMod
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useContactDiagnosis } from "@/components/whatsapp/hooks/useContactDiagnosis";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { cnpjDigitsVariants } from "@/lib/cnpjDigitsVariants";
 import type { ClienteFormValues } from "@/pages/ClienteForm";
+
+type ClienteDuplicado = {
+  id: string;
+  codigo_sequencial: number | null;
+  razao_social: string | null;
+  nome_fantasia: string | null;
+  cancelado: boolean | null;
+};
 
 interface Props {
   form: UseFormReturn<ClienteFormValues>;
@@ -55,6 +65,50 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     tipoDetectadoRef.current = true;
     setTipoPessoa(digits.length === 11 ? "fisica" : "juridica");
   }, [cnpjValue, clienteId]);
+
+  // Aviso (NÃO trava) de CNPJ/CPF já usado por outro cliente do mesmo tenant.
+  // Duplicata continua permitida: quem cadastra é que decide se é filial, troca
+  // de titularidade ou engano.
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const [cnpjDuplicados, setCnpjDuplicados] = useState<ClienteDuplicado[]>([]);
+  const cnpjDupDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const cnpjDupReqRef = useRef(0);
+  useEffect(() => {
+    const digits = (cnpjValue ?? "").replace(/\D/g, "");
+    if (cnpjDupDebounceRef.current) clearTimeout(cnpjDupDebounceRef.current);
+
+    // Só consulta com o documento inteiro. Um CNPJ pela metade tem 11 dígitos e,
+    // com o zero à esquerda, casaria com o CPF de outra pessoa — o aviso piscaria
+    // errado no meio da digitação.
+    const documentoCompleto = tipoPessoa === "fisica" ? digits.length === 11 : digits.length >= 14;
+
+    // Sem tenant escolhido (super admin em "Todos") a busca cruzaria empresas e
+    // acusaria duplicata que não é. Melhor não avisar do que avisar errado.
+    if (!tid || !documentoCompleto) {
+      setCnpjDuplicados([]);
+      return;
+    }
+
+    cnpjDupDebounceRef.current = setTimeout(async () => {
+      const req = ++cnpjDupReqRef.current;
+      let q = (supabase as any)
+        .from("clientes")
+        .select("id, codigo_sequencial, razao_social, nome_fantasia, cancelado")
+        .eq("tenant_id", tid)
+        .in("cnpj_digits", cnpjDigitsVariants(digits))
+        .limit(4);
+      if (clienteId) q = q.neq("id", clienteId);
+      const { data, error } = await q;
+      // Resposta atrasada de um documento que já não está no campo não pode
+      // sobrescrever o resultado do atual.
+      if (req !== cnpjDupReqRef.current) return;
+      setCnpjDuplicados(error ? [] : ((data ?? []) as ClienteDuplicado[]));
+    }, 400);
+
+    return () => {
+      if (cnpjDupDebounceRef.current) clearTimeout(cnpjDupDebounceRef.current);
+    };
+  }, [cnpjValue, tipoPessoa, tid, clienteId]);
 
   // Matriz lookup state
   const [matrizSearch, setMatrizSearch] = useState("");
@@ -378,6 +432,36 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
       </div>
+
+      {/* Aviso de documento repetido — informa, não impede de salvar. */}
+      {cnpjDuplicados.length > 0 && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" />
+          <div className="text-xs text-amber-900 dark:text-amber-200">
+            <p className="font-medium">
+              {cnpjDuplicados.length === 1
+                ? "Já existe um cliente com este CNPJ/CPF:"
+                : `Já existem ${cnpjDuplicados.length} clientes com este CNPJ/CPF:`}
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {cnpjDuplicados.map((c) => (
+                <li key={c.id}>
+                  <a
+                    href={`/clientes/${c.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline underline-offset-2 hover:opacity-80"
+                  >
+                    #{c.codigo_sequencial ?? "—"} — {c.razao_social || c.nome_fantasia || "(sem nome)"}
+                  </a>
+                  {c.cancelado ? " (cancelado)" : ""}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 opacity-80">Você pode salvar assim mesmo.</p>
+          </div>
+        </div>
+      )}
 
       {/* Linha 2: Cod Matriz | Razão Social | Nome Fantasia */}
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr_2fr] gap-4">
