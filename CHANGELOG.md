@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 09/09
+
+- 🔧 **A ficha continuava dizendo "bloqueado" depois de a licença ser liberada no OEM** — O quadro de integração do cliente mostra o estado da licença a partir de uma cópia que o sistema traz do OEM de seis em seis horas. Quando a licença mudava no portal do parceiro fora do DoctorSaaS, a ficha seguia afirmando o estado antigo até a próxima cópia, sem nada indicando que aquele dado era velho. Foi o que aconteceu com um cliente bloqueado às 08:58: o bloqueio chegou ao OEM e foi confirmado por ele, alguém liberou a licença no portal algumas horas depois, e a ficha continuou marcando **Bloqueado: Sim**. Quem tentou desbloquear pela tela recebeu *"nada será enviado"* e clicou quatro vezes, porque o card não mudava. Agora, toda vez que alguém abre **Ativar/Desativar** ou **Bloquear/Desbloquear**, o sistema lê a licença ao vivo no parceiro (isso ele já fazia) e passa a **corrigir a ficha com o que leu**: se o estado na tela estava diferente do que o OEM respondeu, ela é atualizada na hora e a confirmação avisa que estava desatualizada. Continua valendo a regra de sempre: se o parceiro não devolver o estado da licença, nada é gravado nem enviado.
+
 ### 08/09
 
 - 🔧 **Desvincular um cliente do chat apagava o número do cadastro dele** — Quem clicava em **Desvincular** no painel de detalhes da conversa não só soltava o cliente daquele atendimento: o telefone também era removido da lista de contatos do cadastro do cliente, sem escolha e sem volta. Agora desvincular faz só o que o nome diz. Tirar o número do cadastro virou uma opção à parte, desmarcada, para quando o telefone tiver sido cadastrado no cliente errado. Junto disso, quando um contato é desvinculado o sistema para de insistir naquele cliente: em vez de sugerir o mesmo vínculo de novo, ele mostra que a sugestão automática foi desativada naquela conversa e deixa a escolha com o atendente.
