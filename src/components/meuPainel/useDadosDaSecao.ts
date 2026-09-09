@@ -50,7 +50,29 @@ export function ehProviderAtendimento(p: ProviderId): boolean {
 /** SLA de 1ª resposta padrão, espelhando a aba Velocidade. */
 const SLA_FRT_PADRAO_SEG = 300;
 
-function paramsAtendimento(
+/** O que CADA RPC aceita, conferido em `pg_get_function_identity_arguments`
+ *  contra o banco em 09/09/2026.
+ *
+ *  Isso não é zelo excessivo: mandar um argumento nomeado que a função não
+ *  declara faz o PostgREST não achar a função e a chamada falhar inteira.
+ *  Um objeto genérico com "todos os filtros" quebrava 5 das 11 — `clientes`
+ *  recusa quatro, `ura` e `latencia` recusam dois cada, `agentes` e
+ *  `backlog` um cada. */
+export const PARAMS_ACEITOS: Record<string, readonly string[]> = {
+  "atendimento.volume": ["p_tenant_id", "p_date_from", "p_date_to", "p_department_id", "p_unidade_base_id", "p_agent_id", "p_is_group", "p_plantao"],
+  "atendimento.velocidade": ["p_tenant_id", "p_date_from", "p_date_to", "p_department_id", "p_sla_frt_seconds", "p_unidade_base_id", "p_agent_id", "p_is_group", "p_plantao"],
+  "atendimento.velocidade_timeline": ["p_tenant_id", "p_date_from", "p_date_to", "p_department_id", "p_sla_frt_seconds", "p_unidade_base_id", "p_agent_id", "p_is_group", "p_plantao"],
+  "atendimento.backlog": ["p_tenant_id", "p_date_from", "p_date_to", "p_department_id", "p_unidade_base_id", "p_agent_id"],
+  "atendimento.agentes": ["p_tenant_id", "p_date_from", "p_date_to", "p_department_id", "p_unidade_base_id", "p_is_group", "p_plantao"],
+  "atendimento.satisfacao": ["p_tenant_id", "p_date_from", "p_date_to", "p_department_id", "p_unidade_base_id", "p_agent_id", "p_is_group", "p_plantao"],
+  "atendimento.ura": ["p_tenant_id", "p_date_from", "p_date_to", "p_department_id", "p_unidade_base_id", "p_plantao"],
+  "atendimento.taxonomia": ["p_tenant_id", "p_date_from", "p_date_to", "p_department_id", "p_unidade_base_id", "p_agent_id", "p_plantao"],
+  "atendimento.clientes": ["p_tenant_id", "p_date_from", "p_date_to", "p_unidade_base_id"],
+  "atendimento.latencia": ["p_tenant_id", "p_date_from", "p_date_to", "p_department_id", "p_agent_id", "p_is_group"],
+  "atendimento.tempo_real": ["p_tenant_id", "p_department_id", "p_unidade_base_id", "p_is_group"],
+};
+
+export function montarParamsAtendimento(
   provider: ProviderId,
   tid: string,
   f: FiltrosSecao,
@@ -60,7 +82,7 @@ function paramsAtendimento(
   const isGroup = f.tipoAtendimento === "all" ? null : f.tipoAtendimento === "group";
   const plantao = f.plantao === "all" ? null : f.plantao;
 
-  const base: Record<string, unknown> = {
+  const todos: Record<string, unknown> = {
     p_tenant_id: tid,
     p_date_from: from.toISOString(),
     p_date_to: to.toISOString(),
@@ -69,16 +91,13 @@ function paramsAtendimento(
     p_agent_id: f.agentId,
     p_is_group: isGroup,
     p_plantao: plantao,
+    p_sla_frt_seconds: SLA_FRT_PADRAO_SEG,
   };
 
-  /** Tempo real é foto do agora: não recebe intervalo nem agente. */
-  if (provider === "atendimento.tempo_real") {
-    return { p_tenant_id: tid, p_unidade_base_id: unidadeId, p_is_group: isGroup };
-  }
-  if (provider === "atendimento.velocidade" || provider === "atendimento.velocidade_timeline") {
-    return { ...base, p_sla_frt_seconds: SLA_FRT_PADRAO_SEG };
-  }
-  return base;
+  const aceitos = PARAMS_ACEITOS[provider] ?? [];
+  const params: Record<string, unknown> = {};
+  for (const nome of aceitos) params[nome] = todos[nome];
+  return params;
 }
 
 /** Busca UM provider de Atendimento. `ativo` falso não dispara consulta. */
@@ -86,7 +105,7 @@ function useProviderAtendimento(provider: ProviderId, filtros: FiltrosSecao, ati
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const rpc = RPC_ATENDIMENTO[provider];
-  const params = tid ? paramsAtendimento(provider, tid, filtros, selectedUnidadeId ?? null) : null;
+  const params = tid ? montarParamsAtendimento(provider, tid, filtros, selectedUnidadeId ?? null) : null;
 
   return useQuery<unknown>({
     queryKey: ["meu-painel", provider, tid, viewKey, params],
