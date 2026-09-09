@@ -367,8 +367,8 @@ export const atendimento: CatalogEntry[] = [
     source: { provider: "atendimento.satisfacao", path: "response_rate_pct" },
   },
   /** O percentual é calculado dentro da SatisfacaoTab a partir de
-   *  `div_neg_nota_alta` e `div_neg_total`. A F3 decide se o cálculo sobe
-   *  para o provider ou se o card recebe os dois campos. */
+   *  `div_neg_nota_alta` e `div_neg_total`. Pela §5.0 da spec o cálculo NÃO
+   *  sobe para o provider: o painel refaz a mesma conta do seu lado. */
   {
     id: "at.csat_divergencia",
     area: "atendimento",

@@ -36,6 +36,7 @@ diária de quem montou.
 | Fora | Painel de Uso |
 | Persistência | Tabela nova `user_dashboards` |
 | Origem dos números | Reúso dos hooks dos dashboards atuais |
+| Telas existentes | **Intocadas.** As 7 abas atuais continuam idênticas. Nenhum hook, card ou gráfico existente é alterado, movido ou refatorado |
 | Primeiro acesso | Painel vazio com botão "Montar painel". Sem sugestão automática |
 
 ## 4. O catálogo de indicadores
@@ -109,6 +110,22 @@ trabalho de grep: rótulo na tela e chave no `kpiHelp` divergem em vários casos
 justamente essa divergência que precisa ser resolvida por decisão, não por heurística.
 
 ## 5. De onde vêm os números
+
+### 5.0 Restrição dura: nada existente muda
+
+Decisão do owner em 09/09/2026. O módulo **só lê**. Não altera hook, card,
+gráfico, aba ou cálculo que já esteja no ar. A única escrita em arquivo
+existente é acrescentar a aba nova em `src/pages/Dashboard.tsx` e o `if` que
+esconde a barra global nela — sem isso não existe aba.
+
+Duas consequências práticas:
+
+- **Cálculo que hoje mora dentro de um componente não sobe para o provider.**
+  Onde a tela de origem calcula na hora de exibir (a divergência CSAT, a
+  contagem de produtos com ticket, o nome do ofensor #1), o painel refaz a
+  mesma conta do seu lado, a partir do campo cru. Duplica lógica de exibição,
+  e é o preço de não encostar na tela que já funciona.
+- **Gráfico não é extraído da aba de origem.** Ver §10, F5.
 
 ### 5.1 A escolha
 
@@ -290,10 +307,14 @@ global condicional.
 
 **F4 — Construtor.** Diálogo de montagem: seções, catálogo, busca, cota, arrastar.
 
-**F5 — Extração dos gráficos embutidos.** Transformar os ~22 gráficos escritos dentro
-das abas em componentes reutilizáveis e tirar o `pending` deles. Feito por aba,
-começando pela `VendasTab` que concentra 9. Cada aba extraída é uma entrega
-independente, e a aba de origem tem que continuar idêntica.
+**F5 — Gráficos próprios do painel.** Os ~22 gráficos hoje escritos dentro das abas
+entram no painel como **componente novo, do painel**, lendo o mesmo campo do mesmo
+provider — nunca extraindo código da aba de origem. A versão anterior desta fase
+mandava refatorar as abas; foi descartada em 09/09/2026 pela restrição da §5.0.
+
+O custo é duplicar código de desenho de gráfico. O ganho é que a aba de origem não
+corre risco nenhum, e cada gráfico vira entrega independente: enquanto não tiver o
+componente do painel, o item fica `pending` e aparece apagado no catálogo.
 
 F1 a F4 entregam o módulo funcionando. F5 amplia o catálogo sem mexer no módulo.
 
