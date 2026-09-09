@@ -1,0 +1,60 @@
+import type { KpiUnit } from "@/lib/kpiHelp";
+
+export type KpiArea = "atendimento" | "financeiro" | "cs" | "implantacao" | "certificados";
+export type KpiKind = "card" | "chart";
+export type KpiFormat = "currency" | "percent" | "integer" | "decimal" | "duration" | "ratio";
+
+/** Prefixo obrigatório do id, por área. Mantém o id legível e evita colisão
+ *  entre áreas que têm indicador de mesmo nome (ex: "clientes ativos"). */
+export const PREFIXO_AREA: Record<KpiArea, string> = {
+  atendimento: "at.",
+  financeiro: "fin.",
+  cs: "cs.",
+  implantacao: "imp.",
+  certificados: "cert.",
+};
+
+/** Um provider = um bloco de dados que um hook existente já devolve pronto.
+ *  A implementação vem na F3; aqui é só o contrato, para o catálogo não
+ *  poder apontar para lugar nenhum. */
+export const PROVIDERS = [
+  "atendimento.volume",
+  "atendimento.velocidade",
+  "atendimento.backlog",
+  "atendimento.agentes",
+  "atendimento.satisfacao",
+  "atendimento.cobertura",
+  "atendimento.ura",
+  "atendimento.taxonomia",
+  "atendimento.clientes",
+  "atendimento.tempo_real",
+  "financeiro.dashboard",
+  "financeiro.cohort",
+  "cs.dashboard",
+  "implantacao.dash",
+  "certificados.a1",
+] as const;
+
+export type ProviderId = (typeof PROVIDERS)[number];
+
+export interface CatalogEntry {
+  /** Identificador estável. NUNCA muda: painéis salvos guardam ids. */
+  id: string;
+  area: KpiArea;
+  kind: KpiKind;
+  /** Rótulo exibido. Espelha o texto que já aparece no dashboard de origem. */
+  label: string;
+  /** Chave em kpiHelp para o popover "?". Ausente = indicador sem verbete. */
+  helpKey?: string;
+  unit?: KpiUnit;
+  format: KpiFormat;
+  /** De onde o valor sai: qual bloco de dados e qual campo dentro dele. */
+  source: { provider: ProviderId; path: string };
+  /** Só para gráfico: largura em colunas da grade de 4. */
+  span?: 2 | 3 | 4;
+  /** Só para gráfico: nome do componente que desenha. */
+  render?: string;
+  /** Gráfico ainda escrito dentro da aba de origem. Aparece apagado no
+   *  catálogo e não é selecionável. Sai na F5. */
+  pending?: true;
+}
