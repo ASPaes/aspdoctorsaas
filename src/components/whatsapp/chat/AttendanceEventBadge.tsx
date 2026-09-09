@@ -103,6 +103,14 @@ const config: Record<AttendanceEventType, {
   },
 };
 
+// O código vem entre asteriscos no aviso de grupo ("Atendimento *07293/26* iniciado.",
+// negrito do WhatsApp) e sem eles no de 1:1 ("Atendimento 00035/26 aberto com sucesso.").
+// Sem o `\*?` o grupo caía no chip com o código vazio.
+const CODIGO = /Atendimento\s+\*?(\d{5}\/\d{2})/;
+
+// `iniciado` é o verbo do aviso de grupo; `aberto`, o do 1:1. Mesma abertura, dois textos.
+const EVENTO = /Atendimento\s+\*?(\d{5}\/\d{2})\*?\s+(aberto|iniciado|encerrado|reaberto)/;
+
 /**
  * Parse attendance system messages to extract event type and code.
  * Matches messages like "✅ Atendimento 00035/26 aberto com sucesso."
@@ -117,7 +125,7 @@ export function parseAttendanceEvent(msg: {
   if (meta?.attendance_event) {
     const event = meta.attendance_event as string;
     // Extract code from content
-    const codeMatch = msg.content?.match(/(?:Atendimento\s+)(\d{5}\/\d{2})/);
+    const codeMatch = msg.content?.match(CODIGO);
     const code = codeMatch?.[1] || '';
     if (event === 'opened' || event === 'closed' || event === 'reopened') {
       return { eventType: event, code };
@@ -125,8 +133,20 @@ export function parseAttendanceEvent(msg: {
   }
 
   // Fallback: parse from content for legacy messages
-  if (msg.message_type === 'system' && msg.content) {
-    const match = msg.content.match(/Atendimento\s+(\d{5}\/\d{2})\s+(aberto|encerrado|reaberto)/);
+  //
+  // `system_message` entra junto do tipo `system` por causa do histórico: até
+  // 09/09/2026 o botão "Iniciar atendimento" do grupo mandava o aviso pela
+  // send-whatsapp-message como `messageType: 'text'`, e essas linhas continuam
+  // gravadas assim. Sem reconhecê-las aqui, elas seguem desenhadas como balão do
+  // operador — inclusive com o ícone de falha que a varredura carimbou em algumas,
+  // que foi a queixa que levou a este arquivo.
+  //
+  // O casamento é pelo formato exato do aviso, e não pela flag sozinha: `system_message`
+  // também marca o convite do CSAT, que é mensagem de verdade para o cliente e tem que
+  // continuar aparecendo como balão.
+  const ehAviso = msg.message_type === 'system' || msg.metadata?.system_message === true;
+  if (ehAviso && msg.content) {
+    const match = msg.content.match(EVENTO);
     if (match) {
       const code = match[1];
       const label = match[2];
