@@ -148,7 +148,10 @@ export function VelocidadeTimeline({ slaSeconds }: { slaSeconds: number }) {
               stroke={cfg.cor}
               strokeWidth={2}
               dot={{ r: 3 }}
-              connectNulls={false}
+              // Dia fechado fica SEM ponto, mas a linha passa por cima dele.
+              // Cortar a linha (connectNulls={false}) tirava o mergulho e punha
+              // no lugar tres segmentos soltos — ficou pior que o problema.
+              connectNulls
             />
           </ComposedChart>
         </ResponsiveContainer>
