@@ -1,27 +1,27 @@
 {
-  "capturado_em": "2026-09-09T02:37:49.890Z",
+  "capturado_em": "2026-09-09T17:53:58.345Z",
   "project_ref": "vbngjzovjhkmietztffo",
   "motivo": "atualizacao manual",
   "functions": {
     "admin-db-actions": {
       "sha": "b2b885d21a014e37c2a61e7c1c4ccdaa8e886e755fc7661fafd4b3ce991bcb5f",
-      "version": 259,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 260,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "ai-admin-commands": {
       "sha": "8f447ea87921b00c8360fee1cf773dc2171ba36b6b866661d91ac33f209c953b",
-      "version": 351,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 352,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "analyze-csat": {
       "sha": "be2ee738be7b93e765bc65873bdc8e11de458e5deb8613fb3b91531fdcc80698",
-      "version": 126,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 127,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "analyze-whatsapp-sentiment": {
       "sha": "934f821b47300c9ff0492f99b7c7627d9f1f1c98b019fe8d7e201f0275b6aad0",
-      "version": 524,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 525,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "backfill-contact-pictures": {
       "sha": "87a18c72fa69ba5133d564d5135e23f8da5581738b658f9b704a9575139779d1",
@@ -30,103 +30,103 @@
     },
     "categorize-whatsapp-conversation": {
       "sha": "bb95982380845a5d2d0b8ef5dd6197161419fd18b793ec8571c1b1f342d9b3e9",
-      "version": 515,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 516,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "check-ai-usage-alert": {
       "sha": "882a7c680cbd6b698aac2d2105bed8ee67627bd99d1f28e98ed966a0387f705d",
-      "version": 355,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 356,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "check-csat-timeout": {
       "sha": "241c9a22add990fe0434354a34b8cbe97ec8d51f88cd8ef3b34093a38aeb3a27",
-      "version": 456,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 457,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "check-db-health": {
       "sha": "7411f8491b8c0eb892cfdcb9bd5301375e7f50fbe045ced2ab91a41e4c2815b5",
-      "version": 274,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 275,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "check-inactivity-timeout": {
       "sha": "81a307e997081bcabe072d147108de4b4a227ff13138d90d505d76837ec7e4af",
-      "version": 306,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 307,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "check-instances-status": {
       "sha": "91f706849c1fed7a56773360341a9a8d81207193ff7339deecf751ad004881a0",
-      "version": 543,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 544,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "check-whatsapp-number": {
       "sha": "5eb50e414922a78420ce0ef523e3bc8c83834130e6566373004adf436547f6f3",
-      "version": 261,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 262,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "compose-whatsapp-message": {
       "sha": "0e17ddd3b504905245623b9c3056da3824a9f421a4e8f392b34122c5507f2dd0",
-      "version": 519,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 520,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "conselho-ds-analyze": {
       "sha": "a1857873df9048f0bbef6343f53c0009b511dbf8e857b3bcbbc8bd2ed1bb9bcd",
-      "version": 127,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 128,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "conselho-ds-suggest-foco": {
       "sha": "a027a1cae75f52f8c06591498be5649481d1455323b3df3677a0254f19381025",
-      "version": 127,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 128,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "create-whatsapp-instance": {
       "sha": "363f252b1235f311381d8d0f172fbd17487705f9cc8c764aed0106cb6a00f1f7",
-      "version": 304,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 305,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "deactivate-whatsapp-instance": {
       "sha": "a38fc7c411283316d91b5f506d4531c8253809a1128ab80453810bef122c8416",
-      "version": 219,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 220,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "delete-conversation-note": {
       "sha": "86f994f442c2b77950150cf78464f1e9b776782fcf134289378226239cf89cb2",
-      "version": 81,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 82,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "delete-ticket-attachment": {
       "sha": "aa8b77e80da8ea1576901d84116c73793c3a0b5c2e48a3a67e45092ee7811162",
-      "version": 65,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 66,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "delete-whatsapp-message": {
       "sha": "c379aa3a271462f2e69615a24a91598456ee51e7d3a20e893edd916f344529d6",
-      "version": 513,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 514,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "diagnose-contact-history": {
       "sha": "2cd083e15098ee20453c10b622718a2ef26ace8a4e5b5c37965b9c6650a86883",
-      "version": 427,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 428,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "ds-enviar-whatsapp-externo": {
       "sha": "9d2072d66cfe924e3c123361ac1fdaeefdfec552097410c753059595869ed149",
-      "version": 58,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 59,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "ds-omie-anexo-enviar": {
       "sha": "ac7db6a808ea04f0e4736459a150e784e82afc2be4bc1c240f13876cdcb91a6c",
-      "version": 57,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 58,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "edit-whatsapp-message": {
       "sha": "0923ffd65b0b40dba7b3135d2a9daf46fb95001bb58f2a1586f35d2dcf98aecf",
-      "version": 505,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 506,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "evolution-webhook": {
       "sha": "92211081f0922ae21c509d4a7c0b4e3320359ef6d568c8c56575dbf3735175c9",
-      "version": 713,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 714,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "fetch-evolution-history": {
       "sha": "e2d8552172052c27875c6a06746947b270dcde5ea3f9e73f92450f7288fee776",
@@ -140,193 +140,193 @@
     },
     "finalize-attendance": {
       "sha": "567c78901a0b5cc4ecf2dbb42b7e3dceefe3fed7e553238f1c951fa47b8a6b42",
-      "version": 454,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 455,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "forward-whatsapp-message": {
       "sha": "f19b6e337d087cc2688be00e6262bd6229ef08b4baa5bc7431025793b0bc93ff",
-      "version": 483,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 484,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "generate-conversation-summary": {
       "sha": "07d138f4b6cc02a7194b07014c621542891a253d2f546a7e6a6c6bcff12ed290",
-      "version": 519,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 520,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "generate-onboarding-blueprint": {
       "sha": "cc854d6492cda5448771003c8aaafa9abc112925c5d9337091ea9ac0f1c5e330",
-      "version": 86,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 87,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "generate-sso-token": {
       "sha": "d6e43c9b6b1aedfb82210b345d28fddc7cac9d27c2a812339b8cef8a56ad697a",
-      "version": 227,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 228,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "get-group-participants": {
       "sha": "b7c1cc64366bf4cd10bab8b2aeed3e40e6c4877e1eadad115ceb746931d1b934",
-      "version": 76,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 77,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "get-media-upload-url": {
       "sha": "8fede4639cc0130fdf088b72b7727197c603e4e5776de35278c106dba89c374c",
-      "version": 148,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 149,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "get-note-media-url": {
       "sha": "2ff96409c044d0e320a56cbb8030da5d63258a1730689445f61b151a9d8b0034",
-      "version": 81,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 82,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "hiper-integration-call": {
       "sha": "9a87b3697884759e834de03547e7dc221678d82127e147ecf8de09c6bbb6d24e",
-      "version": 81,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 82,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "hiper-integration-save": {
       "sha": "23eddb77e0627acca840f8f3ddf234c2086843b19d57fe7181d3461f70e91285",
-      "version": 71,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 72,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "lookup-cnpj": {
       "sha": "6d2077a0821a10b86c78554dfac20e381164c65d9e759f035f2349b117b604b5",
-      "version": 249,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 250,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "manage-group-participants": {
       "sha": "1a265bcf136932f4a9b1661ff93df6638486da9ea1360e9c21397a156be5ff67",
-      "version": 68,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 69,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "meta-webhook": {
       "sha": "80de71e804a839679be64a26925a081cef8d14b1f03871f5fb23fe73363b8afa",
-      "version": 499,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 500,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "oem-atualizar-cadastro-licenca": {
       "sha": "2f76b5cb0fe4e835d6d6330e7134c873bfccf858faa61233329e454b848baad6",
-      "version": 33,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 34,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "oem-cancelar-modulo": {
       "sha": "ec838941c74a28ba76306122c449b0d6e86f4c45cd644ce2c699d1784012bec4",
-      "version": 46,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 47,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "oem-espelho-sync": {
       "sha": "31f0cbca628b758bce7170f856c35f883ab4c7e8520c66ef1972969592340fe0",
-      "version": 75,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 76,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "oem-licenca-estado": {
-      "sha": "5ac8fca4a36c86f8001c8da8225c4fe6ddfb1856a18e229713901f79b7158af9",
-      "version": 20,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "sha": "a82365f681035b7597c473e922568dffb542610c1ad3b73bd9e93a63a099c90e",
+      "version": 22,
+      "updated_at": "2026-09-09T17:52:18.807Z"
     },
     "oem-sync-processar": {
       "sha": "76d8a4b50142ea4aa0c68de74a16375d0bb94b2d674d0e6ba9d6531a38b0adb2",
-      "version": 48,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 49,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "omie-integration-call": {
       "sha": "49cd5d6cd294af3b1b33ae9d95bf59a3d903445939be8a6f97cb67ac2758d45d",
-      "version": 77,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 78,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "omie-integration-save": {
       "sha": "a2d5564a5a4acf4f628376d454ad16162c9b28766d1d039eab738a9314020c06",
-      "version": 64,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 65,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "omie-sync-processar": {
       "sha": "0aab01aed50ed92cada9537d8aa4c9d0c1c6fd3628eb677611fe026c3dfb442b",
-      "version": 81,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 82,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "onboarding-catalogo": {
       "sha": "78dd6d90b8b5a1231fbf6d8a2b3e6cff9a7a62157121fbc7d00afc28e9ab5a18",
-      "version": 23,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 24,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "onboarding-intake-anexos": {
       "sha": "e7f54696c48ffc088dbe0bb34c9f5003fd2c548eeb25bf69de58c5a5126eab97",
-      "version": 20,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 21,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "onboarding-intake-webhook": {
       "sha": "f1e57c039aa82797645d4ef07322f338927bce2a777c0ba100e3696dc5a9af67",
-      "version": 84,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 85,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "onboarding-send-welcome": {
       "sha": "315029e5424f3cac6ef5321dfbe31b4995d7c17c9001fb5fb28291d41dbbdda5",
-      "version": 84,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 85,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "populate-cidades": {
       "sha": "f8952c55381cf779827c59e74a89fb39ca7c2923a1a2d9b53aa8bd55a1aad07a",
-      "version": 519,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 520,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "process-finalize-queue": {
       "sha": "88f3a42f4d3d9d23b8ba3ff92170351b013e4dd1b1c42e8dd72dbcc10dfe6a98",
-      "version": 143,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 144,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "process-notification-outbox": {
       "sha": "65082ff3659fe017fd6601c4e36492ddf1f6d4b55dd6a8cab6bab9312ce7f5b9",
-      "version": 131,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 132,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "purge-chat-media": {
       "sha": "9556d2447019dbe0e125929b7265651fe1ced4ca718acfee4af2f9f2e7788599",
-      "version": 47,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 48,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "recon-atribuir-modelo-lote": {
       "sha": "e8aeee8cc2b9cb722368e9749000bcc7d537664001689ff108dbf423dfa25c9c",
-      "version": 62,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 63,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "recon-atualizar-valor-ds": {
       "sha": "c059c4929b6d6621a04fb9ae81ce7ee0ff23fd2f247f453a9202f18f78a86f59",
-      "version": 64,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 65,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "recon-candidato-confirmar": {
       "sha": "42e04e4d52fe533276e1bc039eb1bb75e57366b144bc4b4f02d14dd9f45df4ad",
-      "version": 64,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 65,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "recon-candidatos-listar": {
       "sha": "33f2b927a2c024041d802e99220df7c78ff792fdaca4cb05cf5a5a4dfd77d792",
-      "version": 66,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 67,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "recon-espelho-pull": {
       "sha": "f23c7e5f0eab1d9f36c0d7c5dfc7d14a90d337dd61b0de8d6963eeee4bbf5c7d",
-      "version": 65,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 66,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "recon-espelho-pull-cron": {
       "sha": "5aed57f866f7c0323e6a348ebc0808dada6cbbc9e1eb35a4ec44a6f3df5cca86",
-      "version": 62,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 63,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "recon-omie-escrever": {
       "sha": "b5afc81f5504a36af632a5ff0f0f7652917803ce80b029dfa91a46dc171c540a",
-      "version": 71,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 72,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "recon-vincular-lote": {
       "sha": "07b1c9395dc030c06a521732fa1702a05bb23ae01a7eb1ac2b3ccf970ec22b9a",
-      "version": 62,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 63,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "recon-vincular-unitario": {
       "sha": "fdf5ceed39d67dff2c52d9e957f0d628e1c974a680407cd4da86f9d2f9933d16",
-      "version": 63,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 64,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "reconnect-whatsapp-instance": {
       "sha": "4c8b943e8455559c54d1d2fe85c10012634adb393e2a3b339b409771a9a6b1cf",
@@ -335,58 +335,58 @@
     },
     "recover-instance-messages": {
       "sha": "514e794e3c7b7260cb4c9628be9c98a3562911d10b0a5b5f3b5e533cbd4c3332",
-      "version": 103,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 104,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "resend-failed-message": {
       "sha": "14df5bd5b0ee254315349563a6066e5010985021a6e31defefcc7cc0a2a946fd",
-      "version": 203,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 204,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "restart-whatsapp-instance": {
       "sha": "87a5cb1eae97acd65fabf36f628b0597dc4dc563bfb434dd6d9b6ed2dc6fdeb3",
-      "version": 103,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 104,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "save-ai-settings": {
       "sha": "0123cf555ec3a49844e48c29f298e56422e4730e36f9a2627722bfd6f9f8a894",
-      "version": 484,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 485,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "schedule-reminder": {
       "sha": "4335a924a5a341693fe2e8783220d2d4d714599f414acd5d93739c87678ec95e",
-      "version": 209,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 210,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "send-assignment-greeting": {
       "sha": "cb06d2a63acedc522c2248ddc896ceb14d44add6c726ead5cd59c22870db7539",
-      "version": 2,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 3,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "send-meta-message": {
       "sha": "29ac6da3ac33d5315d68be0b7b2e97232f2ba237631ed1edb7c11cf37a3320a7",
-      "version": 396,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 397,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "send-whatsapp-message": {
       "sha": "3d8afdadef962bfb26d4e9deb503ee4fceb19b45d51a5f498945f8967b785361",
-      "version": 539,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 540,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "send-whatsapp-template": {
       "sha": "c43f1b6b4ea7c5e4c7715bab0e13b93888e7af29bd64746d32d8f8c345147c7e",
-      "version": 231,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 232,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "suggest-smart-replies": {
       "sha": "2b362ae74d552785ff8225ab067d0ebddec887e6750ec241088d9acf553f1a27",
-      "version": 518,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 519,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "summarize-ticket": {
       "sha": "ca8122bd5de90e8c5a8b4ed171c0f7c4af68283656755bf96ae54f26be1311ab",
-      "version": 117,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 118,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "sync-contact-picture": {
       "sha": "d34a96d4ff482e371b409dff2c4eb793500aee3bb647d1c33db4524767d85799",
@@ -395,73 +395,73 @@
     },
     "sync-meta-templates": {
       "sha": "2addb1182d17f2c50d58b23e12d6584a529efb6b11fa4405632d8e0e4d5fa582",
-      "version": 216,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 217,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "sync-whatsapp-groups": {
       "sha": "2c97f0bb51944243a4092ef5aaaae2d7bb2887d00957730b5642892f795aec65",
-      "version": 277,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 278,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "test-ai-config": {
       "sha": "525714411cc6f041d5bb3421f7679e1bf9dceb302068028489025d8b1160dea8",
-      "version": 122,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 123,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "test-ai-config-v2": {
       "sha": "668b8a8b171ef82357abaf31e01bad51afe6203e9bf07b2cdfbf87e2ea10e18c",
-      "version": 124,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 125,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "test-evolution-connection": {
       "sha": "b580da0b6cb0a50520ffaeb719ea120e620f66325ad4a735249baa2201995650",
-      "version": 486,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 487,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "test-instance-connection": {
       "sha": "8f1e24de8196356b6486298c22159511b3362be9ee706667b7ee68eb1ee4685b",
-      "version": 531,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 532,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "theo-dispatch": {
       "sha": "664e7b13780f65038b826f16634f7e0e09eca6160807fcf7e6fcf623b8e324cd",
-      "version": 119,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 120,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "transcribe-whatsapp-audio": {
       "sha": "85c99c68693db1962220b8096a71853ef3e25bdc6a6475fac717e811c851935f",
-      "version": 514,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 515,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "upload-ticket-attachment": {
       "sha": "15f6b26128167b3d0298974e4879a91b80cc01c9ae1877ce6183a68871bb5c0c",
-      "version": 208,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 209,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "upsert-instance-secrets": {
       "sha": "56ec2a48522283f41afab3706469b209d860714aa5e5f62f955abab1a845af39",
-      "version": 334,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 335,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "verify-failed-deliveries": {
-      "sha": "7973e687d8ca67fcf4da7ad94d85218150d3361a502f6514052ad3977df29348",
-      "version": 60,
-      "updated_at": "2026-09-09T02:37:06.233Z"
+      "sha": "22f5ed310e9eaaf5f3beb22dc93df986aa8c3341bd1e9596572c3fa6aa85226b",
+      "version": 61,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "watchdog-instance-silence": {
       "sha": "2633903533365c6ff40bc19d08312dbc2100dd3333075d4af953e9a3334f3a20",
-      "version": 109,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 110,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "whatsapp-media-proxy": {
       "sha": "c4a3bf4502e2b199036dc3237826c7ccdb580bf2a666d2ae461681aa6508a199",
-      "version": 479,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 480,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "zapi-webhook": {
       "sha": "614ef284b01b3c2f7801d174f326100e2241177fc9ba52bf40cab2184aaaefbf",
-      "version": 441,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "version": 442,
+      "updated_at": "2026-09-09T02:41:20.253Z"
     }
   }
 }
