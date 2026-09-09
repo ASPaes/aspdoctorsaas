@@ -1,7 +1,12 @@
 # Meu Painel — dashboard personalizado por usuário
 
 **Data:** 09/09/2026
-**Status:** desenho aprovado. Nada implementado.
+**Status:** F1 a F4 implementadas na branch `feat/meu-painel`. **Nada em produção.**
+Banco: migration aplicada só no Docker local. Frontend: não publicado.
+Piloto fechado em ASP e Digi Office (`src/lib/meuPainelAcesso.ts`).
+
+**Pendências de decisão do Alexandre:** os 4 descartes do catálogo, os 84
+verbetes órfãos, a aplicação da migration em produção e a publicação.
 **Mockup aprovado:** https://claude.ai/code/artifact/85ddb187-cd28-4d5d-a757-251855f7c4eb
 
 ---
@@ -317,6 +322,31 @@ corre risco nenhum, e cada gráfico vira entrega independente: enquanto não tiv
 componente do painel, o item fica `pending` e aparece apagado no catálogo.
 
 F1 a F4 entregam o módulo funcionando. F5 amplia o catálogo sem mexer no módulo.
+
+## 10.1 O que o desenvolvimento mudou nesta spec
+
+Registrado em 09/09/2026, depois de implementar. Cada item aqui contradiz algo
+que a spec afirmava antes, e o código é que está certo.
+
+- **Implantação ficou de fora do painel.** A tela de lá monta os números com
+  ~10 `useQuery` dentro da própria página, sem hook reaproveitável. Construir
+  um provider sem alterar aquela tela é entrega à parte. Os 26 itens seguem no
+  catálogo; a seção mostra um aviso em vez de número.
+- **A aba Distribuição não tem indicador nenhum.** `useDistribuicaoExtras` e
+  `useVendasExtras` recebem a dimensão como parâmetro: são exploradores.
+- **Atendimento não reaproveita os hooks, chama as mesmas RPCs.** Os hooks de
+  lá leem `AtendimentoFilterContext`, montado uma vez por página e sem valor
+  inicial — filtro por seção exigiria alterá-lo. Sem risco de divergência:
+  quem calcula é o banco.
+- **A carga preguiçosa não usa gate dentro dos hooks**, e sim
+  `IntersectionObserver` montando o componente de dados só quando a seção
+  aparece. `useCSDashboardData` não tem `enabled`, então gate seria mentira.
+- **Um objeto genérico de filtros quebrava 5 das 11 RPCs.** Cada função aceita
+  um subconjunto diferente; argumento nomeado a mais faz o PostgREST não achar
+  a função. Ver `PARAMS_ACEITOS` e `scripts/sql-tests/09_meu_painel_rpcs.sql`.
+- **`KpiFormat` ganhou `text`**: "Ofensor #1" mostra o nome do cliente.
+- **Dois providers novos** para gráficos que buscam os próprios dados
+  (`atendimento.velocidade_timeline`, `atendimento.latencia`), com `path: "self"`.
 
 ## 11. Testes
 
