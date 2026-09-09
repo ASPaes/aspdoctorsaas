@@ -2,7 +2,10 @@ import type { KpiUnit } from "@/lib/kpiHelp";
 
 export type KpiArea = "atendimento" | "financeiro" | "cs" | "implantacao" | "certificados";
 export type KpiKind = "card" | "chart";
-export type KpiFormat = "currency" | "percent" | "integer" | "decimal" | "duration" | "ratio";
+/** `text` existe porque nem todo indicador é número: "Ofensor #1" mostra o
+ *  nome do cliente que mais abriu chamado. */
+export type KpiFormat =
+  | "currency" | "percent" | "integer" | "decimal" | "duration" | "ratio" | "text";
 
 /** Prefixo obrigatório do id, por área. Mantém o id legível e evita colisão
  *  entre áreas que têm indicador de mesmo nome (ex: "clientes ativos"). */
@@ -20,6 +23,11 @@ export const PREFIXO_AREA: Record<KpiArea, string> = {
 export const PROVIDERS = [
   "atendimento.volume",
   "atendimento.velocidade",
+  /** Gráficos que buscam os próprios dados, em vez de ler um bloco pronto:
+   *  VelocidadeTimeline e LatenciaHistograma têm hook próprio. Nesses o
+   *  `path` é "self" — não existe campo a extrair. */
+  "atendimento.velocidade_timeline",
+  "atendimento.latencia",
   "atendimento.backlog",
   "atendimento.agentes",
   "atendimento.satisfacao",
