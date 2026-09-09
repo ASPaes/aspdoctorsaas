@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Link2, Unlink, Building2, Loader2, ChevronDown, Cake, ExternalLink, Search } from "lucide-react";
+import { Link2, Unlink, Building2, Loader2, ChevronDown, Cake, ExternalLink, Search, ArrowLeftRight } from "lucide-react";
 import { useClienteLinkSuggestion, type ClienteCandidato } from "../hooks/useClienteLinkSuggestion";
 import { useLinkedClienteDetails } from "../hooks/useLinkedClienteDetails";
 import { useClienteSearch } from "../hooks/useClienteSearch";
@@ -44,6 +44,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
   const groupContactId = (conversation as any)?.contact_id ?? conversation.contact?.id ?? null;
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [switchOpen, setSwitchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   const {
@@ -110,12 +111,20 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
     ? ((groupLinkedCliente as any)?.id ?? null)
     : (indLinkedClienteId ?? null);
   const { data: clienteDetails } = useLinkedClienteDetails(clienteId);
-  const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen ? searchTerm : "");
+  const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen || switchOpen ? searchTerm : "");
+
+  const closePicker = () => {
+    setSearchOpen(false);
+    setSwitchOpen(false);
+    setSearchTerm("");
+  };
 
 
 
 
   if (isLinked && linkedCliente) {
+    const otherCandidates = candidates.filter((c) => c.cliente_id !== linkedCliente.id);
+    const switchResults = (searchResults ?? []).filter((c) => c.id !== linkedCliente.id);
     const isBirthday = clienteDetails?.contato_aniversario
       ? (() => {
           const today = new Date();
@@ -220,7 +229,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
           </Collapsible>
         )}
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-wrap">
           <Button
             size="sm"
             variant="ghost"
@@ -230,6 +239,18 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
             <ExternalLink className="h-3 w-3" />
             Abrir Cadastro
           </Button>
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 text-[10px] gap-1"
+              onClick={() => (switchOpen ? closePicker() : (setSwitchOpen(true), setSearchTerm("")))}
+              disabled={isLinking}
+            >
+              {isLinking ? <Loader2 className="h-3 w-3 animate-spin" /> : <ArrowLeftRight className="h-3 w-3" />}
+              Trocar cliente
+            </Button>
+          )}
           {canEdit && (
             <AlertDialog open={unlinkDialogOpen} onOpenChange={setUnlinkDialogOpen}>
               <AlertDialogTrigger asChild>
@@ -270,6 +291,78 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
             </AlertDialog>
           )}
         </div>
+
+        {canEdit && switchOpen && (
+          <div className="space-y-2 border-t border-border/60 pt-2">
+            <p className="text-[10px] text-muted-foreground">
+              Escolha a empresa deste atendimento. O contato continua no cadastro do cliente atual.
+            </p>
+
+            {otherCandidates.length > 0 && (
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {otherCandidates.map((c: ClienteCandidato) => (
+                  <button
+                    key={c.cliente_id}
+                    className="w-full text-left px-2 py-1.5 rounded-md border border-border bg-background hover:bg-muted text-xs transition-colors disabled:opacity-50"
+                    onClick={() => {
+                      linkCliente(c.cliente_id);
+                      closePicker();
+                    }}
+                    disabled={isLinking}
+                  >
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      <span className="truncate">
+                        <span className="text-muted-foreground">#{c.codigo_sequencial ?? "?"}</span>{" "}
+                        {c.nome_fantasia || c.razao_social || "Sem nome"}
+                      </span>
+                      <Link2 className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    </div>
+                    {c.fornecedor_nome && (
+                      <p className="text-[10px] text-muted-foreground truncate mt-0.5">{c.fornecedor_nome}</p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <Input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar outro cliente por nome, CNPJ ou código..."
+              className="text-xs h-7"
+              autoFocus
+            />
+            {isSearching && (
+              <div className="flex justify-center py-2">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            {switchResults.length > 0 && (
+              <div className="max-h-40 overflow-y-auto space-y-1">
+                {switchResults.map((c) => (
+                  <button
+                    key={c.id}
+                    className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-xs flex items-center justify-between gap-2 transition-colors disabled:opacity-50"
+                    onClick={() => {
+                      linkCliente(c.id);
+                      closePicker();
+                    }}
+                    disabled={isLinking}
+                  >
+                    <span className="truncate">
+                      <span className="text-muted-foreground">#{c.codigo_sequencial}</span>{" "}
+                      {c.nome_fantasia || c.razao_social}
+                    </span>
+                    <Link2 className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            )}
+            {!isSearching && searchTerm.length >= 2 && switchResults.length === 0 && (
+              <p className="text-[10px] text-muted-foreground text-center py-1">Nenhum cliente encontrado</p>
+            )}
+          </div>
+        )}
       </div>
     );
   }
