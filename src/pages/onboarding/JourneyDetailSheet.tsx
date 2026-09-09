@@ -420,6 +420,7 @@ interface JourneyChecklistRow {
 interface JourneyModule {
   id: string;
   nome: string;
+  quantidade: number;
   produto_modulo_id: string | null;
   origem: string;
   position: number;
@@ -456,6 +457,11 @@ function SortableModuleRow({ m, onDelete }: { m: JourneyModule; onDelete: (id: s
           <GripVertical className="h-3.5 w-3.5" />
         </button>
         <span className="text-xs font-medium truncate">{m.nome}</span>
+        {(m.quantidade ?? 1) > 1 && (
+          <Badge variant="secondary" className="text-[9px] font-semibold tabular-nums shrink-0 px-1.5">
+            x{m.quantidade}
+          </Badge>
+        )}
         <Badge
           variant="outline"
           className="text-[9px] capitalize border-0 text-white shrink-0"
@@ -834,7 +840,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journeyId && !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_journey_modules" as any) as any)
-        .select("id, nome, produto_modulo_id, origem, position, created_at")
+        .select("id, nome, quantidade, produto_modulo_id, origem, position, created_at")
         .eq("tenant_id", tenantId)
         .eq("journey_id", journeyId)
         .order("position", { ascending: true })
@@ -864,12 +870,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journey?.cliente_id && !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("cliente_produto_modulos" as any) as any)
-        .select("id, modulo_id, produto_modulos!inner(id, nome), cliente_produtos!inner(cliente_id)")
+        .select("id, modulo_id, quantidade, produto_modulos!inner(id, nome), cliente_produtos!inner(cliente_id)")
         .eq("tenant_id", tenantId)
         .eq("ativo", true)
         .eq("cliente_produtos.cliente_id", journey!.cliente_id!);
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; modulo_id: string; produto_modulos: { id: string; nome: string } }>;
+      return (data ?? []) as Array<{ id: string; modulo_id: string; quantidade: number; produto_modulos: { id: string; nome: string } }>;
     },
   });
 
@@ -2038,6 +2044,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         tenant_id: tenantId,
         journey_id: journeyId,
         nome: it.produto_modulos.nome,
+        quantidade: Math.max(1, it.quantidade ?? 1),
         produto_modulo_id: it.modulo_id,
         origem: "cliente",
         position: base + i,
