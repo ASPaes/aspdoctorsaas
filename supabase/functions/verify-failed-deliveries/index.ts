@@ -10,7 +10,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
 import { resendMessage } from '../_shared/resend-message.ts';
-import { decidirReenvio } from './retry-policy.ts';
+import { decidirReenvio, erroCondenaMensagem } from './retry-policy.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,7 +20,9 @@ const corsHeaders = {
 const LOG = '[verify-failed-deliveries]';
 const LOTE_VARREDURA = 50;
 
-const CAMPOS = 'id, tenant_id, conversation_id, instance_id, message_id, content, message_type, media_path, media_mimetype, media_filename, media_kind, status, is_from_me, metadata, remote_jid, sent_by_user_id, last_error_at, delivery_confirmed_at, failure_confirmed_at, auto_retry_count';
+// `timestamp` entra aqui para o portão do ERROR tardio: sem ele não há como medir
+// quanto tempo o ack demorou a chegar. Ver retry-policy.ts.
+const CAMPOS = 'id, tenant_id, conversation_id, instance_id, message_id, content, message_type, media_path, media_mimetype, media_filename, media_kind, status, is_from_me, metadata, remote_jid, sent_by_user_id, timestamp, last_error_at, delivery_confirmed_at, failure_confirmed_at, auto_retry_count';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -118,6 +120,36 @@ async function verificar(supabase: any, msg: any): Promise<string> {
   if (msg.status !== 'error') return 'subiu-na-escada';
   if (msg.delivery_confirmed_at) return 'entregue';
 
+  // `is_group` sobe para cá: ele agora decide ANTES da condenação, não só o reenvio.
+  const { data: conv } = await supabase
+    .from('whatsapp_conversations')
+    .select('is_group')
+    .eq('id', msg.conversation_id)
+    .maybeSingle();
+  const isGroup = conv?.is_group === true;
+
+  // Portão do ERROR tardio. Em grupo, ack que chega horas depois é a fila do provedor
+  // sendo esvaziada no restart, não veredito: essas mensagens são respondidas pelo
+  // cliente em 90% dos casos, ACIMA da taxa das que sabidamente chegaram. Ver
+  // retry-policy.ts para a medição.
+  const cond = erroCondenaMensagem({
+    isGroup,
+    enviadaEm: msg.timestamp,
+    erroEm: msg.last_error_at,
+  });
+  if (!cond.condena) {
+    // Volta para `pending` = "não sabemos", que é a verdade. Três efeitos, todos
+    // desejados: sai do filtro da varredura (`status='error'`) sem mentir com
+    // failure_confirmed_at; a escada continua aceitando um ack real depois
+    // (pending=1 < sent=3); e `last_error_at` fica como rastro do que aconteceu.
+    await supabase
+      .from('whatsapp_messages')
+      .update({ status: 'pending' })
+      .eq('id', msg.id);
+    console.log(`${LOG} msg=${msg.id} não condenada — ${cond.motivo}`);
+    return 'erro-tardio-nao-condena';
+  }
+
   // Condição 2: a segunda fonte não contradiz.
   if (await provedorRegistraEntrega(supabase, msg)) {
     await supabase
@@ -134,14 +166,9 @@ async function verificar(supabase: any, msg: any): Promise<string> {
 
   // Em grupo, reenviar é pior do que não reenviar: o ack de falha é por participante e
   // a mensagem provavelmente chegou aos outros. Ver retry-policy.ts.
-  const { data: conv } = await supabase
-    .from('whatsapp_conversations')
-    .select('is_group')
-    .eq('id', msg.conversation_id)
-    .maybeSingle();
-
+  // (`isGroup` já foi lido acima, para o portão do ERROR tardio.)
   const decisao = decidirReenvio({
-    isGroup: conv?.is_group === true,
+    isGroup,
     messageType: msg.message_type,
     autoRetryCount: msg.auto_retry_count,
   });

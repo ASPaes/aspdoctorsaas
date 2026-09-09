@@ -50,3 +50,74 @@ export function decidirReenvio(ctx: ContextoReenvio): DecisaoReenvio {
 
   return { reenviar: true, alarmar: true, motivo: 'conversa direta, primeira tentativa' };
 }
+
+// ---------------------------------------------------------------------------------
+// ERROR tardio em grupo não condena a mensagem.
+//
+// Medido em produção em 08/09/2026, 14 dias, comparando com a taxa de resposta do
+// cliente em 30 min (63.563 mensagens 1:1 com entrega confirmada respondem 77,9%):
+//
+//   ERROR chegou < 1 min do envio ......  68 msgs, 54% respondidas  → abaixo do
+//                                         baseline, o ERROR diz alguma coisa
+//   ERROR chegou > 1 hora do envio ..... 137 msgs, 90% respondidas  → ACIMA do
+//                                         baseline de entregues; foram entregues
+//
+// As 137 são a fila da Evolution sendo esvaziada quando o servidor reinicia: em
+// 09/09 entraram 20 ERROR entre 00:31:42 e 00:31:49 para mensagens enviadas entre
+// 18:07 e 22:35, exatamente na janela em que todas as instâncias reconectaram.
+// Cada uma virava bolha vermelha e notificação para o operador.
+//
+// Só vale para GRUPO. Em conversa direta o ack é confiável (99,99% das 71 mil saídas
+// do período chegaram a `sent` ou acima) e não há medição que justifique mexer.
+// ---------------------------------------------------------------------------------
+
+/**
+ * Acima disto, o ERROR chegou tarde demais para ser veredito.
+ *
+ * O corte é 10 min porque é onde a evidência troca de lado. A faixa de 10 a 60 min
+ * tem 4 casos em 14 dias — não dá para calibrar com ela, e por isso o número aqui é
+ * uma escolha conservadora, não um ótimo medido. Mudar exige deploy só desta
+ * function (o CI deploya o que mudou; `_shared` é que arrasta todas).
+ */
+export const ERRO_TARDIO_MS = 10 * 60 * 1000;
+
+export interface ContextoCondenacao {
+  isGroup: boolean;
+  /** whatsapp_messages.timestamp — quando a mensagem saiu */
+  enviadaEm: string | null | undefined;
+  /** whatsapp_messages.last_error_at — quando o ERROR chegou */
+  erroEm: string | null | undefined;
+}
+
+export interface DecisaoCondenacao {
+  /** false = a mensagem volta a "sem confirmação", sem `failed` e sem alarme */
+  condena: boolean;
+  atrasoMs: number | null;
+  motivo: string;
+}
+
+export function erroCondenaMensagem(ctx: ContextoCondenacao): DecisaoCondenacao {
+  if (!ctx.isGroup) {
+    return { condena: true, atrasoMs: null, motivo: 'conversa direta: ack confiável' };
+  }
+
+  const t0 = Date.parse(String(ctx.enviadaEm ?? ''));
+  const t1 = Date.parse(String(ctx.erroEm ?? ''));
+
+  // Sem os dois carimbos não dá para medir atraso. Mantém o comportamento antigo em
+  // vez de absolver por falta de dado — absolver caladamente esconderia falha real.
+  if (!Number.isFinite(t0) || !Number.isFinite(t1)) {
+    return { condena: true, atrasoMs: null, motivo: 'grupo: sem carimbo para medir o atraso' };
+  }
+
+  const atrasoMs = t1 - t0;
+  if (atrasoMs > ERRO_TARDIO_MS) {
+    return {
+      condena: false,
+      atrasoMs,
+      motivo: `grupo: ERROR chegou ${Math.round(atrasoMs / 60000)} min após o envio (fila do provedor, não falha)`,
+    };
+  }
+
+  return { condena: true, atrasoMs, motivo: 'grupo: ERROR imediato' };
+}
