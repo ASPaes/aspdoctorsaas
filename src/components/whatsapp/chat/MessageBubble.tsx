@@ -49,6 +49,8 @@ interface Props {
   onReplyClick?: (quotedMessageId: string) => void;
   quotedMessage?: Message | null;
   groupParticipants?: GroupParticipant[];
+  /** conversa é grupo: muda o que o ✓ pode afirmar. Ver `semConfirmacaoEmGrupo`. */
+  isGroup?: boolean;
 }
 
 // Limite do próprio WhatsApp: editar só vale nos 15 min seguintes ao envio.
@@ -86,6 +88,7 @@ export function MessageBubble({
   onReplyClick,
   quotedMessage,
   groupParticipants,
+  isGroup,
 }: Props) {
   const isFromMe = Boolean(msg.isFromMe ?? msg.is_from_me ?? (msg as any).fromMe ?? (msg as any).key?.fromMe ?? false);
   const rawKind = (msg.message_type ?? (msg as any).messageType ?? (msg as any).type ?? 'text') as string;
@@ -214,8 +217,41 @@ export function MessageBubble({
   // branco no escuro) porque o balão é verde nos dois temas.
   const metaInk = isFromMe ? "text-emerald-950/80" : "opacity-60";
 
+  // Em grupo o WhatsApp não devolve confirmação de entrega para este tipo de conexão.
+  // Medido em produção em 08/09/2026, 14 dias: 0 de 2.367 mensagens de saída em grupo
+  // chegaram a `delivered`, contra 63.563 em conversa direta. O ✓ cheio é o vocabulário
+  // do 1:1, onde ele significa "o servidor recebeu"; emprestá-lo aqui faz o operador ler
+  // entrega onde não existe informação nenhuma. Foi a queixa do DEM-0373: o atendente
+  // segue a conversa achando que a mensagem chegou.
+  //
+  // Fica ✓ (e não relógio nem alerta) de propósito: em grupo isso vale para TODA
+  // mensagem, então qualquer marca de aviso viraria alarme permanente e o operador
+  // aprenderia a ignorá-la. O que muda é o peso da tinta, mais o motivo no tooltip.
+  //
+  // `delivered`/`read` continuam ganhando: se um dia o ack de grupo passar a chegar,
+  // o ✓✓ aparece sozinho, sem mexer aqui.
+  const semConfirmacaoEmGrupo = Boolean(isGroup) && isFromMe && !isDeleted && !isPending
+    && msg.status !== "read" && msg.status !== "delivered"
+    && msg.status !== "failed" && msg.status !== "sending";
+
   const statusIcon = isFromMe && !isDeleted && !isPending && (
-    msg.status === "read" || msg.status === "delivered" ? (
+    semConfirmacaoEmGrupo ? (
+      // `title` nativo, e não o Tooltip do Radix: esta marca aparece em TODA mensagem
+      // de saída do grupo, e a lista do chat não é virtualizada (páginas de 100 em
+      // scroll infinito). Um componente de tooltip por bolha seria centenas de
+      // assinantes de contexto numa das listas mais quentes do app. O `(editada)` ali
+      // embaixo pode usar Radix porque é raro; este não.
+      //
+      // /70 e não /45: a tinta cheia dá 6,6:1 sobre o verde da marca e /45 cairia para
+      // 2,2:1, abaixo do mínimo de 3:1 de elemento gráfico. /70 fica em 3,6:1, sai do
+      // primeiro olhar sem sumir de quem procura.
+      <span
+        className="inline-flex cursor-help"
+        title="Enviado ao WhatsApp. Em conversa de grupo não há confirmação de entrega nem de leitura, então o painel não tem como saber se chegou."
+      >
+        <Check strokeWidth={2.5} className="h-3.5 w-3.5 text-emerald-950/70" />
+      </span>
+    ) : msg.status === "read" || msg.status === "delivered" ? (
       <CheckCheck strokeWidth={2.5} className={cn("h-3.5 w-3.5", msg.status === "read" ? "text-blue-800" : "text-emerald-950")} />
     ) : msg.status === "sending" ? (
       <Clock className="h-3.5 w-3.5 text-emerald-950/60" />

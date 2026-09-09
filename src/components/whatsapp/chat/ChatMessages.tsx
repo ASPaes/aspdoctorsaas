@@ -431,6 +431,7 @@ export function ChatMessages({
                         onContactChat={onContactChat}
                         onContactSave={onContactSave}
                         groupParticipants={isGroup ? groupParticipants : undefined}
+                        isGroup={isGroup}
                         deleteEveryoneDisabled={!!item.msg.instance_id && revokeUnsupportedInstanceIds.has(item.msg.instance_id)}
                         editDisabled={!!item.msg.instance_id && revokeUnsupportedInstanceIds.has(item.msg.instance_id)}
                       />
