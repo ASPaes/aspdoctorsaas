@@ -1,5 +1,5 @@
 {
-  "capturado_em": "2026-09-09T23:44:46.006Z",
+  "capturado_em": "2026-09-09T23:53:00.345Z",
   "project_ref": "vbngjzovjhkmietztffo",
   "motivo": "atualizacao manual",
   "functions": {
@@ -219,9 +219,9 @@
       "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "oem-licenca-estado": {
-      "sha": "a82365f681035b7597c473e922568dffb542610c1ad3b73bd9e93a63a099c90e",
-      "version": 22,
-      "updated_at": "2026-09-09T17:52:18.807Z"
+      "sha": "8d2e904b2de7028ad14ec68c140f0e3f72e9a3f82ac6d4f4e603a103b63a0d95",
+      "version": 23,
+      "updated_at": "2026-09-09T23:51:59.815Z"
     },
     "oem-sync-processar": {
       "sha": "76d8a4b50142ea4aa0c68de74a16375d0bb94b2d674d0e6ba9d6531a38b0adb2",
