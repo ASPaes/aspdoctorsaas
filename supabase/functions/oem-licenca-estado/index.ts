@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
     // ------------------------------------------------------------ contexto
     const { data: linha, error: errL } = await ds
       .from("reconciliacao_oem")
-      .select("id, tenant_id, conta_integration_id, empresa_codigo, filial_codigo, razao_oem, status_oem, bloqueado_oem")
+      .select("id, tenant_id, conta_integration_id, empresa_codigo, filial_codigo, razao_oem, status_oem, bloqueado_oem, desativa_em")
       .eq("id", reconId)
       .maybeSingle();
     if (errL || !linha) {
@@ -171,6 +171,74 @@ Deno.serve(async (req) => {
     });
     if (errK || !chave) return json({ ok: false, mensagem: "Chave do OEM não encontrada no Vault." }, 409);
 
+    // ------------------------------------------------------------------------
+    // A LEITURA AO VIVO CORRIGE O ESPELHO, MESMO QUANDO NADA É ENVIADO
+    // ------------------------------------------------------------------------
+    // Toda chamada daqui — inclusive a simulação — faz um GET ao vivo na licença
+    // do parceiro, e é esse estado que volta em `antes`. Até 09/09/2026 ele era
+    // descartado: o espelho só era tocado depois de uma gravação confirmada.
+    //
+    // O caso que mostrou o preço disso: a filial 22658 (158 PIZZA & BURGER) foi
+    // bloqueada às 08:58, o parceiro respondeu `LicencaBloqueada: true` e a
+    // releitura confirmou. Até as 14:06 alguém desfez o bloqueio no OEM, fora do
+    // DoctorSaaS. O card continuou afirmando "BLOQUEADO Sim" porque o espelho é
+    // uma foto de 6 em 6 horas (cron `17 */6 * * *`), e a operadora clicou em
+    // Desbloquear QUATRO vezes: as quatro leram `bloqueado: false` no parceiro,
+    // e as quatro jogaram fora a única informação que consertaria a tela.
+    //
+    // Ler e não gravar é o pior dos dois mundos: paga a chamada e mantém a
+    // afirmação errada. Corrigir aqui não custa nenhuma chamada nova.
+    //
+    // Só entra o que foi REALMENTE lido. `null` num flag quer dizer "não deu
+    // para ler" — a guarda do DoctorOEM é sem valor de reserva de propósito — e
+    // sobrescrever o espelho com isso trocaria um dado velho por nenhum dado.
+    async function corrigirEspelhoComLeitura(
+      lido: { bloqueado: boolean | null; desativado: boolean | null; baixa_em?: string | null } | null,
+    ) {
+      if (!lido) return null;
+      const dia = (v: unknown) => (typeof v === "string" && v.length >= 10 ? v.slice(0, 10) : null);
+
+      const patchRecon: Record<string, unknown> = {};
+      const patchEspelho: Record<string, unknown> = {};
+      const mudou: { campo: string; de: unknown; para: unknown }[] = [];
+
+      if (typeof lido.bloqueado === "boolean" && lido.bloqueado !== linha.bloqueado_oem) {
+        patchRecon.bloqueado_oem = lido.bloqueado;
+        patchEspelho.bloqueado = lido.bloqueado;
+        mudou.push({ campo: "bloqueado", de: linha.bloqueado_oem, para: lido.bloqueado });
+      }
+
+      if (typeof lido.desativado === "boolean") {
+        const status = lido.desativado ? "Desativado" : "Ativo";
+        if (status !== linha.status_oem) {
+          patchRecon.status_oem = status;
+          patchEspelho.status = status;
+          mudou.push({ campo: "status", de: linha.status_oem, para: status });
+        }
+      }
+
+      // `baixa_em` sai da leitura documentada, que o modo estado sempre faz, e
+      // ali `null` é "não há baixa marcada" de verdade — diferente dos flags.
+      // Por isso ela pode ser apagada, e precisa ser: uma baixa cancelada no
+      // portal deixaria a ficha prometendo uma data que o parceiro já esqueceu.
+      if (lido.baixa_em !== undefined) {
+        const novo = dia(lido.baixa_em);
+        if (novo !== dia(linha.desativa_em)) {
+          patchRecon.desativa_em = novo;
+          patchEspelho.desativa_em = novo;
+          mudou.push({ campo: "desativa_em", de: linha.desativa_em, para: novo });
+        }
+      }
+
+      if (mudou.length === 0) return null;
+
+      await ds.from("reconciliacao_oem").update(patchRecon)
+        .eq("tenant_id", linha.tenant_id).eq("filial_codigo", linha.filial_codigo);
+      await ds.from("oem_espelho_filial").update(patchEspelho)
+        .eq("conta_integration_id", conta.id).eq("filial_codigo", linha.filial_codigo);
+      return mudou;
+    }
+
     const { campo, valor } = ACOES[acao];
     const resp = await fetch(
       `${String(conta.api_url).replace(/\/+$/, "")}/oem-licenca-modulo`,
@@ -230,12 +298,14 @@ Deno.serve(async (req) => {
 
     // ------------------------------------------------------- a simulação
     // Devolve o estado do parceiro para a tela montar a confirmação. Nada foi
-    // enviado, e nada é gravado no espelho.
+    // ENVIADO — mas o que foi LIDO corrige o espelho, porque é leitura ao vivo
+    // e mais nova que a foto de 6 em 6 horas que a tela está mostrando.
     if (simular) {
       return json({
         ok: true,
         simulado: true,
         acao,
+        espelho_corrigido: await corrigirEspelhoComLeitura(antes),
         pode_gravar: oem?.pode_gravar === true,
         faltando: oem?.faltando ?? [],
         sem_mudanca: oem?.sem_mudanca === true,
@@ -248,9 +318,21 @@ Deno.serve(async (req) => {
     }
 
     if (oem?.sem_mudanca === true) {
+      // "Nada a fazer" quase sempre quer dizer que a TELA estava errada: a
+      // pessoa clicou porque o card mostrava o estado contrário. Aqui o espelho
+      // também se corrige com a leitura ao vivo, senão o clique seguinte cai no
+      // mesmo lugar.
+      //
       // A mensagem de lá distingue "já está assim" de "a baixa já está marcada
       // para tal dia", e é a segunda que explica por que o clique não fez nada.
-      return json({ ok: true, acao, sem_mudanca: true, antes, mensagem: oem?.mensagem ?? null });
+      return json({
+        ok: true,
+        acao,
+        sem_mudanca: true,
+        antes,
+        espelho_corrigido: await corrigirEspelhoComLeitura(antes),
+        mensagem: oem?.mensagem ?? null,
+      });
     }
 
     // ---------------------------------------------------------- o espelho
