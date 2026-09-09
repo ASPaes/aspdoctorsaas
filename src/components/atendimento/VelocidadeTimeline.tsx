@@ -13,12 +13,15 @@ import {
 import { differenceInDays, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Loader2 } from "lucide-react";
-import { useAtendimentoVelocidadeTimeline } from "./useAtendimentoVelocidadeTimeline";
+import {
+  useAtendimentoVelocidadeTimeline,
+  type VelocidadeTimelinePoint,
+} from "./useAtendimentoVelocidadeTimeline";
+import { prepararSerieTimeline, type MetricKey } from "./velocidadeTimelineSerie";
 import { fmtEspera } from "./TempoRealTab";
 import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 import { cn } from "@/lib/utils";
 
-type MetricKey = "sla_pct" | "tme_p50" | "frt_p50" | "tmr_p50";
 const METRICAS: { key: MetricKey; label: string; tipo: "pct" | "tempo"; cor: string }[] = [
   { key: "sla_pct", label: "% SLA", tipo: "pct", cor: "#22c55e" },
   { key: "tme_p50", label: "TME", tipo: "tempo", cor: "#0ea5e9" },
@@ -35,14 +38,21 @@ export function VelocidadeTimeline({ slaSeconds }: { slaSeconds: number }) {
   const meta = metrica === "sla_pct" ? 90 : metrica === "frt_p50" ? slaSeconds : null;
   const fmtEixo = (v: number) => (cfg.tipo === "pct" ? `${v}%` : fmtEspera(v));
   const fmtBucket = (b: string) => format(parseISO(b), "dd/MM", { locale: ptBR });
-  const chartData = useMemo(() => data ?? [], [data]);
+  const chartData = useMemo(() => prepararSerieTimeline(data ?? []), [data]);
 
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">
-          Tendência {bucket === "week" ? "semanal" : "diária"}
-        </h3>
+        <div>
+          <h3 className="text-sm font-semibold">
+            Tendência {bucket === "week" ? "semanal" : "diária"}
+          </h3>
+          {bucket === "day" && (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Feriados e dias fechados não entram na linha.
+            </p>
+          )}
+        </div>
         <div className="flex flex-wrap gap-1 rounded-md border border-border overflow-hidden">
           {METRICAS.map((m) => (
             <button
@@ -91,18 +101,36 @@ export function VelocidadeTimeline({ slaSeconds }: { slaSeconds: number }) {
               fontSize={12}
             />
             <Tooltip
-              contentStyle={{
-                background: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: 6,
-                fontSize: 12,
+              cursor={{ fill: "hsl(var(--muted))", opacity: 0.25 }}
+              content={({ active, payload }) => {
+                const ponto = payload?.[0]?.payload as VelocidadeTimelinePoint | undefined;
+                if (!active || !ponto) return null;
+                const valor = ponto[metrica];
+                return (
+                  <div className="rounded-md border border-border bg-card px-3 py-2 text-xs shadow-md">
+                    <div className="font-medium">{fmtBucket(ponto.bucket)}</div>
+                    {ponto.dia_fechado ? (
+                      <div className="mt-1 text-muted-foreground">
+                        {ponto.fechado_motivo ?? "Fora do expediente"} — fora da linha
+                      </div>
+                    ) : (
+                      <div className="mt-1">
+                        {cfg.label}:{" "}
+                        <span className="font-medium tabular-nums">
+                          {valor === null
+                            ? "—"
+                            : cfg.tipo === "pct"
+                              ? `${valor}%`
+                              : fmtEspera(valor)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="text-muted-foreground">
+                      Volume: <span className="tabular-nums">{ponto.volume}</span>
+                    </div>
+                  </div>
+                );
               }}
-              labelFormatter={(l) => fmtBucket(String(l))}
-              formatter={(value: any, name: string) =>
-                name === "volume"
-                  ? [value, "Volume"]
-                  : [cfg.tipo === "pct" ? `${value}%` : fmtEspera(Number(value)), cfg.label]
-              }
             />
             <Bar yAxisId="right" dataKey="volume" fill="hsl(var(--muted))" opacity={0.5} />
             {meta !== null && (
@@ -120,7 +148,7 @@ export function VelocidadeTimeline({ slaSeconds }: { slaSeconds: number }) {
               stroke={cfg.cor}
               strokeWidth={2}
               dot={{ r: 3 }}
-              connectNulls
+              connectNulls={false}
             />
           </ComposedChart>
         </ResponsiveContainer>
