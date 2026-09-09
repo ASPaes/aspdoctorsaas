@@ -13,6 +13,11 @@ export interface VelocidadeTimelinePoint {
   tme_p50: number | null;
   frt_p50: number | null;
   tmr_p50: number | null;
+  /** Empresa fechada nesse dia: feriado cadastrado ou dia da semana fora do
+   *  expediente. Sempre false no bucket semanal, onde a marca não faz sentido. */
+  dia_fechado: boolean;
+  /** Nome do feriado, ou "Fora do expediente". Null em dia aberto. */
+  fechado_motivo: string | null;
 }
 
 export function useAtendimentoVelocidadeTimeline(
@@ -64,6 +69,8 @@ export function useAtendimentoVelocidadeTimeline(
         tme_p50: num(r.tme_p50),
         frt_p50: num(r.frt_p50),
         tmr_p50: num(r.tmr_p50),
+        dia_fechado: r.dia_fechado === true,
+        fechado_motivo: r.fechado_motivo ?? null,
       }));
     },
   });
