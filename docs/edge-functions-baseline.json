@@ -1,7 +1,7 @@
 {
-  "capturado_em": "2026-09-08T23:43:18.881Z",
+  "capturado_em": "2026-09-09T02:37:49.890Z",
   "project_ref": "vbngjzovjhkmietztffo",
-  "motivo": "reconciliacao 08/09: 6 mudancas reais (forward-whatsapp-message + os 5 importadores de _shared/message-processor.ts), 1 nova (send-assignment-greeting) e 44 re-bundles sem mudanca de codigo (imports remotos flutuantes + setup-cli version:latest)",
+  "motivo": "atualizacao manual",
   "functions": {
     "admin-db-actions": {
       "sha": "b2b885d21a014e37c2a61e7c1c4ccdaa8e886e755fc7661fafd4b3ce991bcb5f",
@@ -444,9 +444,9 @@
       "updated_at": "2026-09-08T20:00:30.436Z"
     },
     "verify-failed-deliveries": {
-      "sha": "3a6aee0a25455f630b654cc65853fba4eb50af7691ff8c59537f9f214b524396",
-      "version": 59,
-      "updated_at": "2026-09-08T20:00:30.436Z"
+      "sha": "7973e687d8ca67fcf4da7ad94d85218150d3361a502f6514052ad3977df29348",
+      "version": 60,
+      "updated_at": "2026-09-09T02:37:06.233Z"
     },
     "watchdog-instance-silence": {
       "sha": "2633903533365c6ff40bc19d08312dbc2100dd3333075d4af953e9a3334f3a20",
