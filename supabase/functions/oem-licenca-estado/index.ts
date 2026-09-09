@@ -34,7 +34,8 @@
 // "Ativo" por até 6 horas, logo depois de dizer que deu certo.
 //
 // TODA tentativa vira linha em `oem_estado_licenca_log`, inclusive a recusa e a
-// simulação.
+// simulação. A exceção é a ação `reler`, que não é tentativa de alterar nada e
+// está explicada onde o log é gravado.
 // ============================================================================
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -59,7 +60,11 @@ const ACOES = {
   bloquear:    { campo: "novo_bloqueado",  valor: true  },
 } as const;
 
-type Acao = keyof typeof ACOES;
+// `reler` não muda nada: é a leitura ao vivo que a simulação já fazia, virada
+// botão, para quem olha a ficha poder conferir o parceiro sem abrir um diálogo
+// de bloquear nem correr risco de clicar em confirmar. Fica fora de `ACOES`
+// porque não tem flag para pedir.
+type Acao = keyof typeof ACOES | "reler";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
@@ -85,11 +90,14 @@ Deno.serve(async (req) => {
     const reconId = String(corpo.recon_id ?? "");
     const clienteId = String(corpo.cliente_id ?? "");
     const acao = String(corpo.acao ?? "") as Acao;
-    const simular = corpo.simular === true;
-    if (!reconId || !clienteId || !(acao in ACOES)) {
+    const ehReler = acao === "reler";
+    // `reler` é leitura, e vai SEMPRE com `simular: true`. Não existe forma de
+    // pedir uma releitura que grave.
+    const simular = corpo.simular === true || ehReler;
+    if (!reconId || !clienteId || !(acao in ACOES || ehReler)) {
       return json({
         ok: false,
-        mensagem: 'Informe recon_id, cliente_id e acao ("ativar", "desativar", "bloquear" ou "desbloquear").',
+        mensagem: 'Informe recon_id, cliente_id e acao ("ativar", "desativar", "bloquear", "desbloquear" ou "reler").',
       }, 400);
     }
 
@@ -239,7 +247,14 @@ Deno.serve(async (req) => {
       return mudou;
     }
 
-    const { campo, valor } = ACOES[acao];
+    // O modo estado do DoctorOEM não existe sem um pedido: ele precisa de
+    // `novo_bloqueado` ou `novo_desativado` para saber que o assunto é a
+    // licença e não um módulo. Numa releitura o pedido vai INERTE, com o valor
+    // que o espelho já tem, e como `simular` é sempre true nada é enviado ao
+    // parceiro: só as duas leituras acontecem, e é delas que sai o `antes`.
+    const { campo, valor } = ehReler
+      ? { campo: "novo_bloqueado", valor: linha.bloqueado_oem === true }
+      : ACOES[acao as keyof typeof ACOES];
     const resp = await fetch(
       `${String(conta.api_url).replace(/\/+$/, "")}/oem-licenca-modulo`,
       {
@@ -265,7 +280,15 @@ Deno.serve(async (req) => {
     // licença só muda no dia.
     const baixaEm = (oem?.conferencia?.baixa_em ?? null) as string | null;
 
-    await ds.from("oem_estado_licenca_log").insert({
+    // A releitura NÃO vira linha no log de estado, e isso é escolha, não
+    // esquecimento: aquela tabela é o histórico de tentativas de ALTERAR a
+    // licença, e é dela que a conferência diária tira a última intenção de cada
+    // filial (`v_oem_divergencia_estado`). Encher de leitura o registro que
+    // responde "o que foi pedido aqui" atrapalharia as duas leituras, a humana
+    // e a da view. O `acao_check` da tabela também só admite os quatro verbos.
+    // O que a releitura muda continua rastreável: ela devolve `espelho_corrigido`
+    // com de/para de cada campo.
+    if (!ehReler) await ds.from("oem_estado_licenca_log").insert({
       tenant_id: linha.tenant_id,
       conta_integration_id: conta.id,
       cliente_id: clienteId,
@@ -294,6 +317,23 @@ Deno.serve(async (req) => {
         detalhe: oem,
         http,
       }, 502);
+    }
+
+    // --------------------------------------------------------- a releitura
+    // Nada foi enviado. O valor todo dela está em `antes` (o estado que o
+    // parceiro tem AGORA) e em `espelho_corrigido` (o que a ficha estava
+    // dizendo de errado). `leitura_completa: false` é a mesma guarda da
+    // simulação: sem os dois flags, o que voltou não dá para acreditar.
+    if (ehReler) {
+      return json({
+        ok: true,
+        acao: "reler",
+        antes,
+        espelho_corrigido: await corrigirEspelhoComLeitura(antes),
+        leitura_completa: oem?.pode_gravar === true,
+        faltando: oem?.faltando ?? [],
+        lido_em: new Date().toISOString(),
+      });
     }
 
     // ------------------------------------------------------- a simulação
