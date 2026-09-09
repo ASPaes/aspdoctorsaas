@@ -1551,7 +1551,8 @@ export default function OemIntegrationTab() {
         rotulo: "Licença OEM ativa de cliente cancelado no DS",
         detalhe: <>filial {l.filial_codigo} · grupo {l.empresa_codigo} · custo{" "}
           <strong className="text-destructive">{brl(Number(l.custo_oem || 0))}</strong>/mês.
-          A desativação é pedida no portal do OEM</>,
+          Ou a licença é de outro cadastro do mesmo CNPJ, que continua ativo, ou a
+          desativação é pedida no portal do OEM</>,
       });
     }
     for (const l of r.desativaComClienteAtivo) {
@@ -1813,6 +1814,17 @@ export default function OemIntegrationTab() {
             soltar: i.linha!,
           })}>
           <Link2 className="h-3.5 w-3.5" /> Trocar licença
+        </Button>
+      )}
+      {/* O mesmo CNPJ costuma ter dois cadastros aqui: o antigo, cancelado, e o
+          que continua pagando. Quando a licença ficou no cancelado, não há nada
+          a desativar no OEM, e pedir a baixa lá derrubaria o sistema de um
+          cliente ativo. A saída é trocar o cliente da licença, e a RPC tira o
+          código da ficha antiga antes de gravar na nova. */}
+      {i.tipo === "licenca_cancelado" && i.linha && (
+        <Button size="sm" variant="secondary" className="gap-1.5"
+          onClick={() => setEscolhendo(i.linha!)}>
+          <Link2 className="h-3.5 w-3.5" /> Trocar cliente
         </Button>
       )}
       {(i.tipo === "margem" || i.tipo === "sem_licenca" || i.tipo === "escolher_licenca"
