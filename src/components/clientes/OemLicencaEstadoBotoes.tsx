@@ -145,6 +145,51 @@ export default function OemLicencaEstadoBotoes({
   // ainda está de pé. Nos dois casos o pedido ao parceiro é o mesmo.
   const acaoEstado: Acao = desativado || baixaMarcada ? "ativar" : "desativar";
 
+  // RELER É LEITURA, ENTÃO NÃO PASSA POR DIÁLOGO.
+  //
+  // Ela lê a licença no parceiro agora e corrige a ficha com o que voltou. Sem
+  // confirmação porque não há nada a confirmar: nenhum pedido é enviado. É a
+  // saída para quem olha o carimbo de idade e quer decidir sobre o estado de
+  // verdade, em vez de abrir o diálogo de Bloquear só para espiar o "Agora no
+  // OEM" e correr o risco de clicar em confirmar.
+  const relerMut = useMutation({
+    mutationFn: () => chamar({ recon_id: licenca.id, cliente_id: clienteId, acao: "reler" }),
+    onSuccess: async (d: any) => {
+      const mudou: { campo: string; de: unknown; para: unknown }[] = d?.espelho_corrigido ?? [];
+      toast(
+        d?.leitura_completa === false
+          ? {
+              title: "A leitura da licença veio incompleta",
+              description: `O OEM não devolveu ${
+                (d?.faltando ?? []).join(" nem ") || "os campos de estado"
+              }. Nada na ficha foi alterado.`,
+            }
+          : mudou.length
+            ? {
+                title: "A ficha estava desatualizada e foi corrigida",
+                description: `No OEM agora: ${
+                  d?.antes?.bloqueado === true ? "bloqueada" : "não bloqueada"
+                }, ${d?.antes?.desativado === true ? "desativada" : "ativa"}${
+                  d?.antes?.baixa_em ? `, com baixa em ${dataBR(d.antes.baixa_em)}` : ""
+                }.`,
+              }
+            : {
+                title: "A ficha já estava certa",
+                description: "A licença no parceiro está no mesmo estado que a tela mostrava.",
+              },
+      );
+      await qc.invalidateQueries({ queryKey: ["oem-licencas-cliente"] });
+      // O carimbo de idade continua o da varredura, que não mudou: ela é quem
+      // atualiza custo e módulos. Invalidar aqui evitaria uma tela dizendo que
+      // leu agora um custo que é da cópia de antes.
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Não deu para reler a licença no OEM",
+        description: e?.message ?? String(e),
+      }),
+  });
+
   const simulacaoMut = useMutation({
     mutationFn: (a: Acao) => chamar({ recon_id: licenca.id, cliente_id: clienteId, acao: a, simular: true }),
     onSuccess: (d) => setSimulacao(d as Simulacao),
@@ -246,6 +291,23 @@ export default function OemLicencaEstadoBotoes({
         >
           {bloqueado ? <LockOpen className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
           {bloqueado ? "Desbloquear" : "Bloquear"}
+        </Button>
+
+        {/* Fica habilitado mesmo quando o estado não veio na última leitura:
+            é justamente aí que reler é o que resolve, e é o único botão dos três
+            que não depende de saber o estado atual. */}
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 px-2 text-xs gap-1.5 text-muted-foreground"
+          disabled={relerMut.isPending || gravando}
+          title="Lê a licença no OEM agora e corrige a ficha com o que o parceiro responder. Não envia nenhuma alteração."
+          onClick={() => relerMut.mutate()}
+        >
+          {relerMut.isPending
+            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : <RefreshCw className="h-3.5 w-3.5" />}
+          Reler
         </Button>
       </div>
 

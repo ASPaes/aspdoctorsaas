@@ -37,6 +37,31 @@ type Licenca = {
   resolvido_em: string | null;
 };
 
+// A IDADE DA LEITURA, EM TEXTO CURTO O SUFICIENTE PARA CABER NO CABEÇALHO.
+//
+// Ela existe porque o cartão afirmava o estado da licença com a mesma tinta de
+// um fato ao vivo, e o dado é uma cópia de 6 em 6 horas (cron 17 */6). Em
+// 09/09/2026 isso deixou a ficha do 158 Pizza & Burger dizendo "Bloqueado: Sim"
+// durante horas depois de a licença ter sido liberada no portal do parceiro.
+// Sem o carimbo, ninguém tem como desconfiar do que está lendo.
+const idadeDaLeitura = (iso: string | null) => {
+  if (!iso) return null;
+  const lido = new Date(iso);
+  if (Number.isNaN(lido.getTime())) return null;
+  const horas = (Date.now() - lido.getTime()) / 3_600_000;
+  const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const dia = lido.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const hora = lido.toLocaleTimeString("pt-BR", {
+    timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit",
+  });
+  return {
+    texto: dia === hoje ? `lido no OEM às ${hora}` : `lido no OEM em ${dia} às ${hora}`,
+    // A cópia roda de 6 em 6 horas. Passou de 7, ela atrasou, e aí a idade
+    // deixa de ser rotina e passa a ser motivo para reler antes de decidir.
+    atrasado: horas > 7,
+  };
+};
+
 const brl = (v: number | null | undefined) =>
   (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -156,6 +181,29 @@ export function useOemDoCliente(clienteId: string) {
     },
   });
 
+  // QUANDO O PARCEIRO FOI LIDO. Não é `reconciliacao_oem.gerado_em`, que é
+  // quando o DoctorSaaS copiou a tabela do DoctorOEM: o dado dentro dela já
+  // pode ser de horas antes. O carimbo honesto é o `last_sync_oem` do espelho,
+  // que é quando a varredura leu a licença no parceiro.
+  //
+  // Com mais de uma licença vale a MAIS VELHA: o carimbo qualifica o cartão
+  // inteiro, e prometer a idade da leitura mais nova diria que algo ali é mais
+  // fresco do que é. Errar para o lado velho é o único lado seguro.
+  const { data: lidoEm = null } = useQuery({
+    queryKey: ["oem-lido-em-cliente", tid, codigos.join(",")],
+    enabled: !!tid && temConta === true && codigos.length > 0,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("oem_espelho_filial" as any) as any)
+        .select("last_sync_oem")
+        .eq("tenant_id", tid)
+        .in("filial_codigo", codigos)
+        .order("last_sync_oem", { ascending: true })
+        .limit(1);
+      if (error) throw error;
+      return (data?.[0]?.last_sync_oem ?? null) as string | null;
+    },
+  });
+
   const ativo = !!tid && temConta === true;
   // Vínculo indefinido: o de/para aponta para cá, mas nenhuma licença foi
   // confirmada. Dizer isso é mais útil do que listar 38 palpites.
@@ -165,14 +213,17 @@ export function useOemDoCliente(clienteId: string) {
     licencas: licencas as Licenca[],
     pendentes,
     indefinido,
+    lidoEm,
     visivel: ativo && (licencas.length > 0 || indefinido),
   };
 }
 
 export default function IntegracaoOemSection({ clienteId }: { clienteId: string }) {
-  const { licencas, pendentes, indefinido, visivel } = useOemDoCliente(clienteId);
+  const { licencas, pendentes, indefinido, lidoEm, visivel } = useOemDoCliente(clienteId);
 
   if (!visivel) return null;
+
+  const idade = idadeDaLeitura(lidoEm);
 
   const cabecalho = (extra?: ReactNode, acoes?: ReactNode) => (
     <div className="flex flex-wrap items-center gap-2 mb-2.5">
@@ -181,6 +232,22 @@ export default function IntegracaoOemSection({ clienteId }: { clienteId: string 
         OEM
       </span>
       {extra}
+      {idade && (
+        <span
+          className={
+            "text-[11px] tabular-nums " +
+            (idade.atrasado ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")
+          }
+          title={
+            "Custo, módulos e estado desta licença vêm de uma cópia que o sistema traz do OEM de 6 em 6 horas. " +
+            "Se a licença mudou no portal do parceiro depois desse horário, o que aparece aqui ainda é o estado anterior. " +
+            "Use Reler para ler a licença no parceiro agora." +
+            (idade.atrasado ? " Esta cópia passou de 7 horas, ou seja, a atualização automática atrasou." : "")
+          }
+        >
+          {idade.texto}
+        </span>
+      )}
       {acoes && <div className="ml-auto">{acoes}</div>}
     </div>
   );
