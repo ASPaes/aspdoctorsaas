@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Link2, Unlink, Building2, Loader2, ChevronDown, Cake, ExternalLink, Search, ArrowLeftRight } from "lucide-react";
 import { useClienteLinkSuggestion, type ClienteCandidato } from "../hooks/useClienteLinkSuggestion";
 import { useLinkedClienteDetails } from "../hooks/useLinkedClienteDetails";
@@ -60,6 +61,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
     isAmbiguous,
   } = useClienteLinkSuggestion(conversation.id, phoneNumber, metadata, attendanceId, conversation.tenant_id);
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
+  const [removerDoCadastro, setRemoverDoCadastro] = useState(false);
 
   const canEdit = !isAttendanceClosed || isAdminOrHead;
 
@@ -252,7 +254,13 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
             </Button>
           )}
           {canEdit && (
-            <AlertDialog open={unlinkDialogOpen} onOpenChange={setUnlinkDialogOpen}>
+            <AlertDialog
+              open={unlinkDialogOpen}
+              onOpenChange={(open) => {
+                setUnlinkDialogOpen(open);
+                if (open) setRemoverDoCadastro(false);
+              }}
+            >
               <AlertDialogTrigger asChild>
                 <Button
                   size="sm"
@@ -270,18 +278,37 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
                   <AlertDialogDescription>
                     {isGroup
                       ? "O vínculo deste grupo com o cliente será removido. Deseja continuar?"
-                      : "O vínculo com este cliente será removido e o número será excluído do cadastro de contatos. Deseja continuar?"}
+                      : "O vínculo deste atendimento com o cliente será removido. O número continua no cadastro do cliente, a não ser que você marque a opção abaixo."}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                {!isGroup && (
+                  <label className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-2.5 text-xs cursor-pointer">
+                    <Checkbox
+                      checked={removerDoCadastro}
+                      onCheckedChange={(v) => setRemoverDoCadastro(v === true)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      Também remover este número do cadastro de contatos do cliente
+                      <span className="block text-[10px] text-muted-foreground mt-0.5">
+                        Use só quando o número foi cadastrado no cliente errado.
+                      </span>
+                    </span>
+                  </label>
+                )}
                 <AlertDialogFooter className="gap-2">
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={() => {
                       if (isGroup) groupLinkMutation.mutate(null);
-                      else unlinkCliente(true);
+                      else unlinkCliente(removerDoCadastro);
                       setUnlinkDialogOpen(false);
                     }}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    className={
+                      removerDoCadastro
+                        ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        : undefined
+                    }
                   >
                     Desvincular
                   </AlertDialogAction>
@@ -367,7 +394,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
     );
   }
 
-  if (!isGroup && isAmbiguous && canEdit) {
+  if (!isGroup && isAmbiguous && !autoLinkBlocked && canEdit) {
     return (
       <div className="bg-accent/40 border border-accent rounded-md p-3 space-y-2">
         <div className="flex items-center gap-2">
@@ -405,7 +432,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
     );
   }
 
-  if (!isGroup && isAmbiguous && !canEdit) {
+  if (!isGroup && isAmbiguous && !autoLinkBlocked && !canEdit) {
     return (
       <div className="bg-muted/50 border border-border rounded-md p-3">
         <div className="flex items-center gap-2">
@@ -417,7 +444,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
     );
   }
 
-  if (!isGroup && suggestedCliente) {
+  if (!isGroup && suggestedCliente && !autoLinkBlocked) {
     return (
       <div className="bg-accent/50 border border-accent rounded-md p-3 space-y-2">
         <div className="flex items-center gap-2">
@@ -467,7 +494,13 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
       </div>
       {!searchOpen && (
         <p className="text-[10px] text-muted-foreground">
-          {canEdit ? 'Nenhum cliente vinculado. Clique em "Vincular" para buscar.' : "Nenhum cliente vinculado."}
+          {autoLinkBlocked
+            ? canEdit
+              ? 'Nenhum cliente vinculado. A sugestão automática foi desativada nesta conversa; clique em "Vincular" para escolher.'
+              : "Nenhum cliente vinculado. A sugestão automática foi desativada nesta conversa."
+            : canEdit
+              ? 'Nenhum cliente vinculado. Clique em "Vincular" para buscar.'
+              : "Nenhum cliente vinculado."}
         </p>
       )}
       {searchOpen && canEdit && (
