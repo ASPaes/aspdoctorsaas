@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import kpiHelp from "@/lib/kpiHelp";
-import { kpiCatalog, entradasDaArea, entradaPorId } from "./index";
+import {
+  kpiCatalog, entradasDaArea, entradaPorId,
+  verbetesSemEntrada, entradasSemVerbete,
+} from "./index";
 import { PROVIDERS, PREFIXO_AREA, type KpiArea } from "./types";
 
 /** O catálogo é escrito à mão, área por área. Estes testes são a rede que
@@ -71,5 +74,24 @@ describe("kpiCatalog — invariantes", () => {
   it("entradaPorId acha o que existe e devolve undefined para o que não existe", () => {
     expect(entradaPorId("at.volume_total")?.label).toBe("Total de atendimentos");
     expect(entradaPorId("nao.existe")).toBeUndefined();
+  });
+});
+
+describe("kpiCatalog — órfãos", () => {
+  it("verbetesSemEntrada lista chave do kpiHelp que nenhuma entrada usa", () => {
+    const sobrando = verbetesSemEntrada();
+    const usadas = new Set(kpiCatalog.map((e) => e.helpKey).filter(Boolean));
+    expect(sobrando.every((k) => !usadas.has(k))).toBe(true);
+    expect(sobrando.every((k) => k in kpiHelp)).toBe(true);
+  });
+
+  it("entradasSemVerbete lista id de entrada que não declara helpKey", () => {
+    const sem = entradasSemVerbete();
+    expect(sem.every((id) => entradaPorId(id)?.helpKey === undefined)).toBe(true);
+  });
+
+  it("as duas listas juntas explicam a diferença entre catálogo e kpiHelp", () => {
+    const comVerbete = kpiCatalog.filter((e) => e.helpKey).length;
+    expect(comVerbete + entradasSemVerbete().length).toBe(kpiCatalog.length);
   });
 });
