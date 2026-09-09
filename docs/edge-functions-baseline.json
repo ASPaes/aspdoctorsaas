@@ -1,5 +1,5 @@
 {
-  "capturado_em": "2026-09-09T17:53:58.345Z",
+  "capturado_em": "2026-09-09T23:44:46.006Z",
   "project_ref": "vbngjzovjhkmietztffo",
   "motivo": "atualizacao manual",
   "functions": {
@@ -369,9 +369,9 @@
       "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "send-whatsapp-message": {
-      "sha": "3d8afdadef962bfb26d4e9deb503ee4fceb19b45d51a5f498945f8967b785361",
-      "version": 540,
-      "updated_at": "2026-09-09T02:41:20.253Z"
+      "sha": "ff0dce91c51ab524af71f64a00878ec42fafd196bf1def632c32a8413f88b6a5",
+      "version": 541,
+      "updated_at": "2026-09-09T23:43:35.295Z"
     },
     "send-whatsapp-template": {
       "sha": "c43f1b6b4ea7c5e4c7715bab0e13b93888e7af29bd64746d32d8f8c345147c7e",
