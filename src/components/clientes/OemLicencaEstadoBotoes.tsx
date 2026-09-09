@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, Lock, LockOpen, Power, PowerOff, TriangleAlert } from "lucide-react";
+import { Loader2, Lock, LockOpen, Power, PowerOff, RefreshCw, TriangleAlert } from "lucide-react";
 
 // ============================================================================
 // Ativar/Desativar e Bloquear/Desbloquear a licença do cliente no OEM.
@@ -56,6 +56,9 @@ type Simulacao = {
   antes: { bloqueado: boolean | null; desativado: boolean | null; baixa_em?: string | null } | null;
   depois: { bloqueado: boolean | null; desativado: boolean | null } | null;
   campos_vistos?: unknown;
+  // O que a leitura ao vivo acertou no espelho. Vem preenchido quando a ficha
+  // estava afirmando um estado que o parceiro não tem mais.
+  espelho_corrigido?: { campo: string; de: unknown; para: unknown }[] | null;
 };
 
 // ⚠️ DESATIVAR NÃO DESLIGA NA HORA, e o texto tem que dizer isso. Medido em
@@ -99,6 +102,14 @@ async function chamar(body: Record<string, unknown>) {
   if (data?.ok === false) throw new Error(data?.mensagem ?? "O OEM recusou a alteração.");
   return data;
 }
+
+// Os campos do espelho no vocabulário de quem lê a tela. A chave vem da edge
+// function, que fala em nome de coluna.
+const ROTULO_ESPELHO: Record<string, string> = {
+  bloqueado: "o bloqueio",
+  status: "o status",
+  desativa_em: "a baixa marcada",
+};
 
 const sim = (v: boolean | null | undefined) => (v === true ? "Sim" : v === false ? "Não" : "sem leitura");
 const dataBR = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
@@ -177,6 +188,12 @@ export default function OemLicencaEstadoBotoes({
   }
 
   function fechar() {
+    // A simulação pode ter corrigido o espelho com a leitura ao vivo. O refetch
+    // fica para o fechamento de propósito: recarregar a lista com o diálogo
+    // aberto trocaria os botões debaixo da mão de quem está lendo a confirmação.
+    if (simulacao?.espelho_corrigido?.length) {
+      void qc.invalidateQueries({ queryKey: ["oem-licencas-cliente"] });
+    }
     setAcao(null);
     setSimulacao(null);
     setErro(null);
@@ -287,6 +304,25 @@ export default function OemLicencaEstadoBotoes({
                   </span>
                 </div>
               </div>
+
+              {/* A ficha afirmava um estado que o parceiro não tem mais. Dizer
+                  isso em voz alta é o que evita o clique repetido: sem essa
+                  linha, "nada será enviado" parece defeito do botão. */}
+              {!!simulacao.espelho_corrigido?.length && (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-400 space-y-1">
+                  <p className="font-medium flex items-center gap-1.5">
+                    <RefreshCw className="h-4 w-4" /> A ficha estava desatualizada
+                  </p>
+                  <p>
+                    O espelho do OEM é copiado de 6 em 6 horas, e aqui{" "}
+                    {simulacao.espelho_corrigido
+                      .map((c) => ROTULO_ESPELHO[c.campo] ?? c.campo)
+                      .join(" e ")}{" "}
+                    estava diferente do parceiro. O estado acima é a leitura de agora, e a ficha já foi
+                    corrigida com ela.
+                  </p>
+                </div>
+              )}
 
               {simulacao.sem_mudanca && (
                 <p className="text-sm text-muted-foreground">
