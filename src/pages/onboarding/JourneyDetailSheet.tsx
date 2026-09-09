@@ -433,8 +433,30 @@ const MODULE_ORIGEM_COLOR: Record<string, string> = {
   cliente: "hsl(262 83% 58%)",
 };
 
-function SortableModuleRow({ m, onDelete }: { m: JourneyModule; onDelete: (id: string) => void }) {
+function SortableModuleRow({ m, onDelete, onQuantidadeChange }: {
+  m: JourneyModule;
+  onDelete: (id: string) => void;
+  /** Salva a nova quantidade. So chega aqui modulo lancado na tela: o que veio da
+   *  calculadora nao e editavel, para a jornada nao divergir da venda. */
+  onQuantidadeChange: (id: string, quantidade: number) => Promise<void>;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: m.id });
+  const qtd = m.quantidade ?? 1;
+  const editavel = m.origem !== "intake";
+  const [editandoQtd, setEditandoQtd] = useState(false);
+  const [qtdDraft, setQtdDraft] = useState(String(qtd));
+
+  async function salvarQtd() {
+    setEditandoQtd(false);
+    const n = Math.trunc(Number(qtdDraft));
+    if (!Number.isFinite(n) || n < 1) {
+      setQtdDraft(String(qtd));
+      toast.error("A quantidade mínima é 1");
+      return;
+    }
+    if (n === qtd) return;
+    await onQuantidadeChange(m.id, n);
+  }
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -457,11 +479,40 @@ function SortableModuleRow({ m, onDelete }: { m: JourneyModule; onDelete: (id: s
           <GripVertical className="h-3.5 w-3.5" />
         </button>
         <span className="text-xs font-medium truncate">{m.nome}</span>
-        {(m.quantidade ?? 1) > 1 && (
-          <Badge variant="secondary" className="text-[9px] font-semibold tabular-nums shrink-0 px-1.5">
-            x{m.quantidade}
+        {editandoQtd ? (
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            autoFocus
+            value={qtdDraft}
+            onChange={(e) => setQtdDraft(e.target.value)}
+            onBlur={salvarQtd}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
+              if (e.key === "Escape") { setQtdDraft(String(qtd)); setEditandoQtd(false); }
+            }}
+            className="h-6 w-14 shrink-0 px-1.5 text-center text-[11px] tabular-nums"
+            aria-label={`Quantidade de ${m.nome}`}
+          />
+        ) : editavel ? (
+          <button
+            type="button"
+            onClick={() => { setQtdDraft(String(qtd)); setEditandoQtd(true); }}
+            className="shrink-0 rounded border border-dashed border-border px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+            title="Alterar a quantidade"
+          >
+            x{qtd}
+          </button>
+        ) : qtd > 1 ? (
+          <Badge
+            variant="secondary"
+            className="text-[9px] font-semibold tabular-nums shrink-0 px-1.5"
+            title="Quantidade recebida da calculadora de vendas. Para corrigir, ajuste a venda na ficha do cliente."
+          >
+            x{qtd}
           </Badge>
-        )}
+        ) : null}
         <Badge
           variant="outline"
           className="text-[9px] capitalize border-0 text-white shrink-0"
@@ -2058,6 +2109,20 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     } catch (e: any) { toast.error(e.message || "Erro ao importar módulos"); }
   }
 
+  /** Quantidade da linha da jornada. A tela so oferece isso em modulo lancado
+   *  aqui dentro; o que veio da calculadora fica como a venda registrou. */
+  async function handleModuleQuantidade(id: string, quantidade: number) {
+    if (!tenantId) return;
+    try {
+      const { error } = await (supabase.from("onboarding_journey_modules" as any) as any)
+        .update({ quantidade })
+        .eq("id", id)
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["onboarding-journey-modules", journeyId, tenantId] });
+    } catch (e: any) { toast.error(e.message || "Erro ao alterar a quantidade"); }
+  }
+
   async function handleDeleteModule(id: string) {
     if (!tenantId) return;
     try {
@@ -3245,7 +3310,12 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                               <SortableContext items={(modulesQ.data ?? []).map((m) => m.id)} strategy={verticalListSortingStrategy}>
                                 <div className="space-y-1.5">
                                   {(modulesQ.data ?? []).map((m) => (
-                                    <SortableModuleRow key={m.id} m={m} onDelete={handleDeleteModule} />
+                                    <SortableModuleRow
+                                      key={m.id}
+                                      m={m}
+                                      onDelete={handleDeleteModule}
+                                      onQuantidadeChange={handleModuleQuantidade}
+                                    />
                                   ))}
                                 </div>
                               </SortableContext>
