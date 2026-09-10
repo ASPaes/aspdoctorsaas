@@ -1,10 +1,24 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+/**
+ * Só o diálogo de importação usa `useLookups`, e ele exige TenantFilterProvider
+ * dentro de AuthProvider. Montar a árvore inteira de contextos para conferir em
+ * que faixa uma conta cai testaria os contextos, não a regra.
+ */
+vi.mock("@/hooks/useLookups", () => ({
+  useLookups: () => ({
+    unidadesBase: { data: [{ id: 1, nome: "Matriz", is_active: true }] },
+    origensVenda: { data: [] }, funcionarios: { data: [] },
+    formasPagamento: { data: [] }, areasAtuacao: { data: [] }, segmentos: { data: [] },
+  }),
+}));
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import HiperVisaoGeralTab from "./HiperVisaoGeralTab";
 import HiperCustosTab from "./HiperCustosTab";
 import HiperDivergenciasTab, { montarLoteDaFamilia } from "./HiperDivergenciasTab";
+import HiperImportarDialog from "./HiperImportarDialog";
 import type { LinhaRecon } from "./useHiperDados";
 
 /** Sem @testing-library/react: o peer @testing-library/dom não está instalado. */
@@ -542,5 +556,44 @@ describe("Divergências: lote por família", () => {
     expect(lote?.total).toBe(629);
     expect(lote?.linhas).toHaveLength(500);
     expect(lote?.deFora).toBe(129);
+  });
+});
+
+describe("diálogo de importação", () => {
+  /** Conta que o portal manda sem CNPJ e sem id — as duas buscas ficam desligadas. */
+  const semChaves: LinhaRecon = {
+    ...base, id: "9", id_portal: null, cnpj_norm: null,
+    razao_social_hiper: "CONTA SEM CNPJ NO PORTAL",
+    ds_cliente_id: null, ds_cliente_produto_id: null, razao_social_ds: null,
+    divergencias: ["sem_dono"], estado_match: "orfao",
+  };
+
+  it("não fica preso em 'Conferindo' quando não há o que consultar", () => {
+    // `isPending` do React Query v5 é true também para query DESLIGADA. Sem
+    // CNPJ e sem id_portal as duas ficam desligadas, e o diálogo travava no
+    // spinner para sempre — a conta nunca aparecia para ser corrigida.
+    render(<HiperImportarDialog tid="t1" contas={[semChaves]} open onOpenChange={() => {}} />);
+    const txt = document.body.textContent ?? "";
+    expect(txt).not.toContain("Conferindo os CNPJs");
+    expect(txt).toContain("CONTA SEM CNPJ NO PORTAL");
+  });
+
+  it("separa as duas faixas na tela, com a contagem de cada uma", () => {
+    const central: LinhaRecon = {
+      ...base, id: "10", id_portal: null, cnpj_norm: null,
+      razao_social_hiper: "CONTA DA CENTRAL", responsavel_tipo: "central_leads",
+      mrr_hiper: 108.75, ds_cliente_id: null, ds_cliente_produto_id: null,
+      razao_social_ds: null, divergencias: ["sem_dono"], estado_match: "orfao",
+    };
+    const hiperador: LinhaRecon = {
+      ...base, id: "11", id_portal: null, cnpj_norm: null,
+      razao_social_hiper: "CONTA DO HIPERADOR", responsavel_tipo: "hiper",
+      mrr_hiper: null, ds_cliente_id: null, ds_cliente_produto_id: null,
+      razao_social_ds: null, divergencias: ["sem_dono"], estado_match: "orfao",
+    };
+    render(<HiperImportarDialog tid="t1" contas={[central, hiperador]} open onOpenChange={() => {}} />);
+    const txt = document.body.textContent ?? "";
+    expect(txt).toContain("Pronta para importar (1)");
+    expect(txt).toContain("Falta a mensalidade (1)");
   });
 });

@@ -262,3 +262,40 @@ omissão.
    para as 3 contas da ASP e é o pedaço barato.
 2. **Faixas + tabela + envio em chamadas de 200.**
 3. **Medição de timeout** e ajuste do teto efetivo.
+
+---
+
+## 12. O que a execução mudou neste desenho
+
+Registrado em 10/09/2026, depois de implementar. O que está acima continua
+valendo; o que muda está aqui.
+
+**Não houve limiar de "tabela acima de 10 contas".** Em vez de dois renderizadores,
+ficou um só: linha compacta sempre, com seta que abre e-mail, WhatsApp, área e
+segmento. Mantém tudo o que o cartão tinha e escala.
+
+**Dois defeitos vieram junto, achados ao escrever o teste de tela:**
+
+1. **O diálogo travava em "Conferindo…" para sempre** quando não havia o que
+   consultar. No React Query v5 `isPending` é `true` também para query
+   **desligada** — e uma conta que o portal manda sem CNPJ desliga a busca.
+   Justamente a conta que precisava aparecer para ser corrigida é a que sumia.
+   Corrigido trocando por `isLoading`. **Era pré-existente**, não veio do lote.
+2. **Laço infinito de render.** Três causas somadas: `= []` no destructuring do
+   `useQuery` cria array novo a cada render e invalida todo `useMemo` abaixo; o
+   efeito de semeadura devolvia objeto novo mesmo sem semear nada; e a marcação
+   inicial criava um `Set` novo toda passada quando a faixa automática estava
+   vazia. Todas introduzidas nesta entrega e corrigidas antes do commit.
+
+**Componente declarado dentro do componente pai** (`Linha`, `Cabecalho`) vira um
+tipo novo a cada render: o React remonta a linha e **o campo de mensalidade
+perderia o foco a cada tecla**. Viraram funções que devolvem JSX.
+
+**Correspondência do que a RPC criou é por RAZÃO SOCIAL, e 14 das 998 contas do
+espelho têm nome repetido.** Com duas homônimas no mesmo envio não há como saber
+qual entrou. `entraramComCerteza` só tira da lista nome único no lote; homônimas
+ficam visíveis e a próxima tentativa da que já entrou é recusada com motivo.
+Resolver de vez pede a RPC devolver `id_portal` em `criados` — não feito aqui.
+
+**Teste de altura de diálogo do repo:** o novo diálogo passa. O único
+reprovado, `MacroDialog.tsx` com 695px, já reprovava antes desta branch.

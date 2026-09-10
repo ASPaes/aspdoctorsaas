@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -10,29 +10,30 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertTriangle, ExternalLink, Loader2, Download } from "lucide-react";
+import {
+  AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Loader2, Download,
+} from "lucide-react";
 import { maskPhoneBR } from "@/lib/masks";
 import { brl, cnpjMask, nomeTipo, num, rotuloRecorrencia } from "./ui";
 import {
-  contaVazia, contarFaltando, mensalidadeDoPortal, recorrenciaDoPlano, semearConta,
-  separarContas, telefoneEhFixo,
+  TETO_LOTE, contaVazia, entraramComCerteza, fatiar, mensalidadeOk, prontasParaEnviar,
+  recorrenciaDoPlano, semearConta, separarContas, separarFaixas, telefoneEhFixo,
   type ContatoEspelho, type JaCadastrado, type PorConta,
 } from "./importarRegras";
 import type { LinhaRecon } from "./useHiperDados";
 
 /**
- * Importar para o DoctorSaaS a conta que vive no portal Hiper e não tem
+ * Importar para o DoctorSaaS as contas que vivem no portal Hiper e não têm
  * cadastro aqui.
  *
- * O portal dá razão social, fantasia, CNPJ, cidade/UF, plano, tipo de contrato
- * e custo. O resto do cadastro não existe lá e é perguntado aqui: o que é igual
- * para todas as contas fica no topo, o que muda de conta para conta fica no
- * cartão de cada uma.
+ * O portal dá razão social, fantasia, CNPJ, cidade/UF, plano, tipo de contrato,
+ * custo — e, desde 10/09/2026, também e-mail e telefone, que a tela pedia à mão.
  *
- * Mensalidade é campo obrigatório e não um palpite: em 9 das 12 contas o
- * responsável é o Hiperador, e nessas quem cobra o cliente é a revenda — o
- * portal não conhece o preço. Importar com zero encheria a base de cliente sem
- * receita e com custo saindo.
+ * O que ele não dá é a mensalidade, e não dá por um motivo: nas contas de
+ * Hiperador quem cobra o cliente é a revenda. Medido nas 998 do espelho, só
+ * contas ativas: Hiperador tem 0 preços em 352; Central tem 249 em 268. É essa
+ * assimetria que divide a tela em duas faixas — uma que não pede nada e outra
+ * que é uma lista de trabalho, preenchida aos poucos.
  */
 
 export default function HiperImportarDialog({
@@ -54,7 +55,12 @@ export default function HiperImportarDialog({
   const [dia, setDia] = useState("");
   const [dataInicio, setDataInicio] = useState(() => new Date().toISOString().slice(0, 10));
   const [porConta, setPorConta] = useState<Record<string, PorConta>>({});
+  const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
+  const [aberta, setAberta] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [progresso, setProgresso] = useState<{ feitas: number; total: number } | null>(null);
+  /** Quem já entrou nesta sessão. Some da lista sem esperar refetch. */
+  const [importados, setImportados] = useState<Set<string>>(new Set());
 
   const cnpjs = useMemo(
     () => contas.map((c) => c.cnpj_norm).filter((c): c is string => !!c),
@@ -67,7 +73,11 @@ export default function HiperImportarDialog({
    * cliente cancelado, sem produto, é exatamente isso. Criar outro duplicaria a
    * base, então essas contas saem do lote e a tela diz qual cadastro é.
    */
-  const { data: existentes = [], isPending: checando } = useQuery({
+  // `isLoading` no lugar de `isPending`: no React Query v5 o segundo é true
+  // também para query DESLIGADA. Uma conta que o portal manda sem CNPJ desliga
+  // esta busca, e o diálogo ficava preso em "Conferindo…" para sempre —
+  // justamente a conta que precisava aparecer para ser corrigida.
+  const { data: existentes, isLoading: checando } = useQuery({
     queryKey: ["hiper_importar_existentes", tid, cnpjs.join(",")],
     enabled: open && !!tid && cnpjs.length > 0,
     queryFn: async (): Promise<JaCadastrado[]> => {
@@ -92,7 +102,7 @@ export default function HiperImportarDialog({
     [contas],
   );
 
-  const { data: contatos = [], isPending: buscandoContato } = useQuery({
+  const { data: contatos, isLoading: buscandoContato } = useQuery({
     queryKey: ["hiper_importar_contatos", tid, idsPortal.join(",")],
     enabled: open && !!tid && idsPortal.length > 0,
     queryFn: async (): Promise<ContatoEspelho[]> => {
@@ -107,12 +117,21 @@ export default function HiperImportarDialog({
 
   const porPortal = useMemo(() => {
     const m = new Map<string, ContatoEspelho>();
-    for (const c of contatos) m.set(c.id_portal, c);
+    for (const c of contatos ?? []) m.set(c.id_portal, c);
     return m;
   }, [contatos]);
 
-  const { mapa: mapaExistente, novas, bloqueadas } = useMemo(
-    () => separarContas(contas, existentes), [contas, existentes]);
+  const checandoTudo = checando || buscandoContato;
+
+  const { mapa: mapaExistente, novas: todasNovas, bloqueadas } = useMemo(
+    () => separarContas(contas, existentes ?? []), [contas, existentes]);
+
+  // O que já entrou nesta sessão sai da lista: é o que faz "importar aos
+  // poucos" parecer trabalho andando, sem esperar a reconciliação voltar.
+  const novas = useMemo(
+    () => todasNovas.filter((c) => !importados.has(c.id)), [todasNovas, importados]);
+
+  const { prontas, faltaValor } = useMemo(() => separarFaixas(novas), [novas]);
 
   /**
    * Semeia com o que o portal sabe. Espera o contato chegar: semear antes
@@ -122,81 +141,270 @@ export default function HiperImportarDialog({
   useEffect(() => {
     if (!open || buscandoContato) return;
     setPorConta((atual) => {
+      let mudou = false;
       const novo = { ...atual };
       for (const c of contas) {
-        if (!novo[c.id]) novo[c.id] = semearConta(c, c.id_portal ? porPortal.get(c.id_portal) : undefined);
+        if (novo[c.id]) continue;
+        novo[c.id] = semearConta(c, c.id_portal ? porPortal.get(c.id_portal) : undefined);
+        mudou = true;
       }
-      return novo;
+      // Devolver objeto novo sem ter mudado nada re-renderiza, o que refaz as
+      // dependências do efeito, que roda de novo: laço infinito.
+      return mudou ? novo : atual;
     });
   }, [open, contas, buscandoContato, porPortal]);
+
+  /**
+   * A faixa automática nasce toda marcada; a manual, nenhuma. Marcar a manual
+   * junto ofereceria "importar" um monte que ainda não tem preço, e o botão
+   * ficaria cinza sem a pessoa entender por quê.
+   */
+  const marcacaoInicial = useRef(false);
+  useEffect(() => {
+    if (!open) { marcacaoInicial.current = false; return; }
+    if (checandoTudo || marcacaoInicial.current) return;
+    // Uma vez por abertura. Reagir a `prontas` sem essa trava desmarcaria de
+    // volta o que a pessoa acabou de desmarcar.
+    marcacaoInicial.current = true;
+    setMarcadas(new Set(prontas.map((c) => c.id)));
+  }, [open, checandoTudo, prontas]);
 
   const editar = (id: string, campo: keyof PorConta, valor: string) =>
     setPorConta((s) => ({ ...s, [id]: { ...(s[id] ?? contaVazia), [campo]: valor } }));
 
-  const faltando = useMemo(() => contarFaltando(novas, porConta), [novas, porConta]);
+  const alternar = (id: string) =>
+    setMarcadas((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+
+  const alternarFaixa = (faixa: LinhaRecon[], ligar: boolean) =>
+    setMarcadas((s) => {
+      const n = new Set(s);
+      for (const c of faixa) { if (ligar) n.add(c.id); else n.delete(c.id); }
+      return n;
+    });
+
+  const alvo = useMemo(
+    () => prontasParaEnviar(novas, porConta, marcadas), [novas, porConta, marcadas]);
+  const marcadasIncompletas = useMemo(
+    () => novas.filter((c) => marcadas.has(c.id)).length - alvo.length, [novas, marcadas, alvo]);
 
   const padraoOk = !!unidade && !!dataInicio;
-  const checandoTudo = checando || buscandoContato;
-  // `checando` conta: até a busca por CNPJ voltar, TODAS as contas parecem
-  // novas. Mostrar 12 e cair para 7 um instante depois é pior do que esperar.
-  const podeEnviar = padraoOk && !checandoTudo && novas.length > 0 && faltando === 0 && !enviando;
+  const podeEnviar = padraoOk && !checandoTudo && alvo.length > 0 && !enviando;
 
+  /**
+   * Envia em chamadas do tamanho que a RPC aceita (200). Uma chamada que falha
+   * não cancela as seguintes: cada uma é sua própria transação e tem seu
+   * `lote_id`, e o resumo diz qual delas não passou. Perder 200 contas boas
+   * porque a 3ª fatia teve um problema seria pior do que continuar.
+   */
   const importar = async () => {
     setEnviando(true);
-    try {
-      const { data, error } = await supabase.rpc("hiper_importar_contas" as any, {
-        p_tenant_id: tid,
-        p_padrao: {
-          unidade_base_id: unidade,
-          origem_venda_id: origem || null,
-          funcionario_id: vendedor || null,
-          forma_pagamento_mensalidade_id: forma || null,
-          dia_vencimento: dia || null,
-          data_inicio: dataInicio,
-        },
-        p_itens: novas.map((c) => {
-          const d = porConta[c.id] ?? contaVazia;
-          return {
-            id_portal: c.id_portal,
-            mensalidade: d.mensalidade.replace(",", "."),
-            email: d.email.trim(),
-            whatsapp: d.whatsapp,
-            area_atuacao_id: d.area_atuacao_id || null,
-            segmento_id: d.segmento_id || null,
-          };
-        }),
-      } as any);
-      if (error) throw error;
-      const r = data as any;
-      if (!r?.ok) throw new Error(r?.erro || "Não foi possível importar.");
+    const fatias = fatiar(alvo);
+    setProgresso({ feitas: 0, total: fatias.length });
 
-      const criados = (r.criados ?? []) as any[];
-      const recusados = (r.recusados ?? []) as { conta: string; motivo: string }[];
-      toast({
-        title: criados.length === 0
-          ? "Nenhuma conta foi importada"
-          : `${num(criados.length)} ${criados.length === 1 ? "cliente criado" : "clientes criados"}`,
-        // O recusado importa tanto quanto o criado: sem isso a pessoa acha que
-        // importou 12 e importou 7.
-        description: recusados.length
-          ? `Não entraram: ${recusados.map((x) => `${x.conta} (${x.motivo})`).join(" · ")}`
-          : "Contrato, custo e módulos vieram junto.",
-        variant: criados.length === 0 ? "destructive" : undefined,
-      });
-      ["hiper_recon", "hiper_log", "clientes"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
-      if (criados.length > 0) onOpenChange(false);
-    } catch (e: any) {
-      toast({ title: "Não foi possível importar", description: e.message, variant: "destructive" });
-    } finally {
-      setEnviando(false);
+    const criados: any[] = [];
+    const recusados: { conta: string; motivo: string }[] = [];
+    const entraram = new Set<string>();
+
+    for (let i = 0; i < fatias.length; i++) {
+      const fatia = fatias[i];
+      try {
+        const { data, error } = await supabase.rpc("hiper_importar_contas" as any, {
+          p_tenant_id: tid,
+          p_padrao: {
+            unidade_base_id: unidade,
+            origem_venda_id: origem || null,
+            funcionario_id: vendedor || null,
+            forma_pagamento_mensalidade_id: forma || null,
+            dia_vencimento: dia || null,
+            data_inicio: dataInicio,
+          },
+          p_itens: fatia.map((c) => {
+            const d = porConta[c.id] ?? contaVazia;
+            return {
+              id_portal: c.id_portal,
+              mensalidade: d.mensalidade.replace(",", "."),
+              email: d.email.trim(),
+              whatsapp: d.whatsapp,
+              area_atuacao_id: d.area_atuacao_id || null,
+              segmento_id: d.segmento_id || null,
+            };
+          }),
+        } as any);
+        if (error) throw error;
+        const r = data as any;
+        if (!r?.ok) throw new Error(r?.erro || "Não foi possível importar.");
+
+        const feitos = (r.criados ?? []) as any[];
+        criados.push(...feitos);
+        recusados.push(...((r.recusados ?? []) as any[]));
+        for (const id of entraramComCerteza(fatia, feitos)) entraram.add(id);
+      } catch (e: any) {
+        recusados.push({
+          conta: `lote ${i + 1} de ${fatias.length} (${fatia.length} contas)`,
+          motivo: e.message,
+        });
+      }
+      setProgresso({ feitas: i + 1, total: fatias.length });
+    }
+
+    setImportados((s) => new Set([...s, ...entraram]));
+    setMarcadas((s) => new Set([...s].filter((id) => !entraram.has(id))));
+
+    toast({
+      title: criados.length === 0
+        ? "Nenhuma conta foi importada"
+        : `${num(criados.length)} ${criados.length === 1 ? "cliente criado" : "clientes criados"}`,
+      // O recusado importa tanto quanto o criado: sem isso a pessoa acha que
+      // importou 800 e importou 780.
+      description: recusados.length
+        ? `Não entraram: ${recusados.map((x) => `${x.conta} (${x.motivo})`).join(" · ")}`
+        : "Contrato, custo e módulos vieram junto.",
+      variant: criados.length === 0 ? "destructive" : undefined,
+    });
+
+    ["hiper_recon", "hiper_log", "clientes"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+    setProgresso(null);
+    setEnviando(false);
+    // Fecha só quando não sobrou trabalho. Na faixa manual o ciclo é preencher
+    // um punhado, mandar e continuar — fechar a cada rodada faria recomeçar.
+    if (criados.length > 0 && todasNovas.length === importados.size + entraram.size) {
+      onOpenChange(false);
     }
   };
 
   const selectCls = "h-9 w-full rounded-md border bg-background px-3 text-sm";
 
+  /**
+   * A linha de uma conta. Função que devolve JSX, e NÃO um componente declarado
+   * aqui dentro: componente definido no corpo do pai vira um tipo novo a cada
+   * render, o React remonta a linha inteira e o campo de mensalidade perde o
+   * foco a cada tecla digitada.
+   */
+  const linha = (c: LinhaRecon, pedeValor: boolean) => {
+    const d = porConta[c.id] ?? contaVazia;
+    const expandida = aberta === c.id;
+    const completa = mensalidadeOk(d.mensalidade);
+    return (
+      <div key={c.id} className="rounded-lg border bg-background">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">
+          <input type="checkbox" className="shrink-0" checked={marcadas.has(c.id)}
+            onChange={() => alternar(c.id)} aria-label={`Selecionar ${c.razao_social_hiper}`} />
+
+          <button type="button" className="shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => setAberta(expandida ? null : c.id)}
+            aria-label={expandida ? "Fechar detalhes" : "Ver e-mail, WhatsApp e classificação"}>
+            {expandida ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </button>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <span className="truncate text-sm font-medium">{c.razao_social_hiper}</span>
+              <span className="font-mono text-xs text-muted-foreground">{cnpjMask(c.cnpj_norm)}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1 pt-0.5">
+              <Badge variant="secondary" className="text-[10px]">{c.plano_hiper}</Badge>
+              <Badge variant="outline" className="text-[10px]">{nomeTipo(c.responsavel_tipo)}</Badge>
+              {/* A recorrência sai do NOME do plano e precisa estar à vista: é
+                  ela que evita o contrato anual entrar como mensal. */}
+              {recorrenciaDoPlano(c.plano_hiper) !== "mensal" && (
+                <Badge variant="outline" className="text-[10px]">
+                  {rotuloRecorrencia(recorrenciaDoPlano(c.plano_hiper))}
+                </Badge>
+              )}
+              {telefoneEhFixo(d.whatsapp) && (
+                <Badge variant="outline" className="border-amber-500/50 text-[10px] text-amber-500">
+                  telefone fixo
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+            custo {brl(c.custo_hiper)}/mês
+          </span>
+
+          <div className="w-32 shrink-0">
+            {pedeValor ? (
+              <Input className="h-8 tabular-nums" inputMode="decimal" placeholder="mensalidade"
+                value={d.mensalidade} onChange={(e) => editar(c.id, "mensalidade", e.target.value)} />
+            ) : (
+              <span className="block text-right text-sm font-medium tabular-nums">
+                {brl(Number(d.mensalidade || 0))}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {expandida && (
+          <div className="grid gap-3 border-t px-3 py-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-1">
+              <Label className="text-xs">E-mail *</Label>
+              <Input className="h-9" type="email" placeholder="cliente@empresa.com.br"
+                value={d.email} onChange={(e) => editar(c.id, "email", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">WhatsApp *</Label>
+              <Input className="h-9" placeholder="(47) 99999-9999" value={d.whatsapp}
+                onChange={(e) => editar(c.id, "whatsapp", maskPhoneBR(e.target.value))} />
+              {/* 472 dos 998 telefones do espelho são fixo. Avisar aqui, e não
+                  na hora de mandar a primeira mensagem. */}
+              {telefoneEhFixo(d.whatsapp) && (
+                <p className="text-[11px] text-amber-500">
+                  O portal deu um telefone fixo — confira se tem WhatsApp.
+                </p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Área de atuação</Label>
+              <select className={selectCls} value={d.area_atuacao_id}
+                onChange={(e) => editar(c.id, "area_atuacao_id", e.target.value)}>
+                <option value="">—</option>
+                {(lookups.areasAtuacao.data ?? []).map((a: any) => (
+                  <option key={a.id} value={a.id}>{a.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Segmento</Label>
+              <select className={selectCls} value={d.segmento_id}
+                onChange={(e) => editar(c.id, "segmento_id", e.target.value)}>
+                <option value="">—</option>
+                {(lookups.segmentos.data ?? []).map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.nome}</option>
+                ))}
+              </select>
+            </div>
+            {pedeValor && !completa && (
+              <p className="text-[11px] text-muted-foreground lg:col-span-4">
+                O portal não informa o preço desta conta: aqui quem cobra o cliente é você.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const cabecalho = (titulo: string, explica: string, faixa: LinhaRecon[]) => {
+    const todasMarcadas = faixa.every((c) => marcadas.has(c.id));
+    return (
+      <div key={titulo} className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2">
+        <input type="checkbox" checked={todasMarcadas}
+          onChange={() => alternarFaixa(faixa, !todasMarcadas)}
+          aria-label={`Selecionar todas de ${titulo}`} />
+        <span className="text-sm font-medium">{titulo} ({num(faixa.length)})</span>
+        <span className="text-xs text-muted-foreground">{explica}</span>
+      </div>
+    );
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col gap-0 p-0">
+    <Dialog open={open} onOpenChange={(o) => !enviando && onOpenChange(o)}>
+      <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col gap-0 p-0">
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle>
             {checandoTudo
@@ -204,8 +412,8 @@ export default function HiperImportarDialog({
               : `Importar ${num(novas.length)} ${novas.length === 1 ? "conta" : "contas"} do Hiper`}
           </DialogTitle>
           <DialogDescription>
-            Razão social, CNPJ, cidade, plano, tipo de contrato e custo vêm do portal.
-            O que ele não tem é preenchido aqui. Fornecedor:{" "}
+            Razão social, CNPJ, cidade, plano, tipo de contrato, custo, e-mail e telefone
+            vêm do portal. O que ele não tem é preenchido aqui. Fornecedor:{" "}
             <strong className="text-foreground">Hiper Software</strong>, o mesmo da integração.
           </DialogDescription>
         </DialogHeader>
@@ -214,7 +422,7 @@ export default function HiperImportarDialog({
           {checandoTudo && (
             <p className="flex items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Conferindo quais CNPJs já têm cadastro aqui…
+              Conferindo os CNPJs e buscando o contato no portal…
             </p>
           )}
 
@@ -263,7 +471,9 @@ export default function HiperImportarDialog({
                 <Label className="text-xs">Data de início *</Label>
                 <Input type="date" className="h-9" value={dataInicio} max={new Date().toISOString().slice(0, 10)}
                   onChange={(e) => setDataInicio(e.target.value)} />
-                <p className="text-[11px] text-muted-foreground">Vale como venda e ativação — o portal não informa nenhuma das duas.</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Vale como venda e ativação para todas — o portal não informa nenhuma das duas.
+                </p>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Dia de vencimento</Label>
@@ -273,82 +483,21 @@ export default function HiperImportarDialog({
             </div>
           </div>
 
-          {/* ── conta a conta ─────────────────────────────────────────────── */}
-          {novas.map((c) => {
-            const d = porConta[c.id] ?? contaVazia;
-            return (
-              <div key={c.id} className="rounded-lg border p-3 space-y-3">
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <span className="font-medium text-sm">{c.razao_social_hiper}</span>
-                  <span className="font-mono text-xs text-muted-foreground">{cnpjMask(c.cnpj_norm)}</span>
-                  <Badge variant="secondary" className="text-[10px]">{c.plano_hiper}</Badge>
-                  <Badge variant="outline" className="text-[10px]">{nomeTipo(c.responsavel_tipo)}</Badge>
-                  {/* A recorrência sai do NOME do plano e precisa estar à vista:
-                      é ela que evita o contrato anual entrar como mensal. Só
-                      aparece quando não é mensal — rotuloRecorrencia devolve
-                      null nesse caso, e concatenar deixaria um "·" solto. */}
-                  {recorrenciaDoPlano(c.plano_hiper) !== "mensal" && (
-                    <Badge variant="outline" className="text-[10px]">
-                      {rotuloRecorrencia(recorrenciaDoPlano(c.plano_hiper))}
-                    </Badge>
-                  )}
-                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-                    custo {brl(c.custo_hiper)}/mês
-                  </span>
-                </div>
+          {/* ── faixa automática ──────────────────────────────────────────── */}
+          {prontas.length > 0 && (<>
+            {cabecalho("Pronta para importar",
+              "Central de Cobrança e Leads: a Hiper cobra o cliente, então o portal sabe o preço. Nada a preencher.",
+              prontas)}
+            <div className="space-y-2">{prontas.map((c) => linha(c, false))}</div>
+          </>)}
 
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Mensalidade *</Label>
-                    <Input className="h-9 tabular-nums" inputMode="decimal" placeholder="0,00"
-                      value={d.mensalidade} onChange={(e) => editar(c.id, "mensalidade", e.target.value)} />
-                    {!mensalidadeDoPortal(c) && (
-                      <p className="text-[11px] text-muted-foreground">
-                        O portal não informa: nesta conta quem cobra o cliente é você.
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">E-mail *</Label>
-                    <Input className="h-9" type="email" placeholder="cliente@empresa.com.br"
-                      value={d.email} onChange={(e) => editar(c.id, "email", e.target.value)} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">WhatsApp *</Label>
-                    <Input className="h-9" placeholder="(47) 99999-9999" value={d.whatsapp}
-                      onChange={(e) => editar(c.id, "whatsapp", maskPhoneBR(e.target.value))} />
-                    {/* 472 dos 998 telefones do espelho são fixo. Avisar aqui,
-                        e não na hora de mandar a primeira mensagem. */}
-                    {telefoneEhFixo(d.whatsapp) && (
-                      <p className="text-[11px] text-amber-500">
-                        O portal deu um telefone fixo — confira se tem WhatsApp.
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Área de atuação</Label>
-                    <select className={selectCls} value={d.area_atuacao_id}
-                      onChange={(e) => editar(c.id, "area_atuacao_id", e.target.value)}>
-                      <option value="">—</option>
-                      {(lookups.areasAtuacao.data ?? []).map((a: any) => (
-                        <option key={a.id} value={a.id}>{a.nome}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Segmento</Label>
-                    <select className={selectCls} value={d.segmento_id}
-                      onChange={(e) => editar(c.id, "segmento_id", e.target.value)}>
-                      <option value="">—</option>
-                      {(lookups.segmentos.data ?? []).map((s: any) => (
-                        <option key={s.id} value={s.id}>{s.nome}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {/* ── faixa manual ──────────────────────────────────────────────── */}
+          {faltaValor.length > 0 && (<>
+            {cabecalho("Falta a mensalidade",
+              "No Hiperador quem cobra o cliente é você, e o portal não conhece o preço. Preencha quem souber e importe; o resto continua aqui.",
+              faltaValor)}
+            <div className="space-y-2">{faltaValor.map((c) => linha(c, true))}</div>
+          </>)}
 
           {/* ── as que não entram, e por quê ──────────────────────────────── */}
           {bloqueadas.length > 0 && (
@@ -386,7 +535,9 @@ export default function HiperImportarDialog({
 
           {novas.length === 0 && (
             <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Nenhuma das contas selecionadas pode virar cadastro novo.
+              {importados.size > 0
+                ? "Tudo o que dava foi importado."
+                : "Nenhuma das contas selecionadas pode virar cadastro novo."}
             </p>
           )}
           </>)}
@@ -394,21 +545,27 @@ export default function HiperImportarDialog({
 
         <DialogFooter className="border-t px-6 py-4 sm:justify-between">
           <span className="text-xs text-muted-foreground">
-            {checandoTudo
+            {progresso
+              ? `Enviando lote ${num(progresso.feitas + (progresso.feitas < progresso.total ? 1 : 0))} de ${num(progresso.total)}…`
+              : checandoTudo
               ? "Conferindo os CNPJs…"
               : !padraoOk
               ? "Escolha a unidade base e a data de início."
-              : faltando > 0
-                ? `Faltam mensalidade, e-mail ou WhatsApp em ${num(faltando)} de ${num(novas.length)}.`
-                : novas.length > 0
-                  ? "Tudo preenchido."
-                  : ""}
+              : alvo.length === 0
+                ? "Marque ao menos uma conta com a mensalidade preenchida."
+                : marcadasIncompletas > 0
+                  // Marcada e incompleta ficaria de fora em silêncio: pior do
+                  // que dizer quantas são.
+                  ? `${num(alvo.length)} vão nesta rodada · ${num(marcadasIncompletas)} marcadas ainda sem mensalidade`
+                  : alvo.length > TETO_LOTE
+                    ? `${num(alvo.length)} contas em ${num(fatiar(alvo).length)} envios de até ${num(TETO_LOTE)}`
+                    : `${num(alvo.length)} ${alvo.length === 1 ? "conta vai" : "contas vão"} nesta rodada`}
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={enviando}>Cancelar</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={enviando}>Fechar</Button>
             <Button onClick={importar} disabled={!podeEnviar}>
               {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              Importar{!checandoTudo && ` ${num(novas.length)}`}
+              Importar{!checandoTudo && alvo.length > 0 && ` ${num(alvo.length)}`}
             </Button>
           </div>
         </DialogFooter>

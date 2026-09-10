@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
-  contaVazia, contarFaltando, emailOk, mensalidadeDoPortal, numeroOk,
-  recorrenciaDoPlano, semearConta, separarContas, telefoneEhFixo, zapOk,
+  TETO_LOTE, contaVazia, contarFaltando, emailOk, entraramComCerteza, fatiar, mensalidadeDoPortal,
+  mensalidadeOk, prontasParaEnviar, recorrenciaDoPlano, semearConta, separarContas,
+  separarFaixas, telefoneEhFixo, zapOk,
   type ContatoEspelho, type JaCadastrado, type PorConta,
 } from "./importarRegras";
 import type { LinhaRecon } from "./useHiperDados";
@@ -69,16 +70,21 @@ describe("importação de contas do Hiper", () => {
     expect(contarFaltando([c], { a: { ...completo, email: "sem-arroba" } })).toBe(1);
     expect(contarFaltando([c], { a: { ...completo, whatsapp: "(47) 9999" } })).toBe(1);
     expect(contarFaltando([c], { a: { ...completo, mensalidade: "" } })).toBe(1);
+    expect(contarFaltando([c], { a: { ...completo, mensalidade: "0" } })).toBe(1);
     expect(contarFaltando([c], {})).toBe(1);
   });
 
-  it("mensalidade aceita vírgula e zero, recusa texto e negativo", () => {
-    expect(numeroOk("0")).toBe(true);
-    expect(numeroOk("1.234,56".replace(".", ""))).toBe(true);
-    expect(numeroOk("150,50")).toBe(true);
-    expect(numeroOk("-1")).toBe(false);
-    expect(numeroOk("abc")).toBe(false);
-    expect(numeroOk("  ")).toBe(false);
+  it("mensalidade aceita vírgula, recusa texto, negativo e ZERO", () => {
+    // Zero passava, e a RPC também só recusa negativo. Numa conta de Hiperador
+    // isso cria exatamente o que a obrigatoriedade existe para impedir:
+    // cliente sem receita com o custo do portal saindo todo mês.
+    expect(mensalidadeOk("1.234,56".replace(".", ""))).toBe(true);
+    expect(mensalidadeOk("150,50")).toBe(true);
+    expect(mensalidadeOk("0")).toBe(false);
+    expect(mensalidadeOk("0,00")).toBe(false);
+    expect(mensalidadeOk("-1")).toBe(false);
+    expect(mensalidadeOk("abc")).toBe(false);
+    expect(mensalidadeOk("  ")).toBe(false);
   });
 
   it("e-mail e WhatsApp seguem a mesma régua do cadastro manual", () => {
@@ -174,5 +180,110 @@ describe("telefone fixo num campo chamado WhatsApp", () => {
     // dizendo outra coisa sobre o mesmo defeito.
     expect(telefoneEhFixo("")).toBe(false);
     expect(telefoneEhFixo("473333111")).toBe(false);
+  });
+});
+
+/** Conta de Central, que é onde o portal costuma saber o preço. */
+const central = (id: string, mrr: number | null, tipo = "central_leads"): LinhaRecon =>
+  ({ ...conta(id, `${id}1111111000111`.slice(0, 14), mrr), responsavel_tipo: tipo });
+
+describe("as duas faixas de trabalho", () => {
+  it("Central com valor no portal entra na faixa que não pede nada", () => {
+    const { prontas, faltaValor } = separarFaixas([
+      central("a", 108.75, "central_leads"),
+      central("b", 259.9, "central_cobranca"),
+    ]);
+    expect(prontas.map((c) => c.id)).toEqual(["a", "b"]);
+    expect(faltaValor).toHaveLength(0);
+  });
+
+  it("Hiperador vai sempre para a faixa manual, mesmo se vier valor", () => {
+    // 0 das 352 contas ativas de Hiperador têm MRR no portal. Se um dia vier,
+    // ele é suspeito: nessas contas quem cobra o cliente é a revenda.
+    const { prontas, faltaValor } = separarFaixas([
+      conta("a", "11111111000111", null),
+      conta("b", "22222222000122", 300),
+    ]);
+    expect(prontas).toHaveLength(0);
+    expect(faltaValor.map((c) => c.id)).toEqual(["a", "b"]);
+  });
+
+  it("Central SEM valor cai na faixa manual, não entra com zero", () => {
+    // Medido: 19 contas ativas de Central estão sem MRR no portal. Assumir que
+    // Central sempre tem valor criaria 19 clientes com R$ 0,00.
+    const { prontas, faltaValor } = separarFaixas([
+      central("a", null, "central_cobranca"),
+      central("b", 0, "central_leads"),
+      central("c", 90, "central_leads"),
+    ]);
+    expect(prontas.map((x) => x.id)).toEqual(["c"]);
+    expect(faltaValor.map((x) => x.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("envio em chamadas do tamanho que a RPC aceita", () => {
+  it("quebra o lote no teto de 200 que a RPC impõe", () => {
+    const itens = Array.from({ length: 450 }, (_, i) => i);
+    expect(fatiar(itens).map((f) => f.length)).toEqual([200, 200, 50]);
+    expect(TETO_LOTE).toBe(200);
+  });
+
+  it("lote que cabe numa chamada só continua sendo uma chamada", () => {
+    expect(fatiar([1, 2, 3]).map((f) => f.length)).toEqual([3]);
+    expect(fatiar([])).toEqual([]);
+  });
+
+  it("aceita teto menor, para quando a medição pedir", () => {
+    // Se hiper_importar_modulos estourar o tempo com 200, o teto da tela cai
+    // sem tocar na RPC.
+    expect(fatiar([1, 2, 3, 4, 5], 2).map((f) => f.length)).toEqual([2, 2, 1]);
+  });
+});
+
+describe("importação parcial da faixa manual", () => {
+  it("manda só o que está marcado E preenchido", () => {
+    // É assim que "vai importando aos poucos" funciona: preenche um punhado,
+    // manda, e o resto continua na lista para o próximo dia.
+    const cheio: PorConta = {
+      ...contaVazia, mensalidade: "300,00", email: "x@y.com.br", whatsapp: "(47) 99999-1111",
+    };
+    const contas = [conta("a", "1"), conta("b", "2"), conta("c", "3")];
+    const porConta = { a: cheio, b: { ...cheio, mensalidade: "" }, c: cheio };
+
+    expect(prontasParaEnviar(contas, porConta, new Set(["a", "b"])).map((x) => x.id)).toEqual(["a"]);
+    expect(prontasParaEnviar(contas, porConta, new Set(["a", "c"])).map((x) => x.id)).toEqual(["a", "c"]);
+    expect(prontasParaEnviar(contas, porConta, new Set()).map((x) => x.id)).toEqual([]);
+  });
+
+  it("preenchida mas não marcada não vai junto por engano", () => {
+    const cheio: PorConta = {
+      ...contaVazia, mensalidade: "300,00", email: "x@y.com.br", whatsapp: "(47) 99999-1111",
+    };
+    expect(prontasParaEnviar([conta("a", "1")], { a: cheio }, new Set())).toHaveLength(0);
+  });
+});
+
+describe("quem saiu da lista depois do envio", () => {
+  const nomeado = (id: string, nome: string): LinhaRecon =>
+    ({ ...conta(id, `${id}1111111000111`.slice(0, 14)), razao_social_hiper: nome });
+
+  it("some da lista quem a RPC confirmou ter criado", () => {
+    const fatia = [nomeado("a", "PADARIA UM"), nomeado("b", "MERCADO DOIS")];
+    const ids = entraramComCerteza(fatia, [{ conta: "PADARIA UM" }]);
+    expect([...ids]).toEqual(["a"]);
+  });
+
+  it("nome repetido no lote NÃO some, mesmo aparecendo como criado", () => {
+    // 14 razões sociais se repetem entre as 998 do espelho. A RPC devolve só o
+    // nome; com duas contas homônimas não dá para saber qual das duas entrou, e
+    // chutar tiraria da lista uma conta que nunca foi criada. Ela fica visível
+    // e a próxima tentativa dela é recusada com motivo.
+    const fatia = [nomeado("a", "COMERCIO LTDA"), nomeado("b", "COMERCIO LTDA"), nomeado("c", "OUTRO")];
+    const ids = entraramComCerteza(fatia, [{ conta: "COMERCIO LTDA" }, { conta: "OUTRO" }]);
+    expect([...ids]).toEqual(["c"]);
+  });
+
+  it("lote sem nenhum criado não tira ninguém", () => {
+    expect(entraramComCerteza([nomeado("a", "X")], []).size).toBe(0);
   });
 });
