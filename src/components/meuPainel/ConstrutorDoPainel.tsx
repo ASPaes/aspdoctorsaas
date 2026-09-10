@@ -174,9 +174,14 @@ export function ConstrutorDoPainel({
 
   return (
     <Dialog open={aberto} onOpenChange={(o) => !o && onFechar()}>
-      {/* flex em coluna com o corpo em `min-h-0`: é o que impede o diálogo de
-          estourar a tela e cortar o cabeçalho e as últimas linhas. */}
-      <DialogContent className="flex h-[88vh] max-h-[88vh] w-[min(1100px,95vw)] max-w-none flex-col gap-0 overflow-hidden p-0">
+      {/* Os `!` não são estilo: o DialogContent do projeto já traz
+          `grid`, `gap-4`, `p-6`, `max-w-lg`, `max-h-[calc(100dvh-2rem)]` e
+          `overflow-y-auto`. Sem forçar precedência, o `grid` dele vence o
+          nosso `flex` (na folha do Tailwind `.grid` vem depois de `.flex`) e,
+          pior, o `overflow-y-auto` faz o DIÁLOGO INTEIRO rolar — foi isso que
+          empurrou o cabeçalho para fora da tela. Aqui o container não rola:
+          quem rola é a lista lá dentro. */}
+      <DialogContent className="!flex h-[88vh] !max-h-[88vh] w-[min(1100px,95vw)] !max-w-none !flex-col !gap-0 !overflow-hidden !p-0">
         <DialogHeader className="shrink-0 border-b border-border px-5 py-3">
           <DialogTitle className="text-base">Montar o meu painel</DialogTitle>
         </DialogHeader>
