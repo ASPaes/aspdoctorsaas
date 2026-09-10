@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   contaVazia, contarFaltando, emailOk, mensalidadeDoPortal, numeroOk,
-  recorrenciaDoPlano, separarContas, zapOk,
-  type JaCadastrado, type PorConta,
+  recorrenciaDoPlano, semearConta, separarContas, telefoneEhFixo, zapOk,
+  type ContatoEspelho, type JaCadastrado, type PorConta,
 } from "./importarRegras";
 import type { LinhaRecon } from "./useHiperDados";
 
@@ -106,5 +106,73 @@ describe("recorrência lida do nome do plano", () => {
     expect(recorrenciaDoPlano(null)).toBe("mensal");
     expect(recorrenciaDoPlano("")).toBe("mensal");
     expect(recorrenciaDoPlano("Plano Que Ainda Não Existe")).toBe("mensal");
+  });
+});
+
+/**
+ * O contato do portal, do jeito que o espelho guarda: só dígitos no telefone e
+ * dois pares de campos, o da conta e o da pessoa de contato.
+ */
+const contato = (p: Partial<ContatoEspelho>): ContatoEspelho => ({
+  id_portal: "P-a", email: null, contato_email: null,
+  telefone: null, contato_telefone: null, ...p,
+});
+
+describe("contato vindo do espelho", () => {
+  it("preenche e-mail e WhatsApp com o que o portal já entregou", () => {
+    // Medido em 10/09/2026: e-mail e telefone vêm em 998 das 998 contas do
+    // espelho. Pedir os dois à mão, conta a conta, é trabalho inventado.
+    const d = semearConta(conta("a", "11111111000111", 258),
+      contato({ email: "financeiro@empresa.com.br", telefone: "47999991111" }));
+    expect(d.email).toBe("financeiro@empresa.com.br");
+    expect(d.whatsapp).toBe("(47) 99999-1111");
+    expect(d.mensalidade).toBe("258.00");
+  });
+
+  it("cai para o contato da pessoa quando a conta não tem o campo", () => {
+    const d = semearConta(conta("a", "1"),
+      contato({ email: null, contato_email: "joao@empresa.com.br",
+                telefone: null, contato_telefone: "4733331111" }));
+    expect(d.email).toBe("joao@empresa.com.br");
+    expect(d.whatsapp).toBe("(47) 3333-1111");
+  });
+
+  it("conta sem contato nenhum nasce vazia, para a pessoa preencher", () => {
+    const d = semearConta(conta("a", "1"), undefined);
+    expect(d.email).toBe("");
+    expect(d.whatsapp).toBe("");
+  });
+
+  it("não semeia mensalidade que o portal não conhece", () => {
+    // Hiperador: 0 em 352 contas ativas têm MRR no portal. Semear zero criaria
+    // cliente sem receita com custo saindo.
+    const d = semearConta(conta("a", "1", null), contato({ email: "x@y.com.br" }));
+    expect(d.mensalidade).toBe("");
+  });
+
+  it("DDD 55 continua sendo DDD, não código de país", () => {
+    // 9 contas do espelho têm DDD 55. Tratar como país comeria o DDD e o
+    // telefone sairia errado no cadastro.
+    const d = semearConta(conta("a", "1"), contato({ telefone: "55999991111" }));
+    expect(d.whatsapp).toBe("(55) 99999-1111");
+  });
+});
+
+describe("telefone fixo num campo chamado WhatsApp", () => {
+  it("reconhece fixo por ter 10 dígitos e celular por ter 11", () => {
+    // 472 dos 998 telefones do espelho são fixo. A tela precisa marcar isso:
+    // esconder seria mentir sobre o dado que a operação vai usar para falar
+    // com o cliente.
+    expect(telefoneEhFixo("(47) 3333-1111")).toBe(true);
+    expect(telefoneEhFixo("4733331111")).toBe(true);
+    expect(telefoneEhFixo("(47) 99999-1111")).toBe(false);
+    expect(telefoneEhFixo("47999991111")).toBe(false);
+  });
+
+  it("telefone incompleto ou vazio não é chamado de fixo", () => {
+    // Ele já é barrado por zapOk; marcar como fixo daria um segundo aviso
+    // dizendo outra coisa sobre o mesmo defeito.
+    expect(telefoneEhFixo("")).toBe(false);
+    expect(telefoneEhFixo("473333111")).toBe(false);
   });
 });

@@ -6,6 +6,7 @@
  * montar o diálogo inteiro só para verificar uma conta que não pode entrar
  * custaria mock de rede e não provaria mais nada.
  */
+import { maskPhoneBR } from "@/lib/masks";
 import type { LinhaRecon } from "./useHiperDados";
 
 export type PorConta = {
@@ -84,3 +85,53 @@ export function recorrenciaDoPlano(plano: string | null | undefined) {
   if (/semanal/i.test(p)) return "semanal";
   return "mensal";
 }
+
+/**
+ * O contato como o espelho guarda. Dois pares: o da conta e o da pessoa de
+ * contato — o portal preenche ora um, ora o outro.
+ */
+export type ContatoEspelho = {
+  id_portal: string;
+  email: string | null;
+  contato_email: string | null;
+  telefone: string | null;
+  contato_telefone: string | null;
+};
+
+const primeiro = (...vs: (string | null | undefined)[]) =>
+  vs.map((v) => (v ?? "").trim()).find((v) => v !== "") ?? "";
+
+/**
+ * O cartão de uma conta já preenchido com o que o portal entregou.
+ *
+ * Medido em 10/09/2026 nas 998 contas do espelho: e-mail em 998, telefone em
+ * 998. A tela pedia os dois à mão, conta a conta — trabalho inventado, e o que
+ * inviabilizava importar centenas de uma vez.
+ *
+ * Mensalidade continua sendo a exceção deliberada: `mensalidadeDoPortal` só
+ * semeia quando o portal sabe o preço. Área e segmento não existem lá.
+ */
+export function semearConta(r: LinhaRecon, contato?: ContatoEspelho): PorConta {
+  const fone = primeiro(contato?.telefone, contato?.contato_telefone);
+  return {
+    ...contaVazia,
+    mensalidade: mensalidadeDoPortal(r),
+    email: primeiro(contato?.email, contato?.contato_email),
+    // Máscara na semeadura: o espelho guarda só dígitos e o campo da tela é
+    // mascarado. Sem isso a primeira tecla digitada reformataria o número
+    // inteiro na frente da pessoa.
+    whatsapp: fone ? maskPhoneBR(fone) : "",
+  };
+}
+
+/**
+ * Fixo num campo chamado WhatsApp.
+ *
+ * 472 dos 998 telefones do espelho têm 10 dígitos. Marcar é obrigatório: a
+ * operação usa esse número para falar com o cliente, e descobrir só na hora do
+ * envio que ele não tem WhatsApp é tarde.
+ *
+ * Menos de 10 dígitos não é fixo, é incompleto — `zapOk` já barra, e um segundo
+ * aviso diria outra coisa sobre o mesmo defeito.
+ */
+export const telefoneEhFixo = (v: string) => v.replace(/\D/g, "").length === 10;

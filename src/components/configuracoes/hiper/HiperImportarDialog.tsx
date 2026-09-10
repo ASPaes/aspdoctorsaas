@@ -14,8 +14,9 @@ import { AlertTriangle, ExternalLink, Loader2, Download } from "lucide-react";
 import { maskPhoneBR } from "@/lib/masks";
 import { brl, cnpjMask, nomeTipo, num, rotuloRecorrencia } from "./ui";
 import {
-  contaVazia, contarFaltando, mensalidadeDoPortal, recorrenciaDoPlano, separarContas,
-  type JaCadastrado, type PorConta,
+  contaVazia, contarFaltando, mensalidadeDoPortal, recorrenciaDoPlano, semearConta,
+  separarContas, telefoneEhFixo,
+  type ContatoEspelho, type JaCadastrado, type PorConta,
 } from "./importarRegras";
 import type { LinhaRecon } from "./useHiperDados";
 
@@ -80,20 +81,54 @@ export default function HiperImportarDialog({
     },
   });
 
+  /**
+   * E-mail e telefone do espelho. A reconciliação não os carrega, mas o portal
+   * entrega os dois: medido em 10/09/2026, 998 das 998 contas têm e-mail (100%
+   * em formato válido) e 998 têm telefone. Pedir isso à mão, conta a conta, era
+   * o que inviabilizava importar um lote grande.
+   */
+  const idsPortal = useMemo(
+    () => contas.map((c) => c.id_portal).filter((p): p is string => !!p),
+    [contas],
+  );
+
+  const { data: contatos = [], isPending: buscandoContato } = useQuery({
+    queryKey: ["hiper_importar_contatos", tid, idsPortal.join(",")],
+    enabled: open && !!tid && idsPortal.length > 0,
+    queryFn: async (): Promise<ContatoEspelho[]> => {
+      const { data, error } = await (supabase.from("hiper_espelho_cadastro" as any) as any)
+        .select("id_portal, email, contato_email, telefone, contato_telefone")
+        .eq("tenant_id", tid as string)
+        .in("id_portal", idsPortal);
+      if (error) throw error;
+      return (data ?? []) as ContatoEspelho[];
+    },
+  });
+
+  const porPortal = useMemo(() => {
+    const m = new Map<string, ContatoEspelho>();
+    for (const c of contatos) m.set(c.id_portal, c);
+    return m;
+  }, [contatos]);
+
   const { mapa: mapaExistente, novas, bloqueadas } = useMemo(
     () => separarContas(contas, existentes), [contas, existentes]);
 
-  // Semeia a mensalidade que o portal conhece; o resto nasce vazio de propósito.
+  /**
+   * Semeia com o que o portal sabe. Espera o contato chegar: semear antes
+   * gravaria vazio em `porConta`, e a guarda `!novo[c.id]` — que existe para
+   * não apagar o que a pessoa digitou — impediria o preenchimento depois.
+   */
   useEffect(() => {
-    if (!open) return;
+    if (!open || buscandoContato) return;
     setPorConta((atual) => {
       const novo = { ...atual };
       for (const c of contas) {
-        if (!novo[c.id]) novo[c.id] = { ...contaVazia, mensalidade: mensalidadeDoPortal(c) };
+        if (!novo[c.id]) novo[c.id] = semearConta(c, c.id_portal ? porPortal.get(c.id_portal) : undefined);
       }
       return novo;
     });
-  }, [open, contas]);
+  }, [open, contas, buscandoContato, porPortal]);
 
   const editar = (id: string, campo: keyof PorConta, valor: string) =>
     setPorConta((s) => ({ ...s, [id]: { ...(s[id] ?? contaVazia), [campo]: valor } }));
@@ -101,9 +136,10 @@ export default function HiperImportarDialog({
   const faltando = useMemo(() => contarFaltando(novas, porConta), [novas, porConta]);
 
   const padraoOk = !!unidade && !!dataInicio;
+  const checandoTudo = checando || buscandoContato;
   // `checando` conta: até a busca por CNPJ voltar, TODAS as contas parecem
   // novas. Mostrar 12 e cair para 7 um instante depois é pior do que esperar.
-  const podeEnviar = padraoOk && !checando && novas.length > 0 && faltando === 0 && !enviando;
+  const podeEnviar = padraoOk && !checandoTudo && novas.length > 0 && faltando === 0 && !enviando;
 
   const importar = async () => {
     setEnviando(true);
@@ -163,7 +199,7 @@ export default function HiperImportarDialog({
       <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col gap-0 p-0">
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle>
-            {checando
+            {checandoTudo
               ? "Importar contas do Hiper"
               : `Importar ${num(novas.length)} ${novas.length === 1 ? "conta" : "contas"} do Hiper`}
           </DialogTitle>
@@ -175,14 +211,14 @@ export default function HiperImportarDialog({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-4">
-          {checando && (
+          {checandoTudo && (
             <p className="flex items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Conferindo quais CNPJs já têm cadastro aqui…
             </p>
           )}
 
-          {!checando && (<>
+          {!checandoTudo && (<>
           {/* ── o que vale para todas ─────────────────────────────────────── */}
           <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
             <p className="text-xs font-medium text-muted-foreground">Vale para todas as contas deste lote</p>
@@ -281,6 +317,13 @@ export default function HiperImportarDialog({
                     <Label className="text-xs">WhatsApp *</Label>
                     <Input className="h-9" placeholder="(47) 99999-9999" value={d.whatsapp}
                       onChange={(e) => editar(c.id, "whatsapp", maskPhoneBR(e.target.value))} />
+                    {/* 472 dos 998 telefones do espelho são fixo. Avisar aqui,
+                        e não na hora de mandar a primeira mensagem. */}
+                    {telefoneEhFixo(d.whatsapp) && (
+                      <p className="text-[11px] text-amber-500">
+                        O portal deu um telefone fixo — confira se tem WhatsApp.
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Área de atuação</Label>
@@ -351,7 +394,7 @@ export default function HiperImportarDialog({
 
         <DialogFooter className="border-t px-6 py-4 sm:justify-between">
           <span className="text-xs text-muted-foreground">
-            {checando
+            {checandoTudo
               ? "Conferindo os CNPJs…"
               : !padraoOk
               ? "Escolha a unidade base e a data de início."
@@ -365,7 +408,7 @@ export default function HiperImportarDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={enviando}>Cancelar</Button>
             <Button onClick={importar} disabled={!podeEnviar}>
               {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              Importar{!checando && ` ${num(novas.length)}`}
+              Importar{!checandoTudo && ` ${num(novas.length)}`}
             </Button>
           </div>
         </DialogFooter>
