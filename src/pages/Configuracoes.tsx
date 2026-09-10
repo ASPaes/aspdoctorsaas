@@ -44,6 +44,7 @@ import { ChatTimezoneSelector } from "@/components/configuracoes/whatsapp/ChatTi
 import { SetupGuideCollapsible } from "@/components/configuracoes/whatsapp/SetupGuideCollapsible";
 import DistribuicaoTab from "@/components/configuracoes/whatsapp/DistribuicaoTab";
 import OperacaoTab from "@/components/configuracoes/whatsapp/OperacaoTab";
+import EmailAccountsTab from "@/components/configuracoes/email/EmailAccountsTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import KBTab from "@/components/configuracoes/KBTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
@@ -96,6 +97,7 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   canais: { breadcrumb: ["Atendimento", "Canais"], title: "Canais", description: "Conexão dos números WhatsApp (Evolution, Z-API, Meta)." },
   distribuicao: { breadcrumb: ["Atendimento", "Distribuição"], title: "Distribuição", description: "Para qual setor e agente cada atendimento é encaminhado." },
   operacao: { breadcrumb: ["Atendimento", "Operação"], title: "Operação", description: "CSAT, pausas, macros e grupos do atendimento." },
+  email: { breadcrumb: ["Atendimento", "E-mail"], title: "E-mail", description: "Contas de e-mail que a operação usa para falar com o cliente. Cada conta pode ficar ligada a um setor." },
   seguranca: { breadcrumb: ["Equipe", "Segurança"], title: "Segurança", description: "Aprovação de novas contas e restrição de domínio de email." },
   duplicidades: { breadcrumb: ["Dados", "Duplicidades"], title: "Duplicidades", description: "Unificação de contatos duplicados." },
   ia: { breadcrumb: ["Atendimento", "Inteligência artificial"], title: "Inteligência artificial", description: "Modelos, prompts e comportamento da IA." },
@@ -428,6 +430,8 @@ export default function Configuracoes() {
         return <DistribuicaoTab />;
       case "operacao":
         return <OperacaoTab />;
+      case "email":
+        return <EmailAccountsTab />;
       case "seguranca":
         return <SecuritySettingsTab />;
       case "duplicidades":
