@@ -78,10 +78,12 @@ import {
   Link2,
   Building2,
   Puzzle,
+  History,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import { HistoricoAcessosDialog } from "./HistoricoAcessosDialog";
 
 // ========== Types ==========
 
@@ -556,6 +558,8 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
   const [resolveFuncId, setResolveFuncId] = useState<string>("");
   const [emailEditUser, setEmailEditUser] = useState<AccessUser | null>(null);
   const [novoEmail, setNovoEmail] = useState<string>("");
+  const [derrubarSessoes, setDerrubarSessoes] = useState(true);
+  const [showHistorico, setShowHistorico] = useState(false);
 
   // Reset invite state when tenant changes
   const prevTidRef = useRef(tenantId);
@@ -1024,9 +1028,17 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
   // Troca o e-mail de LOGIN. Não dá para fazer daqui direto: o schema auth só é
   // alcançável pela service_role, então quem grava é a edge function.
   const changeLoginEmailMutation = useMutation({
-    mutationFn: async ({ userId, email }: { userId: string; email: string }) => {
+    mutationFn: async ({
+      userId,
+      email,
+      revogarSessoes,
+    }: {
+      userId: string;
+      email: string;
+      revogarSessoes: boolean;
+    }) => {
       const { data, error } = await supabase.functions.invoke("admin-change-login-email", {
-        body: { target_user_id: userId, new_email: email },
+        body: { target_user_id: userId, new_email: email, revoke_sessions: revogarSessoes },
       });
       // Erro de negócio volta com status != 2xx, e o invoke esconde o corpo no
       // FunctionsHttpError. Sem ler o context, o usuário só veria "non-2xx status".
@@ -1036,20 +1048,31 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
         throw new Error(detalhe?.error ?? error.message);
       }
       if (data && data.ok === false) throw new Error(data.error ?? "Falha ao alterar o e-mail.");
-      return data as { old_email: string; new_email: string; funcionario_sincronizado: boolean };
+      return data as {
+        old_email: string;
+        new_email: string;
+        funcionario_sincronizado: boolean;
+        sessoes_derrubadas: number | null;
+      };
     },
     onSuccess: (res) => {
       void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
       void queryClient.invalidateQueries({ queryKey: ["tenant-users", tenantId] });
       void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.inviteFuncionarios(tenantId) });
       void queryClient.invalidateQueries({ queryKey: ["crud_funcionarios"] });
-      sonnerToast.success(
-        res?.funcionario_sincronizado
-          ? "E-mail de acesso alterado. O cadastro do funcionário também foi atualizado."
-          : "E-mail de acesso alterado."
-      );
+      const partes = ["E-mail de acesso alterado."];
+      if (res?.funcionario_sincronizado) partes.push("O cadastro do funcionário foi atualizado.");
+      if (res?.sessoes_derrubadas) {
+        partes.push(
+          res.sessoes_derrubadas === 1
+            ? "1 sessão foi encerrada."
+            : `${res.sessoes_derrubadas} sessões foram encerradas.`
+        );
+      }
+      sonnerToast.success(partes.join(" "));
       setEmailEditUser(null);
       setNovoEmail("");
+      setDerrubarSessoes(true);
     },
     onError: (err: any) => sonnerToast.error(err.message),
   });
@@ -1176,14 +1199,22 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
             {activeCount} ativos / {maxUsers} permitidos
           </p>
         </div>
-        <Button
-          size="sm"
-          onClick={() => setShowInviteCard(!showInviteCard)}
-          disabled={!canInvite}
-        >
-          <UserPlus className="h-4 w-4 mr-1" />
-          Convidar
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button size="sm" variant="outline" onClick={() => setShowHistorico(true)}>
+              <History className="h-4 w-4 mr-1" />
+              Histórico
+            </Button>
+          )}
+          <Button
+            size="sm"
+            onClick={() => setShowInviteCard(!showInviteCard)}
+            disabled={!canInvite}
+          >
+            <UserPlus className="h-4 w-4 mr-1" />
+            Convidar
+          </Button>
+        </div>
       </div>
 
       {/* Invite Card - Funcionário-based */}
@@ -1770,6 +1801,18 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Histórico de alterações da tela */}
+      <HistoricoAcessosDialog
+        open={showHistorico}
+        onOpenChange={setShowHistorico}
+        tenantId={tenantId ?? null}
+        users={users.map((u) => ({
+          user_id: u.user_id,
+          funcionario_nome: u.funcionario_nome,
+          email: u.email,
+        }))}
+      />
+
       {/* Alterar e-mail de acesso (login) */}
       <Dialog
         open={!!emailEditUser}
@@ -1813,6 +1856,24 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                 O cadastro do funcionário é atualizado junto. A senha continua a mesma.
               </p>
             </div>
+
+            <div className="flex items-start gap-2 rounded-md border p-3">
+              <Checkbox
+                id="derrubar-sessoes"
+                checked={derrubarSessoes}
+                onCheckedChange={(v) => setDerrubarSessoes(v === true)}
+                className="mt-0.5"
+              />
+              <div className="space-y-0.5">
+                <Label htmlFor="derrubar-sessoes" className="text-sm cursor-pointer">
+                  Encerrar as sessões abertas deste usuário
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Quem estiver logado com o e-mail antigo precisa entrar de novo. Pode levar até
+                  1 hora para valer em uma aba que já está aberta.
+                </p>
+              </div>
+            </div>
           </div>
 
           <DialogFooter>
@@ -1837,6 +1898,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                 changeLoginEmailMutation.mutate({
                   userId: emailEditUser.user_id,
                   email: novoEmail.trim(),
+                  revogarSessoes: derrubarSessoes,
                 });
               }}
             >

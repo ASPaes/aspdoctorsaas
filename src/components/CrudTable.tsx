@@ -26,6 +26,8 @@ export interface ColumnDef {
   valueType?: "number" | "string";
   /** Display transform for table cell */
   render?: (value: any, row: any) => string;
+  /** Texto de apoio abaixo do campo no formulário */
+  hint?: string;
 }
 
 interface CrudTableProps {
@@ -331,6 +333,7 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
                     onChange={(e) => setFormData((p) => ({ ...p, [c.key]: e.target.value }))}
                   />
                 )}
+                {c.hint && <p className="text-xs text-muted-foreground">{c.hint}</p>}
               </div>
             ))}
           </div>

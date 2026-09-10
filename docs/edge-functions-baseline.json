@@ -1,8 +1,13 @@
 {
-  "capturado_em": "2026-09-10T02:00:53.070Z",
+  "capturado_em": "2026-09-10T02:21:46.281Z",
   "project_ref": "vbngjzovjhkmietztffo",
   "motivo": "atualizacao manual",
   "functions": {
+    "admin-change-login-email": {
+      "sha": "20efbbd3575ff3d896d12e3ad053a6df0895f17c3f369312b9d7ca58cbcf5107",
+      "version": 1,
+      "updated_at": "2026-09-10T02:20:28.494Z"
+    },
     "admin-db-actions": {
       "sha": "539e85aaf78baa727827f24669a50295a37ce870080bb45365814b7cdc1a479c",
       "version": 261,

@@ -117,7 +117,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       columns: [
         { key: "nome", label: "Nome" },
         { key: "cargo", label: "Cargo" },
-        { key: "email", label: "Email" },
+        { key: "email", label: "Email de contato", hint: "Não é o e-mail de login. Para trocar o acesso ao sistema, use Configurações > Acessos da Equipe." },
         { key: "department_id", label: "Setor", type: "select", valueType: "string", options: departmentOptions, render: (_val, row) => row.support_departments?.name ?? "—" },
         { key: "ativo", label: "Ativo", type: "boolean" },
       ],
