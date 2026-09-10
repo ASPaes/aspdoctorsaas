@@ -149,20 +149,40 @@ export function useOemDoCliente(clienteId: string) {
     },
   });
 
-  // Quantas licenças o de/para ainda atribui a este cliente sem confirmação.
-  // Não viram lista: viram aviso, porque nenhuma delas é dele com certeza.
-  const { data: pendentes = 0 } = useQuery({
-    queryKey: ["oem-pendentes-cliente", tid, clienteId],
-    enabled: !!tid && !!clienteId && temConta === true && codigos.length === 0,
+  // AS LICENÇAS QUE APONTAM PARA ESTE CLIENTE, tenham ou não código na ficha.
+  //
+  // Serve a duas perguntas diferentes, e é por isso que deixou de rodar só
+  // quando a ficha está vazia:
+  //
+  // 1. Sem nenhum código gravado, o número vira o aviso de "vínculo
+  //    indefinido". Continua sem virar lista: nenhuma delas é dele com certeza.
+  // 2. COM código gravado, o que sobra são as licenças que alguém já decidiu
+  //    que são deste cliente e que não couberam na ficha — cada produto guarda
+  //    um código do OEM só, então quem tem duas lojas e uma linha de produto
+  //    perde a segunda. Sem esta consulta ela sumia da ficha inteira, e o
+  //    alerta das Divergências citava uma filial que a ficha não mencionava em
+  //    lugar nenhum. Quem abria concluía que o número estava errado.
+  //
+  // O índice `idx_recon_oem_cliente (tenant_id, ds_customer_id)` já existe, e
+  // o resultado é de poucas linhas.
+  const { data: apontam = [] } = useQuery({
+    queryKey: ["oem-apontam-cliente", tid, clienteId],
+    enabled: !!tid && !!clienteId && temConta === true,
     queryFn: async () => {
-      const { count, error } = await (supabase.from("reconciliacao_oem" as any) as any)
-        .select("id", { count: "exact", head: true })
+      const { data, error } = await (supabase.from("reconciliacao_oem" as any) as any)
+        .select(
+          "id, filial_codigo, empresa_codigo, razao_oem, custo_oem, status_oem, " +
+          "bloqueado_oem, desativa_em, mensalidade_ds, status_usuario, resolvido_em",
+        )
+        .eq("tenant_id", tid)
         .eq("ds_customer_id", clienteId)
-        .not("filial_codigo", "is", null);
+        .not("filial_codigo", "is", null)
+        .order("filial_codigo");
       if (error) throw error;
-      return count ?? 0;
+      return (data ?? []) as Licenca[];
     },
   });
+  const pendentes = apontam.length;
 
   const { data: licencas = [] } = useQuery({
     queryKey: ["oem-licencas-cliente", tid, clienteId, codigos.join(",")],
@@ -209,17 +229,31 @@ export function useOemDoCliente(clienteId: string) {
   // confirmada. Dizer isso é mais útil do que listar 38 palpites.
   const indefinido = ativo && codigos.length === 0 && pendentes > 0;
 
+  // As decididas que não couberam na ficha.
+  //
+  // O filtro por `vinculado` é o que impede este bloco de virar lista de
+  // palpite: num grupo que repete o CNPJ, o de/para aponta dezenas de filiais
+  // para o mesmo cadastro e todas ficam em `novo` até alguém decidir. Só entra
+  // aqui o que já tem dono declarado. Medido em 10/09/2026: 6 licenças em 5
+  // clientes, todas decididas à mão, R$ 522,90/mês.
+  const orfas = codigos.length > 0
+    ? apontam.filter(
+        (l) => l.status_usuario === "vinculado" && !codigos.includes(String(l.filial_codigo)))
+    : [];
+
   return {
     licencas: licencas as Licenca[],
     pendentes,
     indefinido,
+    orfas,
+    codigos,
     lidoEm,
     visivel: ativo && (licencas.length > 0 || indefinido),
   };
 }
 
 export default function IntegracaoOemSection({ clienteId }: { clienteId: string }) {
-  const { licencas, pendentes, indefinido, lidoEm, visivel } = useOemDoCliente(clienteId);
+  const { licencas, pendentes, indefinido, orfas, codigos, lidoEm, visivel } = useOemDoCliente(clienteId);
 
   if (!visivel) return null;
 
@@ -397,6 +431,50 @@ export default function IntegracaoOemSection({ clienteId }: { clienteId: string 
           );
         })}
       </div>
+
+      {/* Linha 4: a licença que é deste cliente e não coube na ficha.
+
+          Sem este bloco ela não existia em lugar nenhum da ficha, e o alerta
+          das Divergências citava uma filial que a tela do cliente não
+          mencionava. A conclusão de quem abria era sempre a mesma: "o código
+          não bate". Ele fica FORA da moldura das licenças de propósito: o custo
+          dele não entra no total nem na margem acima, e misturá-lo na mesma
+          lista faria parecer que entra. */}
+      {orfas.length > 0 && (
+        <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2">
+          <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+            {orfas.length === 1
+              ? "1 licença é deste cliente e não está vinculada a nenhum produto"
+              : `${orfas.length} licenças são deste cliente e não estão vinculadas a nenhum produto`}
+          </p>
+          <ul className="mt-1.5 space-y-1">
+            {orfas.map((l) => {
+              const st = statusDaLicenca(l);
+              return (
+                <li key={l.id} className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
+                  <span className="tabular-nums">filial {l.filial_codigo}</span>
+                  <span className={st.classe}>{st.texto}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {l.status_oem === "Ativo" ? `${brl(l.custo_oem)}/mês` : "—"}
+                  </span>
+                  {l.razao_oem && (
+                    <span className="min-w-0 truncate text-muted-foreground">{l.razao_oem}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Cada linha de produto guarda um código do OEM só, e{" "}
+            {codigos.length === 1
+              ? <>o desta ficha já está com a filial <strong>{codigos[0]}</strong></>
+              : <>as desta ficha já estão com as filiais <strong>{codigos.join(", ")}</strong></>}
+            . O custo acima fica de fora do total e da margem desta ficha. Para resolver,
+            cadastre a loja como cliente e traga a licença para ele em{" "}
+            <strong>Configurações › Integrações › OEM › Divergências</strong>.
+          </p>
+        </div>
+      )}
     </section>
   );
 }

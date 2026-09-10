@@ -573,6 +573,25 @@ export default function OemIntegrationTab() {
     [produtosOem],
   );
 
+  // QUAL filial ficou na ficha de cada cliente.
+  //
+  // `filiaisComCodigo` responde "este vínculo foi confirmado?". Esta responde
+  // "e a ficha, ficou com o quê?" — e é a diferença entre "ninguém decidiu
+  // ainda" e "a ficha está com a licença da OUTRA loja". Sem ela a tela mandava
+  // ajustar a ficha de um cliente cuja ficha já estava preenchida, com um
+  // número que não batia com o do alerta, e quem abria não tinha o que fazer.
+  const codigoNaFichaPorCliente = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const p of produtosOem) {
+      const k = String(p.cliente_id);
+      const cod = String(p.oem_codigo_filial);
+      const lista = m.get(k);
+      if (!lista) m.set(k, [cod]);
+      else if (!lista.includes(cod)) lista.push(cod);
+    }
+    return m;
+  }, [produtosOem]);
+
   // Só o número da aba. O painel da fila busca o resto por conta dele — puxar a
   // lista inteira aqui carregaria a página toda por causa de um badge.
   // Por CONTA, como o resto da tela: o selo vermelho tem que dizer que ESTA
@@ -1134,6 +1153,10 @@ export default function OemIntegrationTab() {
             (l) => (porCli.get(l.ds_customer_id!)?.size ?? 0) <= 1 && nProd(l) === 1),
           gravados: comFilial.length - pendentes.length,
           total: comFilial.length,
+          // Quantas filiais cada cliente carrega. Sai daqui em vez de ser
+          // recontado lá fora: é a mesma contagem que decidiu o balde, e duas
+          // contagens do mesmo número acabam divergindo.
+          filiaisPorCliente: porCli,
           // Fora de escopo por estarem mortos dos dois lados — contados para a
           // tela poder dizer que eles existem sem pedir trabalho por eles.
           foraDeEscopo: todosComFilial.length - comFilial.length,
@@ -1472,6 +1495,10 @@ export default function OemIntegrationTab() {
       tipo: string;
       rotulo: string;
       detalhe: React.ReactNode;
+      // A frase de saída. Só existe onde o rótulo sozinho não diz o que fazer:
+      // "a ficha já está com outra loja" descreve, não instrui, e a diferença
+      // entre as duas é o que decide se a linha sai da lista algum dia.
+      comoResolver?: React.ReactNode;
       grave: boolean;
       linha?: Recon;
       custo?: (typeof custos.lista)[number];
@@ -1617,20 +1644,77 @@ export default function OemIntegrationTab() {
           na ficha, mas nenhuma filial casou com ele</>,
       });
     }
-    const motivos: [Recon[], string, string][] = [
-      [r.semCodigo.multiplas, "multiplas", "mais de uma filial para o mesmo cliente"],
-      [r.semCodigo.semProduto, "sem_produto", "o cliente não tem produto ativo onde gravar"],
-      [r.semCodigo.variosProdutos, "varios_produtos", "mais de um produto ativo, e não dá para saber em qual gravar"],
-      [r.semCodigo.outroMotivo, "outro", "outro motivo"],
+    // AS QUATRO CAUSAS, CADA UMA COM O SEU NOME, OS SEUS NÚMEROS E A SUA SAÍDA.
+    //
+    // Era uma linha só para as quatro: "Vínculo sem o código na ficha · filial
+    // X · <motivo>". Ela nomeava o SINTOMA, não o problema, e o botão levava à
+    // ficha, que responde "o código é gravado em Configurações › Integrações ›
+    // OEM" e devolve a pessoa para cá. Círculo fechado: nenhum dos 6 casos
+    // vivos em 10/09/2026 tinha saído da lista, e todos já haviam sido
+    // decididos à mão, alguns mais de uma vez — vincular a filial órfã roubava
+    // o código da irmã e o alerta voltava na outra.
+    const motivos: [Recon[], string][] = [
+      [r.semCodigo.multiplas, "multiplas"],
+      [r.semCodigo.semProduto, "sem_produto"],
+      [r.semCodigo.variosProdutos, "varios_produtos"],
+      [r.semCodigo.outroMotivo, "outro"],
     ];
-    for (const [lista, sufixo, porque] of motivos) {
+    for (const [lista, sufixo] of motivos) {
       for (const l of lista) {
         if (!l.ds_customer_id) continue;
-        doCliente(l.ds_customer_id, nomeDe(l), l.cnpj_ds ?? null).itens.push({
+        const cliId = l.ds_customer_id;
+        const quantas = r.semCodigo.filiaisPorCliente.get(cliId)?.size ?? 0;
+        const naFicha = codigoNaFichaPorCliente.get(cliId) ?? [];
+        const nProdutos = produtosAtivos.get(cliId) ?? 0;
+        // Abre toda variação: é por filial e valor que se acha a licença no
+        // portal do parceiro, e é o valor que diz se vale a pressa.
+        const cabeca = <>filial <strong>{l.filial_codigo}</strong> · {brl(Number(l.custo_oem || 0))}/mês</>;
+        // Zero cai neste balde também (duas filiais e ficha vazia): "0 linhas
+        // de produto" é o tipo de frase que denuncia texto montado por máquina.
+        const produtosEmTexto = nProdutos === 0
+          ? "nenhuma linha de produto"
+          : nProdutos === 1 ? "uma linha de produto" : `${nProdutos} linhas de produto`;
+
+        let rotulo: string;
+        let detalhe: React.ReactNode;
+        let comoResolver: React.ReactNode;
+
+        if (sufixo === "multiplas") {
+          rotulo = "A ficha do cliente já está com a licença de outra loja";
+          detalhe = naFicha.length
+            ? <>{cabeca} · o cliente tem <strong>{quantas}</strong> licenças no OEM e{" "}
+              {produtosEmTexto} na ficha, que já guarda a filial{" "}
+              <strong>{naFicha.join(", ")}</strong>. Cada produto guarda um código só, então
+              este custo não entra na margem de nenhum cliente.</>
+            : <>{cabeca} · o cliente tem <strong>{quantas}</strong> licenças no OEM,{" "}
+              {produtosEmTexto} na ficha e nenhum código gravado. Cada produto guarda um código
+              só, então as {quantas} não cabem no mesmo cliente.</>;
+          comoResolver = <>Cadastre esta loja como cliente e traga a licença para ele em
+            “Escolher o cliente”. Vincular ao mesmo cadastro só troca o código pelo desta
+            filial, e o alerta volta na outra.</>;
+        } else if (sufixo === "sem_produto") {
+          rotulo = "O cliente não tem produto ativo onde gravar o código";
+          detalhe = <>{cabeca} · a licença está ativa no OEM e a ficha não tem nenhum produto
+            ativo, então não existe linha onde gravar o código nem de onde tirar o custo.</>;
+          comoResolver = <>Cadastre o produto do parceiro na ficha do cliente e vincule de novo.</>;
+        } else if (sufixo === "varios_produtos") {
+          rotulo = "A ficha tem mais de um produto ativo, e o código não escolhe sozinho";
+          detalhe = <>{cabeca} · o cliente tem <strong>{nProdutos}</strong> produtos ativos na
+            ficha. O sistema não adivinha em qual gravar, então não grava em nenhum.</>;
+          comoResolver = <>Confira os produtos ativos da ficha: o código só é gravado quando
+            sobra um do parceiro.</>;
+        } else {
+          rotulo = "O vínculo está feito, mas o código não chegou à ficha";
+          detalhe = <>{cabeca} · o cliente tem uma licença e um produto ativo, que é justamente
+            o caso em que a gravação funciona. Alguma coisa falhou no caminho.</>;
+          comoResolver = <>Abra “Escolher o cliente” e confirme o mesmo cliente: isso regrava
+            o código.</>;
+        }
+
+        doCliente(cliId, nomeDe(l), l.cnpj_ds ?? null).itens.push({
           chave: `semcod:${sufixo}:${l.id}`, tipo: "sem_codigo", grave: false, linha: l,
           assinatura: `${l.filial_codigo ?? ""}|${sufixo}`,
-          rotulo: "Vínculo sem o código na ficha",
-          detalhe: <>filial {l.filial_codigo} · {porque}</>,
+          rotulo, detalhe, comoResolver,
         });
       }
     }
@@ -1704,7 +1788,8 @@ export default function OemIntegrationTab() {
       emImplantacao: emImplantacao.sort((a, b) => a.criadoEm.localeCompare(b.criadoEm)),
       total: lista.reduce((a, c) => a + c.itens.length, 0) + semDono.length,
     };
-  }, [r, custos, codigoEmProdutoDeOutro, linhas, produtosDs, clientesNovos]);
+  }, [r, custos, codigoEmProdutoDeOutro, linhas, produtosDs, clientesNovos,
+      codigoNaFichaPorCliente, produtosAtivos]);
 
   // É este número que acende o alerta na aba.
   const totalDivergencias = divergencias.total;
@@ -1782,11 +1867,24 @@ export default function OemIntegrationTab() {
           </Button>
         </>
       )}
+      {/* "Ajustar na ficha" era a única saída, e era um círculo: a ficha
+          responde que o código se grava aqui e devolve a pessoa para cá. A
+          saída de verdade é dizer de qual cadastro é esta licença — quase
+          sempre uma loja que ainda não tem cliente próprio. A ficha continua
+          a um clique, em segundo plano: ela serve para CONFERIR o que está
+          gravado, não para consertar. */}
       {i.tipo === "sem_codigo" && i.linha && (
-        <Button size="sm" variant="secondary" className="gap-1.5"
-          onClick={() => navigate(`/clientes/${clienteId}`)}>
-          <ExternalLink className="h-3.5 w-3.5" /> Ajustar na ficha
-        </Button>
+        <>
+          <Button size="sm" variant="secondary" className="gap-1.5"
+            title="Trazer esta licença para o cadastro da loja a que ela pertence"
+            onClick={() => setEscolhendo(i.linha!)}>
+            <Link2 className="h-3.5 w-3.5" /> Escolher o cliente
+          </Button>
+          <Button size="sm" variant="ghost" className="gap-1.5"
+            onClick={() => navigate(`/clientes/${clienteId}`)}>
+            <ExternalLink className="h-3.5 w-3.5" /> Abrir ficha
+          </Button>
+        </>
       )}
       {/* "Cliente sem licença" é a única divergência cuja saída é escolher uma
           LICENÇA, e não um cliente: nem Ignorar nem Abrir ficha resolvem, porque
@@ -4377,6 +4475,15 @@ export default function OemIntegrationTab() {
                               <div className="min-w-0 flex-1">
                                 <p className="font-medium">{i.rotulo}</p>
                                 <p className="text-xs text-muted-foreground">{i.detalhe}</p>
+                                {/* Mais claro que o detalhe, de propósito: é a
+                                    única linha da divergência que manda fazer
+                                    alguma coisa, e ela estava faltando. */}
+                                {i.comoResolver && (
+                                  <p className="mt-1 text-xs text-foreground/75">
+                                    <span className="font-medium">O que fazer: </span>
+                                    {i.comoResolver}
+                                  </p>
+                                )}
                               </div>
                               <div className="shrink-0 flex items-center gap-1.5">
                                 {/* Vale para TODA divergência: às vezes o
