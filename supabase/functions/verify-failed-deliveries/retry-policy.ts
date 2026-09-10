@@ -74,12 +74,27 @@ export function decidirReenvio(ctx: ContextoReenvio): DecisaoReenvio {
 /**
  * Acima disto, o ERROR chegou tarde demais para ser veredito.
  *
- * O corte é 10 min porque é onde a evidência troca de lado. A faixa de 10 a 60 min
- * tem 4 casos em 14 dias — não dá para calibrar com ela, e por isso o número aqui é
- * uma escolha conservadora, não um ótimo medido. Mudar exige deploy só desta
- * function (o CI deploya o que mudou; `_shared` é que arrasta todas).
+ * Era 10 min, e o corte estava no lugar errado. Remedido em 10/09/2026, 14 dias, só
+ * grupo, contra a linha de base do próprio grupo (2.136 saídas não condenadas
+ * respondem 73,0% em 30 min):
+ *
+ *   ERROR < 10s ............  63 msgs, 48% respondidas  → abaixo da base, tem sinal
+ *   ERROR de 10s a 10 min ..  13 msgs, 69% respondidas  → NA base, sinal zero
+ *   ERROR > 1 hora ......... 250 msgs, 84% respondidas  → acima da base, entregues
+ *
+ * A faixa do meio era condenada e não distingue nada: no agregado, as 221 condenadas
+ * do período foram respondidas em 76,5% contra 73,0% das NÃO condenadas — a bolha
+ * vermelha em grupo não previa entrega, previa nada.
+ *
+ * O caso que trouxe isto: em 10/09, 7 mensagens de um grupo enviadas entre 15:08 e
+ * 15:15 receberam ERROR entre 15:16:35 e 15:16:41 — 6 segundos para 7 minutos de
+ * envios. Fila da Evolution esvaziando, e o cliente já tinha respondido no meio.
+ * Vídeo e áudio ficaram com "falha no envio" na tela do operador tendo chegado.
+ *
+ * O corte em 60s deixa de fora só a faixa < 10s, que é onde a evidência está. Mudar
+ * exige deploy só desta function (o CI deploya o que mudou; `_shared` arrasta todas).
  */
-export const ERRO_TARDIO_MS = 10 * 60 * 1000;
+export const ERRO_TARDIO_MS = 60 * 1000;
 
 export interface ContextoCondenacao {
   isGroup: boolean;
@@ -115,7 +130,11 @@ export function erroCondenaMensagem(ctx: ContextoCondenacao): DecisaoCondenacao 
     return {
       condena: false,
       atrasoMs,
-      motivo: `grupo: ERROR chegou ${Math.round(atrasoMs / 60000)} min após o envio (fila do provedor, não falha)`,
+      // Em minutos o corte de 60s vira sempre "1 min" no log e some a diferença entre
+      // 63s e 9 min. Abaixo de 2 min o motivo sai em segundos.
+      motivo: atrasoMs < 120000
+        ? `grupo: ERROR chegou ${Math.round(atrasoMs / 1000)}s após o envio (fila do provedor, não falha)`
+        : `grupo: ERROR chegou ${Math.round(atrasoMs / 60000)} min após o envio (fila do provedor, não falha)`,
     };
   }
 
