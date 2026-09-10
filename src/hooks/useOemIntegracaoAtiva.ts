@@ -11,9 +11,14 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
  *
  * Devolve `undefined` enquanto não sabe: quem consome deve comparar com `true`,
  * senão o campo pisca na tela antes de sumir.
+ *
+ * `tenantIdOverride` existe para a tela de Acessos & permissões: lá o tenant é o
+ * da equipe que está sendo administrada, que para o super admin em "Todos" é o
+ * dele próprio, não o `effectiveTenantId` vazio.
  */
-export function useOemIntegracaoAtiva() {
-  const { effectiveTenantId: tid } = useTenantFilter();
+export function useOemIntegracaoAtiva(tenantIdOverride?: string | null) {
+  const { effectiveTenantId } = useTenantFilter();
+  const tid = tenantIdOverride !== undefined ? tenantIdOverride : effectiveTenantId;
 
   const { data } = useQuery({
     queryKey: ["oem-integracao-ativa", tid],
