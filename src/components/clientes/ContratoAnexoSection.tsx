@@ -5,6 +5,9 @@ import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Tooltip, TooltipContent, TooltipTrigger, TooltipProvider,
 } from "@/components/ui/tooltip";
 import {
@@ -13,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Paperclip, Upload, Download, ExternalLink, FileText, Image as ImageIcon,
-  Loader2, Trash2,
+  Loader2, Trash2, X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { isAdminLike } from "@/lib/permissions";
@@ -27,6 +30,7 @@ export interface ContratoAnexo {
   nome_omie?: string | null;
   mime_type: string | null;
   tamanho_bytes: number | null;
+  tipo?: string | null;
   omie_status: string | null;
   omie_erro: string | null;
   omie_enviado_em?: string | null;
@@ -34,9 +38,12 @@ export interface ContratoAnexo {
 }
 
 /**
- * Controlled: parent passes the row (already fetched in bulk) plus invalidateKey.
+ * Controlled: parent passes the rows (already fetched in bulk) plus invalidateKey.
  * Self-fetch: parent only passes contratoId (+ tenantId to allow writes); component
- * queries its own anexo row and invalidates itself.
+ * queries its own anexo rows and invalidates itself.
+ *
+ * DEM-0328: um contrato pode ter N documentos ativos (contrato + termos aditivos).
+ * Antes disso a lista era um registro só e enviar um arquivo novo apagava o anterior.
  */
 interface BaseProps {
   contratoId: string | null;
@@ -44,11 +51,11 @@ interface BaseProps {
   readOnly?: boolean;
 }
 interface ControlledProps extends BaseProps {
-  anexo: ContratoAnexo | null;
+  anexos: ContratoAnexo[];
   invalidateKey: readonly unknown[];
 }
 interface SelfFetchProps extends BaseProps {
-  anexo?: undefined;
+  anexos?: undefined;
   invalidateKey?: undefined;
 }
 type Props = ControlledProps | SelfFetchProps;
@@ -59,6 +66,18 @@ export const ANEXO_MAX_BYTES = 10 * 1024 * 1024;
 export const ANEXO_ACCEPT = "application/pdf,image/jpeg,image/png";
 const ACCEPTED_MIMES = new Set(["application/pdf", "image/jpeg", "image/png", "image/jpg"]);
 const NOME_OMIE_REGEX = /^[A-Za-z0-9_-]{1,80}\.[A-Za-z0-9]{1,10}$/;
+
+export const ANEXO_TIPOS = [
+  { value: "contrato", label: "Contrato" },
+  { value: "aditivo", label: "Termo aditivo" },
+  { value: "outro", label: "Outro documento" },
+] as const;
+
+export type AnexoTipo = (typeof ANEXO_TIPOS)[number]["value"];
+
+export function anexoTipoLabel(tipo: string | null | undefined): string {
+  return ANEXO_TIPOS.find((t) => t.value === tipo)?.label ?? "Contrato";
+}
 
 export function validateAnexoFile(file: File): string | null {
   if (!ACCEPTED_MIMES.has(file.type)) return "Formato inválido. Aceito: PDF, JPG, PNG.";
@@ -99,14 +118,19 @@ async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
  * End-to-end upload: validate → hash → upload to storage → call RPC.
  * On RPC failure the uploaded blob is removed from storage.
  * Reused by both the section (inline upload) and the create-product modal
- * (staged file uploaded right after the RPC that creates the contract).
+ * (staged files uploaded right after the RPC that creates the contract).
+ *
+ * `duplicado` = o mesmo arquivo já está anexado neste contrato. A RPC devolve o id
+ * existente em vez de criar linha nova; o blob recém-enviado é apagado aqui, senão o
+ * bucket acumularia cópia órfã a cada tentativa.
  */
 export async function uploadContratoAnexo(args: {
   contratoId: string;
   tenantId: string;
   file: File;
-}): Promise<void> {
-  const { contratoId, tenantId, file } = args;
+  tipo?: AnexoTipo;
+}): Promise<{ id: string; duplicado: boolean }> {
+  const { contratoId, tenantId, file, tipo = "contrato" } = args;
   const err = validateAnexoFile(file);
   if (err) throw new Error(err);
 
@@ -122,7 +146,7 @@ export async function uploadContratoAnexo(args: {
     .upload(path, file, { contentType: file.type, upsert: false });
   if (upErr) throw upErr;
 
-  const { error: rpcErr } = await (supabase.rpc as any)("contrato_anexo_substituir", {
+  const { data, error: rpcErr } = await (supabase.rpc as any)("contrato_anexo_adicionar", {
     p_contrato_id: contratoId,
     p_storage_path: path,
     p_nome_original: file.name,
@@ -130,11 +154,18 @@ export async function uploadContratoAnexo(args: {
     p_mime_type: file.type,
     p_tamanho_bytes: file.size,
     p_hash_sha256: hash,
+    p_tipo: tipo,
   });
   if (rpcErr) {
     await supabase.storage.from("contrato-anexos").remove([path]).catch(() => {});
     throw rpcErr;
   }
+
+  const duplicado = (data as any)?.duplicado === true;
+  if (duplicado) {
+    await supabase.storage.from("contrato-anexos").remove([path]).catch(() => {});
+  }
+  return { id: (data as any)?.id as string, duplicado };
 }
 
 // ---------- UI helpers ----------
@@ -157,6 +188,19 @@ function fmtDateTime(iso: string | null | undefined): string {
   try { return new Date(iso).toLocaleString("pt-BR"); } catch { return ""; }
 }
 
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return "";
+  try { return new Date(iso).toLocaleDateString("pt-BR"); } catch { return ""; }
+}
+
+function ehPdf(a: ContratoAnexo): boolean {
+  return a.mime_type === "application/pdf" || !!a.nome_original?.toLowerCase().endsWith(".pdf");
+}
+
+function ehImagem(a: ContratoAnexo): boolean {
+  return !!a.mime_type?.startsWith("image/") || /\.(jpe?g|png)$/i.test(a.nome_original ?? "");
+}
+
 function omieBadge(status: string | null, erro: string | null, enviadoEm: string | null | undefined) {
   const map: Record<string, { label: string; variant: "secondary" | "default" | "destructive" | "outline"; className?: string }> = {
     pendente:                  { label: "Na fila para o Omie", variant: "secondary" },
@@ -166,7 +210,7 @@ function omieBadge(status: string | null, erro: string | null, enviadoEm: string
     invalido:                  { label: "Falhou definitivamente", variant: "destructive" },
     fora_do_escopo:            { label: "Não sincroniza", variant: "secondary" },
   };
-  const info = map[status ?? "pendente"] ?? { label: status ?? "—", variant: "secondary" as const };
+  const info = map[status ?? "pendente"] ?? { label: status ?? "sem status", variant: "secondary" as const };
   const badge = (
     <Badge variant={info.variant} className={info.className}>
       {info.label}
@@ -194,41 +238,55 @@ export default function ContratoAnexoSection(props: Props) {
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [tipoUpload, setTipoUpload] = useState<AnexoTipo | null>(null);
+
+  // Preview é de UM documento por vez: guardar o id evita abrir o PDF errado
+  // quando a lista tem contrato e aditivo lado a lado.
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewIsBlob, setPreviewIsBlob] = useState(false);
   const [previewFallbackUrl, setPreviewFallbackUrl] = useState<string | null>(null);
-  const [loadingPreview, setLoadingPreview] = useState(false);
-  const [locallyRemoved, setLocallyRemoved] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [loadingPreviewId, setLoadingPreviewId] = useState<string | null>(null);
+
+  const [locallyRemoved, setLocallyRemoved] = useState<string[]>([]);
+  const [confirmRemove, setConfirmRemove] = useState<ContratoAnexo | null>(null);
   const [removing, setRemoving] = useState(false);
 
-  // Self-fetch mode: query the single active row for this contract.
+  // Self-fetch mode: query the active rows for this contract.
   const selfQueryKey = useMemo(
-    () => ["contrato_anexo_single", contratoId] as const,
+    () => ["contrato_anexos_lista", contratoId] as const,
     [contratoId],
   );
-  const selfQuery = useQuery<ContratoAnexo | null>({
+  const selfQuery = useQuery<ContratoAnexo[]>({
     queryKey: selfQueryKey,
     enabled: !controlled && !!contratoId,
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await (supabase.from("contrato_anexos" as any) as any)
-        .select("id, contrato_id, storage_path, nome_original, nome_omie, mime_type, tamanho_bytes, omie_status, omie_erro, omie_enviado_em, created_at")
+        .select("id, contrato_id, storage_path, nome_original, nome_omie, mime_type, tamanho_bytes, tipo, omie_status, omie_erro, omie_enviado_em, created_at")
         .eq("contrato_id", contratoId)
         .eq("ativo", true)
-        .maybeSingle();
+        .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? null) as ContratoAnexo | null;
+      return (data ?? []) as ContratoAnexo[];
     },
   });
 
-  const rawAnexo = controlled ? (props as ControlledProps).anexo : (selfQuery.data ?? null);
-  const anexo = locallyRemoved ? null : rawAnexo;
+  const anexosDoPai = (props as ControlledProps).anexos;
+  const anexosProprios = selfQuery.data;
+  const anexos = useMemo(
+    () => ((controlled ? anexosDoPai : anexosProprios) ?? [])
+      .filter((a) => !locallyRemoved.includes(a.id))
+      .slice()
+      .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? "")),
+    [controlled, anexosDoPai, anexosProprios, locallyRemoved],
+  );
 
   const disabled = !contratoId;
   const ios = isIOS();
-  const isPdf = anexo?.mime_type === "application/pdf" || anexo?.nome_original?.toLowerCase().endsWith(".pdf");
-  const isImage = anexo?.mime_type?.startsWith("image/") || /\.(jpe?g|png)$/i.test(anexo?.nome_original ?? "");
+
+  // Primeiro documento é o contrato; a partir do segundo o normal é aditivo.
+  const tipoEfetivo: AnexoTipo = tipoUpload ?? (anexos.length === 0 ? "contrato" : "aditivo");
 
   useEffect(() => {
     return () => {
@@ -238,12 +296,13 @@ export default function ContratoAnexoSection(props: Props) {
 
   const clearPreview = () => {
     if (previewIsBlob && previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewId(null);
     setPreviewUrl(null);
     setPreviewIsBlob(false);
     setPreviewFallbackUrl(null);
   };
 
-  const invalidateAnexo = () => {
+  const invalidateAnexos = () => {
     if (controlled) {
       qc.invalidateQueries({ queryKey: (props as ControlledProps).invalidateKey });
     } else {
@@ -251,22 +310,22 @@ export default function ContratoAnexoSection(props: Props) {
     }
   };
 
-  const loadPreview = async () => {
-    if (!anexo) return;
+  const loadPreview = async (anexo: ContratoAnexo) => {
     clearPreview();
-    setLoadingPreview(true);
+    setLoadingPreviewId(anexo.id);
     const { data, error } = await supabase.storage
       .from("contrato-anexos")
       .createSignedUrl(anexo.storage_path, 300);
     if (error || !data?.signedUrl) {
-      setLoadingPreview(false);
+      setLoadingPreviewId(null);
       toast({ title: "Erro ao gerar preview", description: error?.message, variant: "destructive" });
       return;
     }
-    if (!isPdf) {
+    if (!ehPdf(anexo)) {
+      setPreviewId(anexo.id);
       setPreviewUrl(data.signedUrl);
       setPreviewIsBlob(false);
-      setLoadingPreview(false);
+      setLoadingPreviewId(null);
       return;
     }
     try {
@@ -274,9 +333,11 @@ export default function ContratoAnexoSection(props: Props) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
+      setPreviewId(anexo.id);
       setPreviewUrl(url);
       setPreviewIsBlob(true);
     } catch (err: any) {
+      setPreviewId(anexo.id);
       setPreviewFallbackUrl(data.signedUrl);
       toast({
         title: "Não foi possível carregar o preview",
@@ -284,12 +345,11 @@ export default function ContratoAnexoSection(props: Props) {
         variant: "destructive",
       });
     } finally {
-      setLoadingPreview(false);
+      setLoadingPreviewId(null);
     }
   };
 
-  const handleDownload = async () => {
-    if (!anexo) return;
+  const handleDownload = async (anexo: ContratoAnexo) => {
     const { data, error } = await supabase.storage
       .from("contrato-anexos")
       .createSignedUrl(anexo.storage_path, 60, { download: anexo.nome_original });
@@ -300,8 +360,7 @@ export default function ContratoAnexoSection(props: Props) {
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
 
-  const handleOpen = async () => {
-    if (!anexo) return;
+  const handleOpen = async (anexo: ContratoAnexo) => {
     const { data, error } = await supabase.storage
       .from("contrato-anexos")
       .createSignedUrl(anexo.storage_path, 60);
@@ -318,42 +377,71 @@ export default function ContratoAnexoSection(props: Props) {
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (!file) return;
+    if (files.length === 0) return;
     if (!contratoId || !tenantId) {
       toast({ title: "Salve o produto para anexar arquivos", variant: "destructive" });
       return;
     }
     setUploading(true);
+    const enviados: string[] = [];
+    const duplicados: string[] = [];
+    const falhas: string[] = [];
     try {
-      await uploadContratoAnexo({ contratoId, tenantId, file });
-      toast({ title: "Anexo enviado", description: file.name });
-      clearPreview();
-      setLocallyRemoved(false);
-      invalidateAnexo();
-    } catch (err: any) {
-      toast({ title: "Erro ao enviar anexo", description: err?.message ?? String(err), variant: "destructive" });
+      // Sequencial de propósito: cada arquivo é um hash + um upload + uma RPC, e a
+      // dedup por hash só enxerga o que já foi gravado.
+      for (const file of files) {
+        try {
+          const r = await uploadContratoAnexo({ contratoId, tenantId, file, tipo: tipoEfetivo });
+          if (r.duplicado) duplicados.push(file.name);
+          else enviados.push(file.name);
+        } catch (err: any) {
+          falhas.push(`${file.name}: ${err?.message ?? String(err)}`);
+        }
+      }
+      if (enviados.length > 0) {
+        toast({
+          title: enviados.length === 1 ? "Documento anexado" : `${enviados.length} documentos anexados`,
+          description: enviados.join(", "),
+        });
+      }
+      if (duplicados.length > 0) {
+        toast({
+          title: "Arquivo já anexado neste contrato",
+          description: duplicados.join(", "),
+        });
+      }
+      if (falhas.length > 0) {
+        toast({
+          title: "Erro ao enviar anexo",
+          description: falhas.join(" · "),
+          variant: "destructive",
+        });
+      }
+      setTipoUpload(null);
+      invalidateAnexos();
     } finally {
       setUploading(false);
     }
   };
 
   const handleRemove = async () => {
-    if (!contratoId) return;
+    const alvo = confirmRemove;
+    if (!alvo) return;
     setRemoving(true);
     try {
-      const { error } = await (supabase.rpc as any)("contrato_anexo_remover", {
-        p_contrato_id: contratoId,
+      const { error } = await (supabase.rpc as any)("contrato_anexo_excluir", {
+        p_anexo_id: alvo.id,
       });
       if (error) throw error;
-      setLocallyRemoved(true);
-      clearPreview();
-      setConfirmRemove(false);
-      toast({ title: "Anexo removido", description: "A remoção no Omie será feita pelo cron." });
-      invalidateAnexo();
+      setLocallyRemoved((prev) => [...prev, alvo.id]);
+      if (previewId === alvo.id) clearPreview();
+      setConfirmRemove(null);
+      toast({ title: "Documento removido", description: "A remoção no Omie será feita pelo cron." });
+      invalidateAnexos();
     } catch (err: any) {
-      toast({ title: "Erro ao remover anexo", description: err?.message ?? String(err), variant: "destructive" });
+      toast({ title: "Erro ao remover documento", description: err?.message ?? String(err), variant: "destructive" });
     } finally {
       setRemoving(false);
     }
@@ -361,16 +449,34 @@ export default function ContratoAnexoSection(props: Props) {
 
   return (
     <div className="rounded border bg-background/50 p-3 space-y-2">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Paperclip className="h-4 w-4" />
-          Anexo do contrato
+          Documentos do contrato
+          {anexos.length > 0 && (
+            <Badge variant="secondary" className="text-[10px]">{anexos.length}</Badge>
+          )}
         </div>
         {canWrite && (
           <div className="flex items-center gap-2">
+            <Select
+              value={tipoEfetivo}
+              onValueChange={(v) => setTipoUpload(v as AnexoTipo)}
+              disabled={disabled || uploading}
+            >
+              <SelectTrigger className="h-8 w-[10.5rem] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ANEXO_TIPOS.map((t) => (
+                  <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <input
               ref={inputRef}
               type="file"
+              multiple
               accept={ANEXO_ACCEPT}
               className="hidden"
               onChange={handleFileChange}
@@ -384,105 +490,131 @@ export default function ContratoAnexoSection(props: Props) {
               title={disabled ? "Salve o produto para anexar arquivos" : undefined}
             >
               {uploading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
-              {anexo ? "Substituir" : "Enviar arquivo"}
+              {anexos.length > 0 ? "Adicionar documento" : "Enviar arquivo"}
             </Button>
           </div>
         )}
       </div>
 
-      {readOnly && anexo && (
+      {readOnly && anexos.length > 0 && (
         <p className="text-xs text-amber-600">
-          Este contrato já tem anexo, compartilhado com os outros produtos vinculados a ele.
-          Para trocar, use o painel do produto.
+          Estes documentos são do contrato, compartilhados com os outros produtos vinculados a ele.
+          Para mexer neles, use o painel do produto.
         </p>
       )}
 
       {disabled ? (
         <p className="text-xs text-muted-foreground">Salve o produto para anexar arquivos.</p>
-      ) : !anexo ? (
+      ) : anexos.length === 0 ? (
         <p className="text-xs text-muted-foreground">
           {canWrite
-            ? "Nenhum arquivo anexado. Aceito: PDF, JPG, PNG (até 10 MB)."
+            ? "Nenhum arquivo anexado. Aceito: PDF, JPG, PNG (até 10 MB por arquivo). Pode enviar vários de uma vez."
             : "Nenhum arquivo anexado."}
         </p>
       ) : (
         <div className="space-y-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            {isPdf ? <FileText className="h-4 w-4 text-primary" /> : <ImageIcon className="h-4 w-4 text-primary" />}
-            <span className="text-sm font-medium truncate max-w-[24rem]" title={anexo.nome_original}>
-              {anexo.nome_original}
-            </span>
-            {anexo.tamanho_bytes ? (
-              <span className="text-xs text-muted-foreground">{fmtBytes(anexo.tamanho_bytes)}</span>
-            ) : null}
-            {omieBadge(anexo.omie_status, anexo.omie_erro, anexo.omie_enviado_em)}
-          </div>
+          {anexos.map((anexo) => {
+            const isPdf = ehPdf(anexo);
+            const isImage = ehImagem(anexo);
+            const mostrandoPreview = previewId === anexo.id;
+            return (
+              <div key={anexo.id} className="rounded border bg-background/60 p-2 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {isPdf ? <FileText className="h-4 w-4 text-primary shrink-0" /> : <ImageIcon className="h-4 w-4 text-primary shrink-0" />}
+                  <span className="text-sm font-medium truncate max-w-[22rem]" title={anexo.nome_original}>
+                    {anexo.nome_original}
+                  </span>
+                  <Badge variant="outline" className="text-[10px]">{anexoTipoLabel(anexo.tipo)}</Badge>
+                  {anexo.created_at ? (
+                    <span className="text-xs text-muted-foreground">{fmtDate(anexo.created_at)}</span>
+                  ) : null}
+                  {anexo.tamanho_bytes ? (
+                    <span className="text-xs text-muted-foreground">{fmtBytes(anexo.tamanho_bytes)}</span>
+                  ) : null}
+                  {omieBadge(anexo.omie_status, anexo.omie_erro, anexo.omie_enviado_em)}
+                </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            {isPdf && ios ? (
-              <Button type="button" variant="outline" size="sm" onClick={handleOpen}>
-                <ExternalLink className="h-4 w-4 mr-1" /> Abrir
-              </Button>
-            ) : (
-              <Button type="button" variant="outline" size="sm" onClick={loadPreview} disabled={loadingPreview}>
-                {loadingPreview ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <ExternalLink className="h-4 w-4 mr-1" />}
-                {previewUrl ? "Recarregar preview" : "Ver preview"}
-              </Button>
-            )}
-            <Button type="button" variant="outline" size="sm" onClick={handleDownload}>
-              <Download className="h-4 w-4 mr-1" /> Baixar
-            </Button>
-            {canWrite && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                onClick={() => setConfirmRemove(true)}
-                disabled={removing}
-                aria-label="Remover anexo"
-                title="Remover anexo"
-              >
-                {removing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              </Button>
-            )}
-          </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {isPdf && ios ? (
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleOpen(anexo)}>
+                      <ExternalLink className="h-4 w-4 mr-1" /> Abrir
+                    </Button>
+                  ) : mostrandoPreview && previewUrl ? (
+                    <Button type="button" variant="outline" size="sm" onClick={clearPreview}>
+                      <X className="h-4 w-4 mr-1" /> Fechar preview
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => loadPreview(anexo)}
+                      disabled={loadingPreviewId === anexo.id}
+                    >
+                      {loadingPreviewId === anexo.id
+                        ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        : <ExternalLink className="h-4 w-4 mr-1" />}
+                      Ver preview
+                    </Button>
+                  )}
+                  <Button type="button" variant="outline" size="sm" onClick={() => handleDownload(anexo)}>
+                    <Download className="h-4 w-4 mr-1" /> Baixar
+                  </Button>
+                  {canWrite && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => setConfirmRemove(anexo)}
+                      disabled={removing}
+                      aria-label={`Remover ${anexo.nome_original}`}
+                      title="Remover documento"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
 
-          {previewUrl && !ios && (
-            <div className="rounded border overflow-hidden bg-muted/30">
-              {isImage ? (
-                <img src={previewUrl} alt={anexo.nome_original} className="max-h-96 w-auto mx-auto" />
-              ) : isPdf ? (
-                <iframe src={previewUrl} title={anexo.nome_original} className="w-full h-96" />
-              ) : null}
-            </div>
-          )}
+                {mostrandoPreview && previewUrl && !ios && (
+                  <div className="rounded border overflow-hidden bg-muted/30">
+                    {isImage ? (
+                      <img src={previewUrl} alt={anexo.nome_original} className="max-h-96 w-auto mx-auto" />
+                    ) : isPdf ? (
+                      <iframe src={previewUrl} title={anexo.nome_original} className="w-full h-96" />
+                    ) : null}
+                  </div>
+                )}
 
-          {previewFallbackUrl && !previewUrl && (
-            <div className="rounded border bg-muted/30 p-4 flex items-center gap-3">
-              <FileText className="h-8 w-8 text-muted-foreground shrink-0" />
-              <div className="flex-1 text-sm text-muted-foreground">
-                Não foi possível exibir o preview aqui.
+                {mostrandoPreview && previewFallbackUrl && !previewUrl && (
+                  <div className="rounded border bg-muted/30 p-4 flex items-center gap-3">
+                    <FileText className="h-8 w-8 text-muted-foreground shrink-0" />
+                    <div className="flex-1 text-sm text-muted-foreground">
+                      Não foi possível exibir o preview aqui.
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(previewFallbackUrl, "_blank", "noopener,noreferrer")}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" /> Abrir em nova aba
+                    </Button>
+                  </div>
+                )}
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(previewFallbackUrl, "_blank", "noopener,noreferrer")}
-              >
-                <ExternalLink className="h-4 w-4 mr-1" /> Abrir em nova aba
-              </Button>
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
 
-      <AlertDialog open={confirmRemove} onOpenChange={(o) => { if (!removing) setConfirmRemove(o); }}>
+      <AlertDialog open={!!confirmRemove} onOpenChange={(o) => { if (!removing && !o) setConfirmRemove(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remover anexo</AlertDialogTitle>
+            <AlertDialogTitle>Remover documento</AlertDialogTitle>
             <AlertDialogDescription>
-              Remover o anexo deste contrato? Ele também será removido do Omie.
+              Remover <span className="font-medium">{confirmRemove?.nome_original}</span> deste contrato?
+              Ele também será removido do Omie. Os outros documentos continuam anexados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

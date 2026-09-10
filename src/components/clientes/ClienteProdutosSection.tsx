@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   Package, Plus, Pencil, Trash2, ChevronDown, ChevronRight,
-  ExternalLink, Loader2, Puzzle, Percent, AlertTriangle, Paperclip, X, XCircle, Clock,
+  ExternalLink, Loader2, Puzzle, Percent, AlertTriangle, Paperclip, X, XCircle, Clock, FileText,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -49,7 +49,9 @@ import EnviarOmieComPreviaButton from "./EnviarOmieComPreviaButton";
 import HistoricoModulosProduto from "./HistoricoModulosProduto";
 import ContratoAnexoSection, {
   type ContratoAnexo,
+  type AnexoTipo,
   ANEXO_ACCEPT,
+  ANEXO_TIPOS,
   validateAnexoFile,
   uploadContratoAnexo,
 } from "./ContratoAnexoSection";
@@ -433,25 +435,21 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await (supabase.from("contrato_anexos" as any) as any)
-        .select("id, contrato_id, tenant_id, storage_path, nome_original, nome_omie, mime_type, tamanho_bytes, omie_status, omie_erro, omie_enviado_em, created_at")
+        .select("id, contrato_id, tenant_id, storage_path, nome_original, nome_omie, mime_type, tamanho_bytes, tipo, omie_status, omie_erro, omie_enviado_em, created_at")
         .in("contrato_id", contratoIds)
-        .eq("ativo", true);
+        .eq("ativo", true)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as ContratoAnexo[];
     },
   });
 
-  const anexoByContrato = useMemo(() => {
-    const map: Record<string, ContratoAnexo> = {};
+  // DEM-0328: um contrato tem N documentos ativos (contrato + aditivos), não mais um.
+  const anexosByContrato = useMemo(() => {
+    const map: Record<string, ContratoAnexo[]> = {};
     (anexosQuery.data ?? []).forEach(a => {
-      map[a.contrato_id] = a;
+      (map[a.contrato_id] ??= []).push(a);
     });
-    return map;
-  }, [anexosQuery.data]);
-
-  const anexosMap = useMemo(() => {
-    const map = new Map<string, ContratoAnexo>();
-    (anexosQuery.data ?? []).forEach(a => map.set(a.contrato_id, a));
     return map;
   }, [anexosQuery.data]);
 
@@ -473,12 +471,12 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
       anexosQuery: {
         enabled: contratoIds.length > 0,
         table: "contrato_anexos",
-        select: "id, contrato_id, tenant_id, storage_path, nome_original, nome_omie, mime_type, tamanho_bytes, omie_status, omie_erro",
+        select: "id, contrato_id, tenant_id, storage_path, nome_original, nome_omie, mime_type, tamanho_bytes, tipo, omie_status, omie_erro",
         filter: { contrato_id: contratoIds, ativo: true },
         rows: anexosQuery.data?.length ?? 0,
         error: anexosQuery.error?.message ?? null,
       },
-      anexosMapSize: anexosMap.size,
+      contratosComAnexo: Object.keys(anexosByContrato).length,
     });
   }, [
     clienteId,
@@ -490,7 +488,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     contratoIds,
     anexosQuery.data,
     anexosQuery.error,
-    anexosMap,
+    anexosByContrato,
   ]);
 
   const clienteTenantQuery = useQuery<{ tenant_id: string | null }>({
@@ -847,13 +845,24 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                     <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
                       <div className="font-semibold truncate flex items-center gap-1.5">
                         {p.produtos?.nome ?? "—"}
-                        {anexosMap.has(contratoIdByCliProd[p.id]) && (
+                        {(anexosByContrato[contratoIdByCliProd[p.id]]?.length ?? 0) > 0 && (
                           <Tooltip>
                             <TooltipTrigger>
-                              <Paperclip className="h-4 w-4 text-muted-foreground" aria-label="Contrato anexado" />
+                              <span className="inline-flex items-center gap-0.5 text-muted-foreground">
+                                <Paperclip className="h-4 w-4" aria-label="Documentos anexados" />
+                                {(anexosByContrato[contratoIdByCliProd[p.id]]?.length ?? 0) > 1 && (
+                                  <span className="text-[10px] font-medium">
+                                    {anexosByContrato[contratoIdByCliProd[p.id]].length}
+                                  </span>
+                                )}
+                              </span>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>Contrato anexado</p>
+                              <p>
+                                {(anexosByContrato[contratoIdByCliProd[p.id]]?.length ?? 0) === 1
+                                  ? "1 documento anexado"
+                                  : `${anexosByContrato[contratoIdByCliProd[p.id]].length} documentos anexados`}
+                              </p>
                             </TooltipContent>
                           </Tooltip>
                         )}
@@ -1205,7 +1214,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                       <ContratoAnexoSection
                         contratoId={contratoIdByCliProd[p.id] ?? null}
                         tenantId={lookupTenantId}
-                        anexo={anexoByContrato[contratoIdByCliProd[p.id] ?? ""] ?? null}
+                        anexos={anexosByContrato[contratoIdByCliProd[p.id] ?? ""] ?? []}
                         invalidateKey={anexosQueryKey}
                       />
                     </div>
@@ -1763,7 +1772,9 @@ function ProdutoDialog({
   const isHead = profile?.role === "head";
   const canAttach = isAdminLike(profile);
   const canSwapProduto = isEdit && (isSuperAdmin || isTenantAdmin || isHead);
-  const [stagedFile, setStagedFile] = useState<File | null>(null);
+  // DEM-0328: vários documentos podem ser escolhidos antes de o contrato existir.
+  const [stagedFiles, setStagedFiles] = useState<File[]>([]);
+  const [stagedTipo, setStagedTipo] = useState<AnexoTipo>("contrato");
   const stagedFileInputRef = useRef<HTMLInputElement | null>(null);
   const [produtoId, setProdutoId] = useState<string>("");
   const [fornecedorId, setFornecedorId] = useState<string>("");
@@ -1996,7 +2007,8 @@ function ProdutoDialog({
       setFormaPagAtivacaoId(e?.forma_pagamento_ativacao_id ? String(e.forma_pagamento_ativacao_id) : "");
       setFormaPagMensalidadeId(e?.forma_pagamento_mensalidade_id ? String(e.forma_pagamento_mensalidade_id) : "");
       setObservacoesContratuais(e?.observacoes_contratuais ?? "");
-      setStagedFile(null);
+      setStagedFiles([]);
+      setStagedTipo("contrato");
       setTimeout(() => setDataProximoReajuste(e?.data_proximo_reajuste ?? ""), 0);
     }
   }, [open, edit]);
@@ -2123,10 +2135,10 @@ function ProdutoDialog({
         });
         if (error) throw error;
 
-        // Upload do anexo staged (arquivo escolhido antes de existir o contrato).
-        // Ordem obrigatória: RPC cria produto+contrato → busca contrato_id → sobe → RPC substituir.
+        // Upload dos documentos staged (escolhidos antes de existir o contrato).
+        // Ordem obrigatória: RPC cria produto+contrato → busca contrato_id → sobe → RPC adicionar.
         // Se falhar, o produto já existe: avisa e expande o card para retry pelo painel.
-        if (stagedFile && canAttach && novoCliProdId && resolvedTenantId) {
+        if (stagedFiles.length > 0 && canAttach && novoCliProdId && resolvedTenantId) {
           try {
             const { data: ci, error: ciErr } = await (supabase.from("contrato_itens" as any) as any)
               .select("contrato_id")
@@ -2136,14 +2148,25 @@ function ProdutoDialog({
             if (ciErr) throw ciErr;
             const novoContratoId = (ci as any)?.contrato_id as string | undefined;
             if (!novoContratoId) throw new Error("Contrato não encontrado para o produto recém-criado.");
-            await uploadContratoAnexo({
-              contratoId: novoContratoId,
-              tenantId: resolvedTenantId,
-              file: stagedFile,
-            });
+            // Sequencial: um arquivo que falha não pode levar os outros junto, e a
+            // dedup por hash da RPC só enxerga o que já foi gravado.
+            const naoSubiram: string[] = [];
+            for (const f of stagedFiles) {
+              try {
+                await uploadContratoAnexo({
+                  contratoId: novoContratoId,
+                  tenantId: resolvedTenantId,
+                  file: f,
+                  tipo: stagedTipo,
+                });
+              } catch (e: any) {
+                naoSubiram.push(`${f.name}: ${e?.message ?? String(e)}`);
+              }
+            }
+            if (naoSubiram.length > 0) throw new Error(naoSubiram.join(" · "));
           } catch (upErr: any) {
             toast({
-              title: "Produto criado. Falha ao anexar o contrato — anexe pelo painel do produto.",
+              title: "Produto criado. Falha ao anexar documento, anexe pelo painel do produto.",
               description: upErr?.message ?? String(upErr),
               variant: "destructive",
             });
@@ -2549,7 +2572,7 @@ function ProdutoDialog({
 
         <Separator />
 
-        {/* Anexo do contrato */}
+        {/* Documentos do contrato */}
         {isEdit && editContratoId ? (
           <ContratoAnexoSection
             contratoId={editContratoId}
@@ -2557,36 +2580,56 @@ function ProdutoDialog({
           />
         ) : !isEdit ? (
           <div className="rounded border bg-background/50 p-3 space-y-2">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Paperclip className="h-4 w-4" />
-                Anexo do contrato
+                Documentos do contrato
+                {stagedFiles.length > 0 && (
+                  <Badge variant="secondary" className="text-[10px]">{stagedFiles.length}</Badge>
+                )}
               </div>
               {canAttach && (
                 <>
                   <input
                     ref={stagedFileInputRef}
                     type="file"
+                    multiple
                     accept={ANEXO_ACCEPT}
                     className="hidden"
                     onChange={(e) => {
-                      const f = e.target.files?.[0] ?? null;
+                      const escolhidos = Array.from(e.target.files ?? []);
                       e.target.value = "";
-                      if (!f) { setStagedFile(null); return; }
-                      const err = validateAnexoFile(f);
-                      if (err) {
-                        toast({ title: "Arquivo inválido", description: err, variant: "destructive" });
-                        return;
+                      if (escolhidos.length === 0) return;
+                      const validos: File[] = [];
+                      const invalidos: string[] = [];
+                      escolhidos.forEach((f) => {
+                        const err = validateAnexoFile(f);
+                        if (err) invalidos.push(`${f.name}: ${err}`);
+                        else validos.push(f);
+                      });
+                      if (invalidos.length > 0) {
+                        toast({ title: "Arquivo inválido", description: invalidos.join(" · "), variant: "destructive" });
                       }
-                      setStagedFile(f);
+                      if (validos.length === 0) return;
+                      // Mesmo arquivo escolhido duas vezes não vira duas linhas.
+                      setStagedFiles((prev) => {
+                        const chave = (f: File) => `${f.name}|${f.size}|${f.lastModified}`;
+                        const vistos = new Set(prev.map(chave));
+                        return [...prev, ...validos.filter((f) => !vistos.has(chave(f)))];
+                      });
                     }}
                   />
                   <div className="flex items-center gap-2">
-                    {stagedFile && (
-                      <Button type="button" variant="ghost" size="sm" onClick={() => setStagedFile(null)}>
-                        Remover
-                      </Button>
-                    )}
+                    <Select value={stagedTipo} onValueChange={(v) => setStagedTipo(v as AnexoTipo)}>
+                      <SelectTrigger className="h-8 w-[10.5rem] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ANEXO_TIPOS.map((t) => (
+                          <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Button
                       type="button"
                       variant="outline"
@@ -2594,7 +2637,7 @@ function ProdutoDialog({
                       onClick={() => stagedFileInputRef.current?.click()}
                     >
                       <Paperclip className="h-4 w-4 mr-1" />
-                      {stagedFile ? "Trocar arquivo" : "Selecionar arquivo"}
+                      {stagedFiles.length > 0 ? "Adicionar documento" : "Selecionar arquivo"}
                     </Button>
                   </div>
                 </>
@@ -2604,13 +2647,31 @@ function ProdutoDialog({
               <p className="text-xs text-muted-foreground">
                 Somente admin ou head podem anexar o contrato. Peça a um responsável para anexar depois pelo painel do produto.
               </p>
-            ) : stagedFile ? (
-              <p className="text-xs text-muted-foreground truncate" title={stagedFile.name}>
-                Selecionado: <span className="font-medium">{stagedFile.name}</span> — será enviado após criar o produto.
-              </p>
+            ) : stagedFiles.length > 0 ? (
+              <div className="space-y-1">
+                {stagedFiles.map((f, i) => (
+                  <div key={`${f.name}-${f.size}-${f.lastModified}-${i}`} className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-xs truncate flex-1" title={f.name}>{f.name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                      onClick={() => setStagedFiles((prev) => prev.filter((_, j) => j !== i))}
+                      aria-label={`Remover ${f.name}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+                <p className="text-xs text-muted-foreground">
+                  Serão enviados logo após o produto ser criado.
+                </p>
+              </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Opcional. Aceito: PDF, JPG, PNG (até 10 MB). O arquivo é enviado logo após o produto ser criado.
+                Opcional. Aceito: PDF, JPG, PNG (até 10 MB por arquivo). Pode selecionar vários; eles são enviados logo após o produto ser criado.
               </p>
             )}
           </div>
