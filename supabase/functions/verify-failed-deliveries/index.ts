@@ -11,6 +11,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
 import { resendMessage } from '../_shared/resend-message.ts';
 import { decidirReenvio, erroCondenaMensagem } from './retry-policy.ts';
+import { entregaConfirmadaNoStore } from './provider-status.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -60,8 +61,9 @@ async function provedorRegistraEntrega(supabase: any, msg: any): Promise<boolean
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return false;
-    const st = String((await res.json())?.messages?.records?.[0]?.status ?? '').toUpperCase();
-    return st === 'DELIVERY_ACK' || st === 'READ' || st === 'PLAYED';
+    // O status fica em `records[0].MessageUpdate[]`, e é um log, não um estado.
+    // Ver provider-status.ts — este ponto leu o campo errado por mais de um mês.
+    return entregaConfirmadaNoStore((await res.json())?.messages?.records?.[0]);
   } catch (e) {
     console.warn(`${LOG} segunda fonte indisponível para ${msg.message_id}: ${(e as Error)?.message}`);
     return false;
