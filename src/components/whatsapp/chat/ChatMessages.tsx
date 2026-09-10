@@ -13,7 +13,7 @@ import { formatDateLabel, formatTime } from "@/lib/formatDateWithTimezone";
 import { useConversationAssignmentHistory, type AssignmentEvent } from "../hooks/useConversationAssignmentHistory";
 import { useConversationNotes, type ConversationNote } from "../hooks/useConversationNotes";
 import { useGroupParticipants } from "../hooks/useGroupParticipants";
-import { ArrowRightLeft, ChevronDown, Loader2, StickyNote, Trash2 } from "lucide-react";
+import { ArrowRightLeft, ChevronDown, Loader2, StickyNote, Trash2, UserCheck, Users } from "lucide-react";
 import { NoteMediaPreview } from "./NoteMediaPreview";
 
 interface Props {
@@ -440,13 +440,26 @@ export function ChatMessages({
                 }
 
                 if (item.type === 'transfer') {
+                  const ev = item.event;
+                  const quem = ev.agent_name || 'Agente';
+                  const autor = ev.by_name || 'Agente';
+                  const cargo = ev.agent_role ? ` · ${ev.agent_role}` : '';
+                  // Cada origem tem a sua frase: a fila DISTRIBUI, o agente ASSUME,
+                  // e só transferência tem alguém do outro lado. Antes tudo saía como
+                  // "Transferido para X", o que dizia o contrário do que aconteceu.
+                  const EventIcon = ev.kind === 'auto' ? Users : ev.kind === 'claim' ? UserCheck : ArrowRightLeft;
+                  const texto =
+                    ev.kind === 'auto' ? `Distribuído para ${quem}${cargo}`
+                    : ev.kind === 'claim' ? `${quem} assumiu o atendimento`
+                    : ev.kind === 'department' ? `Transferido de setor por ${autor}`
+                    : ev.kind === 'transfer_unknown' ? `Transferido por ${autor}`
+                    : `${autor} transferiu para ${quem}${cargo}`;
                   return (
-                    <div key={`transfer-${item.event.id}`} className="flex justify-center my-2">
+                    <div key={`transfer-${ev.id}`} className="flex justify-center my-2">
                       <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full select-text">
-                        <ArrowRightLeft className="h-3 w-3" />
-                        Transferido para {item.event.agent_name || 'Agente'}
-                        {item.event.agent_role ? ` · ${item.event.agent_role}` : ''}
-                        <span className="opacity-60 ml-1">{formatTime(item.event.created_at, timezone)}</span>
+                        <EventIcon className="h-3 w-3 shrink-0" />
+                        {texto}
+                        <span className="opacity-60 ml-1">{formatTime(ev.created_at, timezone)}</span>
                       </span>
                     </div>
                   );
