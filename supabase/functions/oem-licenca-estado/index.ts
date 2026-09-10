@@ -238,10 +238,24 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (mudou.length === 0) return null;
+      // O CARIMBO VAI MESMO QUANDO NADA DIVERGIU, e é aí que ele mais serve.
+      //
+      // A carga periódica copia a varredura do DoctorOEM por cima do espelho
+      // sem olhar idade, e a varredura pode ser mais velha que esta leitura.
+      // Se ele só fosse gravado quando houvesse diferença, uma leitura que
+      // CONFIRMA o estado certo não protegeria nada: a carga seguinte poderia
+      // trazer o estado antigo da varredura e desfazer a verdade que acabamos
+      // de conferir. `estado_lido_em` é o que a `oem-espelho-sync` usa para
+      // saber que o dado dela é o velho. Ver a migration 20260910003000.
+      patchEspelho.estado_lido_em = new Date().toISOString();
 
-      await ds.from("reconciliacao_oem").update(patchRecon)
-        .eq("tenant_id", linha.tenant_id).eq("filial_codigo", linha.filial_codigo);
+      // `reconciliacao_oem` não tem a coluna e nem precisa: a carga reconstrói
+      // o de/para a partir das linhas do espelho, então preservar lá já chega
+      // aqui. Sem divergência, não há o que escrever nela.
+      if (mudou.length > 0) {
+        await ds.from("reconciliacao_oem").update(patchRecon)
+          .eq("tenant_id", linha.tenant_id).eq("filial_codigo", linha.filial_codigo);
+      }
       await ds.from("oem_espelho_filial").update(patchEspelho)
         .eq("conta_integration_id", conta.id).eq("filial_codigo", linha.filial_codigo);
       return mudou;

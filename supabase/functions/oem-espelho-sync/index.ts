@@ -256,22 +256,65 @@ Deno.serve(async (req) => {
       }
       const filiais = (corpo.filiais ?? []) as FilialOem[];
 
-      const linhas = filiais.filter((f) => f.filial_codigo).map((f) => ({
-        tenant_id: conta.tenant_id,
-        conta_integration_id: conta.id,
-        empresa_codigo: f.empresa_codigo ?? "",
-        filial_codigo: String(f.filial_codigo),
-        grupo_economico: f.grupo_economico, nome_fantasia: f.nome_fantasia,
-        razao_social: f.razao_social, cnpj_oem: f.cnpj_cpf,
-        cnpj_norm: digitos(f.cnpj_cpf) || null,
-        produto_principal: f.produto_principal,
-        status: f.status, bloqueado: f.bloqueado === true,
-        custo_total: f.custo_total, qtd_pdv: f.qtd_pdv, qtd_comandas: f.qtd_comandas,
-        usuarios_adicionais: f.usuarios_adicionais, numero_filiais: f.numero_filiais,
-        modulos: f.modulos_ativos, last_sync_oem: f.last_sync,
-        desativa_em: desativacaoProgramada(f.modulos_ativos),
-        atualizado_em: new Date().toISOString(),
-      }));
+      // ---------------------------------------------------------------------
+      // ⚠️ ESTADO LIDO AO VIVO NÃO É SOBRESCRITO POR VARREDURA MAIS VELHA
+      // ---------------------------------------------------------------------
+      // A `oem-licenca-estado` lê a licença direto no parceiro a cada clique da
+      // ficha e corrige o espelho com o que voltou, carimbando `estado_lido_em`.
+      // Esta carga copia a varredura do DoctorOEM, que pode ser de horas antes:
+      // no 158 PIZZA & BURGER a varredura era de 13:27 e a licença foi liberada
+      // no portal por volta das 14:00. Sem esta guarda, a carga desfazia a
+      // correção e o cliente voltava a aparecer bloqueado sozinho — o mesmo
+      // sintoma que a correção existe para acabar.
+      //
+      // Só os três campos de ESTADO são preservados. Custo, contadores e o
+      // jsonb de módulos continuam vindo da varredura sempre, porque a leitura
+      // ao vivo não olha para eles.
+      //
+      // A busca é barata: só filial que já teve leitura ao vivo tem a coluna
+      // preenchida, e são poucas.
+      const { data: comLeitura } = await ds.from("oem_espelho_filial")
+        .select("filial_codigo, status, bloqueado, desativa_em, estado_lido_em")
+        .eq("conta_integration_id", conta.id)
+        .not("estado_lido_em", "is", null);
+      type EstadoLido = {
+        status: string | null; bloqueado: boolean | null;
+        desativa_em: string | null; estado_lido_em: string | null;
+      };
+      const lidoAoVivo = new Map<string, EstadoLido>(
+        (comLeitura ?? []).map((r: any) => [String(r.filial_codigo), r as EstadoLido]),
+      );
+      let estadosPreservados = 0;
+
+      const linhas = filiais.filter((f) => f.filial_codigo).map((f) => {
+        const guardado = lidoAoVivo.get(String(f.filial_codigo));
+        const varredura = f.last_sync ? Date.parse(String(f.last_sync)) : NaN;
+        const lido = guardado?.estado_lido_em ? Date.parse(String(guardado.estado_lido_em)) : NaN;
+        // Varredura sem data não vence leitura datada: sem saber a idade dela,
+        // o único lado seguro é manter o que foi lido no parceiro.
+        const manterEstado = !!guardado
+          && !Number.isNaN(lido) && (Number.isNaN(varredura) || lido > varredura);
+        if (manterEstado) estadosPreservados++;
+        return {
+          tenant_id: conta.tenant_id,
+          conta_integration_id: conta.id,
+          empresa_codigo: f.empresa_codigo ?? "",
+          filial_codigo: String(f.filial_codigo),
+          grupo_economico: f.grupo_economico, nome_fantasia: f.nome_fantasia,
+          razao_social: f.razao_social, cnpj_oem: f.cnpj_cpf,
+          cnpj_norm: digitos(f.cnpj_cpf) || null,
+          produto_principal: f.produto_principal,
+          status: manterEstado ? guardado.status : f.status,
+          bloqueado: manterEstado ? guardado.bloqueado === true : f.bloqueado === true,
+          custo_total: f.custo_total, qtd_pdv: f.qtd_pdv, qtd_comandas: f.qtd_comandas,
+          usuarios_adicionais: f.usuarios_adicionais, numero_filiais: f.numero_filiais,
+          modulos: f.modulos_ativos, last_sync_oem: f.last_sync,
+          desativa_em: manterEstado
+            ? guardado.desativa_em
+            : desativacaoProgramada(f.modulos_ativos),
+          atualizado_em: new Date().toISOString(),
+        };
+      });
 
       for (let i = 0; i < linhas.length; i += 500) {
         const { error } = await ds.from("oem_espelho_filial")
@@ -846,6 +889,10 @@ Deno.serve(async (req) => {
         clientesDs: clientes.length, linhasRecon: recon.length,
         outraUnidade: deOutraUnidade,
         decisoesPreservadas: decidido.size,
+        // Quantas filiais tiveram o estado mantido porque a leitura ao vivo era
+        // mais nova que a varredura. Zero é o normal; número alto seguido
+        // significa que a varredura do DoctorOEM parou de avançar.
+        estadosPreservados,
         codigosGravados: codigosGravados ?? 0,
         precosGravados, precosErro,
         ultimaSincronizacaoOem: corpo.ultimaSincronizacao ?? null,
