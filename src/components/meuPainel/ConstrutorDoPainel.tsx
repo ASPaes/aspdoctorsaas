@@ -180,9 +180,16 @@ export function ConstrutorDoPainel({
           nosso `flex` (na folha do Tailwind `.grid` vem depois de `.flex`) e,
           pior, o `overflow-y-auto` faz o DIÁLOGO INTEIRO rolar — foi isso que
           empurrou o cabeçalho para fora da tela. Aqui o container não rola:
-          quem rola é a lista lá dentro. */}
-      <DialogContent className="!flex h-[88vh] !max-h-[88vh] w-[min(1100px,95vw)] !max-w-none !flex-col !gap-0 !overflow-hidden !p-0">
-        <DialogHeader className="shrink-0 border-b border-border px-5 py-3">
+          quem rola é a lista lá dentro.
+
+          O `top-[3vh]` com `translate-y-0` tira a centralização da conta: o
+          topo do diálogo fica ancorado a 3vh do alto da tela, então nenhuma
+          combinação de altura, animação de entrada ou rolagem consegue
+          empurrar o cabeçalho para fora. */}
+      <DialogContent className="!flex !top-[3vh] !translate-y-0 h-[90vh] !max-h-[90vh] w-[min(1100px,95vw)] !max-w-none !flex-col !gap-0 !overflow-hidden !p-0">
+        {/* `sticky` além de `shrink-0`: cinto e suspensório. Se algum dia
+            algo voltar a rolar aqui dentro, o título continua visível. */}
+        <DialogHeader className="sticky top-0 z-20 shrink-0 border-b border-border bg-background px-5 py-3">
           <DialogTitle className="text-base">Montar o meu painel</DialogTitle>
         </DialogHeader>
 
