@@ -282,3 +282,9 @@ verify_jwt = true
 # fn_onboarding_send_welcome). Declarado explicitamente: sem entrada aqui o CI
 # deploya com false e abre a function para qualquer um.
 verify_jwt = true
+
+# Teste de conta de e-mail. verify_jwt = TRUE: chamada do navegador com a sessão
+# do admin, e ainda confere auth.getUser + papel + tenant por dentro. Sem entrada
+# aqui o CI deploya FALSE e abre a function para qualquer um.
+[functions.test-email-account]
+verify_jwt = true
