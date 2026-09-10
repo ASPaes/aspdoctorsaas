@@ -1,18 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { Skeleton } from "@/components/ui/skeleton";
-import { entradaPorId, type CatalogEntry } from "@/lib/kpiCatalog";
+import { entradaPorId, type CatalogEntry, type KpiArea } from "@/lib/kpiCatalog";
 import { resolverIndicador } from "@/lib/valorDoIndicador";
-import { GraficoDoPainel } from "./GraficoDoPainel";
-import type { LayoutSecao } from "@/lib/dashboardLayout";
+import { areasDaSecao, type LayoutSecao } from "@/lib/dashboardLayout";
 import { normalizarFiltros, type FiltrosSecao } from "./filtrosDaSecao";
 import { FiltrosDaSecaoBar } from "./FiltrosDaSecaoBar";
+import { GraficoDoPainel } from "./GraficoDoPainel";
 import {
   ehProviderAtendimento, useDadosAtendimento,
   useDadosCS, useDadosCertificados, useDadosFinanceiro, type DadosDaSecao,
 } from "./useDadosDaSecao";
 
-const NOME_AREA: Record<string, string> = {
+const NOME_AREA: Record<KpiArea, string> = {
   atendimento: "Atendimento",
   financeiro: "Financeiro",
   cs: "Customer Success",
@@ -20,7 +20,7 @@ const NOME_AREA: Record<string, string> = {
   certificados: "Certificados A1",
 };
 
-const COR_AREA: Record<string, string> = {
+const COR_AREA: Record<KpiArea, string> = {
   atendimento: "bg-sky-500/15 text-sky-300",
   financeiro: "bg-green-500/15 text-green-300",
   cs: "bg-violet-500/15 text-violet-300",
@@ -55,30 +55,70 @@ function QuandoVisivel({ children }: { children: React.ReactNode }) {
   return <div ref={ref}>{visivel ? children : <Skeleton className="h-24 w-full rounded-lg" />}</div>;
 }
 
-function GradeDeItens({
-  entradas, dados, carregando,
-}: {
+type Publicar = (dados: DadosDaSecao, carregando: boolean, area: KpiArea) => void;
+
+/** Cada carregador é montado só quando a seção tem item daquela área — é o
+ *  gate que impede uma seção sem Financeiro de disparar as varreduras dele.
+ *  Não desenham nada: entregam o dado ao pai, que monta uma grade só. */
+function CarregaAtendimento({ entradas, filtros, publicar }: {
+  entradas: CatalogEntry[]; filtros: FiltrosSecao; publicar: Publicar;
+}) {
+  const necessarios = new Set(
+    entradas.map((e) => e.source.provider).filter(ehProviderAtendimento),
+  );
+  const { carregando, ...dados } = useDadosAtendimento(necessarios, filtros);
+  const assinatura = JSON.stringify(Object.keys(dados).map((k) => dados[k as never] !== undefined));
+  useEffect(() => {
+    publicar(dados, carregando, "atendimento");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carregando, assinatura]);
+  return null;
+}
+
+function CarregaFinanceiro({ filtros, publicar }: { filtros: FiltrosSecao; publicar: Publicar }) {
+  const { carregando, ...dados } = useDadosFinanceiro(filtros);
+  useEffect(() => {
+    publicar(dados, carregando, "financeiro");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carregando, dados["financeiro.dashboard"], dados["financeiro.visao_geral"],
+      dados["financeiro.crescimento"], dados["financeiro.cancelamentos"]]);
+  return null;
+}
+
+function CarregaCS({ filtros, publicar }: { filtros: FiltrosSecao; publicar: Publicar }) {
+  const { carregando, ...dados } = useDadosCS(filtros);
+  useEffect(() => {
+    publicar(dados, carregando, "cs");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carregando, dados["cs.dashboard"]]);
+  return null;
+}
+
+function CarregaCertificados({ filtros, publicar }: { filtros: FiltrosSecao; publicar: Publicar }) {
+  const { carregando, ...dados } = useDadosCertificados(filtros);
+  useEffect(() => {
+    publicar(dados, carregando, "certificados");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carregando, dados["certificados.a1"]]);
+  return null;
+}
+
+function GradeDeItens({ entradas, dados, areasCarregando }: {
   entradas: CatalogEntry[];
   dados: DadosDaSecao;
-  carregando: boolean;
+  areasCarregando: Set<KpiArea>;
 }) {
-  if (carregando) {
-    return (
-      <div className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
-        {entradas.map((e) => (
-          <Skeleton key={e.id} className="h-24 w-full rounded-lg" />
-        ))}
-      </div>
-    );
-  }
-
   return (
     <div className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
       {entradas.map((entrada) => {
+        if (areasCarregando.has(entrada.area)) {
+          return <Skeleton key={entrada.id} className="h-24 w-full rounded-lg" />;
+        }
+
         if (entrada.kind === "chart") {
-          /** O gráfico ocupa 2, 3 ou 4 colunas da grade de 4. As classes
-           *  estão escritas por extenso porque o Tailwind varre o código
-           *  procurando o nome inteiro — `col-span-${n}` nunca chega no CSS. */
+          /** As classes estão escritas por extenso porque o Tailwind varre o
+           *  código procurando o nome inteiro — `col-span-${n}` nunca chega
+           *  no CSS. */
           const largura =
             entrada.span === 4 ? "col-span-2 md:col-span-4"
               : entrada.span === 3 ? "col-span-2 md:col-span-3"
@@ -89,6 +129,7 @@ function GradeDeItens({
             </div>
           );
         }
+
         const { texto, numero } = resolverIndicador(entrada, dados[entrada.source.provider]);
         return (
           <KPICardEnhanced
@@ -106,29 +147,6 @@ function GradeDeItens({
   );
 }
 
-function DadosAtendimento({ entradas, filtros }: { entradas: CatalogEntry[]; filtros: FiltrosSecao }) {
-  const necessarios = new Set(
-    entradas.map((e) => e.source.provider).filter(ehProviderAtendimento),
-  );
-  const { carregando, ...dados } = useDadosAtendimento(necessarios, filtros);
-  return <GradeDeItens entradas={entradas} dados={dados} carregando={carregando} />;
-}
-
-function DadosFinanceiro({ entradas, filtros }: { entradas: CatalogEntry[]; filtros: FiltrosSecao }) {
-  const { carregando, ...dados } = useDadosFinanceiro(filtros);
-  return <GradeDeItens entradas={entradas} dados={dados} carregando={carregando} />;
-}
-
-function DadosCS({ entradas, filtros }: { entradas: CatalogEntry[]; filtros: FiltrosSecao }) {
-  const { carregando, ...dados } = useDadosCS(filtros);
-  return <GradeDeItens entradas={entradas} dados={dados} carregando={carregando} />;
-}
-
-function DadosCertificados({ entradas, filtros }: { entradas: CatalogEntry[]; filtros: FiltrosSecao }) {
-  const { carregando, ...dados } = useDadosCertificados(filtros);
-  return <GradeDeItens entradas={entradas} dados={dados} carregando={carregando} />;
-}
-
 export function SecaoDoPainel({
   secao, onMudarFiltro,
 }: {
@@ -140,21 +158,43 @@ export function SecaoDoPainel({
     .map((i) => entradaPorId(i.id))
     .filter((e): e is CatalogEntry => !!e && !e.pending);
 
+  const areas = areasDaSecao(secao);
+  const temImplantacao = areas.includes("implantacao");
+  const areasComDados = areas.filter((a) => a !== "implantacao");
+
+  const [dados, setDados] = useState<DadosDaSecao>({});
+  const [carregando, setCarregando] = useState<Set<KpiArea>>(() => new Set(areasComDados));
+
+  const publicar = useCallback<Publicar>((novos, estaCarregando, area) => {
+    setDados((d) => ({ ...d, ...novos }));
+    setCarregando((c) => {
+      const tem = c.has(area);
+      if (estaCarregando === tem) return c;
+      const n = new Set(c);
+      if (estaCarregando) n.add(area);
+      else n.delete(area);
+      return n;
+    });
+  }, []);
+
+  const entradasAtendimento = entradas.filter((e) => e.area === "atendimento");
+
   return (
     <section className="mt-5 rounded-xl border border-border bg-card/40">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold">{secao.nome}</h3>
-          <span
-            className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-              COR_AREA[secao.area] ?? "bg-muted text-muted-foreground"
-            }`}
-          >
-            {NOME_AREA[secao.area] ?? secao.area}
-          </span>
+          {areas.map((a) => (
+            <span
+              key={a}
+              className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${COR_AREA[a]}`}
+            >
+              {NOME_AREA[a]}
+            </span>
+          ))}
         </div>
         <FiltrosDaSecaoBar
-          area={secao.area}
+          areas={areas}
           filtros={filtros}
           onMudar={(campo, valor) => onMudarFiltro(secao.id, campo, valor)}
         />
@@ -164,22 +204,36 @@ export function SecaoDoPainel({
         <p className="px-4 py-6 text-sm text-muted-foreground">
           Nenhum indicador nesta seção ainda.
         </p>
-      ) : secao.area === "implantacao" ? (
-        <p className="px-4 py-6 text-sm text-muted-foreground">
-          Os indicadores de Implantação ainda não estão disponíveis no painel. A tela de
-          Implantação monta os números dentro da própria página, sem um hook reaproveitável —
-          construir isso sem alterar a tela existente é uma entrega à parte.
-        </p>
       ) : (
         <QuandoVisivel>
-          {secao.area === "atendimento" ? (
-            <DadosAtendimento entradas={entradas} filtros={filtros} />
-          ) : secao.area === "financeiro" ? (
-            <DadosFinanceiro entradas={entradas} filtros={filtros} />
-          ) : secao.area === "cs" ? (
-            <DadosCS entradas={entradas} filtros={filtros} />
-          ) : (
-            <DadosCertificados entradas={entradas} filtros={filtros} />
+          {areasComDados.includes("atendimento") && (
+            <CarregaAtendimento
+              entradas={entradasAtendimento}
+              filtros={filtros}
+              publicar={publicar}
+            />
+          )}
+          {areasComDados.includes("financeiro") && (
+            <CarregaFinanceiro filtros={filtros} publicar={publicar} />
+          )}
+          {areasComDados.includes("cs") && (
+            <CarregaCS filtros={filtros} publicar={publicar} />
+          )}
+          {areasComDados.includes("certificados") && (
+            <CarregaCertificados filtros={filtros} publicar={publicar} />
+          )}
+
+          <GradeDeItens
+            entradas={entradas.filter((e) => e.area !== "implantacao")}
+            dados={dados}
+            areasCarregando={carregando}
+          />
+
+          {temImplantacao && (
+            <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+              Os indicadores de Implantação ainda não aparecem no painel: aquela tela monta os
+              números dentro da própria página, sem um hook reaproveitável.
+            </p>
           )}
         </QuandoVisivel>
       )}

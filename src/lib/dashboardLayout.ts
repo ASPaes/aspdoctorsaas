@@ -16,8 +16,12 @@ export interface LayoutItem {
 export interface LayoutSecao {
   id: string;
   nome: string;
-  area: KpiArea;
-  /** Filtros da área, crus. Cada área interpreta os seus. */
+  /** @deprecated A seção não tem mais área fixa — ela é o que o gestor
+   *  colocou dentro, e pode misturar áreas. Continua sendo lido dos painéis
+   *  salvos antes de 10/09/2026 para não quebrar nenhum layout, mas quem
+   *  manda são as áreas dos itens (ver `areasDaSecao`). */
+  area?: KpiArea;
+  /** Filtros crus. Cada área consome os que aceita. */
   filtros: Record<string, unknown>;
   itens: LayoutItem[];
 }
@@ -61,11 +65,11 @@ export function validarLayout(layout: DashboardLayout): Validacao {
 function secaoValida(raw: unknown): raw is LayoutSecao {
   if (!raw || typeof raw !== "object") return false;
   const s = raw as Record<string, unknown>;
+  const areaOk = s.area === undefined || AREAS.includes(s.area as KpiArea);
   return (
     typeof s.id === "string" &&
     typeof s.nome === "string" &&
-    typeof s.area === "string" &&
-    AREAS.includes(s.area as KpiArea) &&
+    areaOk &&
     Array.isArray(s.itens)
   );
 }
@@ -79,13 +83,24 @@ export function parseLayout(raw: unknown): DashboardLayout {
   const secoes = l.secoes.filter(secaoValida).map((s) => ({
     id: s.id,
     nome: s.nome,
-    area: s.area,
+    ...(s.area ? { area: s.area } : {}),
     filtros: (s.filtros ?? {}) as Record<string, unknown>,
     itens: (s.itens as unknown[]).filter(
       (i): i is LayoutItem => !!i && typeof (i as LayoutItem).id === "string",
     ),
   }));
   return { versao: 1, secoes };
+}
+
+/** Áreas presentes numa seção, deduzidas dos itens. A seção não tem mais
+ *  área fixa: ela é o que o gestor colocou dentro. */
+export function areasDaSecao(secao: LayoutSecao): KpiArea[] {
+  const vistas = new Set<KpiArea>();
+  for (const item of secao.itens) {
+    const e = entradaPorId(item.id);
+    if (e) vistas.add(e.area);
+  }
+  return AREAS.filter((a) => vistas.has(a));
 }
 
 /** Item cujo id sumiu do catálogo não quebra o painel: sai da renderização e

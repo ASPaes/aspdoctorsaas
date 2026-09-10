@@ -70,14 +70,19 @@ function useFornecedores(ativo: boolean) {
 const CLASSE = "h-7 w-auto min-w-[110px] border-border bg-background/40 text-[11.5px]";
 
 export function FiltrosDaSecaoBar({
-  area, filtros, onMudar,
+  areas, filtros, onMudar,
 }: {
-  area: KpiArea;
+  /** Áreas presentes na seção. Uma seção pode misturar, e a barra mostra a
+   *  união dos filtros: setor e agente só aparecem se houver indicador de
+   *  Atendimento, fornecedor só se houver de Financeiro. Filtro que nenhum
+   *  indicador da seção usa não aparece — botão que não faz nada é pior que
+   *  botão ausente. */
+  areas: KpiArea[];
   filtros: FiltrosSecao;
   onMudar: (campo: string, valor: unknown) => void;
 }) {
-  const ehAtendimento = area === "atendimento";
-  const ehFinanceiro = area === "financeiro";
+  const ehAtendimento = areas.includes("atendimento");
+  const ehFinanceiro = areas.includes("financeiro");
 
   const setores = useSetores(ehAtendimento);
   const agentes = useAgentes(ehAtendimento);
