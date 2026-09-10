@@ -90,6 +90,9 @@ verify_jwt = false
 [functions.admin-db-actions]
 verify_jwt = true
 
+[functions.admin-change-login-email]
+verify_jwt = true
+
 [functions.generate-sso-token]
 verify_jwt = false
 
