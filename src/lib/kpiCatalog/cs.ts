@@ -101,7 +101,8 @@ export const cs: CatalogEntry[] = [
     label: "Tickets por situação",
     format: "integer",
     source: { provider: "cs.dashboard", path: "backlogPorStatus" },
-    pending: true,
+    span: 2,
+    chart: { tipo: "barras", fonte: "mapa" },
   },
   {
     id: "cs.backlog_por_prioridade",
@@ -110,7 +111,8 @@ export const cs: CatalogEntry[] = [
     label: "Tickets por prioridade",
     format: "integer",
     source: { provider: "cs.dashboard", path: "backlogPorPrioridade" },
-    pending: true,
+    span: 2,
+    chart: { tipo: "barras", fonte: "mapa" },
   },
 
   // ---------- Risco ----------
@@ -156,7 +158,8 @@ export const cs: CatalogEntry[] = [
     label: "Desfecho dos clientes em risco",
     format: "integer",
     source: { provider: "cs.dashboard", path: "resultadoRisco" },
-    pending: true,
+    span: 2,
+    chart: { tipo: "barras", fonte: "mapa" },
   },
 
   // ---------- Cobertura de relacionamento 90d ----------
@@ -220,7 +223,8 @@ export const cs: CatalogEntry[] = [
     label: "Funil de indicações",
     format: "integer",
     source: { provider: "cs.dashboard", path: "pipelineIndicacao" },
-    pending: true,
+    span: 2,
+    chart: { tipo: "barras", fonte: "mapa" },
   },
 
   // ---------- Oportunidades ----------

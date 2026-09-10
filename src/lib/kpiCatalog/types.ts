@@ -65,6 +65,18 @@ export interface CatalogEntry {
   span?: 2 | 3 | 4;
   /** Só para gráfico: nome do componente que desenha. */
   render?: string;
+  /** Só para gráfico: como transformar o dado cru em barras ou linha.
+   *  `lista` = array de objetos; `mapa` = objeto {chave: número}. */
+  chart?: {
+    tipo: "barras" | "linha";
+    fonte: "lista" | "mapa";
+    /** Campo do rótulo, quando `fonte: "lista"`. */
+    rotulo?: string;
+    /** Campo do valor, quando `fonte: "lista"`. */
+    valor?: string;
+    /** Quantas barras no máximo; o resto é cortado. Default 8. */
+    limite?: number;
+  };
   /** Gráfico ainda escrito dentro da aba de origem. Aparece apagado no
    *  catálogo e não é selecionável. Sai na F5. */
   pending?: true;

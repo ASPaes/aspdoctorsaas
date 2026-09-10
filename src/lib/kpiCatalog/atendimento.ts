@@ -70,7 +70,8 @@ export const atendimento: CatalogEntry[] = [
     label: "Atendimentos por canal",
     format: "integer",
     source: { provider: "atendimento.volume", path: "canais" },
-    pending: true,
+    span: 2,
+    chart: { tipo: "barras", fonte: "lista", rotulo: "canal", valor: "qtd" },
   },
   {
     id: "at.volume_heatmap",
@@ -89,7 +90,8 @@ export const atendimento: CatalogEntry[] = [
     helpKey: "atendimento_top_motivos",
     format: "integer",
     source: { provider: "atendimento.volume", path: "top_motivos" },
-    pending: true,
+    span: 2,
+    chart: { tipo: "barras", fonte: "lista", rotulo: "tag", valor: "qtd", limite: 6 },
   },
 
   // ---------- Velocidade ----------
@@ -164,9 +166,14 @@ export const atendimento: CatalogEntry[] = [
     helpKey: "atendimento_sla_frt",
     format: "percent",
     source: { provider: "atendimento.velocidade", path: "por_departamento" },
-    pending: true,
+    span: 2,
+    chart: { tipo: "barras", fonte: "lista", rotulo: "nome", valor: "pct" },
   },
-  /** Componente próprio, com hook próprio: não lê campo de bloco nenhum. */
+  /** ⚠️ `pending` de propósito. Os dois têm componente e hook próprios, mas o
+   *  hook lê `AtendimentoFilterContext`, que NÃO é montado no Dashboard: o
+   *  gráfico apareceria com o filtro padrão do contexto, ignorando em
+   *  silêncio o filtro da seção. Mentira visual é pior que ausência. Saem de
+   *  pending quando ganharem versão que recebe filtro por propriedade. */
   {
     id: "at.velocidade_timeline",
     area: "atendimento",
@@ -174,8 +181,7 @@ export const atendimento: CatalogEntry[] = [
     label: "Velocidade ao longo do tempo",
     format: "duration",
     source: { provider: "atendimento.velocidade_timeline", path: "self" },
-    span: 4,
-    render: "VelocidadeTimeline",
+    pending: true,
   },
   {
     id: "at.latencia_histograma",
@@ -184,8 +190,7 @@ export const atendimento: CatalogEntry[] = [
     label: "Distribuição de latência",
     format: "integer",
     source: { provider: "atendimento.latencia", path: "self" },
-    span: 2,
-    render: "LatenciaHistograma",
+    pending: true,
   },
 
   // ---------- Tempo real ----------
@@ -288,7 +293,8 @@ export const atendimento: CatalogEntry[] = [
     label: "Envelhecimento do backlog",
     format: "integer",
     source: { provider: "atendimento.backlog", path: "aging" },
-    pending: true,
+    span: 2,
+    chart: { tipo: "barras", fonte: "mapa" },
   },
   {
     id: "at.backlog_por_prioridade",
@@ -297,7 +303,8 @@ export const atendimento: CatalogEntry[] = [
     label: "Backlog por prioridade",
     format: "integer",
     source: { provider: "atendimento.backlog", path: "por_prioridade" },
-    pending: true,
+    span: 2,
+    chart: { tipo: "barras", fonte: "lista", rotulo: "prioridade", valor: "qtd" },
   },
 
   // ---------- Agentes ----------
@@ -344,7 +351,8 @@ export const atendimento: CatalogEntry[] = [
     label: "Ranking de agentes",
     format: "integer",
     source: { provider: "atendimento.agentes", path: "agentes" },
-    pending: true,
+    span: 3,
+    chart: { tipo: "barras", fonte: "lista", rotulo: "nome", valor: "encerrados", limite: 8 },
   },
 
   // ---------- Satisfação ----------
@@ -395,7 +403,8 @@ export const atendimento: CatalogEntry[] = [
     helpKey: "atendimento_csat_media",
     format: "integer",
     source: { provider: "atendimento.satisfacao", path: "distribuicao" },
-    pending: true,
+    span: 2,
+    chart: { tipo: "barras", fonte: "lista", rotulo: "score", valor: "qtd" },
   },
 
   // ---------- URA ----------
@@ -473,7 +482,8 @@ export const atendimento: CatalogEntry[] = [
     helpKey: "atendimento_tax_categoria",
     format: "integer",
     source: { provider: "atendimento.taxonomia", path: "por_categoria" },
-    pending: true,
+    span: 3,
+    chart: { tipo: "barras", fonte: "lista", rotulo: "nome", valor: "qtd", limite: 8 },
   },
   {
     id: "at.tax_heatmap",
@@ -491,7 +501,8 @@ export const atendimento: CatalogEntry[] = [
     label: "Maiores ofensores",
     format: "integer",
     source: { provider: "atendimento.taxonomia", path: "ofensores" },
-    pending: true,
+    span: 3,
+    chart: { tipo: "barras", fonte: "lista", rotulo: "nome", valor: "qtd", limite: 8 },
   },
 
   // ---------- Clientes ----------

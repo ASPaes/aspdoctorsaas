@@ -44,12 +44,17 @@ describe("kpiCatalog — invariantes", () => {
     expect(fora).toEqual([]);
   });
 
-  it("gráfico disponível declara span e render; card não declara nenhum dos dois", () => {
+  /** Um gráfico disponível precisa de largura e de UM jeito de desenhar:
+   *  ou `chart` (barras/linha montadas pelo painel) ou `render` (componente
+   *  próprio). Sem isso ele apareceria selecionável e não desenharia nada. */
+  it("gráfico disponível declara span e como desenhar; card não declara nenhum", () => {
     const graficoIncompleto = kpiCatalog
-      .filter((e) => e.kind === "chart" && !e.pending && (!e.span || !e.render))
+      .filter((e) => e.kind === "chart" && !e.pending)
+      .filter((e) => !e.span || (!e.chart && !e.render))
       .map((e) => e.id);
     const cardComSobra = kpiCatalog
-      .filter((e) => e.kind === "card" && (e.span !== undefined || e.render !== undefined))
+      .filter((e) => e.kind === "card")
+      .filter((e) => e.span !== undefined || e.render !== undefined || e.chart !== undefined)
       .map((e) => e.id);
     expect({ graficoIncompleto, cardComSobra }).toEqual({
       graficoIncompleto: [],

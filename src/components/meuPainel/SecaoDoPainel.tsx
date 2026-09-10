@@ -3,6 +3,7 @@ import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { Skeleton } from "@/components/ui/skeleton";
 import { entradaPorId, type CatalogEntry } from "@/lib/kpiCatalog";
 import { resolverIndicador } from "@/lib/valorDoIndicador";
+import { GraficoDoPainel } from "./GraficoDoPainel";
 import type { LayoutSecao } from "@/lib/dashboardLayout";
 import { normalizarFiltros, type FiltrosSecao } from "./filtrosDaSecao";
 import { FiltrosDaSecaoBar } from "./FiltrosDaSecaoBar";
@@ -74,6 +75,20 @@ function GradeDeItens({
   return (
     <div className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
       {entradas.map((entrada) => {
+        if (entrada.kind === "chart") {
+          /** O gráfico ocupa 2, 3 ou 4 colunas da grade de 4. As classes
+           *  estão escritas por extenso porque o Tailwind varre o código
+           *  procurando o nome inteiro — `col-span-${n}` nunca chega no CSS. */
+          const largura =
+            entrada.span === 4 ? "col-span-2 md:col-span-4"
+              : entrada.span === 3 ? "col-span-2 md:col-span-3"
+                : "col-span-2";
+          return (
+            <div key={entrada.id} className={largura}>
+              <GraficoDoPainel entrada={entrada} dados={dados[entrada.source.provider]} />
+            </div>
+          );
+        }
         const { texto, numero } = resolverIndicador(entrada, dados[entrada.source.provider]);
         return (
           <KPICardEnhanced

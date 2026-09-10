@@ -198,7 +198,8 @@ export const financeiro: CatalogEntry[] = [
     helpKey: "mrr_snapshot",
     format: "currency",
     source: { provider: "financeiro.visao_geral", path: "mrrSeries" },
-    pending: true,
+    span: 4,
+    chart: { tipo: "linha", fonte: "lista", rotulo: "dataCorte", valor: "mrr" },
   },
 
   // ---------- Crescimento ----------
@@ -588,6 +589,7 @@ export const financeiro: CatalogEntry[] = [
     label: "Principais motivos de cancelamento",
     format: "integer",
     source: { provider: "financeiro.cancelamentos", path: "topMotivos" },
-    pending: true,
+    span: 3,
+    chart: { tipo: "barras", fonte: "lista", rotulo: "motivo", valor: "qtd", limite: 8 },
   },
 ];

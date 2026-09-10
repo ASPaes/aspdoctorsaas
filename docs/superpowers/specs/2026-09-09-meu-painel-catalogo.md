@@ -2,15 +2,15 @@
 
 Gerado de `src/lib/kpiCatalog/`. Total: **176** itens.
 
-150 indicadores · 26 gráficos, dos quais 24 aguardam componente próprio do painel.
+150 indicadores · 26 gráficos, dos quais 11 aguardam componente próprio do painel.
 
 ## Resumo por área
 
 | Área | Indicadores | Gráficos | Aguardando |
 |---|---:|---:|---:|
-| Atendimento | 41 | 13 | 11 |
-| Financeiro / MRR | 57 | 6 | 6 |
-| Customer Success | 23 | 4 | 4 |
+| Atendimento | 41 | 13 | 4 |
+| Financeiro / MRR | 57 | 6 | 4 |
+| Customer Success | 23 | 4 | 0 |
 | Implantação | 23 | 3 | 3 |
 | Certificados A1 | 6 | 0 | 0 |
 
@@ -23,9 +23,9 @@ Gerado de `src/lib/kpiCatalog/`. Total: **176** itens.
 | Clientes recorrentes | indicador | Atendimentos de contatos que falam pela primeira vez (novos) vs que já tinham contato anterior (recorrentes). | `atendimento.volume.recorrentes` | pronto |
 | Atendimentos proativos | indicador | Quem iniciou: a empresa (agente, operador, automação, ticket = proativo) ou o cliente (customer, fora do horário = reativo). | `atendimento.volume.proativo` | pronto |
 | Atendimentos reativos | indicador | Quem iniciou: a empresa (agente, operador, automação, ticket = proativo) ou o cliente (customer, fora do horário = reativo). | `atendimento.volume.reativo` | pronto |
-| Atendimentos por canal | gráfico |  | `atendimento.volume.canais` | aguarda gráfico |
+| Atendimentos por canal | gráfico |  | `atendimento.volume.canais` | sem texto de ajuda |
 | Mapa de calor semanal | gráfico |  | `atendimento.volume.heatmap` | aguarda gráfico |
-| Principais motivos de contato | gráfico | Tags de assunto mais frequentes (geradas por IA a partir do conteúdo do atendimento). | `atendimento.volume.top_motivos` | aguarda gráfico |
+| Principais motivos de contato | gráfico | Tags de assunto mais frequentes (geradas por IA a partir do conteúdo do atendimento). | `atendimento.volume.top_motivos` | pronto |
 | TME | indicador | Quanto tempo o cliente fica na fila até um agente assumir. Conta tanto quem assume pela tela quanto quem responde direto pelo WhatsApp do celular. Mostramos a mediana (p50) e a cauda (p90). | `atendimento.velocidade.tme_p50` | pronto |
 | 1ª Resposta | indicador | Tempo até a primeira resposta de um agente ao cliente — pela tela ou pelo WhatsApp do celular, conta igual. A saudação automática não conta. Mediana (p50) e cauda (p90). | `atendimento.velocidade.frt_p50` | pronto |
 | TMA | indicador | Tempo ativo do atendimento, de quando o agente assume até encerrar. Mediana (p50) e p90. | `atendimento.velocidade.tma_p50` | pronto |
@@ -33,9 +33,9 @@ Gerado de `src/lib/kpiCatalog/`. Total: **176** itens.
 | % dentro do SLA | indicador | Percentual de 1ªs respostas dentro do alvo de tempo configurado. | `atendimento.velocidade.sla_pct` | pronto |
 | % SLA (horário útil) | indicador | % de 1ªs respostas dentro do alvo, medindo o tempo em horário útil — descontando o período fora do expediente entre a abertura e a resposta. | `atendimento.velocidade.sla_util_pct` | pronto |
 | Não Atendido | indicador | % de atendimentos encerrados em que o time nunca respondeu o cliente. | `atendimento.velocidade.nao_atendido_pct` | pronto |
-| SLA por setor | gráfico | Percentual de 1ªs respostas dentro do alvo de tempo configurado. | `atendimento.velocidade.por_departamento` | aguarda gráfico |
-| Velocidade ao longo do tempo | gráfico |  | `atendimento.velocidade_timeline.self` | sem texto de ajuda |
-| Distribuição de latência | gráfico |  | `atendimento.latencia.self` | sem texto de ajuda |
+| SLA por setor | gráfico | Percentual de 1ªs respostas dentro do alvo de tempo configurado. | `atendimento.velocidade.por_departamento` | pronto |
+| Velocidade ao longo do tempo | gráfico |  | `atendimento.velocidade_timeline.self` | aguarda gráfico |
+| Distribuição de latência | gráfico |  | `atendimento.latencia.self` | aguarda gráfico |
 | Fila Agora | indicador | Conversas aguardando atendimento neste momento, dentro do horário comercial e ainda sem agente. | `atendimento.tempo_real.fila` | pronto |
 | Espera Mais Antiga | indicador | Há quanto tempo aguarda o cliente que está esperando há mais tempo na fila. | `atendimento.tempo_real.espera_mais_antigo_seg` | pronto |
 | Em Atendimento | indicador | Conversas sendo atendidas agora por um agente. | `atendimento.tempo_real.em_atendimento` | pronto |
@@ -46,18 +46,18 @@ Gerado de `src/lib/kpiCatalog/`. Total: **176** itens.
 | Órfãos | indicador | Tickets abertos sem responsável atribuído. | `atendimento.backlog.orfaos` | pronto |
 | Parados (>7d) | indicador | Tickets abertos sem nenhuma atualização há mais de 7 dias. | `atendimento.backlog.parados` | pronto |
 | Vencidos | indicador | Tickets abertos que já passaram da previsão de encerramento (previsao_encerramento). | `atendimento.backlog.vencidos` | pronto |
-| Envelhecimento do backlog | gráfico |  | `atendimento.backlog.aging` | aguarda gráfico |
-| Backlog por prioridade | gráfico |  | `atendimento.backlog.por_prioridade` | aguarda gráfico |
+| Envelhecimento do backlog | gráfico |  | `atendimento.backlog.aging` | sem texto de ajuda |
+| Backlog por prioridade | gráfico |  | `atendimento.backlog.por_prioridade` | sem texto de ajuda |
 | Encerrados no Período | indicador | Total de atendimentos encerrados pela equipe no período selecionado. | `atendimento.agentes.total_encerrados` | pronto |
 | Agentes Ativos | indicador | Número de agentes que atenderam ao menos um chat no período. | `atendimento.agentes.agentes_ativos` | pronto |
 | CSAT da Equipe | indicador | Nota média de satisfação dos atendimentos avaliados no período. | `atendimento.agentes.csat_equipe` | pronto |
 | Taxa de Reabertura | indicador | % dos atendimentos encerrados que foram reabertos (o problema voltou). | `atendimento.agentes.reabertura_equipe_pct` | pronto |
-| Ranking de agentes | gráfico |  | `atendimento.agentes.agentes` | aguarda gráfico |
+| Ranking de agentes | gráfico |  | `atendimento.agentes.agentes` | sem texto de ajuda |
 | CSAT Médio | indicador | Nota média de satisfação das avaliações respondidas no período (escala 0–5). | `atendimento.satisfacao.media` | pronto |
 | Taxa de Resposta | indicador | % das pesquisas de CSAT enviadas que foram respondidas. | `atendimento.satisfacao.response_rate_pct` | pronto |
 | Divergência CSAT × Sentimento | indicador | Atendimentos com sentimento negativo que mesmo assim receberam nota alta (≥4). | `atendimento.satisfacao.div_neg_nota_alta` | pronto |
 | Atendeu na Hora | indicador | % de atendimentos encerrados resolvidos sem reabertura e sem virar ticket. | `atendimento.satisfacao.atendeu_na_hora_pct` | pronto |
-| Distribuição das notas | gráfico | Nota média de satisfação das avaliações respondidas no período (escala 0–5). | `atendimento.satisfacao.distribuicao` | aguarda gráfico |
+| Distribuição das notas | gráfico | Nota média de satisfação das avaliações respondidas no período (escala 0–5). | `atendimento.satisfacao.distribuicao` | pronto |
 | URAs Enviadas | indicador | Atendimentos em que o menu automático (URA) foi enviado ao cliente. | `atendimento.ura.enviadas` | pronto |
 | URA Concluída | indicador | % das URAs enviadas em que o cliente navegou o menu e foi roteado. | `atendimento.ura.completadas_pct` | pronto |
 | Timeout / Fallback | indicador | % das URAs enviadas em que o cliente não respondeu e caiu direto para o humano. | `atendimento.ura.timeout_pct` | pronto |
@@ -65,9 +65,9 @@ Gerado de `src/lib/kpiCatalog/`. Total: **176** itens.
 | Total de Tickets | indicador | Tickets abertos no período (mundo de tickets, não chats). | `atendimento.taxonomia.total` | pronto |
 | Produtos com Tickets | indicador | Distribuição dos tickets pelo produto associado. | `atendimento.taxonomia.por_produto` | pronto |
 | Categorias Ativas | indicador | Distribuição dos tickets por categoria de serviço, com peso (%) no total. | `atendimento.taxonomia.por_categoria` | pronto |
-| Tickets por categoria | gráfico | Distribuição dos tickets por categoria de serviço, com peso (%) no total. | `atendimento.taxonomia.por_categoria` | aguarda gráfico |
+| Tickets por categoria | gráfico | Distribuição dos tickets por categoria de serviço, com peso (%) no total. | `atendimento.taxonomia.por_categoria` | pronto |
 | Mapa de calor de tickets | gráfico |  | `atendimento.taxonomia.heatmap` | aguarda gráfico |
-| Maiores ofensores | gráfico |  | `atendimento.taxonomia.ofensores` | aguarda gráfico |
+| Maiores ofensores | gráfico |  | `atendimento.taxonomia.ofensores` | sem texto de ajuda |
 | Clientes atendidos | indicador | Quantidade de clientes distintos com pelo menos um chat ou ticket no período (apenas atendimentos com cliente vinculado). | `atendimento.clientes.totais.clientes` | pronto |
 | MRR coberto | indicador | Soma do MRR ativo (cliente_produtos.vlr_mensal onde ativo=true) dos clientes que apareceram no atendimento no período. | `atendimento.clientes.totais.mrr_coberto` | pronto |
 | Risco alto | indicador | Contagem de até 4 sinais de risco por cliente: (1) densidade de suporte acima de N× a média do tenant, (2) % de chats com sentimento negativo acima do limiar, (3) reincidência de categorias de ticket, (4) CSAT médio abaixo do limiar (só quando há nota suficiente). 0 = Baixo, 1–2 = Médio, 3–4 = Alto. | `atendimento.clientes.totais.risco_alto` | pronto |
@@ -95,7 +95,7 @@ Gerado de `src/lib/kpiCatalog/`. Total: **176** itens.
 | CAC | indicador |  | `financeiro.dashboard.cac` | sem texto de ajuda |
 | Margem de contribuição | indicador |  | `financeiro.dashboard.margemContribuicao` | sem texto de ajuda |
 | Receita por funcionário | indicador |  | `financeiro.dashboard.revenuePerFuncionario` | sem texto de ajuda |
-| Evolução do MRR · 12 meses | gráfico | Receita mensal recorrente total dos clientes ativos neste momento. | `financeiro.visao_geral.mrrSeries` | aguarda gráfico |
+| Evolução do MRR · 12 meses | gráfico | Receita mensal recorrente total dos clientes ativos neste momento. | `financeiro.visao_geral.mrrSeries` | pronto |
 | Net New MRR | indicador | Variação líquida da receita recorrente no período — quanto o MRR cresceu ou encolheu. | `financeiro.dashboard.netNewMrr` | pronto |
 | Growth Rate MoM | indicador | Taxa de crescimento do MRR mês a mês. | `financeiro.crescimento.growthRateMoM` | pronto |
 | Growth Rate QoQ | indicador |  | `financeiro.crescimento.growthRateQoQ` | sem texto de ajuda |
@@ -139,7 +139,7 @@ Gerado de `src/lib/kpiCatalog/`. Total: **176** itens.
 | CAC perdido | indicador |  | `financeiro.cancelamentos.cacPerdido` | sem texto de ajuda |
 | Churn por categoria | gráfico |  | `financeiro.cancelamentos.categorias` | aguarda gráfico |
 | Churn por tempo de casa | gráfico |  | `financeiro.cancelamentos.buckets` | aguarda gráfico |
-| Principais motivos de cancelamento | gráfico |  | `financeiro.cancelamentos.topMotivos` | aguarda gráfico |
+| Principais motivos de cancelamento | gráfico |  | `financeiro.cancelamentos.topMotivos` | sem texto de ajuda |
 
 ## Customer Success
 
@@ -153,20 +153,20 @@ Gerado de `src/lib/kpiCatalog/`. Total: **176** itens.
 | % Higiene | indicador | Percentual de tickets abertos que possuem próxima ação E data de follow-up preenchidas. | `cs.dashboard.percentHigiene` | pronto |
 | Tempo até a 1ª ação | indicador |  | `cs.dashboard.tempoAteAcaoMediana` | sem texto de ajuda |
 | Tempo até a conclusão | indicador |  | `cs.dashboard.tempoAteConclusaoMediana` | sem texto de ajuda |
-| Tickets por situação | gráfico |  | `cs.dashboard.backlogPorStatus` | aguarda gráfico |
-| Tickets por prioridade | gráfico |  | `cs.dashboard.backlogPorPrioridade` | aguarda gráfico |
+| Tickets por situação | gráfico |  | `cs.dashboard.backlogPorStatus` | sem texto de ajuda |
+| Tickets por prioridade | gráfico |  | `cs.dashboard.backlogPorPrioridade` | sem texto de ajuda |
 | Clientes em Risco | indicador | Clientes com tickets de tipo 'Risco de Churn' abertos ou em andamento. | `cs.dashboard.clientesEmRisco` | pronto |
 | MRR em Risco | indicador | Soma do MRR dos clientes com tickets de risco de churn abertos. | `cs.dashboard.mrrEmRisco` | pronto |
 | MRR Recuperado | indicador | MRR de clientes que estavam em risco e foram retidos (ticket concluído como retido). | `cs.dashboard.mrrRecuperado` | pronto |
 | % de risco com plano de ação | indicador |  | `cs.dashboard.percentRiscoComPlano` | sem texto de ajuda |
-| Desfecho dos clientes em risco | gráfico |  | `cs.dashboard.resultadoRisco` | aguarda gráfico |
+| Desfecho dos clientes em risco | gráfico |  | `cs.dashboard.resultadoRisco` | sem texto de ajuda |
 | Clientes Ativos | indicador | Quantidade total de clientes que não estão cancelados. | `cs.dashboard.cobertura90d.totalAtivos` | pronto |
 | % Cobertura 90D | indicador | Percentual de clientes ativos que tiveram ao menos um contato (ticket) nos últimos 90 dias. | `cs.dashboard.cobertura90d.percentCoberto` | pronto |
 | Descobertos | indicador | Clientes ativos que não tiveram nenhum contato (ticket) nos últimos 90 dias. | `cs.dashboard.cobertura90d.descobertos` | pronto |
 | Indicações ganhas | indicador |  | `cs.dashboard.indicacoesGanhas` | sem texto de ajuda |
 | Indicações perdidas | indicador |  | `cs.dashboard.indicacoesPerdidas` | sem texto de ajuda |
 | Conversão das indicações | indicador |  | `cs.dashboard.indicacoesConversaoPercent` | sem texto de ajuda |
-| Funil de indicações | gráfico |  | `cs.dashboard.pipelineIndicacao` | aguarda gráfico |
+| Funil de indicações | gráfico |  | `cs.dashboard.pipelineIndicacao` | sem texto de ajuda |
 | Oportunidades abertas | indicador |  | `cs.dashboard.oportunidadesAbertas` | sem texto de ajuda |
 | Oportunidades ganhas | indicador |  | `cs.dashboard.oportunidadesGanhas` | sem texto de ajuda |
 | Conversão das oportunidades | indicador |  | `cs.dashboard.oportunidadesConversaoPercent` | sem texto de ajuda |
