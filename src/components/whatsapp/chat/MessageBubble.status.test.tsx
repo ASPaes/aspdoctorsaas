@@ -129,9 +129,24 @@ describe('MessageBubble — mensagem de grupo que ficou retida (DEM-0373)', () =
     expect(achaTituloExplicativo()).toBeUndefined();
   });
 
-  it('erro que chegou dentro dos 10 min nao e retencao, volta para o ✓ atenuado', () => {
+  it('quem decide e o backend: a tela marca qualquer erro tardio que ele tenha absolvido', () => {
+    // 3 min de atraso. A tela marca assim mesmo, e isso NAO e bug: em grupo,
+    // `pending` + `last_error_at` so existe porque a verify-failed-deliveries
+    // absolveu (erro imediato vira `failed`, e antes da decisao a linha esta em
+    // `error`). Refazer o corte de 10 min aqui era ter dois lugares decidindo o
+    // mesmo, e o dia em que um mudasse sozinho produziria mensagem absolvida no
+    // backend que a tela nao marcaria, calada. Se o corte mudar la, a tela segue.
     const tresMin = new Date(Date.parse('2026-08-31T19:24:50.845Z') + 3 * 60000).toISOString();
     render(<MessageBubble msg={mensagem({ last_error_at: tresMin })} isGroup />);
+
+    const marca = achaMarcaDeRetencao();
+    expect(marca).toBeDefined();
+    expect(marca?.getAttribute('title')).toContain('3 minutos depois do envio');
+  });
+
+  it('carimbo invertido (erro antes do envio) nao marca nada', () => {
+    const antes = new Date(Date.parse('2026-08-31T19:24:50.845Z') - 60000).toISOString();
+    render(<MessageBubble msg={mensagem({ last_error_at: antes })} isGroup />);
 
     expect(achaMarcaDeRetencao()).toBeUndefined();
     expect(achaCheckFraco()).not.toBeNull();

@@ -28,9 +28,11 @@ export interface Message {
    *
    * Em grupo ele é a ÚNICA pista de que a mensagem ficou retida na fila do aparelho:
    * quando o ack chega muito depois do envio, o provedor esvaziou a fila atrasado.
-   * A `verify-failed-deliveries` não condena mais esse caso (absolve e devolve para
-   * `pending`), então o par `status='pending'` + `last_error_at` distante do
-   * `timestamp` identifica a retenção sem precisar de coluna nova.
+   *
+   * Em grupo, `status='pending'` **com** este campo preenchido é o carimbo da decisão
+   * da `verify-failed-deliveries`: só ela produz esse par, absolvendo o erro tardio.
+   * Erro imediato vira `failed`, e entre o ERROR e a decisão a linha fica em `error`.
+   * A tela lê o par como veredito pronto, sem refazer a conta e sem coluna nova.
    */
   last_error_at?: string | null;
   is_from_me: boolean;

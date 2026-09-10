@@ -240,18 +240,23 @@ export function MessageBubble({
   // DEM-0373: no caso do print, mensagens de 31/08 tiveram retorno em 08/09, 8 dias
   // depois, e chegaram ao grupo no bloco das 09:54.
   //
-  // Este par é o único jeito de identificar isso, e ele não precisa de coluna nova:
-  // a `verify-failed-deliveries` deixou de condenar o erro tardio e devolve a
-  // mensagem para `pending`, então `pending` + `last_error_at` distante do envio só
-  // acontece por esse caminho (erro imediato continua virando `failed`).
+  // A tela NÃO refaz esse julgamento, e isso é deliberado: o par
+  // `status='pending'` + `last_error_at` só existe em grupo porque a
+  // `verify-failed-deliveries` absolveu a mensagem. Erro imediato vira `failed`, e
+  // entre o ERROR chegar e a decisão sair a linha fica em `error`, nunca em
+  // `pending`. Então o par já É a decisão do backend, e basta confiar nela.
   //
-  // O corte de 10 min é o MESMO da retry-policy.ts. Se um mudar sem o outro, some o
-  // caso do meio: mensagem absolvida no backend que a tela não marcaria.
-  const RETENCAO_MS = 10 * 60 * 1000;
+  // A primeira versão daqui repetia o corte de 10 min da retry-policy.ts. Funcionava
+  // e era dívida: dois lugares decidindo a mesma coisa, e o dia em que um mudasse
+  // sozinho produziria mensagem absolvida no backend que a tela não marcaria, sem
+  // erro nenhum para denunciar. Confiar na decisão remove a classe inteira de bug em
+  // vez de documentá-la.
+  //
+  // O atraso abaixo é só para o texto. Ele não decide nada.
   const atrasoDoErroMs = semConfirmacaoEmGrupo && msg.last_error_at
     ? Date.parse(msg.last_error_at) - Date.parse(msg.timestamp)
     : NaN;
-  const ficouRetida = Number.isFinite(atrasoDoErroMs) && atrasoDoErroMs > RETENCAO_MS;
+  const ficouRetida = Number.isFinite(atrasoDoErroMs) && atrasoDoErroMs > 0;
 
   // `formatDuration` do timeFormatters não serve aqui: ela para em horas, e estes
   // atrasos chegam a dias ("191h 24min" não comunica). Mexer nela mudaria a saída
