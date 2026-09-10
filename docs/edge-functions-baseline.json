@@ -1,5 +1,5 @@
 {
-  "capturado_em": "2026-09-09T23:53:00.345Z",
+  "capturado_em": "2026-09-10T00:49:33.430Z",
   "project_ref": "vbngjzovjhkmietztffo",
   "motivo": "atualizacao manual",
   "functions": {
@@ -214,14 +214,14 @@
       "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "oem-espelho-sync": {
-      "sha": "31f0cbca628b758bce7170f856c35f883ab4c7e8520c66ef1972969592340fe0",
-      "version": 76,
-      "updated_at": "2026-09-09T02:41:20.253Z"
+      "sha": "1d9b5fb9717634b31f224aca5a4a347b3585efceb312856ca5ba147a3b9da550",
+      "version": 77,
+      "updated_at": "2026-09-10T00:24:14.121Z"
     },
     "oem-licenca-estado": {
-      "sha": "8d2e904b2de7028ad14ec68c140f0e3f72e9a3f82ac6d4f4e603a103b63a0d95",
-      "version": 23,
-      "updated_at": "2026-09-09T23:51:59.815Z"
+      "sha": "64c4e1762e2be29e700d58295f20ebe10b5f6cd95deee721ce64cf90af895ccd",
+      "version": 24,
+      "updated_at": "2026-09-10T00:24:18.712Z"
     },
     "oem-sync-processar": {
       "sha": "76d8a4b50142ea4aa0c68de74a16375d0bb94b2d674d0e6ba9d6531a38b0adb2",
@@ -444,9 +444,9 @@
       "updated_at": "2026-09-09T02:41:20.253Z"
     },
     "verify-failed-deliveries": {
-      "sha": "22f5ed310e9eaaf5f3beb22dc93df986aa8c3341bd1e9596572c3fa6aa85226b",
-      "version": 61,
-      "updated_at": "2026-09-09T02:41:20.253Z"
+      "sha": "313a60bd87f4280952ad1a1cc9db38a81f2590656576293fcbdf1fcf7a24bd22",
+      "version": 62,
+      "updated_at": "2026-09-10T00:48:48.016Z"
     },
     "watchdog-instance-silence": {
       "sha": "2633903533365c6ff40bc19d08312dbc2100dd3333075d4af953e9a3334f3a20",
