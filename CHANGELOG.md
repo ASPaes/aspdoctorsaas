@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 10/09
+
+- ⬆️ **A tela de Tickets passa a lembrar os filtros que você deixou escolhidos** — A cada visita a **Atendimento › Tickets** os filtros voltavam ao padrão: estado em "Todos", ordenação em "Mais recentes", agente em "Todos os agentes", e o setor voltava sozinho para o do seu cadastro. Quem trabalha o dia inteiro numa combinação só, por exemplo os tickets abertos de um agente, tinha que remontá-la toda vez que entrava na tela. Agora a plataforma guarda a última seleção e reabre a tela exatamente assim: estado, ordenação, agente, setor, a visualização escolhida (Lista, Kanban, Atendimentos ou Pendentes) e também tudo que estiver marcado dentro do botão **Filtros**, incluindo os filtros da aba de Atendimentos. A memória é por pessoa e por navegador, então em computador compartilhado ninguém herda a seleção do outro. Continuam começando limpos, de propósito, o período, a busca e o filtro de Cliente: guardar um período com data fixa faria a tela abrir vazia dias depois, e busca e cliente são recortes pontuais que esconderiam quase tudo sem motivo aparente. Se um filtro salvo deixar de existir, como um agente desligado ou uma etiqueta apagada, ele é descartado sozinho e a tela abre sem ele.
+
 ### 09/09
 
 - 🔧 **O aviso de mensagem nova só sumia da lista alguns segundos depois de abrir a conversa** — Ao clicar num chat com mensagem nova, o contador verde do card e o número vermelho em cima das abas continuavam acesos por vários segundos, às vezes só saindo com F5. A leitura era registrada na hora, mas a lista esperava o servidor avisar de volta que aquilo tinha acontecido, e esse retorno pode demorar quando o sistema está sob carga. Agora o aviso some no próprio clique, e o número das abas é atualizado junto quando havia mesmo algo por ler. Vale igual para conversa individual e para grupo.
