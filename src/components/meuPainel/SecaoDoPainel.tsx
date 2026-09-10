@@ -181,7 +181,10 @@ export function SecaoDoPainel({
 
   return (
     <section className="mt-5 rounded-xl border border-border bg-card/40">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+      {/* Título e filtros em LINHAS separadas. Na mesma linha, com
+          `justify-between` e `flex-wrap`, os filtros somem para fora quando o
+          nome da seção é comprido ou a janela é estreita. */}
+      <header className="space-y-2 border-b border-border px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold">{secao.nome}</h3>
           {areas.map((a) => (
