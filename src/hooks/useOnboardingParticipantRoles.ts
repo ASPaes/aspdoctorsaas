@@ -8,6 +8,8 @@ export interface OnboardingParticipantRole {
   cor: string;
   ativo: boolean;
   position: number;
+  /** Setor cujos membros entram na jornada com este papel. NULL = não resolve por setor. */
+  department_id: string | null;
 }
 
 export const ONBOARDING_ROLES_QUERY_KEY = "onb-participant-roles";
@@ -26,7 +28,7 @@ export function useOnboardingParticipantRoles(
     enabled: (opts?.enabled ?? true) && !!tenantId,
     queryFn: async () => {
       let q = (supabase.from("onboarding_participant_roles" as any) as any)
-        .select("id, nome, slug, cor, ativo, position")
+        .select("id, nome, slug, cor, ativo, position, department_id")
         .eq("tenant_id", tenantId)
         .order("position");
       if (somenteAtivos) q = q.eq("ativo", true);
