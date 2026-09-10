@@ -264,6 +264,29 @@ export const useWhatsAppMessages = (
       // acabou de abrir e o badge tem que sumir na hora.
       clearUnreadCount(conversationId);
 
+      // ...mas "imediato" era só a ESCRITA. O badge da sidebar e o número
+      // sobrescrito das pills vinham do cache, e quem os atualizava era o eco do
+      // Realtime desse mesmo UPDATE. Como `whatsapp_conversations` está na
+      // publication, esse eco paga a fila de decodificação de WAL (pico medido de
+      // 12,9 s em 04/08/2026): o atendente abria a conversa, lia tudo, e o badge
+      // continuava aceso até o eco chegar ou até um F5. O caminho irmão — mensagem
+      // que chega COM a conversa aberta — já não tinha esse problema, porque
+      // `patchConversationPreview(..., isViewing=true)` zera no cache na hora.
+      // Aqui fazemos o mesmo para o momento de abrir.
+      let tinhaNaoLida = false;
+      patchConversationInCache(queryClient, conversationId, (prev) => {
+        if ((prev.unread_count || 0) > 0) tinhaNaoLida = true;
+        return { unread_count: 0 };
+      });
+
+      // As pills são agregado do servidor (`whatsapp_pill_counts`), não dá para
+      // patchar sem saber em quais buckets a conversa cai. Refetch, então — mas
+      // só quando havia o que baixar. Abrir conversa já lida é o caso comum e
+      // segue sem custo nenhum, mesma disciplina do dismiss de notificações abaixo.
+      if (tinhaNaoLida) {
+        queryClient.invalidateQueries({ queryKey: ['whatsapp', 'pill-counts'] });
+      }
+
       // Dispensar todas as notificações dessa conversa (sino).
       //
       // A RPC devolve QUANTAS foram dispensadas — e só invalidamos se houve
