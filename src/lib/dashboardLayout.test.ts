@@ -125,6 +125,13 @@ describe("separarConhecidos", () => {
   });
 });
 
+describe("padrão da seção", () => {
+  it("seção nova nasce em 'Mês atual', não em 'hoje'", async () => {
+    const { FILTROS_PADRAO } = await import("@/components/meuPainel/filtrosDaSecao");
+    expect(FILTROS_PADRAO.periodo).toBe("mes_atual");
+  });
+});
+
 describe("resolverPeriodo", () => {
   const agora = new Date(2026, 8, 9, 15, 30, 0); // 09/09/2026 15:30 local
 

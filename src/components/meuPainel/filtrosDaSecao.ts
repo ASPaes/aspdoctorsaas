@@ -27,7 +27,12 @@ export interface FiltrosSecao {
 }
 
 export const FILTROS_PADRAO: FiltrosSecao = {
-  periodo: "hoje",
+  /** "Mês atual" e não "hoje", decidido pelo Alexandre em 10/09/2026: com
+   *  "hoje" todo indicador de FLUXO — novos clientes, cancelamentos, New MRR,
+   *  volume de atendimento — abre zerado de manhã, e um painel que abre
+   *  zerado parece quebrado. Os de FOTO (MRR, ARR, clientes ativos) mostram o
+   *  mesmo nos dois. */
+  periodo: "mes_atual",
   departmentId: null,
   agentId: null,
   tipoAtendimento: "all",
