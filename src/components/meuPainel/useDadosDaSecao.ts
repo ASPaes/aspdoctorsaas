@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -181,7 +182,26 @@ export function filtrosDashboardDaSecao(
  *  gate dentro dos hooks originais. */
 export function useDadosFinanceiro(filtros: FiltrosSecao): DadosDaSecao & { carregando: boolean } {
   const { selectedUnidadeId } = useUnidadeFilter();
-  const filters = filtrosDashboardDaSecao(filtros, selectedUnidadeId ?? null);
+
+  /** ⚠️ Este useMemo NÃO é otimização, é o que impede um loop infinito.
+   *  `useDashboardData` guarda o fetch num useCallback com `[filters]` na
+   *  dependência e dispara por useEffect. Objeto novo a cada render =
+   *  efeito dispara = setLoading(true) = render = objeto novo. O painel
+   *  ficava preso no esqueleto martelando o banco.
+   *
+   *  As dependências são primitivas de propósito: data em milissegundo e a
+   *  lista de fornecedores serializada. */
+  const { from, to } = intervaloDaSecao(filtros);
+  const deInicio = from.getTime();
+  const deFim = to.getTime();
+  const chaveFornecedores = filtros.fornecedorIds.join(",");
+  const unidade = selectedUnidadeId ?? null;
+
+  const filters = useMemo(
+    () => filtrosDashboardDaSecao(filtros, unidade),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [deInicio, deFim, chaveFornecedores, unidade],
+  );
 
   const { loading, metrics } = useDashboardData(filters);
   const visaoGeral = useVisaoGeralExtras(filters);

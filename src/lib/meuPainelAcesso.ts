@@ -1,8 +1,9 @@
 /** Quem enxerga o módulo "Meu Painel".
  *
- *  PILOTO FECHADO, decidido pelo Alexandre em 09/09/2026: só ASP e Digi
- *  Office, até ele aprovar o módulo inteiro. Para liberar geral, basta
- *  `TENANTS_LIBERADOS = null`.
+ *  PILOTO FECHADO. Em 09/09/2026 o Alexandre pediu ASP + Digi Office; em
+ *  10/09/2026, ao publicar, reduziu para **só a ASP**. Para liberar geral,
+ *  basta `TENANTS_LIBERADOS = null`; para incluir a Digi Office de volta, o
+ *  id dela é `955178ba-b367-498d-8443-cc5b7d1ee163`.
  *
  *  Por que lista no código e não uma flag em `tenants` (como
  *  `onboarding_enabled`): a flag seria melhor engenharia, mas exige DDL em
@@ -15,7 +16,6 @@
  */
 export const TENANTS_LIBERADOS: readonly string[] | null = [
   "a0000000-0000-0000-0000-000000000001", // ASP
-  "955178ba-b367-498d-8443-cc5b7d1ee163", // Digi Office Sistemas
 ];
 
 /** Papéis que podem montar e ver o painel. Super admin passa pela flag

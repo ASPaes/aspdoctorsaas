@@ -8,8 +8,26 @@ import { SecaoDoPainel } from "./SecaoDoPainel";
 import { ConstrutorDoPainel } from "./ConstrutorDoPainel";
 
 export function MeuPainelTab() {
-  const { liberado, layout, isLoading } = useUserDashboard();
+  const { liberado, layout, isLoading, salvar } = useUserDashboard();
   const [editando, setEditando] = useState(false);
+
+  /** Mudar filtro na seção salva na hora. É a visão diária do gestor: se ele
+   *  trocou o setor hoje, amanhã tem que abrir no setor que ele deixou.
+   *  Falha de gravação não pode travar a tela — o número já mudou; o que se
+   *  perde é a lembrança, e o console registra. */
+  async function mudarFiltro(secaoId: string, campo: string, valor: unknown) {
+    const novo = {
+      ...layout,
+      secoes: layout.secoes.map((s) =>
+        s.id === secaoId ? { ...s, filtros: { ...s.filtros, [campo]: valor } } : s,
+      ),
+    };
+    try {
+      await salvar(novo);
+    } catch (e) {
+      console.error("Meu Painel: não deu para guardar o filtro da seção", e);
+    }
+  }
 
   if (!liberado) {
     return (
@@ -50,7 +68,7 @@ export function MeuPainelTab() {
       ) : (
         <>
           {layout.secoes.map((s) => (
-            <SecaoDoPainel key={s.id} secao={s} />
+            <SecaoDoPainel key={s.id} secao={s} onMudarFiltro={mudarFiltro} />
           ))}
 
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-border px-4 py-3">

@@ -4,9 +4,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { entradaPorId, type CatalogEntry } from "@/lib/kpiCatalog";
 import { resolverIndicador } from "@/lib/valorDoIndicador";
 import type { LayoutSecao } from "@/lib/dashboardLayout";
-import {
-  normalizarFiltros, rotuloDoPeriodo, type FiltrosSecao,
-} from "./filtrosDaSecao";
+import { normalizarFiltros, type FiltrosSecao } from "./filtrosDaSecao";
+import { FiltrosDaSecaoBar } from "./FiltrosDaSecaoBar";
 import {
   ehProviderAtendimento, useDadosAtendimento,
   useDadosCS, useDadosCertificados, useDadosFinanceiro, type DadosDaSecao,
@@ -115,22 +114,16 @@ function DadosCertificados({ entradas, filtros }: { entradas: CatalogEntry[]; fi
   return <GradeDeItens entradas={entradas} dados={dados} carregando={carregando} />;
 }
 
-export function SecaoDoPainel({ secao }: { secao: LayoutSecao }) {
+export function SecaoDoPainel({
+  secao, onMudarFiltro,
+}: {
+  secao: LayoutSecao;
+  onMudarFiltro: (secaoId: string, campo: string, valor: unknown) => void;
+}) {
   const filtros = normalizarFiltros(secao.filtros);
   const entradas = secao.itens
     .map((i) => entradaPorId(i.id))
     .filter((e): e is CatalogEntry => !!e && !e.pending);
-
-  const rotulos: string[] = [rotuloDoPeriodo(filtros.periodo)];
-  if (filtros.departmentId) rotulos.push("Setor selecionado");
-  if (filtros.agentId) rotulos.push("Agente selecionado");
-  if (filtros.tipoAtendimento !== "all") {
-    rotulos.push(filtros.tipoAtendimento === "group" ? "Só grupos" : "Só individuais");
-  }
-  if (filtros.plantao !== "all") {
-    rotulos.push(filtros.plantao === "plantao" ? "Só plantão" : "Só horário comercial");
-  }
-  if (filtros.fornecedorIds.length > 0) rotulos.push(`${filtros.fornecedorIds.length} fornecedor(es)`);
 
   return (
     <section className="mt-5 rounded-xl border border-border bg-card/40">
@@ -145,16 +138,11 @@ export function SecaoDoPainel({ secao }: { secao: LayoutSecao }) {
             {NOME_AREA[secao.area] ?? secao.area}
           </span>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {rotulos.map((r) => (
-            <span
-              key={r}
-              className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground"
-            >
-              {r}
-            </span>
-          ))}
-        </div>
+        <FiltrosDaSecaoBar
+          area={secao.area}
+          filtros={filtros}
+          onMudar={(campo, valor) => onMudarFiltro(secao.id, campo, valor)}
+        />
       </header>
 
       {entradas.length === 0 ? (
