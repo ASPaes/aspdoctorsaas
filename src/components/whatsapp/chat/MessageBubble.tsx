@@ -234,8 +234,52 @@ export function MessageBubble({
     && msg.status !== "read" && msg.status !== "delivered"
     && msg.status !== "failed" && msg.status !== "sending";
 
+  // Dentro do "não sabemos" existe UM caso em que sabemos algo: a mensagem ficou
+  // retida na fila do aparelho. O sinal é o ack de erro que chega muito depois do
+  // envio — o provedor esvaziando a fila atrasado, normalmente num restart. Foi o
+  // DEM-0373: no caso do print, mensagens de 31/08 tiveram retorno em 08/09, 8 dias
+  // depois, e chegaram ao grupo no bloco das 09:54.
+  //
+  // Este par é o único jeito de identificar isso, e ele não precisa de coluna nova:
+  // a `verify-failed-deliveries` deixou de condenar o erro tardio e devolve a
+  // mensagem para `pending`, então `pending` + `last_error_at` distante do envio só
+  // acontece por esse caminho (erro imediato continua virando `failed`).
+  //
+  // O corte de 10 min é o MESMO da retry-policy.ts. Se um mudar sem o outro, some o
+  // caso do meio: mensagem absolvida no backend que a tela não marcaria.
+  const RETENCAO_MS = 10 * 60 * 1000;
+  const atrasoDoErroMs = semConfirmacaoEmGrupo && msg.last_error_at
+    ? Date.parse(msg.last_error_at) - Date.parse(msg.timestamp)
+    : NaN;
+  const ficouRetida = Number.isFinite(atrasoDoErroMs) && atrasoDoErroMs > RETENCAO_MS;
+
+  // `formatDuration` do timeFormatters não serve aqui: ela para em horas, e estes
+  // atrasos chegam a dias ("191h 24min" não comunica). Mexer nela mudaria a saída
+  // dos painéis de SLA que já a usam.
+  const atrasoLegivel = (() => {
+    const min = Math.round(atrasoDoErroMs / 60000);
+    if (min < 60) return `${min} minutos`;
+    const h = Math.round(min / 60);
+    if (h < 48) return `${h} hora${h !== 1 ? "s" : ""}`;
+    return `${Math.round(h / 24)} dias`;
+  })();
+
   const statusIcon = isFromMe && !isDeleted && !isPending && (
-    semConfirmacaoEmGrupo ? (
+    ficouRetida ? (
+      // Relógio de tinta cheia, e não o disco vermelho da falha: a mensagem
+      // provavelmente CHEGOU, só atrasada. Das 141 absolvidas em 14 dias, 90% tiveram
+      // resposta do cliente em 30 min, acima até das que têm entrega confirmada.
+      // Chamar isso de falha seria trocar um alarme falso por outro.
+      //
+      // Tinta cheia (6,6:1) porque aqui a marca DEVE ser vista: são ~10 casos por dia
+      // em toda a base, contra ~150 que levam o ✓ atenuado. Marca rara é marca lida.
+      <span
+        className="inline-flex cursor-help"
+        title={`Esta mensagem ficou parada na fila do aparelho: o retorno do WhatsApp só chegou ${atrasoLegivel} depois do envio. Ela pode ter chegado ao grupo com atraso.`}
+      >
+        <Clock className="h-3.5 w-3.5 text-emerald-950" />
+      </span>
+    ) : semConfirmacaoEmGrupo ? (
       // `title` nativo, e não o Tooltip do Radix: esta marca aparece em TODA mensagem
       // de saída do grupo, e a lista do chat não é virtualizada (páginas de 100 em
       // scroll infinito). Um componente de tooltip por bolha seria centenas de

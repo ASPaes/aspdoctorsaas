@@ -23,6 +23,16 @@ export interface Message {
   media_kind: string | null;
   media_purged_at: string | null;
   status: string;
+  /**
+   * Último ERROR que o provedor devolveu. Sinal, não veredito.
+   *
+   * Em grupo ele é a ÚNICA pista de que a mensagem ficou retida na fila do aparelho:
+   * quando o ack chega muito depois do envio, o provedor esvaziou a fila atrasado.
+   * A `verify-failed-deliveries` não condena mais esse caso (absolve e devolve para
+   * `pending`), então o par `status='pending'` + `last_error_at` distante do
+   * `timestamp` identifica a retenção sem precisar de coluna nova.
+   */
+  last_error_at?: string | null;
   is_from_me: boolean;
   isFromMe?: boolean;
   fromMe?: boolean;
@@ -95,7 +105,7 @@ export const normalizeMessage = (message: Partial<Message> & Record<string, any>
 const MESSAGE_SELECT = [
   'id', 'conversation_id', 'message_id', 'remote_jid', 'content', 'message_type',
   'media_url', 'media_mimetype', 'media_path', 'media_filename', 'media_ext',
-  'media_size_bytes', 'media_kind', 'media_purged_at', 'status', 'is_from_me', 'timestamp', 'edited_at',
+  'media_size_bytes', 'media_kind', 'media_purged_at', 'status', 'last_error_at', 'is_from_me', 'timestamp', 'edited_at',
   'quoted_message_id', 'mentions', 'mentions_everyone', 'metadata', 'audio_transcription', 'transcription_status',
   'sent_by_user_id', 'instance_id', 'sender_name', 'sender_role',
   'delete_status', 'delete_scope', 'delete_error',

@@ -108,3 +108,46 @@ describe("MessageBubble — ✓ de entrega", () => {
     expect(achaTituloExplicativo()).toBeUndefined();
   });
 });
+
+/** o relogio de retencao se identifica pelo texto do title, nao pela cor */
+const achaMarcaDeRetencao = () =>
+  Array.from(container.querySelectorAll('[title]')).find((el) =>
+    (el.getAttribute('title') ?? '').includes('ficou parada na fila do aparelho'),
+  );
+
+describe('MessageBubble — mensagem de grupo que ficou retida (DEM-0373)', () => {
+  // o caso real do print: enviada 31/08, retorno do provedor em 08/09
+  const OITO_DIAS_DEPOIS = '2026-09-08T12:52:32.975Z';
+
+  it('marca a mensagem e diz quanto tempo o retorno demorou', () => {
+    render(<MessageBubble msg={mensagem({ last_error_at: OITO_DIAS_DEPOIS })} isGroup />);
+
+    const marca = achaMarcaDeRetencao();
+    expect(marca).toBeDefined();
+    expect(marca?.getAttribute('title')).toContain('8 dias depois do envio');
+    // nao vira falha: a mensagem provavelmente chegou, so atrasada
+    expect(achaTituloExplicativo()).toBeUndefined();
+  });
+
+  it('erro que chegou dentro dos 10 min nao e retencao, volta para o ✓ atenuado', () => {
+    const tresMin = new Date(Date.parse('2026-08-31T19:24:50.845Z') + 3 * 60000).toISOString();
+    render(<MessageBubble msg={mensagem({ last_error_at: tresMin })} isGroup />);
+
+    expect(achaMarcaDeRetencao()).toBeUndefined();
+    expect(achaCheckFraco()).not.toBeNull();
+  });
+
+  it('mensagem de grupo sem nenhum erro segue no ✓ atenuado', () => {
+    render(<MessageBubble msg={mensagem()} isGroup />);
+
+    expect(achaMarcaDeRetencao()).toBeUndefined();
+    expect(achaCheckFraco()).not.toBeNull();
+  });
+
+  it('conversa direta nao ganha a marca, mesmo com erro antigo', () => {
+    render(<MessageBubble msg={mensagem({ last_error_at: OITO_DIAS_DEPOIS })} isGroup={false} />);
+
+    expect(achaMarcaDeRetencao()).toBeUndefined();
+    expect(achaCheckFraco()).toBeNull();
+  });
+});
