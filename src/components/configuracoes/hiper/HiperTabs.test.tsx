@@ -578,6 +578,22 @@ describe("diálogo de importação", () => {
     expect(txt).toContain("CONTA SEM CNPJ NO PORTAL");
   });
 
+  it("cabeçalho e rodapé não vazam para fora do diálogo", () => {
+    // O DialogContent aqui usa `p-0` (rolagem própria no miolo), mas o
+    // DialogHeader/DialogFooter do repo trazem `-mx-6 -mt-6 -mb-4` desde
+    // 4c6c415a: eles assumem o `p-6` do DialogContent para compensar. Sem
+    // `m-0`, o cabeçalho fica 24px ACIMA e 24px à ESQUERDA da caixa e o título
+    // sai cortado — foi o que apareceu na tela. Padrão do repo:
+    // AttendanceDetailModal.tsx:389.
+    render(<HiperImportarDialog tid="t1" contas={[semChaves]} open onOpenChange={() => {}} />);
+    const dialogo = document.querySelector('[role="dialog"]');
+    const margensNegativas = /-m[xytb]?-\d/;
+    const vazando = Array.from(dialogo?.children ?? [])
+      .map((el) => el.className)
+      .filter((c) => typeof c === "string" && margensNegativas.test(c));
+    expect(vazando).toEqual([]);
+  });
+
   it("separa as duas faixas na tela, com a contagem de cada uma", () => {
     const central: LinhaRecon = {
       ...base, id: "10", id_portal: null, cnpj_norm: null,

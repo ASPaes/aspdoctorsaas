@@ -404,8 +404,8 @@ export default function HiperImportarDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !enviando && onOpenChange(o)}>
-      <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col gap-0 p-0">
-        <DialogHeader className="px-6 pt-6 pb-4">
+      <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <DialogHeader className="m-0 shrink-0 border-b px-6 pt-6 pb-4">
           <DialogTitle>
             {checandoTudo
               ? "Importar contas do Hiper"
@@ -543,7 +543,7 @@ export default function HiperImportarDialog({
           </>)}
         </div>
 
-        <DialogFooter className="border-t px-6 py-4 sm:justify-between">
+        <DialogFooter className="m-0 shrink-0 border-t px-6 py-4 sm:justify-between">
           <span className="text-xs text-muted-foreground">
             {progresso
               ? `Enviando lote ${num(progresso.feitas + (progresso.feitas < progresso.total ? 1 : 0))} de ${num(progresso.total)}…`
