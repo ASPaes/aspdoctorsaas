@@ -27,6 +27,7 @@ import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTick
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
+import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 
 import { TicketsKanbanView } from "@/components/tickets/TicketsKanbanView";
 import { CsatReportModal } from "@/components/tickets/CsatReportModal";
@@ -128,19 +129,61 @@ function SortableDeptPill({ dept, isActive, onClick }: { dept: { id: string; nam
   );
 }
 
+/**
+ * Filtros que a tela guarda entre visitas (por usuário, em localStorage).
+ *
+ * Ficam de fora de propósito: o período (o DateRangePicker só devolve datas
+ * absolutas, então "Hoje" salvo hoje viraria uma tela vazia semana que vem),
+ * a busca e o filtro de cliente — os dois são recorte pontual e, salvos,
+ * fariam a tela abrir escondendo quase tudo sem o usuário lembrar por quê.
+ */
+type FiltrosTickets = {
+  ticketStateFilter: string;
+  sortBy: string;
+  atendenteFilter: string;
+  statusFilter: string;
+  departmentFilter: string;
+  ticketsView: string;
+  produtoFilter: string;
+  categoriaFilter: string;
+  subcategoriaFilter: string;
+  canalFilter: string;
+  tipoHorarioFilter: string;
+  ticketDevFilter: string;
+  serviceTypeFilters: string[];
+  tagFilters: string[];
+  attClosureTypeFilter: string;
+  attCsatFilter: string;
+  attCsatScoreFilter: string;
+  attTicketFilter: string;
+  attSentimentFilter: string;
+  attInstanceFilter: string;
+  attResolucaoFilter: string;
+  attTipoFilter: string;
+};
+
+const VIEWS_VALIDAS = ["lista", "kanban", "atendimentos", "pendentes"];
+
+const textoSalvo = (v: unknown, padrao: string) =>
+  typeof v === "string" && v.length > 0 ? v : padrao;
+
+const listaSalva = (v: unknown) =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+
 export default function SupportTickets() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
+  const { initial: filtrosSalvos, save: salvarFiltros } = usePersistedFilters<FiltrosTickets>("tickets-filtros");
   const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 30), to: new Date() });
-  const [produtoFilter, setProdutoFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [atendenteFilter, setAtendenteFilter] = useState<string>("all");
-  const [categoriaFilter, setCategoriaFilter] = useState<string>("all");
-  const [canalFilter, setCanalFilter] = useState<string>("all");
-  const [tipoHorarioFilter, setTipoHorarioFilter] = useState<string>("all");
-  const [subcategoriaFilter, setSubcategoriaFilter] = useState<string>("all");
-  const [ticketDevFilter, setTicketDevFilter] = useState<string>("all");
-  const [serviceTypeFilters, setServiceTypeFilters] = useState<string[]>([]);
+  const [produtoFilter, setProdutoFilter] = useState<string>(() => textoSalvo(filtrosSalvos.produtoFilter, "all"));
+  const [statusFilter, setStatusFilter] = useState<string>(() => textoSalvo(filtrosSalvos.statusFilter, "all"));
+  const [atendenteFilter, setAtendenteFilter] = useState<string>(() => textoSalvo(filtrosSalvos.atendenteFilter, "all"));
+  const [categoriaFilter, setCategoriaFilter] = useState<string>(() => textoSalvo(filtrosSalvos.categoriaFilter, "all"));
+  const [canalFilter, setCanalFilter] = useState<string>(() => textoSalvo(filtrosSalvos.canalFilter, "all"));
+  const [tipoHorarioFilter, setTipoHorarioFilter] = useState<string>(() => textoSalvo(filtrosSalvos.tipoHorarioFilter, "all"));
+  const [subcategoriaFilter, setSubcategoriaFilter] = useState<string>(() => textoSalvo(filtrosSalvos.subcategoriaFilter, "all"));
+  const [ticketDevFilter, setTicketDevFilter] = useState<string>(() => textoSalvo(filtrosSalvos.ticketDevFilter, "all"));
+  const [serviceTypeFilters, setServiceTypeFilters] = useState<string[]>(() => listaSalva(filtrosSalvos.serviceTypeFilters));
   const [search, setSearch] = useState<string>("");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -165,20 +208,23 @@ export default function SupportTickets() {
   }, [searchParams, setSearchParams]);
   const [createOpen, setCreateOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [ticketsView, setTicketsView] = useState<string>("lista");
-  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
-  const [tagFilters, setTagFilters] = useState<string[]>([]);
+  const [ticketsView, setTicketsView] = useState<string>(() => {
+    const salva = textoSalvo(filtrosSalvos.ticketsView, "lista");
+    return VIEWS_VALIDAS.includes(salva) ? salva : "lista";
+  });
+  const [departmentFilter, setDepartmentFilter] = useState<string>(() => textoSalvo(filtrosSalvos.departmentFilter, "all"));
+  const [tagFilters, setTagFilters] = useState<string[]>(() => listaSalva(filtrosSalvos.tagFilters));
   const [csatModalOpen, setCsatModalOpen] = useState(false);
-  const [ticketStateFilter, setTicketStateFilter] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<string>("recent");
-  const [attClosureTypeFilter, setAttClosureTypeFilter] = useState<string>("all");
-  const [attCsatFilter, setAttCsatFilter] = useState<string>("all");
-  const [attCsatScoreFilter, setAttCsatScoreFilter] = useState<string>("all");
-  const [attTicketFilter, setAttTicketFilter] = useState<string>("all");
-  const [attSentimentFilter, setAttSentimentFilter] = useState<string>("all");
-  const [attInstanceFilter, setAttInstanceFilter] = useState<string>("all");
-  const [attResolucaoFilter, setAttResolucaoFilter] = useState<string>("all");
-  const [attTipoFilter, setAttTipoFilter] = useState<string>("all");
+  const [ticketStateFilter, setTicketStateFilter] = useState<string>(() => textoSalvo(filtrosSalvos.ticketStateFilter, "all"));
+  const [sortBy, setSortBy] = useState<string>(() => textoSalvo(filtrosSalvos.sortBy, "recent"));
+  const [attClosureTypeFilter, setAttClosureTypeFilter] = useState<string>(() => textoSalvo(filtrosSalvos.attClosureTypeFilter, "all"));
+  const [attCsatFilter, setAttCsatFilter] = useState<string>(() => textoSalvo(filtrosSalvos.attCsatFilter, "all"));
+  const [attCsatScoreFilter, setAttCsatScoreFilter] = useState<string>(() => textoSalvo(filtrosSalvos.attCsatScoreFilter, "all"));
+  const [attTicketFilter, setAttTicketFilter] = useState<string>(() => textoSalvo(filtrosSalvos.attTicketFilter, "all"));
+  const [attSentimentFilter, setAttSentimentFilter] = useState<string>(() => textoSalvo(filtrosSalvos.attSentimentFilter, "all"));
+  const [attInstanceFilter, setAttInstanceFilter] = useState<string>(() => textoSalvo(filtrosSalvos.attInstanceFilter, "all"));
+  const [attResolucaoFilter, setAttResolucaoFilter] = useState<string>(() => textoSalvo(filtrosSalvos.attResolucaoFilter, "all"));
+  const [attTipoFilter, setAttTipoFilter] = useState<string>(() => textoSalvo(filtrosSalvos.attTipoFilter, "all"));
   const [clienteFilterId, setClienteFilterId] = useState<string | null>(null);
   const [clienteFilterName, setClienteFilterName] = useState<string>("");
   const [clienteSearchTerm, setClienteSearchTerm] = useState<string>("");
@@ -232,9 +278,11 @@ export default function SupportTickets() {
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin === true;
   const [attSearchOverride, setAttSearchOverride] = useState<string | undefined>(undefined);
 
-  // Ao abrir a tela, pré-seleciona o setor do usuário (sempre, a cada mount).
+  // Ao abrir a tela, pré-seleciona o setor do usuário — só quando não existe
+  // escolha salva. Uma troca de setor feita pelo usuário vale mais que o padrão
+  // do cadastro; senão a pill voltaria sozinha a cada visita.
   const { data: userDepartmentId } = useUserDepartment();
-  const didInitDeptRef = useRef(false);
+  const didInitDeptRef = useRef(typeof filtrosSalvos.departmentFilter === "string");
   useEffect(() => {
     if (didInitDeptRef.current) return;
     if (!userDepartmentId) return;
@@ -589,7 +637,14 @@ export default function SupportTickets() {
     [subcategories, categoriaFilter]
   );
 
+  // Trocar de categoria zera a subcategoria. O primeiro disparo é ignorado: no
+  // mount ele apagaria a subcategoria que veio salva junto com a categoria.
+  const didMountCategoriaRef = useRef(false);
   useEffect(() => {
+    if (!didMountCategoriaRef.current) {
+      didMountCategoriaRef.current = true;
+      return;
+    }
     setSubcategoriaFilter("all");
   }, [categoriaFilter]);
 
@@ -616,6 +671,78 @@ export default function SupportTickets() {
     }
     return count;
   }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, ticketDevFilter, serviceTypeFilters, tagFilters, ticketsView, attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter, attSentimentFilter, attInstanceFilter, attResolucaoFilter, attTipoFilter]);
+
+  /**
+   * Filtro salvo pode ter virado poeira entre uma visita e outra: agente
+   * desligado, categoria inativada, tag apagada, setor removido. Sem esta
+   * limpeza a tela abriria filtrando por um id que não existe mais — lista
+   * vazia e chip mostrando um UUID. Cada lista só é usada depois de carregar
+   * (vazia = ainda chegando), por isso o `length` na frente de cada teste.
+   */
+  useEffect(() => {
+    if (produtos.length && produtoFilter !== "all" && !produtos.some((p) => String(p.id) === produtoFilter)) {
+      setProdutoFilter("all");
+    }
+    if (agentes.length && atendenteFilter !== "all" && !agentes.some((a) => a.user_id === atendenteFilter)) {
+      setAtendenteFilter("all");
+    }
+    if (categories.length && categoriaFilter !== "all" && !categories.some((c) => c.id === categoriaFilter)) {
+      setCategoriaFilter("all");
+    }
+    if (subcategories.length && subcategoriaFilter !== "all" && !subcategories.some((s) => s.id === subcategoriaFilter)) {
+      setSubcategoriaFilter("all");
+    }
+    if (serviceTypes.length && serviceTypeFilters.length) {
+      const validos = serviceTypeFilters.filter((id) => serviceTypes.some((t) => t.id === id));
+      if (validos.length !== serviceTypeFilters.length) setServiceTypeFilters(validos);
+    }
+    if (availableTags.length && tagFilters.length) {
+      const validas = tagFilters.filter((id) => availableTags.some((t: any) => t.id === id));
+      if (validas.length !== tagFilters.length) setTagFilters(validas);
+    }
+    if (ticketStatuses.length && statusFilter !== "all" && !ticketStatuses.some((s) => s.id === statusFilter)) {
+      setStatusFilter("all");
+    }
+    if (supportDepartments.length && departmentFilter !== "all" && !supportDepartments.some((d) => d.id === departmentFilter)) {
+      setDepartmentFilter("all");
+    }
+    if (whatsappInstances.length && attInstanceFilter !== "all" && !whatsappInstances.some((i) => i.id === attInstanceFilter)) {
+      setAttInstanceFilter("all");
+    }
+  }, [
+    produtos, agentes, categories, subcategories, serviceTypes, availableTags, ticketStatuses,
+    supportDepartments, whatsappInstances,
+    produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, serviceTypeFilters,
+    tagFilters, statusFilter, departmentFilter, attInstanceFilter,
+  ]);
+
+  // "Pendentes" é aba de admin/head. Se o papel mudou depois da última visita,
+  // a view salva não pode abrir uma aba que o usuário não enxerga mais.
+  useEffect(() => {
+    if (ticketsView === "pendentes" && profile && !isAdminOrHead) setTicketsView("lista");
+  }, [ticketsView, profile, isAdminOrHead]);
+
+  /**
+   * Grava a seleção atual — é o que faz a tela reabrir do jeito que o usuário
+   * deixou, em vez de voltar ao padrão. Período, busca e cliente ficam de fora
+   * (ver FiltrosTickets).
+   */
+  useEffect(() => {
+    salvarFiltros({
+      ticketStateFilter, sortBy, atendenteFilter, statusFilter, departmentFilter, ticketsView,
+      produtoFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter,
+      ticketDevFilter, serviceTypeFilters, tagFilters,
+      attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter,
+      attSentimentFilter, attInstanceFilter, attResolucaoFilter, attTipoFilter,
+    });
+  }, [
+    salvarFiltros,
+    ticketStateFilter, sortBy, atendenteFilter, statusFilter, departmentFilter, ticketsView,
+    produtoFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter,
+    ticketDevFilter, serviceTypeFilters, tagFilters,
+    attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter,
+    attSentimentFilter, attInstanceFilter, attResolucaoFilter, attTipoFilter,
+  ]);
 
   const clearAdvancedFilters = () => {
     setProdutoFilter("all");

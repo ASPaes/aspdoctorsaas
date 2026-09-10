@@ -2511,6 +2511,7 @@ export type Database = {
           substituido_em: string | null
           tamanho_bytes: number
           tenant_id: string
+          tipo: string
           updated_at: string
         }
         Insert: {
@@ -2535,6 +2536,7 @@ export type Database = {
           substituido_em?: string | null
           tamanho_bytes: number
           tenant_id: string
+          tipo?: string
           updated_at?: string
         }
         Update: {
@@ -2559,6 +2561,7 @@ export type Database = {
           substituido_em?: string | null
           tamanho_bytes?: number
           tenant_id?: string
+          tipo?: string
           updated_at?: string
         }
         Relationships: [
@@ -12787,6 +12790,23 @@ export type Database = {
             Args: { p_conta_integration_id: string; p_tenant_id: string }
             Returns: Json
           }
+      contrato_anexo_adicionar: {
+        Args: {
+          p_contrato_id: string
+          p_hash_sha256: string
+          p_mime_type: string
+          p_nome_omie: string
+          p_nome_original: string
+          p_storage_path: string
+          p_tamanho_bytes: number
+          p_tipo?: string
+        }
+        Returns: Json
+      }
+      contrato_anexo_excluir: {
+        Args: { p_anexo_id: string }
+        Returns: string
+      }
       contrato_anexo_remover: {
         Args: { p_contrato_id: string }
         Returns: string

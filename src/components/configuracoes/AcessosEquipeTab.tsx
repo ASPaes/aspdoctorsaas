@@ -9,6 +9,7 @@ import {
   useUpdateUserMaxConcurrentChats,
   useUpdateUserSkills,
 } from "@/hooks/useTenantUsers";
+import { useOemIntegracaoAtiva } from "@/hooks/useOemIntegracaoAtiva";
 import {
   Tooltip,
   TooltipContent,
@@ -77,10 +78,12 @@ import {
   Link2,
   Building2,
   Puzzle,
+  History,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import { HistoricoAcessosDialog } from "./HistoricoAcessosDialog";
 
 // ========== Types ==========
 
@@ -124,6 +127,37 @@ interface Funcionario {
 // uma admin e uma head, e os outros 3 admins ficam de fora. Por isso a exceção é
 // por usuário, em user_permissions, que vence o papel.
 const RESOURCE_MODULOS = "clientes.modulos";
+// Aprovar pedido do OEM tinha o mesmo problema pelo lado oposto: o portão era
+// "admin, ponto", e a pessoa que cuida da fila na operação é head. Em vez de
+// promover alguém a admin por causa de uma aba, o acesso entra na mesma coluna.
+const RESOURCE_OEM_APROVACAO = "clientes.oem_aprovacao";
+
+type AcessoIntegracao = {
+  key: string;
+  titulo: string;
+  descricao: string;
+  // Acesso que só existe onde a integração está ligada. Desenhar a caixa em
+  // tenant sem OEM seria oferecer permissão para uma aba que nunca aparece.
+  soComOem?: boolean;
+};
+
+const ACESSOS_INTEGRACAO: AcessoIntegracao[] = [
+  {
+    key: RESOURCE_MODULOS,
+    titulo: "Módulos",
+    descricao:
+      "Adicionar e cancelar módulos no card Produtos & Módulos da ficha do cliente. Sem isso a pessoa continua vendo a lista, as quantidades e os valores.",
+  },
+  {
+    key: RESOURCE_OEM_APROVACAO,
+    titulo: "Aprovação OEM",
+    descricao:
+      "Abre a aba Clientes › Aprovação OEM e deixa aprovar ou recusar os pedidos da fila. Sem isso, só admin enxerga a aba.",
+    soComOem: true,
+  },
+];
+
+const RESOURCES_INTEGRACAO = ACESSOS_INTEGRACAO.map((a) => a.key);
 
 const accessEquipeQueryKeys = {
   users: (tenantId?: string) => ["tenant-access-users", tenantId] as const,
@@ -370,23 +404,25 @@ function UnidadesCell({
   );
 }
 
-function ModulosCell({
+function IntegracaoCell({
   user,
-  liberado,
+  opcoes,
+  liberados,
   onSave,
   isPending,
 }: {
   user: AccessUser;
-  liberado: boolean;
-  onSave: (next: boolean) => void;
+  opcoes: AcessoIntegracao[];
+  liberados: Record<string, boolean>;
+  onSave: (mudancas: Array<{ resourceKey: string; liberado: boolean }>) => void;
   isPending: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [marcado, setMarcado] = useState(liberado);
+  const [marcados, setMarcados] = useState<Record<string, boolean>>(liberados);
 
   useEffect(() => {
-    if (open) setMarcado(liberado);
-  }, [open, liberado]);
+    if (open) setMarcados(liberados);
+  }, [open, liberados]);
 
   if (user.is_super_admin) {
     return (
@@ -396,6 +432,11 @@ function ModulosCell({
     );
   }
 
+  const quantosLiberados = opcoes.filter((o) => liberados[o.key]).length;
+  const mudancas = opcoes
+    .filter((o) => (marcados[o.key] ?? false) !== (liberados[o.key] ?? false))
+    .map((o) => ({ resourceKey: o.key, liberado: marcados[o.key] ?? false }));
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -403,34 +444,49 @@ function ModulosCell({
           variant="outline"
           size="sm"
           className={
-            liberado
+            quantosLiberados > 0
               ? "h-8 text-sm gap-1.5 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
               : "h-8 text-sm gap-1.5 text-muted-foreground"
           }
         >
           <Puzzle className="h-3.5 w-3.5" />
-          {liberado ? "Liberado" : "Bloqueado"}
+          {quantosLiberados > 0 ? "Liberado" : "Bloqueado"}
+          {/* O número só faz sentido quando há mais de um acesso para dar: com
+              um só, "Liberado 1" é ruído. */}
+          {opcoes.length > 1 && quantosLiberados > 0 && (
+            <span className="text-xs tabular-nums opacity-80">{quantosLiberados}</span>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-3 space-y-3" align="start">
-        <div className="text-sm font-medium">Módulos do cliente</div>
-        <div className="flex items-start gap-2">
-          <Checkbox
-            id={`u-${user.user_id}-mod`}
-            checked={marcado}
-            onCheckedChange={(c) => setMarcado(c === true)}
-            className="mt-0.5"
-          />
-          <Label
-            htmlFor={`u-${user.user_id}-mod`}
-            className="text-sm font-normal cursor-pointer leading-snug"
-          >
-            Pode adicionar e cancelar módulos
-            <span className="block text-xs text-muted-foreground mt-1">
-              Vale no card Produtos &amp; Módulos, dentro da ficha de qualquer cliente. Sem
-              isso a pessoa continua vendo a lista, as quantidades e os valores.
-            </span>
-          </Label>
+        <div>
+          <div className="text-sm font-medium">Integração</div>
+          <div className="text-xs text-muted-foreground mt-0.5 leading-snug">
+            O que esta pessoa pode fazer, independente do papel dela.
+          </div>
+        </div>
+        <div className="space-y-3">
+          {opcoes.map((o, i) => (
+            <div key={o.key} className={i > 0 ? "border-t pt-3" : undefined}>
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id={`u-${user.user_id}-${o.key}`}
+                  checked={marcados[o.key] ?? false}
+                  onCheckedChange={(c) =>
+                    setMarcados((prev) => ({ ...prev, [o.key]: c === true }))
+                  }
+                  className="mt-0.5"
+                />
+                <Label
+                  htmlFor={`u-${user.user_id}-${o.key}`}
+                  className="text-sm font-normal cursor-pointer leading-snug"
+                >
+                  {o.titulo}
+                  <span className="block text-xs text-muted-foreground mt-1">{o.descricao}</span>
+                </Label>
+              </div>
+            </div>
+          ))}
         </div>
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={isPending}>
@@ -438,9 +494,9 @@ function ModulosCell({
           </Button>
           <Button
             size="sm"
-            disabled={isPending || marcado === liberado}
+            disabled={isPending || mudancas.length === 0}
             onClick={() => {
-              onSave(marcado);
+              onSave(mudancas);
               setOpen(false);
             }}
           >
@@ -500,6 +556,10 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
   const [confirmReject, setConfirmReject] = useState<{ userId: string; email: string } | null>(null);
   const [resolveUser, setResolveUser] = useState<AccessUser | null>(null);
   const [resolveFuncId, setResolveFuncId] = useState<string>("");
+  const [emailEditUser, setEmailEditUser] = useState<AccessUser | null>(null);
+  const [novoEmail, setNovoEmail] = useState<string>("");
+  const [derrubarSessoes, setDerrubarSessoes] = useState(true);
+  const [showHistorico, setShowHistorico] = useState(false);
 
   // Reset invite state when tenant changes
   const prevTidRef = useRef(tenantId);
@@ -652,28 +712,39 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
 
 
 
-  // Permissão de mexer em módulo, por usuário. A célula mostra o valor EFETIVO:
-  // linha da pessoa, senão o do papel neste tenant, senão o padrão global. Isso
-  // importa porque fora da Digi Office o padrão do papel é liberado, e mostrar
-  // "Bloqueado" só porque não existe linha seria mentira.
-  const { data: modulosPerm } = useQuery<{
+  // A caixa da Aprovação OEM só é desenhada onde a integração está ligada. O
+  // tenant vem por parâmetro, e não do filtro global, porque o super admin em
+  // "Todos" administra a equipe do próprio tenant.
+  const oemAtivo = useOemIntegracaoAtiva(tenantId);
+  const acessosIntegracao = useMemo(
+    () => ACESSOS_INTEGRACAO.filter((a) => !a.soComOem || oemAtivo === true),
+    [oemAtivo]
+  );
+
+  // Permissões da coluna Integração, por usuário. A célula mostra o valor
+  // EFETIVO: linha da pessoa, senão o do papel neste tenant, senão o padrão
+  // global. Isso importa porque fora da Digi Office o padrão do papel para
+  // módulos é liberado, e mostrar "Bloqueado" só porque não existe linha seria
+  // mentira. A chave dos mapas é `papel|recurso` e `usuário|recurso`, senão um
+  // acesso sobrescreveria o outro.
+  const { data: integracaoPerm } = useQuery<{
     defaults: Record<string, boolean>;
     byUser: Map<string, boolean>;
   }>({
-    queryKey: ["tenant-user-permissions", tenantId, RESOURCE_MODULOS],
+    queryKey: ["tenant-user-permissions", tenantId, RESOURCES_INTEGRACAO.join(",")],
     enabled: !!tenantId,
     queryFn: async () => {
       const [globalRes, tenantRes, userRes] = await Promise.all([
         (supabase.from("role_permissions" as any) as any)
-          .select("role, can_view")
-          .eq("resource_key", RESOURCE_MODULOS),
+          .select("role, resource_key, can_view")
+          .in("resource_key", RESOURCES_INTEGRACAO),
         (supabase.from("tenant_role_permissions" as any) as any)
-          .select("role, can_view")
-          .eq("resource_key", RESOURCE_MODULOS)
+          .select("role, resource_key, can_view")
+          .in("resource_key", RESOURCES_INTEGRACAO)
           .eq("tenant_id", tenantId!),
         (supabase.from("user_permissions" as any) as any)
-          .select("user_id, can_view")
-          .eq("resource_key", RESOURCE_MODULOS)
+          .select("user_id, resource_key, can_view")
+          .in("resource_key", RESOURCES_INTEGRACAO)
           .eq("tenant_id", tenantId!),
       ]);
       if (globalRes.error) throw globalRes.error;
@@ -681,30 +752,40 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       if (userRes.error) throw userRes.error;
 
       const defaults: Record<string, boolean> = {};
-      ((globalRes.data ?? []) as Array<{ role: string; can_view: boolean }>).forEach((row) => {
-        defaults[row.role] = !!row.can_view;
+      type LinhaPapel = { role: string; resource_key: string; can_view: boolean };
+      ((globalRes.data ?? []) as LinhaPapel[]).forEach((row) => {
+        defaults[`${row.role}|${row.resource_key}`] = !!row.can_view;
       });
-      ((tenantRes.data ?? []) as Array<{ role: string; can_view: boolean }>).forEach((row) => {
-        defaults[row.role] = !!row.can_view;
+      ((tenantRes.data ?? []) as LinhaPapel[]).forEach((row) => {
+        defaults[`${row.role}|${row.resource_key}`] = !!row.can_view;
       });
 
       const byUser = new Map<string, boolean>();
-      ((userRes.data ?? []) as Array<{ user_id: string; can_view: boolean | null }>).forEach(
-        (row) => {
-          if (row.can_view !== null) byUser.set(row.user_id, row.can_view);
-        }
-      );
+      (
+        (userRes.data ?? []) as Array<{
+          user_id: string;
+          resource_key: string;
+          can_view: boolean | null;
+        }>
+      ).forEach((row) => {
+        if (row.can_view !== null) byUser.set(`${row.user_id}|${row.resource_key}`, row.can_view);
+      });
 
       return { defaults, byUser };
     },
   });
 
-  const moduloLiberado = (u: AccessUser) => {
+  const integracaoLiberado = (u: AccessUser, resourceKey: string) => {
     if (u.is_super_admin) return true;
-    const daPessoa = modulosPerm?.byUser.get(u.user_id);
+    const daPessoa = integracaoPerm?.byUser.get(`${u.user_id}|${resourceKey}`);
     if (daPessoa !== undefined) return daPessoa;
-    return modulosPerm?.defaults[u.role] ?? false;
+    return integracaoPerm?.defaults[`${u.role}|${resourceKey}`] ?? false;
   };
+
+  const integracaoLiberados = (u: AccessUser) =>
+    Object.fromEntries(
+      acessosIntegracao.map((o) => [o.key, integracaoLiberado(u, o.key)])
+    ) as Record<string, boolean>;
 
   // Fetch active funcionários for invite — filter by tenant
   const { data: funcionarios = [] } = useQuery<Funcionario[]>({
@@ -944,6 +1025,58 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     onError: (err: any) => sonnerToast.error(err.message),
   });
 
+  // Troca o e-mail de LOGIN. Não dá para fazer daqui direto: o schema auth só é
+  // alcançável pela service_role, então quem grava é a edge function.
+  const changeLoginEmailMutation = useMutation({
+    mutationFn: async ({
+      userId,
+      email,
+      revogarSessoes,
+    }: {
+      userId: string;
+      email: string;
+      revogarSessoes: boolean;
+    }) => {
+      const { data, error } = await supabase.functions.invoke("admin-change-login-email", {
+        body: { target_user_id: userId, new_email: email, revoke_sessions: revogarSessoes },
+      });
+      // Erro de negócio volta com status != 2xx, e o invoke esconde o corpo no
+      // FunctionsHttpError. Sem ler o context, o usuário só veria "non-2xx status".
+      if (error) {
+        const ctx = (error as any)?.context;
+        const detalhe = typeof ctx?.json === "function" ? await ctx.json().catch(() => null) : null;
+        throw new Error(detalhe?.error ?? error.message);
+      }
+      if (data && data.ok === false) throw new Error(data.error ?? "Falha ao alterar o e-mail.");
+      return data as {
+        old_email: string;
+        new_email: string;
+        funcionario_sincronizado: boolean;
+        sessoes_derrubadas: number | null;
+      };
+    },
+    onSuccess: (res) => {
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
+      void queryClient.invalidateQueries({ queryKey: ["tenant-users", tenantId] });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.inviteFuncionarios(tenantId) });
+      void queryClient.invalidateQueries({ queryKey: ["crud_funcionarios"] });
+      const partes = ["E-mail de acesso alterado."];
+      if (res?.funcionario_sincronizado) partes.push("O cadastro do funcionário foi atualizado.");
+      if (res?.sessoes_derrubadas) {
+        partes.push(
+          res.sessoes_derrubadas === 1
+            ? "1 sessão foi encerrada."
+            : `${res.sessoes_derrubadas} sessões foram encerradas.`
+        );
+      }
+      sonnerToast.success(partes.join(" "));
+      setEmailEditUser(null);
+      setNovoEmail("");
+      setDerrubarSessoes(true);
+    },
+    onError: (err: any) => sonnerToast.error(err.message),
+  });
+
   const updateMaxChatsMutation = useUpdateUserMaxConcurrentChats();
   const updateSkillsMutation = useUpdateUserSkills();
 
@@ -965,37 +1098,45 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
   });
 
   // Grava linha explícita sempre, nos dois sentidos: o que está na tela passa a
-  // ser o que vale, sem depender do padrão do papel mudar debaixo.
-  const setModulosPermMutation = useMutation({
-    mutationFn: async ({ userId, liberado }: { userId: string; liberado: boolean }) => {
+  // ser o que vale, sem depender do padrão do papel mudar debaixo. Só as caixas
+  // que a pessoa mexeu viram linha, para não carimbar decisão em recurso que
+  // ninguém tocou.
+  const setIntegracaoPermMutation = useMutation({
+    mutationFn: async ({
+      userId,
+      mudancas,
+    }: {
+      userId: string;
+      mudancas: Array<{ resourceKey: string; liberado: boolean }>;
+    }) => {
+      if (mudancas.length === 0) return;
+      const agora = new Date().toISOString();
       const { error } = await (supabase.from("user_permissions" as any) as any).upsert(
-        {
+        mudancas.map((m) => ({
           tenant_id: tenantId!,
           user_id: userId,
-          resource_key: RESOURCE_MODULOS,
-          can_view: liberado,
-          can_insert: liberado,
-          can_update: liberado,
-          can_delete: liberado,
-          updated_at: new Date().toISOString(),
+          resource_key: m.resourceKey,
+          can_view: m.liberado,
+          can_insert: m.liberado,
+          can_update: m.liberado,
+          can_delete: m.liberado,
+          updated_at: agora,
           updated_by: profile?.user_id ?? null,
-        },
+        })),
         { onConflict: "user_id,resource_key" }
       );
       if (error) throw error;
     },
     onSuccess: (_data, vars) => {
-      void queryClient.invalidateQueries({
-        queryKey: ["tenant-user-permissions", tenantId, RESOURCE_MODULOS],
-      });
+      void queryClient.invalidateQueries({ queryKey: ["tenant-user-permissions", tenantId] });
       // Mudou a própria permissão: o cache de permissões da sessão precisa cair,
-      // senão a tela do cliente continua com o estado antigo por 5 minutos.
+      // senão a tela do cliente continua com o estado antigo por 5 minutos, e a
+      // aba Aprovação OEM só apareceria no próximo login.
       if (vars.userId === profile?.user_id) {
         void queryClient.invalidateQueries({ queryKey: ["my-permissions"] });
+        void queryClient.invalidateQueries({ queryKey: ["oem-aprovacao-pode"] });
       }
-      sonnerToast.success(
-        vars.liberado ? "Liberado para mexer em módulos." : "Bloqueado para mexer em módulos."
-      );
+      sonnerToast.success("Acessos de integração atualizados.");
     },
     onError: (err: any) => sonnerToast.error(err.message),
   });
@@ -1058,14 +1199,22 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
             {activeCount} ativos / {maxUsers} permitidos
           </p>
         </div>
-        <Button
-          size="sm"
-          onClick={() => setShowInviteCard(!showInviteCard)}
-          disabled={!canInvite}
-        >
-          <UserPlus className="h-4 w-4 mr-1" />
-          Convidar
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button size="sm" variant="outline" onClick={() => setShowHistorico(true)}>
+              <History className="h-4 w-4 mr-1" />
+              Histórico
+            </Button>
+          )}
+          <Button
+            size="sm"
+            onClick={() => setShowInviteCard(!showInviteCard)}
+            disabled={!canInvite}
+          >
+            <UserPlus className="h-4 w-4 mr-1" />
+            Convidar
+          </Button>
+        </div>
       </div>
 
       {/* Invite Card - Funcionário-based */}
@@ -1367,11 +1516,11 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                       <TableHead>
                         <TooltipProvider delayDuration={200}>
                           <Tooltip>
-                            <TooltipTrigger className="cursor-help">Módulos</TooltipTrigger>
+                            <TooltipTrigger className="cursor-help">Integração</TooltipTrigger>
                             <TooltipContent className="max-w-xs">
-                              Quem pode adicionar e cancelar módulos na ficha do cliente. É por
-                              pessoa, não por papel. Quem não tem continua vendo a lista e os
-                              valores.
+                              Acessos que valem por pessoa, não por papel: mexer nos módulos da
+                              ficha do cliente e aprovar os pedidos do OEM. Clique para escolher
+                              quais.
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -1406,7 +1555,45 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {u.email ?? u.funcionario_email ?? "—"}
+                        <div className="flex items-center gap-1.5">
+                          <span>{u.email ?? u.funcionario_email ?? "—"}</span>
+                          {u.email &&
+                            u.funcionario_email &&
+                            u.email.toLowerCase() !== u.funcionario_email.toLowerCase() && (
+                              <TooltipProvider delayDuration={200}>
+                                <Tooltip>
+                                  <TooltipTrigger className="cursor-help">
+                                    <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 shrink-0" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    O cadastro do funcionário tem outro e-mail (
+                                    {u.funcionario_email}). Quem entra no sistema é o e-mail
+                                    mostrado aqui.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          {isAdmin && u.email && (
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+                                    onClick={() => {
+                                      setEmailEditUser(u);
+                                      setNovoEmail("");
+                                    }}
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Alterar e-mail de acesso</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {u.funcionario_id ? (
@@ -1564,12 +1751,13 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                             />
                           </TableCell>
                           <TableCell>
-                            <ModulosCell
+                            <IntegracaoCell
                               user={u}
-                              liberado={moduloLiberado(u)}
-                              isPending={setModulosPermMutation.isPending}
-                              onSave={(next) =>
-                                setModulosPermMutation.mutate({ userId: u.user_id, liberado: next })
+                              opcoes={acessosIntegracao}
+                              liberados={integracaoLiberados(u)}
+                              isPending={setIntegracaoPermMutation.isPending}
+                              onSave={(mudancas) =>
+                                setIntegracaoPermMutation.mutate({ userId: u.user_id, mudancas })
                               }
                             />
                           </TableCell>
@@ -1612,6 +1800,114 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Histórico de alterações da tela */}
+      <HistoricoAcessosDialog
+        open={showHistorico}
+        onOpenChange={setShowHistorico}
+        tenantId={tenantId ?? null}
+        users={users.map((u) => ({
+          user_id: u.user_id,
+          funcionario_nome: u.funcionario_nome,
+          email: u.email,
+        }))}
+      />
+
+      {/* Alterar e-mail de acesso (login) */}
+      <Dialog
+        open={!!emailEditUser}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEmailEditUser(null);
+            setNovoEmail("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Alterar e-mail de acesso
+            </DialogTitle>
+            <DialogDescription>
+              Este é o e-mail que a pessoa usa para entrar no sistema e para recuperar a senha. A
+              troca vale na hora, sem precisar confirmar no e-mail antigo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+              <div className="text-xs text-muted-foreground">Usuário</div>
+              <div className="font-medium">{emailEditUser?.funcionario_nome ?? "Sem vínculo"}</div>
+              <div className="text-xs text-muted-foreground mt-1">E-mail atual</div>
+              <div className="font-mono text-xs">{emailEditUser?.email}</div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-sm">Novo e-mail de acesso</Label>
+              <Input
+                type="email"
+                autoComplete="off"
+                placeholder="nome@empresa.com.br"
+                value={novoEmail}
+                onChange={(e) => setNovoEmail(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                O cadastro do funcionário é atualizado junto. A senha continua a mesma.
+              </p>
+            </div>
+
+            <div className="flex items-start gap-2 rounded-md border p-3">
+              <Checkbox
+                id="derrubar-sessoes"
+                checked={derrubarSessoes}
+                onCheckedChange={(v) => setDerrubarSessoes(v === true)}
+                className="mt-0.5"
+              />
+              <div className="space-y-0.5">
+                <Label htmlFor="derrubar-sessoes" className="text-sm cursor-pointer">
+                  Encerrar as sessões abertas deste usuário
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Quem estiver logado com o e-mail antigo precisa entrar de novo. Pode levar até
+                  1 hora para valer em uma aba que já está aberta.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEmailEditUser(null);
+                setNovoEmail("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={
+                !emailEditUser ||
+                !novoEmail.trim() ||
+                novoEmail.trim().toLowerCase() === (emailEditUser?.email ?? "").toLowerCase() ||
+                changeLoginEmailMutation.isPending
+              }
+              onClick={() => {
+                if (!emailEditUser) return;
+                changeLoginEmailMutation.mutate({
+                  userId: emailEditUser.user_id,
+                  email: novoEmail.trim(),
+                  revogarSessoes: derrubarSessoes,
+                });
+              }}
+            >
+              {changeLoginEmailMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Alterar e-mail
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Resolve unlinked user dialog */}
       <Dialog open={!!resolveUser} onOpenChange={(o) => !o && setResolveUser(null)}>

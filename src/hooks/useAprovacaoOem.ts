@@ -19,12 +19,13 @@ export type AprovacaoOemStatus = {
  *
  * 1. **A empresa usa o OEM.** Nos outros tenants a aba seria uma fila que nunca
  *    recebe nada. Mesma régua do IntegracaoOemSection na ficha do cliente.
- * 2. **É admin.** Head e user PEDEM (adicionam e cancelam módulo); quem aprova é
- *    admin, ou super admin. O portão de verdade é o do banco
- *    (`fn_oem_aprovacao_pode`); este aqui só evita desenhar uma aba que
- *    responderia "sem permissão" em toda query.
+ * 2. **A pessoa pode aprovar.** Quem pergunta é o próprio portão do banco,
+ *    `fn_oem_aprovacao_pode`, que é o mesmo que aprovar e recusar consultam. Era
+ *    "é admin" escrito aqui na tela, e desde 09/09/2026 o acesso também pode vir
+ *    marcado por usuário em Configurações › Equipe › Acessos & permissões. Duas
+ *    cópias da regra dariam aba aberta com botão negando, ou o contrário.
  * 3. **Há um tenant escolhido.** Com o super admin em "Todos", `effectiveTenantId`
- *    é null e as RPCs cairiam no tenant do próprio super admin — mostrando a fila
+ *    é null e as RPCs cairiam no tenant do próprio super admin, mostrando a fila
  *    de UMA empresa com a tela dizendo "Todos". Some a aba em vez de mostrar
  *    número de origem errada.
  *
@@ -36,11 +37,24 @@ export function useAprovacaoOemVisivel(): boolean | undefined {
   const { effectiveTenantId: tid } = useTenantFilter();
   const oemAtivo = useOemIntegracaoAtiva();
 
+  const { data: podeAprovar } = useQuery<boolean>({
+    queryKey: ["oem-aprovacao-pode", tid, profile?.user_id],
+    enabled: !!tid,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("fn_oem_aprovacao_pode", {
+        p_tenant_id: tid,
+      });
+      if (error) throw error;
+      return data === true;
+    },
+  });
+
   if (oemAtivo === undefined) return undefined;
   if (!tid) return false;
+  if (podeAprovar === undefined) return undefined;
 
-  const ehAdmin = profile?.is_super_admin === true || profile?.role === "admin";
-  return oemAtivo === true && ehAdmin;
+  return oemAtivo === true && podeAprovar === true;
 }
 
 /**

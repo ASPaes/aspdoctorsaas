@@ -49,6 +49,8 @@ interface Props {
   onReplyClick?: (quotedMessageId: string) => void;
   quotedMessage?: Message | null;
   groupParticipants?: GroupParticipant[];
+  /** conversa é grupo: muda o que o ✓ pode afirmar. Ver `semConfirmacaoEmGrupo`. */
+  isGroup?: boolean;
 }
 
 // Limite do próprio WhatsApp: editar só vale nos 15 min seguintes ao envio.
@@ -86,6 +88,7 @@ export function MessageBubble({
   onReplyClick,
   quotedMessage,
   groupParticipants,
+  isGroup,
 }: Props) {
   const isFromMe = Boolean(msg.isFromMe ?? msg.is_from_me ?? (msg as any).fromMe ?? (msg as any).key?.fromMe ?? false);
   const rawKind = (msg.message_type ?? (msg as any).messageType ?? (msg as any).type ?? 'text') as string;
@@ -214,8 +217,90 @@ export function MessageBubble({
   // branco no escuro) porque o balão é verde nos dois temas.
   const metaInk = isFromMe ? "text-emerald-950/80" : "opacity-60";
 
+  // Em grupo o WhatsApp não devolve confirmação de entrega para este tipo de conexão.
+  // Medido em produção em 08/09/2026, 14 dias: 0 de 2.367 mensagens de saída em grupo
+  // chegaram a `delivered`, contra 63.563 em conversa direta. O ✓ cheio é o vocabulário
+  // do 1:1, onde ele significa "o servidor recebeu"; emprestá-lo aqui faz o operador ler
+  // entrega onde não existe informação nenhuma. Foi a queixa do DEM-0373: o atendente
+  // segue a conversa achando que a mensagem chegou.
+  //
+  // Fica ✓ (e não relógio nem alerta) de propósito: em grupo isso vale para TODA
+  // mensagem, então qualquer marca de aviso viraria alarme permanente e o operador
+  // aprenderia a ignorá-la. O que muda é o peso da tinta, mais o motivo no tooltip.
+  //
+  // `delivered`/`read` continuam ganhando: se um dia o ack de grupo passar a chegar,
+  // o ✓✓ aparece sozinho, sem mexer aqui.
+  const semConfirmacaoEmGrupo = Boolean(isGroup) && isFromMe && !isDeleted && !isPending
+    && msg.status !== "read" && msg.status !== "delivered"
+    && msg.status !== "failed" && msg.status !== "sending";
+
+  // Dentro do "não sabemos" existe UM caso em que sabemos algo: a mensagem ficou
+  // retida na fila do aparelho. O sinal é o ack de erro que chega muito depois do
+  // envio — o provedor esvaziando a fila atrasado, normalmente num restart. Foi o
+  // DEM-0373: no caso do print, mensagens de 31/08 tiveram retorno em 08/09, 8 dias
+  // depois, e chegaram ao grupo no bloco das 09:54.
+  //
+  // A tela NÃO refaz esse julgamento, e isso é deliberado: o par
+  // `status='pending'` + `last_error_at` só existe em grupo porque a
+  // `verify-failed-deliveries` absolveu a mensagem. Erro imediato vira `failed`, e
+  // entre o ERROR chegar e a decisão sair a linha fica em `error`, nunca em
+  // `pending`. Então o par já É a decisão do backend, e basta confiar nela.
+  //
+  // A primeira versão daqui repetia o corte de 10 min da retry-policy.ts. Funcionava
+  // e era dívida: dois lugares decidindo a mesma coisa, e o dia em que um mudasse
+  // sozinho produziria mensagem absolvida no backend que a tela não marcaria, sem
+  // erro nenhum para denunciar. Confiar na decisão remove a classe inteira de bug em
+  // vez de documentá-la.
+  //
+  // O atraso abaixo é só para o texto. Ele não decide nada.
+  const atrasoDoErroMs = semConfirmacaoEmGrupo && msg.last_error_at
+    ? Date.parse(msg.last_error_at) - Date.parse(msg.timestamp)
+    : NaN;
+  const ficouRetida = Number.isFinite(atrasoDoErroMs) && atrasoDoErroMs > 0;
+
+  // `formatDuration` do timeFormatters não serve aqui: ela para em horas, e estes
+  // atrasos chegam a dias ("191h 24min" não comunica). Mexer nela mudaria a saída
+  // dos painéis de SLA que já a usam.
+  const atrasoLegivel = (() => {
+    const min = Math.round(atrasoDoErroMs / 60000);
+    if (min < 60) return `${min} minutos`;
+    const h = Math.round(min / 60);
+    if (h < 48) return `${h} hora${h !== 1 ? "s" : ""}`;
+    return `${Math.round(h / 24)} dias`;
+  })();
+
   const statusIcon = isFromMe && !isDeleted && !isPending && (
-    msg.status === "read" || msg.status === "delivered" ? (
+    ficouRetida ? (
+      // Relógio de tinta cheia, e não o disco vermelho da falha: a mensagem
+      // provavelmente CHEGOU, só atrasada. Das 141 absolvidas em 14 dias, 90% tiveram
+      // resposta do cliente em 30 min, acima até das que têm entrega confirmada.
+      // Chamar isso de falha seria trocar um alarme falso por outro.
+      //
+      // Tinta cheia (6,6:1) porque aqui a marca DEVE ser vista: são ~10 casos por dia
+      // em toda a base, contra ~150 que levam o ✓ atenuado. Marca rara é marca lida.
+      <span
+        className="inline-flex cursor-help"
+        title={`Esta mensagem ficou parada na fila do aparelho: o retorno do WhatsApp só chegou ${atrasoLegivel} depois do envio. Ela pode ter chegado ao grupo com atraso.`}
+      >
+        <Clock className="h-3.5 w-3.5 text-emerald-950" />
+      </span>
+    ) : semConfirmacaoEmGrupo ? (
+      // `title` nativo, e não o Tooltip do Radix: esta marca aparece em TODA mensagem
+      // de saída do grupo, e a lista do chat não é virtualizada (páginas de 100 em
+      // scroll infinito). Um componente de tooltip por bolha seria centenas de
+      // assinantes de contexto numa das listas mais quentes do app. O `(editada)` ali
+      // embaixo pode usar Radix porque é raro; este não.
+      //
+      // /70 e não /45: a tinta cheia dá 6,6:1 sobre o verde da marca e /45 cairia para
+      // 2,2:1, abaixo do mínimo de 3:1 de elemento gráfico. /70 fica em 3,6:1, sai do
+      // primeiro olhar sem sumir de quem procura.
+      <span
+        className="inline-flex cursor-help"
+        title="Enviado ao WhatsApp. Em conversa de grupo não há confirmação de entrega nem de leitura, então o painel não tem como saber se chegou."
+      >
+        <Check strokeWidth={2.5} className="h-3.5 w-3.5 text-emerald-950/70" />
+      </span>
+    ) : msg.status === "read" || msg.status === "delivered" ? (
       <CheckCheck strokeWidth={2.5} className={cn("h-3.5 w-3.5", msg.status === "read" ? "text-blue-800" : "text-emerald-950")} />
     ) : msg.status === "sending" ? (
       <Clock className="h-3.5 w-3.5 text-emerald-950/60" />

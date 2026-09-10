@@ -614,6 +614,22 @@ async function countOffHoursCustomerMessages(supabase: any, conversationId: stri
 
 // ─── CSAT ─────────────────────────────────────────────────────────────────────
 
+// A resposta de CSAT ja passou pelo incremento de unread_count la em cima (o processador
+// so descobre que a mensagem era a nota depois de persistir). Como o atendimento esta
+// encerrado, ninguem vai abrir a conversa para zerar o contador: o badge verde fica preso
+// para sempre na aba "Encerrados". Aqui devolvemos o contador ao valor que ele tinha antes
+// desta mensagem — decremento, nao zeragem, porque mensagem anterior nao lida continua
+// nao lida. So e chamado quando a mensagem virou DADO de CSAT (nota, motivo, nota tardia);
+// texto solto que apenas provocou o nudge segue contando como nao lido de proposito.
+async function decrementUnreadForCsat(supabase: any, conversationId: string): Promise<void> {
+  try {
+    const { data } = await supabase
+      .from('whatsapp_conversations').select('unread_count').eq('id', conversationId).maybeSingle();
+    const next = Math.max((data?.unread_count || 0) - 1, 0);
+    await supabase.from('whatsapp_conversations').update({ unread_count: next }).eq('id', conversationId);
+  } catch (err) { console.error('[processor] decrementUnreadForCsat failed:', err); }
+}
+
 export async function handleCsatResponse(supabase: any, ctx: SendContext, conversationId: string, tenantId: string, messageContent: string): Promise<boolean> {
   try {
     // Busca o CSAT pendente DA CONVERSA (não exige attendance closed+manual:
@@ -712,6 +728,7 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
 
       const needsReason = scoreNum <= supportConfig.support_csat_reason_threshold;
       await supabase.from('support_csat').update({ score: scoreNum, responded_at: new Date().toISOString(), status: needsReason ? 'awaiting_reason' : 'completed' }).eq('id', csat.id);
+      await decrementUnreadForCsat(supabase, conversationId);
       try {
         if (needsReason) {
           await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.reason_prompt_template || 'Entendi. Pode me dizer em poucas palavras o motivo da sua nota?', { csat: true });
@@ -728,6 +745,7 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
 
     if (csat.status === 'awaiting_reason') {
       await supabase.from('support_csat').update({ reason: trimmed, status: 'completed', responded_at: new Date().toISOString() }).eq('id', csat.id);
+      await decrementUnreadForCsat(supabase, conversationId);
       try {
         await closeAttendanceIfOpen('csat_completed', 'csat_completed');
         await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.', { csat: true });
@@ -799,6 +817,8 @@ export async function handleLateCsatResponse(supabase: any, ctx: SendContext, co
       late_response: true,
       responded_at: new Date().toISOString(),
     }).eq('id', csat.id);
+
+    await decrementUnreadForCsat(supabase, conversationId);
 
     await sendAndPersistAutoMessage(supabase, ctx, conversationId,
       '\u{2705} Avaliacao registrada. Obrigado pelo retorno! \u{1F64F}',
@@ -2136,6 +2156,8 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
                 await supabase.from('support_csat')
                   .update({ score: scoreNum, status: 'completed', responded_at: nowIso })
                   .eq('id', csat.id);
+
+                await decrementUnreadForCsat(supabase, conversationId);
 
                 const thanks = supportConfig.support_csat_thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.';
                 const groupCtx: SendContext = {

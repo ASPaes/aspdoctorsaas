@@ -789,7 +789,25 @@ Deno.serve(async (req) => {
           message_id: messageId,
           remote_jid: contact.phone_number,
           content: messageContent,
-          message_type: body.messageType,
+          // Aviso automático de abertura/encerramento nasce `system`, não `text`.
+          //
+          // O texto é o mesmo que o bloco PRE-SEND de grupo desta própria function já
+          // grava como `system` algumas linhas acima — mas quando o aviso vem do botão
+          // "Iniciar atendimento" do cabeçalho (ou do encerramento manual), ele chega
+          // aqui como uma mensagem de texto qualquer e era gravado como tal. Os dois
+          // caminhos mandam a mesma frase para o mesmo grupo e produziam linhas de
+          // tipos diferentes.
+          //
+          // `system` é o que segura três coisas, todas medidas no aviso de 09/09/2026
+          // que virou balão vermelho num grupo que tinha recebido a mensagem:
+          //   1. `decidirReenvio` (verify-failed-deliveries/retry-policy.ts) devolve
+          //      alarmar=false para `system` — sem ele o aviso caía no ramo de grupo e
+          //      notificava "Mensagem não entregue" ao operador;
+          //   2. o chat desenha o chip centralizado em vez de balão do operador com
+          //      ícone de falha (ver parseAttendanceEvent);
+          //   3. as réguas de `awaiting_agent` e de inatividade param de contar um
+          //      aviso automático como resposta do atendente.
+          message_type: body.attendanceNotice === true ? 'system' : body.messageType,
           media_url: savedMediaUrl,
           media_mimetype: body.mediaMimetype || null,
           media_path: mediaPath,

@@ -23,6 +23,18 @@ export interface Message {
   media_kind: string | null;
   media_purged_at: string | null;
   status: string;
+  /**
+   * Último ERROR que o provedor devolveu. Sinal, não veredito.
+   *
+   * Em grupo ele é a ÚNICA pista de que a mensagem ficou retida na fila do aparelho:
+   * quando o ack chega muito depois do envio, o provedor esvaziou a fila atrasado.
+   *
+   * Em grupo, `status='pending'` **com** este campo preenchido é o carimbo da decisão
+   * da `verify-failed-deliveries`: só ela produz esse par, absolvendo o erro tardio.
+   * Erro imediato vira `failed`, e entre o ERROR e a decisão a linha fica em `error`.
+   * A tela lê o par como veredito pronto, sem refazer a conta e sem coluna nova.
+   */
+  last_error_at?: string | null;
   is_from_me: boolean;
   isFromMe?: boolean;
   fromMe?: boolean;
@@ -95,7 +107,7 @@ export const normalizeMessage = (message: Partial<Message> & Record<string, any>
 const MESSAGE_SELECT = [
   'id', 'conversation_id', 'message_id', 'remote_jid', 'content', 'message_type',
   'media_url', 'media_mimetype', 'media_path', 'media_filename', 'media_ext',
-  'media_size_bytes', 'media_kind', 'media_purged_at', 'status', 'is_from_me', 'timestamp', 'edited_at',
+  'media_size_bytes', 'media_kind', 'media_purged_at', 'status', 'last_error_at', 'is_from_me', 'timestamp', 'edited_at',
   'quoted_message_id', 'mentions', 'mentions_everyone', 'metadata', 'audio_transcription', 'transcription_status',
   'sent_by_user_id', 'instance_id', 'sender_name', 'sender_role',
   'delete_status', 'delete_scope', 'delete_error',
@@ -251,6 +263,29 @@ export const useWhatsAppMessages = (
       // Zerar unread_count na conversa (badge da sidebar). Imediato: o atendente
       // acabou de abrir e o badge tem que sumir na hora.
       clearUnreadCount(conversationId);
+
+      // ...mas "imediato" era só a ESCRITA. O badge da sidebar e o número
+      // sobrescrito das pills vinham do cache, e quem os atualizava era o eco do
+      // Realtime desse mesmo UPDATE. Como `whatsapp_conversations` está na
+      // publication, esse eco paga a fila de decodificação de WAL (pico medido de
+      // 12,9 s em 04/08/2026): o atendente abria a conversa, lia tudo, e o badge
+      // continuava aceso até o eco chegar ou até um F5. O caminho irmão — mensagem
+      // que chega COM a conversa aberta — já não tinha esse problema, porque
+      // `patchConversationPreview(..., isViewing=true)` zera no cache na hora.
+      // Aqui fazemos o mesmo para o momento de abrir.
+      let tinhaNaoLida = false;
+      patchConversationInCache(queryClient, conversationId, (prev) => {
+        if ((prev.unread_count || 0) > 0) tinhaNaoLida = true;
+        return { unread_count: 0 };
+      });
+
+      // As pills são agregado do servidor (`whatsapp_pill_counts`), não dá para
+      // patchar sem saber em quais buckets a conversa cai. Refetch, então — mas
+      // só quando havia o que baixar. Abrir conversa já lida é o caso comum e
+      // segue sem custo nenhum, mesma disciplina do dismiss de notificações abaixo.
+      if (tinhaNaoLida) {
+        queryClient.invalidateQueries({ queryKey: ['whatsapp', 'pill-counts'] });
+      }
 
       // Dispensar todas as notificações dessa conversa (sino).
       //
