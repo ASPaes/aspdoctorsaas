@@ -44,6 +44,12 @@ export type ContratoParaEnvioOmie = {
    * do que já existe lá. O caminho é vincular na Conferência.
    */
   codigo_omie_sem_vinculo?: string | number | null;
+  /**
+   * Nome do modelo quando ele esta marcado para NAO sincronizar (ex.: Cobranca Fornecedor). Vence
+   * os outros estados: nem o selo verde nem o aviso de vinculo fazem sentido, porque nenhuma
+   * alteracao deste contrato vai ao Omie, de proposito.
+   */
+  fora_da_integracao?: string | null;
 };
 
 const brl = (v: any) =>
@@ -325,6 +331,21 @@ export default function EnviarOmieComPreviaButton({
   // depois do sucesso e convida a mandar de novo.
   const [enviadoAgora, setEnviadoAgora] = useState<string | number | null | undefined>(undefined);
 
+  // Antes de tudo: modelo que nao sincroniza (Cobranca Fornecedor) nao vai ao Omie de proposito.
+  // Os 41 contratos que ganharam o aviso ambar em 11/09 eram todos deste caso -- alarme falso.
+  if (contrato.fora_da_integracao) {
+    return (
+      <div className="space-y-1">
+        <Badge variant="outline" className="text-muted-foreground">
+          Fora da integração
+        </Badge>
+        <div className="text-xs text-muted-foreground">
+          O modelo {contrato.fora_da_integracao} está marcado para não sincronizar com o Omie.
+          Nenhuma alteração deste contrato é enviada.
+        </div>
+      </div>
+    );
+  }
   if (contrato.sincronizado) {
     return <SincronizadoBadge codigo={contrato.codigo_contrato_omie} />;
   }

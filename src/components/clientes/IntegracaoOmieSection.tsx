@@ -21,7 +21,7 @@ interface Props {
 // fim do cadastro de produto promete a mesma pré-visualização e precisava do mesmo botão.
 interface ContratoAtivo extends ContratoParaEnvioOmie {
   vlr_total_mensal: number | null;
-  modelos_contrato?: { nome: string } | null;
+  modelos_contrato?: { nome: string; sincroniza_omie?: boolean | null } | null;
 }
 
 const brl = (v: any) =>
@@ -40,7 +40,7 @@ export default function IntegracaoOmieSection({ clienteId }: Props) {
     enabled: !!clienteId && !!tid && integracaoAtivaQuery.data === true,
     queryFn: async () => {
       let q = (supabase.from("contratos") as any)
-        .select("id, numero, vlr_total_mensal, status, modelos_contrato:modelo_contrato_id(nome)")
+        .select("id, numero, vlr_total_mensal, status, modelos_contrato:modelo_contrato_id(nome, sincroniza_omie)")
         .eq("cliente_id", clienteId)
         .eq("status", "ativo")
         .order("numero", { ascending: false });
@@ -71,6 +71,8 @@ export default function IntegracaoOmieSection({ clienteId }: Props) {
           sincronizado: codigo != null,
           codigo_contrato_omie: codigo,
           codigo_omie_sem_vinculo: semVinculoMap.get(c.id) ?? null,
+          fora_da_integracao:
+            c.modelos_contrato?.sincroniza_omie === false ? (c.modelos_contrato?.nome ?? "deste contrato") : null,
         } as ContratoAtivo;
       });
     },
