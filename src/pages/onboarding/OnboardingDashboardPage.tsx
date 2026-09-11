@@ -185,7 +185,7 @@ export default function OnboardingDashboardPage() {
   const dashFilters = useOnboardingDashFilters(journeys, effectiveTenantId, canAccess);
 
   /** Um mapa só de nomes para os dois blocos que abrem drill-down. */
-  const nomes = useJourneyNames(journeys);
+  const nomes = useJourneyNames(journeys, dashFilters.periodosResponsavel, dashFilters.nomePorUsuario);
 
   /** O filtro entra ANTES de tudo: `ativas` e `allowedJourneyIds` derivam daqui, e é
    *  por isso que treinos, pausas e retornos obedecem ao filtro sem mudança própria. */

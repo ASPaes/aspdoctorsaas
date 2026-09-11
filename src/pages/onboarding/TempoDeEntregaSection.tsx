@@ -10,6 +10,7 @@ import {
   type JourneyTempo,
 } from "./dashMetrics";
 import { fasesDosPipelines } from "./dashFilters";
+import type { JourneyNomes } from "./useJourneyNames";
 
 /** Posição da fase na régua do tenant. 1 = a primeira (Onboarding), 2 = a seguinte. */
 const FASE_ONBOARDING = 1;
@@ -41,7 +42,7 @@ export default function TempoDeEntregaSection({
   dateRange: { from: Date; to: Date };
   allowedJourneyIds: Set<string>;
   /** Cliente e responsável por journey_id, para o drill-down. */
-  nomes: { cliente: (id: string) => string; responsavel: (id: string) => string };
+  nomes: JourneyNomes;
   pipelineIds: string[];
   /** pipeline_id → posição da fase que ele atende. */
   fasePorPipeline: Record<string, number>;
@@ -59,11 +60,22 @@ export default function TempoDeEntregaSection({
   const motivoRecorte = "não se aplica ao pipeline filtrado";
   const [drill, setDrill] = useState<{ titulo: string; regra: string; linhas: LinhaDrilldown[]; unidade: "util" | "cal" } | null>(null);
 
+  /**
+   * `de`/`ate` são a janela que o card mede — é ela que diz de quem é o tempo.
+   * Mostrar o responsável de hoje creditava ao implantador o 1º contato e o
+   * onboarding que outra pessoa fez (10 de 27 linhas erradas em setembro/2026).
+   */
   const linha = useCallback(
-    (journeyId: string, util: number | null, cal: number | null): LinhaDrilldown => ({
+    (
+      journeyId: string,
+      util: number | null,
+      cal: number | null,
+      de: string | null | undefined,
+      ate: string | null | undefined,
+    ): LinhaDrilldown => ({
       journeyId,
       cliente: nomes.cliente(journeyId),
-      responsavel: nomes.responsavel(journeyId),
+      responsavel: nomes.responsavelEm(journeyId, de, ate),
       util,
       cal,
       pctSla: null, // estes cards não têm alvo cadastrado: são medida, não cobrança
@@ -86,14 +98,18 @@ export default function TempoDeEntregaSection({
     return {
       cal: mediaTempo(c.map((j) => minutosEntre(j.aberta_em, j.concluido_em))),
       n: c.length,
-      linhas: c.map((j) => linha(j.journey_id, null, minutosEntre(j.aberta_em, j.concluido_em))),
+      linhas: c.map((j) => linha(j.journey_id, null, minutosEntre(j.aberta_em, j.concluido_em), j.aberta_em, j.concluido_em)),
     };
   }, [journeys, dateRange, linha]);
 
   const onboarding = useMemo(() => {
     const c = coorteOnboarding(journeys, dateRange);
     const min = (j: JourneyTempo) => minutosEntre(j.aberta_em, j.onboarding_concluido_em);
-    return { cal: mediaTempo(c.map(min)), n: c.length, linhas: c.map((j) => linha(j.journey_id, null, min(j))) };
+    return {
+      cal: mediaTempo(c.map(min)),
+      n: c.length,
+      linhas: c.map((j) => linha(j.journey_id, null, min(j), j.aberta_em, j.onboarding_concluido_em)),
+    };
   }, [journeys, dateRange, linha]);
 
   const implantacao = useMemo(() => {
@@ -102,7 +118,7 @@ export default function TempoDeEntregaSection({
     return {
       cal: mediaTempo(c.map(min)),
       n: c.length,
-      linhas: c.map((j) => linha(j.journey_id, null, min(j))),
+      linhas: c.map((j) => linha(j.journey_id, null, min(j), j.implantacao_iniciada_em, j.implantacao_concluida_em)),
     };
   }, [journeys, dateRange, linha]);
 
@@ -118,7 +134,7 @@ export default function TempoDeEntregaSection({
     return {
       util: mediaTempo(linhas.map((r) => r.minutos_uteis)),
       cal: mediaTempo(linhas.map((r) => r.minutos_corridos)),
-      linhas: linhas.map((r) => linha(r.journey_id, r.minutos_uteis, r.minutos_corridos)),
+      linhas: linhas.map((r) => linha(r.journey_id, r.minutos_uteis, r.minutos_corridos, r.distribuido_em, r.primeiro_contato_em)),
     };
   }, [firstContactQ.data, dateRange, allowedJourneyIds, linha]);
 

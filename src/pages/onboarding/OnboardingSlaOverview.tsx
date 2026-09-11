@@ -47,13 +47,37 @@ interface PhaseRow {
   phase_nome: string | null;
   phase_position: number | null;
   pipeline_id: string | null;
+  /** Janela da passagem pela fase — é ela que diz de quem é este tempo. */
+  iniciada_em: string | null;
+  concluida_em: string | null;
   sla_corrido_min: number | null;
   sla_pausado_min: number | null;
   sla_util_min: number | null;
 }
 
+/** Uma passagem de fase já medida, com a janela de quando ela aconteceu. */
+interface FaseMedida {
+  pipelineId: string;
+  bruto: number;
+  efetivo: number;
+  target: number;
+  de: string | null;
+  ate: string | null;
+}
+
+interface StageHistRow {
+  journey_id: string;
+  stage_id: string;
+  /** Janela da passagem pela etapa — quem estava com a jornada nela. */
+  entrou_em: string | null;
+  saiu_em: string | null;
+  duracao_minutos: number | null;
+  duracao_util_minutos: number | null;
+}
+
 export interface SlaJourneyRow {
   journey_id: string | null;
+  aberta_em: string | null;
   concluido_em: string | null;
   cliente_id: string | null;
   responsavel_nome: string | null;
@@ -87,10 +111,18 @@ function clicavel(onClick?: () => void) {
 const CLICAVEL_CLS =
   "cursor-pointer hover:border-foreground/30 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-/** Uma linha de drill-down a partir do que cada agregação já tem em mãos. */
+/**
+ * Uma linha de drill-down a partir do que cada agregação já tem em mãos.
+ *
+ * `responsavel` chega PRONTO, de propósito: cada aba mede uma janela diferente
+ * (a fase, a etapa, a jornada inteira) e só quem chama sabe qual é. Deixar esta
+ * função resolver o nome foi o que produziu o defeito de 11/09/2026 — ela usava
+ * `nomes.responsavel()`, que é o dono de hoje, em todas as quatro abas.
+ */
 function linhaDrill(
   journeyId: string,
-  nomes: { cliente: (id: string) => string; responsavel: (id: string) => string },
+  nomes: { cliente: (id: string) => string },
+  responsavel: string,
   util: number | null,
   cal: number | null,
   alvo: number | null,
@@ -98,7 +130,7 @@ function linhaDrill(
   return {
     journeyId,
     cliente: nomes.cliente(journeyId),
-    responsavel: nomes.responsavel(journeyId),
+    responsavel,
     util,
     cal,
     pctSla: alvo && alvo > 0 ? Math.round(((util ?? 0) / alvo) * 100) : null,
@@ -259,10 +291,10 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
     queryKey: ["onb-sla-stage-history", tenantId],
     enabled: !!tenantId,
     queryFn: async () =>
-      fetchAllRows<{ journey_id: string; stage_id: string; duracao_minutos: number | null; duracao_util_minutos: number | null }>(() =>
+      fetchAllRows<StageHistRow>(() =>
         supabase
           .from("onboarding_stage_history")
-          .select("journey_id, stage_id, duracao_minutos, duracao_util_minutos")
+          .select("journey_id, stage_id, entrou_em, saiu_em, duracao_minutos, duracao_util_minutos")
           .eq("tenant_id", tenantId!)
           .not("duracao_minutos", "is", null),
       ),
@@ -274,9 +306,9 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
     queryKey: ["onb-sla-training-stage-history", tenantId],
     enabled: !!tenantId,
     queryFn: async () =>
-      fetchAllRows<{ journey_id: string; stage_id: string; duracao_minutos: number | null; duracao_util_minutos: number | null }>(() =>
+      fetchAllRows<StageHistRow>(() =>
         (supabase.from("onboarding_training_stage_history" as any) as any)
-          .select("journey_id, stage_id, duracao_minutos, duracao_util_minutos")
+          .select("journey_id, stage_id, entrou_em, saiu_em, duracao_minutos, duracao_util_minutos")
           .eq("tenant_id", tenantId!)
           .not("duracao_minutos", "is", null),
       ),
@@ -294,7 +326,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
     queryFn: async () =>
       fetchAllRows<PhaseRow>(() =>
         (supabase.from("vw_onboarding_journey_phases" as any) as any)
-          .select("journey_id, phase_id, phase_nome, phase_position, pipeline_id, sla_corrido_min, sla_pausado_min, sla_util_min")
+          .select("journey_id, phase_id, phase_nome, phase_position, pipeline_id, iniciada_em, concluida_em, sla_corrido_min, sla_pausado_min, sla_util_min")
           .eq("tenant_id", tenantId!),
       ),
   });
@@ -321,9 +353,9 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
   // O gate de "fase iniciada" continua sendo o tempo de calendário — uma fase que só
   // rodou fora do expediente tem 0 min úteis, mas já começou e precisa entrar na conta.
   const journeyPhases = useMemo(() => {
-    return (j: SlaJourneyRow): { pipelineId: string; bruto: number; efetivo: number; target: number }[] => {
+    return (j: SlaJourneyRow): FaseMedida[] => {
       const linhas = j.journey_id ? phaseRowsByJourney.get(j.journey_id) ?? [] : [];
-      const out: { pipelineId: string; bruto: number; efetivo: number; target: number }[] = [];
+      const out: FaseMedida[] = [];
       linhas.forEach((r) => {
         if (!r.pipeline_id) return;
         // Recorte da fase: com pipeline filtrado, a passagem pela OUTRA fase da mesma
@@ -333,7 +365,14 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
         if (!target || target <= 0) return;
         if ((r.sla_corrido_min ?? 0) <= 0) return;
         const efetivo = r.sla_util_min ?? 0;
-        out.push({ pipelineId: r.pipeline_id, bruto: efetivo + (r.sla_pausado_min ?? 0), efetivo, target });
+        out.push({
+          pipelineId: r.pipeline_id,
+          bruto: efetivo + (r.sla_pausado_min ?? 0),
+          efetivo,
+          target,
+          de: r.iniciada_em,
+          ate: r.concluida_em,
+        });
       });
       return out;
     };
@@ -400,7 +439,8 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
         if (ph.efetivo <= ph.target) cur.withinE++;
         m.set(ph.pipelineId, cur);
         const arrP = porPipeline.get(ph.pipelineId) ?? [];
-        arrP.push(linhaDrill(j.journey_id!, nomes, ph.efetivo, ph.bruto, ph.target));
+        // Quem estava com a jornada NESTA fase — não quem está com ela hoje.
+        arrP.push(linhaDrill(j.journey_id!, nomes, nomes.responsavelEm(j.journey_id!, ph.de, ph.ate), ph.efetivo, ph.bruto, ph.target));
         porPipeline.set(ph.pipelineId, arrP);
       });
     });
@@ -449,7 +489,11 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
       // Alvo `null`: a área não tem SLA próprio — ele vive no pipeline. A coluna
       // "% SLA" fica "—" em vez de inventar um denominador.
       const arrA = porArea.get(key) ?? [];
-      arrA.push(linhaDrill(j.journey_id!, nomes, efe, bru, null));
+      // Com pipeline filtrado a medida é das fases escolhidas; sem filtro, da jornada
+      // inteira. A janela do nome acompanha a mesma coisa que o número mede.
+      const de = recorteDeFase ? phases[0]?.de ?? j.aberta_em : j.aberta_em;
+      const ate = recorteDeFase ? phases[phases.length - 1]?.ate ?? j.concluido_em : j.concluido_em;
+      arrA.push(linhaDrill(j.journey_id!, nomes, nomes.responsavelEm(j.journey_id!, de, ate), efe, bru, null));
       porArea.set(key, arrA);
     });
     return Array.from(m.entries())
@@ -495,23 +539,6 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
     return agregarPorResponsavel(linhas, slaPorEtapa);
   }, [journeys, atribuicaoQ.data, slaPorEtapa]);
 
-  /** MESMO filtro de `agregarPorResponsavel` (etapa sem SLA fica de fora). Se divergir,
-   *  o rodapé do painel divide por um N diferente do card e o número não bate — é
-   *  exatamente o que o drill-down existe para evitar. */
-  const linhasPorResponsavel = useMemo(() => {
-    const allowed = new Set(journeys.map((j) => j.journey_id));
-    const m = new Map<string | null, LinhaDrilldown[]>();
-    (atribuicaoQ.data ?? []).forEach((l) => {
-      if (!allowed.has(l.journey_id)) return;
-      const alvo = slaPorEtapa[l.stage_id];
-      if (!alvo || alvo <= 0) return;
-      const arr = m.get(l.responsavel_user_id) ?? [];
-      arr.push(linhaDrill(l.journey_id, nomes, l.duracao_util_minutos, l.duracao_minutos, alvo));
-      m.set(l.responsavel_user_id, arr);
-    });
-    return m;
-  }, [journeys, atribuicaoQ.data, slaPorEtapa, nomes]);
-
   const respIds = useMemo(
     () => responsavelAgg.map((r) => r.userId).filter(Boolean) as string[],
     [responsavelAgg],
@@ -531,7 +558,31 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
       return m;
     },
   });
-  const respNomes = respNomesQ.data ?? {};
+  /** Memoizado: `?? {}` cria objeto novo a cada render enquanto a query não volta, e
+   *  isso refaria as ~450 linhas do drill-down por responsável à toa. */
+  const respNomes = useMemo(() => respNomesQ.data ?? {}, [respNomesQ.data]);
+
+  /** MESMO filtro de `agregarPorResponsavel` (etapa sem SLA fica de fora). Se divergir,
+   *  o rodapé do painel divide por um N diferente do card e o número não bate — é
+   *  exatamente o que o drill-down existe para evitar.
+   *
+   *  Fica DEPOIS de `respNomes` de propósito: ele é lido durante o render. */
+  const linhasPorResponsavel = useMemo(() => {
+    const allowed = new Set(journeys.map((j) => j.journey_id));
+    const m = new Map<string | null, LinhaDrilldown[]>();
+    (atribuicaoQ.data ?? []).forEach((l) => {
+      if (!allowed.has(l.journey_id)) return;
+      const alvo = slaPorEtapa[l.stage_id];
+      if (!alvo || alvo <= 0) return;
+      const arr = m.get(l.responsavel_user_id) ?? [];
+      // Aqui não há janela a cruzar: a view já carimbou quem estava na etapa. Usar o
+      // responsável da jornada fazia o card dizer "Fabianne" e a lista dizer "Igor".
+      const quem = (l.responsavel_user_id && respNomes[l.responsavel_user_id]) || "—";
+      arr.push(linhaDrill(l.journey_id, nomes, quem, l.duracao_util_minutos, l.duracao_minutos, alvo));
+      m.set(l.responsavel_user_id, arr);
+    });
+    return m;
+  }, [journeys, atribuicaoQ.data, slaPorEtapa, nomes, respNomes]);
 
   // Por etapa (histórico de etapas concluídas)
   const etapaAgg = useMemo(() => {
@@ -553,7 +604,10 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
       cur.sumE += e;
       m.set(h.stage_id, cur);
       const arrE = porEtapa.get(h.stage_id) ?? [];
-      arrE.push(linhaDrill(h.journey_id, nomes, h.duracao_util_minutos, h.duracao_minutos, st.sla_minutos));
+      arrE.push(linhaDrill(
+        h.journey_id, nomes, nomes.responsavelEm(h.journey_id, h.entrou_em, h.saiu_em),
+        h.duracao_util_minutos, h.duracao_minutos, st.sla_minutos,
+      ));
       porEtapa.set(h.stage_id, arrE);
     });
     return Array.from(m.entries())

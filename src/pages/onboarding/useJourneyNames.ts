@@ -2,10 +2,17 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
+import { criarResolvedorResponsavel, type PeriodoResponsavel } from "./responsavelNaJanela";
 
 export interface JourneyNomes {
   cliente: (journeyId: string) => string;
+  /** Responsável de HOJE. Só para rótulo de jornada — nunca para creditar uma medida. */
   responsavel: (journeyId: string) => string;
+  /**
+   * Quem era responsável DURANTE a janela medida. É o que vale no drill-down: o
+   * responsável de hoje não fez, necessariamente, o que o número mede.
+   */
+  responsavelEm: (journeyId: string, de: string | null | undefined, ate: string | null | undefined) => string;
 }
 
 interface JourneyComNome {
@@ -22,7 +29,12 @@ interface JourneyComNome {
  * próprio: o painel de SLA e o bloco de tempo de entrega precisam do mesmo mapa, e
  * duplicar o hook duplicaria a query.
  */
-export function useJourneyNames(journeys: JourneyComNome[]): JourneyNomes {
+export function useJourneyNames(
+  journeys: JourneyComNome[],
+  /** Posse por jornada e nomes de usuário — vêm do hook de filtros, que já os carrega. */
+  periodosResponsavel: Record<string, PeriodoResponsavel[]> = {},
+  nomePorUsuario: Record<string, string> = {},
+): JourneyNomes {
   const clienteIds = useMemo(
     () => Array.from(new Set(journeys.map((j) => j.cliente_id).filter(Boolean))).sort() as string[],
     [journeys],
@@ -51,9 +63,15 @@ export function useJourneyNames(journeys: JourneyComNome[]): JourneyNomes {
       cli.set(j.journey_id, (j.cliente_id && porCliente.get(j.cliente_id)) || "—");
       res.set(j.journey_id, j.responsavel_nome ?? "—");
     });
+    const responsavel = (id: string) => res.get(id) ?? "—";
     return {
       cliente: (id: string) => cli.get(id) ?? "—",
-      responsavel: (id: string) => res.get(id) ?? "—",
+      responsavel,
+      responsavelEm: criarResolvedorResponsavel(
+        periodosResponsavel,
+        (userId) => nomePorUsuario[userId] ?? "—",
+        responsavel,
+      ),
     };
-  }, [journeys, clienteNomesQ.data]);
+  }, [journeys, clienteNomesQ.data, periodosResponsavel, nomePorUsuario]);
 }

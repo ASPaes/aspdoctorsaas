@@ -14,8 +14,13 @@ const jornadas: JourneyFiltravel[] = [
 const pipelinesPorJornada: Record<string, string[]> = { j1: ["p1", "p2"], j2: ["p1"], j3: ["p3"], j4: [] };
 const participantesPorJornada: Record<string, string[]> = { j1: ["u1", "u9"], j2: ["u2"], j3: ["u1"], j4: [] };
 
-function filtrar(f: Partial<typeof FILTRO_VAZIO>) {
-  return [...filtrarJornadas(jornadas, { ...FILTRO_VAZIO, ...f }, pipelinesPorJornada, participantesPorJornada)].sort();
+/** j2 está hoje com u2, mas quem fez o onboarding dela foi u7. */
+const responsaveisPorJornada: Record<string, string[]> = { j2: ["u7", "u2"] };
+
+function filtrar(f: Partial<typeof FILTRO_VAZIO>, hist: Record<string, string[]> = {}) {
+  return [
+    ...filtrarJornadas(jornadas, { ...FILTRO_VAZIO, ...f }, pipelinesPorJornada, participantesPorJornada, hist),
+  ].sort();
 }
 
 describe("filtrarJornadas", () => {
@@ -43,6 +48,17 @@ describe("filtrarJornadas", () => {
   it("jornada sem responsável/demanda/pipeline some quando o filtro é usado", () => {
     expect(filtrar({ responsavelIds: ["u1"] })).not.toContain("j4");
     expect(filtrar({ pipelineIds: ["p1"] })).not.toContain("j4");
+  });
+
+  it("responsável é 'passou pela mão de', não 'está com'", () => {
+    // Sem o histórico, quem só fez o onboarding não encontra a própria jornada.
+    expect(filtrar({ responsavelIds: ["u7"] })).toEqual([]);
+    expect(filtrar({ responsavelIds: ["u7"] }, responsaveisPorJornada)).toEqual(["j2"]);
+  });
+
+  it("o dono de hoje continua achando a jornada mesmo sem histórico", () => {
+    expect(filtrar({ responsavelIds: ["u2"] }, responsaveisPorJornada)).toEqual(["j2"]);
+    expect(filtrar({ responsavelIds: ["u1"] }, responsaveisPorJornada)).toEqual(["j1", "j3"]);
   });
 
   it("combinação sem interseção devolve vazio", () => {

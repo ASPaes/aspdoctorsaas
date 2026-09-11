@@ -9,6 +9,11 @@
  * `pipelineIds` é "a jornada PASSOU POR este pipeline", não "está nele agora":
  * a jornada percorre um pipeline por fase (Onboarding e Implantação), então
  * perguntar em qual ela está esconderia metade do histórico.
+ *
+ * `responsavelIds` segue a MESMA regra — "passou pela mão desta pessoa". Perguntar
+ * pelo dono de hoje escondia o trabalho de quem fez o onboarding assim que o
+ * implantador assumia a jornada na fase seguinte: medido em 11/09/2026, o filtro da
+ * Amanda escondia 56 das 122 etapas dela, e o da Geice escondia as 2 que ela tinha.
  */
 
 export interface FiltroDash {
@@ -46,15 +51,30 @@ function bate(selecionados: string[], valores: (string | null)[]): boolean {
   return valores.some((v) => v != null && selecionados.includes(v));
 }
 
+/**
+ * Todo mundo que já foi responsável pela jornada. O histórico manda; o dono de hoje
+ * entra por união porque uma jornada distribuída e nunca transferida pode não ter
+ * linha de histórico nenhuma — sem a união ela sumiria de qualquer filtro.
+ */
+function responsaveisDa(
+  j: JourneyFiltravel,
+  responsaveisPorJornada: Record<string, string[]>,
+): (string | null)[] {
+  const s = new Set<string>(responsaveisPorJornada[j.journey_id] ?? []);
+  if (j.responsavel_user_id) s.add(j.responsavel_user_id);
+  return Array.from(s);
+}
+
 export function filtrarJornadas(
   journeys: JourneyFiltravel[],
   filtro: FiltroDash,
   pipelinesPorJornada: Record<string, string[]>,
   participantesPorJornada: Record<string, string[]>,
+  responsaveisPorJornada: Record<string, string[]> = {},
 ): Set<string> {
   const out = new Set<string>();
   journeys.forEach((j) => {
-    if (!bate(filtro.responsavelIds, [j.responsavel_user_id])) return;
+    if (!bate(filtro.responsavelIds, responsaveisDa(j, responsaveisPorJornada))) return;
     if (!bate(filtro.demandTypeIds, [j.demand_type_id])) return;
     if (!bate(filtro.pipelineIds, pipelinesPorJornada[j.journey_id] ?? [])) return;
     if (!bate(filtro.participanteIds, participantesPorJornada[j.journey_id] ?? [])) return;

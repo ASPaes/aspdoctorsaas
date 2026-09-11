@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { FILTRO_VAZIO, filtrarJornadas, filtroAtivo, type FiltroDash, type JourneyFiltravel } from "./dashFilters";
+import type { PeriodoResponsavel } from "./responsavelNaJanela";
 
 export interface OpcaoFiltro {
   id: string;
@@ -94,6 +95,32 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
     },
   });
 
+  /** Todo mundo que já foi responsável por cada jornada.
+   *  A jornada troca de mão ao entrar na Implantação, então o dono de hoje não conta a
+   *  história: sem isto, o filtro de uma pessoa escondia as etapas que ela mesma fez. */
+  const responsaveisQ = useQuery({
+    queryKey: ["onb-dash-filtro-responsaveis-hist", tenantId],
+    enabled: enabled && !!tenantId,
+    queryFn: async () => {
+      const rows = await fetchAllRows<{ journey_id: string; user_id: string | null; de: string; ate: string | null }>(() =>
+        (supabase.from("onboarding_responsavel_history" as any) as any)
+          .select("journey_id, user_id, de, ate")
+          .eq("tenant_id", tenantId!),
+      );
+      // Dois recortes do mesmo histórico: o filtro só precisa de "quem passou"; o
+      // drill-down precisa de QUANDO, para dizer quem estava na janela medida.
+      const porJornada: Record<string, string[]> = {};
+      const periodos: Record<string, PeriodoResponsavel[]> = {};
+      rows.forEach((r) => {
+        if (!r.user_id) return;
+        const arr = (porJornada[r.journey_id] ||= []);
+        if (!arr.includes(r.user_id)) arr.push(r.user_id);
+        (periodos[r.journey_id] ||= []).push({ userId: r.user_id, de: r.de, ate: r.ate });
+      });
+      return { porJornada, periodos };
+    },
+  });
+
   /** pipeline_id → posição da fase que ele atende, tirada da própria view de passagens.
    *  Casar por NOME de fase não serve: cada tenant tem o seu conjunto e os nomes se
    *  repetem entre eles (14 fases chamadas "Onboarding" no banco). */
@@ -107,6 +134,8 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
 
   const pipelinesPorJornada = useMemo(() => phasesQ.data?.porJornada ?? {}, [phasesQ.data]);
   const participantesPorJornada = useMemo(() => participantsQ.data ?? {}, [participantsQ.data]);
+  const responsaveisPorJornada = useMemo(() => responsaveisQ.data?.porJornada ?? {}, [responsaveisQ.data]);
+  const periodosResponsavel = useMemo(() => responsaveisQ.data?.periodos ?? {}, [responsaveisQ.data]);
 
   /** Pessoas: responsáveis das jornadas + participantes. Nome via profiles → funcionarios. */
   const pessoaIds = useMemo(() => {
@@ -114,9 +143,10 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
     journeys.forEach((j) => {
       if (j.responsavel_user_id) s.add(j.responsavel_user_id);
     });
+    Object.values(responsaveisPorJornada).forEach((arr) => arr.forEach((u) => s.add(u)));
     Object.values(participantesPorJornada).forEach((arr) => arr.forEach((u) => s.add(u)));
     return Array.from(s).sort();
-  }, [journeys, participantesPorJornada]);
+  }, [journeys, responsaveisPorJornada, participantesPorJornada]);
 
   const pessoasQ = useQuery({
     queryKey: ["onb-dash-filtro-pessoas", pessoaIds.join(",")],
@@ -138,7 +168,12 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
   const nomes = useMemo(() => pessoasQ.data ?? {}, [pessoasQ.data]);
 
   const opcoes = useMemo(() => {
-    const responsavelIds = Array.from(new Set(journeys.map((j) => j.responsavel_user_id).filter(Boolean))) as string[];
+    /** Mesma régua do filtro: quem PASSOU pela jornada. Listar só o dono de hoje
+     *  deixava fora da lista quem só fez onboarding e nunca ficou com a jornada. */
+    const responsavelIds = Array.from(new Set([
+      ...journeys.map((j) => j.responsavel_user_id),
+      ...Object.values(responsaveisPorJornada).flat(),
+    ].filter(Boolean))) as string[];
     const participanteIds = Array.from(new Set(Object.values(participantesPorJornada).flat()));
     const paraOpcao = (ids: string[]): OpcaoFiltro[] =>
       ids.map((id) => ({ id, nome: nomes[id] ?? "—" })).sort((a, b) => a.nome.localeCompare(b.nome));
@@ -148,11 +183,11 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
       responsaveis: paraOpcao(responsavelIds),
       participantes: paraOpcao(participanteIds),
     };
-  }, [journeys, participantesPorJornada, nomes, pipelinesQ.data, demandTypesQ.data]);
+  }, [journeys, responsaveisPorJornada, participantesPorJornada, nomes, pipelinesQ.data, demandTypesQ.data]);
 
   const allowedByFilter = useMemo(
-    () => filtrarJornadas(journeys, filtro, pipelinesPorJornada, participantesPorJornada),
-    [journeys, filtro, pipelinesPorJornada, participantesPorJornada],
+    () => filtrarJornadas(journeys, filtro, pipelinesPorJornada, participantesPorJornada, responsaveisPorJornada),
+    [journeys, filtro, pipelinesPorJornada, participantesPorJornada, responsaveisPorJornada],
   );
 
   return {
@@ -164,5 +199,9 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
     allowedByFilter,
     pipelineIds: filtro.pipelineIds,
     fasePorPipeline,
+    /** Posse por jornada, com datas — é o que o drill-down usa para nomear quem fez. */
+    periodosResponsavel,
+    /** user_id → nome, já resolvido para os filtros. Evita uma segunda query igual. */
+    nomePorUsuario: nomes,
   };
 }
