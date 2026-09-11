@@ -149,6 +149,10 @@ describe("desfechoTreino", () => {
     expect(desfechoTreino("cancelado")).toBe("cancelado");
     expect(desfechoTreino("realizado")).toBe("realizado");
   });
+
+  it("desistência do cliente é desfecho próprio, não um cancelamento", () => {
+    expect(desfechoTreino("desistencia")).toBe("desistencia");
+  });
 });
 
 describe("agregarTreinos", () => {
@@ -172,6 +176,23 @@ describe("agregarTreinos", () => {
     expect(a.cancelado).toBe(1);
     expect(a.emAberto).toBe(1);
     expect(a.validos).toBe(10);
+  });
+
+  it("desistência conta como válida e NÃO como realizada", () => {
+    // O cliente recusou o treinamento: o treino terminou, só não foi entregue. Fora do
+    // denominador, recusar treinamento MELHORARIA a taxa de realização.
+    const a = agregarTreinos([...julhoDigiOffice, t({ status: "desistencia" })]);
+    expect(a.desistencia).toBe(1);
+    expect(a.realizado).toBe(9);
+    expect(a.validos).toBe(11);
+    expect(a.desistenciaPct).toBe(9.1);
+    expect(a.realizadoPct).toBe(81.8); // era 90 com 9 de 10
+  });
+
+  it("cancelamento continua fora do denominador; desistência não", () => {
+    const so = (status: string) => agregarTreinos([t({ status: "realizado" }), t({ status })]);
+    expect(so("cancelado").validos).toBe(1);
+    expect(so("desistencia").validos).toBe(2);
   });
 
   it("a taxa de no-show mede treinos que faltaram, não desfecho parado em no_show", () => {

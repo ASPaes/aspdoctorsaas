@@ -39,6 +39,7 @@ export interface TrainingCardRow {
   demand_type_cor: string | null;
   etapa_entrou_em: string | null;
   cancelado_em: string | null;
+  cancelado_por_nome: string | null;
   implantacao_iniciada_em: string | null;
   /** Cancelado já dentro da Implantação. Cancelado antes disso nem chega aqui:
    *  para a Implantação aquele treinamento nunca existiu. */
@@ -88,6 +89,7 @@ const STATUS_COR: Record<string, string> = {
   realizado: "#22C55E",
   no_show: "#EF4444",
   cancelado: "#334155",
+  desistencia: "#F97316",
 };
 
 function iniciais(nome: string | null): string {
@@ -123,6 +125,10 @@ interface GrupoResumo {
   journeyId: string;
   filhos: TrainingCardRow[];
   feitos: number;
+  /** Encerrados por desistência do cliente — contam como fechados, não como entregues. */
+  desistencias: number;
+  /** feitos + desistências: é isto que libera o go-live e enche a barra. */
+  encerrados: number;
   total: number;
   cancelados: number;
   semDono: number;
@@ -141,6 +147,10 @@ function chaveDoPai(r: TrainingCardRow): string {
 function resumirGrupo(chave: string, filhos: TrainingCardRow[]): GrupoResumo {
   const validos = filhos.filter((f) => f.status !== "cancelado");
   const feitos = validos.filter((f) => f.status === "realizado").length;
+  // A desistência fecha o sub-ticket sem treino entregue. Deixá-la fora daqui travava a
+  // barra abaixo de 100% e escondia o "liberado para concluir" de um pai que o go-live
+  // já aceita — fn_onb_treinos_em_aberto não conta desistência como pendência.
+  const desistencias = validos.filter((f) => f.status === "desistencia").length;
   const responsaveis = new Set(filhos.map((f) => f.conduzido_por).filter(Boolean));
   return {
     chave,
@@ -149,15 +159,19 @@ function resumirGrupo(chave: string, filhos: TrainingCardRow[]): GrupoResumo {
     journeyId: filhos[0]?.journey_id ?? "",
     filhos: [...filhos].sort((a, b) => (a.sub_seq ?? 0) - (b.sub_seq ?? 0)),
     feitos,
+    desistencias,
+    encerrados: feitos + desistencias,
     total: validos.length,
     cancelados: filhos.length - validos.length,
-    semDono: validos.filter((f) => !f.conduzido_por).length,
+    semDono: validos.filter((f) => !f.conduzido_por && f.status !== "desistencia").length,
     responsaveis: responsaveis.size,
-    pronto: validos.length > 0 && feitos === validos.length,
-    ultimoFeito: validos.reduce<string | null>(
-      (acc, f) => (f.realizado_em && (!acc || f.realizado_em > acc) ? f.realizado_em : acc),
-      null,
-    ),
+    pronto: validos.length > 0 && feitos + desistencias === validos.length,
+    ultimoFeito: validos.reduce<string | null>((acc, f) => {
+      // Desistência não tem `realizado_em`; sem isto o pai encerrado por desistência
+      // caía no fim da coluna de conclusão, como se nada tivesse acontecido nele.
+      const quando = f.realizado_em ?? (f.status === "desistencia" ? f.cancelado_em : null);
+      return quando && (!acc || quando > acc) ? quando : acc;
+    }, null),
   };
 }
 
@@ -176,7 +190,7 @@ function GrupoTicketCard({
   onDragStartFilho?: (e: DragEvent<HTMLDivElement>, f: TrainingCardRow) => void;
   onDragEndFilho?: () => void;
 }) {
-  const pct = g.total > 0 ? Math.round((g.feitos / g.total) * 100) : 0;
+  const pct = g.total > 0 ? Math.round((g.encerrados / g.total) * 100) : 0;
   return (
     <div
       onClick={onOpen}
@@ -203,9 +217,11 @@ function GrupoTicketCard({
         <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
       </div>
       <div className="flex justify-between gap-2 mt-1.5 text-[10px] text-muted-foreground">
-        <span>{g.feitos} de {g.total} {g.total === 1 ? "concluído" : "concluídos"}</span>
+        <span>{g.encerrados} de {g.total} {g.total === 1 ? "concluído" : "concluídos"}</span>
         <span>
-          {g.cancelados > 0
+          {g.desistencias > 0
+            ? `${g.desistencias} ${g.desistencias > 1 ? "desistências" : "desistência"}`
+            : g.cancelados > 0
             ? `${g.cancelados} cancelado${g.cancelados > 1 ? "s" : ""}`
             : g.semDono > 0
               ? `${g.semDono} sem responsável`
@@ -241,7 +257,9 @@ function GrupoTicketCard({
               >
                 {f.status === "realizado"
                   ? "✓"
-                  : f.status === "cancelado"
+                  : f.status === "desistencia"
+                    ? "desistência"
+                    : f.status === "cancelado"
                     ? "cancelado"
                     : f.agendado_para
                       ? formatTrainingDateTime(f.agendado_para).split(" ")[0]
@@ -512,6 +530,9 @@ export default function ImplantacaoBoard({
 
                     {items.map((t) => {
                       const feito = t.status === "realizado";
+                      // Só aparece aqui quando o pipeline não tem coluna de conclusão:
+                      // com ela, a desistência já nasce lá e entra no cartão do pai.
+                      const desistiu = t.status === "desistencia";
                       // Pelo STATUS, não pela presença da data: depois de um no-show a
                       // `agendado_para` é limpa, mas os treinos anteriores a 11/08 ainda
                       // carregam a data do treino que não aconteceu — e anunciavam
@@ -531,7 +552,7 @@ export default function ImplantacaoBoard({
                           className={`bg-card border rounded-md p-2.5 hover:border-primary/40 transition-all cursor-pointer active:cursor-grabbing ${
                             draggingId === t.training_id ? "opacity-40 scale-95" : ""
                           }`}
-                          style={feito ? { borderColor: "#22C55E" } : undefined}
+                          style={feito ? { borderColor: "#22C55E" } : desistiu ? { borderColor: "#F97316" } : undefined}
                         >
                           {agendado && (
                             <div
@@ -572,7 +593,16 @@ export default function ImplantacaoBoard({
                                 realizado
                               </span>
                             )}
-                            {!feito && !agendado && (
+                            {desistiu && (
+                              <span
+                                className="ml-auto text-[9px] px-1.5 py-0.5 rounded text-white"
+                                style={{ background: "#F97316" }}
+                                title={t.cancelado_por_nome ? `Encerrado por ${t.cancelado_por_nome}` : undefined}
+                              >
+                                desistência
+                              </span>
+                            )}
+                            {!feito && !agendado && !desistiu && (
                               <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded text-white" style={{ background: "#64748B" }}>
                                 sem data
                               </span>

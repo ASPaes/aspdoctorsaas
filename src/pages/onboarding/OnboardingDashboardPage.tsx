@@ -13,8 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   Loader2, CheckCircle2, AlertTriangle, UserCheck, GraduationCap,
-  RotateCcw, TrendingUp, Info, Pause, UserX,
+  RotateCcw, TrendingUp, Info, Pause, UserX, HeartCrack,
 } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 
 import { startOfMonth, endOfMonth } from "date-fns";
 import OnboardingSlaOverview from "./OnboardingSlaOverview";
@@ -67,6 +68,10 @@ interface TrainingRow {
   conduzido_por: string | null;
   realizado_em: string | null;
   agendado_para: string | null;
+  titulo: string | null;
+  /** Quem/quando encerrou o sub-ticket — vale para cancelado e para desistência. */
+  cancelado_em: string | null;
+  cancelado_por: string | null;
 }
 
 
@@ -90,6 +95,7 @@ export default function OnboardingDashboardPage() {
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
+  const [desistenciasAbertas, setDesistenciasAbertas] = useState(false);
 
   const journeysQ = useQuery({
     queryKey: ["onboarding-dash-journeys", effectiveTenantId, viewKey],
@@ -112,7 +118,7 @@ export default function OnboardingDashboardPage() {
     queryFn: async () => {
       const rows = await fetchAllRows<TrainingRow>(() =>
         (supabase.from("vw_onboarding_training_kpis" as any) as any)
-          .select("journey_id, training_type_id, tipo_nome, conta_como_pdv, status, no_show, no_shows, tentativas, proprietario_presente, is_retreinamento, conduzido_por, agendado_para, realizado_em")
+          .select("id, journey_id, training_type_id, tipo_nome, conta_como_pdv, status, no_show, no_shows, tentativas, proprietario_presente, is_retreinamento, conduzido_por, agendado_para, realizado_em, titulo, cancelado_em, cancelado_por")
           .eq("tenant_id", effectiveTenantId)
       );
       return rows;
@@ -325,21 +331,28 @@ export default function OnboardingDashboardPage() {
   }, [vendorReturnsPeriodo]);
 
 
-  // Treinos no período: usa realizado_em quando existe, senão agendado_para
+  // Treinos no período: usa realizado_em quando existe, senão agendado_para.
+  // A desistência não tem `realizado_em` e pode nem ter chegado a ser agendada — para
+  // ela o que aconteceu no período foi o encerramento.
   const trainings = useMemo(() => {
     const from = dateRange.from.getTime();
     const to = dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1;
     return (trainingsAllQ.data ?? []).filter((t) => {
-      const ref = t.realizado_em || t.agendado_para;
+      const ref = t.realizado_em
+        || (t.status === "desistencia" ? t.cancelado_em : null)
+        || t.agendado_para;
       if (!ref) return false;
       const d = new Date(ref).getTime();
       return d >= from && d <= to && t.journey_id != null && allowedJourneyIds.has(t.journey_id);
     });
   }, [trainingsAllQ.data, dateRange, allowedJourneyIds]);
 
-  // Resolver nomes dos implantadores via profiles → funcionarios
+  // Resolver nomes via profiles → funcionarios. Entra quem conduziu o treino e também
+  // quem encerrou o sub-ticket: a lista de desistências mostra os dois.
   const conduzidoIds = useMemo(
-    () => Array.from(new Set(trainings.map((t) => t.conduzido_por).filter(Boolean))) as string[],
+    () => Array.from(new Set(
+      trainings.flatMap((t) => [t.conduzido_por, t.cancelado_por]).filter(Boolean),
+    )) as string[],
     [trainings]
   );
 
@@ -364,6 +377,16 @@ export default function OnboardingDashboardPage() {
 
   // KPIs treinos — desfecho vem do status; falta vem do contador `no_shows`.
   const tr = useMemo(() => agregarTreinos(trainings), [trainings]);
+
+  /** Lista do drill-down de desistências: quem desistiu, de qual treino e quem encerrou.
+   *  Mais recente primeiro — é o que o gestor quer ver ao abrir. */
+  const desistencias = useMemo(
+    () =>
+      trainings
+        .filter((t) => t.status === "desistencia")
+        .sort((a, b) => (b.cancelado_em ?? "").localeCompare(a.cancelado_em ?? "")),
+    [trainings],
+  );
 
   /** Faltas do treino. O contador manda; a flag pegajosa cobre o que é anterior ao
    *  backfill de 11/08. Contar falta pelo DESFECHO zeraria as colunas: desde 11/08 o
@@ -397,15 +420,16 @@ export default function OnboardingDashboardPage() {
 
   // Tabela por tipo de treino
   const byTipo = useMemo(() => {
-    const m: Record<string, { nome: string; previstos: number; realizados: number; no_show: number; cancelados: number }> = {};
+    const m: Record<string, { nome: string; previstos: number; realizados: number; no_show: number; desistencias: number; cancelados: number }> = {};
     trainings.forEach((t) => {
       const key = t.training_type_id || "__sem__";
       const nome = t.tipo_nome || "Sem tipo";
-      if (!m[key]) m[key] = { nome, previstos: 0, realizados: 0, no_show: 0, cancelados: 0 };
+      if (!m[key]) m[key] = { nome, previstos: 0, realizados: 0, no_show: 0, desistencias: 0, cancelados: 0 };
       switch (desfechoTreino(t.status)) {
         case "em_aberto": m[key].previstos += 1; break;
         case "realizado": m[key].realizados += 1; break;
         case "no_show": m[key].previstos += 1; break; // desfecho residual: segue em aberto
+        case "desistencia": m[key].desistencias += 1; break;
         case "cancelado": m[key].cancelados += 1; break;
       }
       m[key].no_show += faltasDe(t);
@@ -532,7 +556,7 @@ export default function OnboardingDashboardPage() {
           {/* KPI Row 2: Treinos */}
           <section>
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Treinamentos no período</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <KpiCard
                 icon={AlertTriangle}
                 label="Taxa de no-show"
@@ -560,6 +584,19 @@ export default function OnboardingDashboardPage() {
                 sub={`${tr.validos} válidos · ${tr.cancelado} cancelados`}
                 tone="info"
               />
+              <KpiCard
+                icon={HeartCrack}
+                label="Desistências"
+                value={String(tr.desistencia)}
+                sub={
+                  tr.desistencia === 0
+                    ? "nenhum cliente recusou treinamento no período"
+                    : `${tr.desistenciaPct}% dos ${tr.validos} válidos · clique para ver quem`
+                }
+                tone={tr.desistencia === 0 ? "default" : tr.desistenciaPct < 10 ? "warning" : "danger"}
+                subTone={tr.desistencia === 0 ? "muted" : "warning"}
+                onClick={tr.desistencia > 0 ? () => setDesistenciasAbertas(true) : undefined}
+              />
             </div>
           </section>
 
@@ -580,6 +617,7 @@ export default function OnboardingDashboardPage() {
                       <th className="px-3 py-2 font-medium text-right">Previstos</th>
                       <th className="px-3 py-2 font-medium text-right">Realizados</th>
                       <th className="px-3 py-2 font-medium text-right">No-show</th>
+                      <th className="px-3 py-2 font-medium text-right">Desistência</th>
                       <th className="px-3 py-2 font-medium text-right">Cancelados</th>
                     </tr>
                   </thead>
@@ -591,6 +629,9 @@ export default function OnboardingDashboardPage() {
                         <td className="px-3 py-2 text-right text-[hsl(142_71%_45%)] font-medium">{row.realizados}</td>
                         <td className={`px-3 py-2 text-right ${row.no_show > 0 ? "text-destructive font-medium" : ""}`}>
                           {row.no_show}
+                        </td>
+                        <td className={`px-3 py-2 text-right ${row.desistencias > 0 ? "text-[hsl(25_95%_53%)] font-medium" : ""}`}>
+                          {row.desistencias}
                         </td>
                         <td className="px-3 py-2 text-right text-muted-foreground">{row.cancelados}</td>
                       </tr>
@@ -813,6 +854,54 @@ export default function OnboardingDashboardPage() {
           </section>
         </div>
       )}
+
+      {/* Drill-down do card de desistências. Fica fora do bloco de conteúdo para não
+          depender do estado de carregamento da página. */}
+      <Sheet open={desistenciasAbertas} onOpenChange={setDesistenciasAbertas}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2 text-base">
+              <HeartCrack className="h-4 w-4 text-[hsl(25_95%_53%)]" />
+              Desistências no período
+            </SheetTitle>
+            <SheetDescription className="text-xs">
+              Treinamentos que o cliente recusou. {desistencias.length}{" "}
+              {desistencias.length === 1 ? "sub-ticket encerrado" : "sub-tickets encerrados"}.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-4 space-y-2">
+            {desistencias.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-6">
+                Nenhuma desistência no período selecionado.
+              </p>
+            ) : (
+              desistencias.map((d) => (
+                <div key={d.id ?? `${d.journey_id}-${d.cancelado_em}`} className="rounded-md border border-border p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-xs font-medium">
+                      {d.journey_id ? nomes.cliente(d.journey_id) : "—"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {d.cancelado_em ? new Date(d.cancelado_em).toLocaleDateString("pt-BR") : "—"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {d.titulo || "Sem título"}
+                    {d.tipo_nome ? ` · ${d.tipo_nome}` : ""}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Encerrado por{" "}
+                    <span className="text-foreground">
+                      {(d.cancelado_por && names[d.cancelado_por]) || "—"}
+                    </span>
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

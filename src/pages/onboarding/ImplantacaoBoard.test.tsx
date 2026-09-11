@@ -53,6 +53,7 @@ function card(p: Partial<TrainingCardRow> & { training_id: string; parent_ticket
     demand_type_cor: null,
     etapa_entrou_em: null,
     cancelado_em: null,
+    cancelado_por_nome: null,
     implantacao_iniciada_em: null,
     cancelado_na_implantacao: null,
     ...p,
@@ -187,6 +188,34 @@ describe("ImplantacaoBoard — etapa final agrupada por ticket pai", () => {
     const arrastaveis = Array.from(colunaFinal().querySelectorAll('[draggable="true"]'));
     // a1, a3 (2359) + b1, b3 (2360) = 4. Os agendados e o cancelado não arrastam daqui.
     expect(arrastaveis.length).toBe(4);
+  });
+
+  it("desistência encerra o sub-ticket: barra completa e pai liberado para concluir", () => {
+    // O cliente recusou o 2º treino. Como fn_onb_treinos_em_aberto não conta desistência
+    // como pendência, o go-live já aceita este pai — o cartão tem que dizer o mesmo.
+    render([
+      card({ training_id: "d1", parent_ticket_code: "TK-2026-2500", sub_seq: 1, cliente_nome: "GULA" }),
+      card({ training_id: "d2", parent_ticket_code: "TK-2026-2500", sub_seq: 2, cliente_nome: "GULA",
+             status: "desistencia", realizado_em: null, agendado_para: null,
+             cancelado_em: "2026-09-10T14:00:00Z", cancelado_por_nome: "Alexandre" }),
+    ]);
+    const col = colunaFinal();
+    expect(col.textContent).toContain("2 de 2 concluídos");
+    expect(col.textContent).toContain("1 desistência");
+    expect(col.textContent).toContain("pronto");
+    expect(col.textContent).toContain("desistência");
+  });
+
+  it("desistência não é cancelamento: entra no total do pai", () => {
+    render([
+      card({ training_id: "e1", parent_ticket_code: "TK-2026-2501", sub_seq: 1, cliente_nome: "GULA" }),
+      card({ training_id: "e2", parent_ticket_code: "TK-2026-2501", sub_seq: 2, cliente_nome: "GULA",
+             status: "cancelado", current_stage_id: null, realizado_em: null }),
+      card({ training_id: "e3", parent_ticket_code: "TK-2026-2501", sub_seq: 3, cliente_nome: "GULA",
+             status: "desistencia", realizado_em: null, cancelado_em: "2026-09-10T14:00:00Z" }),
+    ]);
+    // 3 filhos: 1 realizado + 1 desistência = total 2; o cancelado fica de fora.
+    expect(colunaFinal().textContent).toContain("2 de 2 concluídos");
   });
 
   it("a coluna comum continua com um cartão por sub-ticket", () => {

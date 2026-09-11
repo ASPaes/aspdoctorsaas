@@ -123,7 +123,7 @@ export function contarSituacao(journeys: SituacaoLite[], range?: { from: Date; t
 
 /* ---------- treinos ---------- */
 
-export type DesfechoTreino = "realizado" | "no_show" | "cancelado" | "em_aberto";
+export type DesfechoTreino = "realizado" | "no_show" | "cancelado" | "desistencia" | "em_aberto";
 
 /**
  * O desfecho vem SÓ do `status` — ele responde "como o treino terminou".
@@ -137,6 +137,7 @@ export function desfechoTreino(status: string | null): DesfechoTreino {
   if (status === "realizado") return "realizado";
   if (status === "no_show") return "no_show";
   if (status === "cancelado") return "cancelado";
+  if (status === "desistencia") return "desistencia";
   return "em_aberto"; // previsto, agendado, null
 }
 
@@ -155,9 +156,19 @@ export interface AgregadoTreinos {
   realizado: number;
   noShow: number;
   cancelado: number;
+  /** o cliente não quis o treinamento — desfecho real, diferente de cancelamento */
+  desistencia: number;
   emAberto: number;
-  /** tudo menos cancelado — denominador de todo percentual */
+  /**
+   * Tudo menos cancelado — denominador de todo percentual.
+   *
+   * A desistência ENTRA: é desfecho do treino, e tirá-la daqui faria a taxa de
+   * realização subir justamente quando o cliente recusa treinamento. O cancelamento
+   * continua fora porque é erro operacional — treino que não deveria ter existido.
+   */
   validos: number;
+  /** % dos válidos encerrados por desistência do cliente */
+  desistenciaPct: number;
   /** treinos que faltaram ao menos uma vez, em qualquer desfecho, cancelado incluído */
   comFalta: number;
   /** total de faltas: o mesmo treino pode ter faltado 3 vezes */
@@ -176,7 +187,7 @@ export interface AgregadoTreinos {
 }
 
 export function agregarTreinos(treinos: TreinoLite[]): AgregadoTreinos {
-  let realizado = 0, noShow = 0, cancelado = 0, emAberto = 0;
+  let realizado = 0, noShow = 0, cancelado = 0, desistencia = 0, emAberto = 0;
   let comFalta = 0, faltas = 0, retreinos = 0;
   let propInformado = 0, propSim = 0, pdvFinalizados = 0;
 
@@ -185,6 +196,7 @@ export function agregarTreinos(treinos: TreinoLite[]): AgregadoTreinos {
     if (d === "realizado") realizado++;
     else if (d === "no_show") noShow++;
     else if (d === "cancelado") cancelado++;
+    else if (d === "desistencia") desistencia++;
     else emAberto++;
 
     // A falta é contada mesmo em sessão cancelada: o cliente faltou de verdade.
@@ -207,9 +219,10 @@ export function agregarTreinos(treinos: TreinoLite[]): AgregadoTreinos {
     }
   });
 
-  const validos = realizado + noShow + emAberto;
+  const validos = realizado + noShow + desistencia + emAberto;
   return {
-    realizado, noShow, cancelado, emAberto, validos, comFalta, faltas,
+    realizado, noShow, cancelado, desistencia, emAberto, validos, comFalta, faltas,
+    desistenciaPct: pct(desistencia, validos),
     noShowRate: pct(comFalta, validos),
     realizadoPct: pct(realizado, validos),
     retreinos,

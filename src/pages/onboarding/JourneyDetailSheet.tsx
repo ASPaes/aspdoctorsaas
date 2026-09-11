@@ -579,6 +579,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [linkEditId, setLinkEditId] = useState<string | null>(null);
   const [linkEditValue, setLinkEditValue] = useState("");
+  /** Treino em vias de ser encerrado — o diálogo pergunta o motivo antes de agir. */
+  const [encerrarTreino, setEncerrarTreino] = useState<{ id: string; titulo: string; ticket_code: string | null } | null>(null);
+  const [motivoEncerrar, setMotivoEncerrar] = useState<"desistencia" | "cancelado">("desistencia");
 
   // Modules
   const [addModuleOpen, setAddModuleOpen] = useState(false);
@@ -877,7 +880,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     enabled: !!journeyId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_training_sessions" as any) as any)
-        .select("id, titulo, status, agendado_para, realizado_em, tentativas, no_show, no_shows, ultimo_no_show_em, proprietario_presente, is_retreinamento, conduzido_por, ticket_id, link_agendamento, training_type_id, ticket:ticket_id(ticket_code, sub_seq), participantes:onboarding_training_participants(id, presente)")
+        .select("id, titulo, status, agendado_para, realizado_em, tentativas, no_show, no_shows, ultimo_no_show_em, proprietario_presente, is_retreinamento, conduzido_por, ticket_id, link_agendamento, training_type_id, cancelado_em, cancelado_por, ticket:ticket_id(ticket_code, sub_seq), participantes:onboarding_training_participants(id, presente)")
         .eq("journey_id", journeyId)
         .is("deleted_at", null)
         .order("agendado_para", { ascending: true, nullsFirst: false });
@@ -1912,7 +1915,43 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       qc.invalidateQueries({ queryKey: ["onboarding-training", journeyId] });
       qc.invalidateQueries({ queryKey: ["onboarding-board-trainings"] });
       qc.invalidateQueries({ queryKey: ["onboarding-training-cards"] });
-      toast.success("Treino marcado como realizado");
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+      toast.success(
+        res?.moveu
+          ? "Treino realizado · sub-ticket foi para os finalizados"
+          : "Treino marcado como realizado",
+      );
+    } catch (e: any) { toast.error(e.message || "Erro"); }
+  }
+
+  /** Desistência do cliente: o treinamento não vai acontecer porque ele não quis.
+   *  Diferente do cancelamento — o sub-ticket é ENCERRADO na coluna de conclusão e a
+   *  jornada continua na Implantação, em vez de voltar para o Onboarding. */
+  async function handleDesistencia(id: string) {
+    try {
+      const { data, error } = await (supabase.rpc as any)("desistir_onboarding_training", {
+        p_training_id: id,
+      });
+      if (error) throw error;
+      const res = data as any;
+      if (res?.ok === false) {
+        toast.error(
+          res.reason === "treino_realizado" ? "Treino já realizado não vira desistência." :
+          res.reason === "treino_cancelado" ? "Este treinamento já foi cancelado." :
+          res.reason === "treino_excluido"  ? "Este treinamento foi excluído." :
+          "Não foi possível encerrar o treinamento.",
+        );
+        return;
+      }
+      qc.invalidateQueries({ queryKey: ["onboarding-training", journeyId] });
+      qc.invalidateQueries({ queryKey: ["onboarding-board-trainings"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-training-cards"] });
+      qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+      toast.success(
+        res?.moveu
+          ? "Desistência registrada · sub-ticket foi para os finalizados"
+          : "Desistência registrada",
+      );
     } catch (e: any) { toast.error(e.message || "Erro"); }
   }
 
@@ -2711,10 +2750,19 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                 realizado: "hsl(142 71% 45%)",
                                 no_show: "hsl(0 84% 60%)",
                                 cancelado: "hsl(215 25% 27%)",
+                                desistencia: "hsl(25 95% 53%)",
+                              };
+                              const statusLabels: Record<string, string> = {
+                                no_show: "no-show",
+                                desistencia: "desistência",
                               };
                               const conductorName = t.conduzido_por ? memberNameMap.get(t.conduzido_por) : null;
                               const isDone = t.status === "realizado";
+                              const isDesistencia = t.status === "desistencia";
                               const isCancelled = t.status === "cancelado";
+                              // Cancelado e desistência são desfechos fechados: nada mais se faz com eles.
+                              const isEncerrado = isCancelled || isDesistencia;
+                              const encerradoPor = t.cancelado_por ? memberNameMap.get(t.cancelado_por) : null;
                               const parts: Array<{ presente: boolean | null }> = t.participantes ?? [];
                               const partTotal = parts.length;
                               const partPresentes = parts.filter((p) => p.presente === true).length;
@@ -2733,12 +2781,20 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                       className="text-[10px] capitalize border-0 text-white"
                                       style={{ backgroundColor: statusColors[t.status] || statusColors.previsto }}
                                     >
-                                      {t.status.replace("_", "-")}
+                                      {statusLabels[t.status] ?? t.status}
                                     </Badge>
                                   </div>
                                   <div className="text-[10px] text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
                                     {t.agendado_para && <span>Agendado: {formatDateTime(t.agendado_para)}</span>}
                                     {t.realizado_em && <span>Realizado: {formatDateTime(t.realizado_em)}</span>}
+                                    {/* Quem encerrou o sub-ticket. Vale para os dois desfechos manuais —
+                                        antes o banco já guardava e a tela nunca mostrava. */}
+                                    {t.cancelado_em && (
+                                      <span className={isDesistencia ? "text-[hsl(25_95%_53%)]" : undefined}>
+                                        {isDesistencia ? "Desistência" : "Cancelado"}: {formatDateTime(t.cancelado_em)}
+                                        {encerradoPor ? ` · por ${encerradoPor}` : ""}
+                                      </span>
+                                    )}
                                     {conductorName && <span>Por: {conductorName}</span>}
                                     <button
                                       type="button"
@@ -2815,7 +2871,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                       </span>
                                     )
                                   )}
-                                  {!isCancelled && (
+                                  {!isEncerrado && (
                                     <div className="flex items-center gap-1 mt-2 flex-wrap">
                                       <Button size="sm" variant="outline" className="h-6 text-[10px] px-2"
                                         onClick={() => setEditTraining({
@@ -2901,8 +2957,15 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                         </PopoverContent>
                                       </Popover>
                                       <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-muted-foreground"
-                                        onClick={() => handleCancelTraining(t.id)}>
-                                        Cancelar
+                                        onClick={() => {
+                                          setMotivoEncerrar("desistencia");
+                                          setEncerrarTreino({
+                                            id: t.id,
+                                            titulo: t.titulo,
+                                            ticket_code: t.ticket?.ticket_code ?? null,
+                                          });
+                                        }}>
+                                        <XCircle className="h-3 w-3 mr-1" /> Encerrar
                                       </Button>
                                     </div>
                                   )}
@@ -3996,6 +4059,81 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
         qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
       }}
     />
+
+    {/* Encerrar treinamento. Os dois desfechos manuais moram no mesmo diálogo porque a
+        diferença entre eles não é de rótulo, é de consequência — e quem clica precisa
+        ler a consequência antes de escolher. */}
+    <Dialog open={!!encerrarTreino} onOpenChange={(v) => { if (!v) setEncerrarTreino(null); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <XCircle className="h-5 w-5 text-muted-foreground" />
+            Encerrar o treinamento
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3 pt-1">
+          <div className="text-xs text-muted-foreground">
+            {encerrarTreino?.ticket_code && (
+              <span className="font-mono text-primary font-semibold">{encerrarTreino.ticket_code} · </span>
+            )}
+            {encerrarTreino?.titulo}
+          </div>
+
+          {([
+            {
+              valor: "desistencia" as const,
+              titulo: "Cliente desistiu",
+              descricao: "Ele não quis este treinamento. O sub-ticket é encerrado em “Sub-tickets Finalizados”, entra no painel como desistência e a implantação segue para o go-live.",
+              cor: "hsl(25 95% 53%)",
+            },
+            {
+              valor: "cancelado" as const,
+              titulo: "Cancelar (engano)",
+              descricao: "O treinamento não deveria existir. O sub-ticket sai do quadro e, se era o único treino ativo, a jornada volta para o Onboarding.",
+              cor: "hsl(215 25% 27%)",
+            },
+          ]).map((op) => {
+            const ativo = motivoEncerrar === op.valor;
+            return (
+              <button
+                key={op.valor}
+                type="button"
+                onClick={() => setMotivoEncerrar(op.valor)}
+                className={`w-full text-left rounded-lg border p-3 transition-all duration-300 ${
+                  ativo ? "border-transparent ring-2 shadow-sm" : "border-border hover:bg-muted/50"
+                }`}
+                style={ativo ? { boxShadow: `0 0 0 2px ${op.cor}`, background: `${op.cor}0F` } : undefined}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ background: ativo ? op.cor : "hsl(215 16% 47% / 0.4)" }}
+                  />
+                  <span className="text-sm font-medium">{op.titulo}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{op.descricao}</p>
+              </button>
+            );
+          })}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setEncerrarTreino(null)}>Voltar</Button>
+          <Button
+            onClick={() => {
+              const alvo = encerrarTreino;
+              if (!alvo) return;
+              setEncerrarTreino(null);
+              if (motivoEncerrar === "desistencia") handleDesistencia(alvo.id);
+              else handleCancelTraining(alvo.id);
+            }}
+          >
+            Encerrar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <TrainingParticipantsDialog
       open={!!participantsTraining}
