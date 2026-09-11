@@ -6,8 +6,8 @@ const DIGI = "955178ba-b367-498d-8443-cc5b7d1ee163";
 const OUTRO = "3fa12bfa-37cc-415e-baf0-cd205e4c51cb"; // Delvale
 
 describe("podeVerMeuPainel — piloto fechado", () => {
-  it("o piloto está restrito à ASP e só a ela", () => {
-    expect(TENANTS_LIBERADOS).toEqual([ASP]);
+  it("o piloto está restrito à ASP e à Digi Office", () => {
+    expect(TENANTS_LIBERADOS).toEqual([ASP, DIGI]);
   });
 
   it("admin da ASP entra", () => {
@@ -18,8 +18,16 @@ describe("podeVerMeuPainel — piloto fechado", () => {
     expect(podeVerMeuPainel({ tenantId: ASP, role: "head", isSuperAdmin: false })).toBe(true);
   });
 
-  it("a Digi Office NÃO entra mais — foi tirada do piloto em 10/09", () => {
-    expect(podeVerMeuPainel({ tenantId: DIGI, role: "admin", isSuperAdmin: false })).toBe(false);
+  it("admin da Digi Office entra — voltou ao piloto em 11/09", () => {
+    expect(podeVerMeuPainel({ tenantId: DIGI, role: "admin", isSuperAdmin: false })).toBe(true);
+  });
+
+  it("head da Digi Office entra", () => {
+    expect(podeVerMeuPainel({ tenantId: DIGI, role: "head", isSuperAdmin: false })).toBe(true);
+  });
+
+  it("operador da Digi Office não entra", () => {
+    expect(podeVerMeuPainel({ tenantId: DIGI, role: "user", isSuperAdmin: false })).toBe(false);
   });
 
   it("admin de tenant fora do piloto NÃO entra", () => {
