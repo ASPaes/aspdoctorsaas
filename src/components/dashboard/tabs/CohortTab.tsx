@@ -28,6 +28,9 @@ interface CohortTabProps {
   fornecedorId?: number | null;
   fornecedorIds?: number[];
   unidadeBaseId?: number | null;
+  /** Sobe a escolha de fornecedor para o Dashboard: o estado é dele, as outras
+   *  abas dependem do mesmo valor. */
+  onFornecedorChange?: (ids: number[]) => void;
 }
 
 
@@ -58,14 +61,20 @@ function formatCohortLabel(month: string): string {
   catch { return month; }
 }
 
-export function CohortTab({ tvMode = false, fornecedorId, fornecedorIds, unidadeBaseId }: CohortTabProps) {
+export function CohortTab({ tvMode = false, fornecedorId, fornecedorIds, unidadeBaseId, onFornecedorChange }: CohortTabProps) {
   const [ageWindow, setAgeWindow] = useState<string>('12');
   const [cohortRange, setCohortRange] = useState<string>('12');
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [metricMode, setMetricMode] = useState<'logo' | 'revenue'>('logo');
   const [dim, setDim] = useState<'uf' | 'segmento' | 'canal' | 'faixa_ticket'>('uf');
   const [filtros, setFiltros] = useState<CohortFiltros>(COHORT_FILTROS_VAZIO);
-  const filtrosAtivos = contarFiltrosAtivos(filtros);
+  const filtrosAtivos = contarFiltrosAtivos(filtros) + ((fornecedorIds?.length ?? 0) > 0 ? 1 : 0);
+  const propsBarra = {
+    value: filtros,
+    onChange: setFiltros,
+    fornecedorIds: fornecedorIds ?? [],
+    onFornecedorChange: onFornecedorChange ?? (() => {}),
+  };
 
   const fromMonth = format(subMonths(new Date(), Number(cohortRange)), 'yyyy-MM');
   const toMonth = format(new Date(), 'yyyy-MM');
@@ -308,7 +317,7 @@ export function CohortTab({ tvMode = false, fornecedorId, fornecedorIds, unidade
   if (isLoading) {
     return (
       <div className="space-y-4 mt-4">
-        <CohortFiltrosBar value={filtros} onChange={setFiltros} />
+        <CohortFiltrosBar {...propsBarra} />
         <div className="flex gap-4">
           <Skeleton className="h-10 w-48" />
           <Skeleton className="h-10 w-48" />
@@ -322,13 +331,17 @@ export function CohortTab({ tvMode = false, fornecedorId, fornecedorIds, unidade
   if (cohorts.length === 0) {
     return (
       <div className="space-y-4 mt-4">
-        <CohortFiltrosBar value={filtros} onChange={setFiltros} />
+        <CohortFiltrosBar {...propsBarra} />
         <Card>
           <CardContent className="flex flex-col items-center justify-center gap-3 py-16">
             {filtrosAtivos > 0 ? (
               <>
                 <p className="text-muted-foreground">Nenhum cliente atende aos filtros selecionados.</p>
-                <Button variant="outline" size="sm" onClick={() => setFiltros(COHORT_FILTROS_VAZIO)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setFiltros(COHORT_FILTROS_VAZIO); onFornecedorChange?.([]); }}
+                >
                   Limpar filtros
                 </Button>
               </>
@@ -377,7 +390,7 @@ export function CohortTab({ tvMode = false, fornecedorId, fornecedorIds, unidade
 
   return (
     <div className="space-y-4 mt-4">
-      <CohortFiltrosBar value={filtros} onChange={setFiltros} />
+      <CohortFiltrosBar {...propsBarra} />
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">

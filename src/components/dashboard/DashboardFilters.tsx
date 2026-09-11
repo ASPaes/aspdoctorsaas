@@ -21,6 +21,9 @@ interface DashboardFiltersProps {
   onTvModeToggle: () => void;
   autoRefreshInterval: number;
   onAutoRefreshChange: (interval: number) => void;
+  /** A aba Cohort traz o fornecedor para dentro do próprio painel de Filtros;
+   *  mostrá-lo aqui também deixaria o mesmo controle duas vezes na tela. */
+  ocultarFornecedor?: boolean;
 }
 
 export function getPresetDates(preset: PeriodPreset): { start: Date; end: Date } {
@@ -45,7 +48,7 @@ export const presetLabels: Record<PeriodPreset, string> = {
 
 export function DashboardFilters({
   filters, onFiltersChange, fornecedores, unidadesBase, loading, onRefresh,
-  tvMode, onTvModeToggle, autoRefreshInterval, onAutoRefreshChange,
+  tvMode, onTvModeToggle, autoRefreshInterval, onAutoRefreshChange, ocultarFornecedor = false,
 }: DashboardFiltersProps) {
   const dateRange: DateRange = { from: filters.periodoInicio, to: filters.periodoFim };
 
@@ -62,6 +65,7 @@ export function DashboardFilters({
 
   return (
     <div className={`flex flex-wrap items-end gap-3 ${tvMode ? 'p-4' : ''}`}>
+      {!ocultarFornecedor && (
       <div className="flex flex-col space-y-1">
         <label className="text-xs font-medium text-muted-foreground">Fornecedor</label>
         <MultiSelectFilter
@@ -72,6 +76,7 @@ export function DashboardFilters({
           className={cn('w-[180px]', tvMode && 'h-12 text-lg')}
         />
       </div>
+      )}
 
       <DateRangePicker label="Período" value={dateRange} onChange={handleDateRangeChange} className="w-64" />
 

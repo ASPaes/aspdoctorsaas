@@ -16,17 +16,21 @@ import {
 interface CohortFiltrosBarProps {
   value: CohortFiltros;
   onChange: (f: CohortFiltros) => void;
+  /** Fornecedor mora no estado do Dashboard porque as outras abas também o usam.
+   *  Nesta aba ele sai da barra global e aparece aqui, como um controle só. */
+  fornecedorIds: number[];
+  onFornecedorChange: (ids: number[]) => void;
   className?: string;
 }
 
-export function CohortFiltrosBar({ value, onChange, className }: CohortFiltrosBarProps) {
+export function CohortFiltrosBar({ value, onChange, fornecedorIds, onFornecedorChange, className }: CohortFiltrosBarProps) {
   const [aberto, setAberto] = useState(false);
 
   /** Cidade só faz sentido dentro de um estado: `useLookups` carrega uma UF por
    *  vez (MG sozinha passa de 850 cidades). Com 0 ou 2+ estados o campo fica
    *  desabilitado em vez de mostrar uma lista incompleta. */
   const estadoUnico = value.estadoIds.length === 1 ? value.estadoIds[0] : null;
-  const { estados, cidades, areasAtuacao, segmentos, funcionarios, produtos, origensVenda } =
+  const { estados, cidades, areasAtuacao, segmentos, funcionarios, produtos, origensVenda, fornecedores } =
     useLookups(estadoUnico);
 
   const set = (patch: Partial<CohortFiltros>) => onChange({ ...value, ...patch });
@@ -42,7 +46,7 @@ export function CohortFiltrosBar({ value, onChange, className }: CohortFiltrosBa
   const simples = (rows: any[] | undefined) =>
     (rows ?? []).map((r: any) => ({ id: r.id as number, nome: (r.nome ?? r.descricao) as string }));
 
-  const ativos = contarFiltrosAtivos(value);
+  const ativos = contarFiltrosAtivos(value) + (fornecedorIds.length > 0 ? 1 : 0);
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -64,7 +68,7 @@ export function CohortFiltrosBar({ value, onChange, className }: CohortFiltrosBa
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onChange(COHORT_FILTROS_VAZIO)}
+            onClick={() => { onChange(COHORT_FILTROS_VAZIO); onFornecedorChange([]); }}
             className="gap-1.5 text-muted-foreground"
           >
             <X className="h-3.5 w-3.5" />
@@ -76,6 +80,17 @@ export function CohortFiltrosBar({ value, onChange, className }: CohortFiltrosBa
       {aberto && (
         <div className="rounded-lg border bg-muted/20 p-3">
           <div className="flex flex-wrap gap-3">
+            <Campo label="Fornecedor">
+              <MultiSelectFilter
+                label={rotulo(fornecedorIds.length, 'Todos os fornecedores', 'fornecedor', 'fornecedores')}
+                options={simples(fornecedores.data)}
+                selected={fornecedorIds}
+                onChange={onFornecedorChange}
+                searchPlaceholder="Buscar fornecedor..."
+                className="w-[190px]"
+              />
+            </Campo>
+
             <Campo label="Segmento">
               <MultiSelectFilter
                 label={rotulo(value.segmentoIds.length, 'Todos os segmentos', 'segmento', 'segmentos')}

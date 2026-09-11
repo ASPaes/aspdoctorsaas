@@ -49,6 +49,9 @@ export default function Dashboard() {
    *  seção tem o filtro da própria área, e um card de Atendimento embaixo de
    *  um filtro de Fornecedor seria mentira visual. As outras 7 abas não mudam. */
   const mostrarFiltroGlobal = abaAtiva !== 'meu-painel';
+  /** Na aba Cohort o fornecedor vive dentro do painel de Filtros da própria aba,
+   *  junto dos outros recortes. Aqui ele sairia repetido. */
+  const fornecedorNoPainelDaAba = abaAtiva === 'cohort';
 
   const { loading, metrics, timeSeries, distributions, canceladosList, novosClientesList, downsellList, refetch } = useDashboardData(filters, unidadeFilterReady);
   const { data: mcData } = useMargemContribuicaoDashboard(filters);
@@ -83,6 +86,7 @@ export default function Dashboard() {
         onTvModeToggle={() => setTvMode(!tvMode)}
         autoRefreshInterval={autoRefreshInterval}
         onAutoRefreshChange={setAutoRefreshInterval}
+        ocultarFornecedor={fornecedorNoPainelDaAba}
       />
       )}
 
@@ -129,7 +133,13 @@ export default function Dashboard() {
             </TabsContent>
           )}
           <TabsContent value="cohort">
-            <CohortTab tvMode={tvMode} fornecedorId={filters.fornecedorId} fornecedorIds={filters.fornecedorIds} unidadeBaseId={filters.unidadeBaseId} />
+            <CohortTab
+              tvMode={tvMode}
+              fornecedorId={filters.fornecedorId}
+              fornecedorIds={filters.fornecedorIds}
+              unidadeBaseId={filters.unidadeBaseId}
+              onFornecedorChange={(ids) => setFilters({ ...filters, fornecedorIds: ids, fornecedorId: ids.length === 1 ? ids[0] : null })}
+            />
           </TabsContent>
         </Tabs>
       )}
