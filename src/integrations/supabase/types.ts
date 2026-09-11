@@ -14146,10 +14146,15 @@ export type Database = {
           p_has_comment?: boolean
           p_is_group?: boolean
           p_limit?: number
+          p_plantao?: string
+          p_respondida?: boolean
           p_score?: number
           p_tenant_id: string
+          p_unidade_base_id?: number
         }
         Returns: {
+          agente: string
+          asked_at: string
           attendance_code: string
           attendance_id: string
           cliente_nome: string
@@ -14159,6 +14164,7 @@ export type Database = {
           responded_at: string
           score: number
           setor: string
+          status: string
         }[]
       }
       get_csat_report_summary: {
@@ -14170,8 +14176,10 @@ export type Database = {
           p_department_id?: string
           p_has_comment?: boolean
           p_is_group?: boolean
+          p_plantao?: string
           p_score?: number
           p_tenant_id: string
+          p_unidade_base_id?: number
         }
         Returns: Json
       }

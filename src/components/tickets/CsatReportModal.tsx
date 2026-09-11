@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
 import ReactMarkdown from "react-markdown";
+import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -22,11 +23,16 @@ interface Props {
   initialDepartmentId?: string | null;
   initialAgentId?: string | null;
   initialTipo?: 'all' | 'individual' | 'group';
+  initialStatus?: CsatStatusFilter;
+  unidadeBaseId?: number | null;
+  plantao?: 'all' | 'plantao' | 'comercial';
   scoreMax: number;
   isAdmin?: boolean;
   onNavigateToAttendance?: (attendanceCode: string) => void;
   onOpenAttendance?: (attendanceId: string) => void;
 }
+
+export type CsatStatusFilter = 'all' | 'respondidas' | 'pendentes';
 
 interface SetorRow {
   department_id: string | null;
@@ -42,18 +48,24 @@ interface SummaryData {
 }
 interface AvalRow {
   id: string;
-  score: number;
+  score: number | null;
   reason: string | null;
   responded_at: string | null;
+  asked_at: string | null;
   department_id: string | null;
   setor: string;
   cliente_nome: string;
   attendance_id: string;
   attendance_code: string;
+  agente: string | null;
+  status: string | null;
 }
 
-function toISODate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+// O periodo vai como INSTANTE (ISO com fuso), nunca como data solta:
+// d.toISOString().slice(0,10) convertia 31/08 23:59 (BR) em "2026-09-01" e
+// o relatorio passava a contar pesquisa de setembro dentro de agosto.
+function toISOInstant(d: Date): string {
+  return d.toISOString();
 }
 
 function formatDate(iso: string | null): string {
@@ -69,15 +81,16 @@ function scoreColor(score: number, max: number): { bg: string; fg: string } {
   return { bg: "#E1F5EE", fg: "#0F6E56" };
 }
 
-export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo, initialDepartmentId, initialAgentId, initialTipo, scoreMax, isAdmin, onNavigateToAttendance, onOpenAttendance }: Props) {
+export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo, initialDepartmentId, initialAgentId, initialTipo, initialStatus, unidadeBaseId, plantao, scoreMax, isAdmin, onNavigateToAttendance, onOpenAttendance }: Props) {
   const queryClient = useQueryClient();
-  const fromISO = toISODate(dateFrom);
-  const toISO = toISODate(dateTo);
+  const fromISO = toISOInstant(dateFrom);
+  const toISO = toISOInstant(dateTo);
 
   const [deptFilter, setDeptFilter] = useState<string>(initialDepartmentId && initialDepartmentId !== "all" ? initialDepartmentId : "all");
   const [agentFilter, setAgentFilter] = useState<string>(initialAgentId ?? "all");
   const [tipoFilter, setTipoFilter] = useState<'all' | 'individual' | 'group'>(initialTipo ?? "all");
   const [scoreFilter, setScoreFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<CsatStatusFilter>(initialStatus ?? "respondidas");
   const [commentFilter, setCommentFilter] = useState<string>("all");
   const [clienteFilterId, setClienteFilterId] = useState<string | null>(null);
   const [clienteFilterName, setClienteFilterName] = useState<string>("");
@@ -92,8 +105,13 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
       setDeptFilter(initialDepartmentId && initialDepartmentId !== "all" ? initialDepartmentId : "all");
       setAgentFilter(initialAgentId ?? "all");
       setTipoFilter(initialTipo ?? "all");
+      setStatusFilter(initialStatus ?? "respondidas");
+      setScoreFilter("all");
+      setCommentFilter("all");
+      setClienteFilterId(null);
+      setClienteFilterName("");
     }
-  }, [open]);
+  }, [open, initialDepartmentId, initialAgentId, initialTipo, initialStatus]);
 
   const updateScore = useMutation({
     mutationFn: async ({ csatId, newScore }: { csatId: string; newScore: number }) => {
@@ -118,10 +136,13 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
   const commentParam = commentFilter === "with" ? true : commentFilter === "without" ? false : null;
   const clienteParam = clienteFilterId ?? null;
   const tipoParam: boolean | null = tipoFilter === "group" ? true : tipoFilter === "individual" ? false : null;
+  const respondidaParam: boolean | null = statusFilter === "respondidas" ? true : statusFilter === "pendentes" ? false : null;
+  const unidadeParam = unidadeBaseId ?? null;
+  const plantaoParam = !plantao || plantao === "all" ? null : plantao;
 
   useEffect(() => {
     setAiAnalysis(null);
-  }, [deptFilter, agentFilter, scoreFilter, commentFilter, clienteFilterId, tipoFilter]);
+  }, [deptFilter, agentFilter, scoreFilter, commentFilter, clienteFilterId, tipoFilter, statusFilter]);
 
   const { data: departments = [] } = useQuery({
     queryKey: ["csat-departments", tenantId],
@@ -168,7 +189,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
   });
 
   const { data: summary, isLoading: loadingSummary } = useQuery({
-    queryKey: ["csat-report-summary", tenantId, fromISO, toISO, deptParam, agentParam, scoreParam, commentParam, clienteParam, tipoParam],
+    queryKey: ["csat-report-summary", tenantId, fromISO, toISO, deptParam, agentParam, scoreParam, commentParam, clienteParam, tipoParam, unidadeParam, plantaoParam],
     enabled: open && !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_csat_report_summary", {
@@ -181,6 +202,8 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
         p_has_comment: commentParam,
         p_cliente_id: clienteParam,
         p_is_group: tipoParam,
+        p_unidade_base_id: unidadeParam,
+        p_plantao: plantaoParam,
       });
       if (error) throw error;
       return data as SummaryData;
@@ -188,7 +211,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
   });
 
   const { data: list = [], isLoading: loadingList } = useQuery({
-    queryKey: ["csat-report-list", tenantId, fromISO, toISO, deptParam, agentParam, scoreParam, commentParam, clienteParam, tipoParam],
+    queryKey: ["csat-report-list", tenantId, fromISO, toISO, deptParam, agentParam, scoreParam, commentParam, clienteParam, tipoParam, respondidaParam, unidadeParam, plantaoParam],
     enabled: open && !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_csat_report_list", {
@@ -202,6 +225,9 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
         p_has_comment: commentParam,
         p_cliente_id: clienteParam,
         p_is_group: tipoParam,
+        p_respondida: respondidaParam,
+        p_unidade_base_id: unidadeParam,
+        p_plantao: plantaoParam,
       });
       if (error) throw error;
       return (data ?? []) as AvalRow[];
@@ -226,7 +252,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
           },
           body: JSON.stringify({
             summary: summary ?? { media: null, enviadas: 0, respostas: 0 },
-            evaluations: list,
+            evaluations: respondidasList,
             filters: {
               dateFrom: fromISO,
               dateTo: toISO,
@@ -249,11 +275,13 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
     onSuccess: (analysis) => setAiAnalysis(analysis),
   });
 
+  const respondidasList = list.filter((a) => a.score !== null);
+
   const taxaResposta = summary && summary.enviadas > 0
     ? Math.round((summary.respostas / summary.enviadas) * 100)
     : 0;
 
-  const hasActiveFilter = deptFilter !== "all" || agentFilter !== "all" || tipoFilter !== "all" || scoreFilter !== "all" || commentFilter !== "all" || !!clienteFilterId;
+  const hasActiveFilter = deptFilter !== "all" || agentFilter !== "all" || tipoFilter !== "all" || scoreFilter !== "all" || commentFilter !== "all" || statusFilter !== "respondidas" || !!clienteFilterId;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -293,6 +321,15 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
               <SelectItem value="all">Todos os tipos</SelectItem>
               <SelectItem value="individual">Individual</SelectItem>
               <SelectItem value="group">Grupos</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as CsatStatusFilter)}>
+            <SelectTrigger className="h-8 text-xs w-auto min-w-[150px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Enviadas (todas)</SelectItem>
+              <SelectItem value="respondidas">Só respondidas</SelectItem>
+              <SelectItem value="pendentes">Sem resposta</SelectItem>
             </SelectContent>
           </Select>
 
@@ -369,6 +406,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
                 setDeptFilter("all");
                 setAgentFilter("all");
                 setTipoFilter("all");
+                setStatusFilter("respondidas");
                 setScoreFilter("all");
                 setCommentFilter("all");
                 setClienteFilterId(null);
@@ -397,15 +435,33 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
                 </div>
               </div>
 
-              <div className="rounded-lg border p-3 text-center">
+              <button
+                type="button"
+                onClick={() => setStatusFilter("respondidas")}
+                aria-pressed={statusFilter === "respondidas"}
+                title="Ver só as pesquisas respondidas"
+                className={cn(
+                  "rounded-lg border p-3 text-center transition-colors hover:border-primary/60",
+                  statusFilter === "respondidas" && "border-primary ring-1 ring-primary/40"
+                )}
+              >
                 <div className="text-xs text-muted-foreground mb-1">Respostas</div>
                 <div className="text-xl font-bold">{summary?.respostas ?? 0}</div>
-              </div>
+              </button>
 
-              <div className="rounded-lg border p-3 text-center">
+              <button
+                type="button"
+                onClick={() => setStatusFilter("all")}
+                aria-pressed={statusFilter === "all"}
+                title="Ver todas as pesquisas enviadas, respondidas ou não"
+                className={cn(
+                  "rounded-lg border p-3 text-center transition-colors hover:border-primary/60",
+                  statusFilter === "all" && "border-primary ring-1 ring-primary/40"
+                )}
+              >
                 <div className="text-xs text-muted-foreground mb-1">Enviadas</div>
                 <div className="text-xl font-bold">{summary?.enviadas ?? 0}</div>
-              </div>
+              </button>
 
               <div className="rounded-lg border p-3 text-center">
                 <div className="text-xs text-muted-foreground mb-1">Taxa resposta</div>
@@ -438,12 +494,19 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
         {/* Lista de avaliações individuais */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Avaliações individuais</h3>
+            <h3 className="text-sm font-semibold">
+              {statusFilter === "pendentes"
+                ? "Pesquisas sem resposta"
+                : statusFilter === "respondidas"
+                ? "Avaliações respondidas"
+                : "Pesquisas enviadas"}
+              <span className="ml-2 text-xs font-normal text-muted-foreground tabular-nums">{list.length}</span>
+            </h3>
             <Button
               variant="outline"
               size="sm"
               className="h-7 text-xs gap-1"
-              disabled={analyzeAI.isPending || loadingList || list.length === 0}
+              disabled={analyzeAI.isPending || loadingList || respondidasList.length === 0}
               onClick={() => analyzeAI.mutate()}
             >
               {analyzeAI.isPending ? (
@@ -481,22 +544,35 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
             </div>
           ) : list.length === 0 ? (
             <div className="rounded-lg border p-6 text-center text-muted-foreground text-sm">
-              Nenhuma avaliação no período.
+              {statusFilter === "pendentes"
+                ? "Nenhuma pesquisa sem resposta no período."
+                : "Nenhuma avaliação no período."}
             </div>
           ) : (
             <div className="space-y-2">
               {list.map((a) => {
-                const c = scoreColor(a.score, scoreMax);
+                const pendente = a.score === null;
+                const c = pendente ? { bg: "transparent", fg: "" } : scoreColor(a.score as number, scoreMax);
                 const isEditing = editingId === a.id;
                 return (
                   <div key={a.id} className="rounded-lg border p-3 space-y-2">
                     <div className="flex gap-3 items-start">
-                      {!isEditing && (
+                      {!isEditing && pendente && (
+                        <div
+                          title={a.status === "expired" ? "Expirou sem resposta" : "Aguardando resposta"}
+                          className="flex items-center justify-center rounded-full font-bold text-sm shrink-0 border border-dashed border-muted-foreground/40 text-muted-foreground"
+                          style={{ width: 36, height: 36 }}
+                        >
+                          —
+                        </div>
+                      )}
+
+                      {!isEditing && !pendente && (
                         isAdmin ? (
                           <button
                             type="button"
                             title="Editar nota"
-                            onClick={() => { setEditingId(a.id); setEditScore(a.score); }}
+                            onClick={() => { setEditingId(a.id); setEditScore(a.score ?? 0); }}
                             className="flex items-center justify-center rounded-full font-bold text-sm shrink-0 hover:ring-2 hover:ring-primary/50 transition-all"
                             style={{ width: 36, height: 36, backgroundColor: c.bg, color: c.fg }}
                           >
@@ -544,14 +620,24 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
                       )}
 
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
                           <span className="font-medium text-sm truncate">{a.cliente_nome}</span>
                           <span className="text-xs text-muted-foreground shrink-0">
-                            {a.setor} · {formatDate(a.responded_at)}
+                            {a.setor}
+                            {a.agente ? ` · ${a.agente}` : ""}
+                            {" · "}
+                            {pendente ? `enviada ${formatDate(a.asked_at)}` : formatDate(a.responded_at)}
                           </span>
+                          {pendente && (
+                            <span className="shrink-0 rounded-full border border-muted-foreground/30 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                              {a.status === "expired" ? "Expirou" : "Aguardando"}
+                            </span>
+                          )}
                         </div>
 
-                        {a.reason ? (
+                        {pendente ? (
+                          <p className="text-sm text-muted-foreground italic">O cliente não respondeu a pesquisa.</p>
+                        ) : a.reason ? (
                           <p className="text-sm text-muted-foreground line-clamp-2">{a.reason}</p>
                         ) : (
                           <p className="text-sm text-muted-foreground italic">Sem comentário</p>

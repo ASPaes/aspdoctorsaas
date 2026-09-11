@@ -597,8 +597,8 @@ export default function SupportTickets() {
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_csat_report_summary", {
         p_tenant_id: tid,
-        p_date_from: dateRange.from.toISOString().slice(0, 10),
-        p_date_to: dateRange.to.toISOString().slice(0, 10),
+        p_date_from: dateRange.from.toISOString(),
+        p_date_to: dateRange.to.toISOString(),
         p_department_id: departmentFilter !== "all" ? departmentFilter : null,
       });
       if (error) throw error;

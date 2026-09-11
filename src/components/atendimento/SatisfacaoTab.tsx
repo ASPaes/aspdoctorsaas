@@ -5,11 +5,12 @@ import { useAtendimentoSatisfacao } from "./useAtendimentoSatisfacao";
 import { fmtEspera } from "./TempoRealTab";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
-import { CsatReportModal } from "@/components/tickets/CsatReportModal";
+import { CsatReportModal, type CsatStatusFilter } from "@/components/tickets/CsatReportModal";
 import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -25,10 +26,19 @@ const SCORE_COLOR: Record<number, string> = {
 export function SatisfacaoTab() {
   const { data, isLoading, isError, error } = useAtendimentoSatisfacao();
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { dateRange, departmentId, agentId, tipoAtendimento } = useAtendimentoFilter();
+  const { dateRange, departmentId, agentId, tipoAtendimento, plantao } = useAtendimentoFilter();
+  const { selectedUnidadeId } = useUnidadeFilter();
   const { profile } = useAuth();
   const [csatModalOpen, setCsatModalOpen] = useState(false);
+  const [modalAgentId, setModalAgentId] = useState<string | null>(null);
+  const [modalStatus, setModalStatus] = useState<CsatStatusFilter>("all");
   const [detailAttendanceId, setDetailAttendanceId] = useState<string | null>(null);
+
+  const abrirCsat = (agente: string | null, status: CsatStatusFilter) => {
+    setModalAgentId(agente);
+    setModalStatus(status);
+    setCsatModalOpen(true);
+  };
 
   const { data: scoreMax = 5 } = useQuery({
     queryKey: ["csat-scale-att", tid],
@@ -71,7 +81,7 @@ export function SatisfacaoTab() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <button
               type="button"
-              onClick={() => setCsatModalOpen(true)}
+              onClick={() => abrirCsat(null, "respondidas")}
               className="block w-full text-left cursor-pointer rounded-xl border border-transparent hover:border-primary/50 transition-colors"
               title="Ver avaliações"
             >
@@ -196,8 +206,34 @@ export function SatisfacaoTab() {
                         className="border-b border-border/50 last:border-0"
                       >
                         <td className="py-2 pr-3 truncate">{a.nome}</td>
-                        <td className="py-2 px-3 text-right tabular-nums">{a.enviadas}</td>
-                        <td className="py-2 px-3 text-right tabular-nums">{a.respondidas}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">
+                          {a.agent_id ? (
+                            <button
+                              type="button"
+                              onClick={() => abrirCsat(a.agent_id, "all")}
+                              className="rounded px-1 text-primary underline-offset-2 hover:underline"
+                              title={`Ver as ${a.enviadas} pesquisas enviadas de ${a.nome}`}
+                            >
+                              {a.enviadas}
+                            </button>
+                          ) : (
+                            a.enviadas
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-right tabular-nums">
+                          {a.agent_id && a.respondidas > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => abrirCsat(a.agent_id, "respondidas")}
+                              className="rounded px-1 text-primary underline-offset-2 hover:underline"
+                              title={`Ver as ${a.respondidas} respostas de ${a.nome}`}
+                            >
+                              {a.respondidas}
+                            </button>
+                          ) : (
+                            a.respondidas
+                          )}
+                        </td>
                         <td className="py-2 px-3 text-right tabular-nums">
                           <div className="flex items-center justify-end gap-2">
                             <span>{a.taxa_pct !== null ? `${a.taxa_pct}%` : "—"}</span>
@@ -257,8 +293,11 @@ export function SatisfacaoTab() {
         dateFrom={dateRange.from}
         dateTo={dateRange.to}
         initialDepartmentId={departmentId ?? undefined}
-        initialAgentId={agentId ?? undefined}
+        initialAgentId={modalAgentId ?? agentId ?? undefined}
         initialTipo={tipoAtendimento}
+        initialStatus={modalStatus}
+        unidadeBaseId={selectedUnidadeId ?? null}
+        plantao={plantao}
         scoreMax={scoreMax}
         isAdmin={profile?.role === "admin" || profile?.is_super_admin}
         onOpenAttendance={(id) => setDetailAttendanceId(id)}
