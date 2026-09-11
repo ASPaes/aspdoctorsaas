@@ -25,6 +25,7 @@ export interface AssignmentEvent {
   agent_name: string | null;
   agent_role: string | null;
   by_name: string | null;
+  by_role: string | null;
 }
 
 export const useConversationAssignmentHistory = (conversationId: string | null) => {
@@ -73,6 +74,7 @@ export const useConversationAssignmentHistory = (conversationId: string | null) 
         agent_name: sender ? sender.nome : null,
         agent_role: sender ? sender.cargo : null,
         by_name: author ? author.nome : null,
+        by_role: author ? author.cargo : null,
       };
     });
   }, [rawAssignments, senderMap]);

@@ -444,6 +444,7 @@ export function ChatMessages({
                   const quem = ev.agent_name || 'Agente';
                   const autor = ev.by_name || 'Agente';
                   const cargo = ev.agent_role ? ` · ${ev.agent_role}` : '';
+                  const cargoAutor = ev.by_role ? ` · ${ev.by_role}` : '';
                   // Cada origem tem a sua frase: a fila DISTRIBUI, o agente ASSUME,
                   // e só transferência tem alguém do outro lado. Antes tudo saía como
                   // "Transferido para X", o que dizia o contrário do que aconteceu.
@@ -452,8 +453,8 @@ export function ChatMessages({
                     ev.kind === 'auto' ? `Distribuído para ${quem}${cargo}`
                     : ev.kind === 'claim' ? `${quem} assumiu o atendimento`
                     : ev.kind === 'department' ? `Transferido de setor por ${autor}`
-                    : ev.kind === 'transfer_unknown' ? `Transferido por ${autor}`
-                    : `${autor} transferiu para ${quem}${cargo}`;
+                    : ev.kind === 'transfer_unknown' ? `Transferido por ${autor}${cargoAutor}`
+                    : `Transferido de ${autor}${cargoAutor} para ${quem}${cargo}`;
                   return (
                     <div key={`transfer-${ev.id}`} className="flex justify-center my-2">
                       <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full select-text">
