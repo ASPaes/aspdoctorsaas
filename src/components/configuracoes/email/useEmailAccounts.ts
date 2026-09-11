@@ -10,6 +10,7 @@ export interface EmailAccount {
   from_name: string | null;
   email: string;
   provider: string;
+  /** DEPRECATED: primeiro de `setor_ids`, mantido só para a tela antiga */
   setor_id: string | null;
   smtp_host: string;
   smtp_port: number;
@@ -26,6 +27,9 @@ export interface EmailAccount {
   last_test_error: string | null;
   created_at: string;
   updated_at: string;
+  /** vêm de email_account_setores / email_account_usuarios */
+  setor_ids: string[];
+  user_ids: string[];
 }
 
 export interface EmailTestResult {
@@ -41,7 +45,8 @@ export interface EmailAccountInput {
   from_name: string | null;
   email: string;
   provider: string;
-  setor_id: string | null;
+  setor_ids: string[];
+  user_ids: string[];
   smtp_host: string;
   smtp_port: number;
   smtp_security: EmailSecurity;
@@ -65,9 +70,10 @@ interface Setor {
  * Contas de e-mail do tenant.
  *
  * Gravar e apagar passam pelas RPCs `fn_email_account_save` /
- * `fn_email_account_delete`: são elas que falam com o Vault, onde a senha mora.
- * Nunca escrever a senha direto na tabela. Alternar ativa/padrão é UPDATE
- * comum, coberto pelo RLS (só admin ou head escreve).
+ * `fn_email_account_delete`: são elas que falam com o Vault, onde a senha mora,
+ * e que gravam os setores e usuários de cada conta. Nunca escrever a senha nem
+ * as ligações direto na tabela. Alternar ativa/padrão é UPDATE comum, coberto
+ * pelo RLS (só admin ou head escreve).
  */
 export function useEmailAccounts() {
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -78,14 +84,33 @@ export function useEmailAccounts() {
     queryKey: ["email_accounts", tid],
     enabled: !!tid,
     queryFn: async () => {
-      let q = (supabase.from("email_accounts" as any) as any)
-        .select("*")
-        .order("is_default", { ascending: false })
-        .order("rotulo", { ascending: true });
-      if (tid) q = q.eq("tenant_id", tid);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as EmailAccount[];
+      const doTenant = (q: any) => (tid ? q.eq("tenant_id", tid) : q);
+
+      const [contas, setores, usuarios] = await Promise.all([
+        doTenant(
+          (supabase.from("email_accounts" as any) as any)
+            .select("*")
+            .order("is_default", { ascending: false })
+            .order("rotulo", { ascending: true }),
+        ),
+        doTenant((supabase.from("email_account_setores" as any) as any).select("account_id, setor_id")),
+        doTenant((supabase.from("email_account_usuarios" as any) as any).select("account_id, user_id")),
+      ]);
+      for (const r of [contas, setores, usuarios]) if (r.error) throw r.error;
+
+      const agrupar = (linhas: any[], campo: string) => {
+        const m = new Map<string, string[]>();
+        for (const l of linhas ?? []) m.set(l.account_id, [...(m.get(l.account_id) ?? []), l[campo]]);
+        return m;
+      };
+      const setoresPorConta = agrupar(setores.data, "setor_id");
+      const usuariosPorConta = agrupar(usuarios.data, "user_id");
+
+      return ((contas.data ?? []) as any[]).map((c) => ({
+        ...c,
+        setor_ids: setoresPorConta.get(c.id) ?? [],
+        user_ids: usuariosPorConta.get(c.id) ?? [],
+      })) as EmailAccount[];
     },
   });
 
@@ -119,13 +144,14 @@ export function useEmailAccounts() {
         p_id: input.id ?? null,
         p_tenant_id: tid,
         p_from_name: input.from_name,
-        p_setor_id: input.setor_id,
         p_imap_host: input.imap_host,
         p_imap_port: input.imap_port,
         p_imap_security: input.imap_security,
         p_imap_username: input.imap_username,
         p_is_default: input.is_default,
         p_ativo: input.ativo,
+        p_setor_ids: input.setor_ids,
+        p_user_ids: input.user_ids,
       });
       if (error) throw error;
       return data as string;

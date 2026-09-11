@@ -18,9 +18,9 @@ import {
 } from "./emailProviders";
 import { GuiaProvedor } from "./GuiaProvedor";
 import { ProviderLogo } from "./ProviderLogo";
+import { SetoresMultiSelect } from "./SetoresMultiSelect";
+import { AgentMultiSelect } from "@/components/configuracoes/whatsapp/AgentMultiSelect";
 import type { EmailAccount, EmailAccountInput } from "./useEmailAccounts";
-
-const SEM_SETOR = "__sem_setor__";
 
 interface Props {
   open: boolean;
@@ -46,7 +46,8 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
   const [rotulo, setRotulo] = useState("");
   const [fromName, setFromName] = useState("");
   const [email, setEmail] = useState("");
-  const [setorId, setSetorId] = useState<string>(SEM_SETOR);
+  const [setorIds, setSetorIds] = useState<string[]>([]);
+  const [userIds, setUserIds] = useState<string[]>([]);
   const [provider, setProvider] = useState("gmail");
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
@@ -70,7 +71,8 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
       setRotulo(account.rotulo);
       setFromName(account.from_name ?? "");
       setEmail(account.email);
-      setSetorId(account.setor_id ?? SEM_SETOR);
+      setSetorIds(account.setor_ids);
+      setUserIds(account.user_ids);
       setProvider(account.provider);
       setUsuario(account.smtp_username);
       setSenha("");
@@ -89,7 +91,8 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
       setRotulo("");
       setFromName("");
       setEmail("");
-      setSetorId(SEM_SETOR);
+      setSetorIds([]);
+      setUserIds([]);
       setProvider("gmail");
       setUsuario("");
       setSenha("");
@@ -147,7 +150,8 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
         from_name: fromName.trim() || null,
         email: emailLimpo,
         provider,
-        setor_id: setorId === SEM_SETOR ? null : setorId,
+        setor_ids: setorIds,
+        user_ids: userIds,
         smtp_host: smtpHost.trim(),
         smtp_port: porta,
         smtp_security: smtpSecurity,
@@ -204,19 +208,19 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="email-setor">Setor</Label>
-                <Select value={setorId} onValueChange={setSetorId}>
-                  <SelectTrigger id="email-setor">
-                    <SelectValue placeholder="Nenhum" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={SEM_SETOR}>Nenhum</SelectItem>
-                    {setores.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">Opcional.</p>
+                <Label>Setores</Label>
+                <SetoresMultiSelect setores={setores} value={setorIds} onChange={setSetorIds} />
+                <p className="text-xs text-muted-foreground">Opcional. Pode marcar mais de um.</p>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Usuários</Label>
+                <AgentMultiSelect
+                  value={userIds}
+                  onChange={setUserIds}
+                  placeholder="Selecionar usuários..."
+                  rotuloContagem={(n) => (n === 1 ? "1 usuário vinculado" : `${n} usuários vinculados`)}
+                />
+                <p className="text-xs text-muted-foreground">Opcional. Quem usa esta conta no dia a dia.</p>
               </div>
             </div>
           </section>

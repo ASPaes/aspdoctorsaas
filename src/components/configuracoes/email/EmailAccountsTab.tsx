@@ -14,7 +14,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  ArrowRight, CheckCircle2, Info, LifeBuoy, Loader2, Mail, MoreVertical, Pencil, Plug, Plus, Send, Star, Trash2, Wand2, XCircle,
+  ArrowRight, CheckCircle2, Info, LifeBuoy, Loader2, Mail, MoreVertical, Pencil, Plug, Plus, Send, Star, Trash2, Users, Wand2, XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -25,6 +25,7 @@ import { EmailAccountDialog } from "./EmailAccountDialog";
 import { GuiaProvedor } from "./GuiaProvedor";
 import { ProviderLogo } from "./ProviderLogo";
 import { EnviarTesteDialog, montarEmailDeTeste } from "./EnviarTesteDialog";
+import { useAgentesDoTenant } from "@/components/configuracoes/whatsapp/AgentMultiSelect";
 import { diagnosticar, servidoresRecomendados } from "./emailDiagnostico";
 import { useEmailAccounts, type EmailAccount } from "./useEmailAccounts";
 
@@ -81,6 +82,16 @@ export default function EmailAccountsTab() {
     () => new Map(setores.map((s) => [s.id, s.name])),
     [setores],
   );
+  const agentes = useAgentesDoTenant();
+  const nomePorUsuario = useMemo(
+    () => new Map(agentes.map((a) => [a.user_id, a.funcionario_nome])),
+    [agentes],
+  );
+  /** até 3 nomes; o resto vira "e mais N" para a linha não quebrar */
+  const resumoUsuarios = (ids: string[]) => {
+    const nomes = ids.map((id) => nomePorUsuario.get(id) ?? "Usuário").sort((a, b) => a.localeCompare(b));
+    return nomes.length <= 3 ? nomes.join(", ") : `${nomes.slice(0, 3).join(", ")} e mais ${nomes.length - 3}`;
+  };
 
   // sempre a versão mais nova da conta, para o painel refletir o último teste
   const resolvendo = resolvendoId ? accounts.find((c) => c.id === resolvendoId) ?? null : null;
@@ -146,7 +157,8 @@ export default function EmailAccountsTab() {
         from_name: conta.from_name,
         email: conta.email,
         provider: conta.provider,
-        setor_id: conta.setor_id,
+        setor_ids: conta.setor_ids,
+        user_ids: conta.user_ids,
         smtp_host: rec.smtp_host,
         smtp_port: rec.smtp_port,
         smtp_security: rec.smtp_security,
@@ -223,7 +235,7 @@ export default function EmailAccountsTab() {
         <div className="space-y-2.5">
           {accounts.map((conta) => {
             const provedor = providerByValue(conta.provider);
-            const setorNome = conta.setor_id ? setorPorId.get(conta.setor_id) : null;
+            const setoresNomes = conta.setor_ids.map((id) => setorPorId.get(id)).filter(Boolean) as string[];
             const falhou = conta.last_test_ok === false && !!conta.last_test_error;
             return (
               <article
@@ -245,11 +257,19 @@ export default function EmailAccountsTab() {
                         Padrão de envio
                       </Badge>
                     )}
-                    {setorNome && <Badge variant="secondary">{setorNome}</Badge>}
+                    {setoresNomes.map((nome) => (
+                      <Badge key={nome} variant="secondary">{nome}</Badge>
+                    ))}
                     {!conta.ativo && <Badge variant="outline">Inativa</Badge>}
                     <SeloTeste conta={conta} testando={testandoId === conta.id} />
                   </div>
                   <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{conta.email}</p>
+                  {conta.user_ids.length > 0 && (
+                    <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-muted-foreground" title={resumoUsuarios(conta.user_ids)}>
+                      <Users className="h-3.5 w-3.5 shrink-0" />
+                      {resumoUsuarios(conta.user_ids)}
+                    </p>
+                  )}
                   {falhou && (
                     <div className="mt-1.5 space-y-1.5">
                       <p className="text-xs text-destructive">{motivoDoErro(conta.last_test_error)}</p>

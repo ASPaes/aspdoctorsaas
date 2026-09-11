@@ -11,9 +11,16 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 interface AgentMultiSelectProps {
   value: string[];
   onChange: (value: string[]) => void;
+  /** texto do campo vazio; o padrão é o da regra de distribuição */
+  placeholder?: string;
+  rotuloContagem?: (n: number) => string;
 }
 
-export function AgentMultiSelect({ value, onChange }: AgentMultiSelectProps) {
+/**
+ * Usuários ativos do tenant, com o nome do funcionário e o setor. Exportado
+ * para quem precisa dos nomes sem abrir o seletor (mesma chave de cache).
+ */
+export function useAgentesDoTenant() {
   const { effectiveTenantId: tid } = useTenantFilter();
 
   const { data: enrichedUsers = [] } = useQuery({
@@ -77,6 +84,17 @@ export function AgentMultiSelect({ value, onChange }: AgentMultiSelectProps) {
     },
   });
 
+  return enrichedUsers;
+}
+
+export function AgentMultiSelect({
+  value,
+  onChange,
+  placeholder = "Selecionar agentes...",
+  rotuloContagem = (n) => `${n} agente(s) selecionado(s)`,
+}: AgentMultiSelectProps) {
+  const enrichedUsers = useAgentesDoTenant();
+
   const selectedUsers = enrichedUsers.filter(u => value.includes(u.user_id));
 
   const toggleAgent = (userId: string) => {
@@ -104,7 +122,7 @@ export function AgentMultiSelect({ value, onChange }: AgentMultiSelectProps) {
                 ))}
               </div>
             ) : (
-              <span className="text-muted-foreground">Selecionar agentes...</span>
+              <span className="text-muted-foreground">{placeholder}</span>
             )}
             <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
           </button>
@@ -151,7 +169,7 @@ export function AgentMultiSelect({ value, onChange }: AgentMultiSelectProps) {
         </PopoverContent>
       </Popover>
       {selectedUsers.length > 0 && (
-        <p className="text-xs text-muted-foreground">{selectedUsers.length} agente(s) selecionado(s)</p>
+        <p className="text-xs text-muted-foreground">{rotuloContagem(selectedUsers.length)}</p>
       )}
     </div>
   );
