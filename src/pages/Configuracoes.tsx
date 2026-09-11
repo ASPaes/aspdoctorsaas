@@ -44,7 +44,6 @@ import { ChatTimezoneSelector } from "@/components/configuracoes/whatsapp/ChatTi
 import { SetupGuideCollapsible } from "@/components/configuracoes/whatsapp/SetupGuideCollapsible";
 import DistribuicaoTab from "@/components/configuracoes/whatsapp/DistribuicaoTab";
 import OperacaoTab from "@/components/configuracoes/whatsapp/OperacaoTab";
-import EmailAccountsTab from "@/components/configuracoes/email/EmailAccountsTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import KBTab from "@/components/configuracoes/KBTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
@@ -94,10 +93,9 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   acessos: { breadcrumb: ["Equipe", "Acessos & permissões"], title: "Acessos & permissões", description: "Gerencie usuários, papéis e permissões da equipe." },
   permissoes: { breadcrumb: ["Equipe", "Permissões e papéis"], title: "Permissões e papéis", description: "Configure o que cada papel pode fazer no seu tenant." },
 
-  canais: { breadcrumb: ["Atendimento", "Canais"], title: "Canais", description: "Conexão dos números WhatsApp (Evolution, Z-API, Meta)." },
+  canais: { breadcrumb: ["Atendimento", "Canais"], title: "Canais", description: "Por onde a operação fala com o cliente: números de WhatsApp e contas de e-mail." },
   distribuicao: { breadcrumb: ["Atendimento", "Distribuição"], title: "Distribuição", description: "Para qual setor e agente cada atendimento é encaminhado." },
   operacao: { breadcrumb: ["Atendimento", "Operação"], title: "Operação", description: "CSAT, pausas, macros e grupos do atendimento." },
-  email: { breadcrumb: ["Atendimento", "E-mail"], title: "E-mail", description: "Contas de e-mail que a operação usa para falar com o cliente. Cada conta pode ficar ligada a um setor." },
   seguranca: { breadcrumb: ["Equipe", "Segurança"], title: "Segurança", description: "Aprovação de novas contas e restrição de domínio de email." },
   duplicidades: { breadcrumb: ["Dados", "Duplicidades"], title: "Duplicidades", description: "Unificação de contatos duplicados." },
   ia: { breadcrumb: ["Atendimento", "Inteligência artificial"], title: "Inteligência artificial", description: "Modelos, prompts e comportamento da IA." },
@@ -316,7 +314,9 @@ export default function Configuracoes() {
   }, [profile, rbacEnabled, rbacLoading, isAdmin, navigate]);
 
   const rawSection = searchParams.get("section") || "percentuais";
-  const activeSection = rawSection;
+  // O e-mail virou aba dentro de Canais; link antigo com section=email
+  // continua funcionando e abre direto nela.
+  const activeSection = rawSection === "email" ? "canais" : rawSection;
 
   useEffect(() => {
     if (rawSection !== activeSection) {
@@ -425,13 +425,11 @@ export default function Configuracoes() {
         return <PermissoesPapeisContent />;
 
       case "canais":
-        return <CanaisTab />;
+        return <CanaisTab abaInicial={rawSection === "email" ? "email" : "whatsapp"} />;
       case "distribuicao":
         return <DistribuicaoTab />;
       case "operacao":
         return <OperacaoTab />;
-      case "email":
-        return <EmailAccountsTab />;
       case "seguranca":
         return <SecuritySettingsTab />;
       case "duplicidades":
