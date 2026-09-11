@@ -22,6 +22,7 @@ import { toast } from "@/hooks/use-toast";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
 import { Switch } from "@/components/ui/switch";
+import { PRODUTO_CORES, produtoCor } from "@/lib/produtoCores";
 
 
 interface Produto {
@@ -29,6 +30,8 @@ interface Produto {
   nome: string;
   tenant_id: string;
   fornecedor_id?: number | null;
+  /** Chave da paleta do selo no chat; null = padrão. */
+  cor?: string | null;
   omie_servico_codigo?: number | null;
   omie_conta_corrente_codigo?: number | null;
   omie_tipo_faturamento_codigo?: string | null;
@@ -64,6 +67,7 @@ export default function ProdutosModulosTab() {
   const [editingProduto, setEditingProduto] = useState<Produto | null>(null);
   const [produtoNome, setProdutoNome] = useState("");
   const [produtoFornecedorId, setProdutoFornecedorId] = useState<string>("");
+  const [produtoCorKey, setProdutoCorKey] = useState<string | null>(null);
   const [savingProduto, setSavingProduto] = useState(false);
   // Omie fields (only used when integration is active)
   const [omieServico, setOmieServico] = useState<string>("");
@@ -286,11 +290,12 @@ export default function ProdutosModulosTab() {
     setOmiePermiteNuvem(p?.omie_permite_servidor_nuvem === true);
   };
   const openNewProduto = () => {
-    setEditingProduto(null); setProdutoNome(""); setProdutoFornecedorId(""); resetOmieFields(null); setProdutoDialogOpen(true);
+    setEditingProduto(null); setProdutoNome(""); setProdutoFornecedorId(""); setProdutoCorKey(null); resetOmieFields(null); setProdutoDialogOpen(true);
   };
   const openEditProduto = (p: Produto) => {
     setEditingProduto(p); setProdutoNome(p.nome);
     setProdutoFornecedorId(p.fornecedor_id != null ? String(p.fornecedor_id) : "");
+    setProdutoCorKey(p.cor ?? null);
     resetOmieFields(p); setProdutoDialogOpen(true);
   };
 
@@ -320,20 +325,23 @@ export default function ProdutosModulosTab() {
     try {
       if (editingProduto) {
         const { error } = await (supabase.from("produtos" as any) as any)
-          .update({ nome: produtoNome.trim(), ...fornecedorPayload, ...omiePayload })
+          .update({ nome: produtoNome.trim(), cor: produtoCorKey, ...fornecedorPayload, ...omiePayload })
           .eq("id", editingProduto.id)
           .eq("tenant_id", tid as string);
         if (error) throw error;
         toast({ title: "Produto atualizado" });
       } else {
         const { error } = await (supabase.from("produtos" as any) as any)
-          .insert({ nome: produtoNome.trim(), tenant_id: tid, ...fornecedorPayload, ...omiePayload });
+          .insert({ nome: produtoNome.trim(), cor: produtoCorKey, tenant_id: tid, ...fornecedorPayload, ...omiePayload });
         if (error) throw error;
         toast({ title: "Produto criado" });
       }
       setProdutoDialogOpen(false);
       qc.invalidateQueries({ queryKey: ["crud_produtos_master", tid] });
       qc.invalidateQueries({ queryKey: ["produtos_lookup"] });
+      // Selo do produto na lista de conversas: sem isso a cor nova só
+      // apareceria depois do staleTime de 5 min do hook.
+      qc.invalidateQueries({ queryKey: ["whatsapp", "contact-produtos"] });
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
@@ -463,7 +471,15 @@ export default function ProdutosModulosTab() {
                     key={p.id}
                     className={selectedProdutoId === p.id ? "bg-muted/50" : ""}
                   >
-                    <TableCell className="font-medium">{p.nome}</TableCell>
+                    <TableCell className="font-medium">
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${produtoCor(p.cor).dot}`}
+                          title={`Cor no chat: ${produtoCor(p.cor).label}`}
+                        />
+                        {p.nome}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {p.fornecedor_id != null ? (fornecedorNomePorId.get(p.fornecedor_id) ?? "—") : "—"}
                     </TableCell>
@@ -673,6 +689,38 @@ export default function ProdutosModulosTab() {
                 </Select>
                 <p className="text-xs text-muted-foreground">Sugerido automaticamente ao lançar este produto num cliente.</p>
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Cor no chat</Label>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {PRODUTO_CORES.map((c) => {
+                    const ativa = (c.key ?? null) === (produtoCorKey ?? null);
+                    return (
+                      <button
+                        key={c.key ?? "__padrao__"}
+                        type="button"
+                        onClick={() => setProdutoCorKey(c.key)}
+                        title={c.label}
+                        aria-label={c.label}
+                        aria-pressed={ativa}
+                        className={`h-6 w-6 rounded-full transition-transform ${c.dot} ${ativa ? "ring-2 ring-foreground/60 ring-offset-2 ring-offset-background scale-110" : "hover:scale-110"}`}
+                      />
+                    );
+                  })}
+                </div>
+                {/* Mesmo selo da lista de conversas, para ver antes de salvar. */}
+                <Badge
+                  variant="outline"
+                  className={`h-4 px-1 py-0 text-[9px] font-medium max-w-[200px] ${produtoCor(produtoCorKey).badge}`}
+                >
+                  <span className="truncate">{produtoNome.trim() || "PRODUTO"}</span>
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Cor do selo deste produto nos cards da lista de conversas. {produtoCor(produtoCorKey).label}.
+              </p>
             </div>
 
             {omieAtivo && (

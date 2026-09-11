@@ -12,6 +12,8 @@ import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
 import { useGroupMentionLookup } from "../hooks/useGroupMentionLookup";
 import { resolveMentionsToText } from "../chat/mentionUtils";
 import { showsCSTicketAlert } from "@/lib/churnDismiss";
+import { produtoCor } from "@/lib/produtoCores";
+import type { ContactProduto } from "../hooks/useContactProdutos";
 
 
 interface Props {
@@ -23,7 +25,7 @@ interface Props {
   isAgentAlert?: boolean;
   showDepartment?: boolean;
   departmentName?: string | null;
-  produtos?: string[];
+  produtos?: ContactProduto[];
   /** DEM-0227 — posição na FILA (1 = próximo a ser atendido). Só na pill "Fila". */
   /** O setor deste chat libera para a fila na abertura (support_departments.off_hours_release_to_queue). */
   deptReleasesOffHours?: boolean;
@@ -298,10 +300,14 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
           {produtos && produtos.length > 0 && (
             <Badge
               variant="outline"
-              title={produtos.join(" · ")}
-              className="shrink-0 max-w-[45%] h-4 px-1 py-0 gap-0.5 text-[9px] font-medium border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+              title={produtos.map((p) => p.nome).join(" · ")}
+              // A cor é a do produto exibido; os do "+N" aparecem só no title.
+              className={cn(
+                "shrink-0 max-w-[45%] h-4 px-1 py-0 gap-0.5 text-[9px] font-medium",
+                produtoCor(produtos[0].cor).badge,
+              )}
             >
-              <span className="truncate">{produtos[0]}</span>
+              <span className="truncate">{produtos[0].nome}</span>
               {produtos.length > 1 && (
                 <span className="shrink-0 opacity-70">+{produtos.length - 1}</span>
               )}

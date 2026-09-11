@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 11/09
+
+- 🆕 **Cor para cada produto na lista de conversas** — Em **Configurações › Cadastros › Comercial › Produtos**, o cadastro do produto ganhou o campo **Cor no chat**, com 10 cores para escolher e uma prévia de como o selo fica. O selo com o nome do produto que aparece nos cards da lista de conversas passa a sair nessa cor, o que ajuda a reconhecer de relance qual software o cliente usa. A tabela de produtos mostra a cor escolhida ao lado do nome. Produtos sem cor escolhida continuam no azul de sempre.
+
 ### 10/09
 
 - ⬆️ **Conta de e-mail ligada a vários setores e a vários usuários** — No cadastro das contas em **Configurações › Atendimento › E-mail**, o campo Setor passou a aceitar mais de um setor, e entrou o campo **Usuários**, também com escolha de várias pessoas, para dizer quem usa aquela conta no dia a dia. A lista mostra os setores e os nomes das pessoas ligadas a cada conta. Contas que já tinham um setor continuam com ele.
