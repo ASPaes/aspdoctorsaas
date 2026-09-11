@@ -190,6 +190,14 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
     [periodosResponsavel, filtro.responsavelIds],
   );
 
+  /** Quando a medida já sabe de QUEM ela é (a RPC carimba o autor), não há janela a
+   *  cruzar — a pergunta vira uma comparação direta. */
+  const recorteResponsavelExato = useMemo(
+    () => (userId: string | null) =>
+      filtro.responsavelIds.length === 0 || (userId != null && filtro.responsavelIds.includes(userId)),
+    [filtro.responsavelIds],
+  );
+
   const allowedByFilter = useMemo(
     () => filtrarJornadas(journeys, filtro, pipelinesPorJornada, participantesPorJornada, responsaveisPorJornada),
     [journeys, filtro, pipelinesPorJornada, participantesPorJornada, responsaveisPorJornada],
@@ -210,6 +218,7 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
     /** `(journeyId, de, ate) => a janela é de alguém do filtro?`. Mesmo papel que
      *  `pipelineSelecionado` tem para as fases: recorta a MEDIDA, não só a jornada. */
     recorteResponsavel,
+    recorteResponsavelExato,
     /** user_id → nome, já resolvido para os filtros. Evita uma segunda query igual. */
     nomePorUsuario: nomes,
   };

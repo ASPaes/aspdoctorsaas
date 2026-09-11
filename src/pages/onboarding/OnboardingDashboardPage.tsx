@@ -506,6 +506,7 @@ export default function OnboardingDashboardPage() {
             pipelineIds={dashFilters.pipelineIds}
             fasePorPipeline={dashFilters.fasePorPipeline}
             recorteResponsavel={dashFilters.recorteResponsavel}
+            recorteResponsavelExato={dashFilters.recorteResponsavelExato}
           />
 
           {/* KPI Row 1b: PDV + previsto/realizado */}

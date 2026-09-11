@@ -22,6 +22,11 @@ interface FirstContactRow {
   primeiro_contato_em: string | null;
   minutos_corridos: number | null;
   minutos_uteis: number | null;
+  /** Quem mandou a mensagem. NUNCA o responsável de hoje — ver a RPC. */
+  contato_por: string | null;
+  /** `ticket` = chat aberto pelo ticket (auditável na timeline). `time` = conversa
+   *  solta do cliente, mas de alguém do time da jornada. */
+  contato_origem: "ticket" | "time" | null;
 }
 
 /**
@@ -36,7 +41,7 @@ interface FirstContactRow {
  */
 export default function TempoDeEntregaSection({
   journeys, tenantId, dateRange, allowedJourneyIds, nomes, pipelineIds, fasePorPipeline,
-  recorteResponsavel,
+  recorteResponsavel, recorteResponsavelExato,
 }: {
   journeys: JourneyTempo[];
   tenantId: string | null;
@@ -49,6 +54,8 @@ export default function TempoDeEntregaSection({
   fasePorPipeline: Record<string, number>;
   /** A janela medida é de alguém do filtro de Responsável? Sem filtro, tudo passa. */
   recorteResponsavel: (journeyId: string, de: string | null | undefined, ate: string | null | undefined) => boolean;
+  /** Esta pessoa está no filtro? Para quando a medida já sabe de quem ela é. */
+  recorteResponsavelExato: (userId: string | null) => boolean;
 }) {
   /**
    * Cada cartão aqui é preso a uma fase: não existe "tempo de onboarding" dentro do
@@ -96,6 +103,30 @@ export default function TempoDeEntregaSection({
     },
   });
 
+  /** Nome de quem fez o contato. Não dá para reaproveitar o mapa dos filtros: o autor
+   *  pode ser alguém que nunca foi responsável nem participante — foi exatamente o
+   *  caso do VO TITA, em que o Igor fez o contato e a responsável era a Fabianne. */
+  const autorIds = useMemo(
+    () => Array.from(new Set((firstContactQ.data ?? []).map((r) => r.contato_por).filter(Boolean))).sort() as string[],
+    [firstContactQ.data],
+  );
+
+  const autoresQ = useQuery({
+    queryKey: ["onb-first-contact-autores", autorIds.join(",")],
+    enabled: autorIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, funcionarios:funcionario_id(nome)")
+        .in("user_id", autorIds);
+      if (error) throw error;
+      const m: Record<string, string> = {};
+      (data ?? []).forEach((p: any) => { if (p.funcionarios?.nome) m[p.user_id] = p.funcionarios.nome; });
+      return m;
+    },
+  });
+  const autores = useMemo(() => autoresQ.data ?? {}, [autoresQ.data]);
+
   const total = useMemo(() => {
     // A janela É a jornada inteira, então quem passou por ela está sempre dentro:
     // o recorte não muda nada aqui. Aplicado mesmo assim para a regra ser uma só.
@@ -136,19 +167,36 @@ export default function TempoDeEntregaSection({
     const linhas = (firstContactQ.data ?? []).filter((r) => {
       if (!allowedJourneyIds.has(r.journey_id)) return false;
       if (!r.distribuido_em) return false;
-      // O contato é de quem estava com a jornada ENTRE a distribuição e a mensagem —
-      // não de quem assumiu dias depois. É este recorte que tira a Natural Aires do
-      // filtro da Fabianne: o contato foi da Amanda, 3 dias antes da transferência.
-      if (!recorteResponsavel(r.journey_id, r.distribuido_em, r.primeiro_contato_em)) return false;
+      // Com contato, o recorte é EXATO: a RPC diz quem mandou a mensagem, então não
+      // há janela a cruzar. Sem contato, cai na janela [distribuição, agora] — é de
+      // quem está com a jornada a cobrança de um contato que nunca saiu.
+      if (r.contato_por) {
+        if (!recorteResponsavelExato(r.contato_por)) return false;
+      } else if (!recorteResponsavel(r.journey_id, r.distribuido_em, null)) {
+        return false;
+      }
       const t = new Date(r.distribuido_em).getTime();
       return t >= de && t <= ate;
     });
     return {
       util: mediaTempo(linhas.map((r) => r.minutos_uteis)),
       cal: mediaTempo(linhas.map((r) => r.minutos_corridos)),
-      linhas: linhas.map((r) => linha(r.journey_id, r.minutos_uteis, r.minutos_corridos, r.distribuido_em, r.primeiro_contato_em)),
+      /** Quantos saem do chat do ticket — a parcela auditável na timeline. */
+      viaTicket: linhas.filter((r) => r.contato_origem === "ticket").length,
+      linhas: linhas.map((r) =>
+        r.contato_por
+          ? {
+              journeyId: r.journey_id,
+              cliente: nomes.cliente(r.journey_id),
+              responsavel: autores[r.contato_por] ?? "—",
+              util: r.minutos_uteis,
+              cal: r.minutos_corridos,
+              pctSla: null,
+            }
+          : linha(r.journey_id, r.minutos_uteis, r.minutos_corridos, r.distribuido_em, null),
+      ),
     };
-  }, [firstContactQ.data, dateRange, allowedJourneyIds, linha, recorteResponsavel]);
+  }, [firstContactQ.data, dateRange, allowedJourneyIds, linha, nomes, autores, recorteResponsavel, recorteResponsavelExato]);
 
   const cobertura = pct(contato.util.n, contato.util.total);
   const semContato = contato.util.total - contato.util.n;
@@ -219,20 +267,20 @@ export default function TempoDeEntregaSection({
               ? `o contato acontece no onboarding · ${motivoRecorte}`
               : contato.util.total === 0
               ? "nenhuma jornada distribuída no período"
-              : `${contato.util.n} de ${contato.util.total} com contato registrado · calendário ${contato.cal.media == null ? "—" : formatMinCal(contato.cal.media)}`
+              : `${contato.util.n} de ${contato.util.total} com contato · ${contato.viaTicket} pelo chat do ticket · calendário ${contato.cal.media == null ? "—" : formatMinCal(contato.cal.media)}`
           }
           tone={!vale(FASE_ONBOARDING) || contato.util.media == null ? "default" : "success"}
           subTone={!vale(FASE_ONBOARDING) || (contato.util.total > 0 && cobertura < 70) ? "warning" : "muted"}
           onClick={vale(FASE_ONBOARDING) && contato.util.total ? () => setDrill({
             titulo: "1º contato com o cliente",
-            regra: `Média de (1ª mensagem do responsável ao cliente − distribuição) em horário útil. ${contato.util.n} de ${contato.util.total} jornadas distribuídas no período têm contato registrado; as outras ficam fora do numerador.`,
+            regra: `Média de (1ª mensagem do time ao cliente − distribuição) em horário útil. O contato vale quando sai do chat aberto PELO TICKET (${contato.viaTicket} destes), ou, na falta dele, de alguém do time da jornada. ${contato.util.n} de ${contato.util.total} jornadas distribuídas no período têm contato; as outras ficam fora do numerador. A coluna Responsável mostra quem mandou a mensagem.`,
             linhas: contato.linhas, unidade: "util",
           }) : undefined}
         />
       </div>
       {vale(FASE_ONBOARDING) && semContato > 0 && cobertura < 70 && (
         <p className="text-[11px] text-muted-foreground mt-2">
-          {semContato} de {contato.util.total} jornadas não têm mensagem do responsável ao cliente no WhatsApp.
+          {semContato} de {contato.util.total} jornadas não têm mensagem do time ao cliente no WhatsApp.
           A média fala só das {contato.util.n} que têm.
         </p>
       )}
