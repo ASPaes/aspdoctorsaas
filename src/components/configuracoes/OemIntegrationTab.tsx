@@ -1822,10 +1822,13 @@ export default function OemIntegrationTab() {
           código do OEM não deveria estar nele. Ignorar deixaria a receita de
           outra empresa dentro da conta do OEM, e abrir a ficha só mostra o
           problema. A saída é tirar o código. */}
+      {/* A filial vai junto desde que um cliente pode ter uma licença por
+          loja: sem ela a função não sabe qual linha é a errada, e apagava o
+          código de todas, inclusive das licenças certas das outras lojas. */}
       {i.tipo === "codigo_produto_errado" && (
         <Button size="sm" variant="secondary" className="gap-1.5"
           disabled={desfazendo === clienteId}
-          onClick={() => removerCodigoDaFicha(clienteId)}>
+          onClick={() => removerCodigoDaFicha(clienteId, codigoEmProdutoDeOutro.get(clienteId)?.filial ?? null)}>
           {desfazendo === clienteId
             ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
             : <Undo2 className="h-3.5 w-3.5" />}
@@ -2330,11 +2333,17 @@ export default function OemIntegrationTab() {
   // linha lá: o cliente não é do parceiro, e é exatamente por isso que ele
   // deixou de casar com filial nenhuma. Sem esta saída, a única coisa que a
   // tela oferecia era Ignorar — esconder em vez de resolver.
-  async function removerCodigoDaFicha(clienteId: string) {
+  //
+  // A filial vai junto desde 10/09/2026, quando um cliente passou a poder ter
+  // uma licença por loja: sem ela a RPC não sabe qual linha tirar. Sem filial
+  // (a versão antiga desta tela ainda aberta em algum navegador) ela só age
+  // se o cliente tiver uma licença, e recusa se tiver mais.
+  async function removerCodigoDaFicha(clienteId: string, filial: string | null) {
     setDesfazendo(clienteId);
     try {
       const { error } = await (supabase as any).rpc("oem_remover_codigo_filial", {
         p_cliente_id: clienteId,
+        p_filial: filial,
       });
       if (error) throw error;
       toast({
