@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 10/09
 
+- 🆕 **Enviar e-mail de teste por qualquer conta cadastrada** — Em **Configurações › Atendimento › E-mail**, o menu de cada conta ganhou **Enviar e-mail de teste**: você digita um endereço, a plataforma manda uma mensagem de verdade por aquela conta e diz na hora se o provedor aceitou. O endereço de quem está logado já vem preenchido. Quando o provedor recusa, a tela explica o motivo em português, por exemplo destinatário que não existe ou limite de envios estourado. É o primeiro passo do envio de e-mail pela plataforma: cada tentativa fica registrada, com conta usada, destinatários, assunto e o resultado, para responder quando um cliente disser que não recebeu.
+
 - 🔧 **Vincular licença do OEM voltou a funcionar nas filiais com módulo em quantidade zero** — Desde 07/09, vincular pela primeira vez uma licença do OEM a um cliente dava erro sempre que o parceiro informava algum módulo daquela filial com quantidade zero, o que acontece em centenas de filiais (em geral lojas sem PDV ou módulos de liga e desliga). A tela mostrava uma mensagem técnica e o vínculo não era feito. Agora o vínculo é gravado normalmente. Esses módulos aparecem na ficha com quantidade 1, como era antes de 07/09, e o custo continua sendo o valor total que o parceiro informa, sem nenhuma diferença de valor.
 
 - ⬆️ **Logo de cada provedor na lista de e-mails** — As contas em **Configurações › Atendimento › E-mail** e os botões de escolha de provedor no cadastro mostram agora o logo do Gmail, Outlook, Yahoo, Zoho, Locaweb, Hostinger e UOL Host, no lugar da letra inicial. Fica mais fácil reconhecer de relance qual conta é de qual provedor.

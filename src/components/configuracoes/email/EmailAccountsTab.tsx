@@ -14,7 +14,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  ArrowRight, CheckCircle2, Info, LifeBuoy, Loader2, Mail, MoreVertical, Pencil, Plug, Plus, Star, Trash2, Wand2, XCircle,
+  ArrowRight, CheckCircle2, Info, LifeBuoy, Loader2, Mail, MoreVertical, Pencil, Plug, Plus, Send, Star, Trash2, Wand2, XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -24,6 +24,7 @@ import { SECURITY_LABELS, providerByValue, type EmailSecurity } from "./emailPro
 import { EmailAccountDialog } from "./EmailAccountDialog";
 import { GuiaProvedor } from "./GuiaProvedor";
 import { ProviderLogo } from "./ProviderLogo";
+import { EnviarTesteDialog, montarEmailDeTeste } from "./EnviarTesteDialog";
 import { diagnosticar, servidoresRecomendados } from "./emailDiagnostico";
 import { useEmailAccounts, type EmailAccount } from "./useEmailAccounts";
 
@@ -67,13 +68,14 @@ function SeloTeste({ conta, testando }: { conta: EmailAccount; testando: boolean
 }
 
 export default function EmailAccountsTab() {
-  const { accounts, isLoading, setores, saveAccount, deleteAccount, updateFlags, testAccount } = useEmailAccounts();
+  const { accounts, isLoading, setores, saveAccount, deleteAccount, updateFlags, testAccount, sendEmail } = useEmailAccounts();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editando, setEditando] = useState<EmailAccount | null>(null);
   const [excluindo, setExcluindo] = useState<EmailAccount | null>(null);
   const [testandoId, setTestandoId] = useState<string | null>(null);
   const [resolvendoId, setResolvendoId] = useState<string | null>(null);
   const [corrigindo, setCorrigindo] = useState(false);
+  const [enviandoTeste, setEnviandoTeste] = useState<EmailAccount | null>(null);
 
   const setorPorId = useMemo(
     () => new Map(setores.map((s) => [s.id, s.name])),
@@ -307,6 +309,10 @@ export default function EmailAccountsTab() {
                         <Plug className="mr-2 h-4 w-4" />
                         Testar conexão
                       </DropdownMenuItem>
+                      <DropdownMenuItem disabled={!conta.ativo} onClick={() => setEnviandoTeste(conta)}>
+                        <Send className="mr-2 h-4 w-4" />
+                        Enviar e-mail de teste
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setResolvendoId(conta.id)}>
                         <LifeBuoy className="mr-2 h-4 w-4" />
                         Como liberar o acesso
@@ -345,6 +351,21 @@ export default function EmailAccountsTab() {
         onSave={(input) => saveAccount.mutateAsync(input)}
         onTest={testar}
         saving={saveAccount.isPending}
+      />
+
+      <EnviarTesteDialog
+        conta={enviandoTeste}
+        onOpenChange={(open) => !open && setEnviandoTeste(null)}
+        onEnviar={(para) =>
+          sendEmail.mutateAsync({
+            account_id: enviandoTeste!.id,
+            tenant_id: enviandoTeste!.tenant_id,
+            to: para,
+            origem: "teste",
+            ...montarEmailDeTeste(enviandoTeste!),
+          })
+        }
+        enviando={sendEmail.isPending}
       />
 
       {/* Como resolver: diagnóstico do último teste + passo a passo do provedor */}

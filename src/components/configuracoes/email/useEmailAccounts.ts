@@ -163,11 +163,31 @@ export function useEmailAccounts() {
       const { data, error } = await supabase.functions.invoke("test-email-account", {
         body: { account_id: id },
       });
-      if (error) throw error;
+      if (error) throw new Error(await mensagemDoErro(error));
       if ((data as any)?.error) throw new Error((data as any).error);
       return data as EmailTestResult;
     },
     onSettled: invalidate,
+  });
+
+  /**
+   * Envio de verdade pela send-email. O tenant vai explícito, o da própria
+   * conta, para o super admin conseguir testar conta de outro tenant.
+   */
+  const sendEmail = useMutation({
+    mutationFn: async (input: {
+      account_id: string;
+      tenant_id: string;
+      to: string;
+      subject: string;
+      html: string;
+      origem: string;
+    }) => {
+      const { data, error } = await supabase.functions.invoke("send-email", { body: input });
+      if (error) throw new Error(await mensagemDoErro(error));
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as EnvioResultado;
+    },
   });
 
   return {
@@ -178,5 +198,28 @@ export function useEmailAccounts() {
     deleteAccount,
     updateFlags,
     testAccount,
+    sendEmail,
   };
+}
+
+export interface EnvioResultado {
+  ok: boolean;
+  mensagem: string;
+  envio_id: string | null;
+  message_id: string;
+  conta: string;
+}
+
+/**
+ * Em resposta 4xx, `functions.invoke` devolve só "Edge Function returned a
+ * non-2xx status code" e esconde o motivo, que está no JSON do corpo.
+ */
+async function mensagemDoErro(error: any): Promise<string> {
+  try {
+    const corpo = await error?.context?.json?.();
+    if (corpo?.error) return String(corpo.error);
+  } catch {
+    // corpo não era JSON
+  }
+  return error?.message || "Falha ao falar com o servidor.";
 }

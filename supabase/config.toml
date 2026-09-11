@@ -288,3 +288,9 @@ verify_jwt = true
 # aqui o CI deploya FALSE e abre a function para qualquer um.
 [functions.test-email-account]
 verify_jwt = true
+
+# Envio de e-mail. verify_jwt = TRUE: chamada pela tela com a sessão do usuário
+# ou por outra function com o JWT do service_role; o gateway confere a
+# assinatura e a function lê o claim `role` confiando nisso.
+[functions.send-email]
+verify_jwt = true

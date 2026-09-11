@@ -1,10 +1,15 @@
 /**
- * Verificação de conta de e-mail falando o protocolo direto no socket.
+ * Cliente SMTP e IMAP falando o protocolo direto no socket.
  *
- * Não usa biblioteca de envio de propósito: o que a tela precisa saber é
- * exatamente o que uma biblioteca esconde — se o TLS combinou com a porta, se o
- * servidor aceitou o AUTH e com qual código recusou. Nada é enviado e nada é
- * lido: SMTP para em AUTH + QUIT, IMAP para em LOGIN + LOGOUT.
+ * Usado por DUAS functions: test-email-account (dono do arquivo) e send-email,
+ * que importa `../test-email-account/smtp.ts`. O workflow de deploy sabe disso:
+ * mudou este arquivo, ele redeploya as duas (bloco "Dependentes" em
+ * .github/workflows/deploy-edge-functions.yml).
+ *
+ * Não usa biblioteca de propósito: o que a tela precisa saber é exatamente o que
+ * uma biblioteca esconde — se o TLS combinou com a porta, se o servidor aceitou o
+ * AUTH e com qual código recusou. E o denomailer, a opção óbvia, quebra assunto
+ * com acento (ver denomailer-assunto-acento no DoctorDev).
  */
 
 export type EmailSecurity = "ssl" | "starttls" | "none";
@@ -44,15 +49,23 @@ class ConexaoTexto {
     this.conn = await Deno.startTls(this.conn as Deno.TcpConn, { hostname });
   }
 
-  async escrever(linha: string) {
-    await this.conn.write(enc.encode(linha));
+  /**
+   * `write` pode gravar só parte do buffer. Com comando curto isso nunca
+   * aparece; com o corpo de um e-mail aparece. Repete até mandar tudo.
+   */
+  async escrever(texto: string, etapa = "escrita") {
+    const bytes = enc.encode(texto);
+    let enviados = 0;
+    while (enviados < bytes.length) {
+      enviados += await comPrazo(this.conn.write(bytes.subarray(enviados)), etapa, 30_000);
+    }
   }
 
   /** lê até `completo(acumulado)` dizer que a resposta fechou */
-  async ler(completo: (acumulado: string) => boolean, etapa: string): Promise<string> {
+  async ler(completo: (acumulado: string) => boolean, etapa: string, ms = TIMEOUT_MS): Promise<string> {
     const buffer = new Uint8Array(4096);
     while (!completo(this.acc)) {
-      const n = await comPrazo(this.conn.read(buffer), etapa);
+      const n = await comPrazo(this.conn.read(buffer), etapa, ms);
       if (n === null) throw new Error(`Conexão encerrada pelo servidor na etapa ${etapa}`);
       this.acc += dec.decode(buffer.subarray(0, n));
     }
@@ -91,25 +104,31 @@ const codigoSmtp = (resposta: string) => {
   return parseInt(linhas[linhas.length - 1]?.slice(0, 3) ?? "0", 10);
 };
 
-function exigir(resposta: string, esperado: number, etapa: string) {
+function exigir(resposta: string, esperado: number | number[], etapa: string) {
   const codigo = codigoSmtp(resposta);
-  if (codigo !== esperado) {
+  const aceitos = Array.isArray(esperado) ? esperado : [esperado];
+  if (!aceitos.includes(codigo)) {
     throw new Error(`${etapa}: servidor respondeu ${resposta.trim()}`);
   }
 }
 
-export async function verificarSmtp(params: {
+export interface CredenciaisSmtp {
   host: string;
   port: number;
   security: EmailSecurity;
   username: string;
   password: string;
-}): Promise<void> {
+}
+
+/**
+ * Conecta, cumprimenta, sobe o TLS quando a porta pede e autentica.
+ * Devolve a conexão pronta para o MAIL FROM; quem chama fecha.
+ */
+async function abrirSessaoSmtp(params: CredenciaisSmtp): Promise<ConexaoTexto> {
   const { host, port, security, username, password } = params;
-  let c: ConexaoTexto | null = null;
+  const c = await conectar(host, port, security, "conexão");
 
   try {
-    c = await conectar(host, port, security, "conexão");
     exigir(await c.ler(smtpCompleto, "saudação"), 220, "saudação");
 
     await c.escrever(`EHLO doctorsaas.com.br\r\n`);
@@ -139,9 +158,57 @@ export async function verificarSmtp(params: {
     await c.escrever(`${b64(password)}\r\n`);
     exigir(await c.ler(smtpCompleto, "senha"), 235, "senha");
 
+    return c;
+  } catch (e) {
+    c.fechar();
+    throw e;
+  }
+}
+
+export async function verificarSmtp(params: CredenciaisSmtp): Promise<void> {
+  const c = await abrirSessaoSmtp(params);
+  try {
     await c.escrever("QUIT\r\n");
   } finally {
-    c?.fechar();
+    c.fechar();
+  }
+}
+
+/** linha que começa com ponto ganha outro ponto, senão o servidor lê fim de mensagem (RFC 5321 4.5.2) */
+const pontoDuplo = (mensagem: string) => mensagem.replace(/(^|\r\n)\./g, "$1..");
+
+/**
+ * Envia uma mensagem já montada (cabeçalhos + corpo, com CRLF).
+ * `destinatarios` é o envelope: To + Cc (+ Bcc, quando existir).
+ * Devolve a resposta final do servidor, que costuma trazer o id da fila dele.
+ */
+export async function enviarSmtp(params: CredenciaisSmtp & {
+  remetente: string;
+  destinatarios: string[];
+  mensagem: string;
+}): Promise<string> {
+  const c = await abrirSessaoSmtp(params);
+  try {
+    await c.escrever(`MAIL FROM:<${params.remetente}>\r\n`);
+    exigir(await c.ler(smtpCompleto, "remetente"), 250, "remetente");
+
+    for (const destino of params.destinatarios) {
+      await c.escrever(`RCPT TO:<${destino}>\r\n`);
+      exigir(await c.ler(smtpCompleto, `destinatário ${destino}`), [250, 251], `destinatário ${destino}`);
+    }
+
+    await c.escrever("DATA\r\n");
+    exigir(await c.ler(smtpCompleto, "DATA"), 354, "DATA");
+
+    await c.escrever(`${pontoDuplo(params.mensagem)}\r\n.\r\n`, "envio do corpo");
+    // o provedor pode demorar para aceitar: antivírus, antispam, fila
+    const aceite = await c.ler(smtpCompleto, "entrega", 60_000);
+    exigir(aceite, 250, "entrega");
+
+    await c.escrever("QUIT\r\n");
+    return aceite.trim();
+  } finally {
+    c.fechar();
   }
 }
 
@@ -150,13 +217,7 @@ export async function verificarSmtp(params: {
 /** aspas e barra invertida precisam de escape dentro de string literal do IMAP */
 const escaparImap = (v: string) => v.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
-export async function verificarImap(params: {
-  host: string;
-  port: number;
-  security: EmailSecurity;
-  username: string;
-  password: string;
-}): Promise<void> {
+export async function verificarImap(params: CredenciaisSmtp): Promise<void> {
   const { host, port, security, username, password } = params;
   let c: ConexaoTexto | null = null;
 
@@ -192,13 +253,19 @@ export async function verificarImap(params: {
 
 /**
  * A resposta crua do provedor não ajuda quem está cadastrando. Cada caso vira
- * uma frase com a saída; o texto técnico continua indo para `last_test_error`.
+ * uma frase com a saída; o texto técnico continua indo para `last_test_error`
+ * (teste) ou `email_envios.erro` (envio).
+ *
+ * Os casos de teste de conta estão espelhados em
+ * src/components/configuracoes/email/emailDiagnostico.ts — mudou um, mude o
+ * outro. Os de envio (destinatário, tamanho, limite) só existem aqui: o teste
+ * de conta nunca chega nessas etapas.
  */
 export function mensagemAmigavel(erroBruto: string): string {
   const e = erroBruto.toLowerCase();
 
   // Os dois primeiros vêm antes do 535 genérico: chegam com o mesmo código 535/534
-  // e têm saída diferente. Espelhado em src/components/configuracoes/email/emailDiagnostico.ts.
+  // e têm saída diferente.
   if (/5\.7\.139|basic authentication is disabled|smtpclientauthentication is disabled/.test(e)) {
     return "A Microsoft bloqueou o acesso por senha nesta conta. Em conta de empresa, o administrador precisa liberar o SMTP autenticado; conta pessoal do Outlook ou do Hotmail não funciona mais por senha.";
   }
@@ -208,6 +275,24 @@ export function mensagemAmigavel(erroBruto: string): string {
   if (/535|5\.7\.8|5\.7\.3|authentication failed|authenticationfailed|invalid credentials|username and password not accepted|login failed|a1 no/.test(e)) {
     return "Usuário ou senha recusados pelo provedor. Se a conta tem verificação em duas etapas, gere uma senha de aplicativo e use ela aqui.";
   }
+
+  // só no envio
+  if (/^destinatário .*(550|553|5\.1\.1|5\.1\.0|5\.1\.3|user unknown|does not exist|no such user)/.test(e)) {
+    return "O provedor recusou o destinatário. Confira se o endereço de e-mail está certo e se ele existe.";
+  }
+  if (/552|5\.3\.4|message size|too large/.test(e)) {
+    return "A mensagem ficou maior do que o provedor aceita.";
+  }
+  if (/daily .*limit|sending limit|rate limit|too many (messages|recipients)|4\.7\.28|5\.4\.5/.test(e)) {
+    return "O provedor limitou os envios desta conta por excesso de mensagens em pouco tempo. Tente de novo mais tarde.";
+  }
+  if (/^remetente/.test(e)) {
+    return "O provedor não aceitou esta conta como remetente. O endereço de envio precisa ser o mesmo da conta autenticada.";
+  }
+  if (/^entrega|^data:/.test(e)) {
+    return "O provedor recusou a mensagem na hora da entrega. A resposta dele ficou guardada no registro do envio.";
+  }
+
   if (/timeout|timed out/.test(e)) {
     return "O servidor não respondeu na porta informada. Confira a porta e se o provedor libera envio autenticado.";
   }
