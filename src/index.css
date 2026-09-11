@@ -32,6 +32,15 @@
     --accent: 199 89% 48%;           /* #0EA5E9 */
     --accent-foreground: 0 0% 100%;
 
+    /* ─── Highlight (item em foco numa lista: Command, Select, menus) ───
+       O `--accent` é o azul sólido da marca: como fundo de item, apagava o texto
+       secundário (CNPJ cinza sobre azul = 1,08:1 no escuro). DEM-0391.
+       `--highlight-muted-foreground` substitui o `--muted-foreground` só dentro
+       do item em foco, porque o cinza normal não lê sobre nenhuma tinta. */
+    --highlight: 199 85% 90%;
+    --highlight-foreground: 222 47% 6%;
+    --highlight-muted-foreground: 215 19% 35%;
+
     /* ─── Semantic states ─── */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -109,6 +118,11 @@
     /* ─── Accent (Signal Blue) ─── */
     --accent: 199 89% 48%;           /* #0EA5E9 */
     --accent-foreground: 0 0% 100%;
+
+    /* ─── Highlight — ver o bloco claro ─── */
+    --highlight: 199 60% 22%;
+    --highlight-foreground: 210 40% 98%;
+    --highlight-muted-foreground: 215 20% 78%;
 
     /* ─── Semantic states ─── */
     --destructive: 0 84% 60%;
