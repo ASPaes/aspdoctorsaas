@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -76,10 +76,27 @@ function useCheckOpenConversation(phone: string, instanceId: string) {
 export function NewConversationModal({ open, onOpenChange, onCreated, initialPhone, initialName, initialInstanceId }: Props) {
   const { instances } = useWhatsAppInstances();
   const createConversation = useCreateConversation();
-  const { selectedDepartmentId } = useDepartmentFilter();
+  const { selectedDepartmentId, selectedDepartment, departments, userDepartmentId } = useDepartmentFilter();
   const { user } = useAuth();
   const agentName = useAgentDisplayName();
   const [instanceId, setInstanceId] = useState("");
+  // Enquanto o usuário não mexe no campo, ele acompanha o padrão (os dados de
+  // setor podem chegar depois das instâncias). Mexeu, a escolha dele vale.
+  const instanceTouchedRef = useRef(false);
+
+  // DEM-0337: a "Instância padrão" do setor (Configurações > Distribuição > Setores)
+  // vem pré-selecionada. Mesma prioridade do link ?phone= em WhatsApp.tsx: a
+  // instância de quem chamou (conversa/contato aberto) > setor selecionado na
+  // lista > setor do cadastro do usuário > instância única.
+  const defaultInstanceId = useMemo(() => {
+    const isAvailable = (id?: string | null): id is string => !!id && instances.some((i) => i.id === id);
+    if (isAvailable(initialInstanceId)) return initialInstanceId;
+    const userDept = userDepartmentId ? departments.find((d) => d.id === userDepartmentId) : null;
+    for (const id of [selectedDepartment?.default_instance_id, userDept?.default_instance_id]) {
+      if (isAvailable(id)) return id;
+    }
+    return instances.length === 1 ? instances[0].id : "";
+  }, [initialInstanceId, instances, selectedDepartment?.default_instance_id, departments, userDepartmentId]);
   // Vazio, não "55": com o campo pré-preenchido, digitar/colar um número que já
   // traz o código de país (ou o DDD 55) empilhava um segundo "55" — a máscara não
   // tem como saber que o 55 da frente foi ela quem pôs. A máscara insere o +55
@@ -122,15 +139,20 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
     }
   }, [open, initialPhone, initialName]);
 
+  // O modal fica montado entre aberturas: ao fechar, a escolha manual é
+  // esquecida e a próxima abertura volta ao padrão do setor.
   useEffect(() => {
-    if (open && !instanceId) {
-      if (initialInstanceId && instances.some((i) => i.id === initialInstanceId)) {
-        setInstanceId(initialInstanceId);
-      } else if (instances.length === 1) {
-        setInstanceId(instances[0].id);
-      }
+    if (!open) {
+      instanceTouchedRef.current = false;
+      return;
     }
-  }, [open, initialInstanceId, instances, instanceId]);
+    if (!instanceTouchedRef.current) setInstanceId(defaultInstanceId);
+  }, [open, defaultInstanceId]);
+
+  const handleInstanceChange = (id: string) => {
+    instanceTouchedRef.current = true;
+    setInstanceId(id);
+  };
 
   // Reset waCheck quando phone ou instância mudar
   useEffect(() => {
@@ -148,7 +170,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
     setPhone(c.phone_number);
     setName(c.name || "");
     if (c.instance_id && instances.some((i) => i.id === c.instance_id)) {
-      setInstanceId(c.instance_id);
+      handleInstanceChange(c.instance_id);
     }
   };
 
@@ -393,7 +415,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
         <div className="space-y-4">
           <div>
             <Label className="text-xs font-medium text-muted-foreground">Instância</Label>
-            <Select value={instanceId} onValueChange={setInstanceId}>
+            <Select value={instanceId} onValueChange={handleInstanceChange}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione a instância" />
               </SelectTrigger>
