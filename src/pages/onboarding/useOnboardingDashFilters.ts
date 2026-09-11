@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { FILTRO_VAZIO, filtrarJornadas, filtroAtivo, type FiltroDash, type JourneyFiltravel } from "./dashFilters";
-import type { PeriodoResponsavel } from "./responsavelNaJanela";
+import { criarRecorteResponsavel, type PeriodoResponsavel } from "./responsavelNaJanela";
 
 export interface OpcaoFiltro {
   id: string;
@@ -185,6 +185,11 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
     };
   }, [journeys, responsaveisPorJornada, participantesPorJornada, nomes, pipelinesQ.data, demandTypesQ.data]);
 
+  const recorteResponsavel = useMemo(
+    () => criarRecorteResponsavel(periodosResponsavel, filtro.responsavelIds),
+    [periodosResponsavel, filtro.responsavelIds],
+  );
+
   const allowedByFilter = useMemo(
     () => filtrarJornadas(journeys, filtro, pipelinesPorJornada, participantesPorJornada, responsaveisPorJornada),
     [journeys, filtro, pipelinesPorJornada, participantesPorJornada, responsaveisPorJornada],
@@ -201,6 +206,10 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
     fasePorPipeline,
     /** Posse por jornada, com datas — é o que o drill-down usa para nomear quem fez. */
     periodosResponsavel,
+    responsavelIds: filtro.responsavelIds,
+    /** `(journeyId, de, ate) => a janela é de alguém do filtro?`. Mesmo papel que
+     *  `pipelineSelecionado` tem para as fases: recorta a MEDIDA, não só a jornada. */
+    recorteResponsavel,
     /** user_id → nome, já resolvido para os filtros. Evita uma segunda query igual. */
     nomePorUsuario: nomes,
   };

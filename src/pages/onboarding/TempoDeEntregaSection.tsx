@@ -36,6 +36,7 @@ interface FirstContactRow {
  */
 export default function TempoDeEntregaSection({
   journeys, tenantId, dateRange, allowedJourneyIds, nomes, pipelineIds, fasePorPipeline,
+  recorteResponsavel,
 }: {
   journeys: JourneyTempo[];
   tenantId: string | null;
@@ -46,6 +47,8 @@ export default function TempoDeEntregaSection({
   pipelineIds: string[];
   /** pipeline_id → posição da fase que ele atende. */
   fasePorPipeline: Record<string, number>;
+  /** A janela medida é de alguém do filtro de Responsável? Sem filtro, tudo passa. */
+  recorteResponsavel: (journeyId: string, de: string | null | undefined, ate: string | null | undefined) => boolean;
 }) {
   /**
    * Cada cartão aqui é preso a uma fase: não existe "tempo de onboarding" dentro do
@@ -94,33 +97,38 @@ export default function TempoDeEntregaSection({
   });
 
   const total = useMemo(() => {
-    const c = coorteConcluidas(journeys, dateRange);
+    // A janela É a jornada inteira, então quem passou por ela está sempre dentro:
+    // o recorte não muda nada aqui. Aplicado mesmo assim para a regra ser uma só.
+    const c = coorteConcluidas(journeys, dateRange)
+      .filter((j) => recorteResponsavel(j.journey_id, j.aberta_em, j.concluido_em));
     return {
       cal: mediaTempo(c.map((j) => minutosEntre(j.aberta_em, j.concluido_em))),
       n: c.length,
       linhas: c.map((j) => linha(j.journey_id, null, minutosEntre(j.aberta_em, j.concluido_em), j.aberta_em, j.concluido_em)),
     };
-  }, [journeys, dateRange, linha]);
+  }, [journeys, dateRange, linha, recorteResponsavel]);
 
   const onboarding = useMemo(() => {
-    const c = coorteOnboarding(journeys, dateRange);
+    const c = coorteOnboarding(journeys, dateRange)
+      .filter((j) => recorteResponsavel(j.journey_id, j.aberta_em, j.onboarding_concluido_em));
     const min = (j: JourneyTempo) => minutosEntre(j.aberta_em, j.onboarding_concluido_em);
     return {
       cal: mediaTempo(c.map(min)),
       n: c.length,
       linhas: c.map((j) => linha(j.journey_id, null, min(j), j.aberta_em, j.onboarding_concluido_em)),
     };
-  }, [journeys, dateRange, linha]);
+  }, [journeys, dateRange, linha, recorteResponsavel]);
 
   const implantacao = useMemo(() => {
-    const c = coorteImplantacao(journeys, dateRange);
+    const c = coorteImplantacao(journeys, dateRange)
+      .filter((j) => recorteResponsavel(j.journey_id, j.implantacao_iniciada_em, j.implantacao_concluida_em));
     const min = (j: JourneyTempo) => minutosEntre(j.implantacao_iniciada_em, j.implantacao_concluida_em);
     return {
       cal: mediaTempo(c.map(min)),
       n: c.length,
       linhas: c.map((j) => linha(j.journey_id, null, min(j), j.implantacao_iniciada_em, j.implantacao_concluida_em)),
     };
-  }, [journeys, dateRange, linha]);
+  }, [journeys, dateRange, linha, recorteResponsavel]);
 
   const contato = useMemo(() => {
     const de = dateRange.from.getTime();
@@ -128,6 +136,10 @@ export default function TempoDeEntregaSection({
     const linhas = (firstContactQ.data ?? []).filter((r) => {
       if (!allowedJourneyIds.has(r.journey_id)) return false;
       if (!r.distribuido_em) return false;
+      // O contato é de quem estava com a jornada ENTRE a distribuição e a mensagem —
+      // não de quem assumiu dias depois. É este recorte que tira a Natural Aires do
+      // filtro da Fabianne: o contato foi da Amanda, 3 dias antes da transferência.
+      if (!recorteResponsavel(r.journey_id, r.distribuido_em, r.primeiro_contato_em)) return false;
       const t = new Date(r.distribuido_em).getTime();
       return t >= de && t <= ate;
     });
@@ -136,7 +148,7 @@ export default function TempoDeEntregaSection({
       cal: mediaTempo(linhas.map((r) => r.minutos_corridos)),
       linhas: linhas.map((r) => linha(r.journey_id, r.minutos_uteis, r.minutos_corridos, r.distribuido_em, r.primeiro_contato_em)),
     };
-  }, [firstContactQ.data, dateRange, allowedJourneyIds, linha]);
+  }, [firstContactQ.data, dateRange, allowedJourneyIds, linha, recorteResponsavel]);
 
   const cobertura = pct(contato.util.n, contato.util.total);
   const semContato = contato.util.total - contato.util.n;

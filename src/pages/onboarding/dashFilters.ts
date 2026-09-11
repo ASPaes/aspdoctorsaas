@@ -14,6 +14,10 @@
  * pelo dono de hoje escondia o trabalho de quem fez o onboarding assim que o
  * implantador assumia a jornada na fase seguinte: medido em 11/09/2026, o filtro da
  * Amanda escondia 56 das 122 etapas dela, e o da Geice escondia as 2 que ela tinha.
+ *
+ * Escolher a jornada é só o primeiro passo: quem RECORTA a medida para a janela
+ * daquela pessoa é `criarRecorteResponsavel`, em `responsavelNaJanela.ts`. Sem ele,
+ * o filtro trazia a jornada inteira e nela cabia o trabalho de outra pessoa.
  */
 
 export interface FiltroDash {

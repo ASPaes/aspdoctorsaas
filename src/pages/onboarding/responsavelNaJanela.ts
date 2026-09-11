@@ -77,3 +77,33 @@ export function criarResolvedorResponsavel(
     return ids.map(nomeDe).join(" → ");
   };
 }
+
+/**
+ * O filtro de Responsável RECORTA A MEDIDA, não apenas escolhe jornadas — mesma
+ * régua que `pipelineSelecionado` já aplica às fases.
+ *
+ * A primeira versão selecionava a jornada inteira que "passou pela mão" da pessoa.
+ * Mas a janela que o número mede é bem mais estreita que a vida da jornada: a
+ * Natural Aires foi distribuída para a Amanda em 08/09, ela fez o 1º contato 1h50m
+ * depois, e a Fabianne só assumiu em 11/09 — o contato aparecia no filtro da
+ * Fabianne com o nome da Amanda. Medido em 11/09/2026: no filtro do Igor, 5 das 9
+ * linhas de 1º contato eram trabalho de outra pessoa.
+ *
+ * Em "Tempo total" isto não muda nada: lá a janela É a jornada inteira, então quem
+ * passou por ela está na janela por definição.
+ *
+ * Jornada sem histórico passa. Ela só chegou até aqui porque o responsável ATUAL
+ * bateu com o filtro, e sem carimbo não há como afirmar que a janela não é dela —
+ * sumir com ela seria trocar um erro por outro.
+ */
+export function criarRecorteResponsavel(
+  periodosPorJornada: Record<string, PeriodoResponsavel[]>,
+  responsavelIds: string[],
+) {
+  return (journeyId: string, de: string | null | undefined, ate: string | null | undefined): boolean => {
+    if (responsavelIds.length === 0) return true;
+    const ids = responsaveisNaJanela(periodosPorJornada[journeyId] ?? [], de, ate);
+    if (ids.length === 0) return true;
+    return ids.some((id) => responsavelIds.includes(id));
+  };
+}

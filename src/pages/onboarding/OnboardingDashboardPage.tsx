@@ -484,7 +484,14 @@ export default function OnboardingDashboardPage() {
           <SituacaoAgoraBand contagem={contagem} />
 
           {/* SLA — visão corrido vs. efetivo (total, pipeline, etapa, área) */}
-          <OnboardingSlaOverview journeys={periodo} tenantId={effectiveTenantId} nomes={nomes} pipelineIds={dashFilters.pipelineIds} />
+          <OnboardingSlaOverview
+            journeys={periodo}
+            tenantId={effectiveTenantId}
+            nomes={nomes}
+            pipelineIds={dashFilters.pipelineIds}
+            responsavelIds={dashFilters.responsavelIds}
+            recorteResponsavel={dashFilters.recorteResponsavel}
+          />
 
           {/* Tempo de entrega. Usa `ativas`, não `periodo`: a coorte destes cards é a
               data de CONCLUSÃO, e `periodo` já recortou por sobreposição de abertura —
@@ -498,6 +505,7 @@ export default function OnboardingDashboardPage() {
             nomes={nomes}
             pipelineIds={dashFilters.pipelineIds}
             fasePorPipeline={dashFilters.fasePorPipeline}
+            recorteResponsavel={dashFilters.recorteResponsavel}
           />
 
           {/* KPI Row 1b: PDV + previsto/realizado */}

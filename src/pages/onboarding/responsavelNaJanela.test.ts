@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { responsaveisNaJanela, criarResolvedorResponsavel, type PeriodoResponsavel } from "./responsavelNaJanela";
+import {
+  responsaveisNaJanela, criarResolvedorResponsavel, criarRecorteResponsavel, type PeriodoResponsavel,
+} from "./responsavelNaJanela";
 
 /** Fabianne pega na distribuição e passa para o Igor no dia 3. */
 const periodos: PeriodoResponsavel[] = [
@@ -55,5 +57,34 @@ describe("criarResolvedorResponsavel", () => {
 
   it("jornada sem histórico cai no responsável atual, nunca em '—'", () => {
     expect(resolver("j-sem-historico", "2026-09-01T13:00:00Z", null)).toBe("Responsável atual");
+  });
+});
+
+describe("criarRecorteResponsavel", () => {
+  it("sem filtro, toda janela passa", () => {
+    const vale = criarRecorteResponsavel({ j1: periodos }, []);
+    expect(vale("j1", "2026-09-01T13:00:00Z", "2026-09-02T09:00:00Z")).toBe(true);
+  });
+
+  it("o caso Natural Aires: a janela é de quem fez, não de quem assumiu depois", () => {
+    // Amanda recebe e faz o contato; Fabianne assume 3 dias depois.
+    const natural: PeriodoResponsavel[] = [
+      { userId: "amanda", de: "2026-09-08T18:43:00Z", ate: "2026-09-11T14:19:00Z" },
+      { userId: "fabianne", de: "2026-09-11T14:19:00Z", ate: null },
+    ];
+    const soFabianne = criarRecorteResponsavel({ j: natural }, ["fabianne"]);
+    // 1º contato: distribuição -> 1ª mensagem, ainda na mão da Amanda.
+    expect(soFabianne("j", "2026-09-08T18:43:00Z", "2026-09-08T20:33:00Z")).toBe(false);
+    // Tempo total: a janela é a jornada inteira e alcança a Fabianne.
+    expect(soFabianne("j", "2026-09-08T18:43:00Z", null)).toBe(true);
+  });
+
+  it("janela que atravessa a troca vale para os dois", () => {
+    expect(criarRecorteResponsavel({ j1: periodos }, ["fabianne"])("j1", "2026-09-01T13:00:00Z", "2026-09-04T09:00:00Z")).toBe(true);
+    expect(criarRecorteResponsavel({ j1: periodos }, ["igor"])("j1", "2026-09-01T13:00:00Z", "2026-09-04T09:00:00Z")).toBe(true);
+  });
+
+  it("jornada sem histórico passa — ela só chegou aqui porque o dono atual bateu", () => {
+    expect(criarRecorteResponsavel({}, ["fabianne"])("j-sem-historico", "2026-09-01T13:00:00Z", null)).toBe(true);
   });
 });

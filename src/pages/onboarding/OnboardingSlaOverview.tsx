@@ -256,7 +256,18 @@ function EmptyNote({ children }: { children: React.ReactNode }) {
 
 /* ---------- componente ---------- */
 
-export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipelineIds }: { journeys: SlaJourneyRow[]; tenantId: string | null; nomes: JourneyNomes; pipelineIds: string[] }) {
+export default function OnboardingSlaOverview({
+  journeys, tenantId, nomes, pipelineIds, responsavelIds, recorteResponsavel,
+}: {
+  journeys: SlaJourneyRow[];
+  tenantId: string | null;
+  nomes: JourneyNomes;
+  pipelineIds: string[];
+  /** Pessoas escolhidas no filtro. Vazio = todas. */
+  responsavelIds: string[];
+  /** A janela medida é de alguém do filtro? Recorta a MEDIDA, como `pipelineSelecionado`. */
+  recorteResponsavel: (journeyId: string, de: string | null | undefined, ate: string | null | undefined) => boolean;
+}) {
   const [areaDim, setAreaDim] = useState<"demanda" | "setor">("demanda");
   const [drill, setDrill] = useState<{ titulo: string; regra: string; linhas: LinhaDrilldown[]; unidade: "util" | "cal" } | null>(null);
 
@@ -354,13 +365,18 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
   // rodou fora do expediente tem 0 min úteis, mas já começou e precisa entrar na conta.
   const journeyPhases = useMemo(() => {
     return (j: SlaJourneyRow): FaseMedida[] => {
-      const linhas = j.journey_id ? phaseRowsByJourney.get(j.journey_id) ?? [] : [];
+      if (!j.journey_id) return [];
+      const linhas = phaseRowsByJourney.get(j.journey_id) ?? [];
       const out: FaseMedida[] = [];
       linhas.forEach((r) => {
         if (!r.pipeline_id) return;
         // Recorte da fase: com pipeline filtrado, a passagem pela OUTRA fase da mesma
         // jornada não entra. É o que separa "Onboarding PDV" de "Implantação PDV".
         if (!pipelineSelecionado(pipelineIds, r.pipeline_id)) return;
+        // Mesmo recorte, outra dimensão: a passagem por esta fase tem que ser de
+        // alguém do filtro de Responsável. Como Total, Por Pipeline e Por Área todas
+        // leem daqui, o recorte entra nas três por um caminho só.
+        if (!recorteResponsavel(j.journey_id!, r.iniciada_em, r.concluida_em)) return;
         const target = pipeMap.get(r.pipeline_id)?.sla_total_minutos ?? null;
         if (!target || target <= 0) return;
         if ((r.sla_corrido_min ?? 0) <= 0) return;
@@ -376,10 +392,14 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
       });
       return out;
     };
-  }, [pipeMap, phaseRowsByJourney, pipelineIds]);
+  }, [pipeMap, phaseRowsByJourney, pipelineIds, recorteResponsavel]);
 
-  /** Há pipeline escolhido? Então a tela inteira fala de UMA fase, não da jornada. */
-  const recorteDeFase = pipelineIds.length > 0;
+  /** Há recorte? Então a tela fala das passagens que sobraram, não da jornada.
+   *
+   *  Vale para os DOIS filtros: `sla_total_*` é o tempo da jornada inteira, e usá-lo
+   *  com um filtro de Responsável ativo somaria a fase da outra pessoa ao ciclo dela
+   *  — a mesma contradição que o filtro de pipeline já resolvia por este caminho. */
+  const recorteDeFase = pipelineIds.length > 0 || responsavelIds.length > 0;
 
   // KPIs "SLA Total"
   const total = useMemo(() => {
@@ -535,9 +555,13 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
 
   const responsavelAgg = useMemo(() => {
     const allowed = new Set(journeys.map((j) => j.journey_id));
-    const linhas = (atribuicaoQ.data ?? []).filter((l) => allowed.has(l.journey_id));
+    // Aqui o recorte é exato: a view carimba de quem é cada etapa, não há janela a
+    // cruzar. Sem isto, filtrar uma pessoa trazia os cards das outras.
+    const linhas = (atribuicaoQ.data ?? []).filter(
+      (l) => allowed.has(l.journey_id) && (responsavelIds.length === 0 || (l.responsavel_user_id != null && responsavelIds.includes(l.responsavel_user_id))),
+    );
     return agregarPorResponsavel(linhas, slaPorEtapa);
-  }, [journeys, atribuicaoQ.data, slaPorEtapa]);
+  }, [journeys, atribuicaoQ.data, slaPorEtapa, responsavelIds]);
 
   const respIds = useMemo(
     () => responsavelAgg.map((r) => r.userId).filter(Boolean) as string[],
@@ -572,6 +596,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
     const m = new Map<string | null, LinhaDrilldown[]>();
     (atribuicaoQ.data ?? []).forEach((l) => {
       if (!allowed.has(l.journey_id)) return;
+      if (responsavelIds.length > 0 && !(l.responsavel_user_id != null && responsavelIds.includes(l.responsavel_user_id))) return;
       const alvo = slaPorEtapa[l.stage_id];
       if (!alvo || alvo <= 0) return;
       const arr = m.get(l.responsavel_user_id) ?? [];
@@ -582,7 +607,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
       m.set(l.responsavel_user_id, arr);
     });
     return m;
-  }, [journeys, atribuicaoQ.data, slaPorEtapa, nomes, respNomes]);
+  }, [journeys, atribuicaoQ.data, slaPorEtapa, nomes, respNomes, responsavelIds]);
 
   // Por etapa (histórico de etapas concluídas)
   const etapaAgg = useMemo(() => {
@@ -596,6 +621,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
       const st = stageMap.get(h.stage_id);
       if (!st || !st.sla_minutos || st.sla_minutos <= 0) return;
       if (!pipelineSelecionado(pipelineIds, st.pipeline_id)) return;
+      if (!recorteResponsavel(h.journey_id, h.entrou_em, h.saiu_em)) return;
       const c = h.duracao_minutos ?? 0; // calendário — informativo
       const e = h.duracao_util_minutos ?? 0; // expediente — é o que se compara com o SLA
       const cur = m.get(h.stage_id) ?? { count: 0, sumC: 0, sumE: 0 };
@@ -630,7 +656,7 @@ export default function OnboardingSlaOverview({ journeys, tenantId, nomes, pipel
         };
       })
       .sort((a, b) => a.pipePos - b.pipePos || a.stagePos - b.stagePos);
-  }, [journeys, historyQ.data, trainingHistoryQ.data, stageMap, pipeMap, nomes, pipelineIds]);
+  }, [journeys, historyQ.data, trainingHistoryQ.data, stageMap, pipeMap, nomes, pipelineIds, recorteResponsavel]);
 
   return (
     <>
