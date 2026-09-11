@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subMonths } from 'date-fns';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
+import { type CohortFiltros, aplicarFiltrosRpc, cohortFiltrosKey } from './cohortFiltros';
 
 export interface CohortRevenueParams {
   fromCohortMonth?: string;
@@ -11,6 +12,7 @@ export interface CohortRevenueParams {
   fornecedorId?: number | null;
   fornecedorIds?: number[];
   unidadeBaseId?: number | null;
+  filtros?: CohortFiltros;
 }
 
 export interface CohortEntry {
@@ -57,7 +59,7 @@ export function useCohortRevenue(params: CohortRevenueParams = {}): UseCohortRev
   const unidadeBaseId = params.unidadeBaseId ?? null;
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['cohort-revenue', from, to, maxAge, fornecedorId, JSON.stringify(fornecedorIds), unidadeBaseId, tid],
+    queryKey: ['cohort-revenue', from, to, maxAge, fornecedorId, JSON.stringify(fornecedorIds), unidadeBaseId, tid, cohortFiltrosKey(params.filtros)],
     queryFn: async () => {
       const rpcParams: Record<string, any> = {
         p_from_month: from,
@@ -69,6 +71,7 @@ export function useCohortRevenue(params: CohortRevenueParams = {}): UseCohortRev
       else if (fornecedorId != null) rpcParams.p_fornecedor_id = fornecedorId;
       if (unidadeBaseId != null) rpcParams.p_unidade_base_id = unidadeBaseId;
       if (tid) rpcParams.p_tenant_id = tid;
+      aplicarFiltrosRpc(rpcParams, params.filtros);
 
       const { data, error } = await supabase.rpc('fn_cohort_revenue', rpcParams);
       if (error) throw error;

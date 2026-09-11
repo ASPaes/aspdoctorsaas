@@ -18,6 +18,8 @@ import { useCohortForecast } from '../hooks/useCohortForecast';
 import { ConselhoDSSection } from '../diagnostico/ConselhoDSSection';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
+import { CohortFiltrosBar } from '../CohortFiltrosBar';
+import { COHORT_FILTROS_VAZIO, contarFiltrosAtivos, type CohortFiltros } from '../hooks/cohortFiltros';
 
 interface CohortTabProps {
   tvMode?: boolean;
@@ -62,6 +64,8 @@ export function CohortTab({ tvMode = false, fornecedorId, fornecedorIds, unidade
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [metricMode, setMetricMode] = useState<'logo' | 'revenue'>('logo');
   const [dim, setDim] = useState<'uf' | 'segmento' | 'canal' | 'faixa_ticket'>('uf');
+  const [filtros, setFiltros] = useState<CohortFiltros>(COHORT_FILTROS_VAZIO);
+  const filtrosAtivos = contarFiltrosAtivos(filtros);
 
   const fromMonth = format(subMonths(new Date(), Number(cohortRange)), 'yyyy-MM');
   const toMonth = format(new Date(), 'yyyy-MM');
@@ -75,6 +79,7 @@ export function CohortTab({ tvMode = false, fornecedorId, fornecedorIds, unidade
     fornecedorId,
     fornecedorIds,
     unidadeBaseId,
+    filtros,
   });
 
   const { rows: dimRows } = useCohortRevenueDim(dim, {
@@ -84,9 +89,10 @@ export function CohortTab({ tvMode = false, fornecedorId, fornecedorIds, unidade
     fornecedorId,
     fornecedorIds,
     unidadeBaseId,
+    filtros,
   });
 
-  const { rows: forecastRows } = useCohortForecast({ fornecedorId, fornecedorIds, unidadeBaseId });
+  const { rows: forecastRows } = useCohortForecast({ fornecedorId, fornecedorIds, unidadeBaseId, filtros });
 
   const activeMatrix = metricMode === 'revenue' ? revenueMatrix : matrix;
 
@@ -94,7 +100,7 @@ export function CohortTab({ tvMode = false, fornecedorId, fornecedorIds, unidade
   const [selectedCohorts, setSelectedCohorts] = useState<string[] | null>(null);
   useEffect(() => {
     setSelectedCohorts(null);
-  }, [ageWindow, cohortRange]);
+  }, [ageWindow, cohortRange, filtros]);
   const activeCohorts = selectedCohorts ?? defaultLabels;
 
   // ========== SUMMARY CARDS DATA ==========
@@ -302,6 +308,7 @@ export function CohortTab({ tvMode = false, fornecedorId, fornecedorIds, unidade
   if (isLoading) {
     return (
       <div className="space-y-4 mt-4">
+        <CohortFiltrosBar value={filtros} onChange={setFiltros} />
         <div className="flex gap-4">
           <Skeleton className="h-10 w-48" />
           <Skeleton className="h-10 w-48" />
@@ -314,10 +321,20 @@ export function CohortTab({ tvMode = false, fornecedorId, fornecedorIds, unidade
 
   if (cohorts.length === 0) {
     return (
-      <div className="mt-4">
+      <div className="space-y-4 mt-4">
+        <CohortFiltrosBar value={filtros} onChange={setFiltros} />
         <Card>
-          <CardContent className="flex items-center justify-center py-16">
-            <p className="text-muted-foreground">Ainda não há dados suficientes para análise de coorte.</p>
+          <CardContent className="flex flex-col items-center justify-center gap-3 py-16">
+            {filtrosAtivos > 0 ? (
+              <>
+                <p className="text-muted-foreground">Nenhum cliente atende aos filtros selecionados.</p>
+                <Button variant="outline" size="sm" onClick={() => setFiltros(COHORT_FILTROS_VAZIO)}>
+                  Limpar filtros
+                </Button>
+              </>
+            ) : (
+              <p className="text-muted-foreground">Ainda não há dados suficientes para análise de coorte.</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -360,6 +377,8 @@ export function CohortTab({ tvMode = false, fornecedorId, fornecedorIds, unidade
 
   return (
     <div className="space-y-4 mt-4">
+      <CohortFiltrosBar value={filtros} onChange={setFiltros} />
+
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <div className="space-y-1">
