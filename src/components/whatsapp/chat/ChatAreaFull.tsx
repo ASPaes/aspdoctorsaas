@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { MessageSquare, Trash2, Forward, X, EyeOff, Pause } from "lucide-react";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages";
+import type { ConversationNote } from "../hooks/useConversationNotes";
 import { ChatHeader } from "./ChatHeader";
 import { ClientAlertBanner } from "./ClientAlertBanner";
 import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
@@ -48,6 +49,8 @@ type DeleteMode = 'panel_only' | 'everyone';
 
 export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, onDepartmentTransferred, highlightMessageId, onHighlightShown, pendingAction, onPendingActionConsumed }: Props) {
   const [showDetails, setShowDetails] = useState(false);
+  // Nota clicada na barra de Detalhes: o chat rola até ela
+  const [noteToFocus, setNoteToFocus] = useState<ConversationNote | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const { status: presenceStatus, isBlocked: presenceBlocked } = useAgentPresence();
   const chatInputRef = useRef<ChatInputHandle>(null);
@@ -295,6 +298,8 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           isGroup={(conversation as any)?.is_group === true}
           groupJid={(conversation as any)?.group_jid ?? null}
           instanceId={(conversation as any)?.instance_id ?? null}
+          focusNote={noteToFocus}
+          onFocusNoteHandled={() => setNoteToFocus(null)}
         />
 
         {/* Selection action bar */}
@@ -372,6 +377,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           onClose={() => setShowDetails(false)}
           onNavigateToConversation={onNavigateToConversation}
           onConversationClosed={onClose}
+          onGoToNote={setNoteToFocus}
         />
       )}
 

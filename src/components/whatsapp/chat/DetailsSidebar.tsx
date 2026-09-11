@@ -32,7 +32,9 @@ import { ContactTicketsSection } from "./ContactTicketsSection";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { CSTicketAlert } from "./CSTicketAlert";
 import { showsCSTicketAlert } from "@/lib/churnDismiss";
-import { useConversationNotes } from "../hooks/useConversationNotes";
+import { useConversationNotes, type ConversationNote } from "../hooks/useConversationNotes";
+import { useAppTimezone } from "@/hooks/useAppTimezone";
+import { formatDateLabel, formatTime } from "@/lib/formatDateWithTimezone";
 import { useConversationSummaries } from "../hooks/useConversationSummaries";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import { useConversationTopics } from "../hooks/useConversationTopics";
@@ -61,9 +63,12 @@ interface Props {
   onClose: () => void;
   onNavigateToConversation?: (conversationId: string) => void;
   onConversationClosed?: () => void;
+  /** Clique numa nota da lista: o chat rola até ela */
+  onGoToNote?: (note: ConversationNote) => void;
 }
 
-export function DetailsSidebar({ conversation, onClose, onNavigateToConversation, onConversationClosed }: Props) {
+export function DetailsSidebar({ conversation, onClose, onNavigateToConversation, onConversationClosed, onGoToNote }: Props) {
+  const { timezone } = useAppTimezone();
   const contact = conversation.contact;
   const isGroup = (conversation as any)?.is_group === true;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
@@ -345,11 +350,27 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
           >
             <div className="space-y-2 min-w-0">
               {notes.map((note) => (
-                <div key={note.id} className="bg-muted rounded-md p-2 text-xs relative group min-w-0">
-                  <p className="whitespace-normal break-words" style={{ overflowWrap: 'anywhere' }}>{note.content}</p>
+                <div key={note.id} className="bg-muted rounded-md text-xs relative group min-w-0">
                   <button
+                    type="button"
+                    onClick={() => onGoToNote?.(note)}
+                    disabled={!onGoToNote}
+                    title="Ver esta nota no chat"
+                    className="w-full min-w-0 rounded-md p-2 pr-6 text-left transition-colors hover:bg-accent/60 disabled:cursor-default disabled:hover:bg-transparent"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-0.5 min-w-0 text-[10px] text-muted-foreground">
+                      <span className="truncate font-medium text-amber-700 dark:text-amber-300">{note.author_name || "Equipe"}</span>
+                      <span className="shrink-0">{formatDateLabel(note.created_at, timezone)} {formatTime(note.created_at, timezone)}</span>
+                    </div>
+                    <p className="whitespace-normal break-words" style={{ overflowWrap: 'anywhere' }}>
+                      {note.content || (note.media_type === "video" ? "Vídeo" : note.media_type === "image" ? "Imagem" : "")}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
                     className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-destructive transition-opacity"
                     onClick={() => deleteNote(note.id)}
+                    aria-label="Excluir nota"
                   >
                     <X className="h-3 w-3" />
                   </button>

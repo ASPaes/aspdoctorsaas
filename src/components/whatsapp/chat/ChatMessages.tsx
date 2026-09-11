@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { MessageBubble } from "./MessageBubble";
 import { AttendanceEventBadge, parseAttendanceEvent } from "./AttendanceEventBadge";
@@ -37,6 +38,9 @@ interface Props {
   isGroup?: boolean;
   groupJid?: string | null;
   instanceId?: string | null;
+  /** Nota a mostrar, pedida de fora do chat (barra de Detalhes) */
+  focusNote?: ConversationNote | null;
+  onFocusNoteHandled?: () => void;
 }
 
 type TimelineItem =
@@ -48,6 +52,8 @@ const NEAR_BOTTOM_THRESHOLD = 150;
 // Distância a partir da qual vale mostrar o atalho para o fim da conversa
 const SHOW_SCROLL_DOWN_THRESHOLD = 320;
 const TOP_LOAD_THRESHOLD = 120;
+// Teto de páginas carregadas para alcançar uma nota antiga (100 msgs cada)
+const MAX_NOTE_JUMP_PAGES = 50;
 
 export function ChatMessages({
   conversationId,
@@ -70,6 +76,8 @@ export function ChatMessages({
   isGroup,
   groupJid,
   instanceId,
+  focusNote,
+  onFocusNoteHandled,
 }: Props) {
   const { messages, isLoading, onNewMessage, fetchNextPage, hasNextPage, isFetchingNextPage } = useWhatsAppMessages(conversationId);
   const { participants: groupParticipants } = useGroupParticipants(
@@ -102,6 +110,9 @@ export function ChatMessages({
   const [newMessagesCount, setNewMessagesCount] = useState(0);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [internalHighlight, setInternalHighlight] = useState<string | null>(null);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [noteJump, setNoteJump] = useState<ConversationNote | null>(null);
+  const noteJumpPagesRef = useRef(0);
   const pendingNewCountRef = useRef(0);
   const prependAnchorRef = useRef<number | null>(null);
 
@@ -221,6 +232,25 @@ export function ChatMessages({
     return items;
   }, [messages, assignments, isGroup, notes]);
 
+  const notesNewestFirst = useMemo(
+    () => [...notes].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+    [notes]
+  );
+
+  const goToNote = useCallback((note: ConversationNote) => {
+    setNotesOpen(false);
+    // Impede o auto-scroll para o fim ao chegarem as páginas anteriores
+    isNearBottomRef.current = false;
+    noteJumpPagesRef.current = 0;
+    setNoteJump(note);
+  }, []);
+
+  useEffect(() => {
+    if (!focusNote) return;
+    if (focusNote.conversation_id === conversationId) goToNote(focusNote);
+    onFocusNoteHandled?.();
+  }, [focusNote, conversationId, goToNote, onFocusNoteHandled]);
+
   // Compute the ID of the first unread incoming message
   const firstUnreadId = useMemo(() => {
     if (!unreadCount || unreadCount <= 0) return null;
@@ -256,6 +286,8 @@ export function ChatMessages({
       pendingNewCountRef.current = 0;
       isNearBottomRef.current = true;
       prependAnchorRef.current = null;
+      setNoteJump(null);
+      setNotesOpen(false);
       prevConversationId.current = conversationId;
     }
   }, [conversationId]);
@@ -338,6 +370,34 @@ export function ChatMessages({
     const timer = setTimeout(tryScroll, 200);
     return () => clearTimeout(timer);
   }, [internalHighlight, isLoading]);
+
+  // Ir até uma nota interna. As notas vêm todas de uma vez, mas as mensagens
+  // são paginadas: nota mais antiga que a página carregada cairia no topo,
+  // fora de contexto. Carrega páginas anteriores até cobrir a data da nota.
+  useEffect(() => {
+    if (!noteJump || isLoading) return;
+    const oldestLoaded = messages[0]?.timestamp;
+    const needsOlder =
+      hasNextPage &&
+      !!oldestLoaded &&
+      new Date(oldestLoaded).getTime() > new Date(noteJump.created_at).getTime() &&
+      noteJumpPagesRef.current < MAX_NOTE_JUMP_PAGES;
+    if (needsOlder) {
+      if (!isFetchingNextPage) {
+        noteJumpPagesRef.current += 1;
+        fetchNextPage().then((r) => {
+          if (r.isError) noteJumpPagesRef.current = MAX_NOTE_JUMP_PAGES;
+        });
+      }
+      return;
+    }
+    const el = viewportRef.current?.querySelector(`[data-note-id="${noteJump.id}"]`);
+    setNoteJump(null);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("message-highlight-flash");
+    setTimeout(() => el.classList.remove("message-highlight-flash"), 2500);
+  }, [noteJump, isLoading, messages, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Inject highlight flash CSS
   useEffect(() => {
@@ -468,7 +528,7 @@ export function ChatMessages({
 
                 // Nota interna — visível apenas para a equipe
                 return (
-                  <div key={`note-${item.note.id}`} className="flex justify-center my-2 group">
+                  <div key={`note-${item.note.id}`} data-note-id={item.note.id} className="flex justify-center my-2 group">
                     <div className="max-w-[85%] flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 shadow-sm">
                       <StickyNote className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0" />
                       <div className="flex-1 min-w-0">
@@ -522,7 +582,51 @@ export function ChatMessages({
         </div>
       )}
 
-
+      {/* Atalho para as notas internas: sem ele, achar uma nota exigia rolar o chat inteiro */}
+      {notes.length > 0 && (
+        <Popover open={notesOpen} onOpenChange={setNotesOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="Ver notas internas desta conversa"
+              title="Notas internas desta conversa"
+              className="absolute top-2 right-4 z-10 inline-flex h-7 items-center gap-1.5 rounded-full border border-amber-500/50 bg-amber-50/95 px-2.5 text-[11px] font-medium text-amber-700 shadow-md backdrop-blur-sm transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-amber-100 dark:bg-amber-950/80 dark:text-amber-300 dark:hover:bg-amber-900/80 animate-in fade-in zoom-in-95"
+            >
+              <StickyNote className="h-3.5 w-3.5" />
+              {notes.length === 1 ? "1 nota" : `${notes.length} notas`}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80 p-0">
+            <div className="flex items-center gap-2 border-b px-3 py-2">
+              <StickyNote className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <span className="text-sm font-medium">Notas internas</span>
+              <span className="ml-auto text-xs text-muted-foreground">{notes.length}</span>
+            </div>
+            <div className="max-h-80 overflow-y-auto p-1">
+              {notesNewestFirst.map((note) => (
+                <button
+                  key={note.id}
+                  type="button"
+                  onClick={() => goToNote(note)}
+                  className="flex w-full flex-col gap-0.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-accent/50"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-xs font-medium text-amber-700 dark:text-amber-300">
+                      {note.author_name || "Equipe"}
+                    </span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      {formatDateLabel(note.created_at, timezone)} {formatTime(note.created_at, timezone)}
+                    </span>
+                  </div>
+                  <p className="line-clamp-2 break-words text-xs text-muted-foreground">
+                    {note.content || (note.media_type === "video" ? "Vídeo" : "Imagem")}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
 
       {/* Atalho para o fim da conversa, com contador de novas mensagens */}
       {(showScrollDown || showNewMessages) && (
