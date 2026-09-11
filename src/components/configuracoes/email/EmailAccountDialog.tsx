@@ -17,6 +17,7 @@ import {
   EMAIL_PROVIDERS, SECURITY_LABELS, providerByValue, type EmailSecurity,
 } from "./emailProviders";
 import { GuiaProvedor } from "./GuiaProvedor";
+import { ProviderLogo } from "./ProviderLogo";
 import type { EmailAccount, EmailAccountInput } from "./useEmailAccounts";
 
 const SEM_SETOR = "__sem_setor__";
@@ -239,12 +240,7 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
                         : "border-border hover:bg-muted/60",
                     )}
                   >
-                    <span
-                      className="grid h-6 w-6 place-items-center rounded-[6px] text-[11px] font-bold text-white"
-                      style={{ backgroundColor: p.color }}
-                    >
-                      {p.initial}
-                    </span>
+                    <ProviderLogo value={p.value} size="sm" />
                     {p.label}
                   </button>
                 );

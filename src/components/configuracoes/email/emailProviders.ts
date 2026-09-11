@@ -39,9 +39,6 @@ export interface GuiaProvedor {
 export interface EmailProviderPreset {
   value: string;
   label: string;
-  initial: string;
-  /** cor do selo, no espírito da marca do provedor */
-  color: string;
   smtpHost?: string;
   smtpPort?: number;
   smtpSecurity?: EmailSecurity;
@@ -63,8 +60,6 @@ export const EMAIL_PROVIDERS: EmailProviderPreset[] = [
   {
     value: "gmail",
     label: "Gmail",
-    initial: "G",
-    color: "#D93025",
     smtpHost: "smtp.gmail.com",
     smtpPort: 465,
     smtpSecurity: "ssl",
@@ -108,8 +103,6 @@ export const EMAIL_PROVIDERS: EmailProviderPreset[] = [
   {
     value: "outlook",
     label: "Outlook",
-    initial: "M",
-    color: "#0F6CBD",
     smtpHost: "smtp.office365.com",
     smtpPort: 587,
     smtpSecurity: "starttls",
@@ -142,8 +135,6 @@ export const EMAIL_PROVIDERS: EmailProviderPreset[] = [
   {
     value: "yahoo",
     label: "Yahoo",
-    initial: "Y",
-    color: "#6001D2",
     smtpHost: "smtp.mail.yahoo.com",
     smtpPort: 465,
     smtpSecurity: "ssl",
@@ -168,8 +159,6 @@ export const EMAIL_PROVIDERS: EmailProviderPreset[] = [
   {
     value: "zoho",
     label: "Zoho",
-    initial: "Z",
-    color: "#E42527",
     smtpHost: "smtppro.zoho.com",
     smtpPort: 465,
     smtpSecurity: "ssl",
@@ -200,8 +189,6 @@ export const EMAIL_PROVIDERS: EmailProviderPreset[] = [
   {
     value: "locaweb",
     label: "Locaweb",
-    initial: "L",
-    color: "#00A4E4",
     smtpHost: "email-ssl.com.br",
     smtpPort: 465,
     smtpSecurity: "ssl",
@@ -225,8 +212,6 @@ export const EMAIL_PROVIDERS: EmailProviderPreset[] = [
   {
     value: "hostinger",
     label: "Hostinger",
-    initial: "H",
-    color: "#673DE6",
     smtpHost: "smtp.hostinger.com",
     smtpPort: 465,
     smtpSecurity: "ssl",
@@ -249,8 +234,6 @@ export const EMAIL_PROVIDERS: EmailProviderPreset[] = [
   {
     value: "uolhost",
     label: "UOL Host",
-    initial: "U",
-    color: "#0284C7",
     smtpHost: "smtps.uhserver.com",
     smtpPort: 465,
     smtpSecurity: "ssl",
@@ -269,8 +252,6 @@ export const EMAIL_PROVIDERS: EmailProviderPreset[] = [
   {
     value: "custom",
     label: "Próprio",
-    initial: "P",
-    color: "#475569",
     guia: {
       resumo: "Em servidor próprio, quem sabe os dados é a empresa que hospeda o seu e-mail.",
       passos: [

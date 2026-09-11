@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { SECURITY_LABELS, providerByValue, type EmailSecurity } from "./emailProviders";
 import { EmailAccountDialog } from "./EmailAccountDialog";
 import { GuiaProvedor } from "./GuiaProvedor";
+import { ProviderLogo } from "./ProviderLogo";
 import { diagnosticar, servidoresRecomendados } from "./emailDiagnostico";
 import { useEmailAccounts, type EmailAccount } from "./useEmailAccounts";
 
@@ -231,13 +232,7 @@ export default function EmailAccountsTab() {
                   falhou && "border-destructive/40",
                 )}
               >
-                <div
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] text-[15px] font-bold text-white"
-                  style={{ backgroundColor: provedor.color }}
-                  title={provedor.label}
-                >
-                  {provedor.initial}
-                </div>
+                <ProviderLogo value={conta.provider} />
 
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
