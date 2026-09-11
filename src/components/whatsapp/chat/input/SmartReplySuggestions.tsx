@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, RefreshCw, ChevronUp, ChevronDown, Copy, PenLine } from "lucide-react";
@@ -16,6 +16,11 @@ interface SmartReplySuggestionsProps {
   error?: Error | null;
   onSelectSuggestion: (text: string) => void;
   onRefresh: () => void;
+  /**
+   * Encaixe no meio da barra, entre o rótulo e os botões. Hoje: o botão
+   * "N agendadas" (ScheduledPill). Vazio, a barra fica exatamente como antes.
+   */
+  centro?: ReactNode;
 }
 
 const toneConfig: Record<string, { label: string; className: string }> = {
@@ -42,6 +47,7 @@ export const SmartReplySuggestions = ({
   error,
   onSelectSuggestion,
   onRefresh,
+  centro,
 }: SmartReplySuggestionsProps) => {
   const [expanded, setExpanded] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -69,12 +75,18 @@ export const SmartReplySuggestions = ({
     toast.success("Copiado!");
   };
 
+  // Ocupa o espaço vazio do meio da barra nos três estados (erro, vazio, com sugestões).
+  const slotCentro = centro ? (
+    <div className="flex min-w-0 flex-1 justify-center px-2">{centro}</div>
+  ) : null;
+
   // Error state
   if (error && !isLoading && suggestions.length === 0) {
     return (
       <div className="flex items-center gap-2 px-3 py-1.5 border-t border-border bg-card/50">
         <Sparkles className="h-3 w-3 text-muted-foreground" />
         <span className="text-xs text-muted-foreground">Não foi possível gerar sugestões</span>
+        {slotCentro}
         <Button variant="ghost" size="sm" onClick={onRefresh} className="h-6 px-2 text-xs">
           Tentar novamente
         </Button>
@@ -88,6 +100,7 @@ export const SmartReplySuggestions = ({
       <div className="flex items-center gap-2 px-3 py-1.5 border-t border-border bg-card/50">
         <Sparkles className="h-3 w-3 text-muted-foreground shrink-0" />
         <span className="text-[11px] text-muted-foreground">Sugestões IA</span>
+        {slotCentro}
         <Button
           variant="ghost"
           size="sm"
@@ -120,6 +133,7 @@ export const SmartReplySuggestions = ({
           </Badge>
         )}
 
+        {slotCentro}
         <div className="ml-auto flex items-center gap-0.5">
           <TooltipProvider delayDuration={300}>
             <Tooltip>

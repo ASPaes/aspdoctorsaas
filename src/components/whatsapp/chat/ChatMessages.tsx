@@ -16,6 +16,7 @@ import { useConversationNotes, type ConversationNote } from "../hooks/useConvers
 import { useGroupParticipants } from "../hooks/useGroupParticipants";
 import { ArrowRightLeft, ChevronDown, Loader2, StickyNote, Trash2, UserCheck, Users } from "lucide-react";
 import { NoteMediaPreview } from "./NoteMediaPreview";
+import { ScheduledBubbles, type AcoesAgendada } from "./ScheduledBubbles";
 
 interface Props {
   conversationId: string;
@@ -41,6 +42,15 @@ interface Props {
   /** Nota a mostrar, pedida de fora do chat (barra de Detalhes) */
   focusNote?: ConversationNote | null;
   onFocusNoteHandled?: () => void;
+  /** Ações das bolhas agendadas. Undefined = compositor fora da tela; botões desligados. */
+  agendadaAcoes?: AcoesAgendada;
+  /** Agendada aberta para edição no campo de mensagem, para destacar a bolha. */
+  editandoAgendadaId?: string | null;
+  /**
+   * Mostrar as bolhas agendadas no fim da conversa. Falso = não ocupam nada;
+   * quem avisa que elas existem é o botão da barra de sugestões.
+   */
+  agendadasExpandidas?: boolean;
 }
 
 type TimelineItem =
@@ -78,6 +88,9 @@ export function ChatMessages({
   instanceId,
   focusNote,
   onFocusNoteHandled,
+  agendadaAcoes,
+  editandoAgendadaId = null,
+  agendadasExpandidas = false,
 }: Props) {
   const { messages, isLoading, onNewMessage, fetchNextPage, hasNextPage, isFetchingNextPage } = useWhatsAppMessages(conversationId);
   const { participants: groupParticipants } = useGroupParticipants(
@@ -315,6 +328,15 @@ export function ChatMessages({
     setNewMessagesCount(0);
     setShowScrollDown(false);
     pendingNewCountRef.current = 0;
+  }, []);
+
+  // As bolhas agendadas carregam depois das mensagens e mudam de quantidade
+  // sozinhas (o cron envia, o operador cancela). Mudança de altura não passa
+  // pelo auto-scroll de mensagem nova, então quem estava no fim continua no fim.
+  // `forcar` = o operador abriu as agendadas: rola até elas mesmo longe do fim.
+  const handleAgendadasMudaram = useCallback((forcar?: boolean) => {
+    if (!forcar && !isNearBottomRef.current) return;
+    requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
   }, []);
 
   // Scroll to highlighted message (from message search)
@@ -571,6 +593,14 @@ export function ChatMessages({
             </div>
           ))
         )}
+        <ScheduledBubbles
+          conversationId={conversationId}
+          messages={messages}
+          acoes={agendadaAcoes}
+          editandoId={editandoAgendadaId}
+          expandido={agendadasExpandidas}
+          onMudou={handleAgendadasMudaram}
+        />
         <div ref={bottomRef} />
       </ScrollArea>
 

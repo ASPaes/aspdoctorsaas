@@ -31,7 +31,7 @@ import type { MediaSendParams } from "./input/types";
 import { useGroupParticipants, type GroupParticipant } from "../hooks/useGroupParticipants";
 import { MentionSuggestions, displayFor } from "./input/MentionSuggestions";
 import { ScheduleBar, paraInputLocal, proximaHoraCheia } from "./input/ScheduleBar";
-import { ScheduledMessagesPanel } from "./ScheduledMessagesPanel";
+import { ScheduledPill } from "./input/ScheduledPill";
 import { useScheduledMessages, type ScheduledMessage } from "../hooks/useScheduledMessages";
 import { useBusinessHoursConfig } from "../hooks/useBusinessHoursConfig";
 import { uploadChatMedia } from "../hooks/uploadChatMedia";
@@ -47,6 +47,14 @@ interface Props {
   isGroup?: boolean;
   groupJid?: string | null;
   instanceId?: string | null;
+  /** Qual agendada está aberta para edição no campo — a bolha na conversa se destaca. */
+  onEditandoAgendadaChange?: (id: string | null) => void;
+  /** A aba "Agendar" está ativa — as bolhas agendadas da conversa ficam abertas. */
+  onModoAgendarChange?: (ativo: boolean) => void;
+  /** As bolhas agendadas estão abertas na conversa (pelo botão da barra de sugestões). */
+  agendadasAbertas?: boolean;
+  /** Botão "N agendadas" da barra de sugestões: abre/recolhe as bolhas na conversa. */
+  onToggleAgendadas?: () => void;
 }
 
 function getMessageType(mimeType: string): MediaSendParams['messageType'] {
@@ -74,9 +82,13 @@ export type ChatInputHandle = {
   handleExternalDrop: (files: FileList | File[]) => void;
   /** Escreve no campo (nunca envia). Hoje: o texto que vem da janelinha do AcessoFast. */
   insertText: (texto: string) => void;
+  /** Bolha agendada da conversa pediu "Editar": o texto e o horário voltam para o campo. */
+  editarAgendada: (a: ScheduledMessage) => void;
+  /** Bolha agendada pediu "Enviar agora" ou "Cancelar": abre a mesma confirmação do compositor. */
+  pedirAcaoAgendada: (tipo: "cancelar" | "enviar", a: ScheduledMessage) => void;
 };
 
-export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled, isGroup, groupJid, instanceId }, ref) {
+export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled, isGroup, groupJid, instanceId, onEditandoAgendadaChange, onModoAgendarChange, agendadasAbertas, onToggleAgendadas }, ref) {
   const [mode, setMode] = useState<ComposerMode>("message");
   const [message, setMessage] = useState(() => initialMessage || getDraft(conversationId, "message") || "");
 
@@ -226,6 +238,14 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
 
   const [mediaPreviewOpen, setMediaPreviewOpen] = useState(false);
 
+  // As ações das bolhas agendadas são definidas bem mais abaixo e dependem do
+  // texto atual. A ref é reescrita a cada render, então a handle (que só é
+  // recriada quando mode/attachedFiles mudam) nunca chama uma versão velha.
+  const agendadaAcoesRef = useRef<{
+    editar: (a: ScheduledMessage) => void;
+    pedir: (tipo: "cancelar" | "enviar", a: ScheduledMessage) => void;
+  } | null>(null);
+
   useImperativeHandle(ref, () => ({
     handleExternalDrop: (files: FileList | File[]) => {
       const accepted = validateAndAttachFiles(files);
@@ -243,6 +263,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         el.setSelectionRange(el.value.length, el.value.length);
       });
     },
+    editarAgendada: (a) => agendadaAcoesRef.current?.editar(a),
+    pedirAcaoAgendada: (tipo, a) => agendadaAcoesRef.current?.pedir(tipo, a),
   }), [mode, attachedFiles]);
 
   const maybeOpenMediaPreview = (accepted: File[]) => {
@@ -792,6 +814,20 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     }
   }, [acaoAgendada, cancelar, conversationId, sendMutation, editandoAgendadaId]);
 
+  // Liga as bolhas da conversa (ChatMessages → ChatAreaFull → ref) a estas ações.
+  agendadaAcoesRef.current = {
+    editar: abrirEdicaoAgendada,
+    pedir: (tipo, alvo) => setAcaoAgendada({ tipo, alvo }),
+  };
+
+  useEffect(() => {
+    onEditandoAgendadaChange?.(editandoAgendadaId);
+  }, [editandoAgendadaId, onEditandoAgendadaChange]);
+
+  useEffect(() => {
+    onModoAgendarChange?.(mode === "schedule");
+  }, [mode, onModoAgendarChange]);
+
 
   const handleSendMedia = useCallback((params: MediaSendParams) => {
     if (isBlocked) {
@@ -1074,15 +1110,12 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         error={smartReplyError}
         onSelectSuggestion={handleSmartReplySelect}
         onRefresh={refresh}
-      />
-
-      <ScheduledMessagesPanel
-        agendadas={agendadas}
-        editandoId={editandoAgendadaId}
-        onEditar={abrirEdicaoAgendada}
-        onCancelar={(a) => setAcaoAgendada({ tipo: "cancelar", alvo: a })}
-        onEnviarAgora={(a) => setAcaoAgendada({ tipo: "enviar", alvo: a })}
-        ocupado={cancelar.isPending || reagendar.isPending}
+        centro={
+          // Na aba Agendar as bolhas já estão abertas na conversa: o botão sobra.
+          !isScheduleMode && onToggleAgendadas ? (
+            <ScheduledPill agendadas={agendadas} aberto={!!agendadasAbertas} onToggle={onToggleAgendadas} />
+          ) : undefined
+        }
       />
 
       <div className={cn(

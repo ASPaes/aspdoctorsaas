@@ -9,6 +9,7 @@ import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
 import { useAcessoFastComposer } from "@/hooks/useAcessoFastComposer";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
+import type { ScheduledMessage } from "../hooks/useScheduledMessages";
 import { DetailsSidebar } from "./DetailsSidebar";
 import { ForwardMessageDialog } from "./ForwardMessageDialog";
 import { useDeleteMessages } from "../hooks/useDeleteMessages";
@@ -54,6 +55,26 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const { status: presenceStatus, isBlocked: presenceBlocked } = useAgentPresence();
   const chatInputRef = useRef<ChatInputHandle>(null);
+
+  // Bolhas agendadas (desenhadas no ChatMessages) → ações que moram no ChatInput.
+  // Editar devolve o texto para o campo, e a confirmação de enviar/cancelar é a
+  // mesma do compositor; por isso passa pela ref em vez de duplicar a lógica.
+  const [editandoAgendadaId, setEditandoAgendadaId] = useState<string | null>(null);
+  // Aba "Agendar" ativa no compositor: as bolhas da conversa ficam abertas.
+  const [modoAgendar, setModoAgendar] = useState(false);
+  // Aberta pelo botão "N agendadas" da barra de sugestões. Sempre volta
+  // recolhida: sair da aba Agendar ou trocar de conversa fecha de novo.
+  const [agendadasAbertas, setAgendadasAbertas] = useState(false);
+  const toggleAgendadas = useCallback(() => setAgendadasAbertas((v) => !v), []);
+  useEffect(() => { if (!modoAgendar) setAgendadasAbertas(false); }, [modoAgendar]);
+  // `?.` obrigatório: o ChatAreaFull monta com conversation = null para desenhar
+  // a tela vazia do chat, e a lista de dependências é lida durante o render.
+  // Com `conversation.id` a página inteira do chat caía (11/09, pego no local).
+  useEffect(() => { setAgendadasAbertas(false); }, [conversation?.id]);
+  const agendadaAcoes = useMemo(() => ({
+    editar: (a: ScheduledMessage) => chatInputRef.current?.editarAgendada(a),
+    pedir: (tipo: "cancelar" | "enviar", a: ScheduledMessage) => chatInputRef.current?.pedirAcaoAgendada(tipo, a),
+  }), []);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   // A janelinha do AcessoFast manda as instruções de instalação para o chat.
@@ -300,6 +321,12 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           instanceId={(conversation as any)?.instance_id ?? null}
           focusNote={noteToFocus}
           onFocusNoteHandled={() => setNoteToFocus(null)}
+          agendadaAcoes={!selectionMode && isAccessActive && !hasHardBlock ? agendadaAcoes : undefined}
+          editandoAgendadaId={editandoAgendadaId}
+          agendadasExpandidas={
+            !selectionMode && isAccessActive && !hasHardBlock &&
+            (modoAgendar || agendadasAbertas || !!editandoAgendadaId)
+          }
         />
 
         {/* Selection action bar */}
@@ -367,6 +394,10 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
             isGroup={(conversation as any)?.is_group === true}
             groupJid={(conversation as any)?.group_jid ?? null}
             instanceId={(conversation as any)?.instance_id ?? null}
+            onEditandoAgendadaChange={setEditandoAgendadaId}
+            onModoAgendarChange={setModoAgendar}
+            agendadasAbertas={agendadasAbertas || !!editandoAgendadaId}
+            onToggleAgendadas={toggleAgendadas}
           />
         )}
       </div>
