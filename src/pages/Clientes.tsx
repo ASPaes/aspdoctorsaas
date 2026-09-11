@@ -3,6 +3,7 @@ import { lazyWithReload } from "@/lib/staleChunkReload";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { normalizarBuscaCliente } from "@/lib/buscaCliente";
 import { useLookups } from "@/hooks/useLookups";
 import { useClientesFilters, storeNavIds } from "@/hooks/useClientesFilters";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -69,9 +70,11 @@ function buildSearchOr(term: string): string {
   const trimmed = term.trim();
   const s = `%${escapeLike(trimmed)}%`;
   const POSTGRES_INT_MAX = 2147483647;
+  // busca_nome = nome fantasia + razao social, sem acento e em maiuscula (coluna
+  // gerada). Sem ela, procurar "VARANDAO" nao achava o cadastro gravado "VARANDÃO"
+  // — foi assim que nasceu um cliente duplicado em 11/09/2026.
   const parts = [
-    `razao_social.ilike.${s}`,
-    `nome_fantasia.ilike.${s}`,
+    `busca_nome.ilike.%${escapeLike(normalizarBuscaCliente(trimmed))}%`,
   ];
   // cnpj_digits = coluna gerada (só dígitos). Normaliza o termo pra dígitos e
   // compara — funciona digitando formatado OU não, independente de como o

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { padraoBuscaCliente } from "@/lib/buscaCliente";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -90,7 +91,7 @@ export default function EscolherClienteOemDialog({
         .limit(20);
       q = digitos.length >= 3
         ? q.like("cnpj_digits", `%${digitos}%`)
-        : q.or(`nome_fantasia.ilike.%${termo}%,razao_social.ilike.%${termo}%`);
+        : q.ilike("busca_nome", padraoBuscaCliente(termo));
       if (unidades.length) q = q.in("unidade_base_id", unidades);
       const { data, error } = await q;
       if (error) throw error;

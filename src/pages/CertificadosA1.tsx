@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { normalizarBuscaCliente } from "@/lib/buscaCliente";
 import { escapeLike } from "@/lib/utils";
 import { useLookups } from "@/hooks/useLookups";
 import { useCertA1Filters } from "@/hooks/useCertA1Filters";
@@ -125,10 +126,12 @@ export default function CertificadosA1() {
           const s = `%${escapeLike(debouncedSearch)}%`;
           const trimmed = debouncedSearch.trim();
           const isNumeric = /^\d+$/.test(trimmed);
+          // busca_nome ignora acento — ver src/lib/buscaCliente.ts
+          const n = `%${escapeLike(normalizarBuscaCliente(trimmed))}%`;
           if (isNumeric) {
-            q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${trimmed}`);
+            q = q.or(`busca_nome.ilike.${n},cnpj.ilike.${s},codigo_sequencial.eq.${trimmed}`);
           } else {
-            q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s}`);
+            q = q.or(`busca_nome.ilike.${n},cnpj.ilike.${s}`);
           }
         }
 

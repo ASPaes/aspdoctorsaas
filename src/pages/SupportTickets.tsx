@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
+import { padraoBuscaCliente } from "@/lib/buscaCliente";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
@@ -824,7 +825,8 @@ export default function SupportTickets() {
         const { data: matchedClientes } = await (supabase.from("clientes" as any) as any)
           .select("id")
           .eq("tenant_id", tid)
-          .or(`nome_fantasia.ilike.*${s}*,razao_social.ilike.*${s}*`)
+          // busca_nome ignora acento; o `.or(...ilike)` nao achava "SAO" em "SÃO".
+          .ilike("busca_nome", padraoBuscaCliente(s))
           .limit(500);
         clienteIds = (matchedClientes ?? []).map((c: any) => c.id);
       }
@@ -1020,7 +1022,7 @@ export default function SupportTickets() {
       const { data: matchedClientes } = await (supabase.from("clientes" as any) as any)
         .select("id")
         .eq("tenant_id", tid)
-        .or(`nome_fantasia.ilike.*${s}*,razao_social.ilike.*${s}*`)
+        .ilike("busca_nome", padraoBuscaCliente(s))
         .limit(500);
       clienteIds = (matchedClientes ?? []).map((c: any) => c.id);
     }

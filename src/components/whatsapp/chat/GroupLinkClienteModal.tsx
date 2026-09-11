@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { padraoBuscaCliente } from "@/lib/buscaCliente";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
@@ -37,7 +38,9 @@ export function GroupLinkClienteModal({ open, onOpenChange, conversationId, onLi
       const { data, error } = await (supabase.from("clientes" as any) as any)
         .select("id, nome_fantasia, razao_social")
         .eq("tenant_id", effectiveTenantId)
-        .or(`nome_fantasia.ilike.%${t}%,razao_social.ilike.%${t}%`)
+        // busca_nome = fantasia + razao sem acento; `.or(...ilike)` nao achava
+        // "VARANDAO" quando o cadastro tem "VARANDAO" com til.
+        .ilike("busca_nome", padraoBuscaCliente(t))
         .limit(20);
       if (error) throw error;
       return (data ?? []) as ClienteRow[];
