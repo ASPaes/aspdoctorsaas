@@ -6,7 +6,7 @@ import { useMetaWindow } from "@/hooks/useMetaWindow";
 import { MetaTemplatePicker } from "@/components/whatsapp/templates/MetaTemplatePicker";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Send, Mic, Paperclip, Maximize2, Minimize2, FileText, AlertTriangle, StickyNote } from "lucide-react";
+import { Send, Mic, Paperclip, Maximize2, Minimize2, FileText, AlertTriangle, StickyNote, CalendarClock } from "lucide-react";
 import { useConversationNotes } from "../hooks/useConversationNotes";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -30,6 +30,11 @@ import type { Message } from "../hooks/useWhatsAppMessages";
 import type { MediaSendParams } from "./input/types";
 import { useGroupParticipants, type GroupParticipant } from "../hooks/useGroupParticipants";
 import { MentionSuggestions, displayFor } from "./input/MentionSuggestions";
+import { ScheduleBar, paraInputLocal, proximaHoraCheia } from "./input/ScheduleBar";
+import { ScheduledMessagesPanel } from "./ScheduledMessagesPanel";
+import { useScheduledMessages, type ScheduledMessage } from "../hooks/useScheduledMessages";
+import { useBusinessHoursConfig } from "../hooks/useBusinessHoursConfig";
+import { uploadChatMedia } from "../hooks/uploadChatMedia";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -51,7 +56,7 @@ function getMessageType(mimeType: string): MediaSendParams['messageType'] {
   return 'document';
 }
 
-type ComposerMode = "message" | "note" | "draft";
+type ComposerMode = "message" | "note" | "draft" | "schedule";
 
 const DRAFT_STORAGE_PREFIX = "wa:chat-draft:";
 const draftKey = (id: string, mode: ComposerMode) => `${DRAFT_STORAGE_PREFIX}${id}:${mode}`;
@@ -107,7 +112,25 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const [macroSending, setMacroSending] = useState(false);
   const isInternalNote = mode === "note";
   const isDraftMode = mode === "draft";
+  const isScheduleMode = mode === "schedule";
   const { createNote, isCreating: isCreatingNote } = useConversationNotes(conversationId);
+
+  // --- Mensagens agendadas ---------------------------------------------------
+  const { agendadas, agendar, reagendar, cancelar } = useScheduledMessages(conversationId);
+  const horarioComercial = useBusinessHoursConfig();
+  const [scheduleAt, setScheduleAt] = useState<string>("");
+  const [cancelIfReplies, setCancelIfReplies] = useState(false);
+  const [editandoAgendadaId, setEditandoAgendadaId] = useState<string | null>(null);
+  const [agendandoAnexo, setAgendandoAnexo] = useState(false);
+  const [erroAgendamento, setErroAgendamento] = useState<string | null>(null);
+
+  // Trocar de conversa zera o agendamento em edição — ele é da conversa antiga.
+  useEffect(() => {
+    setScheduleAt("");
+    setCancelIfReplies(false);
+    setEditandoAgendadaId(null);
+    setErroAgendamento(null);
+  }, [conversationId]);
 
   // Menções em grupo (autocomplete só no modo "message"; lookup carregado sempre que for grupo)
   const mentionsEnabled = !!isGroup && mode === "message";
@@ -562,7 +585,104 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     }
   }, [conversationId]);
 
+  // --- Agendar / reagendar ---------------------------------------------------
+  const handleAgendar = useCallback(async () => {
+    setErroAgendamento(null);
+
+    const quando = scheduleAt ? new Date(scheduleAt) : null;
+    if (!quando || isNaN(quando.getTime())) {
+      setErroAgendamento("Escolha a data e a hora do envio.");
+      return;
+    }
+    if (quando.getTime() < Date.now() + 60_000) {
+      setErroAgendamento("O horário precisa ser pelo menos 1 minuto no futuro.");
+      return;
+    }
+
+    const texto = message.trim();
+    const quandoLegivel = quando.toLocaleString("pt-BR", {
+      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+    });
+
+    // Edição: a RPC muda texto, horário e a regra de cancelamento. Trocar o
+    // ANEXO não passa por aqui de propósito — para isso, cancele e agende de novo.
+    if (editandoAgendadaId) {
+      const alvo = agendadas.find((a) => a.id === editandoAgendadaId);
+      if (alvo?.message_type === "text" && !texto) {
+        setErroAgendamento("A mensagem não pode ficar vazia.");
+        return;
+      }
+      const ok = await reagendar.mutateAsync({
+        id: editandoAgendadaId,
+        scheduledAt: quando,
+        content: texto,
+        cancelIfClientReplies: cancelIfReplies,
+      });
+      if (ok) {
+        toast.success(`Agendamento atualizado para ${quandoLegivel}`);
+        setEditandoAgendadaId(null);
+        setMessage("");
+        setScheduleAt(paraInputLocal(proximaHoraCheia()));
+      }
+      return;
+    }
+
+    if (attachedFiles.length === 0 && !texto) {
+      setErroAgendamento("Escreva a mensagem ou anexe um arquivo.");
+      return;
+    }
+
+    try {
+      setAgendandoAnexo(attachedFiles.length > 0);
+
+      if (attachedFiles.length > 0) {
+        // Um agendamento por arquivo, todos no mesmo horário. Só o primeiro
+        // leva a legenda — mesma regra do envio normal de vários anexos.
+        for (let i = 0; i < attachedFiles.length; i++) {
+          const anexo = await uploadChatMedia(conversationId, attachedFiles[i]);
+          await agendar.mutateAsync({
+            scheduledAt: quando,
+            content: i === 0 ? texto : "",
+            messageType: getMessageType(anexo.mediaMimetype),
+            storagePath: anexo.storagePath,
+            mediaMimetype: anexo.mediaMimetype,
+            mediaFileName: anexo.fileName,
+            mediaSizeBytes: anexo.mediaSizeBytes,
+            cancelIfClientReplies: cancelIfReplies,
+            instanceId: instanceId || null,
+          });
+        }
+      } else {
+        await agendar.mutateAsync({
+          scheduledAt: quando,
+          content: texto,
+          cancelIfClientReplies: cancelIfReplies,
+          instanceId: instanceId || null,
+        });
+      }
+
+      toast.success(`Mensagem agendada para ${quandoLegivel}`);
+      setMessage("");
+      setAttachedFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setScheduleAt(paraInputLocal(proximaHoraCheia()));
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    } catch {
+      // O hook já avisou no toast; o texto continua no campo para reaproveitar.
+    } finally {
+      setAgendandoAnexo(false);
+    }
+  }, [
+    scheduleAt, message, editandoAgendadaId, agendadas, reagendar, cancelIfReplies,
+    attachedFiles, conversationId, agendar, instanceId,
+  ]);
+
   const handleSend = useCallback(() => {
+    // Agendar: nada sai agora; a mensagem entra na fila com hora marcada.
+    if (isScheduleMode) {
+      void handleAgendar();
+      return;
+    }
     // Rascunho: não envia nem salva no servidor; é apenas local por conversa
     if (isDraftMode) {
       toast.info("Você está no modo Rascunho — troque para 'Mensagem ao cliente' ou 'Nota interna' para enviar.");
@@ -614,7 +734,63 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     }
 
     performTextSend(false);
-  }, [isDraftMode, isInternalNote, isCreatingNote, createNote, attachedFiles, sendAttachedFilesAll, message, isBlocked, mentionEveryone, openEveryoneConfirmDialog, performTextSend, onCancelReply]);
+  }, [isScheduleMode, handleAgendar, isDraftMode, isInternalNote, isCreatingNote, createNote, attachedFiles, sendAttachedFilesAll, message, isBlocked, mentionEveryone, openEveryoneConfirmDialog, performTextSend, onCancelReply]);
+
+  // --- Ações do painel de agendadas ------------------------------------------
+  const [acaoAgendada, setAcaoAgendada] = useState<{ tipo: "cancelar" | "enviar"; alvo: ScheduledMessage } | null>(null);
+
+  const abrirEdicaoAgendada = useCallback((a: ScheduledMessage) => {
+    // switchMode trocaria o texto pelo rascunho da aba; aqui o texto vem da
+    // própria agendada, então a troca é feita à mão preservando o rascunho atual.
+    setDraft(conversationId, mode, message);
+    setMode("schedule");
+    setMessage(a.content || "");
+    setScheduleAt(paraInputLocal(new Date(a.scheduled_at)));
+    setCancelIfReplies(a.cancel_if_client_replies);
+    setEditandoAgendadaId(a.id);
+    setErroAgendamento(null);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [conversationId, mode, message]);
+
+  const confirmarAcaoAgendada = useCallback(async () => {
+    if (!acaoAgendada) return;
+    const { tipo, alvo } = acaoAgendada;
+    setAcaoAgendada(null);
+
+    if (tipo === "cancelar") {
+      const ok = await cancelar.mutateAsync({ id: alvo.id, motivo: "user" });
+      if (ok) toast.success("Agendamento cancelado");
+      if (editandoAgendadaId === alvo.id) {
+        setEditandoAgendadaId(null);
+        setMessage("");
+      }
+      return;
+    }
+
+    // Enviar agora = desarma o agendamento ANTES de enviar. Se o cancelamento
+    // falhar porque o motor já pegou a linha, não envia — senão o cliente
+    // receberia duas vezes.
+    const desarmou = await cancelar.mutateAsync({ id: alvo.id, motivo: "sent_now" });
+    if (!desarmou) return;
+
+    sendMutation.mutate(
+      {
+        conversationId,
+        content: alvo.content || undefined,
+        messageType: (alvo.message_type || "text") as MediaSendParams["messageType"],
+        storagePath: alvo.storage_path || undefined,
+        mediaMimetype: alvo.media_mimetype || undefined,
+        fileName: alvo.media_file_name || undefined,
+      },
+      {
+        onError: (err: any) => toast.error(err?.message || "Erro ao enviar a mensagem agendada"),
+      },
+    );
+    if (editandoAgendadaId === alvo.id) {
+      setEditandoAgendadaId(null);
+      setMessage("");
+    }
+  }, [acaoAgendada, cancelar, conversationId, sendMutation, editandoAgendadaId]);
 
 
   const handleSendMedia = useCallback((params: MediaSendParams) => {
@@ -900,14 +1076,27 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         onRefresh={refresh}
       />
 
+      <ScheduledMessagesPanel
+        agendadas={agendadas}
+        editandoId={editandoAgendadaId}
+        onEditar={abrirEdicaoAgendada}
+        onCancelar={(a) => setAcaoAgendada({ tipo: "cancelar", alvo: a })}
+        onEnviarAgora={(a) => setAcaoAgendada({ tipo: "enviar", alvo: a })}
+        ocupado={cancelar.isPending || reagendar.isPending}
+      />
+
       <div className={cn(
         "p-4",
         isInternalNote && "bg-amber-500/5 border-t-2 border-amber-500/60",
         isDraftMode && "bg-sky-500/5 border-t-2 border-sky-500/60",
+        isScheduleMode && "bg-violet-500/5 border-t-2 border-violet-500/60",
       )}>
         {/* Toggle: Mensagem ao cliente vs. Nota interna vs. Rascunho */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
+        {/* Quatro abas não cabem em chat estreito (painel de detalhes aberto, tela
+            pequena). A fita rola dentro da própria caixa em vez de empurrar o
+            aviso da direita para fora ou quebrar a linha no meio das bordas. */}
+        <div className="flex flex-wrap items-center justify-between gap-y-1 mb-2">
+          <div className="inline-flex max-w-full overflow-x-auto rounded-md border border-border text-xs [&>button]:shrink-0 [&>button]:whitespace-nowrap">
             <button
               type="button"
               onClick={() => switchMode("message")}
@@ -944,6 +1133,21 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               <FileText className="w-3 h-3" />
               Rascunho
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!scheduleAt) setScheduleAt(paraInputLocal(proximaHoraCheia()));
+                switchMode("schedule");
+              }}
+              className={cn(
+                "px-3 py-1 transition-colors flex items-center gap-1.5 border-l border-border",
+                mode === "schedule" ? "bg-violet-500 text-violet-50" : "bg-transparent text-muted-foreground hover:bg-muted"
+              )}
+              aria-pressed={mode === "schedule"}
+            >
+              <CalendarClock className="w-3 h-3" />
+              Agendar
+            </button>
           </div>
           {isInternalNote && (
             <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
@@ -955,7 +1159,25 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               Rascunho local — não é enviado nem salvo no servidor
             </span>
           )}
+          {isScheduleMode && (
+            <span className="text-[11px] text-violet-700 dark:text-violet-300 font-medium">
+              {editandoAgendadaId
+                ? "Editando um agendamento"
+                : "Sai sozinha na data e hora marcadas"}
+            </span>
+          )}
         </div>
+
+        {isScheduleMode && (
+          <ScheduleBar
+            valor={scheduleAt}
+            onChangeValor={(v) => { setScheduleAt(v); setErroAgendamento(null); }}
+            cancelarSeResponder={cancelIfReplies}
+            onChangeCancelarSeResponder={setCancelIfReplies}
+            horario={horarioComercial}
+            erro={erroAgendamento}
+          />
+        )}
 
         {requiresTemplate && (
           <div className="flex items-start gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 mb-2">
@@ -1089,7 +1311,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={
-                isInternalNote
+                isScheduleMode
+                  ? "Escreva a mensagem que vai sair na hora marcada..."
+                  : isInternalNote
                   ? "Escreva uma nota interna para a equipe (n\u{00E3}o ser\u{00E1} enviada ao cliente)..."
                   : activeMacro
                   ? "Preencha o template acima..."
@@ -1101,7 +1325,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               }
               className={cn(
                 "resize-none pr-8",
-                isInternalNote && "border-amber-500/70 focus-visible:ring-amber-500/40 bg-amber-50 dark:bg-amber-950/20"
+                isInternalNote && "border-amber-500/70 focus-visible:ring-amber-500/40 bg-amber-50 dark:bg-amber-950/20",
+                isScheduleMode && "border-violet-500/70 focus-visible:ring-violet-500/40 bg-violet-50 dark:bg-violet-950/20"
               )}
               style={{
                 minHeight: '44px',
@@ -1109,7 +1334,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                 maxHeight: isExpanded ? '400px' : '200px',
                 overflowY: isExpanded ? 'auto' : undefined,
               }}
-              disabled={(!isInternalNote && (isBlocked || requiresTemplate)) || !!activeMacro}
+              disabled={(!isInternalNote && !isScheduleMode && (isBlocked || requiresTemplate)) || !!activeMacro}
             />
             <Button
               type="button"
@@ -1123,7 +1348,27 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             </Button>
           </div>
 
-          {isInternalNote ? (
+          {isScheduleMode ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={handleSend}
+                  disabled={
+                    (!message.trim() && attachedFiles.length === 0) ||
+                    !scheduleAt || agendar.isPending || reagendar.isPending || agendandoAnexo
+                  }
+                  className="bg-violet-500 hover:bg-violet-600 text-violet-50 gap-1.5"
+                  aria-label={editandoAgendadaId ? "Salvar agendamento" : "Agendar envio"}
+                >
+                  <CalendarClock className="w-4 h-4" />
+                  {agendandoAnexo ? "Subindo anexo..." : editandoAgendadaId ? "Salvar" : "Agendar"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {editandoAgendadaId ? "Salvar as alterações do agendamento" : "A mensagem sai sozinha na hora marcada"}
+              </TooltipContent>
+            </Tooltip>
+          ) : isInternalNote ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -1149,7 +1394,11 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           )}
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          {isInternalNote
+          {isScheduleMode
+            ? (editandoAgendadaId
+                ? "Enter para salvar a alteração, Shift+Enter para nova linha"
+                : "Enter para agendar, Shift+Enter para nova linha")
+            : isInternalNote
             ? "Enter para salvar a nota, Shift+Enter para nova linha"
             : "Enter para enviar, Shift+Enter para nova linha"}
         </p>
@@ -1178,6 +1427,35 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         disabled={mode === "note" ? false : (isBlocked || requiresTemplate)}
         disabledReason={mode === "note" ? undefined : (requiresTemplate ? "Janela de 24h fechada — use um template Meta." : (isBlocked ? "Você precisa estar ATIVO para enviar." : undefined))}
       />
+
+      <AlertDialog open={!!acaoAgendada} onOpenChange={(o) => { if (!o) setAcaoAgendada(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {acaoAgendada?.tipo === "enviar" ? "Enviar agora?" : "Cancelar o agendamento?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {acaoAgendada?.tipo === "enviar"
+                ? "A mensagem sai para o cliente imediatamente e o agendamento é desfeito."
+                : "A mensagem não será enviada. Isso não pode ser desfeito — se precisar, agende de novo."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {acaoAgendada?.alvo.content && (
+            <p className="rounded-md border bg-muted/50 p-2 text-xs whitespace-pre-wrap break-words line-clamp-4">
+              {acaoAgendada.alvo.content}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { void confirmarAcaoAgendada(); }}
+              className={acaoAgendada?.tipo === "cancelar" ? "bg-destructive hover:bg-destructive/90" : undefined}
+            >
+              {acaoAgendada?.tipo === "enviar" ? "Enviar agora" : "Cancelar mensagem"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={everyoneDialogOpen} onOpenChange={setEveryoneDialogOpen}>
         <AlertDialogContent>

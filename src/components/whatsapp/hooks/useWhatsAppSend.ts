@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeMessage, upsertInfinite, patchInfinite, type Message, type MsgPages } from './useWhatsAppMessages';
 import { patchConversationInCache, isConversationInCache, outgoingMediaPreview } from './conversationsCache';
-import { precisaConverterParaWhatsApp, converterImagemParaJpeg } from '@/lib/whatsappImageFormat';
+import { uploadChatMedia } from './uploadChatMedia';
 
 interface SendMessageParams {
   conversationId: string;
@@ -11,6 +11,12 @@ interface SendMessageParams {
   mediaUrl?: string;
   mediaBase64?: string;
   file?: File; // anexo para upload direto ao Storage (evita base64 inline)
+  /**
+   * Arquivo que JÁ está no bucket whatsapp-media. É o caso do "enviar agora"
+   * de uma mensagem agendada: o anexo subiu na hora do agendamento e não
+   * precisa (nem deve) subir de novo.
+   */
+  storagePath?: string;
   mediaMimetype?: string;
   fileName?: string;
   quotedMessageId?: string;
@@ -26,38 +32,25 @@ export const useWhatsAppSend = () => {
 
   const mutation = useMutation({
     mutationFn: async (params: SendMessageParams) => {
-      let storagePath: string | undefined;
+      let storagePath: string | undefined = params.storagePath;
       let mediaSizeBytes: number | undefined;
       let mimeEnvio = params.mediaMimetype || params.file?.type;
       let nomeEnvio = params.fileName || params.file?.name;
 
-      // Upload direto ao Storage para anexos (não passa base64 pela Edge Function)
+      // Upload direto ao Storage para anexos (não passa base64 pela Edge Function).
+      // O bloco mora em uploadChatMedia porque o agendamento de mensagem usa o
+      // mesmo upload sem enviar nada em seguida.
       if (params.file && params.messageType !== 'text') {
-        // AVIF/HEIC são recusados pelo provedor DEPOIS do upload, com uma frase
-        // que não é nossa. Convertendo aqui — e não na hora de anexar — a espera
-        // acontece com a bolha otimista já na tela em 'sending', porque o
-        // onMutate roda antes do mutationFn. Para quem envia, é o envio normal.
-        let arquivo = params.file;
-        if (precisaConverterParaWhatsApp(arquivo.type)) {
-          arquivo = await converterImagemParaJpeg(arquivo);
-          mimeEnvio = arquivo.type;
-          nomeEnvio = arquivo.name;
+        const anexo = await uploadChatMedia(params.conversationId, params.file);
+        storagePath = anexo.storagePath;
+        mediaSizeBytes = anexo.mediaSizeBytes;
+        // Só a conversão para JPEG troca mime e nome. Sem ela, vale o que o
+        // chamador passou — o fluxo de macro manda `fileName` próprio, e
+        // sobrescrever com o nome do File mudaria o que o cliente recebe.
+        if (anexo.convertido) {
+          mimeEnvio = anexo.mediaMimetype;
+          nomeEnvio = anexo.fileName;
         }
-
-        const mime = arquivo.type || 'application/octet-stream';
-        const { data: urlData, error: urlErr } = await supabase.functions.invoke('get-media-upload-url', {
-          body: { conversationId: params.conversationId, mediaMimetype: mime, fileName: arquivo.name },
-        });
-        if (urlErr) throw new Error(urlErr.message || 'Falha ao preparar upload');
-        if (!urlData?.path || !urlData?.token) throw new Error(urlData?.error || 'Falha ao preparar upload');
-
-        const { error: upErr } = await supabase.storage
-          .from('whatsapp-media')
-          .uploadToSignedUrl(urlData.path, urlData.token, arquivo, { contentType: mime });
-        if (upErr) throw new Error(upErr.message || 'Falha no upload do arquivo');
-
-        storagePath = urlData.path;
-        mediaSizeBytes = arquivo.size;
       }
 
       const sendBody = {
