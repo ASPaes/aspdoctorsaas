@@ -4,23 +4,38 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { CheckCircle2, Info, Loader2, Mail, MoreVertical, Pencil, Plug, Plus, Star, Trash2, XCircle } from "lucide-react";
+import {
+  ArrowRight, CheckCircle2, Info, LifeBuoy, Loader2, Mail, MoreVertical, Pencil, Plug, Plus, Star, Trash2, Wand2, XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { providerByValue } from "./emailProviders";
+import { SECURITY_LABELS, providerByValue, type EmailSecurity } from "./emailProviders";
 import { EmailAccountDialog } from "./EmailAccountDialog";
+import { GuiaProvedor } from "./GuiaProvedor";
+import { diagnosticar, servidoresRecomendados } from "./emailDiagnostico";
 import { useEmailAccounts, type EmailAccount } from "./useEmailAccounts";
 
 /** o técnico do erro fica entre colchetes no fim; a tela só mostra a frase */
 const motivoDoErro = (erro: string | null) => (erro ?? "").split(" [")[0];
+const tecnicoDoErro = (erro: string | null) => {
+  const e = erro ?? "";
+  const i = e.indexOf(" [");
+  return i >= 0 ? e.slice(i + 2, e.endsWith("]") ? -1 : undefined) : "";
+};
+
+const servidor = (host: string | null, port: number | null, sec: EmailSecurity | null) =>
+  host ? `${host}:${port ?? ""} · ${sec ? SECURITY_LABELS[sec] : ""}` : "sem recebimento";
 
 /** selo de teste: nunca testada, testada quando, ou falhou */
 function SeloTeste({ conta, testando }: { conta: EmailAccount; testando: boolean }) {
@@ -56,11 +71,16 @@ export default function EmailAccountsTab() {
   const [editando, setEditando] = useState<EmailAccount | null>(null);
   const [excluindo, setExcluindo] = useState<EmailAccount | null>(null);
   const [testandoId, setTestandoId] = useState<string | null>(null);
+  const [resolvendoId, setResolvendoId] = useState<string | null>(null);
+  const [corrigindo, setCorrigindo] = useState(false);
 
   const setorPorId = useMemo(
     () => new Map(setores.map((s) => [s.id, s.name])),
     [setores],
   );
+
+  // sempre a versão mais nova da conta, para o painel refletir o último teste
+  const resolvendo = resolvendoId ? accounts.find((c) => c.id === resolvendoId) ?? null : null;
 
   const abrirNova = () => {
     setEditando(null);
@@ -68,6 +88,7 @@ export default function EmailAccountsTab() {
   };
 
   const abrirEdicao = (conta: EmailAccount) => {
+    setResolvendoId(null);
     setEditando(conta);
     setDialogOpen(true);
   };
@@ -92,16 +113,56 @@ export default function EmailAccountsTab() {
     );
   };
 
-  const testar = (conta: EmailAccount) => {
-    setTestandoId(conta.id);
-    testAccount.mutate(conta.id, {
+  const testar = (id: string) => {
+    setTestandoId(id);
+    testAccount.mutate(id, {
       onSuccess: (r) => {
-        if (r.ok) toast.success(r.mensagem);
-        else toast.error(r.mensagem, { duration: 10000 });
+        if (r.ok) {
+          toast.success(r.mensagem);
+        } else {
+          toast.error(r.mensagem, {
+            duration: 12000,
+            action: { label: "Como resolver", onClick: () => setResolvendoId(id) },
+          });
+        }
       },
       onError: (err: any) => toast.error(err?.message || "Não foi possível testar a conta."),
       onSettled: () => setTestandoId(null),
     });
+  };
+
+  /** troca só os servidores pelos do provedor e testa; a senha fica como está */
+  const aplicarRecomendados = async (conta: EmailAccount) => {
+    const rec = servidoresRecomendados(conta, providerByValue(conta.provider));
+    if (!rec) return;
+    setCorrigindo(true);
+    try {
+      await saveAccount.mutateAsync({
+        id: conta.id,
+        rotulo: conta.rotulo,
+        from_name: conta.from_name,
+        email: conta.email,
+        provider: conta.provider,
+        setor_id: conta.setor_id,
+        smtp_host: rec.smtp_host,
+        smtp_port: rec.smtp_port,
+        smtp_security: rec.smtp_security,
+        smtp_username: conta.smtp_username,
+        imap_host: rec.imap_host,
+        imap_port: rec.imap_port,
+        imap_security: rec.imap_security,
+        imap_username: rec.imap_host ? (conta.imap_username || conta.smtp_username) : null,
+        is_default: conta.is_default,
+        ativo: conta.ativo,
+        senha: "",
+      });
+      toast.success("Servidores atualizados. Testando de novo.");
+      testar(conta.id);
+    } catch (err: any) {
+      toast.error(err?.message || "Não foi possível atualizar os servidores.");
+    } finally {
+      setCorrigindo(false);
+    }
   };
 
   const confirmarExclusao = () => {
@@ -124,6 +185,11 @@ export default function EmailAccountsTab() {
       </div>
     );
   }
+
+  const diag = resolvendo ? diagnosticar(resolvendo.last_test_error) : null;
+  const presetResolvendo = resolvendo ? providerByValue(resolvendo.provider) : null;
+  const recomendados = resolvendo && presetResolvendo ? servidoresRecomendados(resolvendo, presetResolvendo) : null;
+  const testandoResolvendo = !!resolvendo && testandoId === resolvendo.id;
 
   return (
     <div className="space-y-4">
@@ -155,12 +221,14 @@ export default function EmailAccountsTab() {
           {accounts.map((conta) => {
             const provedor = providerByValue(conta.provider);
             const setorNome = conta.setor_id ? setorPorId.get(conta.setor_id) : null;
+            const falhou = conta.last_test_ok === false && !!conta.last_test_error;
             return (
               <article
                 key={conta.id}
                 className={cn(
                   "flex flex-col gap-4 rounded-lg border bg-card p-4 lg:grid lg:grid-cols-[38px_minmax(0,1.15fr)_minmax(0,1.5fr)_auto] lg:items-center",
                   !conta.ativo && "opacity-60",
+                  falhou && "border-destructive/40",
                 )}
               >
                 <div
@@ -185,8 +253,19 @@ export default function EmailAccountsTab() {
                     <SeloTeste conta={conta} testando={testandoId === conta.id} />
                   </div>
                   <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{conta.email}</p>
-                  {conta.last_test_ok === false && conta.last_test_error && (
-                    <p className="mt-1 text-xs text-destructive">{motivoDoErro(conta.last_test_error)}</p>
+                  {falhou && (
+                    <div className="mt-1.5 space-y-1.5">
+                      <p className="text-xs text-destructive">{motivoDoErro(conta.last_test_error)}</p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1.5 border-destructive/40 px-2.5 text-xs"
+                        onClick={() => setResolvendoId(conta.id)}
+                      >
+                        <LifeBuoy className="h-3.5 w-3.5" />
+                        Como resolver
+                      </Button>
+                    </div>
                   )}
                 </div>
 
@@ -229,9 +308,13 @@ export default function EmailAccountsTab() {
                         <Pencil className="mr-2 h-4 w-4" />
                         Editar
                       </DropdownMenuItem>
-                      <DropdownMenuItem disabled={testandoId === conta.id} onClick={() => testar(conta)}>
+                      <DropdownMenuItem disabled={testandoId === conta.id} onClick={() => testar(conta.id)}>
                         <Plug className="mr-2 h-4 w-4" />
                         Testar conexão
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setResolvendoId(conta.id)}>
+                        <LifeBuoy className="mr-2 h-4 w-4" />
+                        Como liberar o acesso
                       </DropdownMenuItem>
                       <DropdownMenuItem disabled={conta.is_default} onClick={() => definirPadrao(conta)}>
                         <Star className="mr-2 h-4 w-4" />
@@ -265,12 +348,92 @@ export default function EmailAccountsTab() {
         account={editando}
         setores={setores}
         onSave={(input) => saveAccount.mutateAsync(input)}
-        onTest={(id) => {
-          const conta = accounts.find((c) => c.id === id);
-          testar(conta ?? ({ id } as EmailAccount));
-        }}
+        onTest={testar}
         saving={saveAccount.isPending}
       />
+
+      {/* Como resolver: diagnóstico do último teste + passo a passo do provedor */}
+      <Dialog open={!!resolvendo} onOpenChange={(open) => !open && setResolvendoId(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+          {resolvendo && presetResolvendo && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{diag ? diag.titulo : `Como liberar o acesso no ${presetResolvendo.label}`}</DialogTitle>
+                <DialogDescription className="font-mono text-xs">{resolvendo.email}</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-5">
+                {diag && (
+                  <div className="space-y-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-destructive">
+                      {diag.lado === "ambos"
+                        ? "Falhou no envio e no recebimento"
+                        : diag.lado === "recebimento"
+                          ? "O envio passou; falhou o recebimento"
+                          : "Falhou no envio"}
+                    </p>
+                    <p className="text-sm">{diag.explicacao}</p>
+                  </div>
+                )}
+
+                {recomendados && (
+                  <div className="space-y-3 rounded-md border px-3 py-3">
+                    <p className="text-sm font-medium">
+                      Os servidores desta conta estão diferentes do recomendado para o {presetResolvendo.label}
+                    </p>
+                    <div className="grid gap-2 text-xs sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+                      <div className="space-y-1 rounded bg-muted/60 px-2.5 py-2 font-mono">
+                        <p className="font-sans text-[10px] uppercase tracking-wide text-muted-foreground">Hoje</p>
+                        <p>Envio: {servidor(resolvendo.smtp_host, resolvendo.smtp_port, resolvendo.smtp_security)}</p>
+                        <p>Entrada: {servidor(resolvendo.imap_host, resolvendo.imap_port, resolvendo.imap_security)}</p>
+                      </div>
+                      <ArrowRight className="mx-auto hidden h-4 w-4 text-muted-foreground sm:block" />
+                      <div className="space-y-1 rounded bg-primary/10 px-2.5 py-2 font-mono">
+                        <p className="font-sans text-[10px] uppercase tracking-wide text-primary">Recomendado</p>
+                        <p>Envio: {servidor(recomendados.smtp_host, recomendados.smtp_port, recomendados.smtp_security)}</p>
+                        <p>Entrada: {servidor(recomendados.imap_host, recomendados.imap_port, recomendados.imap_security)}</p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => aplicarRecomendados(resolvendo)}
+                      disabled={corrigindo || testandoResolvendo}
+                    >
+                      {corrigindo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                      Usar os recomendados e testar
+                    </Button>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold">Como liberar o acesso no {presetResolvendo.label}</p>
+                  <GuiaProvedor preset={presetResolvendo} />
+                </div>
+
+                {tecnicoDoErro(resolvendo.last_test_error) && (
+                  <details className="rounded-md border px-3 py-2 text-xs">
+                    <summary className="cursor-pointer text-muted-foreground">Resposta do servidor, para o suporte do provedor</summary>
+                    <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-[11px] text-muted-foreground">
+                      {tecnicoDoErro(resolvendo.last_test_error)}
+                    </pre>
+                  </details>
+                )}
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-2">
+                <Button variant="outline" onClick={() => abrirEdicao(resolvendo)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Editar conta
+                </Button>
+                <Button onClick={() => testar(resolvendo.id)} disabled={testandoResolvendo || corrigindo}>
+                  {testandoResolvendo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plug className="mr-2 h-4 w-4" />}
+                  Testar de novo
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!excluindo} onOpenChange={(open) => !open && setExcluindo(null)}>
         <AlertDialogContent>

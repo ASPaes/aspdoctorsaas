@@ -197,6 +197,14 @@ export async function verificarImap(params: {
 export function mensagemAmigavel(erroBruto: string): string {
   const e = erroBruto.toLowerCase();
 
+  // Os dois primeiros vêm antes do 535 genérico: chegam com o mesmo código 535/534
+  // e têm saída diferente. Espelhado em src/components/configuracoes/email/emailDiagnostico.ts.
+  if (/5\.7\.139|basic authentication is disabled|smtpclientauthentication is disabled/.test(e)) {
+    return "A Microsoft bloqueou o acesso por senha nesta conta. Em conta de empresa, o administrador precisa liberar o SMTP autenticado; conta pessoal do Outlook ou do Hotmail não funciona mais por senha.";
+  }
+  if (/5\.7\.9|application-specific password required/.test(e)) {
+    return "Esta conta tem verificação em duas etapas e exige senha de aplicativo. Gere uma e use no lugar da senha normal.";
+  }
   if (/535|5\.7\.8|5\.7\.3|authentication failed|authenticationfailed|invalid credentials|username and password not accepted|login failed|a1 no/.test(e)) {
     return "Usuário ou senha recusados pelo provedor. Se a conta tem verificação em duas etapas, gere uma senha de aplicativo e use ela aqui.";
   }

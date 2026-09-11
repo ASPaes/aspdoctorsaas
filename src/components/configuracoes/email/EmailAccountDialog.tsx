@@ -10,12 +10,13 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, ChevronDown, Loader2, Plug } from "lucide-react";
+import { BookOpen, ChevronDown, Loader2, Plug } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   EMAIL_PROVIDERS, SECURITY_LABELS, providerByValue, type EmailSecurity,
 } from "./emailProviders";
+import { GuiaProvedor } from "./GuiaProvedor";
 import type { EmailAccount, EmailAccountInput } from "./useEmailAccounts";
 
 const SEM_SETOR = "__sem_setor__";
@@ -31,6 +32,12 @@ interface Props {
   onTest: (id: string) => void;
   saving: boolean;
 }
+
+/** guia aberto de saída quando o provedor tem pegadinha que a pessoa não adivinha */
+const guiaAbreSozinho = (value: string) => {
+  const p = providerByValue(value);
+  return !!p.exigeSenhaApp || !!p.guia.bloqueio;
+};
 
 export function EmailAccountDialog({ open, onOpenChange, account, setores, onSave, onTest, saving }: Props) {
   const editando = !!account;
@@ -51,6 +58,7 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
   const [isDefault, setIsDefault] = useState(false);
   const [ativo, setAtivo] = useState(true);
   const [servidoresAbertos, setServidoresAbertos] = useState(true);
+  const [guiaAberto, setGuiaAberto] = useState(false);
 
   const preset = providerByValue(provider);
 
@@ -73,6 +81,8 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
       setImapSecurity(account.imap_security ?? "ssl");
       setIsDefault(account.is_default);
       setAtivo(account.ativo);
+      // conta que já falhou abre com o guia à vista
+      setGuiaAberto(account.last_test_ok === false || guiaAbreSozinho(account.provider));
     } else {
       const p = providerByValue("gmail");
       setRotulo("");
@@ -90,6 +100,7 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
       setImapSecurity(p.imapSecurity ?? "ssl");
       setIsDefault(false);
       setAtivo(true);
+      setGuiaAberto(guiaAbreSozinho("gmail"));
     }
     setServidoresAbertos(true);
   }, [open, account]);
@@ -102,11 +113,16 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
       setSmtpPort(String(p.smtpPort ?? 465));
       setSmtpSecurity(p.smtpSecurity ?? "ssl");
     }
-    if (p.imapHost) {
+    if (p.semRecebimento) {
+      // Microsoft não aceita senha para ler a caixa: deixar a entrada seria falha garantida
+      setImapHost("");
+      setImapPort("");
+    } else if (p.imapHost) {
       setImapHost(p.imapHost);
       setImapPort(String(p.imapPort ?? 993));
       setImapSecurity(p.imapSecurity ?? "ssl");
     }
+    setGuiaAberto(guiaAbreSozinho(value));
   };
 
   const submeter = async (testarDepois = false) => {
@@ -250,23 +266,41 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="email-senha">Senha</Label>
+                <Label htmlFor="email-senha">{preset.exigeSenhaApp ? "Senha de aplicativo" : "Senha"}</Label>
                 <PasswordInput
                   id="email-senha"
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
                   showRules={false}
-                  placeholder={editando ? "Deixe em branco para manter" : "Senha ou senha de aplicativo"}
+                  placeholder={
+                    editando
+                      ? "Deixe em branco para manter"
+                      : preset.exigeSenhaApp
+                        ? "Cole aqui a senha de aplicativo"
+                        : "Senha da caixa de e-mail"
+                  }
                   autoComplete="new-password"
                 />
               </div>
             </div>
-            {preset.aviso && (
-              <div className="flex items-start gap-2 rounded-md bg-warning/10 px-3 py-2.5 text-xs text-foreground">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-                <span>{preset.aviso}</span>
-              </div>
-            )}
+
+            <Collapsible
+              open={guiaAberto}
+              onOpenChange={setGuiaAberto}
+              className={cn(
+                "rounded-md border",
+                preset.guia.bloqueio ? "border-destructive/40" : preset.exigeSenhaApp ? "border-warning/50" : "",
+              )}
+            >
+              <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium">
+                <BookOpen className="h-4 w-4 shrink-0 text-accent" />
+                <span className="flex-1">Como liberar o acesso no {preset.label}</span>
+                <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", !guiaAberto && "-rotate-90")} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="px-3 pb-4">
+                <GuiaProvedor preset={preset} />
+              </CollapsibleContent>
+            </Collapsible>
           </section>
 
           {/* Servidores */}
@@ -328,7 +362,9 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Deixe em branco se essa conta for só para envio.
+                  {preset.semRecebimento
+                    ? `O ${preset.label} não aceita senha para ler a caixa. Deixe em branco: a conta fica só para envio.`
+                    : "Deixe em branco se essa conta for só para envio."}
                 </p>
               </div>
             </CollapsibleContent>
