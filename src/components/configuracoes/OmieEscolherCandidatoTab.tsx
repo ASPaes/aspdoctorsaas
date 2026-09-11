@@ -852,7 +852,7 @@ function GrupoCard({
                 <Label
                   key={c.codigo_contrato_omie}
                   htmlFor={id}
-                  className={`flex items-start gap-2 rounded border p-2 cursor-pointer ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-accent"}`}
+                  className={`flex items-start gap-2 rounded border p-2 cursor-pointer ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)]"}`}
                 >
                   <RadioGroupItem id={id} value={String(c.codigo_contrato_omie)} disabled={disabled} className="mt-1" />
                   <CandidatoInfo c={c} recomendado={recomendado} sugestao={sugestaoFor(ds, c)} />

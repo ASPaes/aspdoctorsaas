@@ -262,7 +262,7 @@ export function AttendanceDetailModal({ attendanceId, open, onOpenChange }: Prop
                 {ticket ? (
                   <button
                     onClick={handleOpenTicket}
-                    className="w-full flex items-center justify-between gap-2 p-3 rounded-lg border border-border hover:bg-accent transition-colors text-left"
+                    className="w-full flex items-center justify-between gap-2 p-3 rounded-lg border border-border hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] transition-colors text-left"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <TicketCheck className="h-4 w-4 text-primary shrink-0" />

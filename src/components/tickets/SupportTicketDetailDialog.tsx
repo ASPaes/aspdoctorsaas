@@ -2163,7 +2163,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                               <button
                                 key={t.id}
                                 onClick={() => { handleAddTag(t.id); setTagPopoverOpen(false); }}
-                                className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm flex items-center gap-2"
+                                className="w-full text-left px-2 py-1.5 rounded-md hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] text-sm flex items-center gap-2"
                               >
                                 <span className="h-2 w-2 rounded-full shrink-0" style={{ background: t.color }} />
                                 {t.name}
@@ -2227,7 +2227,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                             .filter(a => !ticketMentions.find(m => m.mentioned_user_id === a.user_id))
                             .map(a => (
                               <button key={a.user_id} onClick={() => handleAddMention(a.user_id)}
-                                className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm">
+                                className="w-full text-left px-2 py-1.5 rounded-md hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] text-sm">
                                 {a.nome}
                               </button>
                             ))}

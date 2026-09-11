@@ -68,12 +68,12 @@ export function AIComposerButton({ message, onComposed, disabled }: AIComposerBu
           </div>
         ) : showTranslateSubmenu ? (
           <div className="space-y-1">
-            <Button type="button" variant="ghost" onClick={() => setShowTranslateSubmenu(false)} className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors justify-start">
+            <Button type="button" variant="ghost" onClick={() => setShowTranslateSubmenu(false)} className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-highlight hover:text-highlight-foreground hover:[--muted-foreground:var(--highlight-muted-foreground)] transition-colors justify-start">
               <ChevronLeft className="h-4 w-4" />Voltar
             </Button>
             <Separator />
             {menuOptions.find(o => o.id === 'translate')?.submenu?.map((lang) => (
-              <Button key={lang.lang} type="button" variant="ghost" onClick={() => handleAction('translate', lang.lang)} className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors justify-start">
+              <Button key={lang.lang} type="button" variant="ghost" onClick={() => handleAction('translate', lang.lang)} className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-highlight hover:text-highlight-foreground hover:[--muted-foreground:var(--highlight-muted-foreground)] transition-colors justify-start">
                 <Languages className="h-4 w-4" />{lang.label}
               </Button>
             ))}
@@ -85,7 +85,7 @@ export function AIComposerButton({ message, onComposed, disabled }: AIComposerBu
                 {index === 2 && <Separator className="my-1" />}
                 {index === 5 && <Separator className="my-1" />}
                 <Button type="button" variant="ghost" onClick={() => option.submenu ? setShowTranslateSubmenu(true) : handleAction(option.id)}
-                  className={cn("w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors", option.submenu ? "justify-between" : "justify-start")}>
+                  className={cn("w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-highlight hover:text-highlight-foreground hover:[--muted-foreground:var(--highlight-muted-foreground)] transition-colors", option.submenu ? "justify-between" : "justify-start")}>
                   <div className="flex items-center gap-3"><option.icon className="h-4 w-4" />{option.label}</div>
                   {option.submenu && <ChevronRight className="h-4 w-4" />}
                 </Button>

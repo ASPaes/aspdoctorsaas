@@ -91,7 +91,7 @@ export default function ImportSimpleTemplateModal({ open, onOpenChange, kind, te
                   key={t.id}
                   type="button"
                   onClick={() => setSelectedId(t.id)}
-                  className={`w-full rounded-md border p-3 text-left transition ${selectedId === t.id ? "border-primary bg-accent" : "hover:bg-accent/50"}`}
+                  className={`w-full rounded-md border p-3 text-left transition ${selectedId === t.id ? "border-primary bg-highlight [--muted-foreground:var(--highlight-muted-foreground)]" : "hover:bg-highlight/60 hover:[--muted-foreground:var(--highlight-muted-foreground)]"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium">{t.nome}</span>

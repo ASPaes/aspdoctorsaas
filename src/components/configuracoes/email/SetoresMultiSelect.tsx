@@ -60,7 +60,7 @@ export function SetoresMultiSelect({
                   key={s.id}
                   type="button"
                   onClick={() => alternar(s.id)}
-                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-highlight hover:text-highlight-foreground hover:[--muted-foreground:var(--highlight-muted-foreground)] focus:bg-highlight focus:text-highlight-foreground focus:[--muted-foreground:var(--highlight-muted-foreground)]"
                 >
                   <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
                     <Check className={cn("h-4 w-4", marcado ? "opacity-100" : "opacity-0")} />

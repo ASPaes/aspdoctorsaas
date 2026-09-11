@@ -369,7 +369,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
                 {switchResults.map((c) => (
                   <button
                     key={c.id}
-                    className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-xs flex items-center justify-between gap-2 transition-colors disabled:opacity-50"
+                    className="w-full text-left px-2 py-1.5 rounded-md hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] text-xs flex items-center justify-between gap-2 transition-colors disabled:opacity-50"
                     onClick={() => {
                       linkCliente(c.id);
                       closePicker();
@@ -518,7 +518,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
               {searchResults.map((c) => (
                 <button
                   key={c.id}
-                  className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-xs flex items-center justify-between gap-2 transition-colors"
+                  className="w-full text-left px-2 py-1.5 rounded-md hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] text-xs flex items-center justify-between gap-2 transition-colors"
                   onClick={() => {
                     linkCliente(c.id);
                     setSearchOpen(false);

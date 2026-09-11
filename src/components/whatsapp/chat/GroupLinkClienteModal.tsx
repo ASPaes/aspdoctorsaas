@@ -98,7 +98,7 @@ export function GroupLinkClienteModal({ open, onOpenChange, conversationId, onLi
                     key={c.id}
                     type="button"
                     onClick={() => setSelected(c)}
-                    className={`w-full text-left px-3 py-2 rounded-sm hover:bg-accent ${isSel ? "bg-accent" : ""}`}
+                    className={`w-full text-left px-3 py-2 rounded-sm hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] ${isSel ? "bg-highlight [--muted-foreground:var(--highlight-muted-foreground)]" : ""}`}
                   >
                     <div className="text-sm font-medium">{label}</div>
                     {sub && <div className="text-xs text-muted-foreground">{sub}</div>}

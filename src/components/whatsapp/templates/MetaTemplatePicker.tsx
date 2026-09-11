@@ -283,8 +283,8 @@ export function MetaTemplatePicker({
                       key={tpl.id}
                       onClick={() => setSelected(tpl)}
                       className={cn(
-                        'cursor-pointer transition-colors hover:bg-accent',
-                        selected?.id === tpl.id && 'border-primary bg-accent',
+                        'cursor-pointer transition-colors hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)]',
+                        selected?.id === tpl.id && 'border-primary bg-highlight [--muted-foreground:var(--highlight-muted-foreground)]',
                       )}
                     >
                       <CardContent className="p-3">

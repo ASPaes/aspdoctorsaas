@@ -51,8 +51,8 @@ export const MacroSuggestions = ({ macros, onSelect, selectedIndex = 0, onClose 
               className={cn(
                 "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors border-l-2",
                 isSelected
-                  ? "bg-accent border-primary"
-                  : "border-transparent hover:bg-accent/50"
+                  ? "bg-highlight border-primary [--muted-foreground:var(--highlight-muted-foreground)]"
+                  : "border-transparent hover:bg-highlight/60 hover:[--muted-foreground:var(--highlight-muted-foreground)]"
               )}
             >
               {macro.shortcut && (

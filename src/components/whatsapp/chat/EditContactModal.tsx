@@ -375,7 +375,7 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
                       <button
                         key={c.id}
                         type="button"
-                        className="w-full text-left px-2 py-1.5 hover:bg-accent flex items-center gap-2 transition-colors"
+                        className="w-full text-left px-2 py-1.5 hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] flex items-center gap-2 transition-colors"
                         onClick={() => applyContact(c)}
                       >
                         <Avatar className="h-7 w-7 shrink-0">
@@ -483,7 +483,7 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
                         <button
                           key={c.id}
                           type="button"
-                          className="w-full text-left px-3 py-2 hover:bg-accent text-xs flex items-center justify-between gap-2 transition-colors"
+                          className="w-full text-left px-3 py-2 hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] text-xs flex items-center justify-between gap-2 transition-colors"
                           onClick={() => {
                             setLinkedCliente({
                               id: c.id,

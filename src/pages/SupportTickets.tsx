@@ -1200,7 +1200,7 @@ export default function SupportTickets() {
                 ) : (
                   unseenMentions.map(m => (
                     <button key={m.id} onClick={() => handleMentionClick(m)}
-                      className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors border-b last:border-0">
+                      className="w-full text-left px-3 py-2.5 hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] transition-colors border-b last:border-0">
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
                         <div className="min-w-0 flex-1">
@@ -1345,7 +1345,7 @@ export default function SupportTickets() {
                     setClienteSearchTerm("");
                     setClientePopoverOpen(false);
                   }}
-                  className={`w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors ${clienteFilterId === c.id ? "bg-primary/10 text-primary" : ""}`}
+                  className={`w-full text-left px-2 py-1.5 rounded text-sm hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] transition-colors ${clienteFilterId === c.id ? "bg-primary/10 text-primary" : ""}`}
                 >
                   <div className="truncate font-medium">
                     {c.codigo_sequencial ? `#${c.codigo_sequencial} ` : ""}{c.nome_fantasia || c.razao_social || "Sem nome"}
@@ -1363,7 +1363,7 @@ export default function SupportTickets() {
                   setClienteSearchTerm("");
                   setClientePopoverOpen(false);
                 }}
-                className="w-full mt-2 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-accent transition-colors"
+                className="w-full mt-2 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] transition-colors"
               >
                 Limpar filtro de cliente
               </button>
@@ -1468,7 +1468,7 @@ export default function SupportTickets() {
                       <PopoverContent align="start" className="w-52 p-2">
                         <div className="space-y-1 max-h-48 overflow-y-auto">
                           {serviceTypes.map(t => (
-                            <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer text-sm">
+                            <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] cursor-pointer text-sm">
                               <Checkbox
                                 checked={serviceTypeFilters.includes(t.id)}
                                 onCheckedChange={v => setServiceTypeFilters(prev => v ? [...prev, t.id] : prev.filter(id => id !== t.id))}

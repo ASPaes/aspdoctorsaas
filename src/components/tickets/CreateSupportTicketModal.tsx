@@ -1162,7 +1162,7 @@ export function CreateSupportTicketModal({
                         <button
                           key={c.id}
                           type="button"
-                          className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors"
+                          className="w-full text-left px-3 py-2 text-xs hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] transition-colors"
                           onClick={() => {
                             setSelectedCliente(c);
                             setClienteSearchTerm("");
@@ -1209,7 +1209,7 @@ export function CreateSupportTicketModal({
                           <button
                             key={c.id}
                             type="button"
-                            className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors"
+                            className="w-full text-left px-3 py-2 text-xs hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] transition-colors"
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
                               setContatoSolicitante(c.name);
@@ -1528,7 +1528,7 @@ export function CreateSupportTicketModal({
                               setSelectedTagIds((prev) => [...prev, t.id]);
                               setTagPopoverOpen(false);
                             }}
-                            className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm flex items-center gap-2"
+                            className="w-full text-left px-2 py-1.5 rounded-md hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] text-sm flex items-center gap-2"
                           >
                             <span className="h-2 w-2 rounded-full shrink-0" style={{ background: t.color }} />
                             {t.name}

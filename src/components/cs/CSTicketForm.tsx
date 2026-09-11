@@ -285,7 +285,7 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
                     {clientes.length > 0 && !selectedClienteId && (
                       <div className="border rounded-md max-h-40 overflow-auto">
                         {clientes.map((c) => (
-                          <button key={c.id} type="button" className="w-full px-3 py-2 text-left hover:bg-accent text-sm flex items-center justify-between gap-2" onClick={() => handleSelectCliente(c)}>
+                          <button key={c.id} type="button" className="w-full px-3 py-2 text-left hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] text-sm flex items-center justify-between gap-2" onClick={() => handleSelectCliente(c)}>
                             <span>{c.nome_fantasia || c.razao_social}</span>
                             {c.cancelado && <Badge variant="destructive" className="shrink-0">Cancelado</Badge>}
                           </button>

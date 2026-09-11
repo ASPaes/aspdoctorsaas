@@ -100,7 +100,7 @@ export function ForwardMessageDialog({ open, onOpenChange, messageIds, onDone }:
                   key={conv.id}
                   onClick={() => handleSelect(conv.id)}
                   disabled={forwardMutation.isPending}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-left transition-colors disabled:opacity-50"
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] text-left transition-colors disabled:opacity-50"
                 >
                   <Avatar className="h-8 w-8 shrink-0">
                     <AvatarImage src={conv.contact?.profile_picture_url || undefined} />

@@ -3283,7 +3283,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                               type="button"
                                               disabled={jaAdicionado}
                                               onClick={() => handleAddModuleFromProduto(m.id)}
-                                              className="w-full flex items-center justify-between gap-2 rounded px-2 py-1.5 text-xs text-left hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                              className="w-full flex items-center justify-between gap-2 rounded px-2 py-1.5 text-xs text-left hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                                             >
                                               <span className="truncate">{m.nome}</span>
                                               {jaAdicionado

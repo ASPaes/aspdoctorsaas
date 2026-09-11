@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 11/09
 
+- ⬆️ **Destaque legível também nas demais buscas e listas de escolha** — A correção do azul forte na lista de clientes da Nova jornada passou a valer também nas buscas de cliente do chat, dos chamados, dos atendimentos e do relatório de CSAT, na escolha de contato, tag e menção dos chamados, no encaminhamento de mensagens, nas sugestões de macro e de menção do chat, no menu de IA do chat, na escolha de modelo de mensagem e na escolha de setores e agentes em Configurações. O item sob o mouse ou selecionado fica num azul suave, e o CNPJ, o telefone e os demais textos em cinza continuam fáceis de ler.
+
 - ⬆️ **Cliente em destaque na lista de busca voltou a ser legível** — Ao abrir uma jornada em **Implantação › Nova jornada**, o cliente em foco na lista de busca aparecia sobre um azul forte que praticamente apagava o CNPJ. O destaque passou a ser um azul suave, com o nome e o CNPJ fáceis de ler nos temas claro e escuro. A mesma correção vale para os demais campos de escolha em lista e menus de ações do sistema, como Tipo de demanda, Responsável e filtros.
 
 - 🆕 **Cor para cada produto na lista de conversas** — Em **Configurações › Cadastros › Comercial › Produtos**, o cadastro do produto ganhou o campo **Cor no chat**, com 10 cores para escolher e uma prévia de como o selo fica. O selo com o nome do produto que aparece nos cards da lista de conversas passa a sair nessa cor, o que ajuda a reconhecer de relance qual software o cliente usa. A tabela de produtos mostra a cor escolhida ao lado do nome. Produtos sem cor escolhida continuam no azul de sempre.

@@ -830,7 +830,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
                               type="button"
                               disabled={isLinking}
                               onClick={(e) => { e.stopPropagation(); handleLinkCliente(att.id, c.id); }}
-                              className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-accent transition-colors disabled:opacity-50"
+                              className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] transition-colors disabled:opacity-50"
                             >
                               <div className="font-medium truncate">
                                 {c.codigo_sequencial ? `#${c.codigo_sequencial} ` : ""}{c.nome_fantasia || c.razao_social || "Sem nome"}

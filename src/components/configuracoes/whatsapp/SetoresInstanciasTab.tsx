@@ -352,8 +352,8 @@ export default function SetoresInstanciasTab() {
             <button
               key={d.id}
               onClick={() => setSelectedId(d.id)}
-              className={`w-full text-left rounded-md border px-3 py-2 text-sm transition-colors hover:bg-accent ${
-                selectedId === d.id ? "border-primary bg-accent" : "border-border"
+              className={`w-full text-left rounded-md border px-3 py-2 text-sm transition-colors hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] ${
+                selectedId === d.id ? "border-primary bg-highlight [--muted-foreground:var(--highlight-muted-foreground)]" : "border-border"
               }`}
             >
               {d.name}

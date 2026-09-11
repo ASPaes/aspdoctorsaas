@@ -63,7 +63,7 @@ export const MentionSuggestions = ({ participants, onSelect, selectedIndex = 0 }
                 onClick={() => onSelect(p)}
                 className={cn(
                   "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors border-l-2",
-                  isSelected ? "bg-accent border-primary" : "border-transparent hover:bg-accent/50"
+                  isSelected ? "bg-highlight border-primary [--muted-foreground:var(--highlight-muted-foreground)]" : "border-transparent hover:bg-highlight/60 hover:[--muted-foreground:var(--highlight-muted-foreground)]"
                 )}
               >
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -90,7 +90,7 @@ export const MentionSuggestions = ({ participants, onSelect, selectedIndex = 0 }
               onClick={() => onSelect(p)}
               className={cn(
                 "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors border-l-2",
-                isSelected ? "bg-accent border-primary" : "border-transparent hover:bg-accent/50"
+                isSelected ? "bg-highlight border-primary [--muted-foreground:var(--highlight-muted-foreground)]" : "border-transparent hover:bg-highlight/60 hover:[--muted-foreground:var(--highlight-muted-foreground)]"
               )}
             >
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">

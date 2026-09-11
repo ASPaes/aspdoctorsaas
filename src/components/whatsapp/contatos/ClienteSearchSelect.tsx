@@ -76,7 +76,7 @@ export function ClienteSearchSelect({
             <button
               key={c.id}
               type="button"
-              className="w-full text-left px-3 py-2 hover:bg-accent text-xs flex items-center justify-between gap-2 transition-colors"
+              className="w-full text-left px-3 py-2 hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)] text-xs flex items-center justify-between gap-2 transition-colors"
               onClick={() => {
                 onChange({
                   id: c.id,

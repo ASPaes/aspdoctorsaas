@@ -350,7 +350,7 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
                       setClienteSearchTerm("");
                       setClientePopoverOpen(false);
                     }}
-                    className="w-full text-left px-2 py-1 rounded text-xs hover:bg-accent"
+                    className="w-full text-left px-2 py-1 rounded text-xs hover:bg-highlight hover:[--muted-foreground:var(--highlight-muted-foreground)]"
                   >
                     <div className="font-medium truncate">{c.nome_fantasia || c.razao_social}</div>
                     {c.cnpj && <div className="text-muted-foreground text-[10px]">{c.cnpj}</div>}
