@@ -294,3 +294,11 @@ verify_jwt = true
 # assinatura e a function lê o claim `role` confiando nisso.
 [functions.send-email]
 verify_jwt = true
+
+# Motor das mensagens agendadas do chat. Chamada pelo pg_cron a cada minuto,
+# com a anon key no Authorization -- mesma receita do purge-chat-media. `true`
+# de proposito: ela manda WhatsApp para cliente, entao sem JWT valido do
+# projeto ninguem a dispara de fora. Sem esta entrada o CI publicaria com
+# FALSE e abriria a function em silencio.
+[functions.dispatch-scheduled-messages]
+verify_jwt = true
