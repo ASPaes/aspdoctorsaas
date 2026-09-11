@@ -1689,20 +1689,23 @@ export default function OemIntegrationTab() {
             : <>{cabeca} · o cliente tem <strong>{quantas}</strong> licenças no OEM,{" "}
               {produtosEmTexto} na ficha e nenhum código gravado. Cada produto guarda um código
               só, então as {quantas} não cabem no mesmo cliente.</>;
-          comoResolver = <>Cadastre esta loja como cliente e traga a licença para ele em
-            “Escolher o cliente”. Vincular ao mesmo cadastro só troca o código pelo desta
-            filial, e o alerta volta na outra.</>;
+          comoResolver = <>Duas saídas. Se a loja tem cadastro próprio, traga a licença para
+            ele. Se é a mesma empresa, some uma linha de produto para esta loja na ficha, com{" "}
+            <strong>mensalidade zero</strong> e o custo da licença: a mensalidade do cliente não
+            muda e o custo passa a somar. Nos dois casos, volte aqui e clique em
+            “Escolher o cliente” para gravar.</>;
         } else if (sufixo === "sem_produto") {
           rotulo = "O cliente não tem produto ativo onde gravar o código";
           detalhe = <>{cabeca} · a licença está ativa no OEM e a ficha não tem nenhum produto
             ativo, então não existe linha onde gravar o código nem de onde tirar o custo.</>;
           comoResolver = <>Cadastre o produto do parceiro na ficha do cliente e vincule de novo.</>;
         } else if (sufixo === "varios_produtos") {
-          rotulo = "A ficha tem mais de um produto ativo, e o código não escolhe sozinho";
+          rotulo = "A ficha tem mais de um produto do parceiro sem licença";
           detalhe = <>{cabeca} · o cliente tem <strong>{nProdutos}</strong> produtos ativos na
-            ficha. O sistema não adivinha em qual gravar, então não grava em nenhum.</>;
-          comoResolver = <>Confira os produtos ativos da ficha: o código só é gravado quando
-            sobra um do parceiro.</>;
+            ficha e mais de uma linha do parceiro está livre. O sistema não adivinha em qual
+            gravar, então não grava em nenhuma.</>;
+          comoResolver = <>Deixe uma linha livre por loja: o código vai para a única linha de
+            produto do parceiro que estiver sem licença.</>;
         } else {
           rotulo = "O vínculo está feito, mas o código não chegou à ficha";
           detalhe = <>{cabeca} · o cliente tem uma licença e um produto ativo, que é justamente
