@@ -112,7 +112,7 @@ const BUCKET_HELP: Record<Bucket, string> = {
   contrato_suspenso:
     "Contrato suspenso no Omie. Normal em Cobrança Fornecedor: o cliente paga o fornecedor, não há o que faturar. Vincular apenas registra o de/para.",
   contrato_cancelado:
-    "O cliente tinha um contrato no Omie, mas foi CANCELADO. Avalie reativar o cancelado ou criar um novo.",
+    "O cliente tinha um contrato no Omie, mas foi CANCELADO. Se o cliente voltou e o contrato foi reativado no DS, vincule aqui e clique em Reprocessar na fila: o Omie reativa este mesmo contrato, sem criar outro.",
 };
 
 
@@ -906,7 +906,35 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
           </div>
         );
       case "contrato_cancelado":
-        return <DisabledActionButton>Reativar/Revisar no Omie</DisabledActionButton>;
+        // Vincular grava só o de/para, zero escrita no Omie. Quem reativa o cancelado é a fila, e só
+        // quando o contrato é reativado no DS (origem 'reativacao'). Sem este botão, cancelado nos
+        // dois lados e reativado no DS ficava sem saída: a fila dizia "não existe no Omie" e aqui não
+        // havia o que clicar (SAMIRA VARGAS e N.S. EVENTOS, DigiUp, 11/09/2026).
+        // Balde de alarme lista linha já vinculada de propósito; para ela o botão bateria sempre no
+        // 409 "Ja vinculado" da recon-vincular-unitario. O que resta é reprocessar na fila.
+        if (row.status_usuario === "vinculado" || row.status_usuario === "resolvido") {
+          return (
+            <Badge
+              variant="outline"
+              className="text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-900 gap-1"
+            >
+              <CheckCircle2 className="h-3 w-3" />
+              Vinculado
+            </Badge>
+          );
+        }
+        return (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1"
+            onClick={handleVincularAssimMesmo}
+            disabled={vincLoading || !tid || !row.ds_contract_id}
+          >
+            {vincLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+            {vincLoading ? "Vinculando..." : "Vincular ao contrato cancelado"}
+          </Button>
+        );
       default:
         return null;
     }

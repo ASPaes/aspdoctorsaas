@@ -55,7 +55,7 @@ export default function EnviarContratoOmieButton({ tenantId, contratoId, created
       // src/lib/omieVinculo.ts. Sem limit(1) fixo: tenant com mais de uma conta Omie pode ter a
       // linha repetida por conta e só uma delas com o código.
       const { data, error } = await (supabase.from("reconciliacao_cadastro" as any) as any)
-        .select("ds_contract_id, candidato_escolhido, codigo_contrato_omie")
+        .select("ds_contract_id, candidato_escolhido, codigo_contrato_omie, status_usuario")
         .eq("ds_contract_id", contratoId)
         .limit(5);
       if (error) throw error;

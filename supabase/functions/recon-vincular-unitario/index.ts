@@ -48,9 +48,20 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Travas MANTIDAS: ja vinculado (409), acao fora da lista (422), codigo de cliente/contrato no
 //   Omie ausente (422). Vincular grava SO o de/para local: zero escrita no Omie.
 const VINCULAR = "https://vqrytdntynxuqozehals.supabase.co/functions/v1/ds-omie-vincular-lote";
+// v5 (11/09/2026): aceita 'contrato_cancelado'.
+//   POR QUE: contrato cancelado nos dois lados e depois REATIVADO no DS nao tinha saida. Sem de/para
+//   a fila so altera o que ja esta vinculado, entao a reativacao morria em "nao existe no Omie"; e
+//   aqui ele era recusado com 422. A tela ainda mostrava "Sincronizado", porque lia o codigo que a
+//   deteccao achou pelo CNPJ. Casos: SAMIRA VARGAS (CT-2026-2538 x Omie 11342104392) e N.S. EVENTOS
+//   (CT-2026-2551 x 11342104670), DigiUp, cancelados em 05/08 e reativados no DS em 27/08 e 10/09.
+//   SEGURANCA -- vincular um cancelado NAO o reativa: o ds-omie-vincular-lote grava so o par, sem
+//   olhar situacao e sem escrever no Omie. Quem reativa e a fila, e so com origem 'reativacao'
+//   (situacao '10' + permitir_reativacao). Com qualquer outra origem o ds-omie-contrato-alterar
+//   recusa com depara_aponta_cancelado, que e o comportamento de hoje para os ja vinculados.
 const ACOES_VINCULAVEIS = [
   "vinculo_auto_ok",
-  "contrato_suspenso"
+  "contrato_suspenso",
+  "contrato_cancelado"
 ];
 const cors = {
   "Access-Control-Allow-Origin": "*",

@@ -264,7 +264,7 @@ export function OmieHistoricoConteudo({ clienteId, aberto }: Props & { aberto: b
         // dos logs, justamente os que mais têm o que contar.
         const { data: v, error: vError } = await supabase
           .from("reconciliacao_cadastro")
-          .select("ds_customer_id, ds_contract_id, codigo_cliente_omie, codigo_contrato_omie, candidato_escolhido")
+          .select("ds_customer_id, ds_contract_id, codigo_cliente_omie, codigo_contrato_omie, candidato_escolhido, status_usuario")
           .eq("tenant_id", tid)
           .in("ds_contract_id", ids);
         if (vError) throw vError;

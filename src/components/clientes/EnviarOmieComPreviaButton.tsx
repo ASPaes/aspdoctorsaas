@@ -38,6 +38,12 @@ export type ContratoParaEnvioOmie = {
   /** Já casado no Omie? Nesse caso o botão vira selo e não há o que enviar. */
   sincronizado: boolean;
   codigo_contrato_omie: string | number | null;
+  /**
+   * Contrato que a Conferência achou no Omie pelo CNPJ, mas sem vínculo gravado. Não ganha selo
+   * verde (a fila não o alcança) nem botão de envio: criar aqui faria um contrato duplicado ao lado
+   * do que já existe lá. O caminho é vincular na Conferência.
+   */
+  codigo_omie_sem_vinculo?: string | number | null;
 };
 
 const brl = (v: any) =>
@@ -263,7 +269,7 @@ export default function EnviarOmieComPreviaButton({
       const ids = (ctrs ?? []).map((c: any) => c.id);
       if (!ids.length) return [];
       const { data: rec, error: eRec } = await (supabase.from("reconciliacao_cadastro") as any)
-        .select("ds_contract_id, candidato_escolhido, codigo_contrato_omie")
+        .select("ds_contract_id, candidato_escolhido, codigo_contrato_omie, status_usuario")
         .eq("tenant_id", tenantId)
         .in("ds_contract_id", ids);
       if (eRec) throw eRec;
@@ -321,6 +327,25 @@ export default function EnviarOmieComPreviaButton({
 
   if (contrato.sincronizado) {
     return <SincronizadoBadge codigo={contrato.codigo_contrato_omie} />;
+  }
+  // Sem botão de envio de propósito: o contrato já existe no Omie, e "Enviar" criaria outro ao lado.
+  if (contrato.codigo_omie_sem_vinculo != null) {
+    return (
+      <div className="space-y-1">
+        <Badge
+          variant="outline"
+          className="gap-1 text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-900"
+        >
+          <AlertTriangle className="h-3 w-3" />
+          Encontrado no Omie, sem vínculo
+          <span className="ml-1 font-mono text-[11px]">({contrato.codigo_omie_sem_vinculo})</span>
+        </Badge>
+        <div className="text-xs text-muted-foreground">
+          A Conferência achou este contrato no Omie pelo CNPJ, mas o vínculo não foi gravado.
+          Enquanto não for vinculado na Conferência do Omie, nenhuma alteração dele chega lá.
+        </div>
+      </div>
+    );
   }
   if (enviadoAgora !== undefined) {
     return <SincronizadoBadge codigo={enviadoAgora ?? null} />;

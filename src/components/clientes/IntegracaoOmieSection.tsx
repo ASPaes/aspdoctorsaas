@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useOmieContaDoCliente } from "@/hooks/useOmieContaDoCliente";
-import { mapaVinculoOmie } from "@/lib/omieVinculo";
+import { mapaVinculoOmie, mapaSemVinculoOmie } from "@/lib/omieVinculo";
 import { Badge } from "@/components/ui/badge";
 import { Cloud } from "lucide-react";
 import EnviarOmieComPreviaButton, {
@@ -54,7 +54,7 @@ export default function IntegracaoOmieSection({ clienteId }: Props) {
         // Sem filtro de estado_match: ver a regra e o porquê em src/lib/omieVinculo.ts.
         const { data: v, error: vError } = await supabase
           .from("reconciliacao_cadastro")
-          .select("ds_contract_id, codigo_contrato_omie, candidato_escolhido")
+          .select("ds_contract_id, codigo_contrato_omie, candidato_escolhido, status_usuario")
           .eq("tenant_id", tid)
           .in("ds_contract_id", ids);
         if (vError) throw vError;
@@ -62,6 +62,7 @@ export default function IntegracaoOmieSection({ clienteId }: Props) {
       }
 
       const vinculoMap = mapaVinculoOmie(vinculos);
+      const semVinculoMap = mapaSemVinculoOmie(vinculos);
 
       return (contratos ?? []).map((c: any) => {
         const codigo = vinculoMap.get(c.id) ?? null;
@@ -69,6 +70,7 @@ export default function IntegracaoOmieSection({ clienteId }: Props) {
           ...c,
           sincronizado: codigo != null,
           codigo_contrato_omie: codigo,
+          codigo_omie_sem_vinculo: semVinculoMap.get(c.id) ?? null,
         } as ContratoAtivo;
       });
     },
