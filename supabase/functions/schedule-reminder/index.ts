@@ -1,3 +1,9 @@
+// verify_jwt = true, declarado em supabase/config.toml desde 11/09/2026.
+// Quem chama e so o pg_cron (job 36), com a anon key no Authorization. Antes a
+// function estava publicada com verify_jwt = false por falta da entrada no
+// config.toml -- e ela manda WhatsApp para cliente. Este comentario tambem e o
+// que faz o CI republicar a function com o portao ligado: o workflow so
+// deploya pasta que teve arquivo alterado no push.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { getAdapter, getInstanceSecrets } from '../_shared/providers/index.ts';
 import { previewCut } from '../_shared/preview.ts';

@@ -302,3 +302,12 @@ verify_jwt = true
 # FALSE e abriria a function em silencio.
 [functions.dispatch-scheduled-messages]
 verify_jwt = true
+
+# Lembrete de retomada do atendimento agendado. verify_jwt = true desde
+# 11/09/2026 -- antes estava publicada com FALSE por falta desta entrada, e a
+# function manda WhatsApp para cliente: qualquer um de fora podia dispara-la.
+# Quem chama e so o pg_cron (job 36), com a anon key no Authorization -- o
+# mesmo token (md5 conferido) dos crons do purge-chat-media e do
+# dispatch-scheduled-messages, que ja passam por este portao.
+[functions.schedule-reminder]
+verify_jwt = true
