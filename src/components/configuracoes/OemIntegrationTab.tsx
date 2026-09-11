@@ -1666,34 +1666,91 @@ export default function OemIntegrationTab() {
         const quantas = r.semCodigo.filiaisPorCliente.get(cliId)?.size ?? 0;
         const naFicha = codigoNaFichaPorCliente.get(cliId) ?? [];
         const nProdutos = produtosAtivos.get(cliId) ?? 0;
+        const custoTxt = brl(Number(l.custo_oem || 0));
         // Abre toda variação: é por filial e valor que se acha a licença no
-        // portal do parceiro, e é o valor que diz se vale a pressa.
-        const cabeca = <>filial <strong>{l.filial_codigo}</strong> · {brl(Number(l.custo_oem || 0))}/mês</>;
-        // Zero cai neste balde também (duas filiais e ficha vazia): "0 linhas
-        // de produto" é o tipo de frase que denuncia texto montado por máquina.
-        const produtosEmTexto = nProdutos === 0
-          ? "nenhuma linha de produto"
-          : nProdutos === 1 ? "uma linha de produto" : `${nProdutos} linhas de produto`;
+        // portal do parceiro, e é o valor que diz se vale a pressa. O bloqueio
+        // entra aqui porque bloqueada continua cobrando (regra do Alexandre), e
+        // quem lê "bloqueada" tende a achar que ela já parou de custar.
+        const cabeca = <>filial <strong>{l.filial_codigo}</strong> · {custoTxt}/mês
+          {l.bloqueado_oem === true && <> · <strong>bloqueada no OEM</strong></>}</>;
 
         let rotulo: string;
         let detalhe: React.ReactNode;
         let comoResolver: React.ReactNode;
 
         if (sufixo === "multiplas") {
-          rotulo = "A ficha do cliente já está com a licença de outra loja";
-          detalhe = naFicha.length
-            ? <>{cabeca} · o cliente tem <strong>{quantas}</strong> licenças no OEM e{" "}
-              {produtosEmTexto} na ficha, que já guarda a filial{" "}
-              <strong>{naFicha.join(", ")}</strong>. Cada produto guarda um código só, então
-              este custo não entra na margem de nenhum cliente.</>
-            : <>{cabeca} · o cliente tem <strong>{quantas}</strong> licenças no OEM,{" "}
-              {produtosEmTexto} na ficha e nenhum código gravado. Cada produto guarda um código
-              só, então as {quantas} não cabem no mesmo cliente.</>;
-          comoResolver = <>Duas saídas. Se a loja tem cadastro próprio, traga a licença para
-            ele. Se é a mesma empresa, some uma linha de produto para esta loja na ficha, com{" "}
-            <strong>mensalidade zero</strong> e o custo da licença: a mensalidade do cliente não
-            muda e o custo passa a somar. Nos dois casos, volte aqui e clique em
-            “Escolher o cliente” para gravar.</>;
+          // OS FATOS QUE DECIDEM, E NÃO DUAS SAÍDAS ABSTRATAS.
+          //
+          // O texto anterior dizia "a ficha do cliente já está com a licença
+          // de outra loja" e oferecia duas saídas sem dizer qual servia. No
+          // caso da ALENTO (10/09/2026) nenhuma servia: as 3 lojas já tinham
+          // cadastro e licença próprios, e as 2 licenças listadas eram de
+          // OUTRO grupo no OEM, sobra de um cadastro antigo no parceiro,
+          // ligadas à matriz pelo nome. A saída era desativar no OEM.
+          //
+          // O que separa os casos está nos dados que a aba já carrega: o grupo
+          // da licença contra o grupo da licença que já está na ficha, como ela
+          // veio parar aqui, e se as outras lojas do mesmo CNPJ já têm licença.
+          const licencasDaFicha = linhas.filter(
+            (x) => x.ds_customer_id === cliId && !!x.filial_codigo && naFicha.includes(String(x.filial_codigo)));
+          const gruposDaFicha = new Set(
+            licencasDaFicha.map((x) => String(x.empresa_codigo ?? "")).filter(Boolean));
+          const outroGrupo = !!l.empresa_codigo && gruposDaFicha.size > 0
+            && !gruposDaFicha.has(String(l.empresa_codigo));
+
+          // Mesma raiz de CNPJ (os 8 primeiros dígitos) é a mesma empresa em
+          // outra loja. Só entram as irmãs que já têm licença gravada: são
+          // elas que dizem "esta aqui está sobrando".
+          const raiz = (v: string | null | undefined) => (v ?? "").replace(/\D/g, "").slice(0, 8);
+          const raizCli = raiz(l.cnpj_ds ?? l.cnpj_norm);
+          const todosCodigos = new Set([...codigoNaFichaPorCliente.values()].flat());
+          const irmas = raizCli.length === 8
+            ? [...new Map(linhas
+                .filter((x) => !!x.ds_customer_id && x.ds_customer_id !== cliId
+                  && raiz(x.cnpj_ds) === raizCli
+                  && !!x.filial_codigo && todosCodigos.has(String(x.filial_codigo)))
+                .map((x) => [x.ds_customer_id!, nomeDe(x)] as const)).values()]
+            : [];
+
+          const comoVeio = l.resolvido_em
+            ? <>foi ligada aqui à mão{l.criterio_match === "nome" ? ", pelo nome," : ""} em{" "}
+                {new Date(l.resolvido_em).toLocaleDateString("pt-BR", {
+                  timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" })}</>
+            : <>foi ligada aqui pelo casamento automático</>;
+
+          // O produto da licença que já está na ficha: é ele que se repete
+          // quando a segunda licença é um caixa a mais do mesmo cliente.
+          const produtoDaFicha = produtosOem.find(
+            (p) => String(p.cliente_id) === cliId && p.ativo && !!p.oem_codigo_filial)?.produto_id;
+          const nomeProduto = produtosDs.find((p) => p.id === produtoDaFicha)?.nome ?? "do parceiro";
+
+          if (outroGrupo) {
+            rotulo = "Licença do OEM a mais neste cliente";
+            detalhe = <>{cabeca}. Este cliente já tem a licença dele ({naFicha.join(", ")}). Esta é de
+              outro grupo no OEM ({l.empresa_codigo}) e {comoVeio}.
+              {irmas.length > 0 && <>{" "}{irmas.length === 1 ? "A loja" : "As lojas"}{" "}
+                <strong>{irmas.join(", ")}</strong>, do mesmo CNPJ, também já{" "}
+                {irmas.length === 1 ? "tem" : "têm"} licença própria.</>}</>;
+            comoResolver = <>Se ninguém usa esta licença, desative no portal do OEM, porque ela está
+              sendo paga. Se alguma loja usa, escolha essa loja em “Escolher o cliente”.</>;
+          } else if (naFicha.length) {
+            rotulo = "Licença do OEM fora da ficha";
+            detalhe = <>{cabeca}. Esta licença é deste cliente, mas{" "}
+              {naFicha.length === 1
+                ? <>a ficha tem um só produto {nomeProduto}, já ocupado pela filial {naFicha[0]}</>
+                : <>os {naFicha.length} produtos da ficha já estão ocupados (filiais {naFicha.join(", ")})</>}.
+              O custo dela não aparece em lugar nenhum.</>;
+            comoResolver = <>Se a loja tem cadastro próprio, escolha esse cadastro em “Escolher o
+              cliente”. Se é um caixa a mais deste cliente, adicione na ficha um produto{" "}
+              {nomeProduto} com mensalidade R$ 0,00 e custo {custoTxt}, depois clique em
+              “Escolher o cliente” e escolha este mesmo cliente.</>;
+          } else {
+            rotulo = "Licenças do OEM fora da ficha";
+            detalhe = <>{cabeca}. O cliente tem <strong>{quantas}</strong> licenças no OEM e nenhuma
+              está gravada na ficha, que guarda uma licença por produto.</>;
+            comoResolver = <>Escolha o cadastro de cada loja em “Escolher o cliente”. Se for tudo do
+              mesmo cliente, a ficha precisa de um produto por licença.</>;
+          }
         } else if (sufixo === "sem_produto") {
           rotulo = "O cliente não tem produto ativo onde gravar o código";
           detalhe = <>{cabeca} · a licença está ativa no OEM e a ficha não tem nenhum produto
@@ -1792,7 +1849,7 @@ export default function OemIntegrationTab() {
       total: lista.reduce((a, c) => a + c.itens.length, 0) + semDono.length,
     };
   }, [r, custos, codigoEmProdutoDeOutro, linhas, produtosDs, clientesNovos,
-      codigoNaFichaPorCliente, produtosAtivos]);
+      codigoNaFichaPorCliente, produtosAtivos, produtosOem]);
 
   // É este número que acende o alerta na aba.
   const totalDivergencias = divergencias.total;
@@ -4468,12 +4525,25 @@ export default function OemIntegrationTab() {
                             </Badge>
                           )}
                           {/* Decisão não é pendência: entra com selo próprio, em
-                              verde, para não somar ao que ainda precisa de gente. */}
-                          {c.decisoes.length > 0 && (
-                            <Badge variant="outline" className="shrink-0 border-emerald-600/40 text-emerald-600 dark:text-emerald-500">
-                              {c.decisoes.length} decidida{c.decisoes.length > 1 ? "s" : ""} à mão
-                            </Badge>
-                          )}
+                              verde, para não somar ao que ainda precisa de gente.
+
+                              Mas só conta a decisão que RESOLVEU. Licença
+                              ligada à mão que continua fora da ficha aparece
+                              também como divergência logo abaixo, e o selo "3
+                              decididas à mão" ao lado de "2 divergências"
+                              dizia que as mesmas duas estavam resolvidas e
+                              pendentes ao mesmo tempo (ALENTO, 10/09/2026). */}
+                          {(() => {
+                            const resolvidas = c.decisoes.filter((l) => !c.itens.some(
+                              (i) => i.tipo === "sem_codigo"
+                                && String(i.linha?.filial_codigo ?? "") === String(l.filial_codigo ?? ""),
+                            )).length;
+                            return resolvidas > 0 && (
+                              <Badge variant="outline" className="shrink-0 border-emerald-600/40 text-emerald-600 dark:text-emerald-500">
+                                {resolvidas} decidida{resolvidas > 1 ? "s" : ""} à mão
+                              </Badge>
+                            );
+                          })()}
                         </button>
                       </div>
 
@@ -4533,21 +4603,36 @@ export default function OemIntegrationTab() {
                               vira vínculo permanente — a sincronização preserva
                               a escolha errada exatamente como preservaria a
                               certa. */}
-                          {c.decisoes.map((l) => (
+                          {c.decisoes.map((l) => {
+                            // Ligada à mão e ainda fora da ficha: a mesma licença
+                            // está listada acima como divergência. Pintar isto de
+                            // verde como "vínculo escolhido" dizia que estava
+                            // resolvido o que a linha de cima diz que não está.
+                            const foraDaFicha = l.status_usuario !== "ignorado" && c.itens.some(
+                              (i) => i.tipo === "sem_codigo"
+                                && String(i.linha?.filial_codigo ?? "") === String(l.filial_codigo ?? ""),
+                            );
+                            return (
                             <div key={`dec:${l.id}`} className="flex items-start gap-3 py-2.5 pl-10 pr-3 text-sm">
-                              <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
+                              {foraDaFicha
+                                ? <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
+                                : <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />}
                               <div className="min-w-0 flex-1">
                                 <p className="font-medium">
                                   {l.status_usuario === "ignorado"
                                     ? "Licença ignorada à mão, não vira cliente"
-                                    : "Vínculo escolhido à mão"}
+                                    : foraDaFicha
+                                      ? "Ligada à mão, mas ainda fora da ficha"
+                                      : "Vínculo escolhido à mão"}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                   {l.razao_oem ?? "—"}
                                   {l.filial_codigo && ` · filial ${l.filial_codigo}`}
                                   {l.resolvido_em &&
                                     ` · ${new Date(l.resolvido_em).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`}
-                                  {" · sobrevive às próximas sincronizações"}
+                                  {foraDaFicha
+                                    ? " · o que fazer está na divergência acima"
+                                    : " · sobrevive às próximas sincronizações"}
                                 </p>
                               </div>
                               <Button
@@ -4561,7 +4646,8 @@ export default function OemIntegrationTab() {
                                 Desfazer
                               </Button>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
