@@ -89,6 +89,23 @@ jobs:
               while read -r fn; do
                 [ -d "supabase/functions/$fn" ] || sed -i "/^${fn}$/d" /tmp/alvo.txt
               done < /tmp/alvo.txt
+              # Dependentes (10/09/2026): function que importa arquivo da pasta de
+              # OUTRA function -- ex.: send-email usa ../test-email-account/smtp.ts.
+              # O bundle embute a copia do import, entao deployar so a pasta que
+              # mudou deixaria o dependente em producao com o codigo velho. Um nivel
+              # basta hoje: ninguem importa de quem importa. _shared segue no ramo
+              # de cima (derruba tudo). So ACRESCENTA alvo, nunca tira.
+              : > /tmp/dependentes.txt
+              while read -r fn; do
+                [ -z "$fn" ] && continue
+                { grep -rlE --include='*.ts' "from ['\"]\.\./${fn}/" supabase/functions/ || true; } \
+                  | sed -n 's#^supabase/functions/\([^/]*\)/.*#\1#p' >> /tmp/dependentes.txt
+              done < /tmp/alvo.txt
+              grep -v '^_shared$' /tmp/dependentes.txt >> /tmp/alvo.txt || true
+              sort -u -o /tmp/alvo.txt /tmp/alvo.txt
+              if [ -s /tmp/dependentes.txt ]; then
+                echo "Dependentes por import: $(sort -u /tmp/dependentes.txt | paste -sd' ' -)"
+              fi
             fi
           fi
           echo "Motivo: $(grep '^motivo=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2-)"
