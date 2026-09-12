@@ -138,9 +138,8 @@ Deno.serve(async (req) => {
           ultimo_erro: null,
           updated_at: new Date().toISOString(),
         });
-        resultados.push({ ...resultado, erro: undefined, ignoradas: 0 });
-        await imap.encerrar();
-        continue;
+        console.log(`[ler-emails-recebidos] ${conta.email}: primeira leitura, marca plantada em ${Math.max(0, caixa.uidNext - 1)}`);
+        continue; // o finally encerra a conexão e registra o resultado
       }
 
       const cabecalhos = await imap.cabecalhosDesde(Number(estado.ultimo_uid), MAX_POR_CAIXA);
@@ -248,6 +247,10 @@ Deno.serve(async (req) => {
         mensagens_lidas: resultado.registradas,
         updated_at: new Date().toISOString(),
       });
+      console.log(
+        `[ler-emails-recebidos] ${conta.email}: lidas=${resultado.lidas} registradas=${resultado.registradas} ` +
+          `ignoradas=${resultado.ignoradas} uid ${estado.ultimo_uid}->${maiorUid} uidNext=${caixa.uidNext}`,
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       resultado.erro = msg;

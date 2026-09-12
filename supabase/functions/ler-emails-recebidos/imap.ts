@@ -18,6 +18,20 @@ const enc = new TextEncoder();
 const dec = new TextDecoder("utf-8", { fatal: false });
 const TIMEOUT_MS = 20_000;
 
+/** 1 caractere por byte, sem interpretar: só assim o `{N}` do IMAP, que conta bytes, bate */
+export function paraBinario(bytes: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return s;
+}
+
+/** do binário de volta para texto UTF-8, que é o que o parser de e-mail espera */
+function binarioParaTexto(s: string): string {
+  return dec.decode(Uint8Array.from(s, (c) => c.charCodeAt(0)));
+}
+
 function comPrazo<T>(p: Promise<T>, etapa: string, ms = TIMEOUT_MS): Promise<T> {
   let timer: number;
   const relogio = new Promise<never>((_, rej) => {
@@ -34,7 +48,8 @@ export interface CaixaInfo {
 
 export class ClienteImap {
   private conn: Deno.Conn | null = null;
-  private buffer = new Uint8Array(0);
+  /** bytes crus, 1 caractere por byte (ver `paraBinario`) */
+  private buffer = "";
   private contador = 0;
 
   constructor(private host: string, private port: number, private seguranca: SegurancaImap) {}
@@ -72,45 +87,48 @@ export class ClienteImap {
     const pedaco = new Uint8Array(64 * 1024);
     const n = await comPrazo(this.conn!.read(pedaco), "leitura");
     if (n === null) throw new Error("Conexão encerrada pelo servidor");
-    const novo = new Uint8Array(this.buffer.length + n);
-    novo.set(this.buffer);
-    novo.set(pedaco.subarray(0, n), this.buffer.length);
-    this.buffer = novo;
+    this.buffer += paraBinario(pedaco.subarray(0, n));
   }
 
   private async lerAte(pronto: (texto: string) => boolean, etapa: string): Promise<string> {
-    while (!pronto(dec.decode(this.buffer))) await this.encher();
-    const texto = dec.decode(this.buffer);
-    this.buffer = new Uint8Array(0);
+    while (!pronto(this.buffer)) await this.encher();
+    const texto = this.buffer;
+    this.buffer = "";
     return texto;
   }
 
   /**
-   * Lê a resposta de um comando até a linha com a etiqueta.
-   * O nó do problema: `{123}` avisa que vêm 123 BYTES crus, que podem conter
-   * quebras de linha e não contam como fim de linha.
+   * Lê a resposta de um comando até a linha com a etiqueta, andando linha a
+   * linha. O nó do problema: `{123}` no fim de uma linha avisa que vêm 123
+   * BYTES crus, que podem ter quebra de linha (e até algo parecido com a
+   * etiqueta). Eles são pulados inteiros, sem olhar dentro.
    */
   private async lerResposta(etiqueta: string, etapa: string): Promise<string> {
+    let pos = 0;
     while (true) {
-      const texto = dec.decode(this.buffer);
-      const literal = texto.match(/\{(\d+)\}\r\n/);
+      const fim = this.buffer.indexOf("\r\n", pos);
+      if (fim < 0) {
+        await this.encher();
+        continue;
+      }
+      const linha = this.buffer.slice(pos, fim);
+      const literal = linha.match(/\{(\d+)\}$/);
       if (literal) {
-        const inicio = texto.indexOf(literal[0]) + literal[0].length;
-        const precisa = inicio + Number(literal[1]);
-        if (this.buffer.length < precisa) {
+        const depois = fim + 2 + Number(literal[1]);
+        if (this.buffer.length < depois) {
           await this.encher();
           continue;
         }
+        pos = depois;
+        continue;
       }
-      const linhas = texto.split("\r\n");
-      const fechou = linhas.some((l) => l.startsWith(`${etiqueta} `));
-      if (fechou && (!literal || texto.length >= 0)) {
-        const ultima = linhas.find((l) => l.startsWith(`${etiqueta} `))!;
-        if (!/^\S+ OK/.test(ultima)) throw new Error(`${etapa}: ${ultima.trim()}`);
-        this.buffer = new Uint8Array(0);
+      if (linha.startsWith(`${etiqueta} `)) {
+        if (!/^\S+ OK/.test(linha)) throw new Error(`${etapa}: ${linha.trim()}`);
+        const texto = this.buffer.slice(0, fim + 2);
+        this.buffer = this.buffer.slice(fim + 2);
         return texto;
       }
-      await this.encher();
+      pos = fim + 2;
     }
   }
 
@@ -137,7 +155,7 @@ export class ClienteImap {
       "FROM TO CC SUBJECT DATE MESSAGE-ID IN-REPLY-TO REFERENCES DELIVERED-TO X-ORIGINAL-TO " +
       "AUTO-SUBMITTED PRECEDENCE LIST-UNSUBSCRIBE X-AUTO-RESPONSE-SUPPRESS RETURN-PATH";
     const bruto = await this.comando(`UID FETCH ${ultimoUid + 1}:* (UID BODY.PEEK[HEADER.FIELDS (${campos})])`);
-    return separarFetch(bruto).slice(0, limite);
+    return novosDesde(separarFetch(bruto), ultimoUid).slice(0, limite);
   }
 
   /** corpo inteiro de uma mensagem, só para quem passou no filtro */
@@ -160,19 +178,43 @@ export class ClienteImap {
   }
 }
 
-/** separa a resposta de um FETCH em (uid, conteúdo do literal) */
+/**
+ * Separa a resposta de um FETCH em (uid, conteúdo do literal).
+ *
+ * Recebe o binário (1 caractere por byte) porque `{N}` conta BYTES: cortar por
+ * caractere desalinha no primeiro acento cru e engole a mensagem seguinte.
+ * O UID pode vir antes ou depois do literal; a ordem dos itens é do servidor,
+ * que não precisa seguir a ordem pedida.
+ */
 export function separarFetch(bruto: string): { uid: number; cabecalho: string }[] {
   const saida: { uid: number; cabecalho: string }[] = [];
-  const re = /\* \d+ FETCH \(([^{]*?)\{(\d+)\}\r\n/g;
+  const re = /\* \d+ FETCH \(/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(bruto)) !== null) {
-    const uid = Number(m[1].match(/UID (\d+)/)?.[1] ?? 0);
-    const inicio = m.index + m[0].length;
-    const conteudo = bruto.slice(inicio, inicio + Number(m[2]));
-    saida.push({ uid, cabecalho: conteudo });
-    re.lastIndex = inicio + Number(m[2]);
+    const fimLinha = bruto.indexOf("\r\n", m.index);
+    if (fimLinha < 0) break;
+    const linha = bruto.slice(m.index, fimLinha);
+    const literal = linha.match(/\{(\d+)\}$/);
+    if (!literal) {
+      // item sem conteúdo (FLAGS avulso, por exemplo): nada a separar
+      re.lastIndex = fimLinha;
+      continue;
+    }
+    const inicio = fimLinha + 2;
+    const fimConteudo = inicio + Number(literal[1]);
+    let fimItem = bruto.indexOf("\r\n", fimConteudo);
+    if (fimItem < 0) fimItem = bruto.length;
+    const resto = bruto.slice(fimConteudo, fimItem);
+    const uid = Number(`${linha} ${resto}`.match(/\bUID (\d+)/)?.[1] ?? 0);
+    saida.push({ uid, cabecalho: binarioParaTexto(bruto.slice(inicio, fimConteudo)) });
+    re.lastIndex = fimItem;
   }
   return saida;
+}
+
+/** `UID FETCH n:*` devolve a última mensagem mesmo quando ela é anterior a n (RFC 3501) */
+export function novosDesde<T extends { uid: number }>(partes: T[], ultimoUid: number): T[] {
+  return partes.filter((p) => p.uid > ultimoUid);
 }
 
 // ─────────────────────────── parsing de e-mail ───────────────────────────
@@ -301,9 +343,16 @@ export function cortarCitacao(texto: string): string {
     const linha = l.trim();
     if (/^>/.test(linha)) return true;
     if (/^-{2,}\s*(mensagem original|forwarded message|original message)/i.test(linha)) return true;
-    if (/^(em|on)\s+.{6,}(escreveu|wrote)\s*:?\s*$/i.test(linha)) return true;
-    // atribuição dobrada: a linha seguinte só tem "escreveu:"
-    if (/^(em|on)\s+.{6,}$/i.test(linha) && /^(escreveu|wrote)\s*:?\s*$/i.test((linhas[i + 1] ?? "").trim())) return true;
+    // atribuição "Em <data>, <nome> <e-mail> escreveu:". O Gmail dobra essa linha
+    // onde quiser, até dentro do <e-mail> (visto em 12/09/2026), então junta até
+    // 3 linhas. Terminar em "escreveu:" é o que impede cortar um "Em breve…".
+    if (/^(em|on)\s+/i.test(linha)) {
+      let junta = linha;
+      for (let k = 0; k < 3; k++) {
+        if (k > 0) junta += (junta.endsWith("<") ? "" : " ") + (linhas[i + k] ?? "").trim();
+        if (/^(em|on)\s+.{6,}(escreveu|wrote)\s*:?\s*$/i.test(junta)) return true;
+      }
+    }
     if (/^_{5,}$/.test(linha)) return true;
     return false;
   });

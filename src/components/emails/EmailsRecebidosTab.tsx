@@ -116,9 +116,22 @@ export default function EmailsRecebidosTab() {
           toast.error(`Erro em ${comErro.length} caixa${comErro.length === 1 ? "" : "s"}: ${comErro[0].erro}`, { duration: 12000 });
           return;
         }
-        toast.success(
-          registradas ? `${registradas} mensagem${registradas === 1 ? "" : "s"} registrada${registradas === 1 ? "" : "s"}.` : "Nada novo nas caixas.",
-        );
+        const lidas = (r.resultados ?? []).reduce((s, x) => s + x.lidas, 0);
+        const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+        if (registradas) {
+          toast.success(`${plural(registradas, "resposta registrada", "respostas registradas")}.`, {
+            description: lidas > registradas
+              ? `${plural(lidas - registradas, "outra mensagem foi lida e ignorada", "outras mensagens foram lidas e ignoradas")} por não ser resposta a e-mail enviado daqui.`
+              : undefined,
+          });
+        } else if (lidas) {
+          toast.info(`${plural(lidas, "mensagem nova lida", "mensagens novas lidas")}, nenhuma registrada.`, {
+            description: "Só entra aqui a resposta a um e-mail enviado pelo DoctorSaaS. Propaganda e e-mail escrito do zero ficam de fora.",
+            duration: 9000,
+          });
+        } else {
+          toast.info("Nenhuma mensagem nova nas caixas desde a última leitura.");
+        }
       },
       onError: (err: any) => toast.error(err?.message || "Não foi possível ler as caixas agora."),
     });

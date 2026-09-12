@@ -8,8 +8,8 @@
  */
 import { describe, expect, test } from "bun:test";
 import {
-  acharToken, cortarCitacao, decodificarCabecalho, decodificarQuotedPrintable,
-  ehAutomatico, extrairEndereco, extrairTexto, lerCabecalhos, separarFetch,
+  ClienteImap, acharToken, cortarCitacao, decodificarCabecalho, decodificarQuotedPrintable,
+  ehAutomatico, extrairEndereco, extrairTexto, lerCabecalhos, novosDesde, paraBinario, separarFetch,
 } from "./imap.ts";
 
 const CRLF = "\r\n";
@@ -32,6 +32,57 @@ describe("protocolo", () => {
     const cab = lerCabecalhos(`Subject: Resumo do seu${CRLF} atendimento${CRLF}From: a@b.com${CRLF}${CRLF}corpo`);
     expect(cab["subject"]).toBe("Resumo do seu atendimento");
     expect(cab["from"]).toBe("a@b.com");
+  });
+});
+
+describe("o que o servidor real manda", () => {
+  const bytes = (t: string) => new TextEncoder().encode(t);
+  const bin = (t: string) => paraBinario(bytes(t));
+
+  test("UID depois do literal e acento cru não desalinham a mensagem seguinte", () => {
+    const c1 = `Subject: Não entendi a cobrança${CRLF}From: João <a@b.com>${CRLF}`;
+    const c2 = `Subject: Dois${CRLF}From: c@d.com${CRLF}`;
+    const bruto =
+      `* 7 FETCH (BODY[HEADER.FIELDS (SUBJECT FROM)] {${bytes(c1).length}}${CRLF}${bin(c1)} UID 10107)${CRLF}` +
+      `* 8 FETCH (UID 10108 BODY[HEADER.FIELDS (SUBJECT FROM)] {${bytes(c2).length}}${CRLF}${bin(c2)})${CRLF}` +
+      `a4 OK Success${CRLF}`;
+    const partes = separarFetch(bruto);
+    expect(partes.map((p) => p.uid)).toEqual([10107, 10108]);
+    expect(partes[0].cabecalho).toBe(c1);
+    expect(partes[1].cabecalho).toBe(c2);
+  });
+
+  test("sem mensagem nova o servidor devolve a última de novo, e ela é descartada", () => {
+    expect(novosDesde([{ uid: 10106 }], 10106)).toEqual([]);
+    expect(novosDesde([{ uid: 10106 }, { uid: 10107 }], 10106)).toEqual([{ uid: 10107 }]);
+  });
+
+  test("resposta picada no socket, com linha parecida com a etiqueta dentro do literal", async () => {
+    const conteudo = `Subject: Ação${CRLF}a1 OK isto é conteúdo, não fim${CRLF}${CRLF}corpo`;
+    const resposta = new Uint8Array([
+      ...bytes(`* 1 FETCH (UID 5 BODY[] {${bytes(conteudo).length}}${CRLF}`),
+      ...bytes(conteudo),
+      ...bytes(`)${CRLF}a1 OK FETCH completed${CRLF}`),
+    ]);
+    // corta no meio do "ç" (2 bytes) e deixa a etiqueta falsa em outro pedaço
+    const corte = resposta.indexOf(0xc3);
+    const pedacos = [resposta.subarray(0, corte + 1), resposta.subarray(corte + 1, corte + 20), resposta.subarray(corte + 20)];
+
+    const cliente = new ClienteImap("imap.teste", 993, "ssl") as any;
+    cliente.conn = {
+      write: async (b: Uint8Array) => b.length,
+      read: async (destino: Uint8Array) => {
+        const p = pedacos.shift();
+        if (!p) return null;
+        destino.set(p);
+        return p.length;
+      },
+    };
+
+    const partes = separarFetch(await cliente.comando("UID FETCH 5 (BODY.PEEK[])"));
+    expect(partes).toHaveLength(1);
+    expect(partes[0].uid).toBe(5);
+    expect(partes[0].cabecalho).toBe(conteudo);
   });
 });
 
@@ -103,6 +154,23 @@ describe("corte da citação", () => {
       "> Olá, segue o resumo do atendimento",
     ].join("\n");
     expect(cortarCitacao(texto)).toBe("Pode fechar, resolvido.");
+  });
+
+  test("Gmail quebrando a atribuição dentro do <e-mail> (resposta real de 12/09/2026)", () => {
+    const texto = [
+      "Boa noite,",
+      "",
+      "Muito obrigado pelo retorno.",
+      "",
+      "Em sáb., 12 de set. de 2026, 19:39, Suporte Gula Menu <",
+      "vinicius@digioffice.com.br> escreveu:",
+    ].join("\n");
+    expect(cortarCitacao(texto)).toBe("Boa noite,\n\nMuito obrigado pelo retorno.");
+  });
+
+  test("frase comum começando com Em não é cortada", () => {
+    const texto = "Em breve envio o comprovante.\nObrigado,\nJoão";
+    expect(cortarCitacao(texto)).toBe(texto);
   });
 
   test("citação com > e mensagem original", () => {
