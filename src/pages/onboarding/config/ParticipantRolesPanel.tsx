@@ -266,8 +266,10 @@ export function ParticipantRolesPanel() {
           Papéis aparecem no bloco “Responsável &amp; participantes” da jornada. Os 4 padrões podem ser renomeados, mas não removidos.
         </p>
         <p className="text-xs text-muted-foreground">
-          Ao ligar um papel a um setor, quem receber a jornada por transferência entra com esse papel, conforme o setor da pessoa.
-          Papel sem setor continua só na escolha manual, e cada setor pode ficar com um papel só.
+          O responsável pela jornada entra no papel do setor dele. O papel de um setor é criado sozinho na primeira vez
+          que alguém daquela área recebe uma jornada, e depois é só renomear ou recolorir aqui. Use o seletor de Setor
+          para apontar um papel que já existe para a área certa, como manter “Implantador” no setor de Implantação.
+          Cada setor fica com um papel só, e quem não tem setor no cadastro entra no papel padrão.
         </p>
       </div>
 
