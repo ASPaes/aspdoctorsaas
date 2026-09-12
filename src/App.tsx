@@ -32,6 +32,7 @@ const ResetPassword = lazyWithReload(() => import("@/pages/ResetPassword"));
 const Cadastros = lazyWithReload(() => import("@/pages/Cadastros"));
 const Configuracoes = lazyWithReload(() => import("@/pages/Configuracoes"));
 const CertificadosA1 = lazyWithReload(() => import("@/pages/CertificadosA1"));
+const Emails = lazyWithReload(() => import("@/pages/Emails"));
 const NotFound = lazyWithReload(() => import("@/pages/NotFound"));
 const Onboarding = lazyWithReload(() => import("@/pages/Onboarding"));
 const AccessPending = lazyWithReload(() => import("@/pages/AccessPending"));
@@ -106,6 +107,7 @@ const App = () => (
               <Route path="/clientes/:id" element={<RequirePermission resource="nav.clientes"><ClienteForm /></RequirePermission>} />
               <Route path="/cadastros" element={<Navigate to="/configuracoes?tab=cadastros" replace />} />
               <Route path="/certificados-a1" element={<RequirePermission resource="nav.certificados_a1"><CertificadosA1 /></RequirePermission>} />
+              <Route path="/emails" element={<RequirePermission resource="nav.emails"><Emails /></RequirePermission>} />
               <Route path="/configuracoes" element={<RequirePermission resource="nav.configuracoes"><Configuracoes /></RequirePermission>} />
               <Route path="/configuracoes/notificacoes" element={<RequirePermission resource="nav.configuracoes"><ConfiguracoesNotificacoes /></RequirePermission>} />
               <Route path="/settings/users" element={<Navigate to="/configuracoes?tab=usuarios" replace />} />

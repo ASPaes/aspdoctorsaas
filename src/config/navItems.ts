@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, ShieldCheck, HeadphonesIcon, MessageCircle,
-  TicketCheck, BarChart3, Settings, Headset, Gauge, type LucideIcon,
+  TicketCheck, BarChart3, Settings, Headset, Gauge, Mail, type LucideIcon,
 } from "lucide-react";
 
 export interface NavItem {
@@ -28,6 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
   { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon, resource: "nav.customer_success" },
   // "Implantação" (onboarding) é injetado aqui no AppSidebar via onboardingMenu (gated por useOnboardingAccess).
   { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck, resource: "nav.certificados_a1" },
+  { title: "E-mails", url: "/emails", icon: Mail, resource: "nav.emails" },
   { title: "Painel de Uso", url: "/painel-uso", icon: BarChart3, resource: "nav.painel_uso" },
   { title: "Configurações", url: "/configuracoes", icon: Settings, resource: "nav.configuracoes" },
 ];

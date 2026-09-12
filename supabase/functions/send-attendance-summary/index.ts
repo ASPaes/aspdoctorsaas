@@ -247,6 +247,8 @@ Deno.serve(async (req) => {
       html,
       origem,
       referencia_id: att.id,
+      cliente_id: att.cliente_id,
+      department_id: att.department_id,
       enviado_por: enviadoPor,
     }),
   });

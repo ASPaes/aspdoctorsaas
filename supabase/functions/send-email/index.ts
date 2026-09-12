@@ -128,6 +128,9 @@ Deno.serve(async (req) => {
   const responderPara = typeof body.reply_to === 'string' && body.reply_to.trim() ? body.reply_to.trim() : null;
   const origem = typeof body.origem === 'string' && /^[a-z_]{1,30}$/.test(body.origem) ? body.origem : 'manual';
   const referenciaId = typeof body.referencia_id === 'string' && UUID.test(body.referencia_id) ? body.referencia_id : null;
+  // cliente e setor vêm de quem pediu o envio; a tela de E-mails mostra e filtra por eles
+  const clienteId = typeof body.cliente_id === 'string' && UUID.test(body.cliente_id) ? body.cliente_id : null;
+  const departmentId = typeof body.department_id === 'string' && UUID.test(body.department_id) ? body.department_id : null;
 
   if (para.length === 0) return json(400, { error: 'Informe pelo menos um destinatário.' });
   if (para.length + cc.length > MAX_DESTINATARIOS) {
@@ -212,6 +215,8 @@ Deno.serve(async (req) => {
       assunto,
       origem,
       referencia_id: referenciaId,
+      cliente_id: clienteId,
+      department_id: departmentId,
       status: ok ? 'enviado' : 'erro',
       erro,
       message_id: mensagem.messageId,
