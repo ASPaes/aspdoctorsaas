@@ -35,6 +35,8 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated, defau
   const [clienteBusca, setClienteBusca] = useState<string>("");
   const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
   const [produtoId, setProdutoId] = useState<string>("");
+  /** Produto escolhido na mão. Enquanto for false, o campo acompanha o cliente. */
+  const [produtoEditado, setProdutoEditado] = useState(false);
   const [assunto, setAssunto] = useState<string>("");
   const [dataInicio, setDataInicio] = useState<string>("");
   const [goLive, setGoLive] = useState<string>("");
@@ -58,7 +60,8 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated, defau
   useEffect(() => {
     if (!open) {
       setClienteId(""); setClienteLabel(""); setClienteBusca("");
-      setProdutoId(""); setAssunto(""); setDataInicio(""); setGoLive("");
+      setProdutoId(""); setProdutoEditado(false);
+      setAssunto(""); setDataInicio(""); setGoLive("");
       setGoLiveEdited(false);
       setDemandTypeId(""); setImplantadorUserId("auto"); setPipelineId("");
     }
@@ -154,6 +157,51 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated, defau
       return data ?? [];
     },
   });
+
+  // Produtos vinculados ao cliente escolhido (DEM-0324). A fonte é `cliente_produtos`,
+  // a mesma da aba Produtos da ficha — e não `clientes.produto_id`, que é o campo antigo
+  // de um produto só: no Digi Office ele diverge do vínculo real em 184 dos 1089 clientes
+  // que têm produto ativo. `ativo` recorta o que o cliente tem hoje; produto cancelado
+  // não deve puxar jornada nova.
+  const clienteProdutosQuery = useQuery({
+    queryKey: ["onb-cliente-produtos", tenantId, clienteId],
+    enabled: open && !!tenantId && !!clienteId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("cliente_produtos" as any) as any)
+        .select("produto_id")
+        .eq("tenant_id", tenantId!)
+        .eq("cliente_id", clienteId)
+        .eq("ativo", true);
+      if (error) throw error;
+      // Mesmo produto pode ter mais de uma linha (licença por unidade, por exemplo).
+      return [...new Set((data ?? []).map((r: any) => Number(r.produto_id)))] as number[];
+    },
+  });
+
+  /** Produtos do cliente que existem no catálogo do tenant, com nome para exibir. */
+  const produtosDoCliente = useMemo(() => {
+    const catalogo = new Map<number, string>(
+      (produtosQuery.data ?? []).map((p: any) => [Number(p.id), p.nome as string]),
+    );
+    return (clienteProdutosQuery.data ?? [])
+      .filter((id) => catalogo.has(id))
+      .map((id) => ({ id, nome: catalogo.get(id)! }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  }, [produtosQuery.data, clienteProdutosQuery.data]);
+
+  // Trocou de cliente, o produto volta a ser do cliente novo: manter a escolha anterior
+  // deixaria a jornada com o produto de outro.
+  useEffect(() => {
+    setProdutoId("");
+    setProdutoEditado(false);
+  }, [clienteId]);
+
+  // Um produto só: preenche sozinho. Nenhum ou vários: fica vazio para a pessoa escolher
+  // (ver o grupo "Do cliente" no select).
+  useEffect(() => {
+    if (produtoEditado) return;
+    if (produtosDoCliente.length === 1) setProdutoId(String(produtosDoCliente[0].id));
+  }, [produtosDoCliente, produtoEditado]);
 
   const demandTypesQuery = useQuery({
     queryKey: ["onb-demand-types-lookup", tenantId],
@@ -298,7 +346,9 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated, defau
       const { data, error } = await (supabase.rpc as any)("create_onboarding_journey", {
         p_tenant_id: tenantId,
         p_cliente_id: clienteId,
-        p_produto_id: produtoId,
+        // p_produto_id é bigint na RPC. O select devolve texto desde o preenchimento
+        // automático (DEM-0324), então a conversão passou a ser explícita aqui.
+        p_produto_id: Number(produtoId),
         p_assunto: assunto.trim(),
         p_data_inicio_planejado: dataInicio || null,
         p_go_live_previsto: goLive || null,
@@ -472,16 +522,46 @@ export function NewJourneyModal({ open, onOpenChange, tenantId, onCreated, defau
           </div>
           <div className="space-y-1.5">
             <Label>Produto *</Label>
-            <Select value={produtoId} onValueChange={setProdutoId}>
+            <Select value={produtoId} onValueChange={(v) => { setProdutoId(v); setProdutoEditado(true); }}>
               <SelectTrigger>
                 <SelectValue placeholder={produtosQuery.isLoading ? "Carregando..." : "Selecione o produto"} />
               </SelectTrigger>
               <SelectContent>
-                {(produtosQuery.data ?? []).map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
-                ))}
+                {/* O que o cliente já tem vem primeiro: era por isso que se abria a ficha
+                    do cliente antes de criar a jornada. */}
+                {produtosDoCliente.length > 0 && (
+                  <>
+                    <div className="px-2 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Do cliente
+                    </div>
+                    {produtosDoCliente.map((p) => (
+                      <SelectItem key={`cli-${p.id}`} value={String(p.id)}>{p.nome}</SelectItem>
+                    ))}
+                    <div className="px-2 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Todos
+                    </div>
+                  </>
+                )}
+                {(produtosQuery.data ?? [])
+                  .filter((p: any) => !produtosDoCliente.some((d) => d.id === Number(p.id)))
+                  .map((p: any) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
+                  ))}
               </SelectContent>
             </Select>
+            {clienteId && (
+              <p className="text-xs text-muted-foreground">
+                {clienteProdutosQuery.isFetching || produtosQuery.isLoading
+                  ? "Buscando o produto do cliente..."
+                  : produtosDoCliente.length === 0
+                    ? "Este cliente não tem produto ativo cadastrado."
+                    : produtosDoCliente.length > 1
+                      ? `Este cliente tem ${produtosDoCliente.length} produtos ativos. Escolha qual.`
+                      : produtoEditado
+                        ? `O produto do cliente é ${produtosDoCliente[0].nome}.`
+                        : "Preenchido pelo produto do cliente."}
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>Tipo de demanda</Label>
