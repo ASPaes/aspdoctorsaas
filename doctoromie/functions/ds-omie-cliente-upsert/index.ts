@@ -1,6 +1,25 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // ds-omie-cliente-upsert
 //
+// v16 (12/09/2026): o ECO em omie_clientes parou de gravar a razao social do DS por cima da do Omie.
+//      Achado durante a DEM-0342. No fim de todo envio a funcao faz upsert em omie_clientes -- a
+//      copia local que alimenta o espelho da Conferencia (espelho_snapshot -> razao_social_omie ->
+//      nome_diverge). A razao social desse eco era `cadastroAtual?.razao_social ?? cliente.razao_social`,
+//      e cadastroAtual so existe no ramo encontrado_por_cnpj. No ramo de_para ele e nulo, entao o eco
+//      gravava a razao social DO DS mesmo quando ela NAO tinha ido ao Omie.
+//      CASO MEDIDO: GBJB BAR E ESPETARIA (nCodCli 7708507359), 12/09 02:58. Enviados so cnpj_cpf e
+//      nome_fantasia. A copia passou de "Espetim do Bin" para "GBJB BAR E ESPETARIA LTDA" com
+//      synced_at no instante do envio e data_alteracao ainda em 10/09 -- escrita nossa, nao leitura
+//      do Omie. O Omie em si nao recebeu nada alem da lista; quem mentia era a copia.
+//      Efeito: a Conferencia comparava o DS com o proprio DS e a divergencia real sumia da tela. Em
+//      12/09 eram 133 de 2546 linhas de omie_clientes com a marca do eco (raw ? 'enviado').
+//      Agora a razao social do eco segue esta ordem, da mais confiavel para a menos:
+//        1) o que foi ENVIADO (param.razao_social) -- e o que o Omie passou a ter;
+//        2) o que o Omie devolveu na busca por CNPJ (cadastroAtual) -- e o que ele ja tinha;
+//        3) o que a copia ja guardava -- veio da leitura do Omie, entao continua valendo;
+//        4) so entao o DS, e so para linha que ainda nao existe (sem nada melhor para por la).
+//      Muda o comportamento em um caso so: ramo de_para com campos_alterados sem razao_social.
+//
 // v14 (14/08/2026): o 9 do celular. Unica excecao ao "so preenche lacuna" da v11.
 //      Contexto: ate hoje o DS NUNCA mandou telefone -- o montar_payload_contrato_omie nao
 //      montava telefone1_ddd/telefone1_numero, entao os campos que estao em CAMPOS desde a v9
@@ -506,11 +525,17 @@ Deno.serve(async (req)=>{
       onConflict: "tenant_id,ds_customer_id"
     });
     if (mapErr) console.error("FALHA_DEPARA:", JSON.stringify(mapErr));
+    // v16: razao social do eco na ordem enviado -> Omie -> copia -> DS. Ver cabecalho.
+    let razaoEspelho = param.razao_social ?? cadastroAtual?.razao_social ?? null;
+    if (razaoEspelho == null) {
+      const { data: copiaAtual } = await supa.from("omie_clientes").select("razao_social").eq("tenant_id", tenant_id).eq("codigo_cliente_omie", Number(omie_customer_id)).maybeSingle();
+      razaoEspelho = copiaAtual?.razao_social ?? String(cliente.razao_social);
+    }
     const espelho = {
       tenant_id,
       codigo_cliente_omie: Number(omie_customer_id),
       cnpj_cpf: String(cliente.cnpj_cpf),
-      razao_social: cadastroAtual?.razao_social ?? String(cliente.razao_social),
+      razao_social: razaoEspelho,
       inativo: false,
       raw: {
         enviado: param,
