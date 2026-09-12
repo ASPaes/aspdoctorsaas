@@ -35,6 +35,7 @@ import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { SignatureControl } from "./SignatureControl";
 import { SentimentChip } from "./SentimentChip";
 import { ClimaResolucaoBadge } from "./ClimaResolucaoBadge";
+import { ConversationTags } from "./ConversationTags";
 import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
 import { ConversationMuteButton } from "./ConversationMuteButton";
 import { ConfirmClienteModal } from "./ConfirmClienteModal";
@@ -1082,6 +1083,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             sentiment={sentimentData}
             activeAttendanceId={activeAttendanceId}
           />
+
+          <ConversationTags conversationId={conversation.id} canManage={!!isAdmin} />
         </div>
       </div>
 
