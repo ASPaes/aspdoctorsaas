@@ -64,7 +64,7 @@ export default function EmailsRecebidosTab() {
   }, [buscaDigitada]);
 
   const { contas } = useOpcoesFiltro();
-  const { data, isLoading, isFetching } = useEmailsRecebidos(filtros, pagina);
+  const { data, isLoading } = useEmailsRecebidos(filtros, pagina);
   const { data: caixasLendo = [] } = useEstadoDaLeitura();
   const lixeira = useLixeiraRecebidos();
   const lerAgora = useLerAgora();
@@ -258,7 +258,7 @@ export default function EmailsRecebidosTab() {
           </p>
         </div>
       ) : (
-        <div className={cn("rounded-lg border", isFetching && "opacity-70")}>
+        <div className="rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>

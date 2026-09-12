@@ -34,6 +34,22 @@ export interface FiltrosEnviados {
 
 export const POR_PAGINA = 50;
 
+/**
+ * As listas de e-mail se comportam como caixa de entrada. Quem registra é o robô
+ * no servidor, com a tela aberta ou não; a tela só precisa mostrar o que já está
+ * no banco. O App.tsx guarda consulta por 5 minutos e não recarrega no foco, o
+ * que aqui escondia resposta já registrada. Então: busca ao abrir, a cada minuto
+ * com a tela aberta e ao voltar para a aba do navegador. Aba escondida não
+ * consulta, e o foco busca na volta.
+ */
+export const LISTA_AO_VIVO = {
+  staleTime: 0,
+  refetchOnMount: "always" as const,
+  refetchOnWindowFocus: true,
+  refetchInterval: 60_000,
+  refetchIntervalInBackground: false,
+};
+
 /** o `.or()` do PostgREST quebra com vírgula e parêntese soltos no valor */
 const limpar = (t: string) => t.replace(/[(),*%]/g, " ").trim();
 
@@ -57,6 +73,7 @@ export function useEmailsEnviados(filtros: FiltrosEnviados, pagina: number) {
   return useQuery({
     queryKey: ["emails_enviados", tid, filtros, pagina],
     enabled: !!tid,
+    ...LISTA_AO_VIVO,
     queryFn: async () => {
       const busca = limpar(filtros.busca);
 

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { LISTA_AO_VIVO } from "./useEmailsEnviados";
 
 export interface EmailRecebido {
   id: string;
@@ -57,6 +58,7 @@ export function useEmailsRecebidos(filtros: FiltrosRecebidos, pagina: number) {
   return useQuery({
     queryKey: ["emails_recebidos", tid, filtros, pagina],
     enabled: !!tid,
+    ...LISTA_AO_VIVO,
     queryFn: async () => {
       const busca = limpar(filtros.busca);
 
@@ -105,6 +107,7 @@ export function useEstadoDaLeitura() {
   return useQuery({
     queryKey: ["emails_estado_leitura", tid],
     enabled: !!tid,
+    ...LISTA_AO_VIVO,
     queryFn: async () => {
       const { data: contas, error } = await (supabase.from("email_accounts" as any) as any)
         .select("id, rotulo, email, receber_respostas, ativo")

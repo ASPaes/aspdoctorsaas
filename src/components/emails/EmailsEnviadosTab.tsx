@@ -73,7 +73,7 @@ export default function EmailsEnviadosTab() {
   }, [buscaDigitada]);
 
   const { contas, setores } = useOpcoesFiltro();
-  const { data, isLoading, isFetching } = useEmailsEnviados(filtros, pagina);
+  const { data, isLoading } = useEmailsEnviados(filtros, pagina);
   const lixeira = useLixeiraEnviados();
 
   const linhas = data?.linhas ?? [];
@@ -217,7 +217,7 @@ export default function EmailsEnviadosTab() {
           </p>
         </div>
       ) : (
-        <div className={cn("rounded-lg border", isFetching && "opacity-70")}>
+        <div className="rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
