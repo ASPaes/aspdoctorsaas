@@ -3,6 +3,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -10,7 +11,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, ChevronDown, Loader2, Plug } from "lucide-react";
+import { BookOpen, ChevronDown, ImagePlus, Loader2, PenLine, Plug, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -20,7 +21,9 @@ import { GuiaProvedor } from "./GuiaProvedor";
 import { ProviderLogo } from "./ProviderLogo";
 import { SetoresMultiSelect } from "./SetoresMultiSelect";
 import { AgentMultiSelect } from "@/components/configuracoes/whatsapp/AgentMultiSelect";
-import type { EmailAccount, EmailAccountInput } from "./useEmailAccounts";
+import {
+  useAssinaturaDaConta, type AssinaturaImagem, type EmailAccount, type EmailAccountInput,
+} from "./useEmailAccounts";
 
 interface Props {
   open: boolean;
@@ -62,6 +65,11 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
   const [receberRespostas, setReceberRespostas] = useState(false);
   const [aceitarCliente, setAceitarCliente] = useState(false);
   const [descartarAutomaticos, setDescartarAutomaticos] = useState(true);
+  const [assinaturaTexto, setAssinaturaTexto] = useState("");
+  const [assinaturaImagem, setAssinaturaImagem] = useState<AssinaturaImagem | null>(null);
+  const assinaturaQuery = useAssinaturaDaConta(open ? account?.id ?? null : null);
+  const assinaturaSalva = assinaturaQuery.data;
+  const carregandoAssinatura = !!account && assinaturaQuery.isLoading;
   const [servidoresAbertos, setServidoresAbertos] = useState(true);
   const [guiaAberto, setGuiaAberto] = useState(false);
 
@@ -117,6 +125,48 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
     }
     setServidoresAbertos(true);
   }, [open, account]);
+
+  // a assinatura chega numa consulta à parte: a imagem não viaja na lista de contas
+  useEffect(() => {
+    if (!open) return;
+    setAssinaturaTexto(assinaturaSalva?.texto ?? "");
+    setAssinaturaImagem(assinaturaSalva?.imagem ?? null);
+  }, [open, assinaturaSalva]);
+
+  const escolherImagem = (arquivo: File | undefined) => {
+    if (!arquivo) return;
+    if (!["image/png", "image/jpeg", "image/gif"].includes(arquivo.type)) {
+      toast.error("Use uma imagem PNG, JPG ou GIF.");
+      return;
+    }
+    if (arquivo.size > 500 * 1024) {
+      toast.error("A imagem passa de 500 KB. Exporte uma versão menor e tente de novo.");
+      return;
+    }
+    const leitor = new FileReader();
+    leitor.onload = () => {
+      const dataUrl = String(leitor.result);
+      const img = new Image();
+      img.onload = () => {
+        if (!img.naturalWidth || !img.naturalHeight) {
+          toast.error("Não foi possível ler essa imagem.");
+          return;
+        }
+        // e-mail tem uns 600 px de largura útil: imagem maior é exibida reduzida
+        const largura = Math.min(img.naturalWidth, 600);
+        const altura = Math.max(1, Math.round((img.naturalHeight * largura) / img.naturalWidth));
+        setAssinaturaImagem({ base64: dataUrl.slice(dataUrl.indexOf(",") + 1), mime: arquivo.type, largura, altura });
+      };
+      img.onerror = () => toast.error("Não foi possível ler essa imagem.");
+      img.src = dataUrl;
+    };
+    leitor.readAsDataURL(arquivo);
+  };
+
+  const aoEscolherArquivo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    escolherImagem(e.target.files?.[0]);
+    e.target.value = ""; // deixa escolher o mesmo arquivo de novo depois de remover
+  };
 
   const escolherProvedor = (value: string) => {
     setProvider(value);
@@ -175,6 +225,10 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
         receber_respostas: temEntrada && receberRespostas,
         aceitar_cliente_cadastrado: temEntrada && receberRespostas && aceitarCliente,
         descartar_automaticos: descartarAutomaticos,
+        // assinatura que não carregou fica como está: salvar vazio apagaria a que existe
+        assinatura: carregandoAssinatura || assinaturaQuery.isError
+          ? undefined
+          : { texto: assinaturaTexto.trim() || null, imagem: assinaturaImagem },
         senha,
       });
       toast.success(editando ? "Conta atualizada." : "Conta cadastrada.");
@@ -382,6 +436,120 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
               </div>
             </CollapsibleContent>
           </Collapsible>
+
+          {/* Assinatura: vai no fim de todo e-mail que sair por esta conta */}
+          <section className="space-y-3 rounded-md border p-3">
+            <div className="space-y-0.5">
+              <p className="flex items-center gap-1.5 text-sm font-medium">
+                <PenLine className="h-4 w-4 text-muted-foreground" />
+                Assinatura
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Vai no final de todo e-mail enviado por esta conta, como no Gmail. Pode ser texto, imagem ou os dois; com
+                os dois, a imagem fica embaixo do texto. Deixe vazio para enviar sem assinatura.
+              </p>
+            </div>
+
+            {assinaturaQuery.isError ? (
+              <p className="text-xs text-destructive">
+                Não foi possível carregar a assinatura desta conta. O resto do cadastro pode ser salvo normalmente, e a
+                assinatura que já existir continua valendo.
+              </p>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="assinatura-texto">Texto</Label>
+                  <Textarea
+                    id="assinatura-texto"
+                    rows={4}
+                    maxLength={2000}
+                    value={assinaturaTexto}
+                    onChange={(e) => setAssinaturaTexto(e.target.value)}
+                    placeholder={"Maria Souza\nSuporte · Sua Empresa\n(11) 3000-0000 · www.suaempresa.com.br"}
+                    disabled={carregandoAssinatura}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Cada linha fica como você digitou. Endereço de site e de e-mail vira link.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Imagem</Label>
+                  {assinaturaImagem ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
+                      <span className="text-xs text-muted-foreground">
+                        Imagem de {assinaturaImagem.largura} × {assinaturaImagem.altura} px
+                      </span>
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" size="sm" className="h-8" asChild>
+                          <label className="cursor-pointer">
+                            <ImagePlus className="mr-1.5 h-3.5 w-3.5" />
+                            Trocar
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/gif"
+                              className="sr-only"
+                              onChange={aoEscolherArquivo}
+                            />
+                          </label>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                          onClick={() => setAssinaturaImagem(null)}
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          Remover
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label
+                      className={cn(
+                        "flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed px-3 py-4 text-sm text-muted-foreground transition-colors hover:bg-muted/40",
+                        carregandoAssinatura && "pointer-events-none opacity-60",
+                      )}
+                    >
+                      <ImagePlus className="h-4 w-4" />
+                      Escolher imagem da assinatura
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/gif"
+                        className="sr-only"
+                        onChange={aoEscolherArquivo}
+                      />
+                    </label>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    PNG, JPG ou GIF, até 500 KB. A imagem vai dentro do próprio e-mail, não como link para fora, e por
+                    isso aparece sem o cliente precisar liberar imagens.
+                  </p>
+                </div>
+
+                {(assinaturaTexto.trim() || assinaturaImagem) && (
+                  <div className="space-y-1.5">
+                    <Label>Como vai aparecer no e-mail</Label>
+                    <div className="rounded-md border bg-white px-4 py-3 text-[13px] leading-relaxed text-slate-700">
+                      <p className="italic text-slate-400">Texto do e-mail…</p>
+                      <div className="mt-5">
+                        {assinaturaTexto.trim() && <p className="whitespace-pre-line">{assinaturaTexto.trim()}</p>}
+                        {assinaturaImagem && (
+                          <img
+                            src={`data:${assinaturaImagem.mime};base64,${assinaturaImagem.base64}`}
+                            alt="Imagem da assinatura"
+                            width={assinaturaImagem.largura}
+                            className={cn("block h-auto max-w-full", assinaturaTexto.trim() && "mt-2.5")}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
 
           {/* Recebimento: só faz sentido quando a entrada (IMAP) está preenchida */}
           <section className="space-y-2 rounded-md border p-3">

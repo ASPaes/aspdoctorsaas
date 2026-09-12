@@ -93,6 +93,8 @@ export interface MensagemEntrada {
   assunto: string;
   html?: string | null;
   texto?: string | null;
+  /** imagens referenciadas no HTML por cid: (hoje, só a da assinatura) */
+  embutidas?: { cid: string; mime: string; nome: string; base64: string }[];
   agora?: Date;
 }
 
@@ -136,7 +138,7 @@ export function montarMensagem(m: MensagemEntrada): MensagemMontada {
       "",
       b64Corpo(html),
     ].join("\r\n");
-    corpo = [
+    const alternativa = [
       `Content-Type: multipart/alternative; boundary="${fronteira}"`,
       "",
       `--${fronteira}`,
@@ -145,6 +147,29 @@ export function montarMensagem(m: MensagemEntrada): MensagemMontada {
       parteHtml,
       `--${fronteira}--`,
     ];
+    if (m.embutidas && m.embutidas.length) {
+      // imagem que o HTML chama por cid: (a da assinatura) vai num multipart/related
+      // por fora da alternativa; é isso que faz ela aparecer no corpo sem virar anexo
+      const relacionada = `=_dsr_${crypto.randomUUID().replace(/-/g, "")}`;
+      corpo = [
+        `Content-Type: multipart/related; type="multipart/alternative"; boundary="${relacionada}"`,
+        "",
+        `--${relacionada}`,
+        ...alternativa,
+        ...m.embutidas.flatMap((e) => [
+          `--${relacionada}`,
+          `Content-Type: ${e.mime}; name="${e.nome}"`,
+          "Content-Transfer-Encoding: base64",
+          `Content-ID: <${e.cid}>`,
+          `Content-Disposition: inline; filename="${e.nome}"`,
+          "",
+          (e.base64.replace(/\s+/g, "").match(/.{1,76}/g) ?? [""]).join("\r\n"),
+        ]),
+        `--${relacionada}--`,
+      ];
+    } else {
+      corpo = alternativa;
+    }
   } else {
     corpo = [parteTexto];
   }

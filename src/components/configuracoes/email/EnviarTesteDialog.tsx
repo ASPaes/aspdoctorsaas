@@ -93,7 +93,8 @@ export function EnviarTesteDialog({
             placeholder="voce@suaempresa.com.br"
           />
           <p className="text-xs text-muted-foreground">
-            Se não aparecer em alguns minutos, olhe a pasta de spam antes de concluir que falhou.
+            Se não aparecer em alguns minutos, olhe a pasta de spam antes de concluir que falhou. A assinatura da conta,
+            se houver, vai no final.
           </p>
         </div>
 

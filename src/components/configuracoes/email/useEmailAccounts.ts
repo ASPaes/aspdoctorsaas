@@ -63,8 +63,23 @@ export interface EmailAccountInput {
   receber_respostas: boolean;
   aceitar_cliente_cadastrado: boolean;
   descartar_automaticos: boolean;
+  /** undefined = não mexe na assinatura (quem salva sem a tela dela, como "usar recomendados") */
+  assinatura?: AssinaturaConta;
   /** vazio em edição = mantém a senha que já está no Vault */
   senha: string;
+}
+
+export interface AssinaturaImagem {
+  base64: string;
+  mime: string;
+  /** já limitada a 600 px, com a altura proporcional */
+  largura: number;
+  altura: number;
+}
+
+export interface AssinaturaConta {
+  texto: string | null;
+  imagem: AssinaturaImagem | null;
 }
 
 interface Setor {
@@ -174,6 +189,31 @@ export function useEmailAccounts() {
         .eq("id", data as string);
       if (erroLeitura) throw erroLeitura;
 
+      // assinatura vazia é linha apagada; a tabela recusa linha sem conteúdo
+      if (input.assinatura !== undefined) {
+        const { texto, imagem } = input.assinatura;
+        const tabela = () => supabase.from("email_account_assinaturas" as any) as any;
+        const { error: erroAssinatura } = !texto && !imagem
+          ? await tabela().delete().eq("account_id", data as string)
+          : await tabela().upsert(
+              {
+                account_id: data as string,
+                tenant_id: tid,
+                texto,
+                imagem_base64: imagem?.base64 ?? null,
+                imagem_mime: imagem?.mime ?? null,
+                imagem_largura: imagem?.largura ?? null,
+                imagem_altura: imagem?.altura ?? null,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "account_id" },
+            );
+        if (erroAssinatura) {
+          throw new Error(`A conta foi salva, mas a assinatura não: ${erroAssinatura.message}`);
+        }
+        queryClient.invalidateQueries({ queryKey: ["email_account_assinatura", data] });
+      }
+
       return data as string;
     },
     onSuccess: invalidate,
@@ -268,4 +308,28 @@ async function mensagemDoErro(error: any): Promise<string> {
     // corpo não era JSON
   }
   return error?.message || "Falha ao falar com o servidor.";
+}
+
+/** assinatura de uma conta; fica fora da lista de contas porque a imagem pesa */
+export function useAssinaturaDaConta(accountId: string | null) {
+  return useQuery({
+    queryKey: ["email_account_assinatura", accountId],
+    enabled: !!accountId,
+    staleTime: 0,
+    retry: false,
+    queryFn: async (): Promise<AssinaturaConta | null> => {
+      const { data, error } = await (supabase.from("email_account_assinaturas" as any) as any)
+        .select("texto, imagem_base64, imagem_mime, imagem_largura, imagem_altura")
+        .eq("account_id", accountId)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      return {
+        texto: data.texto,
+        imagem: data.imagem_base64
+          ? { base64: data.imagem_base64, mime: data.imagem_mime, largura: data.imagem_largura, altura: data.imagem_altura }
+          : null,
+      };
+    },
+  });
 }

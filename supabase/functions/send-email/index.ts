@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { enviarSmtp, mensagemAmigavel, type EmailSecurity } from '../test-email-account/smtp.ts';
 import { enderecoValido, montarMensagem, semQuebra } from './mime.ts';
+import { aplicarAssinatura, montarAssinatura } from './assinatura.ts';
 
 /**
  * Porta única de saída de e-mail do DoctorSaaS.
@@ -13,6 +14,7 @@ import { enderecoValido, montarMensagem, semQuebra } from './mime.ts';
  *     Chave no formato novo (sb_secret_…) não é JWT e o gateway recusa.
  *
  * Conta: a pedida em `account_id`, ou a padrão de envio do tenant.
+ * Assinatura da conta (`email_account_assinaturas`) entra no fim de todo e-mail.
  * Cada tentativa vira uma linha em `email_envios`, com ou sem sucesso.
  * O corpo da mensagem não é guardado em lugar nenhum.
  *
@@ -180,6 +182,17 @@ Deno.serve(async (req) => {
     return json(409, { error: 'A senha desta conta não está no cofre. Edite a conta e digite a senha de novo.' });
   }
 
+  // ── assinatura da conta ──
+  // Falha na leitura (tabela ainda não criada, por exemplo) envia sem assinatura:
+  // assinatura nunca pode ser o motivo de um e-mail deixar de sair.
+  const { data: assinaturaSalva, error: assinaturaErr } = await supabase
+    .from('email_account_assinaturas')
+    .select('texto, imagem_base64, imagem_mime, imagem_largura, imagem_altura')
+    .eq('account_id', conta.id)
+    .maybeSingle();
+  if (assinaturaErr) console.error(`[send-email] assinatura de ${conta.email} não lida: ${assinaturaErr.message}`);
+  const corpo = aplicarAssinatura({ html, texto }, montarAssinatura(assinaturaSalva));
+
   // ── envio ──
   // a resposta volta pelo endereço com sufixo; a marca no assunto é o plano B,
   // para provedor que não entrega sufixo e para quem responde de outro jeito
@@ -191,8 +204,9 @@ Deno.serve(async (req) => {
     cc,
     responderPara: responderPara ?? `${contaLocal}+${replyToken}@${contaDominio}`,
     assunto: `${assunto} [#${replyToken}]`,
-    html,
-    texto,
+    html: corpo.html,
+    texto: corpo.texto,
+    embutidas: corpo.embutidas,
   });
 
   let ok = false;
