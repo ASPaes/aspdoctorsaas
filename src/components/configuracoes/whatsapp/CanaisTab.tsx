@@ -6,7 +6,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { InstanceSetupCollapsible } from "./InstanceSetupCollapsible";
 import { InstancesList } from "./InstancesList";
 import { AddInstanceDialog } from "./AddInstanceDialog";
-import EmailAccountsTab from "@/components/configuracoes/email/EmailAccountsTab";
+import EmailCanalTab from "@/components/configuracoes/email/EmailCanalTab";
 
 /**
  * Canais: por onde a operação fala com o cliente.
@@ -42,7 +42,7 @@ export default function CanaisTab({ abaInicial = "whatsapp" }: { abaInicial?: "w
 
       {mostrarEmail && (
         <TabsContent value="email" className="mt-4">
-          <EmailAccountsTab />
+          <EmailCanalTab />
         </TabsContent>
       )}
 
