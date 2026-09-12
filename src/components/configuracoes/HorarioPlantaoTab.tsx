@@ -65,6 +65,30 @@ function useConfigRow() {
   });
 }
 
+// ─── Hook: intervalo entre avisos de fora do horário (DEM-0400) ──
+// Fora do select do useConfigRow de propósito: se a coluna ainda não existir no banco,
+// só esta query falha e o campo some. No select principal, derrubaria a aba inteira.
+// A chave começa com "configuracoes-horario" para o useSectionSave invalidar junto.
+const NOTICE_COOLDOWN_MAX = 720;
+
+function useNoticeCooldown() {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  return useQuery({
+    queryKey: ["configuracoes-horario", tid, "notice-cooldown"],
+    enabled: !!tid,
+    staleTime: 30_000,
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("configuracoes") as any)
+        .select("business_hours_notice_cooldown_minutes")
+        .eq("tenant_id", tid!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.business_hours_notice_cooldown_minutes as number | null) ?? 5;
+    },
+  });
+}
+
 // ─── Mutation helper ─────────────────────────────────────────────
 function useSectionSave(sectionLabel: string) {
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -109,6 +133,11 @@ export default function HorarioPlantaoTab() {
   });
   const [bhMessage, setBhMessage] = useState("");
   const [bhOutsidePrompt, setBhOutsidePrompt] = useState("");
+  const noticeCooldownQ = useNoticeCooldown();
+  const [bhNoticeCooldown, setBhNoticeCooldown] = useState<number | "">(5);
+  useEffect(() => {
+    if (noticeCooldownQ.data != null) setBhNoticeCooldown(noticeCooldownQ.data);
+  }, [noticeCooldownQ.data]);
   const [deptSlaMin, setDeptSlaMin] = useState<number | "">("");
   const [savingSla, setSavingSla] = useState(false);
 
@@ -259,12 +288,26 @@ export default function HorarioPlantaoTab() {
     const cleaned = cleanSchedule(bhSchedule);
 
     if (selectedContext === "global") {
+      // Só manda o intervalo se a coluna foi lida: sem ela no banco, o update inteiro falharia.
+      const sendCooldown = noticeCooldownQ.isSuccess;
+      if (sendCooldown) {
+        const n = Number(bhNoticeCooldown);
+        if (bhNoticeCooldown === "" || !Number.isInteger(n) || n < 1 || n > NOTICE_COOLDOWN_MAX) {
+          toast({
+            title: "Erro de validação",
+            description: `Intervalo entre avisos deve ser um número inteiro de 1 a ${NOTICE_COOLDOWN_MAX} minutos.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
       saveBH.mutate({
         business_hours_enabled: bhEnabled,
         business_hours_timezone: bhTimezone,
         business_hours: cleaned,
         business_hours_message: bhMessage || null,
         business_hours_outside_prompt: bhOutsidePrompt || null,
+        ...(sendCooldown ? { business_hours_notice_cooldown_minutes: Number(bhNoticeCooldown) } : {}),
       });
     } else {
       // Save to department
@@ -474,6 +517,27 @@ export default function HorarioPlantaoTab() {
                     Placeholders disponíveis: <code className="text-xs">{"{{start}}"}</code> e <code className="text-xs">{"{{end}}"}</code>
                   </p>
                 </div>
+
+                {/* Intervalo entre avisos (DEM-0400): vale para a empresa inteira */}
+                {selectedContext === "global" && noticeCooldownQ.isSuccess && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="bh-notice-cooldown">Intervalo entre avisos (minutos)</Label>
+                    <Input
+                      id="bh-notice-cooldown"
+                      type="number"
+                      min={1}
+                      max={NOTICE_COOLDOWN_MAX}
+                      step={1}
+                      value={bhNoticeCooldown}
+                      onChange={(e) => setBhNoticeCooldown(e.target.value === "" ? "" : Number(e.target.value))}
+                      className="w-36"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Se o cliente mandar várias mensagens fora do horário, o aviso só se repete depois desse tempo.
+                      Padrão: 5 minutos. Máximo: {NOTICE_COOLDOWN_MAX} (12 horas). Vale para todos os setores.
+                    </p>
+                  </div>
+                )}
 
                 {/* Outside hours AI prompt (only global) */}
                 {selectedContext === "global" && (

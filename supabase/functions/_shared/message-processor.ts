@@ -1117,6 +1117,40 @@ export function decideOffHoursMessageMode(params: {
   return count >= OFF_HOURS_TEMPLATE_LIMIT ? 'ai' : 'template';
 }
 
+/** DEM-0400: intervalo entre avisos de fora do horário, escolhido pelo tenant. */
+export const OFF_HOURS_NOTICE_COOLDOWN_DEFAULT = 5;
+/** Acima de 12h o aviso de uma noite bloquearia o da noite seguinte. */
+export const OFF_HOURS_NOTICE_COOLDOWN_MAX = 720;
+
+/** Valor do banco → minutos válidos. Vazio ou lixo volta ao padrão; fora da faixa é travado. */
+export function resolveOffHoursNoticeCooldown(raw: unknown): number {
+  if (raw === null || raw === undefined || raw === '') return OFF_HOURS_NOTICE_COOLDOWN_DEFAULT;
+  const n = typeof raw === 'string' ? Number(raw) : raw;
+  if (typeof n !== 'number' || !Number.isFinite(n)) return OFF_HOURS_NOTICE_COOLDOWN_DEFAULT;
+  return Math.min(OFF_HOURS_NOTICE_COOLDOWN_MAX, Math.max(1, Math.round(n)));
+}
+
+// Lido à parte, e não pelo getSupportConfig: aquele é um select único, e uma coluna
+// que ainda não exista no banco derrubaria o horário de TODOS os tenants. Aqui a falha
+// só devolve os 5 minutos de antes. Só roda quando o aviso vai de fato ser disputado.
+async function getOffHoursNoticeCooldown(supabase: any, tenantId: string): Promise<number> {
+  try {
+    const { data, error } = await supabase
+      .from('configuracoes')
+      .select('business_hours_notice_cooldown_minutes')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (error) {
+      console.error('[processor] getOffHoursNoticeCooldown error:', error.message);
+      return OFF_HOURS_NOTICE_COOLDOWN_DEFAULT;
+    }
+    return resolveOffHoursNoticeCooldown(data?.business_hours_notice_cooldown_minutes);
+  } catch (err) {
+    console.error('[processor] getOffHoursNoticeCooldown unexpected:', err);
+    return OFF_HOURS_NOTICE_COOLDOWN_DEFAULT;
+  }
+}
+
 /** Piso da janela de contagem: um dia. Cobre a noite inteira e zera no dia seguinte. */
 const OFF_HOURS_NOTICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -1337,10 +1371,12 @@ export async function checkBusinessHours(supabase: any, ctx: SendContext, conver
     const { data: activeAttBH } = await supabase.from('support_attendances').select('id').eq('conversation_id', conversationId).eq('status', 'in_progress').limit(1).maybeSingle();
     if (!convBH?.out_of_hours_cleared_at && !convBH?.first_agent_message_at && !activeAttBH) {
       // Cooldown atômico: try_claim_off_hours_notice retorna true só para UMA execução
-      // dentro da janela de 5min, evitando race condition em rajada de mensagens.
+      // dentro do intervalo do tenant (DEM-0400, padrão 5min), evitando aviso repetido
+      // e race condition em rajada de mensagens.
+      const cooldownMinutes = await getOffHoursNoticeCooldown(supabase, tenantId);
       const { data: claimed, error: claimErr } = await supabase.rpc('try_claim_off_hours_notice', {
         p_conversation_id: conversationId,
-        p_cooldown_minutes: 5,
+        p_cooldown_minutes: cooldownMinutes,
       });
       if (claimErr) {
         console.error('[checkBusinessHours] try_claim_off_hours_notice error:', claimErr.message);

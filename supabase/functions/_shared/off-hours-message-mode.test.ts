@@ -12,6 +12,9 @@ import {
   decideOffHoursMessageMode,
   offHoursNoticeWindowStart,
   OFF_HOURS_TEMPLATE_LIMIT,
+  resolveOffHoursNoticeCooldown,
+  OFF_HOURS_NOTICE_COOLDOWN_DEFAULT,
+  OFF_HOURS_NOTICE_COOLDOWN_MAX,
 } from "./message-processor.ts";
 
 describe("decideOffHoursMessageMode", () => {
@@ -112,5 +115,41 @@ describe("offHoursNoticeWindowStart", () => {
   it("a noite inteira cabe na janela — 18h às 08h não zera o contador", () => {
     const start = offHoursNoticeWindowStart({ opened_out_of_hours_at: h(14) }, now);
     expect(start.toISOString()).toBe(h(14));
+  });
+});
+
+// DEM-0400: intervalo entre avisos escolhido pelo tenant (antes, 5 min fixo).
+// Tenant de madrugada (DELVALE) recebia aviso repetido a cada 5 min de insistência.
+describe("resolveOffHoursNoticeCooldown", () => {
+  it("sem valor, mantém os 5 minutos de antes", () => {
+    expect(OFF_HOURS_NOTICE_COOLDOWN_DEFAULT).toBe(5);
+    expect(resolveOffHoursNoticeCooldown(null)).toBe(5);
+    expect(resolveOffHoursNoticeCooldown(undefined)).toBe(5);
+    expect(resolveOffHoursNoticeCooldown("")).toBe(5);
+  });
+
+  it("usa o valor do tenant", () => {
+    expect(resolveOffHoursNoticeCooldown(60)).toBe(60);
+    expect(resolveOffHoursNoticeCooldown("30")).toBe(30);
+  });
+
+  it("lixo volta ao padrão, não vira NaN no intervalo da RPC", () => {
+    expect(resolveOffHoursNoticeCooldown("abc")).toBe(5);
+    expect(resolveOffHoursNoticeCooldown(NaN)).toBe(5);
+    expect(resolveOffHoursNoticeCooldown({})).toBe(5);
+  });
+
+  it("zero ou negativo vira 1: nunca desliga o intervalo", () => {
+    expect(resolveOffHoursNoticeCooldown(0)).toBe(1);
+    expect(resolveOffHoursNoticeCooldown(-10)).toBe(1);
+  });
+
+  it("acima do teto trava em 12h, para não calar a noite seguinte", () => {
+    expect(OFF_HOURS_NOTICE_COOLDOWN_MAX).toBe(720);
+    expect(resolveOffHoursNoticeCooldown(5000)).toBe(720);
+  });
+
+  it("fração arredonda para minuto inteiro", () => {
+    expect(resolveOffHoursNoticeCooldown(7.6)).toBe(8);
   });
 });
