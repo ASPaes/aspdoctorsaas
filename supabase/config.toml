@@ -311,3 +311,9 @@ verify_jwt = true
 # dispatch-scheduled-messages, que ja passam por este portao.
 [functions.schedule-reminder]
 verify_jwt = true
+
+# Resumo do atendimento por e-mail. verify_jwt = TRUE: chamada pela
+# finalize-attendance com o JWT do service_role e, no envio manual, pela tela
+# com a sessão do usuário. A function confere papel e tenant por dentro.
+[functions.send-attendance-summary]
+verify_jwt = true

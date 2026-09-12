@@ -286,6 +286,7 @@ Retorne APENAS JSON válido sem markdown:
   "resolucao": "resolvido|parcial|nao_resolvido",
   "topics": ["topico1"],
   "summary": "Resumo curto (máx 80 palavras)",
+  "customer_summary": "Resumo FALANDO COM O CLIENTE, pronto para enviar por e-mail",
   "title": "Título curto para KB (máx 80 chars)",
   "problem": "Problema/dúvida do cliente (máx 80 palavras)",
   "solution": "Como o técnico resolveu (máx 80 palavras)",
@@ -299,6 +300,7 @@ REGRAS:
 
 - "problem": apenas o relato inicial do cliente
 - "solution": orientação do técnico, forma instrucional
+- "customer_summary": até 90 palavras EM SEGUNDA PESSOA, falando com o cliente ("você relatou", "corrigimos"). Comece pelo que ele pediu, diga o que foi feito e como ficou. Sem jargão interno, sem nome de sistema interno, sem saudação e sem despedida (o e-mail já tem). Se ficou pendência, diga qual em uma frase.
 - "tags": máximo 5, palavras curtas (1-2 termos)
 - "topics": máximo 5
 - "suggested_area": escolha entre as áreas disponíveis ou null`;
@@ -316,13 +318,14 @@ REGRAS:
               resolucao: { type: "string", enum: ["resolvido", "parcial", "nao_resolvido"] },
               topics: { type: "array", items: { type: "string" } },
               summary: { type: "string" },
+              customer_summary: { type: "string" },
               title: { type: "string" },
               problem: { type: "string" },
               solution: { type: "string" },
               tags: { type: "array", items: { type: "string" } },
               suggested_area: { type: "string" },
             },
-            required: ["sentiment_score", "resolucao", "summary", "title", "problem", "solution"],
+            required: ["sentiment_score", "resolucao", "summary", "title", "problem", "solution", "customer_summary"],
           },
         },
       },
@@ -389,6 +392,7 @@ REGRAS:
       .from("support_attendances")
       .update({
         ai_summary: (result.summary || "").substring(0, 500),
+        ai_customer_summary: (result.customer_summary || "").substring(0, 1500),
         ai_problem: (result.problem || "").substring(0, 1000),
         ai_solution: (result.solution || "").substring(0, 1000),
         ai_tags: (result.tags || []).slice(0, 5),
@@ -474,6 +478,28 @@ REGRAS:
       console.log(`[${FUNCTION_NAME}][${requestId}] Sucesso — KB draft criado, sentimento=${sentimentValue}`);
     } else {
       console.log(`[${FUNCTION_NAME}][${requestId}] Sucesso — sentimento gravado (KB já existia), sentimento=${sentimentValue}`);
+    }
+
+    // Resumo por e-mail para o cliente. Quem decide se envia é a
+    // send-attendance-summary: ela olha o parâmetro do tenant, escolhe a conta
+    // e registra o motivo quando não envia. Falha aqui nunca derruba o
+    // encerramento, que já está gravado neste ponto.
+    try {
+      const envioResumo = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-attendance-summary`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ attendance_id: attendanceId, respeitar_parametro: true, origem: "chat_close" }),
+      });
+      const resumo = await envioResumo.json().catch(() => ({}));
+      console.log(
+        `[${FUNCTION_NAME}][${requestId}] resumo por e-mail: ` +
+          (resumo?.enviado ? `enviado para ${resumo.para}` : `nao enviado (${resumo?.motivo ?? "sem motivo"})`),
+      );
+    } catch (mailErr) {
+      console.error(`[${FUNCTION_NAME}][${requestId}] falha ao chamar send-attendance-summary:`, mailErr);
     }
 
     return new Response(

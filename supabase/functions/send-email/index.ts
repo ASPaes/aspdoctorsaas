@@ -78,7 +78,8 @@ Deno.serve(async (req) => {
   let tenantId: string;
   let enviadoPor: string | null = null;
 
-  if (papelDoToken(token) === 'service_role') {
+  // chave de service_role em formato novo (sb_secret_…) não é JWT: compara direto
+  if (papelDoToken(token) === 'service_role' || token === serviceKey) {
     if (typeof body.tenant_id !== 'string' || !UUID.test(body.tenant_id)) {
       return json(400, { error: 'Chamada interna precisa informar tenant_id.' });
     }
