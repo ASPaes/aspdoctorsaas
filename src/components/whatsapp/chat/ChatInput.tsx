@@ -19,8 +19,9 @@ import { SmartReplySuggestions } from "./input/SmartReplySuggestions";
 import { ReplyPreview } from "./input/ReplyPreview";
 import { AttachmentChip } from "./input/AttachmentChip";
 import { MediaSendPreviewDialog } from "./input/MediaSendPreviewDialog";
-import { useWhatsAppMacros, macroAnexos, macroVisibleForDepartment, type MacroAnexo } from "../hooks/useWhatsAppMacros";
+import { useWhatsAppMacros, macroAnexos, macroVisibleForDepartment, macroDepartmentId, type MacroAnexo } from "../hooks/useWhatsAppMacros";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { useMacroTags } from "../hooks/useMacroTags";
 import { useSmartReply } from "../hooks/useSmartReply";
 import { useWhatsAppSend } from "../hooks/useWhatsAppSend";
@@ -345,10 +346,16 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   }, [contactName, agentName]);
 
   const { macros, incrementUsage } = useWhatsAppMacros();
-  // Macro pode ser restrita a setores. Quem sugere é o setor de QUEM atende
-  // (funcionarios.department_id), não o da conversa: a conversa perde o setor
-  // no fechamento e nasce sem setor até a distribuição rodar.
+  // Macro pode ser restrita a setores. Quem manda é o setor de QUEM atende, nunca
+  // o da conversa: a conversa perde o setor no fechamento e nasce sem setor até a
+  // distribuição rodar.
+  // Admin e head trocam de setor no seletor da lista de conversas, e a lista de
+  // macros acompanha essa escolha ("Todos os setores" volta a mostrar tudo).
+  // Operador não tem o seletor: continua preso ao setor do cadastro
+  // (funcionarios.department_id).
   const { data: userDepartmentId } = useUserDepartment();
+  const { selectedDepartmentId, canSeeAllDepartments } = useDepartmentFilter();
+  const macroDeptId = macroDepartmentId({ canSeeAllDepartments, selectedDepartmentId, userDepartmentId });
   const { detectTags } = useMacroTags();
   const { suggestions, isLoading: isLoadingSmartReplies, isRefreshing, refresh, error: smartReplyError } = useSmartReply(conversationId);
 
@@ -371,7 +378,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       const searchTerm = (match[1] || "").toLowerCase();
       const filtered = macros.filter(m =>
         m.is_active !== false &&
-        macroVisibleForDepartment(m, userDepartmentId) && (
+        macroVisibleForDepartment(m, macroDeptId) && (
           searchTerm === "" ||
           (m.shortcut?.toLowerCase().includes(searchTerm)) ||
           m.title.toLowerCase().includes(searchTerm)
@@ -383,7 +390,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       setShowMacroSuggestions(false);
       setFilteredMacros([]);
     }
-  }, [message, macros, userDepartmentId]);
+  }, [message, macros, macroDeptId]);
 
   useEffect(() => {
     setMacroSelectedIndex(0);

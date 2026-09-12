@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { macroVisibleForDepartment } from "./useWhatsAppMacros";
+import { macroVisibleForDepartment, macroDepartmentId } from "./useWhatsAppMacros";
 
 const IMPLANTACAO = "11111111-1111-1111-1111-111111111111";
 const COMERCIAL = "22222222-2222-2222-2222-222222222222";
@@ -29,5 +29,45 @@ describe("macroVisibleForDepartment", () => {
     // esconderia macro de gente que precisa enxergar a operação inteira.
     expect(macroVisibleForDepartment({ department_ids: [IMPLANTACAO] }, null)).toBe(true);
     expect(macroVisibleForDepartment({ department_ids: [IMPLANTACAO] }, undefined)).toBe(true);
+  });
+});
+
+describe("macroDepartmentId", () => {
+  it("admin/head seguem o setor escolhido no seletor do chat", () => {
+    expect(macroDepartmentId({
+      canSeeAllDepartments: true,
+      selectedDepartmentId: COMERCIAL,
+      userDepartmentId: IMPLANTACAO,
+    })).toBe(COMERCIAL);
+  });
+
+  it("'Todos os setores' volta a mostrar tudo, mesmo com setor no cadastro", () => {
+    // null aqui é o que faz macroVisibleForDepartment liberar a lista inteira.
+    expect(macroDepartmentId({
+      canSeeAllDepartments: true,
+      selectedDepartmentId: null,
+      userDepartmentId: IMPLANTACAO,
+    })).toBeNull();
+  });
+
+  it("operador ignora o seletor e fica no setor do cadastro", () => {
+    expect(macroDepartmentId({
+      canSeeAllDepartments: false,
+      selectedDepartmentId: COMERCIAL,
+      userDepartmentId: IMPLANTACAO,
+    })).toBe(IMPLANTACAO);
+  });
+
+  it("undefined vira null (setor ainda carregando)", () => {
+    expect(macroDepartmentId({
+      canSeeAllDepartments: true,
+      selectedDepartmentId: undefined,
+      userDepartmentId: undefined,
+    })).toBeNull();
+    expect(macroDepartmentId({
+      canSeeAllDepartments: false,
+      selectedDepartmentId: COMERCIAL,
+      userDepartmentId: undefined,
+    })).toBeNull();
   });
 });

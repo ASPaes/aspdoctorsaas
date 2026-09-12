@@ -75,6 +75,23 @@ export function macroVisibleForDepartment(
   return ids.includes(departmentId);
 }
 
+/**
+ * Setor que manda na lista de macros do chat.
+ *
+ * Quem tem o seletor de setor na tela (admin, head e super admin) vê a lista
+ * acompanhar a escolha: "Todos os setores" (null) mostra tudo, e um setor
+ * específico mostra só as macros daquele setor. Operador, que não tem o
+ * seletor, continua preso ao setor do cadastro (funcionarios.department_id).
+ */
+export function macroDepartmentId(params: {
+  canSeeAllDepartments: boolean;
+  selectedDepartmentId: string | null | undefined;
+  userDepartmentId: string | null | undefined;
+}): string | null {
+  const { canSeeAllDepartments, selectedDepartmentId, userDepartmentId } = params;
+  return (canSeeAllDepartments ? selectedDepartmentId : userDepartmentId) ?? null;
+}
+
 export const useWhatsAppMacros = (instanceId?: string) => {
   const queryClient = useQueryClient();
   const { effectiveTenantId } = useTenantFilter();
