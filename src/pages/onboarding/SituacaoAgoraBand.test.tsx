@@ -4,8 +4,8 @@ import { createRoot, type Root } from "react-dom/client";
 import SituacaoAgoraBand from "./SituacaoAgoraBand";
 import { contarSituacao } from "./dashMetrics";
 
-/** A faixa só conta situação — não precisa da jornada inteira. */
-type JourneyLite = { journey_id: string; situacao: string };
+/** A faixa só conta situação e data de abertura — não precisa da jornada inteira. */
+type JourneyLite = { journey_id: string; situacao: string; aberta_em: string | null };
 
 /**
  * Sem @testing-library/react: o peer @testing-library/dom não está instalado no
@@ -14,7 +14,7 @@ type JourneyLite = { journey_id: string; situacao: string };
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 function j(situacao: string, id: string): JourneyLite {
-  return { journey_id: id, situacao };
+  return { journey_id: id, situacao, aberta_em: "2026-08-10T12:00:00Z" };
 }
 
 const digiOffice: JourneyLite[] = [
@@ -69,6 +69,15 @@ describe("SituacaoAgoraBand", () => {
     expect(container.textContent).toContain("hoje, não do período");
     expect(container.textContent).toContain("concluídas no período");
     expect(container.textContent).toContain("canceladas no período");
+  });
+
+  /** DEM-0327: o cartão de entrada, contrapartida dos dois desfechos. Sem janela na
+   *  chamada, ele mostra toda jornada com data de abertura — as 49. */
+  it("mostra a entrada do período ao lado dos desfechos", () => {
+    render(digiOffice);
+    expect(container.textContent).toContain("Jornadas abertas no período");
+    expect(container.textContent).toContain("em qualquer situação hoje");
+    expect(container.textContent).toContain("49");
   });
 
   it("só cita 'paradas' quando existe alguma", () => {

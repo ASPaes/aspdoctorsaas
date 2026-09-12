@@ -437,16 +437,16 @@ describe("contarSituacao com janela", () => {
   const JAN = { from: new Date("2026-07-01T00:00:00"), to: new Date("2026-07-31T00:00:00") };
 
   const base: SituacaoLite[] = [
-    { situacao: "em_andamento", concluido_em: null, cancelado_em: null },
-    { situacao: "nao_iniciado", concluido_em: null, cancelado_em: null },
-    { situacao: "parado", concluido_em: null, cancelado_em: null },
+    { situacao: "em_andamento", aberta_em: "2026-07-02T12:00:00Z", concluido_em: null, cancelado_em: null },
+    { situacao: "nao_iniciado", aberta_em: "2026-06-20T12:00:00Z", concluido_em: null, cancelado_em: null },
+    { situacao: "parado", aberta_em: "2026-05-01T12:00:00Z", concluido_em: null, cancelado_em: null },
     // concluídas: uma dentro da janela, uma fora
-    { situacao: "concluido", concluido_em: "2026-07-10T12:00:00Z", cancelado_em: null },
-    { situacao: "concluido", concluido_em: "2026-08-10T12:00:00Z", cancelado_em: null },
+    { situacao: "concluido", aberta_em: "2026-07-05T12:00:00Z", concluido_em: "2026-07-10T12:00:00Z", cancelado_em: null },
+    { situacao: "concluido", aberta_em: "2026-06-01T12:00:00Z", concluido_em: "2026-08-10T12:00:00Z", cancelado_em: null },
     // canceladas: uma dentro, uma fora, uma sem data
-    { situacao: "cancelado", concluido_em: null, cancelado_em: "2026-07-15T12:00:00Z" },
-    { situacao: "cancelado", concluido_em: null, cancelado_em: "2026-06-15T12:00:00Z" },
-    { situacao: "cancelado", concluido_em: null, cancelado_em: null },
+    { situacao: "cancelado", aberta_em: "2026-07-12T12:00:00Z", concluido_em: null, cancelado_em: "2026-07-15T12:00:00Z" },
+    { situacao: "cancelado", aberta_em: "2026-06-10T12:00:00Z", concluido_em: null, cancelado_em: "2026-06-15T12:00:00Z" },
+    { situacao: "cancelado", aberta_em: null, concluido_em: null, cancelado_em: null },
   ];
 
   it("em aberto ignora a janela — é o que está na mão agora", () => {
@@ -468,6 +468,28 @@ describe("contarSituacao com janela", () => {
 
   it("o total do rodapé é em aberto + desfechos da janela, não a base inteira", () => {
     expect(contarSituacao(base, JAN).total).toBe(5); // 3 abertas + 1 concluída + 1 cancelada
+  });
+
+  /* ---- entrada do período: DEM-0327 ---- */
+
+  it("abertas no período conta pela data de abertura, em qualquer situação", () => {
+    // em_andamento 02/07, concluída 05/07 e cancelada 12/07 — as três nasceram na janela
+    expect(contarSituacao(base, JAN).abertasNoPeriodo).toBe(3);
+  });
+
+  it("a entrada não entra no total nem no % de cancelamento da faixa", () => {
+    const c = contarSituacao(base, JAN);
+    expect(c.total).toBe(5);
+    expect(c.pctCanceladas).toBe(20);
+  });
+
+  it("jornada sem data de abertura não vira entrada de janela nenhuma", () => {
+    const c = contarSituacao([{ situacao: "cancelado", aberta_em: null, cancelado_em: "2026-07-15T12:00:00Z" }], JAN);
+    expect(c.abertasNoPeriodo).toBe(0);
+  });
+
+  it("sem janela, a entrada é toda jornada que tem data de abertura", () => {
+    expect(contarSituacao(base).abertasNoPeriodo).toBe(7); // 8 linhas, 1 sem aberta_em
   });
 
   it("sem janela, conta tudo — é a foto de sempre", () => {

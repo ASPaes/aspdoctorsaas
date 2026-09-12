@@ -1,17 +1,24 @@
-import { FolderOpen, CheckCircle2, XCircle } from "lucide-react";
+import { FolderOpen, FolderPlus, CheckCircle2, XCircle } from "lucide-react";
 import KpiCard from "./KpiCard";
 import type { ContagemSituacao } from "./dashMetrics";
 
 /**
- * Faixa de situação. Os três cartões NÃO seguem a mesma regra, e isso é deliberado:
+ * Faixa de situação. Os quatro cartões NÃO seguem a mesma regra, e isso é deliberado:
  *
  *  - **Em aberto** é foto do agora — quanto está na mão da equipe hoje. Ignora o
  *    período, e o próprio cartão avisa.
+ *  - **Abertas no período** é a entrada do fluxo: nasceu dentro do período, esteja em
+ *    que situação estiver hoje. É a contrapartida dos dois desfechos.
  *  - **Concluídas** e **canceladas** são desfechos, e desfecho tem data: contam o que
  *    terminou dentro do período.
  *
- * Até 25/08 os três ignoravam o período, e os dois de desfecho viravam total desde
- * que o módulo existe — nunca mudavam ao trocar a data. Foi a queixa do cliente.
+ * Entrada e desfecho se sobrepõem de propósito: jornada aberta e concluída no mesmo
+ * mês conta nos dois. Por isso o "% das N" do cartão de canceladas ignora a entrada.
+ *
+ * Até 25/08 os cartões de então ignoravam o período, e os dois de desfecho viravam
+ * total desde que o módulo existe — nunca mudavam ao trocar a data. Foi a queixa do
+ * cliente. O cartão de entrada entrou em 11/09 (DEM-0327), pelo mesmo motivo: o
+ * dashboard mostrava as saídas do período e nenhuma entrada.
  */
 export default function SituacaoAgoraBand({ contagem }: { contagem: ContagemSituacao }) {
   const c = contagem;
@@ -26,13 +33,21 @@ export default function SituacaoAgoraBand({ contagem }: { contagem: ContagemSitu
       <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
         Situação das jornadas
       </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
           icon={FolderOpen}
           label="Jornadas em aberto"
           value={String(c.emAberto)}
           sub={`${partes || "nenhuma em aberto"} · hoje, não do período`}
           tone="info"
+          subTone="muted"
+        />
+        <KpiCard
+          icon={FolderPlus}
+          label="Jornadas abertas no período"
+          value={String(c.abertasNoPeriodo)}
+          sub="abertas no período · em qualquer situação hoje"
+          tone="default"
           subTone="muted"
         />
         <KpiCard

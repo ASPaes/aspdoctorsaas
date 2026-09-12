@@ -23,6 +23,9 @@ export interface JourneyLite {
 export interface ContagemSituacao {
   total: number;
   emAberto: number;
+  /** Entradas do período: jornadas cuja abertura caiu na janela, em qualquer
+   *  situação de hoje — inclui as que já foram concluídas ou canceladas. */
+  abertasNoPeriodo: number;
   naoIniciadas: number;
   emAndamento: number;
   paradas: number;
@@ -37,6 +40,8 @@ export interface SituacaoLite {
   situacao: string | null;
   /** Opcionais porque sem `range` a contagem não olha data nenhuma. */
   concluido_em?: string | null;
+  /** Quando a jornada entrou. Alimenta só o cartão de entradas do período. */
+  aberta_em?: string | null;
   /** Vem do evento `onboarding_cancelado` do ticket: a tabela não guarda esse carimbo. */
   cancelado_em?: string | null;
 }
@@ -89,12 +94,20 @@ export function separarJornadas<T extends JourneyLite>(
  *  - **Concluídas e canceladas** são DESFECHOS, e desfecho tem data. Sem janela elas
  *    viravam total desde que o módulo existe, que nunca mudava ao trocar o período —
  *    foi a queixa do cliente em 25/08.
+ *  - **Abertas no período** é a ENTRADA, contrapartida dos dois desfechos: conta por
+ *    `aberta_em`, em qualquer situação de hoje. Jornada aberta e concluída dentro da
+ *    mesma janela aparece nos dois cartões de propósito — um diz que ela entrou, o
+ *    outro que ela saiu. Por isso ela fica FORA de `total` e do % de cancelamento:
+ *    somar entrada com estoque contaria a mesma jornada duas vezes.
  *
  * Sem `range`, conta tudo (a foto de sempre).
  */
 export function contarSituacao(journeys: SituacaoLite[], range?: { from: Date; to: Date }): ContagemSituacao {
   let naoIniciadas = 0, emAndamento = 0, paradas = 0, concluidas = 0, canceladas = 0, canceladasSemData = 0;
+  let abertasNoPeriodo = 0;
   journeys.forEach((j) => {
+    // Independe da situação: cancelada também entrou na janela em que foi aberta.
+    if (range ? dentroDaJanela(j.aberta_em, range) : !!j.aberta_em) abertasNoPeriodo++;
     switch (j.situacao) {
       case "nao_iniciado": naoIniciadas++; break;
       case "em_andamento": emAndamento++; break;
@@ -116,6 +129,7 @@ export function contarSituacao(journeys: SituacaoLite[], range?: { from: Date; t
   return {
     total,
     emAberto,
+    abertasNoPeriodo,
     naoIniciadas, emAndamento, paradas, concluidas, canceladas, canceladasSemData,
     pctCanceladas: pct(canceladas, total),
   };

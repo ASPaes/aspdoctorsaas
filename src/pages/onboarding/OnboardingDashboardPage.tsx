@@ -206,6 +206,7 @@ export default function OnboardingDashboardPage() {
       journeysFiltradas.map((j) => ({
         situacao: j.situacao,
         concluido_em: j.concluido_em,
+        aberta_em: j.aberta_em,
         cancelado_em: j.ticket_id ? (canceladasEm[j.ticket_id] ?? null) : null,
       })),
       dateRange,

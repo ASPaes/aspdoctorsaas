@@ -28,6 +28,14 @@ export const implantacao: CatalogEntry[] = [
     source: { provider: "implantacao.dash", path: "situacao.emAberto" },
   },
   {
+    id: "imp.jornadas_abertas_periodo",
+    area: "implantacao",
+    kind: "card",
+    label: "Jornadas abertas no período",
+    format: "integer",
+    source: { provider: "implantacao.dash", path: "situacao.abertasNoPeriodo" },
+  },
+  {
     id: "imp.jornadas_concluidas",
     area: "implantacao",
     kind: "card",
