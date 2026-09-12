@@ -317,3 +317,10 @@ verify_jwt = true
 # com a sessão do usuário. A function confere papel e tenant por dentro.
 [functions.send-attendance-summary]
 verify_jwt = true
+
+# Leitor das caixas de e-mail. verify_jwt = FALSE de propósito: quem dispara é o
+# cron, que manda o segredo do Vault no Authorization, e a própria function
+# compara (mesmo desenho da recon-espelho-pull-cron). A leitura sob demanda pela
+# tela valida o token do usuário com auth.getUser e exige admin.
+[functions.ler-emails-recebidos]
+verify_jwt = false

@@ -59,6 +59,9 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
   const [imapSecurity, setImapSecurity] = useState<EmailSecurity>("ssl");
   const [isDefault, setIsDefault] = useState(false);
   const [ativo, setAtivo] = useState(true);
+  const [receberRespostas, setReceberRespostas] = useState(false);
+  const [aceitarCliente, setAceitarCliente] = useState(false);
+  const [descartarAutomaticos, setDescartarAutomaticos] = useState(true);
   const [servidoresAbertos, setServidoresAbertos] = useState(true);
   const [guiaAberto, setGuiaAberto] = useState(false);
 
@@ -84,6 +87,9 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
       setImapSecurity(account.imap_security ?? "ssl");
       setIsDefault(account.is_default);
       setAtivo(account.ativo);
+      setReceberRespostas(account.receber_respostas ?? false);
+      setAceitarCliente(account.aceitar_cliente_cadastrado ?? false);
+      setDescartarAutomaticos(account.descartar_automaticos ?? true);
       // conta que já falhou abre com o guia à vista
       setGuiaAberto(account.last_test_ok === false || guiaAbreSozinho(account.provider));
     } else {
@@ -104,6 +110,9 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
       setImapSecurity(p.imapSecurity ?? "ssl");
       setIsDefault(false);
       setAtivo(true);
+      setReceberRespostas(false);
+      setAceitarCliente(false);
+      setDescartarAutomaticos(true);
       setGuiaAberto(guiaAbreSozinho("gmail"));
     }
     setServidoresAbertos(true);
@@ -142,6 +151,7 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
       return toast.error("Porta de entrada inválida.");
     }
     if (!editando && !senha) return toast.error("Informe a senha da conta.");
+    const temEntrada = !!imapHost.trim();
 
     try {
       const id = await onSave({
@@ -162,6 +172,9 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
         imap_username: imapHost.trim() ? (usuario.trim() || emailLimpo) : null,
         is_default: isDefault,
         ativo,
+        receber_respostas: temEntrada && receberRespostas,
+        aceitar_cliente_cadastrado: temEntrada && receberRespostas && aceitarCliente,
+        descartar_automaticos: descartarAutomaticos,
         senha,
       });
       toast.success(editando ? "Conta atualizada." : "Conta cadastrada.");
@@ -369,6 +382,57 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
               </div>
             </CollapsibleContent>
           </Collapsible>
+
+          {/* Recebimento: só faz sentido quando a entrada (IMAP) está preenchida */}
+          <section className="space-y-2 rounded-md border p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium">Registrar as respostas dos clientes</p>
+                <p className="text-xs text-muted-foreground">
+                  O DoctorSaaS abre esta caixa de tempos em tempos e guarda, na tela E-mails, a resposta que o cliente
+                  der a um e-mail enviado daqui. Nada é marcado como lido na caixa e nada é apagado dela.
+                </p>
+              </div>
+              <Switch
+                checked={receberRespostas}
+                onCheckedChange={setReceberRespostas}
+                disabled={!imapHost.trim()}
+                aria-label="Registrar as respostas dos clientes"
+              />
+            </div>
+
+            {!imapHost.trim() && (
+              <p className="text-xs text-muted-foreground">
+                Para ligar, preencha o servidor de entrada (IMAP) em Servidores.
+                {preset.semRecebimento && ` O ${preset.label} não aceita senha para ler a caixa.`}
+              </p>
+            )}
+
+            {imapHost.trim() && receberRespostas && (
+              <div className="space-y-2 border-t pt-2">
+                <label className="flex items-start justify-between gap-3">
+                  <span className="space-y-0.5">
+                    <span className="block text-sm">Aceitar também e-mail novo de cliente cadastrado</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Mensagem que não é resposta entra só se o endereço do remetente estiver na ficha de algum cliente.
+                      Desligado, a caixa registra apenas respostas.
+                    </span>
+                  </span>
+                  <Switch checked={aceitarCliente} onCheckedChange={setAceitarCliente} />
+                </label>
+                <label className="flex items-start justify-between gap-3">
+                  <span className="space-y-0.5">
+                    <span className="block text-sm">Descartar boletins e respostas automáticas</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Newsletter, propaganda e aviso de férias são reconhecidos pelos próprios cabeçalhos e nem chegam a
+                      ser baixados. Recomendado deixar ligado.
+                    </span>
+                  </span>
+                  <Switch checked={descartarAutomaticos} onCheckedChange={setDescartarAutomaticos} />
+                </label>
+              </div>
+            )}
+          </section>
 
           {/* Estado */}
           <section className="grid gap-3 sm:grid-cols-2">

@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 12/09
+
+- 🆕 **A resposta do cliente ao e-mail do DoctorSaaS volta para dentro do sistema** — A aba **Recebidos**, na tela **E-mails**, passou a mostrar o que os clientes respondem. Cada e-mail que sai da plataforma leva uma identificação própria, e é por ela que a resposta encontra sozinha o atendimento ou o ticket que deu origem: a linha mostra de quem veio, o assunto, o cliente, em resposta a qual e-mail e por qual caixa entrou. **Propaganda, newsletter e mensagem de quem nunca recebeu e-mail seu não entram**, porque campanha nenhuma responde ao seu e-mail e, portanto, nunca carrega essa identificação. Quando a resposta chega de um endereço diferente do que recebeu o e-mail, ela aparece marcada como **Remetente diferente** em vez de entrar calada no histórico. A leitura é ligada caixa por caixa, em **Configurações › Atendimento › Canais › E-mail**, e é opcional aceitar também e-mail novo de quem está na ficha de um cliente. A caixa do provedor não é alterada: nada é marcado como lido e nada é apagado de lá. O administrador pode selecionar vários e mandar para a lixeira ou excluir de vez, e continua valendo a trava da aba Enviados: **e-mail ligado a atendimento ou ticket não sai**.
+
 ### 11/09
 
 - 🔧 **A correção feita logo depois de cadastrar um cliente novo agora chega ao Omie sozinha** — Ao cadastrar um cliente e corrigir alguma coisa em seguida, como o nome fantasia em maiúsculas, o telefone ou o endereço, a alteração só chegava ao Omie se você editasse e salvasse **de novo** mais tarde. O motivo: o cliente recém-cadastrado leva um tempo até ficar vinculado ao contrato no Omie, e tudo o que fosse salvo nessa janela era descartado sem aviso. Agora a alteração fica guardada e é enviada sozinha assim que o vínculo aparece, sem depender de uma segunda edição. Se o vínculo não vier em até 48 horas, a linha continua aparecendo na fila de sincronização com o motivo e o botão de reenviar, como antes.

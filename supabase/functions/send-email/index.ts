@@ -46,6 +46,16 @@ function papelDoToken(token: string): string | null {
   }
 }
 
+/**
+ * Identificação que viaja no Reply-To e no fim do assunto. É por ela que a
+ * resposta do cliente encontra este envio. Sem letras que se confundem na
+ * leitura (I, O, 0, 1), porque gente digita isso em algum momento.
+ */
+function gerarReplyToken(): string {
+  const alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) => alfabeto[b % 32]).join('');
+}
+
 const lista = (v: unknown): string[] =>
   (Array.isArray(v) ? v : typeof v === 'string' ? v.split(/[,;]/) : [])
     .map((x) => String(x).trim())
@@ -171,12 +181,16 @@ Deno.serve(async (req) => {
   }
 
   // ── envio ──
+  // a resposta volta pelo endereço com sufixo; a marca no assunto é o plano B,
+  // para provedor que não entrega sufixo e para quem responde de outro jeito
+  const replyToken = gerarReplyToken();
+  const [contaLocal, contaDominio] = conta.email.split('@');
   const mensagem = montarMensagem({
     de: { email: conta.email, nome: conta.from_name },
     para,
     cc,
-    responderPara,
-    assunto,
+    responderPara: responderPara ?? `${contaLocal}+${replyToken}@${contaDominio}`,
+    assunto: `${assunto} [#${replyToken}]`,
     html,
     texto,
   });
@@ -220,6 +234,7 @@ Deno.serve(async (req) => {
       status: ok ? 'enviado' : 'erro',
       erro,
       message_id: mensagem.messageId,
+      reply_token: replyToken,
       enviado_por: enviadoPor,
     })
     .select('id')

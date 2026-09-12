@@ -22,6 +22,9 @@ export interface EmailAccount {
   imap_username: string | null;
   is_default: boolean;
   ativo: boolean;
+  receber_respostas: boolean;
+  aceitar_cliente_cadastrado: boolean;
+  descartar_automaticos: boolean;
   last_test_at: string | null;
   last_test_ok: boolean | null;
   last_test_error: string | null;
@@ -57,6 +60,9 @@ export interface EmailAccountInput {
   imap_username: string | null;
   is_default: boolean;
   ativo: boolean;
+  receber_respostas: boolean;
+  aceitar_cliente_cadastrado: boolean;
+  descartar_automaticos: boolean;
   /** vazio em edição = mantém a senha que já está no Vault */
   senha: string;
 }
@@ -154,6 +160,20 @@ export function useEmailAccounts() {
         p_user_ids: input.user_ids,
       });
       if (error) throw error;
+
+      // As três chaves de leitura são colunas comuns e ficam fora da RPC de
+      // propósito: mexer na assinatura dela de novo obrigaria a derrubar e
+      // recriar a função em produção. O RLS de UPDATE já é o mesmo portão
+      // (admin ou head), que é exatamente quem chega neste diálogo.
+      const { error: erroLeitura } = await (supabase.from("email_accounts" as any) as any)
+        .update({
+          receber_respostas: input.receber_respostas,
+          aceitar_cliente_cadastrado: input.aceitar_cliente_cadastrado,
+          descartar_automaticos: input.descartar_automaticos,
+        })
+        .eq("id", data as string);
+      if (erroLeitura) throw erroLeitura;
+
       return data as string;
     },
     onSuccess: invalidate,

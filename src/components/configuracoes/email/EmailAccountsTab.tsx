@@ -14,7 +14,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  ArrowRight, CheckCircle2, Info, LifeBuoy, Loader2, Mail, MoreVertical, Pencil, Plug, Plus, Send, Star, Trash2, Users, Wand2, XCircle,
+  ArrowRight, CheckCircle2, Inbox, Info, LifeBuoy, Loader2, Mail, MoreVertical, Pencil, Plug, Plus,
+  Send, Star, Trash2, Users, Wand2, XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -169,6 +170,9 @@ export default function EmailAccountsTab() {
         imap_username: rec.imap_host ? (conta.imap_username || conta.smtp_username) : null,
         is_default: conta.is_default,
         ativo: conta.ativo,
+        receber_respostas: conta.receber_respostas,
+        aceitar_cliente_cadastrado: conta.aceitar_cliente_cadastrado,
+        descartar_automaticos: conta.descartar_automaticos,
         senha: "",
       });
       toast.success("Servidores atualizados. Testando de novo.");
@@ -261,6 +265,16 @@ export default function EmailAccountsTab() {
                       <Badge key={nome} variant="secondary">{nome}</Badge>
                     ))}
                     {!conta.ativo && <Badge variant="outline">Inativa</Badge>}
+                    {conta.receber_respostas && conta.ativo && (
+                      <Badge
+                        variant="outline"
+                        className="gap-1 border-accent/40 font-normal text-accent"
+                        title="As respostas dos clientes desta caixa são registradas na tela E-mails"
+                      >
+                        <Inbox className="h-3 w-3" />
+                        Lendo respostas
+                      </Badge>
+                    )}
                     <SeloTeste conta={conta} testando={testandoId === conta.id} />
                   </div>
                   <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{conta.email}</p>
