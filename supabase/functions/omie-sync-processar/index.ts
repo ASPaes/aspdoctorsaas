@@ -1,4 +1,40 @@
-// omie-sync-processar — PROCESSADOR DA FILA (peca 3 final, Caminho D) — v17
+// omie-sync-processar — PROCESSADOR DA FILA (peca 3 final, Caminho D) — v18
+//
+// v18 (11/09/2026) — DEM-0342: "SO SINCRONIZA NA SEGUNDA ALTERACAO".
+//     Queixa da Fabianne (Digi Office): o que o operador corrige no PRIMEIRO salvamento de um
+//     cliente novo nao chega ao Omie. Editar e salvar de novo, depois, funciona.
+//
+//     CAUSA MEDIDA (11/09/2026, producao): o gatilho de cadastro enfileira certo -- sao 302
+//     linhas 'ok' com origem='cadastro' so na Digi Office. O que falha e a JANELA: o cliente
+//     nasce no DS e o vinculo com o Omie so aparece depois, quando a reconciliacao casa por CNPJ
+//     (acao_sugerida='vinculo_auto_ok'). Enquanto nao ha vinculo, o porteiro logo abaixo devolve
+//     'sem_depara' e a linha morria em 'ignorado' -- TERMINAL, em silencio. Quando o vinculo
+//     chegava minutos depois, nada reenviava o que o usuario tinha escrito.
+//     As 5 linhas 'ignorado: sem_vinculo' do banco INTEIRO sao exatamente esse caso, todas da
+//     Digi Office, e TODAS ganharam vinculo depois (0,1h / 1,7h / 2,4h / 18,8h / 25,4h):
+//       ARTE EM CAFE   linha morta 10/09 14:34, vinculo salvo 10/09 14:37  (3 minutos)
+//       GBJB BAR       linha morta 10/09 13:08, vinculo salvo 10/09 14:47
+//       RITHIELLY      linha morta 09/09 19:44, vinculo salvo 10/09 14:31
+//     O rastro no Omie e o nome antigo: reconciliacao_cadastro.nome_diverge=true em 3 dos 4.
+//
+//     AGORA: para as origens de cadastro (ORIGENS_QUE_ESPERAM_VINCULO), 'sem_depara' e ESPERA, e
+//     nao veredito. A linha volta para 'pendente' e tenta de novo a cada 30 min ate completar
+//     48h de vida (o pior caso medido foi 25,4h). Passado esse prazo vira 'ignorado', igual a
+//     hoje. Quando o vinculo aparece, a propria linha entrega o que o usuario editou pelo ramo
+//     cirurgico do campos_alterados -- nao empurra o cadastro inteiro por cima do Omie.
+//
+//     TENTATIVAS NAO INCREMENTA nesta espera, de proposito: esperar nao e falhar. Se contasse,
+//     uma linha que esperou o dia inteiro chegaria em maxTent e a primeira falha de infra depois
+//     do vinculo a mandaria direto para 'erro', sem retentativa nenhuma.
+//
+//     ESCOPO ESTREITO: so 'cadastro' e 'observacao', que sao texto do cadastro e nada mais.
+//     'churn', 'valor' e os movimentos continuam morrendo em 'ignorado' na hora -- contrato que
+//     nao existe no Omie nao tem o que cancelar nem que reajustar, e essas linhas SAO lixo
+//     (LA ESTANCIA, 25/08: cancelar no DS dois contratos sem de/para gerou 2 linhas assim).
+//
+//     NAO alarma e NAO acorda o watchdog: trg_omie_sync_falhou_notify so dispara em
+//     'invalido'/'erro', e fn_integracao_fila_watchdog cobra 'pendente' cuja proxima_tentativa_em
+//     ja passou ha 30 min -- aqui ela e sempre agendada para o futuro.
 //
 // v17 (03/09/2026) — A RETENTATIVA DE valor_nao_confirmado REESCREVIA O QUE JA ESTAVA LA.
 //     O cabecalho da v16 abaixo descreve a retentativa como "ela roda minutos depois, fora da
@@ -212,6 +248,16 @@ const CAMPO_VIGENCIA = "vigencia_final"; // v10. Ver cabecalho.
 // uma retentativa de escrita ja aceita pelo Omie -- e, portanto, de que cabe conferir antes de
 // reescrever. Se mudar la, muda aqui.
 const PREFIXO_VALOR_NAO_CONFIRMADO = "valor_nao_confirmado:";
+// v18 (DEM-0342): origens que, sem vinculo, ESPERAM em vez de morrer. Ver cabecalho.
+// Sao as duas que escrevem texto do cadastro e nada mais -- nenhuma carrega estado de contrato.
+const ORIGENS_QUE_ESPERAM_VINCULO = [
+  "cadastro",
+  "observacao"
+];
+const ESPERA_VINCULO_MIN = 30;
+const ESPERA_VINCULO_LIMITE_H = 48;
+// Carimbo lido pelo omie_fila_status para explicar a espera na tela. Se mudar aqui, muda la.
+const PREFIXO_AGUARDANDO_VINCULO = "aguardando_vinculo:";
 function json(b, status = 200) {
   return new Response(JSON.stringify(b), {
     status,
@@ -308,7 +354,7 @@ Deno.serve(async (req)=>{
       const listaTeste = Array.isArray(t.sync_contratos_teste) && t.sync_contratos_teste.length > 0 ? t.sync_contratos_teste : null;
       // v13: por CONTA. Filtrar por tenant faria as duas voltas do loop pegarem os mesmos itens
       // e mandarem contrato de uma unidade com a chave da outra.
-      let q = service.from("omie_sync_fila").select("id, contrato_id, tentativas, origem, campos_alterados, ultimo_erro").eq("tenant_id", t.tenant_id).eq("conta_integration_id", t.id).in("status", [
+      let q = service.from("omie_sync_fila").select("id, contrato_id, tentativas, origem, campos_alterados, ultimo_erro, enfileirado_em").eq("tenant_id", t.tenant_id).eq("conta_integration_id", t.id).in("status", [
         "pendente",
         "erro"
       ]).lte("proxima_tentativa_em", agora);
@@ -349,7 +395,7 @@ Deno.serve(async (req)=>{
       }).in("id", candidatos.map((i)=>i.id)).in("status", [
         "pendente",
         "erro"
-      ]).select("id, contrato_id, tentativas, origem, campos_alterados, ultimo_erro");
+      ]).select("id, contrato_id, tentativas, origem, campos_alterados, ultimo_erro, enfileirado_em");
       if (claimErr) {
         console.error("ERRO_CLAIM:", claimErr.message);
         resumo.push({
@@ -369,7 +415,7 @@ Deno.serve(async (req)=>{
         continue;
       }
       const claimedIds = claimed.map((i)=>i.id);
-      let ok = 0, bloqueados = 0, invalidos = 0, ignorados = 0, retentar = 0, falhaDef = 0, cancelados = 0, observacoes = 0, vigencias = 0, cadastroPulado = 0, convergidos = 0, confirmadosSemEscrita = 0, parou425 = false;
+      let ok = 0, bloqueados = 0, invalidos = 0, ignorados = 0, retentar = 0, falhaDef = 0, cancelados = 0, observacoes = 0, vigencias = 0, cadastroPulado = 0, convergidos = 0, confirmadosSemEscrita = 0, aguardandoVinculo = 0, parou425 = false;
       for (const item of claimed){
         try {
           const incluirSituacao = ORIGENS_COM_SITUACAO.indexOf(item.origem ?? "") !== -1;
@@ -515,6 +561,25 @@ Deno.serve(async (req)=>{
           }
           const bloq = alt.body?.bloqueado ?? null;
           if (bloq === "sem_depara") {
+            // v18 (DEM-0342): edicao de cadastro ESPERA o vinculo em vez de morrer aqui. O
+            // vinculo costuma chegar minutos ou horas depois (reconciliacao casando por CNPJ), e
+            // ate a v17 tudo que o operador tinha corrigido nesse intervalo se perdia calado.
+            // Ver cabecalho v18.
+            const nascida = item.enfileirado_em ? new Date(item.enfileirado_em).getTime() : NaN;
+            // Sem enfileirado_em legivel nao da para saber a idade: cai no comportamento antigo,
+            // que e o lado seguro (terminal, com Reprocessar na tela).
+            const idadeH = Number.isFinite(nascida) ? (Date.now() - nascida) / 3_600_000 : Infinity;
+            if (ORIGENS_QUE_ESPERAM_VINCULO.indexOf(item.origem ?? "") !== -1 && idadeH < ESPERA_VINCULO_LIMITE_H) {
+              await service.from("omie_sync_fila").update({
+                status: "pendente",
+                // tentativas NAO entra no update de proposito -- esperar nao e falhar (cabecalho).
+                ultimo_erro: PREFIXO_AGUARDANDO_VINCULO + " contrato ainda nao vinculado na Conferencia; nada foi escrito no Omie. A fila reenvia sozinha quando o vinculo aparecer.",
+                proxima_tentativa_em: new Date(Date.now() + ESPERA_VINCULO_MIN * 60_000).toISOString()
+              }).eq("id", item.id);
+              aguardandoVinculo++;
+              await sleep(200);
+              continue;
+            }
             await service.from("omie_sync_fila").update({
               status: "ignorado",
               ultimo_erro: "sem_vinculo: contrato nao vinculado na Conferencia; nada foi escrito no Omie.",
@@ -704,6 +769,8 @@ Deno.serve(async (req)=>{
         bloqueados,
         invalidos,
         ignorados,
+        // v18: linhas de cadastro que ficaram esperando o vinculo em vez de morrer em 'ignorado'.
+        aguardando_vinculo: aguardandoVinculo,
         retentar,
         falha_definitiva: falhaDef,
         ...parou425 ? {
