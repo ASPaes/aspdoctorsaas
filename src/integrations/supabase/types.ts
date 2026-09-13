@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   graphql_public: {
     Tables: {
@@ -589,6 +589,24 @@ export type Database = {
         }
         Relationships: []
       }
+      bkp_asp_reset_20260828: {
+        Row: {
+          criado_em: string | null
+          id: number
+          payload: Json | null
+        }
+        Insert: {
+          criado_em?: string | null
+          id?: number
+          payload?: Json | null
+        }
+        Update: {
+          criado_em?: string | null
+          id?: number
+          payload?: Json | null
+        }
+        Relationships: []
+      }
       bkp_clientes_classificacao_jul2026: {
         Row: {
           area_atuacao_id: number | null
@@ -619,6 +637,183 @@ export type Database = {
           segmento_id?: number | null
           snapshot_em?: string | null
           tenant_id?: string | null
+        }
+        Relationships: []
+      }
+      bkp_csat_dept_20260911: {
+        Row: {
+          attendance_id: string | null
+          capturado_em: string | null
+          csat_id: string | null
+          dept_antigo: string | null
+          dept_novo: string | null
+        }
+        Insert: {
+          attendance_id?: string | null
+          capturado_em?: string | null
+          csat_id?: string | null
+          dept_antigo?: string | null
+          dept_novo?: string | null
+        }
+        Update: {
+          attendance_id?: string | null
+          capturado_em?: string | null
+          csat_id?: string | null
+          dept_antigo?: string | null
+          dept_novo?: string | null
+        }
+        Relationships: []
+      }
+      bkp_dem0362_backfill_tme: {
+        Row: {
+          ancora_nova: string | null
+          aplicado: boolean
+          assumed_at_antes: string | null
+          attendance_code: string | null
+          closed_at: string | null
+          gravado_em: string
+          handle_antes: number | null
+          handle_depois: number | null
+          id: string
+          opened_at: string | null
+          plantao_antes: boolean | null
+          plantao_aplicado: boolean
+          plantao_depois: boolean | null
+          plantao_em_antes: string | null
+          plantao_em_depois: string | null
+          tenant_id: string | null
+          wait_antes: number | null
+          wait_depois: number | null
+        }
+        Insert: {
+          ancora_nova?: string | null
+          aplicado?: boolean
+          assumed_at_antes?: string | null
+          attendance_code?: string | null
+          closed_at?: string | null
+          gravado_em?: string
+          handle_antes?: number | null
+          handle_depois?: number | null
+          id: string
+          opened_at?: string | null
+          plantao_antes?: boolean | null
+          plantao_aplicado?: boolean
+          plantao_depois?: boolean | null
+          plantao_em_antes?: string | null
+          plantao_em_depois?: string | null
+          tenant_id?: string | null
+          wait_antes?: number | null
+          wait_depois?: number | null
+        }
+        Update: {
+          ancora_nova?: string | null
+          aplicado?: boolean
+          assumed_at_antes?: string | null
+          attendance_code?: string | null
+          closed_at?: string | null
+          gravado_em?: string
+          handle_antes?: number | null
+          handle_depois?: number | null
+          id?: string
+          opened_at?: string | null
+          plantao_antes?: boolean | null
+          plantao_aplicado?: boolean
+          plantao_depois?: boolean | null
+          plantao_em_antes?: string | null
+          plantao_em_depois?: string | null
+          tenant_id?: string | null
+          wait_antes?: number | null
+          wait_depois?: number | null
+        }
+        Relationships: []
+      }
+      bkp_hiper_amp_20260902: {
+        Row: {
+          copiado_em: string | null
+          referencia: string | null
+          registro_id: string | null
+          tabela: string | null
+          valor_antes: string | null
+        }
+        Insert: {
+          copiado_em?: string | null
+          referencia?: string | null
+          registro_id?: string | null
+          tabela?: string | null
+          valor_antes?: string | null
+        }
+        Update: {
+          copiado_em?: string | null
+          referencia?: string | null
+          registro_id?: string | null
+          tabela?: string | null
+          valor_antes?: string | null
+        }
+        Relationships: []
+      }
+      bkp_setor_segue_agente_20260911: {
+        Row: {
+          assigned_to: string | null
+          attendance_id: string | null
+          capturado_em: string | null
+          csat_dept_antigo: string | null
+          csat_id: string | null
+          dept_antigo: string | null
+          dept_novo: string | null
+          status: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          attendance_id?: string | null
+          capturado_em?: string | null
+          csat_dept_antigo?: string | null
+          csat_id?: string | null
+          dept_antigo?: string | null
+          dept_novo?: string | null
+          status?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          attendance_id?: string | null
+          capturado_em?: string | null
+          csat_dept_antigo?: string | null
+          csat_id?: string | null
+          dept_antigo?: string | null
+          dept_novo?: string | null
+          status?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
+      bkp_zetta_produto_20260911: {
+        Row: {
+          capturado_em: string | null
+          cliente_id: string | null
+          cliente_produto_id: string | null
+          fornecedor_id: number | null
+          produto_id_cliente_antes: number | null
+          produto_id_vinculo_antes: number | null
+          razao_social: string | null
+        }
+        Insert: {
+          capturado_em?: string | null
+          cliente_id?: string | null
+          cliente_produto_id?: string | null
+          fornecedor_id?: number | null
+          produto_id_cliente_antes?: number | null
+          produto_id_vinculo_antes?: number | null
+          razao_social?: string | null
+        }
+        Update: {
+          capturado_em?: string | null
+          cliente_id?: string | null
+          cliente_produto_id?: string | null
+          fornecedor_id?: number | null
+          produto_id_cliente_antes?: number | null
+          produto_id_vinculo_antes?: number | null
+          razao_social?: string | null
         }
         Relationships: []
       }
@@ -721,6 +916,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cadastro_lote_log: {
+        Row: {
+          campo: string
+          cliente_id: string | null
+          cliente_nome: string | null
+          codigo_sequencial: number | null
+          feito_em: string
+          feito_por: string | null
+          id: string
+          lote_id: string
+          registro_id: string
+          tabela: string
+          tenant_id: string
+          valor_antes: Json | null
+          valor_depois: Json | null
+        }
+        Insert: {
+          campo: string
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          codigo_sequencial?: number | null
+          feito_em?: string
+          feito_por?: string | null
+          id?: string
+          lote_id: string
+          registro_id: string
+          tabela: string
+          tenant_id: string
+          valor_antes?: Json | null
+          valor_depois?: Json | null
+        }
+        Update: {
+          campo?: string
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          codigo_sequencial?: number | null
+          feito_em?: string
+          feito_por?: string | null
+          id?: string
+          lote_id?: string
+          registro_id?: string
+          tabela?: string
+          tenant_id?: string
+          valor_antes?: Json | null
+          valor_depois?: Json | null
+        }
+        Relationships: []
       }
       catalog_template_items: {
         Row: {
@@ -1204,6 +1447,7 @@ export type Database = {
           acao: string
           cliente_produto_id: string
           created_at: string
+          fonte: string | null
           id: string
           modulo_id: string | null
           modulo_nome: string
@@ -1214,12 +1458,16 @@ export type Database = {
           usuario_id: string | null
           usuario_nome: string | null
           vlr_custo: number | null
+          vlr_custo_anterior: number | null
+          vlr_custo_total: number | null
+          vlr_custo_total_anterior: number | null
           vlr_mensal: number | null
         }
         Insert: {
           acao: string
           cliente_produto_id: string
           created_at?: string
+          fonte?: string | null
           id?: string
           modulo_id?: string | null
           modulo_nome: string
@@ -1230,12 +1478,16 @@ export type Database = {
           usuario_id?: string | null
           usuario_nome?: string | null
           vlr_custo?: number | null
+          vlr_custo_anterior?: number | null
+          vlr_custo_total?: number | null
+          vlr_custo_total_anterior?: number | null
           vlr_mensal?: number | null
         }
         Update: {
           acao?: string
           cliente_produto_id?: string
           created_at?: string
+          fonte?: string | null
           id?: string
           modulo_id?: string | null
           modulo_nome?: string
@@ -1246,6 +1498,9 @@ export type Database = {
           usuario_id?: string | null
           usuario_nome?: string | null
           vlr_custo?: number | null
+          vlr_custo_anterior?: number | null
+          vlr_custo_total?: number | null
+          vlr_custo_total_anterior?: number | null
           vlr_mensal?: number | null
         }
         Relationships: []
@@ -1341,6 +1596,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cliente_produto_modulos_cliente_produto_id_fkey"
+            columns: ["cliente_produto_id"]
+            isOneToOne: false
+            referencedRelation: "v_oem_divergencia_modulo"
+            referencedColumns: ["cliente_produto_id"]
+          },
+          {
             foreignKeyName: "cliente_produto_modulos_funcionario_id_fkey"
             columns: ["funcionario_id"]
             isOneToOne: false
@@ -1405,8 +1667,10 @@ export type Database = {
           recorrencia: Database["public"]["Enums"]["recorrencia_tipo"] | null
           tenant_id: string
           updated_at: string
+          vlr_anual: number | null
           vlr_ativacao: number | null
           vlr_custo: number | null
+          vlr_custo_anual: number | null
           vlr_mensal: number | null
         }
         Insert: {
@@ -1436,8 +1700,10 @@ export type Database = {
           recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
           tenant_id: string
           updated_at?: string
+          vlr_anual?: number | null
           vlr_ativacao?: number | null
           vlr_custo?: number | null
+          vlr_custo_anual?: number | null
           vlr_mensal?: number | null
         }
         Update: {
@@ -1467,8 +1733,10 @@ export type Database = {
           recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
           tenant_id?: string
           updated_at?: string
+          vlr_anual?: number | null
           vlr_ativacao?: number | null
           vlr_custo?: number | null
+          vlr_custo_anual?: number | null
           vlr_mensal?: number | null
         }
         Relationships: [
@@ -1550,6 +1818,7 @@ export type Database = {
           _deprecated_link_portal_fornecedor: string | null
           area_atuacao_id: number | null
           bairro: string | null
+          busca_nome: string | null
           cancelado: boolean
           cep: string | null
           cert_a1_ultima_venda_em: string | null
@@ -1614,6 +1883,7 @@ export type Database = {
           _deprecated_link_portal_fornecedor?: string | null
           area_atuacao_id?: number | null
           bairro?: string | null
+          busca_nome?: string | null
           cancelado?: boolean
           cep?: string | null
           cert_a1_ultima_venda_em?: string | null
@@ -1678,6 +1948,7 @@ export type Database = {
           _deprecated_link_portal_fornecedor?: string | null
           area_atuacao_id?: number | null
           bairro?: string | null
+          busca_nome?: string | null
           cancelado?: boolean
           cep?: string | null
           cert_a1_ultima_venda_em?: string | null
@@ -2040,6 +2311,7 @@ export type Database = {
           business_hours_ai_prompt: string | null
           business_hours_enabled: boolean
           business_hours_message: string | null
+          business_hours_notice_cooldown_minutes: number
           business_hours_outside_prompt: string | null
           business_hours_timezone: string
           chat_timezone: string
@@ -2052,6 +2324,8 @@ export type Database = {
           custo_fixo_percentual: number
           group_require_ticket_on_close: boolean
           group_send_attendance_notices: boolean
+          horario_comercial: Json | null
+          horario_comercial_enabled: boolean
           id: number
           imposto_percentual: number
           notification_defaults: Json
@@ -2067,6 +2341,8 @@ export type Database = {
           support_agent_alert_minutes: number
           support_agent_no_response_close_enabled: boolean
           support_agent_no_response_close_minutes: number
+          support_assignment_greeting_enabled: boolean
+          support_assignment_greeting_template: string | null
           support_auto_close_inactivity_minutes: number
           support_config: Json
           support_csat_confirm_before_close: boolean | null
@@ -2083,6 +2359,9 @@ export type Database = {
           support_group_inactivity_warning_before_minutes: number
           support_group_inactivity_warning_template: string
           support_group_send_inactivity_warning: boolean
+          support_inactivity_autohold_enabled: boolean
+          support_inactivity_autohold_extra_terms: string
+          support_inactivity_autohold_minutes: number
           support_inactivity_enabled: boolean
           support_inactivity_eod_close_template: string
           support_inactivity_eod_enabled: boolean
@@ -2116,6 +2395,7 @@ export type Database = {
           business_hours_ai_prompt?: string | null
           business_hours_enabled?: boolean
           business_hours_message?: string | null
+          business_hours_notice_cooldown_minutes?: number
           business_hours_outside_prompt?: string | null
           business_hours_timezone?: string
           chat_timezone?: string
@@ -2128,6 +2408,8 @@ export type Database = {
           custo_fixo_percentual?: number
           group_require_ticket_on_close?: boolean
           group_send_attendance_notices?: boolean
+          horario_comercial?: Json | null
+          horario_comercial_enabled?: boolean
           id?: number
           imposto_percentual?: number
           notification_defaults?: Json
@@ -2143,6 +2425,8 @@ export type Database = {
           support_agent_alert_minutes?: number
           support_agent_no_response_close_enabled?: boolean
           support_agent_no_response_close_minutes?: number
+          support_assignment_greeting_enabled?: boolean
+          support_assignment_greeting_template?: string | null
           support_auto_close_inactivity_minutes?: number
           support_config?: Json
           support_csat_confirm_before_close?: boolean | null
@@ -2159,6 +2443,9 @@ export type Database = {
           support_group_inactivity_warning_before_minutes?: number
           support_group_inactivity_warning_template?: string
           support_group_send_inactivity_warning?: boolean
+          support_inactivity_autohold_enabled?: boolean
+          support_inactivity_autohold_extra_terms?: string
+          support_inactivity_autohold_minutes?: number
           support_inactivity_enabled?: boolean
           support_inactivity_eod_close_template?: string
           support_inactivity_eod_enabled?: boolean
@@ -2192,6 +2479,7 @@ export type Database = {
           business_hours_ai_prompt?: string | null
           business_hours_enabled?: boolean
           business_hours_message?: string | null
+          business_hours_notice_cooldown_minutes?: number
           business_hours_outside_prompt?: string | null
           business_hours_timezone?: string
           chat_timezone?: string
@@ -2204,6 +2492,8 @@ export type Database = {
           custo_fixo_percentual?: number
           group_require_ticket_on_close?: boolean
           group_send_attendance_notices?: boolean
+          horario_comercial?: Json | null
+          horario_comercial_enabled?: boolean
           id?: number
           imposto_percentual?: number
           notification_defaults?: Json
@@ -2219,6 +2509,8 @@ export type Database = {
           support_agent_alert_minutes?: number
           support_agent_no_response_close_enabled?: boolean
           support_agent_no_response_close_minutes?: number
+          support_assignment_greeting_enabled?: boolean
+          support_assignment_greeting_template?: string | null
           support_auto_close_inactivity_minutes?: number
           support_config?: Json
           support_csat_confirm_before_close?: boolean | null
@@ -2235,6 +2527,9 @@ export type Database = {
           support_group_inactivity_warning_before_minutes?: number
           support_group_inactivity_warning_template?: string
           support_group_send_inactivity_warning?: boolean
+          support_inactivity_autohold_enabled?: boolean
+          support_inactivity_autohold_extra_terms?: string
+          support_inactivity_autohold_minutes?: number
           support_inactivity_enabled?: boolean
           support_inactivity_eod_close_template?: string
           support_inactivity_eod_enabled?: boolean
@@ -2696,6 +2991,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "cliente_produtos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_itens_cliente_produto_id_fkey"
+            columns: ["cliente_produto_id"]
+            isOneToOne: false
+            referencedRelation: "v_oem_divergencia_modulo"
+            referencedColumns: ["cliente_produto_id"]
           },
           {
             foreignKeyName: "contrato_itens_contrato_id_fkey"
@@ -3515,6 +3817,478 @@ export type Database = {
         }
         Relationships: []
       }
+      email_account_setores: {
+        Row: {
+          account_id: string
+          created_at: string
+          setor_id: string
+          tenant_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          setor_id: string
+          tenant_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          setor_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_account_setores_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_account_setores_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_account_setores_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_account_usuarios: {
+        Row: {
+          account_id: string
+          created_at: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_account_usuarios_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_account_usuarios_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_account_usuarios_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      email_account_vault_refs: {
+        Row: {
+          account_id: string
+          created_at: string
+          id: string
+          secret_name: string
+          updated_at: string
+          vault_secret_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          id?: string
+          secret_name?: string
+          updated_at?: string
+          vault_secret_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          id?: string
+          secret_name?: string
+          updated_at?: string
+          vault_secret_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_account_vault_refs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_accounts: {
+        Row: {
+          aceitar_cliente_cadastrado: boolean
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          descartar_automaticos: boolean
+          email: string
+          from_name: string | null
+          id: string
+          imap_host: string | null
+          imap_port: number | null
+          imap_security: string | null
+          imap_username: string | null
+          is_default: boolean
+          last_test_at: string | null
+          last_test_error: string | null
+          last_test_ok: boolean | null
+          provider: string
+          receber_respostas: boolean
+          rotulo: string
+          setor_id: string | null
+          smtp_host: string
+          smtp_port: number
+          smtp_security: string
+          smtp_username: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          aceitar_cliente_cadastrado?: boolean
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          descartar_automaticos?: boolean
+          email: string
+          from_name?: string | null
+          id?: string
+          imap_host?: string | null
+          imap_port?: number | null
+          imap_security?: string | null
+          imap_username?: string | null
+          is_default?: boolean
+          last_test_at?: string | null
+          last_test_error?: string | null
+          last_test_ok?: boolean | null
+          provider?: string
+          receber_respostas?: boolean
+          rotulo: string
+          setor_id?: string | null
+          smtp_host: string
+          smtp_port: number
+          smtp_security?: string
+          smtp_username: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          aceitar_cliente_cadastrado?: boolean
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          descartar_automaticos?: boolean
+          email?: string
+          from_name?: string | null
+          id?: string
+          imap_host?: string | null
+          imap_port?: number | null
+          imap_security?: string | null
+          imap_username?: string | null
+          is_default?: boolean
+          last_test_at?: string | null
+          last_test_error?: string | null
+          last_test_ok?: boolean | null
+          provider?: string
+          receber_respostas?: boolean
+          rotulo?: string
+          setor_id?: string | null
+          smtp_host?: string
+          smtp_port?: number
+          smtp_security?: string
+          smtp_username?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_accounts_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_accounts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_envios: {
+        Row: {
+          account_id: string | null
+          assunto: string
+          cc: string[]
+          cliente_id: string | null
+          created_at: string
+          deleted_at: string | null
+          department_id: string | null
+          enviado_por: string | null
+          erro: string | null
+          id: string
+          message_id: string | null
+          origem: string
+          para: string[]
+          referencia_id: string | null
+          remetente: string
+          reply_token: string | null
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          assunto: string
+          cc?: string[]
+          cliente_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          department_id?: string | null
+          enviado_por?: string | null
+          erro?: string | null
+          id?: string
+          message_id?: string | null
+          origem?: string
+          para: string[]
+          referencia_id?: string | null
+          remetente: string
+          reply_token?: string | null
+          status: string
+          tenant_id: string
+        }
+        Update: {
+          account_id?: string | null
+          assunto?: string
+          cc?: string[]
+          cliente_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          department_id?: string | null
+          enviado_por?: string | null
+          erro?: string | null
+          id?: string
+          message_id?: string | null
+          origem?: string
+          para?: string[]
+          referencia_id?: string | null
+          remetente?: string
+          reply_token?: string | null
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_envios_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_envios_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_envios_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_envios_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_envios_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_ingestao_estado: {
+        Row: {
+          account_id: string
+          mensagens_lidas: number
+          tenant_id: string
+          uid_validity: number | null
+          ultima_leitura: string | null
+          ultimo_erro: string | null
+          ultimo_uid: number
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          mensagens_lidas?: number
+          tenant_id: string
+          uid_validity?: number | null
+          ultima_leitura?: string | null
+          ultimo_erro?: string | null
+          ultimo_uid?: number
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          mensagens_lidas?: number
+          tenant_id?: string
+          uid_validity?: number | null
+          ultima_leitura?: string | null
+          ultimo_erro?: string | null
+          ultimo_uid?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_ingestao_estado_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_ingestao_estado_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_recebidos: {
+        Row: {
+          account_id: string | null
+          assunto: string | null
+          cliente_id: string | null
+          corpo_texto: string | null
+          created_at: string
+          de_email: string
+          de_nome: string | null
+          deleted_at: string | null
+          envio_id: string | null
+          id: string
+          imap_uid: number | null
+          message_id: string | null
+          origem: string | null
+          para: string[]
+          recebido_em: string
+          referencia_id: string | null
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          assunto?: string | null
+          cliente_id?: string | null
+          corpo_texto?: string | null
+          created_at?: string
+          de_email: string
+          de_nome?: string | null
+          deleted_at?: string | null
+          envio_id?: string | null
+          id?: string
+          imap_uid?: number | null
+          message_id?: string | null
+          origem?: string | null
+          para?: string[]
+          recebido_em: string
+          referencia_id?: string | null
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          account_id?: string | null
+          assunto?: string | null
+          cliente_id?: string | null
+          corpo_texto?: string | null
+          created_at?: string
+          de_email?: string
+          de_nome?: string | null
+          deleted_at?: string | null
+          envio_id?: string | null
+          id?: string
+          imap_uid?: number | null
+          message_id?: string | null
+          origem?: string | null
+          para?: string[]
+          recebido_em?: string
+          referencia_id?: string | null
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_recebidos_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_recebidos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_recebidos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_recebidos_envio_id_fkey"
+            columns: ["envio_id"]
+            isOneToOne: false
+            referencedRelation: "email_envios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_recebidos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       estados: {
         Row: {
           codigo_ibge: string | null
@@ -3613,27 +4387,149 @@ export type Database = {
           },
         ]
       }
+      hiper_alteracao_log: {
+        Row: {
+          acao: string
+          campo: string | null
+          cliente_id: string | null
+          cliente_nome: string | null
+          cliente_produto_id: string | null
+          codigo_sequencial: number | null
+          feito_em: string
+          feito_por: string | null
+          id: string
+          lote_id: string
+          recon_id: string | null
+          registro_id: string | null
+          revertido_em: string | null
+          revertido_por: string | null
+          tabela: string
+          tenant_id: string
+          valor_antes: Json | null
+          valor_depois: Json | null
+        }
+        Insert: {
+          acao: string
+          campo?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          cliente_produto_id?: string | null
+          codigo_sequencial?: number | null
+          feito_em?: string
+          feito_por?: string | null
+          id?: string
+          lote_id: string
+          recon_id?: string | null
+          registro_id?: string | null
+          revertido_em?: string | null
+          revertido_por?: string | null
+          tabela: string
+          tenant_id: string
+          valor_antes?: Json | null
+          valor_depois?: Json | null
+        }
+        Update: {
+          acao?: string
+          campo?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          cliente_produto_id?: string | null
+          codigo_sequencial?: number | null
+          feito_em?: string
+          feito_por?: string | null
+          id?: string
+          lote_id?: string
+          recon_id?: string | null
+          registro_id?: string | null
+          revertido_em?: string | null
+          revertido_por?: string | null
+          tabela?: string
+          tenant_id?: string
+          valor_antes?: Json | null
+          valor_depois?: Json | null
+        }
+        Relationships: []
+      }
+      hiper_catalogo_vinculo: {
+        Row: {
+          atualizado_em: string
+          chave: string
+          criado_em: string
+          criado_por: string | null
+          id: string
+          modelo_contrato_id: number | null
+          modulo_id: string | null
+          produto_id: number | null
+          tenant_id: string
+          tipo: string
+        }
+        Insert: {
+          atualizado_em?: string
+          chave: string
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          modelo_contrato_id?: number | null
+          modulo_id?: string | null
+          produto_id?: number | null
+          tenant_id: string
+          tipo: string
+        }
+        Update: {
+          atualizado_em?: string
+          chave?: string
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          modelo_contrato_id?: number | null
+          modulo_id?: string | null
+          produto_id?: number | null
+          tenant_id?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
       hiper_espelho_cadastro: {
         Row: {
           a_pagar: number | null
           a_pagar_ultima: number | null
           atraso_dias: number | null
           bruto_mes: number | null
+          cad_custo: number | null
+          cad_mensalidade: number | null
+          cad_repasse: number | null
+          cad_taxa_central: number | null
           cancelada_em: string | null
           cancelada_por: string | null
           cidade: string | null
           cliente_desde: string | null
           cnpj: string | null
           cnpj_norm: string | null
+          contato_email: string | null
+          contato_nome: string | null
+          contato_telefone: string | null
           custo_mes: number | null
+          dominio: string | null
+          email: string | null
+          end_bairro: string | null
+          end_cep: string | null
+          end_cidade: string | null
+          end_logradouro: string | null
+          end_numero: string | null
+          end_uf: string | null
           extrato_mes_ultima: string | null
           id: string
           id_portal: string
+          ie: string | null
           last_scraped_at: string | null
           mensalidade_ultima: number | null
           mrr: number | null
           nome_fantasia: string | null
           plano: string | null
+          plano_qt_caixas: number | null
+          plano_qt_filiais: number | null
+          plano_qt_usuarios: number | null
+          pull_run_id: string | null
           pulled_at: string
           qt_modulos: number | null
           raw: Json | null
@@ -3641,9 +4537,16 @@ export type Database = {
           responsavel_tipo: string | null
           saude: number | null
           situacao: string | null
+          telefone: string | null
           tenant_id: string
           total_aberto: number | null
           uf: string | null
+          ult_a_pagar: number | null
+          ult_a_receber: number | null
+          ult_custo: number | null
+          ult_lancamentos_12m: number | null
+          ult_mensalidade: number | null
+          ult_mes: string | null
           ultimo_acesso: string | null
           usuarios_ativos_30d: number | null
           usuarios_contratados: number | null
@@ -3653,21 +4556,41 @@ export type Database = {
           a_pagar_ultima?: number | null
           atraso_dias?: number | null
           bruto_mes?: number | null
+          cad_custo?: number | null
+          cad_mensalidade?: number | null
+          cad_repasse?: number | null
+          cad_taxa_central?: number | null
           cancelada_em?: string | null
           cancelada_por?: string | null
           cidade?: string | null
           cliente_desde?: string | null
           cnpj?: string | null
           cnpj_norm?: string | null
+          contato_email?: string | null
+          contato_nome?: string | null
+          contato_telefone?: string | null
           custo_mes?: number | null
+          dominio?: string | null
+          email?: string | null
+          end_bairro?: string | null
+          end_cep?: string | null
+          end_cidade?: string | null
+          end_logradouro?: string | null
+          end_numero?: string | null
+          end_uf?: string | null
           extrato_mes_ultima?: string | null
           id?: string
           id_portal: string
+          ie?: string | null
           last_scraped_at?: string | null
           mensalidade_ultima?: number | null
           mrr?: number | null
           nome_fantasia?: string | null
           plano?: string | null
+          plano_qt_caixas?: number | null
+          plano_qt_filiais?: number | null
+          plano_qt_usuarios?: number | null
+          pull_run_id?: string | null
           pulled_at?: string
           qt_modulos?: number | null
           raw?: Json | null
@@ -3675,9 +4598,16 @@ export type Database = {
           responsavel_tipo?: string | null
           saude?: number | null
           situacao?: string | null
+          telefone?: string | null
           tenant_id: string
           total_aberto?: number | null
           uf?: string | null
+          ult_a_pagar?: number | null
+          ult_a_receber?: number | null
+          ult_custo?: number | null
+          ult_lancamentos_12m?: number | null
+          ult_mensalidade?: number | null
+          ult_mes?: string | null
           ultimo_acesso?: string | null
           usuarios_ativos_30d?: number | null
           usuarios_contratados?: number | null
@@ -3687,21 +4617,41 @@ export type Database = {
           a_pagar_ultima?: number | null
           atraso_dias?: number | null
           bruto_mes?: number | null
+          cad_custo?: number | null
+          cad_mensalidade?: number | null
+          cad_repasse?: number | null
+          cad_taxa_central?: number | null
           cancelada_em?: string | null
           cancelada_por?: string | null
           cidade?: string | null
           cliente_desde?: string | null
           cnpj?: string | null
           cnpj_norm?: string | null
+          contato_email?: string | null
+          contato_nome?: string | null
+          contato_telefone?: string | null
           custo_mes?: number | null
+          dominio?: string | null
+          email?: string | null
+          end_bairro?: string | null
+          end_cep?: string | null
+          end_cidade?: string | null
+          end_logradouro?: string | null
+          end_numero?: string | null
+          end_uf?: string | null
           extrato_mes_ultima?: string | null
           id?: string
           id_portal?: string
+          ie?: string | null
           last_scraped_at?: string | null
           mensalidade_ultima?: number | null
           mrr?: number | null
           nome_fantasia?: string | null
           plano?: string | null
+          plano_qt_caixas?: number | null
+          plano_qt_filiais?: number | null
+          plano_qt_usuarios?: number | null
+          pull_run_id?: string | null
           pulled_at?: string
           qt_modulos?: number | null
           raw?: Json | null
@@ -3709,12 +4659,127 @@ export type Database = {
           responsavel_tipo?: string | null
           saude?: number | null
           situacao?: string | null
+          telefone?: string | null
           tenant_id?: string
           total_aberto?: number | null
           uf?: string | null
+          ult_a_pagar?: number | null
+          ult_a_receber?: number | null
+          ult_custo?: number | null
+          ult_lancamentos_12m?: number | null
+          ult_mensalidade?: number | null
+          ult_mes?: string | null
           ultimo_acesso?: string | null
           usuarios_ativos_30d?: number | null
           usuarios_contratados?: number | null
+        }
+        Relationships: []
+      }
+      hiper_espelho_filial: {
+        Row: {
+          ativo: boolean
+          cidade: string | null
+          cnpj: string | null
+          cnpj_norm: string
+          id: string
+          id_portal: string
+          nome: string | null
+          pull_run_id: string | null
+          pulled_at: string
+          tenant_id: string
+          uf: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          cidade?: string | null
+          cnpj?: string | null
+          cnpj_norm: string
+          id?: string
+          id_portal: string
+          nome?: string | null
+          pull_run_id?: string | null
+          pulled_at?: string
+          tenant_id: string
+          uf?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          cidade?: string | null
+          cnpj?: string | null
+          cnpj_norm?: string
+          id?: string
+          id_portal?: string
+          nome?: string | null
+          pull_run_id?: string | null
+          pulled_at?: string
+          tenant_id?: string
+          uf?: string | null
+        }
+        Relationships: []
+      }
+      hiper_espelho_modulo: {
+        Row: {
+          app_nome: string
+          ativo: boolean
+          comprado_por: string | null
+          custo: number | null
+          id: string
+          id_portal: string
+          pull_run_id: string | null
+          pulled_at: string
+          tenant_id: string
+        }
+        Insert: {
+          app_nome: string
+          ativo?: boolean
+          comprado_por?: string | null
+          custo?: number | null
+          id?: string
+          id_portal: string
+          pull_run_id?: string | null
+          pulled_at?: string
+          tenant_id: string
+        }
+        Update: {
+          app_nome?: string
+          ativo?: boolean
+          comprado_por?: string | null
+          custo?: number | null
+          id?: string
+          id_portal?: string
+          pull_run_id?: string | null
+          pulled_at?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
+      hiper_filial_decisao: {
+        Row: {
+          cliente_id: string
+          decidido_em: string
+          decidido_por: string | null
+          decisao: string
+          id: string
+          observacao: string | null
+          tenant_id: string
+        }
+        Insert: {
+          cliente_id: string
+          decidido_em?: string
+          decidido_por?: string | null
+          decisao: string
+          id?: string
+          observacao?: string | null
+          tenant_id: string
+        }
+        Update: {
+          cliente_id?: string
+          decidido_em?: string
+          decidido_por?: string | null
+          decisao?: string
+          id?: string
+          observacao?: string | null
+          tenant_id?: string
         }
         Relationships: []
       }
@@ -3725,11 +4790,15 @@ export type Database = {
           fornecedor_id: number | null
           id: string
           integracao_pausada: boolean
+          portal_tenant_id: string | null
+          portal_tenant_nome: string | null
           puxar_desde: string | null
           sync_automatica_ativa: boolean
           sync_lote_tamanho: number
           sync_max_tentativas: number
           tenant_id: string
+          ultimo_pull_at: string | null
+          ultimo_pull_run_id: string | null
           ultimo_status: string
           ultimo_teste_at: string | null
           updated_at: string
@@ -3741,11 +4810,15 @@ export type Database = {
           fornecedor_id?: number | null
           id?: string
           integracao_pausada?: boolean
+          portal_tenant_id?: string | null
+          portal_tenant_nome?: string | null
           puxar_desde?: string | null
           sync_automatica_ativa?: boolean
           sync_lote_tamanho?: number
           sync_max_tentativas?: number
           tenant_id: string
+          ultimo_pull_at?: string | null
+          ultimo_pull_run_id?: string | null
           ultimo_status?: string
           ultimo_teste_at?: string | null
           updated_at?: string
@@ -3757,11 +4830,15 @@ export type Database = {
           fornecedor_id?: number | null
           id?: string
           integracao_pausada?: boolean
+          portal_tenant_id?: string | null
+          portal_tenant_nome?: string | null
           puxar_desde?: string | null
           sync_automatica_ativa?: boolean
           sync_lote_tamanho?: number
           sync_max_tentativas?: number
           tenant_id?: string
+          ultimo_pull_at?: string | null
+          ultimo_pull_run_id?: string | null
           ultimo_status?: string
           ultimo_teste_at?: string | null
           updated_at?: string
@@ -3776,6 +4853,96 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      hiper_plano_modulo: {
+        Row: {
+          criado_em: string
+          criado_por: string | null
+          id: string
+          modulo_id: string
+          plano: string
+          produto_id: number
+          quantidade_de: string
+          quantidade_fixa: number
+          tenant_id: string
+        }
+        Insert: {
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          modulo_id: string
+          plano: string
+          produto_id: number
+          quantidade_de?: string
+          quantidade_fixa?: number
+          tenant_id: string
+        }
+        Update: {
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          modulo_id?: string
+          plano?: string
+          produto_id?: number
+          quantidade_de?: string
+          quantidade_fixa?: number
+          tenant_id?: string
+        }
+        Relationships: []
+      }
+      hiper_sync_run: {
+        Row: {
+          contas: number | null
+          disparado_por: string | null
+          erro: string | null
+          filiais: number | null
+          id: string
+          iniciado_em: string
+          modulos: number | null
+          origem: string
+          paginas: number | null
+          recon_novas: number | null
+          recon_pendentes: number | null
+          status: string
+          tenant_id: string
+          terminado_em: string | null
+          truncado: boolean
+        }
+        Insert: {
+          contas?: number | null
+          disparado_por?: string | null
+          erro?: string | null
+          filiais?: number | null
+          id?: string
+          iniciado_em?: string
+          modulos?: number | null
+          origem?: string
+          paginas?: number | null
+          recon_novas?: number | null
+          recon_pendentes?: number | null
+          status?: string
+          tenant_id: string
+          terminado_em?: string | null
+          truncado?: boolean
+        }
+        Update: {
+          contas?: number | null
+          disparado_por?: string | null
+          erro?: string | null
+          filiais?: number | null
+          id?: string
+          iniciado_em?: string
+          modulos?: number | null
+          origem?: string
+          paginas?: number | null
+          recon_novas?: number | null
+          recon_pendentes?: number | null
+          status?: string
+          tenant_id?: string
+          terminado_em?: string | null
+          truncado?: boolean
+        }
+        Relationships: []
       }
       invites: {
         Row: {
@@ -4334,6 +5501,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "notification_subscriptions_user_fk"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "notification_subscriptions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -4456,6 +5630,75 @@ export type Database = {
           },
         ]
       }
+      oem_alteracao_log: {
+        Row: {
+          acao: string
+          campo: string | null
+          cliente_id: string | null
+          cliente_nome: string | null
+          cliente_produto_id: string | null
+          conta_integration_id: string | null
+          feito_em: string
+          feito_por: string | null
+          filial_codigo: string | null
+          id: string
+          lote_id: string
+          recon_id: string | null
+          registro_id: string | null
+          reversivel: boolean
+          revertido_em: string | null
+          revertido_por: string | null
+          tabela: string | null
+          tenant_id: string
+          valor_antes: Json | null
+          valor_depois: Json | null
+        }
+        Insert: {
+          acao: string
+          campo?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          cliente_produto_id?: string | null
+          conta_integration_id?: string | null
+          feito_em?: string
+          feito_por?: string | null
+          filial_codigo?: string | null
+          id?: string
+          lote_id: string
+          recon_id?: string | null
+          registro_id?: string | null
+          reversivel?: boolean
+          revertido_em?: string | null
+          revertido_por?: string | null
+          tabela?: string | null
+          tenant_id: string
+          valor_antes?: Json | null
+          valor_depois?: Json | null
+        }
+        Update: {
+          acao?: string
+          campo?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          cliente_produto_id?: string | null
+          conta_integration_id?: string | null
+          feito_em?: string
+          feito_por?: string | null
+          filial_codigo?: string | null
+          id?: string
+          lote_id?: string
+          recon_id?: string | null
+          registro_id?: string | null
+          reversivel?: boolean
+          revertido_em?: string | null
+          revertido_por?: string | null
+          tabela?: string | null
+          tenant_id?: string
+          valor_antes?: Json | null
+          valor_depois?: Json | null
+        }
+        Relationships: []
+      }
       oem_baixa_modulo_log: {
         Row: {
           cliente_produto_id: string | null
@@ -4510,6 +5753,68 @@ export type Database = {
         }
         Relationships: []
       }
+      oem_cadastro_licenca_log: {
+        Row: {
+          campo: string
+          cliente_id: string | null
+          conta_integration_id: string | null
+          criado_em: string
+          empresa_codigo: string | null
+          filial_codigo: string | null
+          http: number | null
+          id: string
+          ok: boolean
+          resposta: Json | null
+          simulado: boolean
+          tenant_id: string
+          usuario_id: string | null
+          valor_anterior: string | null
+          valor_novo: string | null
+        }
+        Insert: {
+          campo: string
+          cliente_id?: string | null
+          conta_integration_id?: string | null
+          criado_em?: string
+          empresa_codigo?: string | null
+          filial_codigo?: string | null
+          http?: number | null
+          id?: string
+          ok?: boolean
+          resposta?: Json | null
+          simulado?: boolean
+          tenant_id: string
+          usuario_id?: string | null
+          valor_anterior?: string | null
+          valor_novo?: string | null
+        }
+        Update: {
+          campo?: string
+          cliente_id?: string | null
+          conta_integration_id?: string | null
+          criado_em?: string
+          empresa_codigo?: string | null
+          filial_codigo?: string | null
+          http?: number | null
+          id?: string
+          ok?: boolean
+          resposta?: Json | null
+          simulado?: boolean
+          tenant_id?: string
+          usuario_id?: string | null
+          valor_anterior?: string | null
+          valor_novo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_cadastro_licenca_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oem_espelho_filial: {
         Row: {
           atualizado_em: string
@@ -4518,7 +5823,9 @@ export type Database = {
           cnpj_oem: string | null
           conta_integration_id: string | null
           custo_total: number | null
+          desativa_em: string | null
           empresa_codigo: string
+          estado_lido_em: string | null
           filial_codigo: string
           grupo_economico: string | null
           id: string
@@ -4541,7 +5848,9 @@ export type Database = {
           cnpj_oem?: string | null
           conta_integration_id?: string | null
           custo_total?: number | null
+          desativa_em?: string | null
           empresa_codigo: string
+          estado_lido_em?: string | null
           filial_codigo: string
           grupo_economico?: string | null
           id?: string
@@ -4564,7 +5873,9 @@ export type Database = {
           cnpj_oem?: string | null
           conta_integration_id?: string | null
           custo_total?: number | null
+          desativa_em?: string | null
           empresa_codigo?: string
+          estado_lido_em?: string | null
           filial_codigo?: string
           grupo_economico?: string | null
           id?: string
@@ -4661,6 +5972,77 @@ export type Database = {
           },
           {
             foreignKeyName: "oem_espelho_modulo_preco_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oem_estado_licenca_log: {
+        Row: {
+          acao: string
+          bloqueado_antes: boolean | null
+          bloqueado_depois: boolean | null
+          cliente_id: string | null
+          confirmado: boolean | null
+          conta_integration_id: string | null
+          criado_em: string
+          desativado_antes: boolean | null
+          desativado_depois: boolean | null
+          empresa_codigo: string | null
+          filial_codigo: string | null
+          http: number | null
+          id: string
+          ok: boolean
+          resposta: Json | null
+          simulado: boolean
+          tenant_id: string
+          usuario_id: string | null
+        }
+        Insert: {
+          acao: string
+          bloqueado_antes?: boolean | null
+          bloqueado_depois?: boolean | null
+          cliente_id?: string | null
+          confirmado?: boolean | null
+          conta_integration_id?: string | null
+          criado_em?: string
+          desativado_antes?: boolean | null
+          desativado_depois?: boolean | null
+          empresa_codigo?: string | null
+          filial_codigo?: string | null
+          http?: number | null
+          id?: string
+          ok?: boolean
+          resposta?: Json | null
+          simulado?: boolean
+          tenant_id: string
+          usuario_id?: string | null
+        }
+        Update: {
+          acao?: string
+          bloqueado_antes?: boolean | null
+          bloqueado_depois?: boolean | null
+          cliente_id?: string | null
+          confirmado?: boolean | null
+          conta_integration_id?: string | null
+          criado_em?: string
+          desativado_antes?: boolean | null
+          desativado_depois?: boolean | null
+          empresa_codigo?: string | null
+          filial_codigo?: string | null
+          http?: number | null
+          id?: string
+          ok?: boolean
+          resposta?: Json | null
+          simulado?: boolean
+          tenant_id?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_estado_licenca_log_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -4870,6 +6252,8 @@ export type Database = {
           acao: string
           cliente_produto_id: string | null
           conta_integration_id: string | null
+          decidido_em: string | null
+          decidido_por: string | null
           empresa_codigo: string | null
           enfileirado_em: string
           filial_codigo: string | null
@@ -4877,6 +6261,7 @@ export type Database = {
           id: string
           modulo_catalogo_id: string | null
           modulo_linha_id: string | null
+          motivo_recusa: string | null
           oem_modulo_codigo: number | null
           payload: Json | null
           processado_em: string | null
@@ -4894,6 +6279,8 @@ export type Database = {
           acao: string
           cliente_produto_id?: string | null
           conta_integration_id?: string | null
+          decidido_em?: string | null
+          decidido_por?: string | null
           empresa_codigo?: string | null
           enfileirado_em?: string
           filial_codigo?: string | null
@@ -4901,6 +6288,7 @@ export type Database = {
           id?: string
           modulo_catalogo_id?: string | null
           modulo_linha_id?: string | null
+          motivo_recusa?: string | null
           oem_modulo_codigo?: number | null
           payload?: Json | null
           processado_em?: string | null
@@ -4918,6 +6306,8 @@ export type Database = {
           acao?: string
           cliente_produto_id?: string | null
           conta_integration_id?: string | null
+          decidido_em?: string | null
+          decidido_por?: string | null
           empresa_codigo?: string | null
           enfileirado_em?: string
           filial_codigo?: string | null
@@ -4925,6 +6315,7 @@ export type Database = {
           id?: string
           modulo_catalogo_id?: string | null
           modulo_linha_id?: string | null
+          motivo_recusa?: string | null
           oem_modulo_codigo?: number | null
           payload?: Json | null
           processado_em?: string | null
@@ -4945,6 +6336,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "cliente_produtos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_sync_fila_cliente_produto_id_fkey"
+            columns: ["cliente_produto_id"]
+            isOneToOne: false
+            referencedRelation: "v_oem_divergencia_modulo"
+            referencedColumns: ["cliente_produto_id"]
           },
           {
             foreignKeyName: "oem_sync_fila_conta_integration_id_fkey"
@@ -5134,6 +6532,7 @@ export type Database = {
           tenant_id: string
           tentativas: number
           ultimo_erro: string | null
+          usuario_id: string | null
         }
         Insert: {
           campos_alterados?: string[] | null
@@ -5148,6 +6547,7 @@ export type Database = {
           tenant_id: string
           tentativas?: number
           ultimo_erro?: string | null
+          usuario_id?: string | null
         }
         Update: {
           campos_alterados?: string[] | null
@@ -5162,6 +6562,7 @@ export type Database = {
           tenant_id?: string
           tentativas?: number
           ultimo_erro?: string | null
+          usuario_id?: string | null
         }
         Relationships: [
           {
@@ -5391,6 +6792,71 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "onboarding_indicators_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_intake_log: {
+        Row: {
+          avisos: Json | null
+          cliente_id: string | null
+          cliente_reusado: boolean | null
+          contrato_id: string | null
+          created_at: string
+          erro: Json | null
+          external_ticket_id: string
+          id: string
+          journey_id: string | null
+          modo: string | null
+          omie_liberado_em: string | null
+          omie_liberado_por: string | null
+          payload: Json
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          avisos?: Json | null
+          cliente_id?: string | null
+          cliente_reusado?: boolean | null
+          contrato_id?: string | null
+          created_at?: string
+          erro?: Json | null
+          external_ticket_id: string
+          id?: string
+          journey_id?: string | null
+          modo?: string | null
+          omie_liberado_em?: string | null
+          omie_liberado_por?: string | null
+          payload: Json
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          avisos?: Json | null
+          cliente_id?: string | null
+          cliente_reusado?: boolean | null
+          contrato_id?: string | null
+          created_at?: string
+          erro?: Json | null
+          external_ticket_id?: string
+          id?: string
+          journey_id?: string | null
+          modo?: string | null
+          omie_liberado_em?: string | null
+          omie_liberado_por?: string | null
+          payload?: Json
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_intake_log_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -5633,6 +7099,7 @@ export type Database = {
           origem: string
           position: number
           produto_modulo_id: string | null
+          quantidade: number
           tenant_id: string
         }
         Insert: {
@@ -5643,6 +7110,7 @@ export type Database = {
           origem?: string
           position?: number
           produto_modulo_id?: string | null
+          quantidade?: number
           tenant_id: string
         }
         Update: {
@@ -5653,6 +7121,7 @@ export type Database = {
           origem?: string
           position?: number
           produto_modulo_id?: string | null
+          quantidade?: number
           tenant_id?: string
         }
         Relationships: [
@@ -5751,6 +7220,7 @@ export type Database = {
           pipeline_implantacao_id: string | null
           pipeline_onboarding_id: string | null
           produto_id: number | null
+          proposta_payload: Json | null
           responsavel_user_id: string | null
           situacao: Database["public"]["Enums"]["onb_situacao"]
           sla_encerrado_em: string | null
@@ -5778,6 +7248,7 @@ export type Database = {
           pipeline_implantacao_id?: string | null
           pipeline_onboarding_id?: string | null
           produto_id?: number | null
+          proposta_payload?: Json | null
           responsavel_user_id?: string | null
           situacao?: Database["public"]["Enums"]["onb_situacao"]
           sla_encerrado_em?: string | null
@@ -5805,6 +7276,7 @@ export type Database = {
           pipeline_implantacao_id?: string | null
           pipeline_onboarding_id?: string | null
           produto_id?: number | null
+          proposta_payload?: Json | null
           responsavel_user_id?: string | null
           situacao?: Database["public"]["Enums"]["onb_situacao"]
           sla_encerrado_em?: string | null
@@ -5892,6 +7364,7 @@ export type Database = {
           ativo: boolean
           cor: string
           created_at: string
+          department_id: string | null
           id: string
           nome: string
           position: number
@@ -5903,6 +7376,7 @@ export type Database = {
           ativo?: boolean
           cor?: string
           created_at?: string
+          department_id?: string | null
           id?: string
           nome: string
           position?: number
@@ -5914,6 +7388,7 @@ export type Database = {
           ativo?: boolean
           cor?: string
           created_at?: string
+          department_id?: string | null
           id?: string
           nome?: string
           position?: number
@@ -5922,6 +7397,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "onboarding_participant_roles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "onboarding_participant_roles_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -6703,6 +8185,13 @@ export type Database = {
             referencedRelation: "vw_onboarding_training_cards"
             referencedColumns: ["training_id"]
           },
+          {
+            foreignKeyName: "onboarding_training_participants_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_kpis"
+            referencedColumns: ["id"]
+          },
         ]
       }
       onboarding_training_sessions: {
@@ -6918,6 +8407,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_onboarding_training_cards"
             referencedColumns: ["training_id"]
+          },
+          {
+            foreignKeyName: "onboarding_training_stage_history_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: false
+            referencedRelation: "vw_onboarding_training_kpis"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -7201,6 +8697,7 @@ export type Database = {
       }
       produtos: {
         Row: {
+          cor: string | null
           fornecedor_id: number | null
           id: number
           nome: string
@@ -7213,6 +8710,7 @@ export type Database = {
           tenant_id: string | null
         }
         Insert: {
+          cor?: string | null
           fornecedor_id?: number | null
           id?: number
           nome: string
@@ -7225,6 +8723,7 @@ export type Database = {
           tenant_id?: string | null
         }
         Update: {
+          cor?: string | null
           fornecedor_id?: number | null
           id?: number
           nome?: string
@@ -7658,6 +9157,123 @@ export type Database = {
           },
         ]
       }
+      reconciliacao_hiper: {
+        Row: {
+          cancelada_em: string | null
+          cancelada_por: string | null
+          cancelado_ds: boolean | null
+          candidato_escolhido: string | null
+          cnpj_ds: string | null
+          cnpj_norm: string | null
+          codigo_sequencial_ds: number | null
+          criterio_match: string | null
+          custo_ds: number | null
+          custo_hiper: number | null
+          detalhe: Json
+          divergencias: string[]
+          divisor_periodo: number
+          ds_cliente_id: string | null
+          ds_cliente_produto_id: string | null
+          estado_match: string
+          gerado_em: string
+          id: string
+          id_portal: string | null
+          margem: number | null
+          mensalidade_ds: number | null
+          modelo_contrato_ds: string | null
+          modelo_contrato_id_ds: number | null
+          mrr_hiper: number | null
+          observacao: string | null
+          plano_hiper: string | null
+          qtd_candidatos_ds: number
+          razao_social_ds: string | null
+          razao_social_hiper: string | null
+          recorrencia_ds: string | null
+          resolvido_em: string | null
+          resolvido_por: string | null
+          responsavel_tipo: string | null
+          situacao_hiper: string | null
+          status_usuario: string
+          tenant_id: string
+        }
+        Insert: {
+          cancelada_em?: string | null
+          cancelada_por?: string | null
+          cancelado_ds?: boolean | null
+          candidato_escolhido?: string | null
+          cnpj_ds?: string | null
+          cnpj_norm?: string | null
+          codigo_sequencial_ds?: number | null
+          criterio_match?: string | null
+          custo_ds?: number | null
+          custo_hiper?: number | null
+          detalhe?: Json
+          divergencias?: string[]
+          divisor_periodo?: number
+          ds_cliente_id?: string | null
+          ds_cliente_produto_id?: string | null
+          estado_match: string
+          gerado_em?: string
+          id?: string
+          id_portal?: string | null
+          margem?: number | null
+          mensalidade_ds?: number | null
+          modelo_contrato_ds?: string | null
+          modelo_contrato_id_ds?: number | null
+          mrr_hiper?: number | null
+          observacao?: string | null
+          plano_hiper?: string | null
+          qtd_candidatos_ds?: number
+          razao_social_ds?: string | null
+          razao_social_hiper?: string | null
+          recorrencia_ds?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          responsavel_tipo?: string | null
+          situacao_hiper?: string | null
+          status_usuario?: string
+          tenant_id: string
+        }
+        Update: {
+          cancelada_em?: string | null
+          cancelada_por?: string | null
+          cancelado_ds?: boolean | null
+          candidato_escolhido?: string | null
+          cnpj_ds?: string | null
+          cnpj_norm?: string | null
+          codigo_sequencial_ds?: number | null
+          criterio_match?: string | null
+          custo_ds?: number | null
+          custo_hiper?: number | null
+          detalhe?: Json
+          divergencias?: string[]
+          divisor_periodo?: number
+          ds_cliente_id?: string | null
+          ds_cliente_produto_id?: string | null
+          estado_match?: string
+          gerado_em?: string
+          id?: string
+          id_portal?: string | null
+          margem?: number | null
+          mensalidade_ds?: number | null
+          modelo_contrato_ds?: string | null
+          modelo_contrato_id_ds?: number | null
+          mrr_hiper?: number | null
+          observacao?: string | null
+          plano_hiper?: string | null
+          qtd_candidatos_ds?: number
+          razao_social_ds?: string | null
+          razao_social_hiper?: string | null
+          recorrencia_ds?: string | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          responsavel_tipo?: string | null
+          situacao_hiper?: string | null
+          status_usuario?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       reconciliacao_oem: {
         Row: {
           acao_sugerida: string | null
@@ -7669,6 +9285,7 @@ export type Database = {
           conta_integration_id: string | null
           criterio_match: string | null
           custo_oem: number | null
+          desativa_em: string | null
           divergencias: string[] | null
           ds_customer_id: string | null
           empresa_codigo: string | null
@@ -7676,6 +9293,7 @@ export type Database = {
           filial_codigo: string | null
           gerado_em: string
           id: string
+          ignoradas: Json | null
           margem: number | null
           mensalidade_ds: number | null
           observacao: string | null
@@ -7700,6 +9318,7 @@ export type Database = {
           conta_integration_id?: string | null
           criterio_match?: string | null
           custo_oem?: number | null
+          desativa_em?: string | null
           divergencias?: string[] | null
           ds_customer_id?: string | null
           empresa_codigo?: string | null
@@ -7707,6 +9326,7 @@ export type Database = {
           filial_codigo?: string | null
           gerado_em?: string
           id?: string
+          ignoradas?: Json | null
           margem?: number | null
           mensalidade_ds?: number | null
           observacao?: string | null
@@ -7731,6 +9351,7 @@ export type Database = {
           conta_integration_id?: string | null
           criterio_match?: string | null
           custo_oem?: number | null
+          desativa_em?: string | null
           divergencias?: string[] | null
           ds_customer_id?: string | null
           empresa_codigo?: string | null
@@ -7738,6 +9359,7 @@ export type Database = {
           filial_codigo?: string | null
           gerado_em?: string
           id?: string
+          ignoradas?: Json | null
           margem?: number | null
           mensalidade_ds?: number | null
           observacao?: string | null
@@ -8239,6 +9861,51 @@ export type Database = {
         }
         Relationships: []
       }
+      support_attendance_greetings: {
+        Row: {
+          attendance_id: string
+          claimed_at: string
+          conversation_id: string | null
+          error: string | null
+          sent_at: string | null
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          attendance_id: string
+          claimed_at?: string
+          conversation_id?: string | null
+          error?: string | null
+          sent_at?: string | null
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          attendance_id?: string
+          claimed_at?: string
+          conversation_id?: string | null
+          error?: string | null
+          sent_at?: string | null
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_attendance_greetings_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: true
+            referencedRelation: "support_attendances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_attendance_greetings_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: true
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["attendance_id"]
+          },
+        ]
+      }
       support_attendance_sequences: {
         Row: {
           ano: number
@@ -8262,6 +9929,7 @@ export type Database = {
           acceptance_deadline_at: string | null
           agent_alert_notified_at: string | null
           ai_category: string | null
+          ai_customer_summary: string | null
           ai_problem: string | null
           ai_solution: string | null
           ai_summary: string | null
@@ -8286,6 +9954,7 @@ export type Database = {
           csat_score: number | null
           csat_sent: boolean | null
           department_id: string | null
+          email_skip_reason: string | null
           first_human_response_at: string | null
           first_response_at: string | null
           first_response_business_seconds: number | null
@@ -8295,6 +9964,8 @@ export type Database = {
           id: string
           inactivity_eod_close_at: string | null
           inactivity_hold: boolean
+          inactivity_hold_reason: string | null
+          inactivity_hold_until: string | null
           inactivity_warning_sent_at: string | null
           instance_id: string | null
           is_group: boolean
@@ -8308,6 +9979,8 @@ export type Database = {
           opened_by: string | null
           participant_label: string | null
           participant_type: string | null
+          plantao: boolean | null
+          plantao_em: string | null
           queue_priority: number
           queue_retries: number
           queued_at: string | null
@@ -8344,6 +10017,7 @@ export type Database = {
           acceptance_deadline_at?: string | null
           agent_alert_notified_at?: string | null
           ai_category?: string | null
+          ai_customer_summary?: string | null
           ai_problem?: string | null
           ai_solution?: string | null
           ai_summary?: string | null
@@ -8368,6 +10042,7 @@ export type Database = {
           csat_score?: number | null
           csat_sent?: boolean | null
           department_id?: string | null
+          email_skip_reason?: string | null
           first_human_response_at?: string | null
           first_response_at?: string | null
           first_response_business_seconds?: number | null
@@ -8377,6 +10052,8 @@ export type Database = {
           id?: string
           inactivity_eod_close_at?: string | null
           inactivity_hold?: boolean
+          inactivity_hold_reason?: string | null
+          inactivity_hold_until?: string | null
           inactivity_warning_sent_at?: string | null
           instance_id?: string | null
           is_group?: boolean
@@ -8390,6 +10067,8 @@ export type Database = {
           opened_by?: string | null
           participant_label?: string | null
           participant_type?: string | null
+          plantao?: boolean | null
+          plantao_em?: string | null
           queue_priority?: number
           queue_retries?: number
           queued_at?: string | null
@@ -8426,6 +10105,7 @@ export type Database = {
           acceptance_deadline_at?: string | null
           agent_alert_notified_at?: string | null
           ai_category?: string | null
+          ai_customer_summary?: string | null
           ai_problem?: string | null
           ai_solution?: string | null
           ai_summary?: string | null
@@ -8450,6 +10130,7 @@ export type Database = {
           csat_score?: number | null
           csat_sent?: boolean | null
           department_id?: string | null
+          email_skip_reason?: string | null
           first_human_response_at?: string | null
           first_response_at?: string | null
           first_response_business_seconds?: number | null
@@ -8459,6 +10140,8 @@ export type Database = {
           id?: string
           inactivity_eod_close_at?: string | null
           inactivity_hold?: boolean
+          inactivity_hold_reason?: string | null
+          inactivity_hold_until?: string | null
           inactivity_warning_sent_at?: string | null
           instance_id?: string | null
           is_group?: boolean
@@ -8472,6 +10155,8 @@ export type Database = {
           opened_by?: string | null
           participant_label?: string | null
           participant_type?: string | null
+          plantao?: boolean | null
+          plantao_em?: string | null
           queue_priority?: number
           queue_retries?: number
           queued_at?: string | null
@@ -8783,6 +10468,7 @@ export type Database = {
           media_retention_days: number
           media_retention_enabled: boolean
           name: string
+          off_hours_release_to_queue: boolean
           requires_ticket_on_close: boolean
           show_in_ura: boolean
           sla_frt_seconds: number | null
@@ -8818,6 +10504,7 @@ export type Database = {
           media_retention_days?: number
           media_retention_enabled?: boolean
           name: string
+          off_hours_release_to_queue?: boolean
           requires_ticket_on_close?: boolean
           show_in_ura?: boolean
           sla_frt_seconds?: number | null
@@ -8853,6 +10540,7 @@ export type Database = {
           media_retention_days?: number
           media_retention_enabled?: boolean
           name?: string
+          off_hours_release_to_queue?: boolean
           requires_ticket_on_close?: boolean
           show_in_ura?: boolean
           sla_frt_seconds?: number | null
@@ -9070,6 +10758,7 @@ export type Database = {
         Row: {
           content: string | null
           created_at: string
+          edited_at: string | null
           event_type: string
           id: string
           new_value: string | null
@@ -9082,6 +10771,7 @@ export type Database = {
         Insert: {
           content?: string | null
           created_at?: string
+          edited_at?: string | null
           event_type: string
           id?: string
           new_value?: string | null
@@ -9094,6 +10784,7 @@ export type Database = {
         Update: {
           content?: string | null
           created_at?: string
+          edited_at?: string | null
           event_type?: string
           id?: string
           new_value?: string | null
@@ -10045,6 +11736,90 @@ export type Database = {
         }
         Relationships: []
       }
+      user_dashboards: {
+        Row: {
+          created_at: string
+          id: string
+          layout: Json
+          tenant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          layout?: Json
+          tenant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          layout?: Json
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_permissions: {
+        Row: {
+          can_delete: boolean | null
+          can_insert: boolean | null
+          can_update: boolean | null
+          can_view: boolean | null
+          created_at: string
+          id: string
+          resource_key: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          can_delete?: boolean | null
+          can_insert?: boolean | null
+          can_update?: boolean | null
+          can_view?: boolean | null
+          created_at?: string
+          id?: string
+          resource_key: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          can_delete?: boolean | null
+          can_insert?: boolean | null
+          can_update?: boolean | null
+          can_view?: boolean | null
+          created_at?: string
+          id?: string
+          resource_key?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_resource_key_fkey"
+            columns: ["resource_key"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "user_permissions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_preferences: {
         Row: {
           alert_background: string
@@ -10406,6 +12181,93 @@ export type Database = {
           },
           {
             foreignKeyName: "whatsapp_conversation_summaries_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_conversation_tag_assignments: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          tag_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          tag_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversation_tag_assignments_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversation_tag_assignments_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversation_tag_assignments_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversation_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_conversation_tags: {
+        Row: {
+          color: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversation_tags_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -11517,9 +13379,122 @@ export type Database = {
           },
         ]
       }
+      whatsapp_scheduled_messages: {
+        Row: {
+          attempts: number
+          cancel_if_client_replies: boolean
+          cancel_reason: string | null
+          canceled_at: string | null
+          canceled_by: string | null
+          claimed_at: string | null
+          content: string
+          conversation_id: string
+          created_at: string
+          created_by: string
+          id: string
+          instance_id: string | null
+          last_error: string | null
+          media_file_name: string | null
+          media_mimetype: string | null
+          media_size_bytes: number | null
+          message_type: string
+          scheduled_at: string
+          sent_at: string | null
+          sent_message_id: string | null
+          status: string
+          storage_path: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          cancel_if_client_replies?: boolean
+          cancel_reason?: string | null
+          canceled_at?: string | null
+          canceled_by?: string | null
+          claimed_at?: string | null
+          content?: string
+          conversation_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          instance_id?: string | null
+          last_error?: string | null
+          media_file_name?: string | null
+          media_mimetype?: string | null
+          media_size_bytes?: number | null
+          message_type?: string
+          scheduled_at: string
+          sent_at?: string | null
+          sent_message_id?: string | null
+          status?: string
+          storage_path?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          cancel_if_client_replies?: boolean
+          cancel_reason?: string | null
+          canceled_at?: string | null
+          canceled_by?: string | null
+          claimed_at?: string | null
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          instance_id?: string | null
+          last_error?: string | null
+          media_file_name?: string | null
+          media_mimetype?: string | null
+          media_size_bytes?: number | null
+          message_type?: string
+          scheduled_at?: string
+          sent_at?: string | null
+          sent_message_id?: string | null
+          status?: string
+          storage_path?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_scheduled_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_scheduled_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_scheduled_messages_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_scheduled_messages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_sentiment_analysis: {
         Row: {
           churn_alerted_at: string | null
+          churn_dismissed_at: string | null
+          churn_dismissed_attendance_id: string | null
+          churn_dismissed_by: string | null
           confidence: number | null
           contact_id: string | null
           conversation_id: string
@@ -11536,6 +13511,9 @@ export type Database = {
         }
         Insert: {
           churn_alerted_at?: string | null
+          churn_dismissed_at?: string | null
+          churn_dismissed_attendance_id?: string | null
+          churn_dismissed_by?: string | null
           confidence?: number | null
           contact_id?: string | null
           conversation_id: string
@@ -11552,6 +13530,9 @@ export type Database = {
         }
         Update: {
           churn_alerted_at?: string | null
+          churn_dismissed_at?: string | null
+          churn_dismissed_attendance_id?: string | null
+          churn_dismissed_by?: string | null
           confidence?: number | null
           contact_id?: string | null
           conversation_id?: string
@@ -11812,6 +13793,120 @@ export type Database = {
           },
         ]
       }
+      v_oem_divergencia_estado: {
+        Row: {
+          acao: string | null
+          baixa_vigente: boolean | null
+          bloqueado_oem: boolean | null
+          cliente: string | null
+          cliente_id: string | null
+          confirmado: boolean | null
+          conta_integration_id: string | null
+          desativa_em: string | null
+          dimensao: string | null
+          filial_codigo: string | null
+          last_sync_oem: string | null
+          licenca: string | null
+          pedido_em: string | null
+          status_oem: string | null
+          tenant_id: string | null
+          tipo: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_estado_licenca_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_oem_divergencia_modulo: {
+        Row: {
+          ativo_no_oem: boolean | null
+          baixa_em: string | null
+          baixa_futura: boolean | null
+          cancelado_em: string | null
+          cancelado_na_ficha: boolean | null
+          cliente: string | null
+          cliente_id: string | null
+          cliente_produto_id: string | null
+          codigo: number | null
+          conta_integration_id: string | null
+          filial_codigo: string | null
+          last_sync_oem: string | null
+          modulo: string | null
+          qtd_ficha: number | null
+          qtd_oem: number | null
+          tenant_id: string | null
+          tipo: string | null
+          vivo_na_ficha: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_produtos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produtos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produtos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_espelho_conta_fk"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "oem_integration"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_espelho_conta_fk"
+            columns: ["conta_integration_id"]
+            isOneToOne: false
+            referencedRelation: "oem_integration_status"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_oem_mudanca_custo_modulo: {
+        Row: {
+          clientes: number | null
+          dia: string | null
+          modulo_id: string | null
+          modulo_nome: string | null
+          ocorrido_em: string | null
+          so_total: boolean | null
+          tenant_id: string | null
+          total_anterior: number | null
+          total_novo: number | null
+          unidade_base_id: number | null
+          valor_anterior: number | null
+          valor_novo: number | null
+          variacao_mensal: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_unidade_base_id_fkey"
+            columns: ["unidade_base_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_base"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_whatsapp_conversations_state: {
         Row: {
           agent_alert_due_at: string | null
@@ -11873,6 +13968,7 @@ export type Database = {
       vw_clientes_financeiro: {
         Row: {
           area_atuacao_id: number | null
+          busca_nome: string | null
           cancelado: boolean | null
           cert_a1_ultima_venda_em: string | null
           cert_a1_ultimo_vendedor_id: number | null
@@ -12337,11 +14433,27 @@ export type Database = {
           },
         ]
       }
+      vw_onboarding_stage_attribution: {
+        Row: {
+          duracao_minutos: number | null
+          duracao_util_minutos: number | null
+          entrou_em: string | null
+          journey_id: string | null
+          origem: string | null
+          responsavel_user_id: string | null
+          saiu_em: string | null
+          stage_id: string | null
+          tenant_id: string | null
+        }
+        Relationships: []
+      }
       vw_onboarding_training_cards: {
         Row: {
           agendado_para: string | null
           cancelado_em: string | null
           cancelado_na_implantacao: boolean | null
+          cancelado_por: string | null
+          cancelado_por_nome: string | null
           chamada_pendente: boolean | null
           cliente_id: string | null
           cliente_nome: string | null
@@ -12447,18 +14559,24 @@ export type Database = {
       vw_onboarding_training_kpis: {
         Row: {
           agendado_para: string | null
+          cancelado_em: string | null
+          cancelado_por: string | null
           conduzido_por: string | null
           conta_como_pdv: boolean | null
+          id: string | null
           is_retreinamento: boolean | null
           journey_id: string | null
           no_show: boolean | null
+          no_shows: number | null
           proprietario_presente: boolean | null
           realizado_em: string | null
           status: Database["public"]["Enums"]["onb_treino_status"] | null
           tenant_id: string | null
           tentativas: number | null
           tipo_nome: string | null
+          titulo: string | null
           training_type_id: string | null
+          ultimo_no_show_em: string | null
         }
         Relationships: [
           {
@@ -12739,6 +14857,7 @@ export type Database = {
       cancel_cliente_produto: {
         Args: {
           p_cliente_produto_id: string
+          p_data?: string
           p_motivo_id: number
           p_observacao?: string
         }
@@ -12751,6 +14870,7 @@ export type Database = {
       cancelar_contrato: {
         Args: {
           p_contrato_id: string
+          p_data?: string
           p_motivo_id?: number
           p_observacao?: string
         }
@@ -12803,10 +14923,7 @@ export type Database = {
         }
         Returns: Json
       }
-      contrato_anexo_excluir: {
-        Args: { p_anexo_id: string }
-        Returns: string
-      }
+      contrato_anexo_excluir: { Args: { p_anexo_id: string }; Returns: string }
       contrato_anexo_remover: {
         Args: { p_contrato_id: string }
         Returns: string
@@ -13024,6 +15141,8 @@ export type Database = {
         }[]
       }
       cron_anexo_omie: { Args: never; Returns: undefined }
+      cron_hiper_sync: { Args: never; Returns: undefined }
+      cron_ler_emails_recebidos: { Args: never; Returns: undefined }
       cron_oem_espelho: { Args: never; Returns: undefined }
       cron_oem_sync: { Args: never; Returns: undefined }
       cron_recon_espelho: { Args: never; Returns: undefined }
@@ -13070,6 +15189,10 @@ export type Database = {
         Args: { p_participant_id: string }
         Returns: Json
       }
+      desistir_onboarding_training: {
+        Args: { p_training_id: string }
+        Returns: Json
+      }
       desvincular_filial_oem: {
         Args: { p_recon_id: string }
         Returns: undefined
@@ -13095,6 +15218,10 @@ export type Database = {
         }
         Returns: Json
       }
+      editar_nota_agente: {
+        Args: { p_content: string; p_event_id: string }
+        Returns: Json
+      }
       email_domain: { Args: { email: string }; Returns: string }
       enable_rbac_for_tenant: { Args: { p_tenant_id?: string }; Returns: Json }
       encrypt_api_key: {
@@ -13108,11 +15235,13 @@ export type Database = {
       estornar_reajuste: { Args: { p_reajuste_id: string }; Returns: Json }
       exec_db_health_query: { Args: { query_text: string }; Returns: Json }
       exec_db_maintenance: { Args: { action: string }; Returns: string }
+      f_unaccent: { Args: { p_texto: string }; Returns: string }
       fmt_brl: { Args: { n: number }; Returns: string }
       fn_acompanhamento_first_stage: {
         Args: { p_tenant_id: string }
         Returns: string
       }
+      fn_acting_source: { Args: never; Returns: string }
       fn_acting_user: { Args: never; Returns: string }
       fn_add_business_days: {
         Args: {
@@ -13131,6 +15260,32 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: Json
       }
+      fn_atendimento_plantao_em: {
+        Args: {
+          p_assumed_at: string
+          p_closed_at: string
+          p_conversation_id: string
+          p_department_id: string
+          p_first_human_at: string
+          p_opened_at: string
+          p_tenant_id: string
+          p_tolerancia_min?: number
+        }
+        Returns: string
+      }
+      fn_atendimento_teve_plantao: {
+        Args: {
+          p_assumed_at: string
+          p_closed_at: string
+          p_conversation_id: string
+          p_department_id: string
+          p_first_human_at: string
+          p_opened_at: string
+          p_tenant_id: string
+          p_tolerancia_min?: number
+        }
+        Returns: boolean
+      }
       fn_ativacao_dos_modulos: {
         Args: { p_cliente_produto_id: string }
         Returns: number
@@ -13144,6 +15299,73 @@ export type Database = {
           p_tenant_id: string
         }
         Returns: string
+      }
+      fn_cadastro_calcular_reajuste: {
+        Args: {
+          p_ids?: string[]
+          p_produto_id?: number
+          p_tenant_id: string
+          p_unidades?: number[]
+        }
+        Returns: Json
+      }
+      fn_cadastro_incompleto_lista: {
+        Args: {
+          p_busca?: string
+          p_campo: string
+          p_dir?: string
+          p_limite?: number
+          p_offset?: number
+          p_ordem?: string
+          p_produto_id?: number
+          p_tenant_id: string
+          p_unidades?: number[]
+        }
+        Returns: {
+          cliente_id: string
+          cliente_nome: string
+          codigo: number
+          data_cadastro: string
+          detalhe: string
+          registro_id: string
+          total: number
+          unidade: string
+        }[]
+      }
+      fn_cadastro_incompleto_resumo: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          campo: string
+          em_lote: boolean
+          escopo: string
+          faltando: number
+          indicador: string
+          rotulo: string
+        }[]
+      }
+      fn_cadastro_preencher_cidade: {
+        Args: { p_itens: Json; p_tenant_id: string }
+        Returns: Json
+      }
+      fn_cadastro_preencher_lote: {
+        Args: {
+          p_campo: string
+          p_ids: string[]
+          p_tenant_id: string
+          p_valor: string
+        }
+        Returns: Json
+      }
+      fn_can_manage_scheduled_message: {
+        Args: { p_id: string }
+        Returns: boolean
+      }
+      fn_cancel_scheduled_message: {
+        Args: { p_id: string; p_reason?: string }
+        Returns: {
+          ok: boolean
+          storage_path: string
+        }[]
       }
       fn_cancelar_modulo_aplicar: {
         Args: {
@@ -13186,6 +15408,45 @@ export type Database = {
         }[]
       }
       fn_check_acceptance_timeouts: { Args: never; Returns: Json }
+      fn_churn_descarte_ativo: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
+      fn_claim_due_scheduled_messages: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          cancel_if_client_replies: boolean
+          cancel_reason: string | null
+          canceled_at: string | null
+          canceled_by: string | null
+          claimed_at: string | null
+          content: string
+          conversation_id: string
+          created_at: string
+          created_by: string
+          id: string
+          instance_id: string | null
+          last_error: string | null
+          media_file_name: string | null
+          media_mimetype: string | null
+          media_size_bytes: number | null
+          message_type: string
+          scheduled_at: string
+          sent_at: string | null
+          sent_message_id: string | null
+          status: string
+          storage_path: string | null
+          tenant_id: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "whatsapp_scheduled_messages"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       fn_close_attendance_atomic: {
         Args: {
           p_attendance_id: string
@@ -13227,11 +15488,19 @@ export type Database = {
       }
       fn_cohort_revenue: {
         Args: {
+          p_area_atuacao_ids?: number[]
+          p_cidade_ids?: number[]
           p_dimensao?: string
+          p_estado_ids?: number[]
+          p_faixas?: string[]
           p_fornecedor_id?: number
           p_fornecedor_ids?: number[]
           p_from_month?: string
+          p_funcionario_ids?: number[]
           p_max_age?: number
+          p_origem_venda_ids?: number[]
+          p_produto_ids?: number[]
+          p_segmento_ids?: number[]
           p_tenant_id?: string
           p_to_month?: string
           p_unidade_base_id?: number
@@ -13251,10 +15520,18 @@ export type Database = {
       }
       fn_cohort_saldo_forecast: {
         Args: {
+          p_area_atuacao_ids?: number[]
+          p_cidade_ids?: number[]
+          p_estado_ids?: number[]
+          p_faixas?: string[]
           p_fornecedor_id?: number
           p_fornecedor_ids?: number[]
+          p_funcionario_ids?: number[]
           p_horizontes?: number[]
           p_janela_meses?: number
+          p_origem_venda_ids?: number[]
+          p_produto_ids?: number[]
+          p_segmento_ids?: number[]
           p_tenant_id?: string
           p_unidade_base_id?: number
         }
@@ -13291,6 +15568,10 @@ export type Database = {
           retencao_mrr_esp_pct: number
         }[]
       }
+      fn_conversa_atendimento_ativo: {
+        Args: { p_conversation_id: string }
+        Returns: string
+      }
       fn_create_acompanhamento_ticket: {
         Args: {
           p_cliente_id: string
@@ -13312,6 +15593,14 @@ export type Database = {
         Args: { p_cliente: string; p_data: string; p_tenant: string }
         Returns: number
       }
+      fn_delete_whatsapp_instance: {
+        Args: {
+          p_confirm?: boolean
+          p_instance_id: string
+          p_manter_historico?: boolean
+        }
+        Returns: Json
+      }
       fn_dispatch_next_in_queue: {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: Json
@@ -13319,6 +15608,62 @@ export type Database = {
       fn_effective_chat_limit: {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: number
+      }
+      fn_email_account_delete: { Args: { p_id: string }; Returns: undefined }
+      fn_email_account_save: {
+        Args: {
+          p_ativo?: boolean
+          p_email: string
+          p_from_name?: string
+          p_id?: string
+          p_imap_host?: string
+          p_imap_port?: number
+          p_imap_security?: string
+          p_imap_username?: string
+          p_is_default?: boolean
+          p_provider: string
+          p_rotulo: string
+          p_senha?: string
+          p_setor_id?: string
+          p_setor_ids?: string[]
+          p_smtp_host: string
+          p_smtp_port: number
+          p_smtp_security: string
+          p_smtp_username: string
+          p_tenant_id?: string
+          p_user_ids?: string[]
+        }
+        Returns: string
+      }
+      fn_email_envios_lixeira: {
+        Args: { p_acao: string; p_ids: string[] }
+        Returns: {
+          afetados: number
+          bloqueados: number
+        }[]
+      }
+      fn_email_recebidos_lixeira: {
+        Args: { p_acao: string; p_ids: string[] }
+        Returns: {
+          afetados: number
+          bloqueados: number
+        }[]
+      }
+      fn_expediente_janela_do_dia: {
+        Args: { p_at: string; p_department_id: string; p_tenant_id: string }
+        Returns: {
+          abre: string
+          fecha: string
+        }[]
+      }
+      fn_finish_scheduled_message: {
+        Args: {
+          p_error?: string
+          p_id: string
+          p_message_id?: string
+          p_ok: boolean
+        }
+        Returns: string
       }
       fn_fix_orphan_closed_attendances: {
         Args: never
@@ -13328,6 +15673,10 @@ export type Database = {
         }[]
       }
       fn_fone_omie: { Args: { p_raw: string }; Returns: Json }
+      fn_inactivity_autohold_match: {
+        Args: { p_content: string; p_extra?: string }
+        Returns: string
+      }
       fn_instance_traffic: {
         Args: { p_minutes?: number }
         Returns: {
@@ -13336,7 +15685,38 @@ export type Database = {
           outbound: number
         }[]
       }
+      fn_instante_fora_comercial: {
+        Args: { p_at: string; p_tenant_id: string; p_tolerancia_min?: number }
+        Returns: boolean
+      }
+      fn_instante_fora_expediente: {
+        Args: {
+          p_at: string
+          p_department_id: string
+          p_tenant_id: string
+          p_tolerancia_min?: number
+        }
+        Returns: boolean
+      }
+      fn_intake_alvo_da_alteracao: {
+        Args: {
+          p_cnpj: string
+          p_modulos: Json
+          p_produto_id: number
+          p_tenant: string
+        }
+        Returns: Json
+      }
+      fn_intake_proposta: { Args: { p_payload: Json }; Returns: Json }
+      fn_integracao_fila_watchdog: { Args: never; Returns: undefined }
       fn_is_business_hours: { Args: { p_tenant_id: string }; Returns: boolean }
+      fn_janela_comercial_do_dia: {
+        Args: { p_at: string; p_tenant_id: string }
+        Returns: {
+          abre: string
+          fecha: string
+        }[]
+      }
       fn_journey_go_live: {
         Args: {
           p_department_id?: string
@@ -13357,6 +15737,10 @@ export type Database = {
         Returns: Json
       }
       fn_norm_nome_modulo: { Args: { p_nome: string }; Returns: string }
+      fn_notif_admins_do_tenant: {
+        Args: { p_tenant_id: string }
+        Returns: string[]
+      }
       fn_notify_awaiting_agent: { Args: never; Returns: Json }
       fn_notify_user: {
         Args: {
@@ -13372,7 +15756,49 @@ export type Database = {
         }
         Returns: string
       }
+      fn_oem_alertar_divergencia_estado: { Args: never; Returns: Json }
+      fn_oem_alertar_divergencia_modulo: { Args: never; Returns: Json }
+      fn_oem_aprovacao_aprovar: { Args: { p_ids: string[] }; Returns: Json }
+      fn_oem_aprovacao_listar: {
+        Args: {
+          p_historico?: number
+          p_limite?: number
+          p_tenant_id?: string
+          p_unidades?: number[]
+        }
+        Returns: Json
+      }
+      fn_oem_aprovacao_notificar: {
+        Args: { p_fila_id: string }
+        Returns: undefined
+      }
+      fn_oem_aprovacao_pode: { Args: { p_tenant_id: string }; Returns: boolean }
+      fn_oem_aprovacao_recusar: {
+        Args: { p_ids: string[]; p_motivo: string }
+        Returns: Json
+      }
+      fn_oem_aprovacao_status: {
+        Args: { p_tenant_id?: string; p_unidades?: number[] }
+        Returns: Json
+      }
+      fn_oem_conta_da_licenca: {
+        Args: {
+          p_cliente_id: string
+          p_empresa_codigo: string
+          p_filial_codigo: string
+          p_tenant_id: string
+        }
+        Returns: string
+      }
       fn_oem_cron_secret_ok: { Args: { p_token: string }; Returns: boolean }
+      fn_oem_custo_do_modulo: {
+        Args: {
+          p_cliente_produto_id: string
+          p_modulo_codigo: number
+          p_tenant_id: string
+        }
+        Returns: number
+      }
       fn_oem_enfileirar: {
         Args: {
           p_acao: string
@@ -13395,13 +15821,27 @@ export type Database = {
         Args: { p_filial_codigo: string; p_modulos: Json; p_tenant_id: string }
         Returns: Json
       }
+      fn_oem_espelho_frescor: {
+        Args: { p_conta_integration_id?: string; p_tenant_id?: string }
+        Returns: Json
+      }
       fn_oem_fila_aplicar: { Args: { p_id: string }; Returns: Json }
+      fn_oem_fila_chave: {
+        Args: {
+          p_cliente_produto_id: string
+          p_modulo_codigo: number
+          p_modulo_linha_id: string
+        }
+        Returns: string
+      }
       fn_oem_fila_claim: {
         Args: { p_id?: string; p_limite?: number }
         Returns: {
           acao: string
           cliente_produto_id: string | null
           conta_integration_id: string | null
+          decidido_em: string | null
+          decidido_por: string | null
           empresa_codigo: string | null
           enfileirado_em: string
           filial_codigo: string | null
@@ -13409,6 +15849,7 @@ export type Database = {
           id: string
           modulo_catalogo_id: string | null
           modulo_linha_id: string | null
+          motivo_recusa: string | null
           oem_modulo_codigo: number | null
           payload: Json | null
           processado_em: string | null
@@ -13430,11 +15871,49 @@ export type Database = {
         }
       }
       fn_oem_fila_listar: {
-        Args: { p_limite?: number; p_tenant_id?: string }
+        Args: {
+          p_conta_integration_id?: string
+          p_limite?: number
+          p_tenant_id?: string
+        }
         Returns: Json
       }
       fn_oem_fila_reprocessar: { Args: { p_id: string }; Returns: Json }
-      fn_oem_fila_status: { Args: { p_tenant_id?: string }; Returns: Json }
+      fn_oem_fila_status: {
+        Args: { p_conta_integration_id?: string; p_tenant_id?: string }
+        Returns: Json
+      }
+      fn_oem_historico_do_cliente: {
+        Args: { p_cliente_id: string; p_limite?: number; p_tenant_id?: string }
+        Returns: Json
+      }
+      fn_oem_historico_listar: {
+        Args: { p_limite?: number; p_tenant_id?: string }
+        Returns: Json
+      }
+      fn_oem_log_alteracao: {
+        Args: {
+          p_acao: string
+          p_campo?: string
+          p_cliente_id?: string
+          p_cliente_produto_id?: string
+          p_conta_integration_id?: string
+          p_filial_codigo?: string
+          p_lote_id: string
+          p_recon_id?: string
+          p_registro_id?: string
+          p_reversivel?: boolean
+          p_tabela?: string
+          p_tenant_id: string
+          p_valor_antes?: Json
+          p_valor_depois?: Json
+        }
+        Returns: string
+      }
+      fn_oem_notificar_falha: {
+        Args: { p_fila_id: string }
+        Returns: undefined
+      }
       fn_oem_pendencias_do_cliente: {
         Args: { p_cliente_id: string }
         Returns: Json
@@ -13472,6 +15951,10 @@ export type Database = {
       fn_onb_checklist_grupo_aplica: {
         Args: { p_demand_type_id: string; p_group_id: string }
         Returns: boolean
+      }
+      fn_onb_etapa_final_do_treino: {
+        Args: { p_training_id: string }
+        Returns: string
       }
       fn_onb_pipeline_do_trilho: {
         Args: { p_phase_id: string; p_produto_id: number; p_tenant_id: string }
@@ -13543,6 +16026,10 @@ export type Database = {
         Args: { p_slug: string; p_tenant_id: string }
         Returns: string
       }
+      fn_onboarding_role_id_do_setor: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: string
+      }
       fn_operador_responsavel_do_contato: {
         Args: { p_contact_id: string; p_tenant_id: string }
         Returns: string
@@ -13552,8 +16039,34 @@ export type Database = {
         Args: { p_cliente_produto_id: string }
         Returns: boolean
       }
+      fn_release_off_hours_on_open: { Args: never; Returns: Json }
+      fn_reschedule_message: {
+        Args: {
+          p_cancel_if_client_replies?: boolean
+          p_content?: string
+          p_id: string
+          p_scheduled_at?: string
+        }
+        Returns: boolean
+      }
       fn_retry_waiting_conversations: { Args: never; Returns: Json }
+      fn_revoke_user_sessions: { Args: { p_user_id: string }; Returns: number }
       fn_schedule_group_syncs: { Args: never; Returns: undefined }
+      fn_schedule_message: {
+        Args: {
+          p_cancel_if_client_replies?: boolean
+          p_content?: string
+          p_conversation_id: string
+          p_instance_id?: string
+          p_media_file_name?: string
+          p_media_mimetype?: string
+          p_media_size_bytes?: number
+          p_message_type?: string
+          p_scheduled_at: string
+          p_storage_path?: string
+        }
+        Returns: string
+      }
       fn_seed_onboarding_acompanhamento_pipeline: {
         Args: { p_tenant_id: string }
         Returns: string
@@ -13593,6 +16106,7 @@ export type Database = {
         Args: { object_name: string }
         Returns: boolean
       }
+      fn_wa_phone_variants: { Args: { p_phone: string }; Returns: string[] }
       fn_watchdog_signals: {
         Args: never
         Returns: {
@@ -13613,6 +16127,7 @@ export type Database = {
           p_date_to: string
           p_department_id?: string
           p_is_group?: boolean
+          p_plantao?: string
           p_tenant_id: string
           p_unidade_base_id?: number
         }
@@ -13648,6 +16163,31 @@ export type Database = {
           p_fornecedor_ids?: number[]
           p_has_ticket?: boolean
           p_is_group?: boolean
+          p_plantao?: string
+          p_produto_ids?: number[]
+          p_resolucoes?: string[]
+          p_segmento_ids?: number[]
+          p_sentiments?: string[]
+          p_tenant_id: string
+          p_unidade_base_id?: number
+        }
+        Returns: Json
+      }
+      get_atendimento_chats_lista: {
+        Args: {
+          p_agent_id?: string
+          p_area_ids?: number[]
+          p_cidade_ids?: number[]
+          p_closed_reasons?: string[]
+          p_date_from: string
+          p_date_to: string
+          p_department_id?: string
+          p_estado_ids?: number[]
+          p_fornecedor_ids?: number[]
+          p_has_ticket?: boolean
+          p_is_group?: boolean
+          p_limit?: number
+          p_plantao?: string
           p_produto_ids?: number[]
           p_resolucoes?: string[]
           p_segmento_ids?: number[]
@@ -13708,6 +16248,7 @@ export type Database = {
           p_department_id?: string
           p_is_group?: boolean
           p_limit?: number
+          p_plantao?: string
           p_tenant_id: string
           p_unidade_base_id?: number
         }
@@ -13741,6 +16282,7 @@ export type Database = {
           p_date_to: string
           p_department_id?: string
           p_is_group?: boolean
+          p_plantao?: string
           p_tenant_id: string
           p_unidade_base_id?: number
         }
@@ -13756,6 +16298,7 @@ export type Database = {
           p_department_id?: string
           p_estado_ids?: number[]
           p_fornecedor_ids?: number[]
+          p_plantao?: string
           p_produto_ids?: number[]
           p_segmento_ids?: number[]
           p_tenant_id: string
@@ -13768,6 +16311,7 @@ export type Database = {
           p_date_from: string
           p_date_to: string
           p_department_id?: string
+          p_plantao?: string
           p_tenant_id: string
           p_unidade_base_id?: number
         }
@@ -13780,7 +16324,23 @@ export type Database = {
           p_date_to: string
           p_department_id?: string
           p_is_group?: boolean
+          p_plantao?: string
           p_sla_frt_seconds?: number
+          p_tenant_id: string
+          p_unidade_base_id?: number
+        }
+        Returns: Json
+      }
+      get_atendimento_velocidade_lista: {
+        Args: {
+          p_agent_id?: string
+          p_date_from: string
+          p_date_to: string
+          p_department_id?: string
+          p_is_group?: boolean
+          p_limit?: number
+          p_metrica?: string
+          p_plantao?: string
           p_tenant_id: string
           p_unidade_base_id?: number
         }
@@ -13794,6 +16354,7 @@ export type Database = {
           p_date_to: string
           p_department_id?: string
           p_is_group?: boolean
+          p_plantao?: string
           p_sla_frt_seconds?: number
           p_tenant_id: string
           p_unidade_base_id?: number
@@ -13807,6 +16368,7 @@ export type Database = {
           p_date_to: string
           p_department_id?: string
           p_is_group?: boolean
+          p_plantao?: string
           p_tenant_id: string
           p_unidade_base_id?: number
         }
@@ -14199,6 +16761,10 @@ export type Database = {
           phone_b: string
         }[]
       }
+      get_email_account_secret: {
+        Args: { p_account_id: string }
+        Returns: string
+      }
       get_inactive_attendances_to_process: {
         Args: { p_limit?: number }
         Returns: {
@@ -14328,6 +16894,18 @@ export type Database = {
           signature_name: string
           sound_enabled: boolean
           visual_notifications_enabled: boolean
+        }[]
+      }
+      get_onboarding_first_contact: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          contato_origem: string
+          contato_por: string
+          distribuido_em: string
+          journey_id: string
+          minutos_corridos: number
+          minutos_uteis: number
+          primeiro_contato_em: string
         }[]
       }
       get_pending_closures: {
@@ -14541,6 +17119,46 @@ export type Database = {
           p75: number
         }[]
       }
+      hiper_aplicar_correcao: {
+        Args: { p_acoes: string[]; p_recon_ids: string[]; p_tenant_id: string }
+        Returns: Json
+      }
+      hiper_aplicar_uma: {
+        Args: {
+          p_acoes: string[]
+          p_lote_id: string
+          p_recon_id: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
+      hiper_cancelar_pelo_portal: {
+        Args: {
+          p_motivo_id: number
+          p_observacao?: string
+          p_recon_id: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
+      hiper_cron_secret_ok: { Args: { p_secret: string }; Returns: boolean }
+      hiper_diagnostico_conta: {
+        Args: { p_id_portal: string; p_tenant_id: string }
+        Returns: Json
+      }
+      hiper_importar_contas: {
+        Args: { p_itens: Json; p_padrao: Json; p_tenant_id: string }
+        Returns: Json
+      }
+      hiper_importar_modulos: {
+        Args: {
+          p_lote_id?: string
+          p_previa?: boolean
+          p_recon_id?: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       hiper_integration_connect: {
         Args: { p_base_url?: string; p_tenant_id: string; p_token: string }
         Returns: undefined
@@ -14551,6 +17169,17 @@ export type Database = {
           base_url: string
           token: string
         }[]
+      }
+      hiper_norm_fone: { Args: { p: string }; Returns: string }
+      hiper_norm_razao: { Args: { p: string }; Returns: string }
+      hiper_pendentes_contagem: {
+        Args: { p_tenant_id: string }
+        Returns: number
+      }
+      hiper_reconciliar: { Args: { p_tenant_id: string }; Returns: Json }
+      hiper_reverter_lote: {
+        Args: { p_lote_id: string; p_tenant_id: string }
+        Returns: Json
       }
       ignorar_filial_oem: {
         Args: { p_observacao?: string; p_recon_id: string }
@@ -14652,6 +17281,10 @@ export type Database = {
       }
       mark_all_mentions_seen: { Args: never; Returns: undefined }
       mark_all_notifications_read: { Args: never; Returns: undefined }
+      mark_assignment_greeting_result: {
+        Args: { p_attendance_id: string; p_error?: string; p_status: string }
+        Returns: undefined
+      }
       mark_conversation_notifications_read: {
         Args: { p_conversation_id: string }
         Returns: number
@@ -14754,10 +17387,50 @@ export type Database = {
             Returns: string
           }
       obter_segredo_cron_espelho: { Args: never; Returns: string }
+      obter_segredo_leitor_emails: { Args: never; Returns: string }
       oem_gravar_codigos_em_lote: { Args: { p_conta: string }; Returns: number }
       oem_gravar_codigos_no_produto: {
         Args: { p_cliente_id: string; p_filial: string; p_grupo: string }
         Returns: number
+      }
+      oem_ignorar_divergencia: {
+        Args: {
+          p_assinatura: string
+          p_cliente_id?: string
+          p_conta?: string
+          p_recon_id?: string
+          p_tipo: string
+        }
+        Returns: number
+      }
+      oem_limpar_codigo_da_filial: {
+        Args: { p_cliente_id: string; p_filial: string }
+        Returns: number
+      }
+      oem_reexibir_divergencia: {
+        Args: {
+          p_cliente_id?: string
+          p_conta?: string
+          p_recon_id?: string
+          p_tipo: string
+        }
+        Returns: number
+      }
+      oem_remover_codigo_filial: {
+        Args: { p_cliente_id: string; p_filial?: string }
+        Returns: number
+      }
+      oem_reverter_lote: {
+        Args: { p_lote_id: string; p_tenant_id: string }
+        Returns: Json
+      }
+      oem_tirar_divergencia_da_linha: {
+        Args: { p_recon_id: string; p_tipo: string }
+        Returns: undefined
+      }
+      oem_trazer_cadastro_do_parceiro: {
+        Args: { p_campo: string; p_recon_id: string }
+        Returns: Json
       }
       omie_fila_descartar: { Args: { p_fila_id: string }; Returns: Json }
       omie_fila_reprocessar: { Args: { p_fila_id: string }; Returns: Json }
@@ -15150,6 +17823,10 @@ export type Database = {
       }
       send_theo_weekly_report: { Args: never; Returns: Json }
       send_weekly_management_digest: { Args: never; Returns: Json }
+      set_acessofast_enabled: {
+        Args: { p_enabled: boolean; p_tenant_id: string }
+        Returns: boolean
+      }
       set_attendance_cliente: {
         Args: { p_attendance_id: string; p_cliente_id: string }
         Returns: undefined
@@ -15183,6 +17860,10 @@ export type Database = {
         Returns: undefined
       }
       set_view_unidades: { Args: { p_ids: number[] }; Returns: undefined }
+      set_wa_contact_active: {
+        Args: { p_active: boolean; p_contact_id: string; p_reason?: string }
+        Returns: Json
+      }
       should_create_recipient: {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: boolean
@@ -15304,6 +17985,10 @@ export type Database = {
         Args: { p_ref_date?: string; p_tenant: string }
         Returns: Json
       }
+      toggle_churn_dismiss: {
+        Args: { p_conversation_id: string; p_dismiss?: boolean }
+        Returns: Json
+      }
       transfer_conversation_to_agent: {
         Args: {
           p_conversation_id: string
@@ -15315,6 +18000,10 @@ export type Database = {
       transfer_onboarding_responsavel: {
         Args: { p_journey_id: string; p_motivo: string; p_novo_user_id: string }
         Returns: Json
+      }
+      try_claim_assignment_greeting: {
+        Args: { p_attendance_id: string }
+        Returns: boolean
       }
       try_claim_off_hours_notice: {
         Args: { p_conversation_id: string; p_cooldown_minutes?: number }
@@ -15487,6 +18176,14 @@ export type Database = {
           p_opened_out_of_hours: boolean
         }
         Returns: string
+      }
+      wa_dept_instance_ids: {
+        Args: { p_department_id: string; p_tenant_id: string }
+        Returns: string[]
+      }
+      wa_instances_with_dept: {
+        Args: { p_tenant_id: string }
+        Returns: string[]
       }
       wa_last_attendance_owner: {
         Args: { p_conversation_id: string; p_tenant_id: string }
@@ -15677,6 +18374,7 @@ export type Database = {
         | "realizado"
         | "no_show"
         | "cancelado"
+        | "desistencia"
       recorrencia_tipo: "mensal" | "anual" | "semestral" | "semanal"
       sentiment_type: "positive" | "neutral" | "negative"
       support_ticket_prioridade: "baixa" | "media" | "alta" | "urgente"
@@ -15696,12 +18394,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -15725,11 +18423,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -15750,11 +18448,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -15775,11 +18473,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -15792,11 +18490,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -15887,6 +18585,7 @@ export const Constants = {
         "realizado",
         "no_show",
         "cancelado",
+        "desistencia",
       ],
       recorrencia_tipo: ["mensal", "anual", "semestral", "semanal"],
       sentiment_type: ["positive", "neutral", "negative"],

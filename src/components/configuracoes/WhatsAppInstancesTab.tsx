@@ -363,12 +363,12 @@ export default function WhatsAppInstancesTab() {
     staleTime: 0,
     retry: false, // sem permissão não melhora repetindo
     queryFn: async () => {
-      const { data, error } = await (supabase.rpc as any)("fn_delete_whatsapp_instance", {
+      const { data, error } = await supabase.rpc("fn_delete_whatsapp_instance", {
         p_instance_id: deleteTarget!.id,
         p_confirm: false,
       });
       if (error) throw error;
-      return data as DeletePreview;
+      return data as unknown as DeletePreview;
     },
   });
 
@@ -390,13 +390,13 @@ export default function WhatsAppInstancesTab() {
   // A RPC faz a ordem correta e solta os contatos ainda em uso em vez de apagá-los.
   const deleteMutation = useMutation({
     mutationFn: async ({ id, modo }: { id: string; modo: ModoExclusao }) => {
-      const { data, error } = await (supabase.rpc as any)("fn_delete_whatsapp_instance", {
+      const { data, error } = await supabase.rpc("fn_delete_whatsapp_instance", {
         p_instance_id: id,
         p_confirm: true,
         p_manter_historico: modo === "preservar",
       });
       if (error) throw error;
-      return data as DeletePreview;
+      return data as unknown as DeletePreview;
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["whatsapp-instances"] });
