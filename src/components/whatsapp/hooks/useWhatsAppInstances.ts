@@ -107,13 +107,23 @@ export const useWhatsAppInstances = (options: UseWhatsAppInstancesOptions = {}) 
     },
   });
 
+  // Um DELETE direto em whatsapp_instances NAO funciona: a FK de whatsapp_messages e NO ACTION
+  // e barra tudo. E deixar o cascade correr levaria junto conversas de OUTROS canais, porque
+  // whatsapp_conversations.contact_id e CASCADE e o contato pertence a este canal.
+  // A RPC faz a ordem correta e solta os contatos ainda em uso em vez de apaga-los.
   const deleteInstance = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('whatsapp_instances').delete().eq('id', id);
+    mutationFn: async ({ id, manterHistorico }: { id: string; manterHistorico: boolean }) => {
+      const { data, error } = await supabase.rpc('fn_delete_whatsapp_instance', {
+        p_instance_id: id,
+        p_confirm: true,
+        p_manter_historico: manterHistorico,
+      });
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'instances'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
     },
   });
 

@@ -9,6 +9,7 @@ import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppIns
 import { supabase } from "@/integrations/supabase/client";
 import { RefreshCw, Pencil, Trash2, Copy, Link, PowerOff, QrCode, RotateCcw, History } from "lucide-react";
 import { toast } from "sonner";
+import { DeleteInstanceDialog, type ModoExclusao } from "./DeleteInstanceDialog";
 import { EditInstanceDialog } from "./EditInstanceDialog";
 import { ReconnectInstanceDialog } from "./ReconnectInstanceDialog";
 import { RecoverMessagesDialog } from "./RecoverMessagesDialog";
@@ -130,13 +131,20 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (modo: ModoExclusao) => {
     try {
-      await deleteInstance.mutateAsync(instance.id);
-      toast.success("Instância excluída com sucesso");
+      const res: any = await deleteInstance.mutateAsync({
+        id: instance.id,
+        manterHistorico: modo === "preservar",
+      });
+      toast.success(
+        res?.manter_historico
+          ? `Canal removido. ${res?.conversas ?? 0} conversa(s) mantidas, agora sem canal.`
+          : `Canal removido. ${res?.conversas ?? 0} conversa(s) e ${res?.mensagens ?? 0} mensagem(ns) apagadas.`,
+      );
       setShowDeleteDialog(false);
-    } catch {
-      toast.error("Erro ao excluir instância");
+    } catch (e: any) {
+      toast.error("Erro ao excluir instância: " + (e?.message || "erro desconhecido"));
     }
   };
 
@@ -308,22 +316,14 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir instância?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Todas as conversas e mensagens associadas a esta instância serão removidas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteInstanceDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        instanceId={instance.id}
+        nomeDoCanal={instance.display_name || instance.instance_name}
+        pending={deleteInstance.isPending}
+        onConfirm={handleDelete}
+      />
 
       <AlertDialog open={showRestartDialog} onOpenChange={setShowRestartDialog}>
         <AlertDialogContent>
