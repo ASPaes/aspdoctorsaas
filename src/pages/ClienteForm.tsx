@@ -12,6 +12,7 @@ import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { getNavIds } from "@/hooks/useClientesFilters";
 import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { buscarClientesComMesmoDocumento, type ClienteMesmoDocumento } from "@/lib/clienteDuplicado";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 import { Form } from "@/components/ui/form";
 import {
@@ -622,7 +623,46 @@ export default function ClienteForm() {
     },
   });
 
-  const onSubmit = (values: ClienteFormValues) => mutation.mutate(values);
+  /**
+   * TRAVA de documento repetido.
+   *
+   * Desde 09/09 existia um AVISO na aba de dados, e em 11/09 ele não segurou: o
+   * VARANDÃO BAR foi cadastrado uma segunda vez com o mesmo CPF, e ficou com duas
+   * implantações abertas ao mesmo tempo. Aviso quem está com pressa não lê.
+   *
+   * Não pode ser bloqueio seco: rede com várias lojas divide o mesmo CNPJ de
+   * propósito (COLEGIO EQUIPE tem 9 unidades, cada uma com contrato próprio). Por
+   * isso a trava tem escape EXPLÍCITO — a pessoa confirma que é outra unidade.
+   *
+   * A consulta é refeita aqui, no submit, em vez de reaproveitar a faixa da aba: o
+   * debounce de 400ms dela perde quem cola o documento e salva em seguida.
+   */
+  const [duplicados, setDuplicados] = useState<ClienteMesmoDocumento[]>([]);
+  const [confirmandoDuplicado, setConfirmandoDuplicado] = useState(false);
+  const [valoresPendentes, setValoresPendentes] = useState<ClienteFormValues | null>(null);
+  const [checandoDuplicado, setChecandoDuplicado] = useState(false);
+
+  const onSubmit = async (values: ClienteFormValues) => {
+    const digits = (values.cnpj ?? "").replace(/\D/g, "");
+    if (tid) {
+      setChecandoDuplicado(true);
+      try {
+        const achados = await buscarClientesComMesmoDocumento(tid, digits, id);
+        if (achados.length > 0) {
+          setDuplicados(achados);
+          setValoresPendentes(values);
+          setConfirmandoDuplicado(true);
+          return;
+        }
+      } catch {
+        // Consulta falhou (rede, RLS). Travar o salvar por causa disso seria pior
+        // que o problema: segue e deixa salvar.
+      } finally {
+        setChecandoDuplicado(false);
+      }
+    }
+    mutation.mutate(values);
+  };
 
   const onInvalid = (errors: any) => {
     const firstKey = Object.keys(errors)[0];
@@ -659,6 +699,62 @@ export default function ClienteForm() {
     <div className="space-y-6">
       {/* Unsaved changes dialog */}
       <UnsavedChangesDialog open={isBlocked} onConfirm={confirmLeave} onCancel={cancelLeave} />
+
+      {/* Trava de documento repetido. O escape existe porque rede multi-loja divide
+          o mesmo CNPJ de proposito — ver o comentario em onSubmit. */}
+      <AlertDialog open={confirmandoDuplicado} onOpenChange={(v) => { if (!v) setConfirmandoDuplicado(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {duplicados.length === 1
+                ? "Já existe um cliente com este CNPJ/CPF"
+                : `Já existem ${duplicados.length} clientes com este CNPJ/CPF`}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <ul className="space-y-1 text-sm">
+                  {duplicados.map((c) => (
+                    <li key={c.id} className="flex items-center gap-2">
+                      <span className="text-muted-foreground tabular-nums">
+                        {c.codigo_sequencial ?? "—"}
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {c.nome_fantasia || c.razao_social || "sem nome"}
+                      </span>
+                      {c.cancelado && (
+                        <Badge variant="outline" className="text-[10px]">cancelado</Badge>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <p>
+                  Se for a <b>mesma empresa</b>, cancele e edite o cadastro que já existe —
+                  cadastrar de novo divide o histórico: contrato num, conversa de WhatsApp
+                  no outro, chamado num terceiro.
+                </p>
+                <p>
+                  Se for <b>outra loja ou unidade</b> que compartilha o documento, pode
+                  continuar.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setValoresPendentes(null)}>
+              Cancelar e revisar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmandoDuplicado(false);
+                if (valoresPendentes) mutation.mutate(valoresPendentes);
+                setValoresPendentes(null);
+              }}
+            >
+              É outra unidade, salvar assim mesmo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Draft restore banner */}
       {hasPendingDraft && (
@@ -977,8 +1073,8 @@ export default function ClienteForm() {
               Cancelar
             </Button>
             <ProtectedElement resource="clientes" action={isEditing ? "update" : "insert"} mode="notify">
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              <Button type="submit" disabled={mutation.isPending || checandoDuplicado}>
+                {(mutation.isPending || checandoDuplicado) && <Loader2 className="h-4 w-4 animate-spin" />}
                 Salvar Cliente
               </Button>
             </ProtectedElement>

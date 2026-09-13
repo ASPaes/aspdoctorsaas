@@ -11,3 +11,15 @@ export function cnpjDigitsVariants(digits: string): string[] {
   const candidatos = [digits, digits.padStart(14, "0"), semZeros];
   return Array.from(new Set(candidatos.filter((d) => d.length >= 11)));
 }
+
+/**
+ * Documento completo = 11 dígitos (CPF) ou 14 (CNPJ).
+ *
+ * Deliberadamente NÃO pergunta ao seletor "Pessoa física / jurídica": em cadastro
+ * NOVO ele fica travado em "jurídica" (a auto-detecção de DadosClienteTab só roda
+ * editando), e nesse estado um CPF de 11 dígitos nunca era considerado completo.
+ * O comprimento do que foi digitado não mente.
+ */
+export function documentoCompleto(digits: string): boolean {
+  return digits.length === 11 || digits.length >= 14;
+}

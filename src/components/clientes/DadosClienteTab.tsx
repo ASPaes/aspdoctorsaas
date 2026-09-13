@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useContactDiagnosis } from "@/components/whatsapp/hooks/useContactDiagnosis";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
-import { cnpjDigitsVariants } from "@/lib/cnpjDigitsVariants";
+import { cnpjDigitsVariants, documentoCompleto } from "@/lib/cnpjDigitsVariants";
 import type { ClienteFormValues } from "@/pages/ClienteForm";
 
 type ClienteDuplicado = {
@@ -77,14 +77,20 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     const digits = (cnpjValue ?? "").replace(/\D/g, "");
     if (cnpjDupDebounceRef.current) clearTimeout(cnpjDupDebounceRef.current);
 
-    // Só consulta com o documento inteiro. Um CNPJ pela metade tem 11 dígitos e,
-    // com o zero à esquerda, casaria com o CPF de outra pessoa — o aviso piscaria
-    // errado no meio da digitação.
-    const documentoCompleto = tipoPessoa === "fisica" ? digits.length === 11 : digits.length >= 14;
+    // Só consulta com o documento inteiro. Antes a régua vinha do seletor de tipo, e
+    // isso deixava o aviso CEGO em cadastro novo: ali `tipoPessoa` fica travado em
+    // "jurídica" (a auto-detecção logo acima só roda editando), então um CPF de 11
+    // dígitos nunca contava como completo. Agora manda o comprimento.
+    //
+    // O preço é um falso positivo de meio segundo: um CNPJ pela metade tem 11 dígitos
+    // e, com o zero à esquerda, casa com o CPF de outra pessoa. A faixa é âmbar e não
+    // bloqueia nada — e quem bloqueia de verdade é a trava do salvar, que vê o valor
+    // final. Aviso que pisca errado por um instante é melhor que aviso que nunca vem.
+    const completo = documentoCompleto(digits);
 
     // Sem tenant escolhido (super admin em "Todos") a busca cruzaria empresas e
     // acusaria duplicata que não é. Melhor não avisar do que avisar errado.
-    if (!tid || !documentoCompleto) {
+    if (!tid || !completo) {
       setCnpjDuplicados([]);
       return;
     }
@@ -108,7 +114,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     return () => {
       if (cnpjDupDebounceRef.current) clearTimeout(cnpjDupDebounceRef.current);
     };
-  }, [cnpjValue, tipoPessoa, tid, clienteId]);
+  }, [cnpjValue, tid, clienteId]); // tipoPessoa saiu: a régua agora é o comprimento
 
   // Matriz lookup state
   const [matrizSearch, setMatrizSearch] = useState("");
