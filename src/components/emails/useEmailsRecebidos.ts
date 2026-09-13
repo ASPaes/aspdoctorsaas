@@ -74,7 +74,10 @@ export function useEmailsRecebidos(filtros: FiltrosRecebidos, pagina: number) {
 
       let q = (supabase.from("email_recebidos" as any) as any)
         .select(
-          "id, recebido_em, assunto, corpo_texto, de_email, de_nome, status, envio_id, cliente_id, referencia_id, origem, account_id, deleted_at, email_accounts(email, rotulo), clientes(razao_social, nome_fantasia), email_envios(assunto, created_at)",
+          // email_recebidos tem DUAS ligações com email_envios desde 13/09/2026
+          // (envio_id e confirmacao_envio_id): sem nomear a ligação, o PostgREST
+          // recusa a consulta inteira e a aba fica vazia com erro.
+          "id, recebido_em, assunto, corpo_texto, de_email, de_nome, status, envio_id, cliente_id, referencia_id, origem, account_id, deleted_at, email_accounts(email, rotulo), clientes(razao_social, nome_fantasia), email_envios!email_recebidos_envio_id_fkey(assunto, created_at)",
           { count: "exact" },
         )
         .eq("tenant_id", tid)
