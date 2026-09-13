@@ -12,6 +12,11 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 13/09
+
+- 🔧 **Excluir um canal de WhatsApp não funcionava — e agora você escolhe o que fazer com o histórico** — Em **Configurações › Canais**, a lixeira só dava erro em qualquer canal que já tivesse recebido mensagem, ou seja, em todo canal que um dia operou. Pior: o aviso na tela prometia que "conversas e mensagens existentes serão mantidas", e essa promessa não se cumpria — se a exclusão tivesse passado, o histórico teria ido junto. Havia ainda um risco silencioso: como os contatos pertencem ao canal, apagar um canal podia levar junto **conversas de outros canais que continuam em uso**. No caso mais extremo da base, um canal de teste com 13 conversas próprias derrubaria **476 conversas de outros números ativos**. Agora, ao excluir um canal, a tela mostra antes **o que exatamente será afetado** — quantas conversas, mensagens, atendimentos e contatos — e pergunta o que fazer com o histórico, explicando a consequência de cada escolha: **manter** (as conversas ficam no sistema, mas passam a aparecer só com o filtro em "Todos os canais", e uma resposta nelas sairia por outro número) ou **apagar junto** (some tudo, sem backup, e os atendimentos saem dos painéis de SLA e volume). Apagar o histórico exige digitar o nome do canal para confirmar; manter, não. Em qualquer um dos dois casos, contato que tem histórico em outro canal é sempre preservado, e artigos da base de conhecimento nunca são apagados. Excluir canal continua sendo coisa de administrador da empresa.
+
+
 ### 12/09
 
 - 🔧 **Cadastrar cliente com CNPJ/CPF já usado agora pede confirmação** — Desde 09/09 a tela avisava, mas deixava salvar — e em 11/09 um cliente foi cadastrado duas vezes mesmo com o aviso na frente, ficando com duas implantações abertas ao mesmo tempo e a conversa de WhatsApp presa no cadastro antigo. Agora, ao salvar, o sistema para e mostra quem já usa aquele documento, com código e nome. Se for a mesma empresa, é só cancelar e editar o cadastro que existe. Se for **outra loja ou unidade** que divide o mesmo CNPJ — o que é comum em rede —, o botão **É outra unidade, salvar assim mesmo** continua o cadastro. O aviso também deixou de ser cego a CPF: em cadastro novo ele só olhava CNPJ, e era justamente um CPF que tinha passado.

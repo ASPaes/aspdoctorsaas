@@ -35,6 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Plus,
   Loader2,
@@ -60,6 +61,27 @@ interface Instance {
   is_active: boolean;
   created_at: string;
 }
+
+/** Retorno de fn_delete_whatsapp_instance — com p_confirm=false é só contagem, não escreve. */
+interface DeletePreview {
+  confirmado: boolean;
+  manter_historico: boolean;
+  canal: string;
+  conversas: number;
+  mensagens: number;
+  atendimentos: number;
+  atendimentos_com_ticket: number;
+  contatos_total: number;
+  contatos_apagados: number;
+  contatos_preservados: number;
+  artigos_kb_desvinculados: number;
+  grupos: number;
+  agendadas: number;
+  templates: number;
+}
+
+/** O operador escolhe o destino do histórico na hora de excluir o canal. */
+type ModoExclusao = "preservar" | "apagar";
 
 interface FormState {
   instance_name: string;
@@ -120,6 +142,9 @@ export default function WhatsAppInstancesTab() {
   const [showMetaAppSecret, setShowMetaAppSecret] = useState(false);
   const [showMetaVerifyToken, setShowMetaVerifyToken] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Instance | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  // Padrão é preservar: perder histórico tem que ser escolha deliberada.
+  const [deleteModo, setDeleteModo] = useState<ModoExclusao>("preservar");
   const [deactivateTarget, setDeactivateTarget] = useState<Instance | null>(null);
   const [activatingId, setActivatingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
@@ -327,17 +352,64 @@ export default function WhatsAppInstancesTab() {
     },
   });
 
-  // ── Delete ──
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await supabase.from("whatsapp_instance_secrets").delete().eq("instance_id", id);
-      const { error } = await supabase.from("whatsapp_instances").delete().eq("id", id);
+  // ── Delete: prévia do que sai junto (dry-run, não escreve nada) ──
+  const {
+    data: deletePreview,
+    isLoading: previewLoading,
+    error: previewError,
+  } = useQuery({
+    queryKey: ["whatsapp-instance-delete-preview", deleteTarget?.id],
+    enabled: !!deleteTarget,
+    staleTime: 0,
+    retry: false, // sem permissão não melhora repetindo
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("fn_delete_whatsapp_instance", {
+        p_instance_id: deleteTarget!.id,
+        p_confirm: false,
+      });
       if (error) throw error;
+      return data as DeletePreview;
     },
-    onSuccess: () => {
+  });
+
+  const previewTemHistorico =
+    !!deletePreview &&
+    (deletePreview.conversas > 0 || deletePreview.mensagens > 0 || deletePreview.atendimentos > 0);
+  const nomeDoCanal = deleteTarget?.display_name || deleteTarget?.instance_name || "";
+  // Digitar o nome só é exigido quando o histórico vai ser destruído de verdade.
+  const exigeDigitarNome = previewTemHistorico && deleteModo === "apagar";
+  const podeConfirmarDelete =
+    !!deletePreview &&
+    !previewLoading &&
+    (!exigeDigitarNome || deleteConfirmText.trim() === nomeDoCanal);
+
+  // ── Delete ──
+  // Um DELETE direto em whatsapp_instances NÃO funciona: a FK de whatsapp_messages é NO ACTION
+  // e barra tudo. E deixar o cascade correr levaria junto conversas de OUTROS canais, porque
+  // whatsapp_conversations.contact_id é CASCADE e o contato pertence a este canal.
+  // A RPC faz a ordem correta e solta os contatos ainda em uso em vez de apagá-los.
+  const deleteMutation = useMutation({
+    mutationFn: async ({ id, modo }: { id: string; modo: ModoExclusao }) => {
+      const { data, error } = await (supabase.rpc as any)("fn_delete_whatsapp_instance", {
+        p_instance_id: id,
+        p_confirm: true,
+        p_manter_historico: modo === "preservar",
+      });
+      if (error) throw error;
+      return data as DeletePreview;
+    },
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["whatsapp-instances"] });
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-conversations"] });
       setDeleteTarget(null);
-      toast({ title: "Instância removida" });
+      setDeleteConfirmText("");
+      setDeleteModo("preservar");
+      toast({
+        title: "Canal removido",
+        description: res.manter_historico
+          ? `${res.conversas} conversa(s) e ${res.mensagens} mensagem(ns) mantidas, agora sem canal.`
+          : `${res.conversas} conversa(s) e ${res.mensagens} mensagem(ns) apagadas.`,
+      });
     },
     onError: (err: any) => {
       toast({ title: "Erro ao remover", description: err.message, variant: "destructive" });
@@ -784,23 +856,199 @@ export default function WhatsAppInstancesTab() {
       </Dialog>
 
       {/* ── Delete Confirmation ── */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <AlertDialogContent>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={() => {
+          setDeleteTarget(null);
+          setDeleteConfirmText("");
+          setDeleteModo("preservar");
+        }}
+      >
+        <AlertDialogContent className="max-h-[85vh] overflow-y-auto">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remover instância?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A instância <strong>{deleteTarget?.display_name || deleteTarget?.instance_name}</strong> será removida
-              permanentemente, incluindo suas credenciais. Conversas e mensagens existentes serão mantidas.
+            <AlertDialogTitle>Excluir o canal {nomeDoCanal}?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  O canal e suas credenciais saem do sistema — isso não tem volta. O que acontece com o histórico
+                  é você quem decide abaixo.
+                </p>
+
+                {previewLoading && (
+                  <p className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Levantando o que será apagado…
+                  </p>
+                )}
+
+                {previewError && (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                    Não foi possível levantar o que seria apagado:{" "}
+                    {(previewError as any)?.message || "erro desconhecido"}
+                    <br />
+                    Excluir um canal é permitido só para administradores do tenant.
+                  </div>
+                )}
+
+                {deletePreview && (
+                  <>
+                    <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                      <p className="mb-1 font-medium">O histórico deste canal hoje:</p>
+                      <p>
+                        <strong>{deletePreview.conversas}</strong> conversa(s) ·{" "}
+                        <strong>{deletePreview.mensagens}</strong> mensagem(ns) ·{" "}
+                        <strong>{deletePreview.atendimentos}</strong> atendimento(s) ·{" "}
+                        <strong>{deletePreview.contatos_total}</strong> contato(s)
+                        {deletePreview.atendimentos_com_ticket > 0 && (
+                          <>
+                            {" "}
+                            — <strong>{deletePreview.atendimentos_com_ticket}</strong> atendimento(s) ligados a
+                            ticket
+                          </>
+                        )}
+                      </p>
+                    </div>
+
+                    {previewTemHistorico && (
+                      <div className="space-y-2">
+                        <Label>O que fazer com esse histórico?</Label>
+                        <RadioGroup
+                          value={deleteModo}
+                          onValueChange={(v) => {
+                            setDeleteModo(v as ModoExclusao);
+                            setDeleteConfirmText("");
+                          }}
+                          className="gap-2"
+                        >
+                          <label
+                            htmlFor="modo-preservar"
+                            className="flex cursor-pointer gap-3 rounded-md border p-3 hover:bg-muted/50 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
+                          >
+                            <RadioGroupItem value="preservar" id="modo-preservar" className="mt-0.5" />
+                            <div className="space-y-1 text-sm">
+                              <p className="font-medium">Manter o histórico</p>
+                              <p className="text-muted-foreground">
+                                As conversas, mensagens e contatos continuam no sistema, sem canal. Consequências:
+                              </p>
+                              <ul className="list-disc space-y-0.5 pl-4 text-muted-foreground">
+                                <li>
+                                  Elas <strong>só aparecem com o filtro em “Todos os canais”</strong> — some ao
+                                  filtrar por um canal específico, e saem dos relatórios por canal.
+                                </li>
+                                <li>
+                                  Se alguém responder numa dessas conversas, a mensagem sai por{" "}
+                                  <strong>outro número</strong> — o sistema cai no primeiro canal conectado do
+                                  tenant.
+                                </li>
+                              </ul>
+                            </div>
+                          </label>
+
+                          <label
+                            htmlFor="modo-apagar"
+                            className="flex cursor-pointer gap-3 rounded-md border p-3 hover:bg-muted/50 has-[[data-state=checked]]:border-destructive has-[[data-state=checked]]:bg-destructive/5"
+                          >
+                            <RadioGroupItem value="apagar" id="modo-apagar" className="mt-0.5" />
+                            <div className="space-y-1 text-sm">
+                              <p className="font-medium text-destructive">Apagar o histórico junto</p>
+                              <p className="text-muted-foreground">
+                                Some tudo, <strong>sem backup e sem volta</strong>. Consequências:
+                              </p>
+                              <ul className="list-disc space-y-0.5 pl-4 text-muted-foreground">
+                                <li>
+                                  Os <strong>{deletePreview.atendimentos}</strong> atendimento(s) saem dos painéis
+                                  de SLA e volume, mudando números de períodos já fechados.
+                                </li>
+                                <li>
+                                  <strong>{deletePreview.contatos_apagados}</strong> contato(s) que só existem
+                                  neste canal são apagados
+                                  {deletePreview.contatos_preservados > 0 && (
+                                    <>
+                                      ; os outros <strong>{deletePreview.contatos_preservados}</strong> têm
+                                      histórico em outros canais e são preservados
+                                    </>
+                                  )}
+                                  .
+                                </li>
+                                {deletePreview.atendimentos_com_ticket > 0 && (
+                                  <li className="text-destructive">
+                                    <strong>{deletePreview.atendimentos_com_ticket}</strong> atendimento(s) estão
+                                    ligados a ticket — os tickets ficam, mas perdem esse histórico.
+                                  </li>
+                                )}
+                                {deletePreview.artigos_kb_desvinculados > 0 && (
+                                  <li>
+                                    <strong>{deletePreview.artigos_kb_desvinculados}</strong> artigo(s) da base de
+                                    conhecimento são mantidos, só perdem o vínculo com o atendimento.
+                                  </li>
+                                )}
+                              </ul>
+                            </div>
+                          </label>
+                        </RadioGroup>
+                      </div>
+                    )}
+
+                    {(deletePreview.grupos > 0 ||
+                      deletePreview.templates > 0 ||
+                      deletePreview.agendadas > 0) && (
+                      <p className="text-xs text-muted-foreground">
+                        Nos dois casos saem junto, porque pertencem ao canal:{" "}
+                        {[
+                          deletePreview.grupos > 0 && `${deletePreview.grupos} grupo(s)`,
+                          deletePreview.templates > 0 && `${deletePreview.templates} template(s)`,
+                          deletePreview.agendadas > 0 &&
+                            `${deletePreview.agendadas} agendamento(s) ficam sem canal`,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                        .
+                      </p>
+                    )}
+
+                    {exigeDigitarNome && (
+                      <div className="space-y-2">
+                        <Label htmlFor="confirm-delete-canal">
+                          Para apagar o histórico, digite <strong>{nomeDoCanal}</strong>:
+                        </Label>
+                        <Input
+                          id="confirm-delete-canal"
+                          value={deleteConfirmText}
+                          onChange={(e) => setDeleteConfirmText(e.target.value)}
+                          placeholder={nomeDoCanal}
+                          autoComplete="off"
+                        />
+                      </div>
+                    )}
+
+                    {previewTemHistorico && (
+                      <p className="text-xs text-muted-foreground">
+                        Se você não quer nem remover o canal, cancele e use <strong>Desativar</strong>: ele sai do
+                        ar e as credenciais são apagadas, mas o canal continua cadastrado.
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              disabled={!podeConfirmarDelete || deleteMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (deleteTarget && podeConfirmarDelete)
+                  deleteMutation.mutate({ id: deleteTarget.id, modo: deleteModo });
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Remover
+              {!previewTemHistorico
+                ? "Excluir canal"
+                : deleteModo === "apagar"
+                  ? "Excluir canal e histórico"
+                  : "Excluir canal, manter histórico"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
