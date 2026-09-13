@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useWhatsAppActions } from '../hooks/useWhatsAppActions';
 import { useClienteSearch } from '../hooks/useClienteSearch';
+import { ClienteEncerradoBadge } from './ClienteEncerradoBadge';
 import { useContactSearch, type ContactSearchResult } from '../hooks/useContactSearch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,7 +42,8 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
   const [searchOpen, setSearchOpen] = useState(false);
   const [linkedCliente, setLinkedCliente] = useState<{ id: string; label: string } | null>(null);
   const [originalClienteId, setOriginalClienteId] = useState<string | null>(null);
-  const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen ? searchTerm : '');
+  // DEM-0394: inclui clientes com contrato encerrado (cliente que volta depois de cancelar).
+  const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen ? searchTerm : '', true);
 
   // Preencher a partir de um contato já cadastrado (nome + empresa).
   // O telefone NÃO vem junto: é único por tenant (whatsapp_contacts_tenant_phone_unique)
@@ -493,9 +495,17 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
                             setSearchTerm('');
                           }}
                         >
-                          <span className="truncate">
-                            <span className="text-muted-foreground">#{c.codigo_sequencial}</span>{' '}
-                            {c.nome_fantasia || c.razao_social}
+                          <span className="min-w-0">
+                            <span className="block truncate">
+                              <span className="text-muted-foreground">#{c.codigo_sequencial}</span>{' '}
+                              {c.nome_fantasia || c.razao_social}
+                            </span>
+                            {c.cancelado && (
+                              <span className="mt-0.5 flex items-center gap-1.5 min-w-0">
+                                <ClienteEncerradoBadge dataCancelamento={c.data_cancelamento} />
+                                {c.cnpj && <span className="text-[10px] text-muted-foreground truncate">{c.cnpj}</span>}
+                              </span>
+                            )}
                           </span>
                           <Link2 className="h-3 w-3 shrink-0 text-muted-foreground" />
                         </button>

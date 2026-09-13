@@ -10,6 +10,8 @@ interface LinkedCliente {
   codigo_sequencial: number;
   /** Coluna gerada em clientes: só dígitos. Vai no &cnpj= da janelinha do AcessoFast. */
   cnpj_digits: string | null;
+  cancelado?: boolean | null;
+  data_cancelamento?: string | null;
 }
 
 export interface ClienteCandidato {
@@ -59,7 +61,7 @@ export function useClienteLinkSuggestion(
       if (!linkedClienteId) return null;
       const { data } = await supabase
         .from('clientes')
-        .select('id, razao_social, nome_fantasia, codigo_sequencial, cnpj_digits')
+        .select('id, razao_social, nome_fantasia, codigo_sequencial, cnpj_digits, cancelado, data_cancelamento')
         .eq('id', linkedClienteId)
         .maybeSingle();
       return data;

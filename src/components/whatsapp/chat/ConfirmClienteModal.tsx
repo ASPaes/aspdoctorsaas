@@ -11,6 +11,7 @@ import { Check, Search, UserX, Loader2, Phone, AlertTriangle } from 'lucide-reac
 import { useRelevantAttendance } from '../hooks/useRelevantAttendance';
 import { useClienteLinkSuggestion, type ClienteCandidato } from '../hooks/useClienteLinkSuggestion';
 import { useClienteSearch } from '../hooks/useClienteSearch';
+import { ClienteEncerradoBadge } from './ClienteEncerradoBadge';
 
 interface Props {
   open: boolean;
@@ -30,6 +31,8 @@ interface ClienteOption {
   nome_fantasia: string | null;
   fornecedor_nome?: string | null;
   telefone_whatsapp?: string | null;
+  cancelado?: boolean | null;
+  data_cancelamento?: string | null;
 }
 
 function clienteLabel(c: { razao_social: string | null; nome_fantasia: string | null; codigo_sequencial: number | null }) {
@@ -76,7 +79,8 @@ export function ConfirmClienteModal({
     tenantId,
   );
 
-  const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchTerm);
+  // DEM-0394: inclui clientes com contrato encerrado (cliente que volta depois de cancelar).
+  const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchTerm, true);
 
   const linkMutation = useMutation({
     mutationFn: async (clienteId: string) => {
@@ -172,6 +176,7 @@ export function ConfirmClienteModal({
             {opts.highlighted && (
               <Badge variant="default" className="text-[10px]">Vinculado atualmente</Badge>
             )}
+            {c.cancelado && <ClienteEncerradoBadge dataCancelamento={c.data_cancelamento} />}
           </div>
           {c.nome_fantasia && c.nome_fantasia !== c.razao_social && (
             <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.nome_fantasia}</p>
@@ -211,6 +216,8 @@ export function ConfirmClienteModal({
                   codigo_sequencial: linkedCliente.codigo_sequencial,
                   razao_social: linkedCliente.razao_social,
                   nome_fantasia: linkedCliente.nome_fantasia,
+                  cancelado: linkedCliente.cancelado,
+                  data_cancelamento: linkedCliente.data_cancelamento,
                 },
                 { highlighted: true, subtitle: 'Clique para confirmar e prosseguir' },
               )}
@@ -299,6 +306,8 @@ export function ConfirmClienteModal({
                       razao_social: r.razao_social,
                       nome_fantasia: r.nome_fantasia,
                       telefone_whatsapp: r.telefone_whatsapp,
+                      cancelado: r.cancelado,
+                      data_cancelamento: r.data_cancelamento,
                     },
                     { subtitle: r.cnpj || null },
                   ),

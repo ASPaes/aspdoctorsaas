@@ -19,6 +19,7 @@ import { Link2, Unlink, Building2, Loader2, ChevronDown, Cake, ExternalLink, Sea
 import { useClienteLinkSuggestion, type ClienteCandidato } from "../hooks/useClienteLinkSuggestion";
 import { useLinkedClienteDetails } from "../hooks/useLinkedClienteDetails";
 import { useClienteSearch } from "../hooks/useClienteSearch";
+import { ClienteEncerradoBadge } from "./ClienteEncerradoBadge";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -78,7 +79,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
       const cid = (contactRow as any)?.cliente_id ?? null;
       if (!cid) return null;
       const { data: cli } = await (supabase.from("clientes" as any) as any)
-        .select("id, codigo_sequencial, nome_fantasia, razao_social")
+        .select("id, codigo_sequencial, nome_fantasia, razao_social, cancelado, data_cancelamento")
         .eq("id", cid)
         .maybeSingle();
       return (cli as any) ?? null;
@@ -113,7 +114,8 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
     ? ((groupLinkedCliente as any)?.id ?? null)
     : (indLinkedClienteId ?? null);
   const { data: clienteDetails } = useLinkedClienteDetails(clienteId);
-  const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen || switchOpen ? searchTerm : "");
+  // DEM-0394: inclui clientes com contrato encerrado (cliente que volta depois de cancelar).
+  const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen || switchOpen ? searchTerm : "", true);
 
   const closePicker = () => {
     setSearchOpen(false);
@@ -145,6 +147,9 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
         <p className="text-sm font-medium break-words">
           #{linkedCliente.codigo_sequencial} — {linkedCliente.nome_fantasia || linkedCliente.razao_social || "Sem nome"}
         </p>
+        {linkedCliente.cancelado && (
+          <ClienteEncerradoBadge dataCancelamento={linkedCliente.data_cancelamento} />
+        )}
 
         {isBirthday && (
           <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 rounded-md px-2 py-1.5 text-xs font-medium">
@@ -376,9 +381,17 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
                     }}
                     disabled={isLinking}
                   >
-                    <span className="truncate">
-                      <span className="text-muted-foreground">#{c.codigo_sequencial}</span>{" "}
-                      {c.nome_fantasia || c.razao_social}
+                    <span className="min-w-0">
+                      <span className="block truncate">
+                        <span className="text-muted-foreground">#{c.codigo_sequencial}</span>{" "}
+                        {c.nome_fantasia || c.razao_social}
+                      </span>
+                      {c.cancelado && (
+                        <span className="mt-0.5 flex items-center gap-1.5 min-w-0">
+                          <ClienteEncerradoBadge dataCancelamento={c.data_cancelamento} />
+                          {c.cnpj && <span className="text-[10px] text-muted-foreground truncate">{c.cnpj}</span>}
+                        </span>
+                      )}
                     </span>
                     <Link2 className="h-3 w-3 shrink-0 text-muted-foreground" />
                   </button>
@@ -526,9 +539,17 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
                   }}
                   disabled={isLinking}
                 >
-                  <span className="truncate">
-                    <span className="text-muted-foreground">#{c.codigo_sequencial}</span>{" "}
-                    {c.nome_fantasia || c.razao_social}
+                  <span className="min-w-0">
+                    <span className="block truncate">
+                      <span className="text-muted-foreground">#{c.codigo_sequencial}</span>{" "}
+                      {c.nome_fantasia || c.razao_social}
+                    </span>
+                    {c.cancelado && (
+                      <span className="mt-0.5 flex items-center gap-1.5 min-w-0">
+                        <ClienteEncerradoBadge dataCancelamento={c.data_cancelamento} />
+                        {c.cnpj && <span className="text-[10px] text-muted-foreground truncate">{c.cnpj}</span>}
+                      </span>
+                    )}
                   </span>
                   <Link2 className="h-3 w-3 shrink-0 text-muted-foreground" />
                 </button>
