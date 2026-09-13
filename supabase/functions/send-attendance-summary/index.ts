@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
 
   const { data: att } = await supabase
     .from('support_attendances')
-    .select('id, tenant_id, cliente_id, department_id, conversation_id, closed_at, ai_customer_summary, ai_summary')
+    .select('id, tenant_id, cliente_id, department_id, conversation_id, closed_at, ai_customer_summary, ai_summary, assigned_to, closed_by')
     .eq('id', attendanceId)
     .maybeSingle();
 
@@ -249,7 +249,10 @@ Deno.serve(async (req) => {
       referencia_id: att.id,
       cliente_id: att.cliente_id,
       department_id: att.department_id,
-      enviado_por: enviadoPor,
+      // Envio automático não tem pessoa clicando: o autor é o dono do atendimento.
+      // É por esse campo que o operador vê, na tela E-mails, o resumo que saiu dos
+      // atendimentos dele (RLS de email_envios, 13/09/2026).
+      enviado_por: enviadoPor ?? att.assigned_to ?? att.closed_by ?? null,
     }),
   });
 

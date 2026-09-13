@@ -1,4 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
 import EmailsEnviadosTab from "@/components/emails/EmailsEnviadosTab";
 import EmailsRecebidosTab from "@/components/emails/EmailsRecebidosTab";
 
@@ -10,12 +11,19 @@ import EmailsRecebidosTab from "@/components/emails/EmailsRecebidosTab";
  * está ligada.
  */
 export default function Emails() {
+  const { profile } = useAuth();
+  // Quem filtra é o RLS (operador só recebe do banco o que é dele). O texto só
+  // explica por que a lista do operador é menor que a do gestor.
+  const soOsProprios = profile?.role === "user" && profile?.is_super_admin !== true;
+
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold">E-mails</h1>
         <p className="mt-1 text-muted-foreground">
-          Tudo que a operação enviou e recebeu dos clientes, de qualquer área.
+          {soOsProprios
+            ? "Os e-mails que você enviou aos clientes e as respostas deles."
+            : "Tudo que a operação enviou e recebeu dos clientes, de qualquer área."}
         </p>
       </div>
 
