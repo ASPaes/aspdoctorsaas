@@ -81,6 +81,12 @@ Deno.serve(async (req) => {
     // ============================================================
     const LOST_ATTEMPTS = 3;       // igual ao MAX_ATTEMPTS do process-finalize-queue
     const LOOKBACK_HOURS = 24;     // teto da janela; tambem o fallback do 1o alerta
+    // Motivo persistente (tenant sem credito de IA) nao muda de 15 em 15 min: o
+    // aviso repetido nao acrescenta nada e vira ruido. Limite de 2 avisos/dia POR
+    // MOTIVO. Enquanto segura, a janela fica aberta e o proximo aviso traz o total
+    // acumulado — nada some. Motivo novo/desconhecido continua avisando na hora.
+    const THROTTLE_HOURS = 12;
+    const ehMotivoPersistente = (m: string) => /quota|credit|billing|insufficient|429/i.test(m);
     const lookbackIso = new Date(Date.now() - LOOKBACK_HOURS * 60 * 60 * 1000).toISOString();
 
     const { data: lostRows } = await supabase
@@ -91,20 +97,29 @@ Deno.serve(async (req) => {
       .gte('processed_at', lookbackIso);
 
     if ((lostRows || []).length > 0) {
-      // Janela por tenant = desde o ultimo alerta dele. Sem isso, ou o mesmo
-      // item e contado varias vezes (janela fixa maior que o cron) ou some no
-      // vao entre execucoes (janela menor). Se o envio falhou e nao gravou
+      // Janela por tenant+motivo = desde o ultimo alerta daquele motivo. Sem isso,
+      // ou o mesmo item e contado varias vezes (janela fixa maior que o cron) ou
+      // some no vao entre execucoes (janela menor). Se o envio falhou e nao gravou
       // ai_alert_log, a janela continua aberta e a proxima rodada reavisa.
+      // function_name antigo era so 'analysis_lost' (sem motivo) — ele serve de
+      // piso na primeira rodada apos este deploy, para nao reavisar o que ja saiu.
       const { data: lastAlerts } = await supabase
         .from('ai_alert_log')
-        .select('tenant_id, sent_at')
-        .eq('function_name', 'analysis_lost')
+        .select('tenant_id, function_name, sent_at')
+        .like('function_name', 'analysis_lost%')
         .gte('sent_at', lookbackIso)
         .order('sent_at', { ascending: false });
 
-      const windowStart: Record<string, string> = {};
+      const ultimoPorChave: Record<string, string> = {};   // tenant|motivo -> sent_at
+      const ultimoLegado: Record<string, string> = {};     // tenant -> sent_at (registro sem motivo)
       for (const a of (lastAlerts || [])) {
-        if (!windowStart[a.tenant_id]) windowStart[a.tenant_id] = a.sent_at; // ordenado desc: 1o = mais recente
+        const motivo = a.function_name.slice('analysis_lost'.length).replace(/^:/, '');
+        if (!motivo) {
+          if (!ultimoLegado[a.tenant_id]) ultimoLegado[a.tenant_id] = a.sent_at;
+          continue;
+        }
+        const k = `${a.tenant_id}|${motivo}`;
+        if (!ultimoPorChave[k]) ultimoPorChave[k] = a.sent_at; // ordenado desc: 1o = mais recente
       }
 
       // "finalize HTTP 503: {"success":false,"reason":"ai_quota_exceeded"}" -> "ai_quota_exceeded (HTTP 503)"
@@ -117,50 +132,64 @@ Deno.serve(async (req) => {
         if (http) return `HTTP ${http}`;
         return err.substring(0, 40);
       };
+      // O codigo HTTP nao separa o motivo: 503 e 429 do mesmo quota sao o mesmo caso.
+      const chaveDe = (motivo: string) => motivo.replace(/\s*\(HTTP \d+\)/, '').substring(0, 60);
 
-      const porTenant: Record<string, { total: number; motivos: Record<string, number> }> = {};
+      // Agrupa por tenant+motivo, cada um com sua propria janela.
+      const porMotivo: Record<string, { tenantId: string; motivo: string; total: number; desde: string }> = {};
       for (const row of lostRows) {
-        const desde = windowStart[row.tenant_id] ?? lookbackIso;
-        if (!row.processed_at || row.processed_at <= desde) continue;
-        const acc = porTenant[row.tenant_id] ??= { total: 0, motivos: {} };
+        if (!row.processed_at) continue;
+        const motivo = motivoDe(row.last_error);
+        const chave = chaveDe(motivo);
+        const k = `${row.tenant_id}|${chave}`;
+        const desde = ultimoPorChave[k] ?? ultimoLegado[row.tenant_id] ?? lookbackIso;
+        if (row.processed_at <= desde) continue;
+        const acc = porMotivo[k] ??= { tenantId: row.tenant_id, motivo, total: 0, desde };
         acc.total++;
-        const m = motivoDe(row.last_error);
-        acc.motivos[m] = (acc.motivos[m] ?? 0) + 1;
       }
 
-      const idsPerdas = Object.keys(porTenant);
+      const idsPerdas = [...new Set(Object.values(porMotivo).map((v) => v.tenantId))];
       const nomesPerda: Record<string, string> = {};
       if (idsPerdas.length > 0) {
         const { data: tn } = await supabase.from('tenants').select('id, nome').in('id', idsPerdas);
         for (const t of (tn || [])) nomesPerda[t.id] = t.nome;
       }
 
-      for (const tenantId of idsPerdas) {
-        const { total, motivos } = porTenant[tenantId];
-        const motivoTop = Object.entries(motivos).sort((a, b) => b[1] - a[1])[0][0];
-        const outros = Object.keys(motivos).length - 1;
+      for (const [k, { tenantId, motivo, total, desde }] of Object.entries(porMotivo)) {
+        const chave = k.split('|')[1];
+
+        // Segura o reaviso do motivo persistente; o total continua somando.
+        if (ehMotivoPersistente(chave)) {
+          const ultimo = ultimoPorChave[k] ?? ultimoLegado[tenantId];
+          if (ultimo && Date.now() - new Date(ultimo).getTime() < THROTTLE_HOURS * 60 * 60 * 1000) {
+            continue;
+          }
+        }
+
         const nome = nomesPerda[tenantId] || tenantId;
-        const desde = new Date(windowStart[tenantId] ?? lookbackIso)
-          .toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        const desdeBr = new Date(desde).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
         const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
         const message = `⛔ *DoctorSaaS — ANALISES PERDIDAS*\n\n` +
           `▪ Empresa: *${nome}*\n` +
           `▪ Perdidas: *${total}* analise(s) de atendimento\n` +
-          `▪ Motivo: ${motivoTop}${outros > 0 ? ` (+${outros} outro(s))` : ''}\n` +
-          `▪ Desde: ${desde}\n` +
+          `▪ Motivo: ${motivo}\n` +
+          `▪ Desde: ${desdeBr}\n` +
           `▪ Horario: ${now}\n\n` +
           `_Nao serao reprocessadas: a fila esgotou as ${LOST_ATTEMPTS} tentativas._\n` +
-          `_Cada uma e um atendimento sem sentimento, sem resumo e sem KB._`;
+          `_Cada uma e um atendimento sem sentimento, sem resumo e sem KB._` +
+          (ehMotivoPersistente(chave)
+            ? `\n_Enquanto este motivo persistir, este aviso sai no maximo a cada ${THROTTLE_HOURS}h._`
+            : '');
 
         const ok = await sendAdminWhatsApp(supabase, admin_instance_name, admin_phone, message);
         if (ok) {
           await supabase.from('ai_alert_log').insert({
             tenant_id: tenantId,
-            function_name: 'analysis_lost',
+            function_name: `analysis_lost:${chave}`,
             level: 'blocked', // unicos valores aceitos pelo CHECK: warning | critical | blocked
           });
-          alertsSent.push(`analysis_lost:${nome}:${total}`);
+          alertsSent.push(`analysis_lost:${nome}:${chave}:${total}`);
         }
       }
     }
