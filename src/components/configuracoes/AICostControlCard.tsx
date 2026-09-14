@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,8 +33,11 @@ const fmtUsd = (v: number) =>
   }).format(v);
 
 export default function AICostControlCard() {
+  const { can: canRbac } = usePermissions();
   const { effectiveTenantId: tid } = useTenantFilter();
   const { profile } = useAuth();
+  // F3 — `ia_configuracoes` passa a mandar. O papel embutido continua como
+  // piso: quem nao e admin nem super nunca ve, mesmo que o recurso libere.
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
   const queryClient = useQueryClient();
 
@@ -42,7 +46,7 @@ export default function AICostControlCard() {
 
   const { data: config, isLoading: configLoading } = useQuery<AICostConfig>({
     queryKey: configKey,
-    enabled: !!tid && !!isAdmin,
+    enabled: !!tid && !!isAdmin && canRbac("ia_configuracoes", "view"),
     queryFn: async () => {
       const { data, error } = await (supabase.from("configuracoes" as any) as any)
         .select("sentiment_analysis_enabled, ai_monthly_budget_usd, ai_budget_alert_pct")

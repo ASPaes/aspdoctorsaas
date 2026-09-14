@@ -11,11 +11,16 @@
 --
 -- ⚠️ Chamar sempre como (SELECT has_perm(...)) para virar InitPlan e rodar
 -- 1x por consulta, nao 1x por linha. 254 das 466 policies ja usam esse padrao.
+--
+-- ⚠️ PARALLEL SAFE nao e enfeite. Funcao SECURITY DEFINER nasce PARALLEL UNSAFE,
+-- e uma policy que a chama DESLIGA o scan paralelo da tabela inteira. Medido em
+-- whatsapp_messages (387 mil linhas): count(*) foi de 104ms para 1.027ms sem a
+-- marcacao, e voltou para 110ms com ela. Dez vezes, em silencio.
 -- ============================================================================
 begin;
 
 create or replace function public.has_perm(p_resource text, p_action text default 'view')
-returns boolean language plpgsql stable security definer set search_path='public','pg_catalog' as $$
+returns boolean language plpgsql stable parallel safe security definer set search_path='public','pg_catalog' as $$
 declare
   v_role text; v_super boolean; v_tenant uuid; v_rbac boolean; v_v2 boolean;
   v_group uuid; v_res boolean;
@@ -56,7 +61,7 @@ begin
 end $$;
 
 create or replace function public.perm_scope(p_resource text, p_action text default 'view')
-returns text language plpgsql stable security definer set search_path='public','pg_catalog' as $$
+returns text language plpgsql stable parallel safe security definer set search_path='public','pg_catalog' as $$
 declare v_super boolean; v_tenant uuid; v_v2 boolean; v_group uuid; v_escopo text;
 begin
   select p.is_super_admin, p.tenant_id into v_super, v_tenant
@@ -76,7 +81,7 @@ end $$;
 -- Setores do usuario. `support_department_members` tem user_id direto e a
 -- coluna is_active — filtrar por ela nao e opcional.
 create or replace function public.my_departments()
-returns uuid[] language sql stable security definer set search_path='public','pg_catalog' as $$
+returns uuid[] language sql stable parallel safe security definer set search_path='public','pg_catalog' as $$
   select coalesce(array_agg(m.department_id), '{}'::uuid[])
   from public.support_department_members m
   where m.user_id = auth.uid() and coalesce(m.is_active,true);

@@ -133,10 +133,22 @@ begin
   insert into res values ('T15 descer de nivel NAO diminui heranca',
     v_view is true, 'admin/oem_aprovacao='||coalesce(v_view::text,'null'));
 
-  -- T10 · has_perm dormente: nenhuma policy usa
+  -- T10 · F4 aplicada: has_perm protege as tabelas sensiveis, e SEMPRE restritiva
   select count(*) into v_n from pg_policies
    where schemaname='public' and (coalesce(qual,'')||coalesce(with_check,'')) ilike '%has_perm%';
-  insert into res values ('T10 has_perm ainda dormente (0 policies)', v_n = 0, v_n||' policies');
+  insert into res values ('T10 F4: has_perm no RLS', v_n >= 10, v_n||' policies');
+
+  -- T10b · nenhuma policy de RBAC pode ser PERMISSIVE (ela AMPLIARIA o acesso)
+  select count(*) into v_n from pg_policies
+   where schemaname='public' and permissive='PERMISSIVE'
+     and (coalesce(qual,'')||coalesce(with_check,'')) ilike '%has_perm%';
+  insert into res values ('T10b nenhuma policy de RBAC permissiva', v_n = 0, v_n||' permissivas');
+
+  -- T10c · as funcoes de RLS sao PARALLEL SAFE (senao desligam o scan paralelo)
+  select count(*) into v_n from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+   where n.nspname='public' and p.proname in ('has_perm','perm_scope','my_departments')
+     and p.proparallel <> 's';
+  insert into res values ('T10c funcoes de RLS sao parallel safe', v_n = 0, v_n||' inseguras');
 end $$;
 
 select case when ok then '✅' else '❌' end as st, t as teste, detalhe from res order by t;

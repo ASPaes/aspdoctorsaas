@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -162,6 +163,7 @@ function AtendimentoDashboardInner() {
   const { isSuperAdmin } = useTenantFilter();
   const { dataUpdatedAt } = useAtendimentoRealtime();
   const [now, setNow] = useState(() => Date.now());
+  const { can } = usePermissions();
   const [tab, setTab] = useState("tempo-real");
 
   useEffect(() => {
@@ -194,17 +196,17 @@ function AtendimentoDashboardInner() {
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList>
-          <TabsTrigger value="tempo-real">Tempo Real</TabsTrigger>
-          <TabsTrigger value="velocidade">Velocidade / SLA</TabsTrigger>
-          <TabsTrigger value="agentes">Agentes</TabsTrigger>
-          <TabsTrigger value="satisfacao">Satisfação</TabsTrigger>
-          <TabsTrigger value="volume">Volume</TabsTrigger>
-          <TabsTrigger value="ura">URA</TabsTrigger>
-          <TabsTrigger value="chats">Chats</TabsTrigger>
-          <TabsTrigger value="taxonomia">Tickets</TabsTrigger>
-          <TabsTrigger value="backlog">Backlog</TabsTrigger>
-          <TabsTrigger value="clientes">Clientes</TabsTrigger>
-          {isSuperAdmin && <TabsTrigger value="cobertura">Cobertura</TabsTrigger>}
+          {can("atd.tempo_real", "view") && (<TabsTrigger value="tempo-real">Tempo Real</TabsTrigger>)}
+          {can("atd.velocidade", "view") && (<TabsTrigger value="velocidade">Velocidade / SLA</TabsTrigger>)}
+          {can("atd.agentes", "view") && (<TabsTrigger value="agentes">Agentes</TabsTrigger>)}
+          {can("atd.satisfacao", "view") && (<TabsTrigger value="satisfacao">Satisfação</TabsTrigger>)}
+          {can("atd.volume", "view") && (<TabsTrigger value="volume">Volume</TabsTrigger>)}
+          {can("atd.ura", "view") && (<TabsTrigger value="ura">URA</TabsTrigger>)}
+          {can("atd.chats", "view") && (<TabsTrigger value="chats">Chats</TabsTrigger>)}
+          {can("atd.tickets", "view") && (<TabsTrigger value="taxonomia">Tickets</TabsTrigger>)}
+          {can("atd.backlog", "view") && (<TabsTrigger value="backlog">Backlog</TabsTrigger>)}
+          {can("atd.clientes", "view") && (<TabsTrigger value="clientes">Clientes</TabsTrigger>)}
+          {isSuperAdmin && can("atd.cobertura", "view") && (<TabsTrigger value="cobertura">Cobertura</TabsTrigger>)}
         </TabsList>
         <TabsContent value="tempo-real" className="mt-4">
           <TempoRealTab />

@@ -131,6 +131,7 @@ const RESOURCE_MODULOS = "clientes.modulos";
 // "admin, ponto", e a pessoa que cuida da fila na operação é head. Em vez de
 // promover alguém a admin por causa de uma aba, o acesso entra na mesma coluna.
 import GrupoDoUsuarioSelect, { useGruposDoTenant } from "./permissoes/GrupoDoUsuarioSelect";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const RESOURCE_OEM_APROVACAO = "clientes.oem_aprovacao";
 
@@ -1160,6 +1161,12 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     },
   });
   const { grupos: rbacGrupos, vinculos: rbacVinculos } = useGruposDoTenant();
+  const { can } = usePermissions();
+  // F3 — trocar o grupo/papel de outra pessoa e o caminho mais curto de
+  // escalada de privilegio. Ate agora `usuarios_roles` existia no catalogo e
+  // ninguem o consultava.
+  const podeTrocarPapel = can("usuarios_roles", "update");
+  const podeConvidar = can("usuarios_convites", "view");
 
   const handleSendInvite = () => {
     if (!selectedFunc || !selectedFunc.email) return;
@@ -1227,7 +1234,8 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
           <Button
             size="sm"
             onClick={() => setShowInviteCard(!showInviteCard)}
-            disabled={!canInvite}
+            /* F3 — `usuarios_convites` existia no catalogo e nao era consultado. */
+            disabled={!canInvite || !podeConvidar}
           >
             <UserPlus className="h-4 w-4 mr-1" />
             Convidar
@@ -1646,13 +1654,13 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                             userId={u.user_id}
                             grupos={rbacGrupos}
                             vinculos={rbacVinculos}
-                            disabled={u.user_id === profile?.user_id || u.is_super_admin}
+                            disabled={!podeTrocarPapel || u.user_id === profile?.user_id || u.is_super_admin}
                           />
                         ) : (
                         <Select
                           value={u.role}
                           onValueChange={(v) => updateRoleMutation.mutate({ userId: u.user_id, role: v })}
-                          disabled={u.user_id === profile?.user_id || u.is_super_admin}
+                          disabled={!podeTrocarPapel || u.user_id === profile?.user_id || u.is_super_admin}
                         >
                           <SelectTrigger className="w-24 h-8">
                             <SelectValue />

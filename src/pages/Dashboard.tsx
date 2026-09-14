@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,6 +24,7 @@ import { podeVerMeuPainel } from '@/lib/meuPainelAcesso';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 export default function Dashboard() {
+  const { can } = usePermissions();
   const { selectedUnidadeId, unidadeFilterReady } = useUnidadeFilter();
   const { filters, setFilters } = useDashboardFilters(selectedUnidadeId);
   const { profile } = useAuth();
@@ -98,13 +100,16 @@ export default function Dashboard() {
         <Tabs value={abaAtiva} onValueChange={setAbaAtiva}>
           <div className="overflow-x-auto pb-1">
             <TabsList>
-              <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
-              <TabsTrigger value="crescimento">Crescimento</TabsTrigger>
-              <TabsTrigger value="cancelamentos">Cancelamentos</TabsTrigger>
-              <TabsTrigger value="vendas">Vendas</TabsTrigger>
-              <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>
-              <TabsTrigger value="cs">Customer Success</TabsTrigger>
-              <TabsTrigger value="cohort">Cohort</TabsTrigger>
+              {/* F3 — cada aba passou a ter recurso proprio. As quatro que
+                  expoem faturamento (Crescimento, Cancelamentos, Cohort e
+                  Vendas) sao as de maior sensibilidade do sistema. */}
+              {can("dash.visao_geral", "view") && <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>}
+              {can("dash.crescimento", "view") && <TabsTrigger value="crescimento">Crescimento</TabsTrigger>}
+              {can("dash.cancelamentos", "view") && <TabsTrigger value="cancelamentos">Cancelamentos</TabsTrigger>}
+              {can("dash.vendas", "view") && <TabsTrigger value="vendas">Vendas</TabsTrigger>}
+              {can("dash.distribuicao", "view") && <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>}
+              {can("dash.cs", "view") && <TabsTrigger value="cs">Customer Success</TabsTrigger>}
+              {can("dash.cohort", "view") && <TabsTrigger value="cohort">Cohort</TabsTrigger>}
               {temMeuPainel && <TabsTrigger value="meu-painel">Meu Painel</TabsTrigger>}
             </TabsList>
           </div>

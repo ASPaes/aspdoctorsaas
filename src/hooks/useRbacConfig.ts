@@ -2,11 +2,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
-
 export type Nivel = 1 | 2 | 3;
 export type Escopo = "nenhum" | "proprio" | "setor" | "unidade" | "todos";
 export type Acao = "view" | "insert" | "update" | "delete";
-
 export interface RbacModulo { id: string; nome: string; descricao: string | null; ordem: number; nivel: Nivel }
 export interface RbacGrupo {
   id: string; nome: string; slug: string;
@@ -32,7 +30,6 @@ export interface RbacConfig {
   modulos: RbacModulo[]; grupos: RbacGrupo[];
   recursos: RbacRecurso[]; permissoes: RbacPermissao[];
 }
-
 /**
  * Recursos que existem no catálogo mas ainda não têm portão no código.
  * Levantado em 13/09/2026 — ver docs/rbac/RBAC_ATUAL.md, P1.
@@ -43,21 +40,16 @@ export const RECURSOS_SEM_PORTAO = new Set<string>([
   // Já existiam no catálogo e nunca tiveram portão (levantado em 13/09/2026).
   "atendimento_chat", "atendimento_filtros", "atendimento_transferir",
   "base_conhecimento", "clientes.oem_aprovacao", "dashboard_conselho",
-  "dashboard_operacional", "ia_configuracoes", "nav.emails",
-  "parametros_atendimento", "super_monitor", "usuarios_convites",
-  "usuarios_roles", "whatsapp_instancias", "lancamentos",
+  "dashboard_operacional",  "nav.emails",
+  "parametros_atendimento", "super_monitor", 
+   "whatsapp_instancias", "lancamentos",
   "receita_mrr", "dashboard_financeiro", "cfg.whatsapp",
   // Entraram com o catálogo completo em 14/09/2026. Nenhum tem portão ainda —
   // ligá-los é a F3, tenant a tenant, com aviso antes.
   "nav.onboarding", "nav.cadastros", "nav.whatsapp_contatos",
-  "nav.meu_painel", "nav.super", "dash.visao_geral",
-  "dash.crescimento", "dash.cancelamentos", "dash.vendas",
-  "dash.distribuicao", "dash.cs", "dash.cohort",
-  "dash.meu_painel", "dash.valores_financeiros", "atd.tempo_real",
-  "atd.velocidade", "atd.agentes", "atd.satisfacao",
-  "atd.volume", "atd.ura", "atd.chats",
-  "atd.tickets", "atd.backlog", "atd.clientes",
-  "atd.cobertura", "clientes.ficha", "clientes.contratos",
+  "nav.meu_painel", "nav.super", 
+  "dash.meu_painel", "dash.valores_financeiros", 
+   "clientes.ficha", "clientes.contratos",
   "clientes.financeiro", "clientes.cancelar", "clientes.reativar",
   "clientes.reajuste", "clientes.purge", "clientes.historico",
   "clientes.filiais", "clientes.contatos", "fin.mrr",
@@ -77,32 +69,26 @@ export const RECURSOS_SEM_PORTAO = new Set<string>([
   "certificados", "painel_uso", "meu_painel",
   "super.tenants", "super.templates", "super.limpeza_uras",
 ]);
-
 export const ESCOPO_LABEL: Record<Escopo, string> = {
   nenhum: "Nenhuma", proprio: "Só as minhas", setor: "Do meu setor",
   unidade: "Das minhas unidades", todos: "Todas",
 };
-
 /** Quais ações a tela mostra em cada nível de controle. */
 export const ACOES_POR_NIVEL: Record<Nivel, Acao[]> = {
   1: ["view"],
   2: ["view", "delete"],
   3: ["view", "insert", "update", "delete"],
 };
-
 export const ACAO_LABEL: Record<Acao, string> = {
   view: "Ver", insert: "Inserir", update: "Editar", delete: "Excluir",
 };
-
 export const NIVEL_LABEL: Record<Nivel, string> = {
   1: "Normal", 2: "Moderado", 3: "Completo",
 };
-
 export function useRbacConfig() {
   const { effectiveTenantId } = useTenantFilter();
   const qc = useQueryClient();
   const chave = ["rbac-config", effectiveTenantId];
-
   const query = useQuery<RbacConfig>({
     queryKey: chave,
     enabled: !!effectiveTenantId,
@@ -115,20 +101,17 @@ export function useRbacConfig() {
       return data as RbacConfig;
     },
   });
-
   // Toda mutação invalida também o mapa de permissões (bug B9: staleTime de
   // 5 min faria a tela e o banco discordarem depois que o RLS entrar).
   const invalidar = () => {
     qc.invalidateQueries({ queryKey: chave });
     qc.invalidateQueries({ queryKey: ["my-permissions"] });
   };
-
   const chamar = (fn: string, args: Record<string, unknown>) =>
     (supabase.rpc as any)(fn, args).then(({ data, error }: any) => {
       if (error) throw new Error(error.message);
       return data;
     });
-
   const setPermissao = useMutation({
     mutationFn: (v: { groupId: string; key: string; acao: Acao; valor: boolean }) =>
       chamar("rbac_set_group_permission", {
@@ -137,7 +120,6 @@ export function useRbacConfig() {
     onSuccess: invalidar,
     onError: (e: Error) => toast.error(e.message),
   });
-
   const setEscopo = useMutation({
     mutationFn: (v: { groupId: string; key: string; escopo: Escopo }) =>
       chamar("rbac_set_group_scope", {
@@ -146,7 +128,6 @@ export function useRbacConfig() {
     onSuccess: invalidar,
     onError: (e: Error) => toast.error(e.message),
   });
-
   const setNivel = useMutation({
     mutationFn: (v: { moduleId: string; nivel: Nivel }) =>
       chamar("rbac_set_module_level", {
@@ -159,27 +140,23 @@ export function useRbacConfig() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
-
   const duplicarGrupo = useMutation({
     mutationFn: (v: { origemId: string; nome: string }) =>
       chamar("rbac_duplicate_group", { p_source_group_id: v.origemId, p_nome: v.nome }),
     onSuccess: () => { invalidar(); toast.success("Grupo criado a partir da cópia."); },
     onError: (e: Error) => toast.error(e.message),
   });
-
   const renomearGrupo = useMutation({
     mutationFn: (v: { groupId: string; nome: string }) =>
       chamar("rbac_rename_group", { p_group_id: v.groupId, p_nome: v.nome }),
     onSuccess: () => { invalidar(); toast.success("Nome atualizado."); },
     onError: (e: Error) => toast.error(e.message),
   });
-
   const excluirGrupo = useMutation({
     mutationFn: (groupId: string) => chamar("rbac_delete_group", { p_group_id: groupId }),
     onSuccess: () => { invalidar(); toast.success("Grupo excluído."); },
     onError: (e: Error) => toast.error(e.message),
   });
-
   return {
     config: query.data, isLoading: query.isLoading, error: query.error,
     setPermissao, setEscopo, setNivel, duplicarGrupo, renomearGrupo, excluirGrupo,
