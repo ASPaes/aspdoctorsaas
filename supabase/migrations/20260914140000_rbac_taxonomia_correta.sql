@@ -33,7 +33,10 @@ do $$
 declare p record;
 begin
   for p in select * from (values
-      ('nav.tickets','tickets'), ('nav.clientes','clientes'), ('ia_configuracoes','cfg.ia')
+      -- ia_configuracoes NAO entra aqui: o portao dela no codigo foi criado nesta
+      -- mesma entrega, entao em producao o valor dela nunca teve efeito. Com AND,
+      -- 14 operadores da Digi Office perdiam a aba de IA (corrigido em 14/09).
+      ('nav.tickets','tickets'), ('nav.clientes','clientes')
     ) as t(morre, sobrevive)
   loop
     update public.group_permissions gp

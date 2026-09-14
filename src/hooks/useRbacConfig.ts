@@ -26,6 +26,9 @@ export interface RbacRecurso {
   /** Onde a funcionalidade fica no produto. É isto que o admin lê, não a chave. */
   caminho: string | null;
   secao: Secao;
+  /** Sub-item do menu (ou aba da tela) onde o recurso fica, dentro do módulo. */
+  grupo: string | null;
+  grupo_ordem: number;
   module_id: string; parent_key: string | null; nivel: Nivel; ordem: number;
   /** Ações que fazem sentido aqui. Recurso que já É uma ação (exportar,
    *  cancelar) traz apenas ["view"]: ligado = pode fazer. */
@@ -63,9 +66,9 @@ export const RECURSOS_SEM_PORTAO = new Set<string>([
   "nav.meu_painel", "nav.super", 
   "dash.meu_painel", "dash.valores_financeiros", 
    "clientes.ficha", "clientes.contratos",
-  "clientes.financeiro", "clientes.cancelar", "clientes.reativar",
-  "clientes.reajuste", "clientes.purge", "clientes.historico",
-  "clientes.filiais", "clientes.contatos", "fin.mrr",
+  "clientes.financeiro", "clientes.cancelar", 
+  "clientes.reajuste", "clientes.purge", 
+  "clientes.filiais", "clientes.contatos", 
   "fin.bridge", "fin.movimentos", "atend.assumir",
   "atend.enviar", "atend.agendar", "atend.encaminhar",
   "atend.macros", "atend.historico_terceiros", "atend.acesso_remoto",
@@ -81,6 +84,14 @@ export const RECURSOS_SEM_PORTAO = new Set<string>([
   "usuarios.desativar", "usuarios.auditoria", "cs.painel",
   "certificados", "painel_uso", "meu_painel",
   "super.tenants", "super.templates", "super.limpeza_uras",
+  // Entraram com a estrutura do menu (14/09/2026): seções reais da ficha do
+  // cliente, abas da lista de Clientes, abas da configuração de Implantação.
+  "clientes.dados", "clientes.venda_produto", "clientes.tickets",
+  "clientes.integracao", "clientes.parametros_atendimento",
+  "clientes.divergencias_hiper", "clientes.cadastro_incompleto",
+  "onb.cfg.jornadas", "onb.cfg.demandas", "onb.cfg.tipos_treino",
+  "onb.cfg.retornos", "onb.cfg.contabilidade", "onb.cfg.indicadores",
+  "certificados.dashboard",
 ]);
 export const ESCOPO_LABEL: Record<Escopo, string> = {
   nenhum: "Nenhuma", proprio: "Só as minhas", setor: "Do meu setor",

@@ -89,26 +89,15 @@ Frontend: `bunx vitest run` → **971 de 972 passam**. As 2 falhas (`CsatReportM
 
 ## O catálogo
 
-**143 recursos visíveis**, distribuídos assim:
+**138 itens, organizados igual ao menu lateral** — a lista completa, com o caminho de cada um, está no início de `RBAC_FUNCTIONALITIES.md`.
 
-| Nível | Recursos | O que é |
+| Nível | Itens | O que é |
 |---|---|---|
-| 1 — Normal | 45 | Exatamente a tela de hoje: menu + configurações |
-| 2 — Moderado | 46 | Portas de módulo e ações sensíveis (dinheiro, LGPD, irreversível) |
-| 3 — Completo | 52 | Abas e sub-ações |
+| 1 — Normal | 42 | A tela de hoje: entradas do menu + Configurações |
+| 2 — Moderado | 37 | Portas de módulo e ações sensíveis (dinheiro, LGPD, irreversível) |
+| 3 — Completo | 59 | Abas e sub-ações |
 
-| Módulo | Recursos |
-|---|---|
-| Configurações | 26 |
-| Onboarding e Implantação | 16 |
-| Menu principal · Clientes · Atendimento | 15 cada |
-| Dashboard · Dashboard de Atendimento | 11 cada |
-| Tickets | 9 |
-| Equipe e segurança · Integrações e canais | 7 cada |
-| Financeiro | 5 · Super admin 4 · Dados 2 |
-
-⚠️ **99 dos 143 ainda não têm portão no código** e aparecem marcados com "ainda não aplicado".
-Isso é esperado: o catálogo é o vocabulário completo do produto; ligar cada um é a F3.
+⚠️ **72 dos 138 ainda não têm portão no código** e aparecem com "ainda não aplicado". Isso é esperado: o catálogo é o vocabulário completo do produto; ligar cada portão é a F3.
 
 ## Os arquivos
 

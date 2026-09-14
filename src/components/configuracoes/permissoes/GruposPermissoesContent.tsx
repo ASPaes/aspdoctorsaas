@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import {
   useRbacConfig, RECURSOS_SEM_PORTAO, NIVEL_LABEL, ESCOPO_LABEL,
-  ACOES_POR_NIVEL, ACAO_LABEL, SECAO_LABEL, SECAO_ORDEM,
-  type Nivel, type Acao, type Escopo, type Secao, type RbacGrupo, type RbacRecurso,
+  ACOES_POR_NIVEL, ACAO_LABEL,
+  type Nivel, type Acao, type Escopo, type RbacGrupo, type RbacRecurso,
 } from "@/hooks/useRbacConfig";
 import LinhaRecurso, { ChipAcao } from "./LinhaRecurso";
 import { Label } from "@/components/ui/label";
@@ -244,7 +244,23 @@ export default function GruposPermissoesContent() {
             // apagada, e as colunas de chips ficam alinhadas entre as linhas.
             const acoesDoModulo = ACOES_POR_NIVEL[mod.nivel];
             const mostraEscopo = mod.nivel >= 3 && itens.some((r) => r.escopo_aplicavel);
-            const entrada = itens.find((r) => r.secao === "entrada");
+            // Entrada do MÓDULO = item do menu principal (sem grupo). Entradas de
+            // sub-item (Chat, Tickets, Ficha do cliente...) ficam dentro do grupo.
+            const entrada = itens.find((r) => r.secao === "entrada" && !r.grupo);
+            // Módulo = item do menu lateral; grupo = sub-item daquele menu ou aba
+            // daquela tela. Na ordem em que aparecem no produto.
+            const gruposDoModulo = Array.from(
+              itens
+                .filter((r) => r !== entrada)
+                .reduce((m, r) => {
+                  const nome = r.grupo ?? mod.nome;
+                  const g = m.get(nome) ?? { nome, ordem: r.grupo_ordem ?? 50, itens: [] as RbacRecurso[] };
+                  g.itens.push(r);
+                  m.set(nome, g);
+                  return m;
+                }, new Map<string, { nome: string; ordem: number; itens: RbacRecurso[] }>())
+                .values(),
+            ).sort((a, b) => a.ordem - b.ordem);
             // Sem entrada cadastrada (módulos internos), tudo segue alcançável.
             const entradaLigada = entrada ? !!mapa.get(entrada.key)?.view : true;
             const fechado = fechados.has(mod.id);
@@ -320,32 +336,36 @@ export default function GruposPermissoesContent() {
                       </div>
                     )}
 
-                    {SECAO_ORDEM.filter((sec) => sec !== "entrada").map((sec) => {
-                      const doSecao = itens.filter((r) => r.secao === sec);
-                      if (!doSecao.length) return null;
+                    {gruposDoModulo.map(({ nome, itens: doGrupo }) => {
+                      const entradaGrupo = doGrupo.find((r) => r.secao === "entrada");
+                      const grupoLigado = entradaGrupo ? !!mapa.get(entradaGrupo.key)?.view : true;
+                      const demais = emArvore(doGrupo.filter((r) => r !== entradaGrupo));
+                      const linha = (r: RbacRecurso, alcancavel: boolean) => (
+                        <LinhaRecurso
+                          key={r.key}
+                          r={r}
+                          estado={mapa.get(r.key)}
+                          acoesVisiveis={acoesDoModulo}
+                          mostraEscopo={mostraEscopo}
+                          alcancavel={alcancavel}
+                          mostrarChave={mostrarChaves}
+                          travada={(acao) => travada(grupo, r.key, acao)}
+                          onAcao={(acao, valor) =>
+                            setPermissao.mutate({ groupId: grupo.id, key: r.key, acao, valor })
+                          }
+                          onEscopo={(escopo) =>
+                            setEscopo.mutate({ groupId: grupo.id, key: r.key, escopo })
+                          }
+                        />
+                      );
                       return (
-                        <div key={sec}>
+                        <div key={nome}>
                           <div className="px-3 pb-1 pt-2.5 text-[9.5px] font-bold uppercase tracking-[.09em] text-muted-foreground">
-                            {SECAO_LABEL[sec]}
+                            {nome}
                           </div>
-                          {doSecao.map((r) => (
-                            <LinhaRecurso
-                              key={r.key}
-                              r={r}
-                              estado={mapa.get(r.key)}
-                              acoesVisiveis={acoesDoModulo}
-                              mostraEscopo={mostraEscopo}
-                              alcancavel={entradaLigada}
-                              mostrarChave={mostrarChaves}
-                              travada={(acao) => travada(grupo, r.key, acao)}
-                              onAcao={(acao, valor) =>
-                                setPermissao.mutate({ groupId: grupo.id, key: r.key, acao, valor })
-                              }
-                              onEscopo={(escopo) =>
-                                setEscopo.mutate({ groupId: grupo.id, key: r.key, escopo })
-                              }
-                            />
-                          ))}
+                          {/* A entrada do sub-item vem primeiro: desligada, o resto dele esmaece. */}
+                          {entradaGrupo && linha(entradaGrupo, entradaLigada)}
+                          {demais.map((r) => linha(r, entradaLigada && grupoLigado))}
                         </div>
                       );
                     })}

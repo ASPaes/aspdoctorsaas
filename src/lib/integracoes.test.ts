@@ -80,9 +80,13 @@ describe("catálogo", () => {
     }
   });
 
-  it("expõe os recursos RBAC sem repetir (Omie e OEM dividem o mesmo)", () => {
+  // Até 14/09/2026 OEM e Omie dividiam `cfg.integracoes_omie`: liberar um liberava
+  // o outro. Na estrutura de permissões por menu, cada aba tem a sua chave — a do
+  // OEM nasceu com o valor do Omie, então ninguém mudou de acesso na troca.
+  it("expõe um recurso RBAC por integração com tela", () => {
     expect(INTEGRACOES_RESOURCES.sort()).toEqual([
       "cfg.integracoes_hiper",
+      "cfg.integracoes_oem",
       "cfg.integracoes_omie",
     ]);
   });

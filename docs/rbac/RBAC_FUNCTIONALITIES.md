@@ -5,6 +5,241 @@
 
 ---
 
+## Estrutura final — igual ao menu (14/09/2026)
+
+> **Esta seção vale sobre todo o resto do documento.** Foi gerada a partir do banco local depois da última migration. As seções seguintes ficam como histórico das decisões.
+
+**A regra:** módulo = item do menu lateral · grupo = sub-item daquele menu, ou aba daquela tela · na mesma ordem do produto. Se está no menu assim, está na tela de permissões assim — e toda funcionalidade nova entra seguindo a mesma regra.
+
+**138 itens em 9 módulos** · nível 1: 42 · nível 2: 37 · nível 3: 59 · **72 ainda sem portão no código** (marcados "ainda não aplicado" na tela).
+
+Ações: **V** ver · **I** inserir · **E** editar · **X** excluir. ⚑ = entrada (desligada, o que está abaixo dela fica inalcançável). ○ = ainda não aplicado. ↳ = fica dentro do item de cima.
+
+
+### Dashboard
+
+Indicadores do negócio, incluindo faturamento.
+
+| Grupo | Item | Onde fica | Ações | Nível |
+|---|---|---|---|---|
+| — | ⚑ Abrir o Dashboard | Menu › Dashboard | V | 1 |
+| Abas | ○ Conselho DS (IA) | Dashboard › Diagnóstico executivo › Conselho DS | V | 2 |
+|  | Aba Visão Geral | Dashboard › Visão Geral | V | 2 |
+|  | Aba Crescimento | Dashboard › Crescimento | V | 2 |
+|  | ○ ↳ Ponte de MRR | Dashboard › Crescimento › Ponte de MRR | V | 2 |
+|  | Aba Cancelamentos | Dashboard › Cancelamentos | V | 2 |
+|  | Aba Vendas | Dashboard › Vendas | V | 2 |
+|  | Aba Distribuição | Dashboard › Distribuição | V | 3 |
+|  | Aba Customer Success | Dashboard › Customer Success | V | 3 |
+|  | Aba Cohort | Dashboard › Cohort | V | 2 |
+|  | ○ Aba Meu Painel | Dashboard › Meu Painel | V E | 3 |
+| Vale em todo o Dashboard | ○ Ver valores em R$ nos painéis | Todos os painéis com valor em R$ | V | 2 |
+
+### Clientes
+
+A lista de clientes e a ficha de cada um.
+
+| Grupo | Item | Onde fica | Ações | Nível |
+|---|---|---|---|---|
+| — | ⚑ Abrir Clientes | Menu › Clientes | V I E X | 2 |
+| Abas da lista | Exportar a lista | Clientes › botão Exportar XLSX | V | 2 |
+|  | ○ Aba Movimentos MRR | Clientes › Movimentos MRR | V | 3 |
+|  | ○ Aba Reajustes | Clientes › Reajustes | V I X | 2 |
+|  | ○ Aba Divergências Hiper | Clientes › Divergências Hiper | V E | 3 |
+|  | ○ Aba Cadastro incompleto | Clientes › Cadastro incompleto | V E | 3 |
+|  | ○ Aba Aprovação OEM | Clientes › Aprovação OEM | V | 2 |
+| Ficha do cliente | ⚑ ○ Abrir a ficha do cliente | Clientes › abrir um cliente | V | 3 |
+|  | ○ ↳ Contatos adicionais | Ficha do cliente › Dados Cadastrais › Contatos adicionais | V I E X | 3 |
+|  | ○ Dados cadastrais | Ficha do cliente › Dados Cadastrais | V E | 3 |
+|  | ○ Produto e contrato | Ficha do cliente › Produto / Contrato | V | 3 |
+|  | ○ ↳ Contratos do cliente | Ficha do cliente › Produto / Contrato › Contratos | V I E X | 2 |
+|  | ↳ Produtos e módulos | Ficha do cliente › Produto / Contrato › Produtos & Módulos | V I E X | 2 |
+|  | ○ Avisos e bloqueios | Ficha do cliente › Avisos e Bloqueios | V E | 3 |
+|  | ○ Tickets do cliente | Ficha do cliente › Tickets | V | 3 |
+|  | ○ Filiais do cliente | Ficha do cliente › Filiais | V I E X | 3 |
+|  | ○ Aba Financeiro do cliente | Ficha do cliente › Financeiro | V E | 2 |
+|  | ↳ Custos e Margens | Ficha do cliente › Financeiro › Parâmetros financeiros | V E | 1 |
+|  | ○ Integração | Ficha do cliente › Integração | V E | 3 |
+|  | ○ Cancelar cliente | Ficha do cliente › Cancelamento | V | 2 |
+|  | ○ Excluir tudo do cliente | Ficha do cliente › Zona de Perigo › Excluir tudo | V | 2 |
+
+### Atendimento
+
+Dashboard de atendimento, Chat e Tickets.
+
+| Grupo | Item | Onde fica | Ações | Nível |
+|---|---|---|---|---|
+| Dashboard de atendimento | ⚑ Abrir o Dashboard de atendimento | Menu › Atendimento › Dashboard | V | 1 |
+|  | Aba Tempo Real | Dashboard de Atendimento › Tempo Real | V | 2 |
+|  | Aba Velocidade / SLA | Dashboard de Atendimento › Velocidade | V | 3 |
+|  | Aba Agentes | Dashboard de Atendimento › Agentes | V | 2 |
+|  | Aba Satisfação | Dashboard de Atendimento › Satisfação | V | 2 |
+|  | Aba Volume | Dashboard de Atendimento › Volume | V | 3 |
+|  | Aba URA | Dashboard de Atendimento › URA | V | 3 |
+|  | Aba Chats | Dashboard de Atendimento › Chats | V | 3 |
+|  | Aba Tickets | Dashboard de Atendimento › Tickets | V | 3 |
+|  | Aba Backlog | Dashboard de Atendimento › Backlog | V | 3 |
+|  | Aba Clientes | Dashboard de Atendimento › Clientes | V | 3 |
+|  | Aba Cobertura | Dashboard de Atendimento › Cobertura | V | 3 |
+| Chat | ⚑ ○ Abrir o Chat | Menu › Atendimento › Chat | V | 2 |
+|  | ○ Filtros Avançados | Botão Filtros no topo da lista de conversas do Chat | V | 3 |
+|  | ○ Encerrar e Transferir | Botões Encerrar / Transferir no chat | V | 3 |
+|  | Participantes do Grupo | Painel do grupo em Atendimento › Chat | V | 3 |
+|  | ○ Assumir conversa da fila | Chat › Fila | V | 3 |
+|  | ○ Enviar mensagem | Chat | V | 3 |
+|  | ○ Agendar mensagem | Chat › Agendar | V | 3 |
+|  | ○ Encaminhar mensagem e mídia | Chat › Encaminhar | V | 2 |
+|  | ○ Ver conversa de outro agente | Chat › Histórico do contato | V | 2 |
+|  | ○ Acesso remoto (AcessoFast) | Chat › Acesso remoto | V | 2 |
+|  | ○ Agenda de contatos do WhatsApp | Chat › Contatos | V | 2 |
+|  | ○ Busca em mensagens | Chat › Buscar | V | 3 |
+| Tickets | ⚑ ○ Abrir Tickets | Menu › Atendimento › Tickets | V I E X | 2 |
+|  | ○ Criar ticket | Tickets › Novo | V | 3 |
+|  | ○ Editar ticket | Tickets › Detalhe | V | 3 |
+|  | ○ Encerrar ticket | Tickets › Detalhe › Encerrar | V | 3 |
+|  | ○ Reabrir ticket | Tickets › Detalhe › Reabrir | V | 3 |
+|  | ○ Excluir ticket | Tickets › Detalhe › Excluir | V | 2 |
+|  | ○ Transferir responsável | Tickets › Detalhe › Transferir | V | 3 |
+|  | ○ Anexos do ticket | Tickets › Detalhe › Anexos | V | 2 |
+|  | ○ Menções | Tickets › Menções | V | 3 |
+
+### Customer Success
+
+Saúde e risco da carteira.
+
+| Grupo | Item | Onde fica | Ações | Nível |
+|---|---|---|---|---|
+| — | ⚑ Abrir Customer Success | Menu › Customer Success | V | 1 |
+
+### Implantação
+
+Kanban, dashboard e configuração das jornadas.
+
+| Grupo | Item | Onde fica | Ações | Nível |
+|---|---|---|---|---|
+| — | ⚑ ○ Abrir Implantação | Menu › Implantação | V | 2 |
+| Kanban | ○ Mover cartão de etapa | Implantação › Kanban | V | 3 |
+|  | ○ Criar jornada | Implantação › Nova jornada | V | 3 |
+|  | ○ Editar dados da jornada | Implantação › Jornada › Editar | V | 3 |
+|  | ○ Go-live / encerrar jornada | Implantação › Jornada › Go-live | V | 2 |
+|  | ○ Cancelar jornada | Implantação › Jornada › Cancelar | V | 2 |
+|  | ○ Reabrir jornada | Implantação › Jornada › Reabrir | V | 2 |
+|  | ○ Transferir responsável | Implantação › Jornada › Transferir | V | 3 |
+|  | ○ Treinos | Implantação › Treinos | V | 3 |
+| Dashboard | ○ Dashboard de Implantação | Implantação › Dashboard | V | 2 |
+| Configuração | ○ Aba Jornadas | Implantação › Configuração › Jornadas | V I E X | 3 |
+|  | ○ ↳ Checklist das etapas | Implantação › Configuração › Pipelines & Etapas › Checklist | V I E X | 3 |
+|  | ○ Aba Pipelines & Etapas | Implantação › Configuração › Pipelines & Etapas | V I E X | 2 |
+|  | ○ Aba Distribuição | Implantação › Configuração › Distribuição | V E | 3 |
+|  | ○ Aba Motivos de Parada | Implantação › Configuração › Motivos de Parada | V I E X | 3 |
+|  | ○ Aba Tipos de demanda | Implantação › Configuração › Tipos de demanda | V I E X | 3 |
+|  | ○ ↳ Aplicar template de pipeline | Implantação › Configuração › Pipelines & Etapas › Aplicar template | V I E X | 3 |
+|  | ○ Aba Tipos de treino | Implantação › Configuração › Tipos de treino | V I E X | 3 |
+|  | ○ Aba Papéis | Implantação › Configuração › Papéis | V I E X | 3 |
+|  | ○ Aba Retorno ao vendedor | Implantação › Configuração › Retorno ao vendedor | V I E X | 3 |
+|  | ○ Aba Dados da contabilidade | Implantação › Configuração › Dados da contabilidade | V E | 3 |
+|  | ○ Aba Indicadores | Implantação › Configuração › Indicadores | V E | 3 |
+
+### Certificados A1
+
+Certificados digitais dos clientes.
+
+| Grupo | Item | Onde fica | Ações | Nível |
+|---|---|---|---|---|
+| — | ⚑ Abrir Certificados A1 | Menu › Certificados A1 | V | 1 |
+| Abas | ○ Aba Dashboard | Certificados A1 › Dashboard | V | 3 |
+
+### Painel de Uso
+
+Consumo da plataforma pela empresa.
+
+| Grupo | Item | Onde fica | Ações | Nível |
+|---|---|---|---|---|
+| — | ⚑ Abrir o Painel de Uso | Menu › Painel de Uso | V | 1 |
+
+### Configurações
+
+Na mesma divisão da barra lateral de Configurações.
+
+| Grupo | Item | Onde fica | Ações | Nível |
+|---|---|---|---|---|
+| — | ⚑ Abrir Configurações | Menu › Configurações | V | 1 |
+| Sistema | Geral | Configurações › Sistema › Geral | V E | 1 |
+|  | Théo | Configurações › Sistema › Théo | V E | 1 |
+|  | Guia de configuração | Configurações › Sistema › Guia de configuração | V | 1 |
+| Financeiro | Percentuais | Configurações › Financeiro › Percentuais | V I E X | 1 |
+|  | Despesas CAC | Configurações › Financeiro › Despesas CAC | V I E X | 1 |
+| Cadastros · Comercial | Produtos | Configurações › Cadastros › Comercial › Produtos | V I E X | 1 |
+|  | Fornecedores | Configurações › Cadastros › Comercial › Fornecedores | V I E X | 1 |
+|  | Modelos de contrato | Configurações › Cadastros › Comercial › Modelos de contrato | V I E X | 1 |
+|  | Origens de venda | Configurações › Cadastros › Comercial › Origens de venda | V I E X | 1 |
+|  | Formas de pagamento | Configurações › Cadastros › Comercial › Formas de pagamento | V I E X | 1 |
+| Cadastros · Operacional | Setores | Configurações › Cadastros › Operacional › Setores | V I E X | 1 |
+|  | Funcionários | Configurações › Cadastros › Operacional › Funcionários | V I E X | 1 |
+|  | Tickets | Configurações › Cadastros › Operacional › Tickets | V I E X | 1 |
+| Cadastros · Serviços | Categorias | Configurações › Cadastros › Serviços › Categorias | V I E X | 1 |
+|  | Tipos de serviço | Configurações › Cadastros › Serviços › Tipos de serviço | V I E X | 1 |
+| Cadastros · Classificação | Segmentos | Configurações › Cadastros › Classificação › Segmentos | V I E X | 1 |
+|  | Áreas de atuação | Configurações › Cadastros › Classificação › Áreas de atuação | V I E X | 1 |
+|  | Unidades base | Configurações › Cadastros › Classificação › Unidades base | V I E X | 1 |
+| Cadastros · Ciclo de vida | Motivos de cancelamento | Configurações › Cadastros › Ciclo de vida › Motivos de cancelamento | V I E X | 1 |
+|  | Motivos de pausa | Configurações › Cadastros › Ciclo de vida › Motivos de pausa | V I E X | 1 |
+| Equipe | ↳ Convidar pessoas | Configurações › Equipe › Acessos & permissões › botão Convidar | V I E X | 2 |
+|  | ↳ Trocar o grupo de outra pessoa | Configurações › Equipe › Acessos & permissões › coluna Grupo | V E | 2 |
+|  | ○ ↳ Desativar pessoa | Configurações › Equipe › Acessos & permissões › Status | V | 2 |
+|  | ○ ↳ Histórico de alterações | Configurações › Equipe › Acessos & permissões › Histórico | V | 3 |
+|  | Acessos & permissões | Configurações › Equipe › Acessos & permissões | V E | 1 |
+|  | Permissões e papéis | Configurações › Equipe › Permissões e papéis | V E | 1 |
+|  | Segurança | Configurações › Equipe › Segurança | V E | 1 |
+| Atendimento | ○ ↳ Macros e respostas rápidas | Configurações › Atendimento › Operação › Macros | V I E X | 3 |
+|  | Canais | Configurações › Atendimento › Canais | V E | 1 |
+|  | Distribuição | Configurações › Atendimento › Distribuição | V E | 1 |
+|  | Operação | Configurações › Atendimento › Operação | V E | 1 |
+|  | E-mail | Configurações › Atendimento › E-mail | V E | 1 |
+|  | Inteligência artificial | Configurações › Atendimento › Inteligência artificial | V E | 1 |
+|  | Horário & plantão | Configurações › Atendimento › Horário & plantão | V E | 1 |
+|  | Base de conhecimento | Configurações › Atendimento › Base de conhecimento | V I E X | 1 |
+| Dados | Duplicidades | Configurações › Dados › Duplicidades | V | 1 |
+|  | Importação | Configurações › Dados › Importação | V | 1 |
+| Integrações | Omie | Configurações › Integrações › Omie | V E | 1 |
+|  | Hiper | Configurações › Integrações › Hiper | V E | 1 |
+|  | OEM | Configurações › Integrações › OEM | V E | 1 |
+
+### Super Admin
+
+Visão entre empresas. Só super admin chega aqui, independentemente do grupo.
+
+| Grupo | Item | Onde fica | Ações | Nível |
+|---|---|---|---|---|
+| — | ⚑ ○ Abrir Super Admin | Menu › Super Admin | V | 3 |
+| Telas | ○ Monitor | Super Admin › Monitor | V | 3 |
+|  | ○ Tenants | Super Admin › Tenants | V | 3 |
+|  | ○ Templates | Super Admin › Templates | V | 3 |
+|  | ○ Limpeza de URAs | Super Admin › Limpeza de URAs | V | 3 |
+
+### De-para: as funcionalidades das versões anteriores deste documento
+
+Nenhuma funcionalidade listada aqui antes se perdeu. As chaves que não existem mais foram para um destes destinos:
+
+| Chave antiga | Destino | Motivo |
+|---|---|---|
+| `dash.financeiro`, `dash.operacional`, `dash.conselho` | uma linha por aba do Dashboard + `dashboard_conselho` | o agrupamento foi recusado: catálogo completo, o nível decide o que aparece |
+| `atd.operacional` | as 11 abas do Dashboard de atendimento | idem |
+| `onb.config` | as 10 abas reais de Implantação › Configuração | idem |
+| `onb.quadro` | `nav.onboarding` (entrada de Implantação) | duplicata: era a mesma tela |
+| `nav.chat` · `nav.clientes` · `nav.tickets` | `atendimento_chat` · `clientes` · `tickets` | duplicata; o código foi repontado |
+| `cs.painel` · `certificados` · `painel_uso` | `nav.customer_success` · `nav.certificados_a1` · `nav.painel_uso` | duplicata |
+| `meu_painel` · `nav.meu_painel` | `dash.meu_painel` | duplicata |
+| `ia_configuracoes` · `whatsapp_instancias` · `base_conhecimento` · `parametros_atendimento` | `cfg.ia` · `cfg.canais` · `cfg.kb` · `cfg.operacao` | duplicata da aba de Configurações |
+| `fin.mrr` (Receita e MRR) | **removido** — o MRR passa a seguir as portas de Clientes e do Dashboard | era uma trava sobre `movimentos_mrr`, lida direto por 9 lugares: quem abria Clientes com ela negada via o MRR vazio, sem aviso |
+| `clientes.reativar` | **removido** | não existe em tela nenhuma (`reativar_cliente` não é chamada pelo frontend) |
+| `clientes.historico` | **removido** | não fica na ficha: é o histórico de permissões, duplicata de `usuarios.auditoria` |
+
+**Entraram** com a regra do menu: as abas da lista de Clientes que faltavam (Divergências Hiper, Cadastro incompleto), as seções reais da ficha (Dados Cadastrais, Produto / Contrato, Avisos e Bloqueios, Tickets, Integração), as 6 abas de Implantação › Configuração que faltavam, a aba Dashboard de Certificados A1 e `cfg.integracoes_oem` — a aba OEM usava a permissão do Omie, e liberar um liberava o outro.
+
+---
+
+
 ## 0. Método — e por que a versão anterior errava
 
 As correções sucessivas tiveram uma causa única: **eu media uma fonte e concluía sobre o sistema todo.** Varri `src/` e afirmei que o recurso do OEM não protegia nada — ele protege 10 funções no banco. Olhei `clientes` e afirmei que o escopo por unidade existia em uma tabela — existe em cinco.
