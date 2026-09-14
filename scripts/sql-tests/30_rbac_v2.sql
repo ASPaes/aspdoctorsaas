@@ -8,7 +8,7 @@ create temp table res(t text, ok boolean, detalhe text);
 do $$
 declare
   v_tenant uuid; v_admin uuid; v_gadm uuid; v_gope uuid; v_novo uuid;
-  v_ok boolean; v_msg text; v_view boolean; v_n int;
+  v_ok boolean; v_msg text; v_view boolean; v_n int; v_outro uuid; v_alvo uuid; v_role text;
 begin
   select id into v_tenant from public.tenants where nome='ASP';
   select p.user_id into v_admin from public.profiles p
@@ -58,14 +58,17 @@ begin
   end;
 
   -- T6 · D6: um grupo por pessoa (atribuir substitui, não acumula)
-  perform public.rbac_assign_user_group(v_admin, v_novo);
-  select count(*) into v_n from public.user_groups where user_id=v_admin;
-  perform public.rbac_assign_user_group(v_admin, v_gadm);
+  -- Usa OUTRA pessoa: ninguém pode trocar o próprio grupo (ver T12).
+  select p.user_id into v_outro from public.profiles p
+   where p.tenant_id=v_tenant and p.user_id <> v_admin
+     and coalesce(p.status,'ativo')='ativo' and p.role='user' limit 1;
+  perform public.rbac_assign_user_group(v_outro, v_novo);
+  select count(*) into v_n from public.user_groups where user_id=v_outro;
+  perform public.rbac_assign_user_group(v_outro, v_gope);
   insert into res values ('T6 um grupo por pessoa', v_n = 1, v_n||' vinculo(s)');
 
   -- T7 · grupo com membros não pode ser excluído
-  perform public.rbac_assign_user_group(
-    (select user_id from public.profiles where tenant_id=v_tenant and role='user' limit 1), v_novo);
+  perform public.rbac_assign_user_group(v_outro, v_novo);
   begin
     perform public.rbac_delete_group(v_novo);
     insert into res values ('T7 grupo com gente nao e excluivel', false, 'NAO bloqueou');
@@ -87,6 +90,22 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', v_admin)::text, true);
   insert into res values ('T9 perm_scope responde', public.perm_scope('clientes','view') is not null,
                           'escopo='||public.perm_scope('clientes','view'));
+
+  -- T11 · vincular pessoa a grupo atualiza o papel legado (D8)
+  select user_id into v_alvo from public.profiles
+   where tenant_id=v_tenant and user_id <> v_admin and role='user'
+     and coalesce(status,'ativo')='ativo' limit 1;
+  perform public.rbac_assign_user_group(v_alvo, v_gadm);
+  select role into v_role from public.profiles where user_id=v_alvo;
+  insert into res values ('T11 vinculo atualiza profiles.role (D8)', v_role='admin', 'role='||coalesce(v_role,'null'));
+
+  -- T12 · ninguem troca o proprio grupo
+  begin
+    perform public.rbac_assign_user_group(v_admin, v_gope);
+    insert into res values ('T12 nao troca o proprio grupo', false, 'NAO bloqueou');
+  exception when others then
+    insert into res values ('T12 nao troca o proprio grupo', sqlerrm ilike '%proprio%', sqlerrm);
+  end;
 
   -- T10 · has_perm dormente: nenhuma policy usa
   select count(*) into v_n from pg_policies

@@ -130,6 +130,8 @@ const RESOURCE_MODULOS = "clientes.modulos";
 // Aprovar pedido do OEM tinha o mesmo problema pelo lado oposto: o portão era
 // "admin, ponto", e a pessoa que cuida da fila na operação é head. Em vez de
 // promover alguém a admin por causa de uma aba, o acesso entra na mesma coluna.
+import GrupoDoUsuarioSelect, { useGruposDoTenant } from "./permissoes/GrupoDoUsuarioSelect";
+
 const RESOURCE_OEM_APROVACAO = "clientes.oem_aprovacao";
 
 type AcessoIntegracao = {
@@ -1143,6 +1145,22 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
 
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
 
+  // RBAC v2: quando o tenant usa grupos, a coluna "Papel" vira "Grupo" e a
+  // troca passa pela RPC, que mantém `profiles.role` coerente com o nível base
+  // do grupo (decisão D8 — 27 funções do banco leem o papel direto).
+  const { data: usaGrupos = false } = useQuery<boolean>({
+    queryKey: ["tenant-rbac-v2", tenantId],
+    enabled: !!tenantId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("tenants" as any) as any)
+        .select("rbac_v2_enabled").eq("id", tenantId).maybeSingle();
+      if (error) throw error;
+      return !!(data as any)?.rbac_v2_enabled;
+    },
+  });
+  const { grupos: rbacGrupos, vinculos: rbacVinculos } = useGruposDoTenant();
+
   const handleSendInvite = () => {
     if (!selectedFunc || !selectedFunc.email) return;
     if (funcAlreadyLinked) {
@@ -1478,7 +1496,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                   <TableHead>Nome</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Setor</TableHead>
-                  <TableHead>Papel</TableHead>
+                  <TableHead>{usaGrupos ? "Grupo" : "Papel"}</TableHead>
                   <TableHead>Acesso</TableHead>
                   <TableHead>Status</TableHead>
                   {isAdmin && (
@@ -1623,6 +1641,14 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                         )}
                       </TableCell>
                       <TableCell>
+                        {usaGrupos ? (
+                          <GrupoDoUsuarioSelect
+                            userId={u.user_id}
+                            grupos={rbacGrupos}
+                            vinculos={rbacVinculos}
+                            disabled={u.user_id === profile?.user_id || u.is_super_admin}
+                          />
+                        ) : (
                         <Select
                           value={u.role}
                           onValueChange={(v) => updateRoleMutation.mutate({ userId: u.user_id, role: v })}
@@ -1635,9 +1661,13 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                             <SelectItem value="admin">admin</SelectItem>
                             <SelectItem value="head">head</SelectItem>
                             <SelectItem value="user">user</SelectItem>
-                            <SelectItem value="viewer">viewer</SelectItem>
+                            {/* `viewer` só aparece para quem já está nele: é um valor
+                                legado sem nenhuma regra, que deixa a pessoa sem acesso
+                                a nada. Não oferecer evita criar novos casos. */}
+                            {u.role === "viewer" && <SelectItem value="viewer">viewer</SelectItem>}
                           </SelectContent>
                         </Select>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Select
