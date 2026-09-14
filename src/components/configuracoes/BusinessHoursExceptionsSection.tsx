@@ -483,27 +483,40 @@ export default function BusinessHoursExceptionsSection() {
             Nenhum feriado ou folga coletiva cadastrado.
           </p>
         ) : (
-          <div className="rounded-lg border overflow-x-auto">
+          // Uma área de rolagem só (a de fora), com altura limitada: a barra
+          // lateral fica sempre à vista, sem descer até o fim da lista. O
+          // [&>div] desliga a rolagem própria que o <Table> do shadcn cria.
+          // Cabeçalho e coluna de ações ficam fixos durante a rolagem. As linhas
+          // divisórias das células fixas são sombra interna, não borda: com
+          // border-collapse a borda fica para trás quando a célula gruda.
+          <div className="rounded-lg border max-h-[60vh] overflow-auto overscroll-contain [&>div]:overflow-visible">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Setores</TableHead>
-                  <TableHead>Atendimento no dia</TableHead>
-                  <TableHead className="w-24 text-right">Ações</TableHead>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="sticky top-0 z-20 bg-background px-3 shadow-[inset_0_-1px_0_hsl(var(--border)/0.6)]">Data</TableHead>
+                  <TableHead className="sticky top-0 z-20 bg-background px-3 shadow-[inset_0_-1px_0_hsl(var(--border)/0.6)]">Nome</TableHead>
+                  <TableHead className="sticky top-0 z-20 bg-background px-3 shadow-[inset_0_-1px_0_hsl(var(--border)/0.6)]">Setores</TableHead>
+                  <TableHead className="sticky top-0 z-20 bg-background px-3 shadow-[inset_0_-1px_0_hsl(var(--border)/0.6)]">Atendimento no dia</TableHead>
+                  <TableHead className="sticky top-0 right-0 z-30 bg-background px-3 text-right shadow-[inset_1px_0_0_hsl(var(--border)/0.4),inset_0_-1px_0_hsl(var(--border)/0.6)]">
+                    Ações
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {groups.map((g) => (
-                  <TableRow key={g.key}>
-                    <TableCell className="font-medium whitespace-nowrap">
+                  // Sem hover na linha: a célula fixa de ações tem fundo opaco
+                  // e ficaria de outra cor que o resto da linha.
+                  <TableRow key={g.key} className="group hover:bg-transparent">
+                    <TableCell className="px-3 font-medium whitespace-nowrap">
                       {format(parseISO(g.date), "dd/MM/yyyy")}
                     </TableCell>
-                    <TableCell>{TYPE_LABELS[g.type] || g.type}</TableCell>
-                    <TableCell className="text-muted-foreground">{g.name || "—"}</TableCell>
-                    <TableCell className="min-w-[160px]">
+                    <TableCell className="px-3 min-w-[140px]">
+                      <div className="text-sm">{g.name || TYPE_LABELS[g.type] || g.type}</div>
+                      {g.name && (
+                        <div className="text-xs text-muted-foreground">{TYPE_LABELS[g.type] || g.type}</div>
+                      )}
+                    </TableCell>
+                    <TableCell className="px-3 min-w-[140px]">
                       {g.departmentIds.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {g.departmentIds.map((id) => (
@@ -516,7 +529,7 @@ export default function BusinessHoursExceptionsSection() {
                         <span className="text-sm text-muted-foreground whitespace-nowrap">Todos os setores</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-3">
                       <Select
                         value={estadoDo(g)}
                         onValueChange={(status) =>
@@ -524,21 +537,21 @@ export default function BusinessHoursExceptionsSection() {
                         }
                         disabled={setDayStatusMutation.isPending}
                       >
-                        <SelectTrigger className="w-56">
+                        <SelectTrigger className="w-[210px]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="closed">Fechado o dia todo</SelectItem>
                           <SelectItem value="reduced" disabled={!templateValido}>
                             {templateValido
-                              ? `Horário reduzido (${formatTemplateRange()})`
+                              ? `Reduzido (${formatTemplateRange()})`
                               : "Horário reduzido"}
                           </SelectItem>
-                          <SelectItem value="open">Aberto (atendimento normal)</SelectItem>
+                          <SelectItem value="open">Aberto normalmente</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="sticky right-0 z-10 bg-background px-3 text-right shadow-[inset_1px_0_0_hsl(var(--border)/0.4),inset_0_-1px_0_hsl(var(--border)/0.4)] group-last:shadow-[inset_1px_0_0_hsl(var(--border)/0.4)]">
                       <div className="flex justify-end gap-1">
                         <Button
                           variant="ghost"

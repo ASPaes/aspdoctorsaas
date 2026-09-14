@@ -391,7 +391,7 @@ export default function HorarioPlantaoTab() {
   }
 
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-4 max-w-5xl">
       <Accordion type="multiple" defaultValue={["horario", "horario-comercial", "feriados", "ai", "plantao"]} className="space-y-4">
         {/* ════════════════════════════════════════════════════════════ */}
         {/* SECTION A: BUSINESS HOURS                                  */}
