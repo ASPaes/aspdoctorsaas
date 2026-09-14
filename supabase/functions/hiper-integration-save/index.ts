@@ -12,7 +12,10 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-const DEFAULT_BASE_URL = "https://portalhiper.com.br";
+// O PortalHiper mudou para hiper.doctorsaas.com.br em 14/09/2026 e o domínio
+// antigo sai do ar. Sem esta troca, salvar o token de novo regravaria o endereço
+// antigo por cima do novo.
+const DEFAULT_BASE_URL = "https://hiper.doctorsaas.com.br";
 
 interface Identidade {
   tenant_id: string | null;

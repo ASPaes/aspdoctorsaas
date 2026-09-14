@@ -144,7 +144,7 @@ serve(async (req) => {
     const cred = Array.isArray(creds) ? creds[0] : creds;
     if (!cred?.token) return json({ ok: false, error: "Integração não configurada ou inativa" });
 
-    const baseUrl = String(cred.base_url || "https://portalhiper.com.br").replace(/\/+$/, "");
+    const baseUrl = String(cred.base_url || "https://hiper.doctorsaas.com.br").replace(/\/+$/, "");
     const token = String(cred.token);
     const auth = { Authorization: `Bearer ${token}` };
 
