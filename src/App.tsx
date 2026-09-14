@@ -13,7 +13,6 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { PresenceHeartbeatProvider } from "@/contexts/PresenceHeartbeatProvider";
 import { Loader2 } from "lucide-react";
 import RequirePermission from "@/components/auth/RequirePermission";
-import RequireRole from "@/components/auth/RequireRole";
 import LandingRedirect from "@/components/auth/LandingRedirect";
 import { registerMediaBlobRevoker } from "@/lib/mediaBlobRegistry";
 
@@ -112,7 +111,11 @@ const App = () => (
               <Route path="/configuracoes/notificacoes" element={<RequirePermission resource="nav.configuracoes"><ConfiguracoesNotificacoes /></RequirePermission>} />
               <Route path="/settings/users" element={<Navigate to="/configuracoes?tab=usuarios" replace />} />
               <Route path="/customer-success" element={<RequirePermission resource="nav.customer_success"><CustomerSuccess /></RequirePermission>} />
-              <Route path="/atendimento/dashboard" element={<RequirePermission resource="nav.atendimento_dashboard"><RequireRole roles={["admin", "head"]}><Suspense fallback={<PageLoader />}><AtendimentoDashboard /></Suspense></RequireRole></RequirePermission>} />
+              {/* O RequireRole saiu: ele anulava a permissão concedida — o admin liberava
+                  nav.atendimento_dashboard e a pessoa continuava barrada. Quem manda agora é
+                  o recurso. A migration 20260914050000 grava o acesso efetivo de hoje para
+                  que ninguém ganhe a tela de graça (ver bug B5 em docs/rbac). */}
+              <Route path="/atendimento/dashboard" element={<RequirePermission resource="nav.atendimento_dashboard"><Suspense fallback={<PageLoader />}><AtendimentoDashboard /></Suspense></RequirePermission>} />
               <Route path="/whatsapp" element={<RequirePermission resource="nav.chat"><WhatsApp /></RequirePermission>} />
               <Route path="/whatsapp/contatos" element={<RequirePermission resource="nav.chat"><WhatsAppContatos /></RequirePermission>} />
               

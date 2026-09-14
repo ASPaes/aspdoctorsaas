@@ -21,6 +21,7 @@ import {
 import { Shield, ShieldCheck, ShieldOff, Loader2, RotateCcw, Info, Save, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import GruposPermissoesContent from "./permissoes/GruposPermissoesContent";
 
 type Role = "admin" | "head" | "user";
 type Action = "view" | "insert" | "update" | "delete";
@@ -56,6 +57,10 @@ interface TenantRow {
   id: string;
   nome: string;
   rbac_enabled: boolean;
+  /** Condição C3: a tela nova é condicionada à mesma flag do motor. O deploy
+   *  do frontend é um bundle só — sem isto, os tenants que continuam no motor
+   *  antigo veriam uma tela de grupos sem ter grupo. */
+  rbac_v2_enabled: boolean;
 }
 
 interface PendingChange {
@@ -97,7 +102,7 @@ export default function PermissoesPapeisContent() {
     enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("tenants" as any) as any)
-        .select("id, nome, rbac_enabled")
+        .select("id, nome, rbac_enabled, rbac_v2_enabled")
         .eq("id", tenantId)
         .single();
       if (error) throw error;
@@ -106,6 +111,7 @@ export default function PermissoesPapeisContent() {
   });
 
   const isActive = tenant?.rbac_enabled === true;
+  const usaGrupos = tenant?.rbac_v2_enabled === true;
 
   const { data: resources } = useQuery<Resource[]>({
     queryKey: ["rbac-resources-v2"],
@@ -300,7 +306,22 @@ export default function PermissoesPapeisContent() {
     onError: (err: any) => toast.error("Erro: " + (err?.message || "falha ao restaurar")),
   });
 
-  if (tenantLoading || !resources || !defaults) {
+  if (tenantLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
+
+  // RBAC v2: grupos criáveis + nível de controle por módulo.
+  // Só para quem tem a flag ligada (condição C3 do plano de publicação).
+  if (isActive && usaGrupos) {
+    return <GruposPermissoesContent />;
+  }
+
+  if (!resources || !defaults) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-24 w-full" />
