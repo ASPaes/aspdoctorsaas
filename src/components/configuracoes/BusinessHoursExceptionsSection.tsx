@@ -10,11 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Switch } from "@/components/ui/switch";
 import { CalendarIcon, Plus, Pencil, Trash2, Loader2, CalendarOff, Download } from "lucide-react";
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -25,12 +25,22 @@ interface Exception {
   name: string | null;
   is_closed: boolean;
   use_template: boolean;
+  department_id: string | null;
+}
+
+interface Department {
+  id: string;
+  name: string;
+  is_active: boolean;
 }
 
 const TYPE_LABELS: Record<string, string> = {
   holiday: "Feriado",
   collective_leave: "Folga coletiva",
 };
+
+// Valor do Select para "sem setor". O Radix não aceita string vazia em SelectItem.
+const TODOS_SETORES = "all";
 
 function calcularPascoa(ano: number): Date {
   const a = ano % 19;
@@ -98,6 +108,7 @@ export default function BusinessHoursExceptionsSection() {
   const [formDate, setFormDate] = useState<Date | undefined>();
   const [formType, setFormType] = useState<string>("holiday");
   const [formName, setFormName] = useState("");
+  const [formDept, setFormDept] = useState<string>(TODOS_SETORES);
 
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importAno, setImportAno] = useState(ANOS_DISPONIVEIS[0]);
@@ -108,13 +119,45 @@ export default function BusinessHoursExceptionsSection() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("business_hours_exceptions" as any)
-        .select("id, date, type, name, is_closed, use_template")
+        .select("id, date, type, name, is_closed, use_template, department_id")
         .eq("tenant_id", tid!)
         .order("date", { ascending: true });
       if (error) throw error;
       return (data ?? []) as unknown as Exception[];
     },
   });
+
+  // Traz os inativos também: uma exceção antiga de setor desativado ainda
+  // precisa mostrar o nome na lista. O seletor só oferece os ativos.
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ["business-hours-exceptions-departments", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_departments" as any) as any)
+        .select("id, name, is_active")
+        .eq("tenant_id", tid)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Department[];
+    },
+  });
+
+  const deptName = useMemo(
+    () => new Map(departments.map((d) => [d.id, d.name])),
+    [departments]
+  );
+  const activeDepartments = useMemo(() => departments.filter((d) => d.is_active), [departments]);
+
+  // Na mesma data, a exceção geral vem antes das de setor.
+  const sortedExceptions = useMemo(
+    () =>
+      [...exceptions].sort((a, b) => {
+        if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+        if (!a.department_id !== !b.department_id) return a.department_id ? 1 : -1;
+        return (deptName.get(a.department_id ?? "") ?? "").localeCompare(deptName.get(b.department_id ?? "") ?? "");
+      }),
+    [exceptions, deptName]
+  );
 
   const { data: template } = useQuery<any>({
     queryKey: ["tenant-holiday-template", tid],
@@ -135,8 +178,10 @@ export default function BusinessHoursExceptionsSection() {
     return `${template.open_at.slice(0, 5)}–${template.close_at.slice(0, 5)}`;
   };
 
+  // A importação cria exceções GERAIS. Uma data que só tem exceção de setor
+  // continua sem a geral e precisa ser importada.
   const datasJaCadastradas = useMemo(
-    () => new Set(exceptions.map((e) => e.date)),
+    () => new Set(exceptions.filter((e) => !e.department_id).map((e) => e.date)),
     [exceptions]
   );
 
@@ -144,29 +189,32 @@ export default function BusinessHoursExceptionsSection() {
     mutationFn: async () => {
       if (!formDate || !tid) throw new Error("Data obrigatória");
       const dateStr = format(formDate, "yyyy-MM-dd");
+      const departmentId = formDept === TODOS_SETORES ? null : formDept;
       const payload: any = {
         tenant_id: tid,
         date: dateStr,
         type: formType,
         name: formName.trim() || null,
+        department_id: departmentId,
         is_closed: true,
         use_template: false,
       };
 
-      if (editingId) {
-        const { error } = await (supabase.from("business_hours_exceptions" as any) as any)
-          .update({ type: formType, name: payload.name, date: dateStr })
-          .eq("id", editingId);
-        if (error) throw error;
-      } else {
-        const { error } = await (supabase.from("business_hours_exceptions" as any) as any)
-          .insert(payload);
-        if (error) {
-          if (error.code === "23505") {
-            throw new Error("Já existe uma exceção para esta data neste tenant.");
-          }
-          throw error;
+      const { error } = editingId
+        ? await (supabase.from("business_hours_exceptions" as any) as any)
+            .update({ type: formType, name: payload.name, date: dateStr, department_id: departmentId })
+            .eq("id", editingId)
+        : await (supabase.from("business_hours_exceptions" as any) as any).insert(payload);
+
+      if (error) {
+        if (error.code === "23505") {
+          throw new Error(
+            departmentId
+              ? `Já existe uma exceção nesta data para o setor ${deptName.get(departmentId) ?? "escolhido"}.`
+              : "Já existe uma exceção geral (todos os setores) nesta data."
+          );
         }
+        throw error;
       }
     },
     onSuccess: () => {
@@ -234,6 +282,7 @@ export default function BusinessHoursExceptionsSection() {
         date: f.date,
         type: "holiday",
         name: f.name,
+        department_id: null,
         is_closed: true,
         use_template: false,
       }));
@@ -273,6 +322,7 @@ export default function BusinessHoursExceptionsSection() {
     setFormDate(undefined);
     setFormType("holiday");
     setFormName("");
+    setFormDept(TODOS_SETORES);
     setDialogOpen(true);
   }, []);
 
@@ -281,6 +331,7 @@ export default function BusinessHoursExceptionsSection() {
     setFormDate(parseISO(ex.date));
     setFormType(ex.type);
     setFormName(ex.name || "");
+    setFormDept(ex.department_id ?? TODOS_SETORES);
     setDialogOpen(true);
   }, []);
 
@@ -288,6 +339,16 @@ export default function BusinessHoursExceptionsSection() {
     setDialogOpen(false);
     setEditingId(null);
   }, []);
+
+  // Setor da exceção em edição que foi desativado depois: continua no seletor
+  // para não trocar o escopo sem o usuário perceber.
+  const deptOptions = useMemo(() => {
+    if (formDept === TODOS_SETORES || activeDepartments.some((d) => d.id === formDept)) {
+      return activeDepartments;
+    }
+    const inativo = departments.find((d) => d.id === formDept);
+    return inativo ? [...activeDepartments, inativo] : activeDepartments;
+  }, [formDept, activeDepartments, departments]);
 
   return (
     <AccordionItem value="feriados" className="border rounded-lg">
@@ -300,9 +361,11 @@ export default function BusinessHoursExceptionsSection() {
       <AccordionContent className="px-4 pb-4 space-y-4">
         <p className="text-sm text-muted-foreground">
           Dias em que o atendimento é considerado fechado, independentemente da grade semanal.
+          Uma exceção pode valer para todos os setores ou só para um. Quando as duas existem
+          na mesma data, a do setor vence para aquele setor.
         </p>
 
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button size="sm" variant="outline" onClick={() => setImportDialogOpen(true)}>
             <Download className="h-4 w-4 mr-1" />
             Importar feriados nacionais
@@ -322,25 +385,35 @@ export default function BusinessHoursExceptionsSection() {
             Nenhum feriado ou folga coletiva cadastrado.
           </p>
         ) : (
-          <div className="rounded-lg border">
+          <div className="rounded-lg border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Data</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Nome</TableHead>
+                  <TableHead>Setor</TableHead>
                   <TableHead>Atendimento no dia</TableHead>
                   <TableHead className="w-24 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {exceptions.map((ex) => (
+                {sortedExceptions.map((ex) => (
                   <TableRow key={ex.id}>
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium whitespace-nowrap">
                       {format(parseISO(ex.date), "dd/MM/yyyy")}
                     </TableCell>
                     <TableCell>{TYPE_LABELS[ex.type] || ex.type}</TableCell>
                     <TableCell className="text-muted-foreground">{ex.name || "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {ex.department_id ? (
+                        <Badge variant="secondary" className="font-medium">
+                          {deptName.get(ex.department_id) ?? "Setor removido"}
+                        </Badge>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Todos os setores</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {(() => {
                         const estadoAtual: "closed" | "reduced" | "open" = ex.use_template
@@ -435,6 +508,28 @@ export default function BusinessHoursExceptionsSection() {
                 </Popover>
               </div>
 
+              {/* Setor */}
+              <div className="space-y-1.5">
+                <Label>Setor</Label>
+                <Select value={formDept} onValueChange={setFormDept}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={TODOS_SETORES}>Aplica a todos os setores</SelectItem>
+                    {deptOptions.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.is_active ? d.name : `${d.name} (inativo)`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Escolha um setor quando só parte da operação para. Ex.: Implantação fechada
+                  enquanto o Suporte atende em plantão.
+                </p>
+              </div>
+
               {/* Type */}
               <div className="space-y-1.5">
                 <Label>Tipo</Label>
@@ -480,7 +575,8 @@ export default function BusinessHoursExceptionsSection() {
             </DialogHeader>
             <div className="flex-1 overflow-y-auto px-6 py-2 space-y-4 min-h-0">
               <p className="text-sm text-muted-foreground">
-                Importa os feriados nacionais oficiais brasileiros (não-facultativos). Feriados já cadastrados são ignorados.
+                Importa os feriados nacionais oficiais brasileiros (não-facultativos) como dias
+                fechados para todos os setores. Feriados já cadastrados são ignorados.
               </p>
 
               <div className="space-y-1.5">

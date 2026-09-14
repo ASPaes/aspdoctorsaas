@@ -25,12 +25,14 @@ export function useBusinessHoursConfig() {
 
       // Feriados dos próximos 60 dias. Só os fechados interessam: o dia com
       // horário diferente continua sendo tratado pela agenda semanal.
+      // Só os gerais: a grade aqui é a do tenant, e um setor fechado não fecha a empresa.
       const hoje = new Date().toISOString().slice(0, 10);
       const limite = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
       const { data: excecoes } = await supabase
         .from("business_hours_exceptions")
         .select("date, is_closed")
         .eq("tenant_id", effectiveTenantId!)
+        .is("department_id", null)
         .gte("date", hoje)
         .lte("date", limite);
 
