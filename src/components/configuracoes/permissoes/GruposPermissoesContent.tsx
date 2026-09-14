@@ -4,13 +4,12 @@ import {
   ACOES_POR_NIVEL, ACAO_LABEL, SECAO_LABEL, SECAO_ORDEM,
   type Nivel, type Acao, type Escopo, type Secao, type RbacGrupo, type RbacRecurso,
 } from "@/hooks/useRbacConfig";
-import LinhaRecurso from "./LinhaRecurso";
+import LinhaRecurso, { ChipAcao } from "./LinhaRecurso";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -241,8 +240,9 @@ export default function GruposPermissoesContent() {
             const itens = porModulo(mod.id, mod.nivel);
             const total = config.recursos.filter((r) => r.module_id === mod.id).length;
             // Só mostra a coluna de uma ação se o nível permite E algum item a aceita.
-            const acoesDoModulo = ACOES_POR_NIVEL[mod.nivel].filter((a) =>
-              itens.some((r) => r.acoes.includes(a)));
+            // Todas as letras do nível, sempre: ação que não existe no item aparece
+            // apagada, e as colunas de chips ficam alinhadas entre as linhas.
+            const acoesDoModulo = ACOES_POR_NIVEL[mod.nivel];
             const mostraEscopo = mod.nivel >= 3 && itens.some((r) => r.escopo_aplicavel);
             const entrada = itens.find((r) => r.secao === "entrada");
             // Sem entrada cadastrada (módulos internos), tudo segue alcançável.
@@ -295,13 +295,16 @@ export default function GruposPermissoesContent() {
                         "flex items-center gap-3 border-b px-3 py-2.5",
                         entradaLigada ? "bg-emerald-500/5" : "bg-muted/50",
                       )}>
-                        <Switch
-                          checked={entradaLigada}
-                          disabled={travada(grupo, entrada.key, "view") || setPermissao.isPending}
-                          onCheckedChange={(v) =>
+                        <ChipAcao
+                          acao="view"
+                          existe
+                          ligado={entradaLigada}
+                          travado={travada(grupo, entrada.key, "view")}
+                          desabilitado={setPermissao.isPending}
+                          rotulo={entrada.label}
+                          onChange={(v) =>
                             setPermissao.mutate({ groupId: grupo.id, key: entrada.key, acao: "view", valor: v })
                           }
-                          aria-label={entrada.label}
                         />
                         <div className="min-w-0 flex-1">
                           <span className="flex items-center gap-2 text-[13px] font-semibold">
@@ -351,6 +354,14 @@ export default function GruposPermissoesContent() {
               </Card>
             );
           })}
+
+          <div className="flex flex-wrap gap-x-4 gap-y-1 rounded-lg border bg-muted/40 px-4 py-2 text-[11.5px] text-muted-foreground">
+            <span><b className="text-foreground">V</b> ver</span>
+            <span><b className="text-foreground">I</b> inserir</span>
+            <span><b className="text-foreground">E</b> editar</span>
+            <span><b className="text-foreground">X</b> excluir</span>
+            <span>Chip apagado = a ação não existe nesse item</span>
+          </div>
         </div>
       </div>
 

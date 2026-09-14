@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Lock, MapPin, Info, AlertTriangle } from "lucide-react";
@@ -8,6 +7,52 @@ import {
   ACAO_LABEL, ESCOPO_LABEL, RECURSOS_SEM_PORTAO,
   type Acao, type Escopo, type RbacRecurso,
 } from "@/hooks/useRbacConfig";
+
+const LETRA: Record<Acao, string> = { view: "V", insert: "I", update: "E", delete: "X" };
+
+interface ChipProps {
+  acao: Acao;
+  ligado: boolean;
+  /** A ação existe neste recurso? Se não, o chip aparece apagado — a linha fica alinhada. */
+  existe: boolean;
+  travado?: boolean;
+  desabilitado?: boolean;
+  rotulo: string;
+  onChange: (valor: boolean) => void;
+}
+
+/** Chip V / I / E / X do desenho aprovado. Excluir liga em vermelho. */
+export function ChipAcao({ acao, ligado, existe, travado, desabilitado, rotulo, onChange }: ChipProps) {
+  const inativo = !existe || travado || desabilitado;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-pressed={existe && ligado}
+          aria-label={`${ACAO_LABEL[acao]} — ${rotulo}`}
+          disabled={inativo}
+          onClick={() => onChange(!ligado)}
+          className={cn(
+            "relative inline-flex h-6 w-[26px] items-center justify-center rounded-md border text-[10.5px] font-bold transition-colors",
+            !existe && "cursor-not-allowed border-border bg-transparent text-muted-foreground/25",
+            existe && !ligado && "border-border bg-background text-muted-foreground hover:border-foreground/40",
+            existe && ligado && acao !== "delete" && "border-emerald-500 bg-emerald-500 text-white",
+            existe && ligado && acao === "delete" && "border-red-500 bg-red-500 text-white",
+            existe && (travado || desabilitado) && "cursor-not-allowed opacity-70",
+          )}
+        >
+          {LETRA[acao]}
+          {travado && <Lock className="absolute -right-1 -top-1 h-2.5 w-2.5 text-muted-foreground" />}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {existe ? ACAO_LABEL[acao] : `${ACAO_LABEL[acao]} não existe neste item`}
+        {travado && " · anti-lockout: o grupo de administração nunca perde isto"}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 interface Props {
   r: RbacRecurso;
@@ -29,10 +74,14 @@ export default function LinhaRecurso({
   const semPortao = RECURSOS_SEM_PORTAO.has(r.key);
 
   return (
-    <div className={cn("flex items-start gap-3 border-t px-3 py-2", !alcancavel && "opacity-40")}>
+    <div className={cn(
+      "flex items-center gap-3 border-t px-3 py-2 transition-colors hover:bg-muted/40",
+      !alcancavel && "pointer-events-none opacity-40",
+    )}>
       <button
+        type="button"
         onClick={() => setAberto((v) => !v)}
-        className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="shrink-0 self-start rounded p-0.5 pt-1 text-muted-foreground hover:bg-muted hover:text-foreground"
         aria-label={`O que faz: ${r.label}`}
         aria-expanded={aberto}
       >
@@ -56,7 +105,6 @@ export default function LinhaRecurso({
             </Tooltip>
           )}
         </span>
-
         {/* O caminho responde "onde eu acho isso?" — a chave técnica não. */}
         {r.caminho && (
           <span className="mt-0.5 flex items-center gap-1 text-[11.5px] text-muted-foreground">
@@ -70,45 +118,30 @@ export default function LinhaRecurso({
         {mostrarChave && <span className="mt-0.5 block font-mono text-[10.5px] text-muted-foreground/70">{r.key}</span>}
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
-        {acoesVisiveis.map((acao) => {
-          const existe = r.acoes.includes(acao);
-          const lock = travada(acao);
-          if (!existe) {
-            return <span key={acao} className="inline-flex h-6 w-7 items-center justify-center text-[10px] text-muted-foreground/30">–</span>;
-          }
-          return (
-            <Tooltip key={acao}>
-              <TooltipTrigger asChild>
-                <span className="inline-flex items-center">
-                  <Switch
-                    checked={!!estado?.[acao]}
-                    disabled={lock || !alcancavel}
-                    onCheckedChange={(v) => onAcao(acao, v)}
-                    aria-label={`${ACAO_LABEL[acao]} — ${r.label}`}
-                    className="scale-[.8]"
-                  />
-                  {lock && <Lock className="ml-0.5 h-3 w-3 text-muted-foreground" />}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>
-                {ACAO_LABEL[acao]}
-                {lock && " · anti-lockout: o grupo de administração nunca perde isto"}
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
+      <div className="flex shrink-0 items-center gap-[3px]">
+        {acoesVisiveis.map((acao) => (
+          <ChipAcao
+            key={acao}
+            acao={acao}
+            existe={r.acoes.includes(acao)}
+            ligado={!!estado?.[acao]}
+            travado={travada(acao)}
+            desabilitado={!alcancavel}
+            rotulo={r.label}
+            onChange={(v) => onAcao(acao, v)}
+          />
+        ))}
       </div>
 
       {mostraEscopo && (
-        <div className="w-44 shrink-0">
+        <div className="w-[150px] shrink-0">
           {r.escopo_aplicavel ? (
             <Select
               value={estado?.escopo ?? "todos"}
               disabled={!estado?.view || !alcancavel}
               onValueChange={(v) => onEscopo(v as Escopo)}
             >
-              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-7 border-border bg-muted/50 px-2 text-[11px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {r.escopos_validos.map((e) => (
                   <SelectItem key={e} value={e} className="text-xs">{ESCOPO_LABEL[e]}</SelectItem>
@@ -118,7 +151,7 @@ export default function LinhaRecurso({
           ) : (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="block text-center text-xs text-muted-foreground/50">—</span>
+                <span className="block text-center text-[11px] text-muted-foreground/50">—</span>
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
                 Este item não tem linhas para filtrar: ou é uma ação única, ou é um
