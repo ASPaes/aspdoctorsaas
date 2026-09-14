@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { CohortFiltrosBar } from '../CohortFiltrosBar';
 import { COHORT_FILTROS_VAZIO, contarFiltrosAtivos, type CohortFiltros } from '../hooks/cohortFiltros';
+import { getRetentionColor } from '../retentionColor';
 
 interface CohortTabProps {
   tvMode?: boolean;
@@ -33,17 +34,6 @@ interface CohortTabProps {
   onFornecedorChange?: (ids: number[]) => void;
 }
 
-
-function getRetentionColor(percent: number | null): string {
-  if (percent == null) return '';
-  if (percent >= 90) return 'bg-emerald-600/90 text-white';
-  if (percent >= 80) return 'bg-emerald-500/70 text-white';
-  if (percent >= 70) return 'bg-emerald-400/50 text-foreground';
-  if (percent >= 60) return 'bg-yellow-400/50 text-foreground';
-  if (percent >= 50) return 'bg-orange-400/50 text-foreground';
-  if (percent >= 30) return 'bg-orange-500/60 text-white';
-  return 'bg-destructive/60 text-white';
-}
 
 const CURVE_COLORS = [
   'hsl(var(--primary))',

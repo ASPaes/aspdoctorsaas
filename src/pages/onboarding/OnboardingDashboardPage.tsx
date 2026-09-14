@@ -23,6 +23,7 @@ import SituacaoAgoraBand from "./SituacaoAgoraBand";
 import KpiCard from "./KpiCard";
 import OnboardingDashFilterBar from "./OnboardingDashFilterBar";
 import TempoDeEntregaSection from "./TempoDeEntregaSection";
+import PermanenciaSection from "./PermanenciaSection";
 import { useJourneyNames } from "./useJourneyNames";
 import { useOnboardingDashFilters } from "./useOnboardingDashFilters";
 import { pct, separarJornadas, contarSituacao, agregarTreinos, desfechoTreino } from "./dashMetrics";
@@ -37,6 +38,9 @@ interface JourneyRow {
   sla_corrido_min: number | null;
   // Campos usados pela visão de SLA (corrido vs. efetivo)
   concluido_em: string | null;
+  /** Data de negócio do go-live. Só 58 das 125 jornadas concluídas a têm — o
+   *  `concluido_em` é o fallback na coorte de permanência. */
+  go_live_real: string | null;
 
   demand_type_nome: string | null;
   demand_type_id: string | null;
@@ -103,7 +107,7 @@ export default function OnboardingDashboardPage() {
     queryFn: async () => {
       const rows = await fetchAllRows<JourneyRow>(() => {
         let q = (supabase.from("vw_onboarding_journeys" as any) as any)
-          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, cliente_id, concluido_em, aberta_em, demand_type_nome, demand_type_id, responsavel_user_id, responsavel_nome, ticket_id, implantacao_iniciada_em, implantacao_concluida_em, onboarding_concluido_em, setor_nome, sla_total_corrido_min, sla_total_pausado_min, sla_total_util_min")
+          .select("journey_id, situacao, fase_atual, etapa_semaforo, sla_util_min, sla_corrido_min, cliente_unidade_id, cliente_id, concluido_em, aberta_em, demand_type_nome, demand_type_id, responsavel_user_id, responsavel_nome, ticket_id, implantacao_iniciada_em, implantacao_concluida_em, onboarding_concluido_em, setor_nome, sla_total_corrido_min, sla_total_pausado_min, sla_total_util_min, go_live_real")
           .eq("tenant_id", effectiveTenantId);
         if (selectedUnidadeIds.length > 0) q = q.in("cliente_unidade_id", selectedUnidadeIds);
         return q;
@@ -507,6 +511,19 @@ export default function OnboardingDashboardPage() {
             pipelineIds={dashFilters.pipelineIds}
             fasePorPipeline={dashFilters.fasePorPipeline}
             recorteResponsavel={dashFilters.recorteResponsavel}
+            recorteResponsavelExato={dashFilters.recorteResponsavelExato}
+          />
+
+          {/* Permanência pós-implantação. Usa `ativas` pelo mesmo motivo do bloco
+              acima — a coorte é a data de CONCLUSÃO — e ignora o `dateRange` do topo
+              de propósito: a janela de coortes é escolhida dentro da própria seção. */}
+          <PermanenciaSection
+            journeys={ativas}
+            treinos={trainingsAllQ.data ?? []}
+            tenantId={effectiveTenantId}
+            nomes={nomes}
+            periodosResponsavel={dashFilters.periodosResponsavel}
+            nomePorUsuario={dashFilters.nomePorUsuario}
             recorteResponsavelExato={dashFilters.recorteResponsavelExato}
           />
 
