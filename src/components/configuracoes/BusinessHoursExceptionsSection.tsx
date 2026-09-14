@@ -11,12 +11,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CalendarIcon, Plus, Pencil, Trash2, Loader2, CalendarOff, Download } from "lucide-react";
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { SetoresMultiSelect } from "@/components/configuracoes/email/SetoresMultiSelect";
 
 interface Exception {
   id: string;
@@ -34,13 +36,27 @@ interface Department {
   is_active: boolean;
 }
 
+// No banco é uma linha por setor. Na tela, os setores do mesmo dia com o mesmo
+// tipo, nome e estado aparecem como UMA exceção, e editar/excluir/trocar o
+// estado age no grupo todo.
+interface ExceptionGroup {
+  key: string;
+  ids: string[];
+  date: string;
+  type: string;
+  name: string | null;
+  is_closed: boolean;
+  use_template: boolean;
+  /** vazio = exceção geral (todos os setores) */
+  departmentIds: string[];
+}
+
+type DayStatus = "closed" | "reduced" | "open";
+
 const TYPE_LABELS: Record<string, string> = {
   holiday: "Feriado",
   collective_leave: "Folga coletiva",
 };
-
-// Valor do Select para "sem setor". O Radix não aceita string vazia em SelectItem.
-const TODOS_SETORES = "all";
 
 function calcularPascoa(ano: number): Date {
   const a = ano % 19;
@@ -98,17 +114,22 @@ const ANOS_DISPONIVEIS = (() => {
   return [atual, atual + 1, atual + 2];
 })();
 
+function estadoDo(g: { is_closed: boolean; use_template: boolean }): DayStatus {
+  return g.use_template ? "reduced" : g.is_closed ? "closed" : "open";
+}
+
 export default function BusinessHoursExceptionsSection() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { toast } = useToast();
   const qc = useQueryClient();
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<ExceptionGroup | null>(null);
   const [formDate, setFormDate] = useState<Date | undefined>();
   const [formType, setFormType] = useState<string>("holiday");
   const [formName, setFormName] = useState("");
-  const [formDept, setFormDept] = useState<string>(TODOS_SETORES);
+  const [formTodos, setFormTodos] = useState(true);
+  const [formDepts, setFormDepts] = useState<string[]>([]);
 
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importAno, setImportAno] = useState(ANOS_DISPONIVEIS[0]);
@@ -146,18 +167,46 @@ export default function BusinessHoursExceptionsSection() {
     () => new Map(departments.map((d) => [d.id, d.name])),
     [departments]
   );
-  const activeDepartments = useMemo(() => departments.filter((d) => d.is_active), [departments]);
+  const nomeSetor = useCallback((id: string) => deptName.get(id) ?? "Setor removido", [deptName]);
 
-  // Na mesma data, a exceção geral vem antes das de setor.
-  const sortedExceptions = useMemo(
-    () =>
-      [...exceptions].sort((a, b) => {
-        if (a.date !== b.date) return a.date < b.date ? -1 : 1;
-        if (!a.department_id !== !b.department_id) return a.department_id ? 1 : -1;
-        return (deptName.get(a.department_id ?? "") ?? "").localeCompare(deptName.get(b.department_id ?? "") ?? "");
-      }),
-    [exceptions, deptName]
-  );
+  const groups = useMemo<ExceptionGroup[]>(() => {
+    const porChave = new Map<string, ExceptionGroup>();
+    for (const ex of exceptions) {
+      // Geral nunca se junta com setor: são escopos diferentes.
+      const key = [
+        ex.date,
+        ex.department_id ? "setor" : "geral",
+        ex.type,
+        ex.name ?? "",
+        ex.is_closed,
+        ex.use_template,
+      ].join("|");
+      const g = porChave.get(key);
+      if (g) {
+        g.ids.push(ex.id);
+        if (ex.department_id) g.departmentIds.push(ex.department_id);
+      } else {
+        porChave.set(key, {
+          key,
+          ids: [ex.id],
+          date: ex.date,
+          type: ex.type,
+          name: ex.name,
+          is_closed: ex.is_closed,
+          use_template: ex.use_template,
+          departmentIds: ex.department_id ? [ex.department_id] : [],
+        });
+      }
+    }
+    const lista = [...porChave.values()];
+    for (const g of lista) g.departmentIds.sort((a, b) => nomeSetor(a).localeCompare(nomeSetor(b)));
+    // Na mesma data, a geral vem antes das de setor.
+    return lista.sort((a, b) => {
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      if (!a.departmentIds.length !== !b.departmentIds.length) return a.departmentIds.length ? 1 : -1;
+      return nomeSetor(a.departmentIds[0] ?? "").localeCompare(nomeSetor(b.departmentIds[0] ?? ""));
+    });
+  }, [exceptions, nomeSetor]);
 
   const { data: template } = useQuery<any>({
     queryKey: ["tenant-holiday-template", tid],
@@ -188,50 +237,95 @@ export default function BusinessHoursExceptionsSection() {
   const upsertMutation = useMutation({
     mutationFn: async () => {
       if (!formDate || !tid) throw new Error("Data obrigatória");
+      if (!formTodos && formDepts.length === 0) throw new Error("Escolha pelo menos um setor.");
       const dateStr = format(formDate, "yyyy-MM-dd");
-      const departmentId = formDept === TODOS_SETORES ? null : formDept;
-      const payload: any = {
-        tenant_id: tid,
-        date: dateStr,
-        type: formType,
-        name: formName.trim() || null,
-        department_id: departmentId,
-        is_closed: true,
-        use_template: false,
+      const nome = formName.trim() || null;
+
+      // null = geral
+      const alvo: (string | null)[] = formTodos ? [null] : formDepts;
+      const idsDoGrupo = new Set(editing?.ids ?? []);
+
+      // Confere colisão antes de gravar qualquer coisa, para não deixar o
+      // grupo pela metade (a gravação são várias chamadas).
+      const colisoes = alvo.filter((dep) =>
+        exceptions.some(
+          (e) => !idsDoGrupo.has(e.id) && e.date === dateStr && (e.department_id ?? null) === dep
+        )
+      );
+      if (colisoes.length > 0) {
+        throw new Error(
+          colisoes[0] === null
+            ? "Já existe uma exceção para todos os setores nesta data."
+            : `Já existe uma exceção nesta data para: ${colisoes.map((d) => nomeSetor(d as string)).join(", ")}.`
+        );
+      }
+
+      const tabela = () => supabase.from("business_hours_exceptions" as any) as any;
+
+      // Estado do dia: grupo editado mantém o seu; exceção nova nasce fechada.
+      const estado = editing
+        ? { is_closed: editing.is_closed, use_template: editing.use_template }
+        : { is_closed: true, use_template: false };
+
+      const atuais = new Map<string | null, string>();
+      if (editing) {
+        const linhas = exceptions.filter((e) => idsDoGrupo.has(e.id));
+        for (const l of linhas) atuais.set(l.department_id ?? null, l.id);
+      }
+
+      const inserir = alvo.filter((dep) => !atuais.has(dep));
+      const manter = alvo.filter((dep) => atuais.has(dep)).map((dep) => atuais.get(dep)!);
+      const remover = [...atuais.entries()].filter(([dep]) => !alvo.includes(dep)).map(([, id]) => id);
+
+      const falhou = (error: any) => {
+        if (error?.code === "23505") {
+          return new Error("Outra pessoa cadastrou uma exceção nesta data agora há pouco. Atualize a tela e tente de novo.");
+        }
+        return error;
       };
 
-      const { error } = editingId
-        ? await (supabase.from("business_hours_exceptions" as any) as any)
-            .update({ type: formType, name: payload.name, date: dateStr, department_id: departmentId })
-            .eq("id", editingId)
-        : await (supabase.from("business_hours_exceptions" as any) as any).insert(payload);
-
-      if (error) {
-        if (error.code === "23505") {
-          throw new Error(
-            departmentId
-              ? `Já existe uma exceção nesta data para o setor ${deptName.get(departmentId) ?? "escolhido"}.`
-              : "Já existe uma exceção geral (todos os setores) nesta data."
-          );
-        }
-        throw error;
+      if (inserir.length > 0) {
+        const { error } = await tabela().insert(
+          inserir.map((dep) => ({
+            tenant_id: tid,
+            date: dateStr,
+            type: formType,
+            name: nome,
+            department_id: dep,
+            ...estado,
+          }))
+        );
+        if (error) throw falhou(error);
+      }
+      if (manter.length > 0) {
+        const { error } = await tabela()
+          .update({ type: formType, name: nome, date: dateStr })
+          .in("id", manter);
+        if (error) throw falhou(error);
+      }
+      if (remover.length > 0) {
+        const { error } = await tabela().delete().in("id", remover);
+        if (error) throw falhou(error);
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["business-hours-exceptions", tid] });
-      toast({ title: editingId ? "Exceção atualizada!" : "Exceção adicionada!" });
+      toast({ title: editing ? "Exceção atualizada!" : "Exceção adicionada!" });
       closeDialog();
     },
     onError: (err: any) => {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     },
+    // Mesmo com erro no meio, a lista precisa refletir o que ficou gravado.
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["business-hours-exceptions", tid] });
+    },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (ids: string[]) => {
       const { error } = await (supabase.from("business_hours_exceptions" as any) as any)
         .delete()
-        .eq("id", id);
+        .in("id", ids);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -244,7 +338,7 @@ export default function BusinessHoursExceptionsSection() {
   });
 
   const setDayStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: "closed" | "reduced" | "open" }) => {
+    mutationFn: async ({ ids, status }: { ids: string[]; status: DayStatus }) => {
       let payload: { is_closed: boolean; use_template: boolean };
       if (status === "closed") {
         payload = { is_closed: true, use_template: false };
@@ -258,7 +352,7 @@ export default function BusinessHoursExceptionsSection() {
       }
       const { error } = await (supabase.from("business_hours_exceptions" as any) as any)
         .update(payload)
-        .eq("id", id);
+        .in("id", ids);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -318,37 +412,41 @@ export default function BusinessHoursExceptionsSection() {
   const totalNovos = previewImport.filter((p) => !p.jaExiste).length;
 
   const openAdd = useCallback(() => {
-    setEditingId(null);
+    setEditing(null);
     setFormDate(undefined);
     setFormType("holiday");
     setFormName("");
-    setFormDept(TODOS_SETORES);
+    setFormTodos(true);
+    setFormDepts([]);
     setDialogOpen(true);
   }, []);
 
-  const openEdit = useCallback((ex: Exception) => {
-    setEditingId(ex.id);
-    setFormDate(parseISO(ex.date));
-    setFormType(ex.type);
-    setFormName(ex.name || "");
-    setFormDept(ex.department_id ?? TODOS_SETORES);
+  const openEdit = useCallback((g: ExceptionGroup) => {
+    setEditing(g);
+    setFormDate(parseISO(g.date));
+    setFormType(g.type);
+    setFormName(g.name || "");
+    setFormTodos(g.departmentIds.length === 0);
+    setFormDepts(g.departmentIds);
     setDialogOpen(true);
   }, []);
 
   const closeDialog = useCallback(() => {
     setDialogOpen(false);
-    setEditingId(null);
+    setEditing(null);
   }, []);
 
-  // Setor da exceção em edição que foi desativado depois: continua no seletor
-  // para não trocar o escopo sem o usuário perceber.
-  const deptOptions = useMemo(() => {
-    if (formDept === TODOS_SETORES || activeDepartments.some((d) => d.id === formDept)) {
-      return activeDepartments;
-    }
-    const inativo = departments.find((d) => d.id === formDept);
-    return inativo ? [...activeDepartments, inativo] : activeDepartments;
-  }, [formDept, activeDepartments, departments]);
+  // Ativos, mais os setores já marcados no grupo que foram desativados depois:
+  // somem do seletor só se o usuário desmarcar.
+  const setoresDoSeletor = useMemo(() => {
+    const ativos = departments.filter((d) => d.is_active);
+    const inativosMarcados = departments
+      .filter((d) => !d.is_active && formDepts.includes(d.id))
+      .map((d) => ({ ...d, name: `${d.name} (inativo)` }));
+    return [...ativos, ...inativosMarcados];
+  }, [departments, formDepts]);
+
+  const salvarDesabilitado = !formDate || (!formTodos && formDepts.length === 0) || upsertMutation.isPending;
 
   return (
     <AccordionItem value="feriados" className="border rounded-lg">
@@ -361,8 +459,8 @@ export default function BusinessHoursExceptionsSection() {
       <AccordionContent className="px-4 pb-4 space-y-4">
         <p className="text-sm text-muted-foreground">
           Dias em que o atendimento é considerado fechado, independentemente da grade semanal.
-          Uma exceção pode valer para todos os setores ou só para um. Quando as duas existem
-          na mesma data, a do setor vence para aquele setor.
+          Uma exceção pode valer para todos os setores ou só para os setores escolhidos. Quando
+          as duas existem na mesma data, a do setor vence para aquele setor.
         </p>
 
         <div className="flex flex-wrap justify-end gap-2">
@@ -380,7 +478,7 @@ export default function BusinessHoursExceptionsSection() {
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
-        ) : exceptions.length === 0 ? (
+        ) : groups.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-6">
             Nenhum feriado ou folga coletiva cadastrado.
           </p>
@@ -392,58 +490,53 @@ export default function BusinessHoursExceptionsSection() {
                   <TableHead>Data</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Nome</TableHead>
-                  <TableHead>Setor</TableHead>
+                  <TableHead>Setores</TableHead>
                   <TableHead>Atendimento no dia</TableHead>
                   <TableHead className="w-24 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedExceptions.map((ex) => (
-                  <TableRow key={ex.id}>
+                {groups.map((g) => (
+                  <TableRow key={g.key}>
                     <TableCell className="font-medium whitespace-nowrap">
-                      {format(parseISO(ex.date), "dd/MM/yyyy")}
+                      {format(parseISO(g.date), "dd/MM/yyyy")}
                     </TableCell>
-                    <TableCell>{TYPE_LABELS[ex.type] || ex.type}</TableCell>
-                    <TableCell className="text-muted-foreground">{ex.name || "—"}</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {ex.department_id ? (
-                        <Badge variant="secondary" className="font-medium">
-                          {deptName.get(ex.department_id) ?? "Setor removido"}
-                        </Badge>
+                    <TableCell>{TYPE_LABELS[g.type] || g.type}</TableCell>
+                    <TableCell className="text-muted-foreground">{g.name || "—"}</TableCell>
+                    <TableCell className="min-w-[160px]">
+                      {g.departmentIds.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {g.departmentIds.map((id) => (
+                            <Badge key={id} variant="secondary" className="font-medium">
+                              {nomeSetor(id)}
+                            </Badge>
+                          ))}
+                        </div>
                       ) : (
-                        <span className="text-sm text-muted-foreground">Todos os setores</span>
+                        <span className="text-sm text-muted-foreground whitespace-nowrap">Todos os setores</span>
                       )}
                     </TableCell>
                     <TableCell>
-                      {(() => {
-                        const estadoAtual: "closed" | "reduced" | "open" = ex.use_template
-                          ? "reduced"
-                          : ex.is_closed
-                          ? "closed"
-                          : "open";
-                        return (
-                          <Select
-                            value={estadoAtual}
-                            onValueChange={(status) =>
-                              setDayStatusMutation.mutate({ id: ex.id, status: status as "closed" | "reduced" | "open" })
-                            }
-                            disabled={setDayStatusMutation.isPending}
-                          >
-                            <SelectTrigger className="w-56">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="closed">Fechado o dia todo</SelectItem>
-                              <SelectItem value="reduced" disabled={!templateValido}>
-                                {templateValido
-                                  ? `Horário reduzido (${formatTemplateRange()})`
-                                  : "Horário reduzido"}
-                              </SelectItem>
-                              <SelectItem value="open">Aberto (atendimento normal)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        );
-                      })()}
+                      <Select
+                        value={estadoDo(g)}
+                        onValueChange={(status) =>
+                          setDayStatusMutation.mutate({ ids: g.ids, status: status as DayStatus })
+                        }
+                        disabled={setDayStatusMutation.isPending}
+                      >
+                        <SelectTrigger className="w-56">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="closed">Fechado o dia todo</SelectItem>
+                          <SelectItem value="reduced" disabled={!templateValido}>
+                            {templateValido
+                              ? `Horário reduzido (${formatTemplateRange()})`
+                              : "Horário reduzido"}
+                          </SelectItem>
+                          <SelectItem value="open">Aberto (atendimento normal)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
@@ -451,7 +544,7 @@ export default function BusinessHoursExceptionsSection() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => openEdit(ex)}
+                          onClick={() => openEdit(g)}
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -459,7 +552,7 @@ export default function BusinessHoursExceptionsSection() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-destructive"
-                          onClick={() => deleteMutation.mutate(ex.id)}
+                          onClick={() => deleteMutation.mutate(g.ids)}
                           disabled={deleteMutation.isPending}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -477,7 +570,7 @@ export default function BusinessHoursExceptionsSection() {
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>{editingId ? "Editar Exceção" : "Adicionar Dia Fechado"}</DialogTitle>
+              <DialogTitle>{editing ? "Editar Exceção" : "Adicionar Dia Fechado"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-2">
               {/* Date picker */}
@@ -508,25 +601,29 @@ export default function BusinessHoursExceptionsSection() {
                 </Popover>
               </div>
 
-              {/* Setor */}
-              <div className="space-y-1.5">
-                <Label>Setor</Label>
-                <Select value={formDept} onValueChange={setFormDept}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={TODOS_SETORES}>Aplica a todos os setores</SelectItem>
-                    {deptOptions.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.is_active ? d.name : `${d.name} (inativo)`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Setores */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="bhe-todos-setores">Aplica a todos os setores</Label>
+                  <Switch
+                    id="bhe-todos-setores"
+                    checked={formTodos}
+                    onCheckedChange={setFormTodos}
+                  />
+                </div>
+                {!formTodos && (
+                  <div className="space-y-1.5">
+                    <Label>Setores *</Label>
+                    <SetoresMultiSelect
+                      setores={setoresDoSeletor}
+                      value={formDepts}
+                      onChange={setFormDepts}
+                    />
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  Escolha um setor quando só parte da operação para. Ex.: Implantação fechada
-                  enquanto o Suporte atende em plantão.
+                  Desligue quando só parte da operação para. Ex.: Onboarding e Implantação
+                  fechados enquanto o Suporte atende em plantão.
                 </p>
               </div>
 
@@ -556,12 +653,9 @@ export default function BusinessHoursExceptionsSection() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={closeDialog}>Cancelar</Button>
-              <Button
-                onClick={() => upsertMutation.mutate()}
-                disabled={!formDate || upsertMutation.isPending}
-              >
+              <Button onClick={() => upsertMutation.mutate()} disabled={salvarDesabilitado}>
                 {upsertMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                {editingId ? "Salvar" : "Adicionar"}
+                {editing ? "Salvar" : "Adicionar"}
               </Button>
             </DialogFooter>
           </DialogContent>
