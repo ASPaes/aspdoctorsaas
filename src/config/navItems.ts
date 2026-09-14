@@ -15,14 +15,14 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, resource: "nav.dashboard" },
-  { title: "Clientes", url: "/clientes", icon: Users, resource: "nav.clientes" },
+  { title: "Clientes", url: "/clientes", icon: Users, resource: "clientes" },
   {
     title: "Atendimento",
     icon: Headset,
     children: [
       { title: "Dashboard", url: "/atendimento/dashboard", icon: Gauge, resource: "nav.atendimento_dashboard", roles: ["admin", "head"] },
-      { title: "Chat", url: "/whatsapp", icon: MessageCircle, resource: "nav.chat" },
-      { title: "Tickets", url: "/tickets", icon: TicketCheck, resource: "nav.tickets" },
+      { title: "Chat", url: "/whatsapp", icon: MessageCircle, resource: "atendimento_chat" },
+      { title: "Tickets", url: "/tickets", icon: TicketCheck, resource: "tickets" },
     ],
   },
   { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon, resource: "nav.customer_success" },

@@ -46,7 +46,7 @@ export default function AICostControlCard() {
 
   const { data: config, isLoading: configLoading } = useQuery<AICostConfig>({
     queryKey: configKey,
-    enabled: !!tid && !!isAdmin && canRbac("ia_configuracoes", "view"),
+    enabled: !!tid && !!isAdmin && canRbac("cfg.ia", "view"),
     queryFn: async () => {
       const { data, error } = await (supabase.from("configuracoes" as any) as any)
         .select("sentiment_analysis_enabled, ai_monthly_budget_usd, ai_budget_alert_pct")

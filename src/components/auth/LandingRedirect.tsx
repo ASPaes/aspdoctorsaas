@@ -18,7 +18,7 @@ export default function LandingRedirect() {
   if (can("nav.dashboard", "view")) {
     return <Navigate to="/dashboard" replace />;
   }
-  if (can("nav.chat", "view")) {
+  if (can("atendimento_chat", "view")) {
     return <Navigate to="/whatsapp" replace />;
   }
   const first = NAV_ITEMS.find((item) => can(item.resource, "view"));

@@ -65,7 +65,7 @@ export function useQueueAlert(): QueueAlertState {
   // Quem não tem o Chat não recebe fila nem paga o RPC. `can()` devolve true
   // enquanto carrega, então o `!permsLoading` é o que evita uma chamada por
   // usuário do financeiro em cada sessão.
-  const hasChatAccess = !permsLoading && can("nav.chat", "view");
+  const hasChatAccess = !permsLoading && can("atendimento_chat", "view");
 
   // A fila alertada é a de UM setor. `selectedDepartmentId` null significa
   // "Todos" — seja por escolha do gestor, seja porque o usuário não tem setor

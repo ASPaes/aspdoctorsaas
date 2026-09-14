@@ -101,9 +101,9 @@ const App = () => (
             <Route element={<AuthGuard><TenantFilterProvider><UnidadeFilterProvider><NotificationProvider><PresenceHeartbeatProvider><AppLayout /></PresenceHeartbeatProvider></NotificationProvider></UnidadeFilterProvider></TenantFilterProvider></AuthGuard>}>
               <Route index element={<LandingRedirect />} />
               <Route path="/dashboard" element={<RequirePermission resource="nav.dashboard"><Dashboard /></RequirePermission>} />
-              <Route path="/clientes" element={<RequirePermission resource="nav.clientes"><Clientes /></RequirePermission>} />
-              <Route path="/clientes/novo" element={<RequirePermission resource="nav.clientes"><ClienteForm /></RequirePermission>} />
-              <Route path="/clientes/:id" element={<RequirePermission resource="nav.clientes"><ClienteForm /></RequirePermission>} />
+              <Route path="/clientes" element={<RequirePermission resource="clientes"><Clientes /></RequirePermission>} />
+              <Route path="/clientes/novo" element={<RequirePermission resource="clientes"><ClienteForm /></RequirePermission>} />
+              <Route path="/clientes/:id" element={<RequirePermission resource="clientes"><ClienteForm /></RequirePermission>} />
               <Route path="/cadastros" element={<Navigate to="/configuracoes?tab=cadastros" replace />} />
               <Route path="/certificados-a1" element={<RequirePermission resource="nav.certificados_a1"><CertificadosA1 /></RequirePermission>} />
               <Route path="/emails" element={<RequirePermission resource="nav.emails"><Emails /></RequirePermission>} />
@@ -116,10 +116,10 @@ const App = () => (
                   o recurso. A migration 20260914050000 grava o acesso efetivo de hoje para
                   que ninguém ganhe a tela de graça (ver bug B5 em docs/rbac). */}
               <Route path="/atendimento/dashboard" element={<RequirePermission resource="nav.atendimento_dashboard"><Suspense fallback={<PageLoader />}><AtendimentoDashboard /></Suspense></RequirePermission>} />
-              <Route path="/whatsapp" element={<RequirePermission resource="nav.chat"><WhatsApp /></RequirePermission>} />
-              <Route path="/whatsapp/contatos" element={<RequirePermission resource="nav.chat"><WhatsAppContatos /></RequirePermission>} />
+              <Route path="/whatsapp" element={<RequirePermission resource="atendimento_chat"><WhatsApp /></RequirePermission>} />
+              <Route path="/whatsapp/contatos" element={<RequirePermission resource="atendimento_chat"><WhatsAppContatos /></RequirePermission>} />
               
-              <Route path="/tickets" element={<RequirePermission resource="nav.tickets"><SupportTickets /></RequirePermission>} />
+              <Route path="/tickets" element={<RequirePermission resource="tickets"><SupportTickets /></RequirePermission>} />
               <Route path="/whatsapp/settings" element={<Navigate to="/configuracoes?tab=whatsapp" replace />} />
               <Route path="/painel-uso" element={<RequirePermission resource="nav.painel_uso"><PainelUso /></RequirePermission>} />
               <Route path="/admin/limpeza-uras" element={<LimpezaUras />} />

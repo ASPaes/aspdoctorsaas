@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import {
   useRbacConfig, RECURSOS_SEM_PORTAO, NIVEL_LABEL, ESCOPO_LABEL,
-  ACOES_POR_NIVEL, ACAO_LABEL,
-  type Nivel, type Acao, type Escopo, type RbacGrupo, type RbacRecurso,
+  ACOES_POR_NIVEL, ACAO_LABEL, SECAO_LABEL, SECAO_ORDEM,
+  type Nivel, type Acao, type Escopo, type Secao, type RbacGrupo, type RbacRecurso,
 } from "@/hooks/useRbacConfig";
+import LinhaRecurso from "./LinhaRecurso";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,6 +76,7 @@ export default function GruposPermissoesContent() {
   const [novoNome, setNovoNome] = useState("");
   const [editando, setEditando] = useState<{ id: string; nome: string } | null>(null);
   const [excluindo, setExcluindo] = useState<RbacGrupo | null>(null);
+  const [mostrarChaves, setMostrarChaves] = useState(false);
 
   const grupo = useMemo(
     () => config?.grupos.find((g) => g.id === grupoId) ?? config?.grupos[0],
@@ -218,9 +221,20 @@ export default function GruposPermissoesContent() {
                 <b>{grupo.nivel_base}</b> · {grupo.is_system ? "não pode ser excluído" : "criado por cópia"}
               </p>
             </div>
-            <p className="text-xs tabular-nums text-muted-foreground">
-              {liberados} de {config.recursos.length} recursos liberados
-            </p>
+            <div className="flex items-center gap-4">
+              <label className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={mostrarChaves}
+                  onChange={(e) => setMostrarChaves(e.target.checked)}
+                  className="accent-primary"
+                />
+                mostrar chaves técnicas
+              </label>
+              <p className="text-xs tabular-nums text-muted-foreground">
+                {liberados} de {config.recursos.length} liberados
+              </p>
+            </div>
           </div>
 
           {config.modulos.map((mod) => {
@@ -230,6 +244,9 @@ export default function GruposPermissoesContent() {
             const acoesDoModulo = ACOES_POR_NIVEL[mod.nivel].filter((a) =>
               itens.some((r) => r.acoes.includes(a)));
             const mostraEscopo = mod.nivel >= 3 && itens.some((r) => r.escopo_aplicavel);
+            const entrada = itens.find((r) => r.secao === "entrada");
+            // Sem entrada cadastrada (módulos internos), tudo segue alcançável.
+            const entradaLigada = entrada ? !!mapa.get(entrada.key)?.view : true;
             const fechado = fechados.has(mod.id);
             if (total === 0) return null;
             return (
@@ -272,109 +289,63 @@ export default function GruposPermissoesContent() {
 
                 {!fechado && (
                   <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b text-[10px] uppercase tracking-wider text-muted-foreground">
-                            <th className="px-3 py-2 text-left font-semibold">Recurso</th>
-                            {acoesDoModulo.map((a) => (
-                              <th key={a} className="w-20 px-3 py-2 text-left font-semibold">{ACAO_LABEL[a]}</th>
-                            ))}
-                            {mostraEscopo && <th className="w-48 px-3 py-2 text-left font-semibold">Quais linhas</th>}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {itens.map((r: RbacRecurso) => {
-                            const est = mapa.get(r.key);
-                            const semPortao = RECURSOS_SEM_PORTAO.has(r.key);
-                            const profundidade = nivelNaArvore(r, itens);
-                            return (
-                              <tr key={r.key} className="border-b last:border-b-0">
-                                <td className="px-3 py-2" style={{ paddingLeft: 12 + profundidade * 20 }}>
-                                  <span className="flex flex-wrap items-center gap-1.5 font-medium">
-                                    {r.label}
-                                    {semPortao && (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <span className="inline-flex items-center gap-1 rounded border border-dashed border-amber-500 px-1.5 py-px text-[10px] text-amber-600 dark:text-amber-400">
-                                            <AlertTriangle className="h-3 w-3" /> ainda não aplicado
-                                          </span>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="max-w-xs">
-                                          Este recurso está no catálogo mas nenhuma tela o consulta ainda.
-                                          Alterá-lo não muda o acesso de ninguém até a entrega que o liga.
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    )}
-                                  </span>
-                                  <span className="block font-mono text-[11px] text-muted-foreground">{r.key}</span>
-                                </td>
-                                {acoesDoModulo.map((acao) => {
-                                  const aplica = r.acoes.includes(acao);
-                                  const lock = travada(grupo, r.key, acao);
-                                  return (
-                                    <td key={acao} className="px-3 py-2">
-                                      {!aplica ? (
-                                        <span className="text-xs text-muted-foreground/60">—</span>
-                                      ) : (
-                                        <span className="flex items-center gap-2">
-                                          <Switch
-                                            checked={!!est?.[acao]}
-                                            disabled={lock || setPermissao.isPending}
-                                            onCheckedChange={(v) =>
-                                              setPermissao.mutate({ groupId: grupo.id, key: r.key, acao, valor: v })
-                                            }
-                                            aria-label={`${ACAO_LABEL[acao]} ${r.label}`}
-                                          />
-                                          {lock && (
-                                            <Tooltip>
-                                              <TooltipTrigger asChild><Lock className="h-3.5 w-3.5 text-muted-foreground" /></TooltipTrigger>
-                                              <TooltipContent>
-                                                Anti-lockout: o grupo de administração nunca perde este acesso.
-                                              </TooltipContent>
-                                            </Tooltip>
-                                          )}
-                                        </span>
-                                      )}
-                                    </td>
-                                  );
-                                })}
-                                {mostraEscopo && (
-                                  <td className="px-3 py-2">
-                                    {r.escopo_aplicavel ? (
-                                      <Select
-                                        value={est?.escopo ?? "todos"}
-                                        disabled={!est?.view || setEscopo.isPending}
-                                        onValueChange={(v) =>
-                                          setEscopo.mutate({ groupId: grupo.id, key: r.key, escopo: v as Escopo })
-                                        }
-                                      >
-                                        <SelectTrigger className="h-7 w-44 text-xs"><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                          {r.escopos_validos.map((e) => (
-                                            <SelectItem key={e} value={e} className="text-xs">{ESCOPO_LABEL[e]}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    ) : (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <span className="text-xs text-muted-foreground/60">—</span>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="max-w-xs">
-                                          Este item não tem linhas para filtrar: ou é uma ação única,
-                                          ou é um ajuste que vale para a empresa inteira.
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    )}
-                                  </td>
-                                )}
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                    {/* A entrada: sem ela, nada no módulo é alcançável. */}
+                    {entrada && (
+                      <div className={cn(
+                        "flex items-center gap-3 border-b px-3 py-2.5",
+                        entradaLigada ? "bg-emerald-500/5" : "bg-muted/50",
+                      )}>
+                        <Switch
+                          checked={entradaLigada}
+                          disabled={travada(grupo, entrada.key, "view") || setPermissao.isPending}
+                          onCheckedChange={(v) =>
+                            setPermissao.mutate({ groupId: grupo.id, key: entrada.key, acao: "view", valor: v })
+                          }
+                          aria-label={entrada.label}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2 text-[13px] font-semibold">
+                            {entrada.label}
+                            <Badge variant="outline" className="h-4 px-1 text-[9px] uppercase tracking-wide">entrada</Badge>
+                          </span>
+                          <span className="text-[11.5px] text-muted-foreground">
+                            {entradaLigada
+                              ? "Desligue e o módulo inteiro fica inacessível para este grupo."
+                              : "Desligada: nada deste módulo é alcançável."}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {SECAO_ORDEM.filter((sec) => sec !== "entrada").map((sec) => {
+                      const doSecao = itens.filter((r) => r.secao === sec);
+                      if (!doSecao.length) return null;
+                      return (
+                        <div key={sec}>
+                          <div className="px-3 pb-1 pt-2.5 text-[9.5px] font-bold uppercase tracking-[.09em] text-muted-foreground">
+                            {SECAO_LABEL[sec]}
+                          </div>
+                          {doSecao.map((r) => (
+                            <LinhaRecurso
+                              key={r.key}
+                              r={r}
+                              estado={mapa.get(r.key)}
+                              acoesVisiveis={acoesDoModulo}
+                              mostraEscopo={mostraEscopo}
+                              alcancavel={entradaLigada}
+                              mostrarChave={mostrarChaves}
+                              travada={(acao) => travada(grupo, r.key, acao)}
+                              onAcao={(acao, valor) =>
+                                setPermissao.mutate({ groupId: grupo.id, key: r.key, acao, valor })
+                              }
+                              onEscopo={(escopo) =>
+                                setEscopo.mutate({ groupId: grupo.id, key: r.key, escopo })
+                              }
+                            />
+                          ))}
+                        </div>
+                      );
+                    })}
                   </CardContent>
                 )}
               </Card>

@@ -11,8 +11,21 @@ export interface RbacGrupo {
   nivel_base: "admin" | "head" | "user";
   is_system: boolean; ordem: number; membros: number;
 }
+export type Secao = "entrada" | "aba" | "acao" | "config" | "transversal" | "pessoal" | "item";
+
+export const SECAO_LABEL: Record<Secao, string> = {
+  entrada: "Entrada", aba: "Telas e abas", acao: "Ações",
+  config: "Configuração", transversal: "Vale em todo o módulo",
+  pessoal: "Pessoal", item: "Outros",
+};
+/** Ordem em que as seções aparecem dentro de um módulo. */
+export const SECAO_ORDEM: Secao[] = ["entrada","aba","acao","config","transversal","pessoal","item"];
+
 export interface RbacRecurso {
   key: string; label: string; descricao: string | null;
+  /** Onde a funcionalidade fica no produto. É isto que o admin lê, não a chave. */
+  caminho: string | null;
+  secao: Secao;
   module_id: string; parent_key: string | null; nivel: Nivel; ordem: number;
   /** Ações que fazem sentido aqui. Recurso que já É uma ação (exportar,
    *  cancelar) traz apenas ["view"]: ligado = pode fazer. */
