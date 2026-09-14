@@ -148,7 +148,7 @@ export default function EmailParametrosRecebidosTab() {
           </p>
         ) : (
           <div>
-            <div className="hidden grid-cols-[minmax(0,1.3fr)_110px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)] gap-3 border-b px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground lg:grid">
+            <div className="hidden grid-cols-[minmax(0,1.3fr)_180px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)] gap-3 border-b px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground lg:grid">
               <span>Endereço</span>
               <span>Abre ticket</span>
               <span>Destino</span>
@@ -424,6 +424,17 @@ function LinhaEndereco({
   const semEntrada = !conta.imap_host || !conta.ativo;
   const semStatus = destino === "suporte" && !!setor && !iniciais.has(setor);
 
+  // A chave só libera para LIGAR quando dá para ligar; ligada, sempre deixa
+  // desligar. Antes o clique era aceito e desfeito por um aviso que sumia, e a
+  // chave ficava em Não sem ninguém perceber (teste do Alexandre, 14/09/2026).
+  const trava = semEntrada
+    ? null
+    : !abre && destino === "suporte" && !setor
+      ? "Escolha o setor para ligar"
+      : !abre && semStatus
+        ? "Setor sem status inicial"
+        : null;
+
   const salvar = (mudanca: Partial<Pick<EnderecoDestino, "abre_ticket" | "destino" | "department_id">>) => {
     const novo = { abre_ticket: abre, destino, department_id: setor, ...mudanca };
     if (novo.abre_ticket && novo.destino === "suporte") {
@@ -451,7 +462,7 @@ function LinhaEndereco({
         : "Abre ticket na fila do setor, sem responsável.";
 
   return (
-    <div className="grid gap-3 border-b px-4 py-3 lg:grid-cols-[minmax(0,1.3fr)_110px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)] lg:items-center">
+    <div className="grid gap-3 border-b px-4 py-3 lg:grid-cols-[minmax(0,1.3fr)_180px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)] lg:items-center">
       <div className="flex min-w-0 items-center gap-2.5">
         <span
           className={cn(
@@ -486,11 +497,21 @@ function LinhaEndereco({
       <label className="flex items-center gap-2 text-xs text-muted-foreground">
         <Switch
           checked={abre}
-          disabled={semEntrada || ocupado}
+          disabled={semEntrada || ocupado || !!trava}
           onCheckedChange={(v) => salvar({ abre_ticket: v })}
           aria-label={`Abrir ticket com e-mail para ${endereco}`}
+          aria-describedby={trava ? `trava-${conta.id}-${endereco}` : undefined}
         />
-        {abre ? "Sim" : "Não"}
+        {trava ? (
+          <span id={`trava-${conta.id}-${endereco}`} className="flex items-center gap-1 font-medium text-warning">
+            <Lock className="h-3 w-3 shrink-0" />
+            {trava}
+          </span>
+        ) : abre ? (
+          <span className="font-semibold text-success">Sim</span>
+        ) : (
+          "Não"
+        )}
       </label>
 
       <Select value={destino} onValueChange={(v) => salvar({ destino: v as DestinoEmail })} disabled={semEntrada || ocupado}>
@@ -632,6 +653,15 @@ function RegrasAssunto({
   const [palavras, setPalavras] = useState("");
   const [setor, setSetor] = useState<string | undefined>(undefined);
 
+  // o botão só libera quando a regra pode ser criada, com o motivo escrito ao lado
+  const temPalavras = palavras.split(",").some((w) => w.trim());
+  const setorSemStatus = !!setor && !iniciais.has(setor);
+  const faltaRegra = !temPalavras || !setor
+    ? "Preencha as palavras e o setor para criar"
+    : setorSemStatus
+      ? "Setor sem status inicial"
+      : null;
+
   const criar = () => {
     const lista = [...new Set(palavras.split(",").map((w) => w.trim()).filter(Boolean))];
     if (lista.length === 0 || lista.length > 20) {
@@ -710,10 +740,16 @@ function RegrasAssunto({
             ))}
           </SelectContent>
         </Select>
-        <Button type="button" variant="outline" size="sm" className="h-9" onClick={criar} disabled={ocupado}>
+        <Button type="button" variant="outline" size="sm" className="h-9" onClick={criar} disabled={ocupado || !!faltaRegra}>
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           Criar regra
         </Button>
+        {faltaRegra && (
+          <span className={cn("flex items-center gap-1 text-xs font-medium", setorSemStatus ? "text-warning" : "text-muted-foreground")}>
+            <Lock className="h-3 w-3 shrink-0" />
+            {faltaRegra}
+          </span>
+        )}
       </div>
     </div>
   );
