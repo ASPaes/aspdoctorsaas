@@ -24,7 +24,7 @@ import {
   Loader2, Clock, Pause, Play, ChevronRight, Calendar, CheckCircle2,
   Circle, AlertCircle, MessageSquare, GraduationCap, User, ArrowRight,
   UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle, Ban, Building2, Paperclip,
-  ExternalLink, Link2,
+  ExternalLink, Link2, Mail,
   Sparkles, Rocket, StickyNote, Undo2, XCircle, Tag,
   Check, ChevronDown, Pencil, GitCommitHorizontal, MessageSquareText,
   GripVertical, Search,
@@ -187,11 +187,16 @@ const TL_META: Record<string, { label: string; Icon: any; tone: TLTone }> = {
   onboarding_fase_revertida: { label: "Fase revertida", Icon: RotateCcw, tone: "amber" },
   nota_agente: { label: "Nota do agente", Icon: StickyNote, tone: "slate" },
   comment: { label: "Comentário", Icon: MessageSquare, tone: "slate" },
+  // mensagem do cliente que chegou por e-mail (ler-emails-recebidos, 13/09/2026)
+  email_cliente: { label: "Mensagem por e-mail", Icon: Mail, tone: "sky" },
+  email_reaberto: { label: "Reaberto por e-mail", Icon: RotateCcw, tone: "sky" },
+  email_continuacao: { label: "Continuou em outro ticket", Icon: ArrowRight, tone: "slate" },
 };
 const tlMeta = (t: string) => TL_META[t] ?? { label: EVENT_LABELS[t] ?? t, Icon: Circle, tone: "slate" as TLTone };
 
 // Coluna esquerda da timeline = o que alguém digitou. Todo o resto é movimentação/log.
-const TL_NOTE_TYPES = new Set(["nota_agente"]);
+// A mensagem do cliente por e-mail também é "o que alguém digitou".
+const TL_NOTE_TYPES = new Set(["nota_agente", "email_cliente"]);
 
 // old_value/new_value às vezes vêm como UUID cru — não serve para exibir.
 const TL_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -1128,7 +1133,9 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const tlLogsByDay = useMemo(() => groupEventsByDay(tlLogs), [tlLogs]);
   const tlFiltersActive = tlOnlyMine || tlTypes.length > 0;
   const tlAuthorOf = (ev: any) =>
-    !ev.user_id ? "Sistema" : (eventUsersQ.data?.[ev.user_id] ?? "Usuário");
+    ev.event_type === "email_cliente"
+      ? "Cliente por e-mail"
+      : !ev.user_id ? "Sistema" : (eventUsersQ.data?.[ev.user_id] ?? "Usuário");
 
   const historyByStage = useMemo(() => {
     const m: Record<string, { entrou_em: string; saiu_em: string | null; duracao_minutos: number | null; duracao_util_minutos: number | null }> = {};

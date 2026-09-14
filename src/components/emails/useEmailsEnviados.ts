@@ -65,6 +65,7 @@ export const ROTULO_ORIGEM: Record<string, string> = {
   onboarding: "Ticket O",
   teste: "Teste",
   manual: "Manual",
+  ticket_email: "Aviso de ticket",
 };
 
 export function useEmailsEnviados(filtros: FiltrosEnviados, pagina: number) {

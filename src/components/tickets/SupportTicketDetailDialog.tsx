@@ -1711,6 +1711,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             {events.map((evt) => (
               <div key={evt.id} className="relative pl-5 pb-4">
                 <div className={`absolute -left-[5px] top-1.5 w-2 h-2 rounded-full ${
+                  evt.event_type === "email_cliente" ? "bg-accent" :
+                  evt.event_type === "email_reaberto" || evt.event_type === "email_continuacao" ? "bg-sky-400" :
                   evt.event_type === "comment" ? "bg-primary" :
                   evt.event_type === "checklist" ? "bg-emerald-400" :
                   evt.event_type === "status_change" ? "bg-blue-400" :
@@ -1722,7 +1724,23 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                   evt.event_type === "closed" ? "bg-red-400" :
                   "bg-muted-foreground"
                 }`} />
-                {evt.event_type === "comment" ? (
+                {evt.event_type === "email_cliente" ? (
+                  // mensagem do cliente que chegou por e-mail (ler-emails-recebidos, 13/09/2026)
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <Mail className="h-3.5 w-3.5 text-accent" />
+                      <span className="text-xs font-medium">Cliente por e-mail</span>
+                      <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap break-words rounded-md border border-accent/20 bg-accent/5 px-2.5 py-1.5">{evt.content}</p>
+                  </div>
+                ) : evt.event_type === "email_reaberto" || evt.event_type === "email_continuacao" ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <RefreshCw className="h-3.5 w-3.5 text-sky-400" />
+                    <span className="text-xs">{evt.content}</span>
+                    <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                  </div>
+                ) : evt.event_type === "comment" ? (
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className="text-xs font-medium">{getAgentName(evt.user_id)}</span>
