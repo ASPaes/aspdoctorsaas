@@ -16,7 +16,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Lock, Copy, Users, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
+import { Lock, Copy, Users, ChevronDown, ChevronRight, AlertTriangle, Pencil, Trash2, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -64,11 +64,16 @@ function travada(g: RbacGrupo, key: string, acao: string) {
 }
 
 export default function GruposPermissoesContent() {
-  const { config, isLoading, setPermissao, setEscopo, setNivel, duplicarGrupo } = useRbacConfig();
+  const {
+    config, isLoading, setPermissao, setEscopo, setNivel,
+    duplicarGrupo, renomearGrupo, excluirGrupo,
+  } = useRbacConfig();
   const [grupoId, setGrupoId] = useState<string | null>(null);
   const [fechados, setFechados] = useState<Set<string>>(new Set());
   const [rebaixar, setRebaixar] = useState<{ moduleId: string; nivel: Nivel } | null>(null);
   const [novoNome, setNovoNome] = useState("");
+  const [editando, setEditando] = useState<{ id: string; nome: string } | null>(null);
+  const [excluindo, setExcluindo] = useState<RbacGrupo | null>(null);
 
   const grupo = useMemo(
     () => config?.grupos.find((g) => g.id === grupoId) ?? config?.grupos[0],
@@ -114,24 +119,70 @@ export default function GruposPermissoesContent() {
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Grupos</p>
           <div className="space-y-1.5">
             {config.grupos.map((g) => (
-              <button
+              <div
                 key={g.id}
-                onClick={() => setGrupoId(g.id)}
-                aria-pressed={g.id === grupo.id}
                 className={cn(
-                  "w-full rounded-lg border px-3 py-2 text-left transition-colors",
+                  "group/item rounded-lg border px-3 py-2 transition-colors",
                   g.id === grupo.id ? "border-border bg-card shadow-sm" : "border-transparent hover:bg-muted",
                 )}
               >
-                <span className="flex items-center gap-2 text-sm font-semibold">
-                  {g.nome}
-                  {g.is_system && <Badge variant="outline" className="h-4 px-1 text-[9px]">base</Badge>}
-                </span>
-                <span className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                  <Users className="h-3 w-3" />
-                  {g.membros} {g.membros === 1 ? "pessoa" : "pessoas"} · nível {g.nivel_base}
-                </span>
-              </button>
+                {editando?.id === g.id ? (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      autoFocus
+                      value={editando.nome}
+                      onChange={(e) => setEditando({ id: g.id, nome: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && editando.nome.trim()) {
+                          renomearGrupo.mutate({ groupId: g.id, nome: editando.nome.trim() });
+                          setEditando(null);
+                        }
+                        if (e.key === "Escape") setEditando(null);
+                      }}
+                      className="h-7 text-xs"
+                    />
+                    <button
+                      className="shrink-0 rounded p-1 hover:bg-muted"
+                      aria-label="Salvar nome"
+                      onClick={() => {
+                        if (editando.nome.trim()) renomearGrupo.mutate({ groupId: g.id, nome: editando.nome.trim() });
+                        setEditando(null);
+                      }}
+                    ><Check className="h-3.5 w-3.5" /></button>
+                    <button className="shrink-0 rounded p-1 hover:bg-muted" aria-label="Cancelar"
+                      onClick={() => setEditando(null)}><X className="h-3.5 w-3.5" /></button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setGrupoId(g.id)}
+                        aria-pressed={g.id === grupo.id}
+                        className="flex flex-1 items-center gap-2 text-left text-sm font-semibold"
+                      >
+                        {g.nome}
+                        {g.is_system && <Badge variant="outline" className="h-4 px-1 text-[9px]">base</Badge>}
+                      </button>
+                      <button
+                        className="shrink-0 rounded p-1 opacity-0 transition-opacity hover:bg-muted group-hover/item:opacity-100"
+                        aria-label={`Renomear ${g.nome}`}
+                        onClick={() => setEditando({ id: g.id, nome: g.nome })}
+                      ><Pencil className="h-3 w-3" /></button>
+                      {!g.is_system && (
+                        <button
+                          className="shrink-0 rounded p-1 text-destructive opacity-0 transition-opacity hover:bg-destructive/10 group-hover/item:opacity-100"
+                          aria-label={`Excluir ${g.nome}`}
+                          onClick={() => setExcluindo(g)}
+                        ><Trash2 className="h-3 w-3" /></button>
+                      )}
+                    </div>
+                    <button onClick={() => setGrupoId(g.id)} className="mt-0.5 flex w-full items-center gap-1 text-left text-xs text-muted-foreground">
+                      <Users className="h-3 w-3" />
+                      {g.membros} {g.membros === 1 ? "pessoa" : "pessoas"} · nível {g.nivel_base}
+                    </button>
+                  </>
+                )}
+              </div>
             ))}
           </div>
 
@@ -331,6 +382,34 @@ export default function GruposPermissoesContent() {
           })}
         </div>
       </div>
+
+      {/* ------------------- excluir grupo criado por cópia ------------------- */}
+      <AlertDialog open={!!excluindo} onOpenChange={(o) => !o && setExcluindo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir o grupo “{excluindo?.nome}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {excluindo && excluindo.membros > 0 ? (
+                <>
+                  Este grupo tem <b>{excluindo.membros} {excluindo.membros === 1 ? "pessoa" : "pessoas"}</b>.
+                  Mova-as para outro grupo antes de excluir — sem grupo, elas ficariam sem acesso a nada.
+                </>
+              ) : (
+                <>O grupo não tem ninguém. As permissões dele são descartadas e a ação não pode ser desfeita.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!excluindo || excluindo.membros > 0}
+              onClick={() => { if (excluindo) excluirGrupo.mutate(excluindo.id); setExcluindo(null); setGrupoId(null); }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ------------- confirmação de rebaixar nível (bug B1) ------------- */}
       <AlertDialog open={!!rebaixar} onOpenChange={(o) => !o && setRebaixar(null)}>

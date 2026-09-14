@@ -22,6 +22,7 @@ import { Shield, ShieldCheck, ShieldOff, Loader2, RotateCcw, Info, Save, Undo2 }
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import GruposPermissoesContent from "./permissoes/GruposPermissoesContent";
+import { RECURSOS_SEM_PORTAO } from "@/hooks/useRbacConfig";
 
 type Role = "admin" | "head" | "user";
 type Action = "view" | "insert" | "update" | "delete";
@@ -582,7 +583,18 @@ function ResourceRow({ res, getValue, isPending, onToggle, disabled }: ResourceR
       <td className="px-4 py-3 border-b border-border/40 align-top">
         <div className="flex items-start gap-1.5">
           <div className="min-w-0">
-            <div className="text-sm font-medium leading-tight">{res.label}</div>
+            <div className="flex flex-wrap items-center gap-1.5 text-sm font-medium leading-tight">
+              {res.label}
+              {/* F0 — sincerar a tela: este recurso esta no catalogo e nenhuma
+                  tela o consulta ainda. Marcar e mais honesto do que deixar o
+                  admin achar que trancou. */}
+              {RECURSOS_SEM_PORTAO.has(res.key) && (
+                <span className="inline-flex items-center gap-1 rounded border border-dashed border-amber-500 px-1.5 py-px text-[10px] font-normal text-amber-600 dark:text-amber-400"
+                      title="Este recurso ainda nao e verificado por nenhuma tela. Alterar aqui nao muda o acesso de ninguem.">
+                  ainda não aplicado
+                </span>
+              )}
+            </div>
             {res.where_it_appears && (
               <div className="text-xs text-muted-foreground mt-0.5">{res.where_it_appears}</div>
             )}
