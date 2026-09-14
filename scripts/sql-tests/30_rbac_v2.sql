@@ -107,6 +107,20 @@ begin
     insert into res values ('T12 nao troca o proprio grupo', sqlerrm ilike '%proprio%', sqlerrm);
   end;
 
+  -- T13 · escopo só aceita valor válido para aquele recurso
+  begin
+    perform public.rbac_set_group_scope(v_gope, 'cfg.percentuais', 'setor');
+    insert into res values ('T13 escopo invalido e recusado', false, 'NAO bloqueou');
+  exception when others then
+    insert into res values ('T13 escopo invalido e recusado', sqlerrm ilike '%nao vale%', sqlerrm);
+  end;
+
+  -- T14 · escopo válido é gravado
+  perform public.rbac_set_group_scope(v_gope, 'atendimento_chat', 'setor');
+  select escopo into v_msg from public.group_permissions
+   where group_id=v_gope and resource_key='atendimento_chat';
+  insert into res values ('T14 escopo valido e gravado', v_msg='setor', 'escopo='||coalesce(v_msg,'null'));
+
   -- T10 · has_perm dormente: nenhuma policy usa
   select count(*) into v_n from pg_policies
    where schemaname='public' and (coalesce(qual,'')||coalesce(with_check,'')) ilike '%has_perm%';

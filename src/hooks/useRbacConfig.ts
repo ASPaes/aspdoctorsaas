@@ -16,6 +16,12 @@ export interface RbacGrupo {
 export interface RbacRecurso {
   key: string; label: string; descricao: string | null;
   module_id: string; parent_key: string | null; nivel: Nivel; ordem: number;
+  /** Ações que fazem sentido aqui. Recurso que já É uma ação (exportar,
+   *  cancelar) traz apenas ["view"]: ligado = pode fazer. */
+  acoes: Acao[];
+  /** Escopo de linha só existe onde há coluna para filtrar. */
+  escopo_aplicavel: boolean;
+  escopos_validos: Escopo[];
 }
 export interface RbacPermissao {
   group_id: string; key: string;
@@ -77,6 +83,17 @@ export const ESCOPO_LABEL: Record<Escopo, string> = {
   unidade: "Das minhas unidades", todos: "Todas",
 };
 
+/** Quais ações a tela mostra em cada nível de controle. */
+export const ACOES_POR_NIVEL: Record<Nivel, Acao[]> = {
+  1: ["view"],
+  2: ["view", "delete"],
+  3: ["view", "insert", "update", "delete"],
+};
+
+export const ACAO_LABEL: Record<Acao, string> = {
+  view: "Ver", insert: "Inserir", update: "Editar", delete: "Excluir",
+};
+
 export const NIVEL_LABEL: Record<Nivel, string> = {
   1: "Normal", 2: "Moderado", 3: "Completo",
 };
@@ -121,6 +138,15 @@ export function useRbacConfig() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const setEscopo = useMutation({
+    mutationFn: (v: { groupId: string; key: string; escopo: Escopo }) =>
+      chamar("rbac_set_group_scope", {
+        p_group_id: v.groupId, p_resource_key: v.key, p_escopo: v.escopo,
+      }),
+    onSuccess: invalidar,
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const setNivel = useMutation({
     mutationFn: (v: { moduleId: string; nivel: Nivel }) =>
       chamar("rbac_set_module_level", {
@@ -156,6 +182,6 @@ export function useRbacConfig() {
 
   return {
     config: query.data, isLoading: query.isLoading, error: query.error,
-    setPermissao, setNivel, duplicarGrupo, renomearGrupo, excluirGrupo,
+    setPermissao, setEscopo, setNivel, duplicarGrupo, renomearGrupo, excluirGrupo,
   };
 }
