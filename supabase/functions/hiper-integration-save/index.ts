@@ -106,8 +106,21 @@ serve(async (req) => {
       return json({ ok: false, error: "Token inválido: o token do PortalHiper começa com \"hig_\"." });
     }
 
-    const baseUrl = (typeof base_url === "string" && base_url.trim() ? base_url.trim() : DEFAULT_BASE_URL)
-      .replace(/\/+$/, "");
+    // A tela manda só {token, tenant_id}. Quando a URL não vem, a ordem é:
+    // a que este tenant já usa → só então o default. Trocar o token não pode
+    // mudar o endereço do portal por efeito colateral; o default é para quem
+    // ainda não tem linha nenhuma.
+    const { data: integExistente } = await supabase
+      .from("hiper_integration")
+      .select("base_url")
+      .eq("tenant_id", targetTenantId)
+      .maybeSingle();
+
+    const baseUrl = (
+      typeof base_url === "string" && base_url.trim()
+        ? base_url.trim()
+        : (integExistente?.base_url?.trim() || DEFAULT_BASE_URL)
+    ).replace(/\/+$/, "");
 
     // 1. De quem é o token — ANTES de guardar. Credencial que não funciona, ou
     //    que é de outra revenda, não chega ao Vault.
