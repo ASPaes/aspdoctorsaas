@@ -30,7 +30,7 @@ Vá em **Configurações › Equipe › Permissões e papéis**.
 | # | O que fazer | O que tem que acontecer |
 |---|---|---|
 | 1 | Trocar a empresa entre ASP e uma terceira | ASP mostra grupos; a outra mostra a matriz antiga |
-| 2 | Em **Clientes**, clicar no nível **3** | Aparecem `clientes.oem_aprovacao` e `clientes.modulos` |
+| 2 | Em **Clientes**, clicar no nível **3** | Sai de 5 para 15 itens. Aparecem Contratos, Cancelar, Reajuste, Excluir tudo, Filiais, Contatos |
 | 3 | Liberar **Clientes** e negar **Custos e margens**; voltar ao nível **1** | O diálogo lista o que sai e diz "fica bloqueado". Confirmar **não** libera Custos |
 | 4 | Desmarcar **Clientes** no grupo Operador | Os filhos caem junto (cascata) |
 | 5 | No grupo **Administrador**, tentar desmarcar **Permissões e papéis** | Cadeado; não deixa. Mensagem de anti-lockout |
@@ -86,6 +86,29 @@ Frontend: `bunx vitest run` → **971 de 972 passam**. As 2 falhas (`CsatReportM
 `tsc -p tsconfig.app.json` limpo · `vite build` em 6,19s.
 
 ---
+
+## O catálogo
+
+**143 recursos visíveis**, distribuídos assim:
+
+| Nível | Recursos | O que é |
+|---|---|---|
+| 1 — Normal | 45 | Exatamente a tela de hoje: menu + configurações |
+| 2 — Moderado | 46 | Portas de módulo e ações sensíveis (dinheiro, LGPD, irreversível) |
+| 3 — Completo | 52 | Abas e sub-ações |
+
+| Módulo | Recursos |
+|---|---|
+| Configurações | 26 |
+| Onboarding e Implantação | 16 |
+| Menu principal · Clientes · Atendimento | 15 cada |
+| Dashboard · Dashboard de Atendimento | 11 cada |
+| Tickets | 9 |
+| Equipe e segurança · Integrações e canais | 7 cada |
+| Financeiro | 5 · Super admin 4 · Dados 2 |
+
+⚠️ **99 dos 143 ainda não têm portão no código** e aparecem marcados com "ainda não aplicado".
+Isso é esperado: o catálogo é o vocabulário completo do produto; ligar cada um é a F3.
 
 ## Os arquivos
 

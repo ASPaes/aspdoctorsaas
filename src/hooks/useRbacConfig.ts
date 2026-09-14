@@ -34,12 +34,42 @@ export interface RbacConfig {
  * que mexer neles não muda nada.
  */
 export const RECURSOS_SEM_PORTAO = new Set<string>([
+  // Já existiam no catálogo e nunca tiveram portão (levantado em 13/09/2026).
   "atendimento_chat", "atendimento_filtros", "atendimento_transferir",
   "base_conhecimento", "clientes.oem_aprovacao", "dashboard_conselho",
   "dashboard_operacional", "ia_configuracoes", "nav.emails",
   "parametros_atendimento", "super_monitor", "usuarios_convites",
-  "usuarios_roles", "whatsapp_instancias",
-  "lancamentos", "receita_mrr", "dashboard_financeiro", "cfg.whatsapp",
+  "usuarios_roles", "whatsapp_instancias", "lancamentos",
+  "receita_mrr", "dashboard_financeiro", "cfg.whatsapp",
+  // Entraram com o catálogo completo em 14/09/2026. Nenhum tem portão ainda —
+  // ligá-los é a F3, tenant a tenant, com aviso antes.
+  "nav.onboarding", "nav.cadastros", "nav.whatsapp_contatos",
+  "nav.meu_painel", "nav.super", "dash.visao_geral",
+  "dash.crescimento", "dash.cancelamentos", "dash.vendas",
+  "dash.distribuicao", "dash.cs", "dash.cohort",
+  "dash.meu_painel", "dash.valores_financeiros", "atd.tempo_real",
+  "atd.velocidade", "atd.agentes", "atd.satisfacao",
+  "atd.volume", "atd.ura", "atd.chats",
+  "atd.tickets", "atd.backlog", "atd.clientes",
+  "atd.cobertura", "clientes.ficha", "clientes.contratos",
+  "clientes.financeiro", "clientes.cancelar", "clientes.reativar",
+  "clientes.reajuste", "clientes.purge", "clientes.historico",
+  "clientes.filiais", "clientes.contatos", "fin.mrr",
+  "fin.bridge", "fin.movimentos", "atend.assumir",
+  "atend.enviar", "atend.agendar", "atend.encaminhar",
+  "atend.macros", "atend.historico_terceiros", "atend.acesso_remoto",
+  "atend.contatos", "atend.busca", "tickets",
+  "tickets.criar", "tickets.editar", "tickets.encerrar",
+  "tickets.reabrir", "tickets.excluir", "tickets.transferir",
+  "tickets.anexos", "tickets.mencoes", "onb.quadro",
+  "onb.mover", "onb.criar_jornada", "onb.editar_jornada",
+  "onb.golive", "onb.cancelar", "onb.reabrir",
+  "onb.transferir", "onb.treinos", "onb.dashboard",
+  "onb.cfg.pipelines", "onb.cfg.checklists", "onb.cfg.papeis",
+  "onb.cfg.distribuicao", "onb.cfg.motivos", "onb.cfg.templates",
+  "usuarios.desativar", "usuarios.auditoria", "cs.painel",
+  "certificados", "painel_uso", "meu_painel",
+  "super.tenants", "super.templates", "super.limpeza_uras",
 ]);
 
 export const ESCOPO_LABEL: Record<Escopo, string> = {
