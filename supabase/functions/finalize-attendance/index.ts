@@ -5,6 +5,38 @@ import { notifyEvent, resolveIncident } from "../_shared/notify.ts";
 
 const FUNCTION_NAME = "finalize-attendance";
 
+// Classifica a falha pela resposta do PROVEDOR, nao por palavra solta. Antes,
+// qualquer mensagem com "429", "rate" ou "quota" virava "sem credito" — e 429 e
+// tanto falta de credito quanto excesso de requisicao, que pedem coisas
+// diferentes do cliente. O callAI lanca "<Provedor> error <status>: <corpo>".
+// null = nao e falha do provedor (rede, JSON invalido): segue como erro do item.
+type FalhaIA = { reason: string; aviso: { titulo: string; corpo: string } | null };
+function classificarFalhaIA(msg: string): FalhaIA | null {
+  const status = Number(msg.match(/^(?:OpenAI|Anthropic|Gemini) error (\d{3})/)?.[1] ?? 0);
+  if (!status) return null;
+  if (/insufficient_quota|credit_balance|credit balance is too low|no credits|billing/i.test(msg)) {
+    return {
+      reason: "ai_quota_exceeded",
+      aviso: {
+        titulo: "IA sem crédito",
+        corpo: "A conta de IA do seu workspace ficou sem crédito. As análises de atendimento ficam em espera e são feitas automaticamente quando o crédito voltar (até 7 dias).",
+      },
+    };
+  }
+  if (status === 401 || status === 403 || /invalid_api_key|incorrect api key|authentication_error|API_KEY_INVALID/i.test(msg)) {
+    return {
+      reason: "ai_key_invalid",
+      aviso: {
+        titulo: "Chave de IA recusada",
+        corpo: "O provedor de IA recusou a chave do seu workspace (inválida ou revogada). As análises de atendimento ficam em espera por até 7 dias: revise a chave nas configurações de IA.",
+      },
+    };
+  }
+  if (status === 429) return { reason: "ai_rate_limited", aviso: null };
+  if (status >= 500) return { reason: "ai_provider_unavailable", aviso: null };
+  return null;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -344,19 +376,24 @@ REGRAS:
       await resolveIncident(supabase, att.tenant_id, "ai_quota_exceeded", att.tenant_id);
     } catch (aiError: any) {
       const msg = aiError?.message || "";
-      if (msg.includes("429") || msg.includes("insufficient_quota") || msg.includes("rate") || msg.includes("quota")) {
-        console.warn(`[${FUNCTION_NAME}][${requestId}] IA indisponível (quota/rate limit) — retornando 503 para re-tentativa da fila`);
-        await notifyEvent(
-          supabase,
-          att.tenant_id,
-          "ai_quota_exceeded",
-          att.tenant_id,
-          "IA sem crédito ou chave inválida",
-          "A chave de IA do seu workspace está falhando (quota/billing). Análises de atendimento e transcrições estão paradas até regularizar.",
-          { source: "finalize-attendance" }
-        );
+      const falha = classificarFalhaIA(msg);
+      if (falha) {
+        console.warn(`[${FUNCTION_NAME}][${requestId}] IA indisponivel (${falha.reason}) — 503 para a fila reagendar`);
+        // So avisa o cliente do que depende DELE. Limite de requisicoes e provedor
+        // fora do ar passam sozinhos, e a fila segura o item ate la.
+        if (falha.aviso) {
+          await notifyEvent(
+            supabase,
+            att.tenant_id,
+            "ai_quota_exceeded",
+            att.tenant_id,
+            falha.aviso.titulo,
+            falha.aviso.corpo,
+            { source: "finalize-attendance", motivo: falha.reason }
+          );
+        }
         return new Response(
-          JSON.stringify({ success: false, reason: "ai_quota_exceeded" }),
+          JSON.stringify({ success: false, reason: falha.reason }),
           { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

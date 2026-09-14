@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
     // MOTIVO. Enquanto segura, a janela fica aberta e o proximo aviso traz o total
     // acumulado — nada some. Motivo novo/desconhecido continua avisando na hora.
     const THROTTLE_HOURS = 12;
-    const ehMotivoPersistente = (m: string) => /quota|credit|billing|insufficient|429/i.test(m);
+    const ehMotivoPersistente = (m: string) => /quota|credit|billing|insufficient|429|rate_limited|key_invalid|provider_unavailable/i.test(m);
     const lookbackIso = new Date(Date.now() - LOOKBACK_HOURS * 60 * 60 * 1000).toISOString();
 
     const { data: lostRows } = await supabase
