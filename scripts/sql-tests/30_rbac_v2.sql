@@ -121,6 +121,18 @@ begin
    where group_id=v_gope and resource_key='atendimento_chat';
   insert into res values ('T14 escopo valido e gravado', v_msg='setor', 'escopo='||coalesce(v_msg,'null'));
 
+  -- T15 · descer de nível também não pode DIMINUIR o que a herança dava
+  -- (o filho sem linha propria herda do tenant/global; materializar como
+  --  `false` rebaixava quem estava liberado)
+  delete from public.group_permissions
+   where group_id=v_gadm and resource_key='clientes.oem_aprovacao';
+  perform public.rbac_set_module_level(v_tenant,'clientes',3::smallint);
+  perform public.rbac_set_module_level(v_tenant,'clientes',1::smallint);
+  select can_view into v_view from public.group_permissions
+   where group_id=v_gadm and resource_key='clientes.oem_aprovacao';
+  insert into res values ('T15 descer de nivel NAO diminui heranca',
+    v_view is true, 'admin/oem_aprovacao='||coalesce(v_view::text,'null'));
+
   -- T10 · has_perm dormente: nenhuma policy usa
   select count(*) into v_n from pg_policies
    where schemaname='public' and (coalesce(qual,'')||coalesce(with_check,'')) ilike '%has_perm%';
