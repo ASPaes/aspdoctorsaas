@@ -31,12 +31,28 @@ export function resolverEnderecoDestino(
   conhecidos: Set<string>,
   enderecoDaCaixa: string,
 ): string {
+  return resolverDestino(cab, conhecidos, enderecoDaCaixa).endereco;
+}
+
+/**
+ * Igual a resolverEnderecoDestino, dizendo também se o endereço só está em
+ * cópia: achado no Cc sem estar no To. Endereço que não aceita cópia
+ * (Parâmetros de Recebidos) não abre ticket nesse caso. Cópia oculta e
+ * redirecionamento (só no Delivered-To) contam como enviado direto.
+ */
+export function resolverDestino(
+  cab: Record<string, string>,
+  conhecidos: Set<string>,
+  enderecoDaCaixa: string,
+): { endereco: string; soEmCopia: boolean } {
   for (const campo of ['to', 'cc', 'x-original-to', 'delivered-to']) {
     for (const e of enderecosDe(cab[campo])) {
-      if (conhecidos.has(e)) return e;
+      if (conhecidos.has(e)) return { endereco: e, soEmCopia: campo === 'cc' };
     }
   }
-  return semSufixo(enderecoDaCaixa);
+  const daCaixa = semSufixo(enderecoDaCaixa);
+  const estaSoEmCopia = enderecosDe(cab['cc']).includes(daCaixa) && !enderecosDe(cab['to']).includes(daCaixa);
+  return { endereco: daCaixa, soEmCopia: estaSoEmCopia };
 }
 
 /** mensagem que saiu de uma caixa do próprio tenant nunca abre ticket (evita robô falando sozinho) */

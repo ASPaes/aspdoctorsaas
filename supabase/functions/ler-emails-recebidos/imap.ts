@@ -316,13 +316,31 @@ export function extrairTexto(bruto: string): string {
     // do bruto: minúsculo estraga a fronteira, que diferencia maiúscula
     const fronteira = tipoBruto.match(/boundary="?([^";]+)"?/i)?.[1];
     if (fronteira) {
-      const partes = corpoInteiro.split(`--${fronteira}`).slice(1, -1);
-      const plana = partes.find((p) => /content-type:\s*text\/plain/i.test(p));
-      const html = partes.find((p) => /content-type:\s*text\/html/i.test(p));
-      const aninhada = partes.find((p) => /content-type:\s*multipart\//i.test(p));
-      if (plana) return decodificarParte(plana);
-      if (html) return decodificarParte(html);
-      if (aninhada) return extrairTexto(aninhada.replace(/^\r?\n/, ""));
+      // Escolhe pelo Content-Type DA PRÓPRIA parte. Procurar "text/plain" no
+      // conteúdo inteiro achava a parte multipart/alternative (que contém um
+      // text/plain dentro) e devolvia ela crua, com fronteiras: foi o que
+      // aconteceu no primeiro e-mail com anexo, em 14/09/2026.
+      const partes = corpoInteiro
+        .split(`--${fronteira}`)
+        .slice(1, -1)
+        .map((p) => p.replace(/^\r?\n/, ""))
+        .map((p) => {
+          const c = lerCabecalhos(p);
+          return {
+            p,
+            tipo: (c["content-type"] ?? "text/plain").toLowerCase(),
+            anexo: /attachment/i.test(c["content-disposition"] ?? ""),
+          };
+        });
+      const plana = partes.find((x) => x.tipo.startsWith("text/plain") && !x.anexo);
+      const html = partes.find((x) => x.tipo.startsWith("text/html") && !x.anexo);
+      const aninhadas = partes.filter((x) => x.tipo.startsWith("multipart/"));
+      if (plana) return decodificarParte(plana.p);
+      for (const x of aninhadas) {
+        const texto = extrairTexto(x.p);
+        if (texto) return texto;
+      }
+      if (html) return decodificarParte(html.p);
     }
     return "";
   }

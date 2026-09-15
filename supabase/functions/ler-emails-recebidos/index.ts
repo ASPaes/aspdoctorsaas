@@ -4,7 +4,7 @@ import {
   extrairEndereco, extrairTexto, lerCabecalhos, type SegurancaImap,
 } from './imap.ts';
 import {
-  assuntoConfirmacao, ehDeUmaDasNossasCaixas, htmlConfirmacao, resolverEnderecoDestino, semSufixo,
+  assuntoConfirmacao, ehDeUmaDasNossasCaixas, enderecosDe, htmlConfirmacao, resolverDestino, semSufixo,
 } from './rotas.ts';
 import { caminhoDoAnexo, extrairAnexos, selecionarAnexos, type AnexoEmail } from './anexos.ts';
 
@@ -64,6 +64,7 @@ interface Rota {
   account_id: string;
   endereco: string;
   abre_ticket: boolean;
+  aceita_copia: boolean;
 }
 
 function papelDoToken(token: string, chaveServico: string): string | null {
@@ -129,7 +130,7 @@ Deno.serve(async (req) => {
   const tenantFiltro = tenantDoUsuario ?? (interno ? null : tenantPedido);
 
   // ── endereços cadastrados em Parâmetros de Recebidos ──
-  let consultaRotas = supabase.from('email_enderecos_destino').select('tenant_id, account_id, endereco, abre_ticket');
+  let consultaRotas = supabase.from('email_enderecos_destino').select('tenant_id, account_id, endereco, abre_ticket, aceita_copia');
   if (tenantFiltro) consultaRotas = consultaRotas.eq('tenant_id', tenantFiltro);
   const { data: rotasLidas, error: erroRotas } = await consultaRotas;
   if (erroRotas) console.warn(`[ler-emails-recebidos] endereços não lidos: ${erroRotas.message}`);
@@ -156,11 +157,13 @@ Deno.serve(async (req) => {
   const nossos = new Map<string, Set<string>>();
   const conhecidos = new Map<string, Set<string>>();
   const abrem = new Map<string, Set<string>>();
+  const aceitamCopia = new Map<string, Set<string>>();
   for (const c of enderecosDasContas ?? []) conjuntoDo(nossos, c.tenant_id).add(semSufixo(c.email));
   for (const r of rotas) {
     conjuntoDo(nossos, r.tenant_id).add(r.endereco);
     conjuntoDo(conhecidos, r.tenant_id).add(r.endereco);
     if (r.abre_ticket) conjuntoDo(abrem, r.tenant_id).add(r.endereco);
+    if (r.abre_ticket && r.aceita_copia) conjuntoDo(aceitamCopia, r.tenant_id).add(r.endereco);
   }
 
   const resultados: Resultado[] = [];
@@ -236,8 +239,15 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const destino = resolverEnderecoDestino(cab, conhecidos.get(conta.tenant_id) ?? new Set(), conta.email);
-        const abreTicket = abrem.get(conta.tenant_id)?.has(destino) ?? false;
+        const { endereco: destino, soEmCopia } = resolverDestino(
+          cab,
+          conhecidos.get(conta.tenant_id) ?? new Set(),
+          conta.email,
+        );
+        // só em cópia, abre ticket apenas se o endereço aceitar (Parâmetros de Recebidos)
+        const abreTicket =
+          (abrem.get(conta.tenant_id)?.has(destino) ?? false) &&
+          (!soEmCopia || (aceitamCopia.get(conta.tenant_id)?.has(destino) ?? false));
 
         const identificacao = acharToken(cab);
         let envio: any = null;
@@ -315,7 +325,8 @@ Deno.serve(async (req) => {
             imap_uid: uid,
             de_email: de.email,
             de_nome: de.nome || null,
-            para: (cab['to'] ?? '').split(',').map((p) => extrairEndereco(p).email).filter(Boolean),
+            // vírgula dentro de nome entre aspas ("Silva, Raissa") não pode cortar a lista
+            para: enderecosDe(cab['to']),
             assunto,
             corpo_texto: texto,
             recebido_em: isNaN(recebidoEm.getTime()) ? agora : recebidoEm.toISOString(),

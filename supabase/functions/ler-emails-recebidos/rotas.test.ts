@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   assuntoConfirmacao, ehDeUmaDasNossasCaixas, enderecosDe, htmlConfirmacao, primeiroNome,
-  resolverEnderecoDestino, semSufixo,
+  resolverDestino, resolverEnderecoDestino, semSufixo,
 } from "./rotas.ts";
 
 describe("endereços", () => {
@@ -46,6 +46,41 @@ describe("destino do e-mail novo", () => {
   test("mensagem que saiu de caixa nossa é reconhecida, com ou sem sufixo", () => {
     expect(ehDeUmaDasNossasCaixas("Suporte+ABC@empresa.com.br", conhecidos)).toBe(true);
     expect(ehDeUmaDasNossasCaixas("marina@padaria.com.br", conhecidos)).toBe(false);
+  });
+});
+
+describe("endereço só em cópia", () => {
+  const conhecidos = new Set(["suporte@empresa.com.br", "financeiro@empresa.com.br"]);
+
+  test("e-mail interno com o suporte só em cópia (caso de 14/09/2026)", () => {
+    const cab = {
+      to: '"Silva, Raissa" <raissa.silva@fiserv.com>, robson@gulamenu.com.br',
+      cc: "suporte@empresa.com.br",
+      "delivered-to": "suporte@empresa.com.br",
+    };
+    expect(resolverDestino(cab, conhecidos, "suporte@empresa.com.br")).toEqual({ endereco: "suporte@empresa.com.br", soEmCopia: true });
+  });
+
+  test("escrito para o suporte não é cópia, mesmo com outro endereço nosso em cópia", () => {
+    const cab = { to: "suporte@empresa.com.br", cc: "financeiro@empresa.com.br" };
+    expect(resolverDestino(cab, conhecidos, "suporte@empresa.com.br")).toEqual({ endereco: "suporte@empresa.com.br", soEmCopia: false });
+  });
+
+  test("cópia oculta (nenhum destinatário conhecido) conta como enviado direto", () => {
+    const cab = { to: "alguem@cliente.com.br", "delivered-to": "suporte@empresa.com.br" };
+    expect(resolverDestino(cab, conhecidos, "suporte@empresa.com.br")).toEqual({ endereco: "suporte@empresa.com.br", soEmCopia: false });
+  });
+
+  test("caixa sem endereço cadastrado, só em cópia, também é reconhecida", () => {
+    const cab = { to: "alguem@cliente.com.br", cc: "Caixa <caixa@empresa.com.br>" };
+    expect(resolverDestino(cab, new Set(), "caixa@empresa.com.br")).toEqual({ endereco: "caixa@empresa.com.br", soEmCopia: true });
+  });
+
+  test("o nome com vírgula entre aspas não quebra a lista de destinatários", () => {
+    expect(enderecosDe('"Silva, Raissa" <raissa.silva@fiserv.com>, robson@gulamenu.com.br')).toEqual([
+      "raissa.silva@fiserv.com",
+      "robson@gulamenu.com.br",
+    ]);
   });
 });
 

@@ -17,6 +17,8 @@ export interface EnderecoDestino {
   account_id: string;
   endereco: string;
   abre_ticket: boolean;
+  /** abre ticket também quando o endereço só está em cópia */
+  aceita_copia: boolean;
   destino: DestinoEmail;
   department_id: string | null;
 }
@@ -98,7 +100,7 @@ export function useParametrosRecebidos() {
           .eq("tenant_id", tid)
           .maybeSingle(),
         tabela("email_enderecos_destino")
-          .select("id, account_id, endereco, abre_ticket, destino, department_id")
+          .select("id, account_id, endereco, abre_ticket, aceita_copia, destino, department_id")
           .eq("tenant_id", tid)
           .order("created_at"),
         tabela("email_regras_assunto")
@@ -161,6 +163,7 @@ export function useParametrosRecebidos() {
           account_id: e.account_id,
           endereco: e.endereco.trim().toLowerCase(),
           abre_ticket: e.abre_ticket,
+          aceita_copia: e.aceita_copia,
           destino: e.destino,
           department_id: e.department_id,
           updated_at: new Date().toISOString(),

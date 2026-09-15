@@ -200,7 +200,7 @@ export default function EmailParametrosRecebidosTab() {
                 ocupado={p.salvarEndereco.isPending}
                 onAdicionar={(endereco, contaId, limpar) =>
                   p.salvarEndereco.mutate(
-                    { account_id: contaId, endereco, abre_ticket: false, destino: "suporte", department_id: null },
+                    { account_id: contaId, endereco, abre_ticket: false, aceita_copia: false, destino: "suporte", department_id: null },
                     {
                       onSuccess: () => {
                         toast.success(`${endereco} adicionado. Escolha o destino e ligue a abertura de ticket.`);
@@ -419,6 +419,7 @@ function LinhaEndereco({
   onRemover?: () => void;
 }) {
   const abre = registro?.abre_ticket ?? false;
+  const aceitaCopia = registro?.aceita_copia ?? false;
   const destino: DestinoEmail = registro?.destino ?? "suporte";
   const setor = registro?.department_id ?? null;
   const semEntrada = !conta.imap_host || !conta.ativo;
@@ -435,8 +436,8 @@ function LinhaEndereco({
         ? "Setor sem status inicial"
         : null;
 
-  const salvar = (mudanca: Partial<Pick<EnderecoDestino, "abre_ticket" | "destino" | "department_id">>) => {
-    const novo = { abre_ticket: abre, destino, department_id: setor, ...mudanca };
+  const salvar = (mudanca: Partial<Pick<EnderecoDestino, "abre_ticket" | "aceita_copia" | "destino" | "department_id">>) => {
+    const novo = { abre_ticket: abre, aceita_copia: aceitaCopia, destino, department_id: setor, ...mudanca };
     if (novo.abre_ticket && novo.destino === "suporte") {
       if (!novo.department_id) {
         toast.error("Escolha o setor antes de ligar a abertura de ticket.");
@@ -459,7 +460,9 @@ function LinhaEndereco({
       ? "Não abre ticket. Respostas continuam registradas."
       : destino === "onboarding"
         ? "Entra na jornada ativa do cliente. Sem jornada ativa, vai para a Triagem."
-        : "Abre ticket na fila do setor, sem responsável.";
+        : aceitaCopia
+          ? "Abre ticket na fila do setor, sem responsável, inclusive quando está em cópia."
+          : "Abre ticket na fila do setor, sem responsável. Só em cópia, não abre ticket.";
 
   return (
     <div className="grid gap-3 border-b px-4 py-3 lg:grid-cols-[minmax(0,1.3fr)_180px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)] lg:items-center">
@@ -494,6 +497,7 @@ function LinhaEndereco({
         )}
       </div>
 
+      <div className="space-y-1.5">
       <label className="flex items-center gap-2 text-xs text-muted-foreground">
         <Switch
           checked={abre}
@@ -513,6 +517,19 @@ function LinhaEndereco({
           "Não"
         )}
       </label>
+      {abre && (
+        <label className="flex items-center gap-1.5 text-[11px] leading-tight text-muted-foreground">
+          <Switch
+            checked={aceitaCopia}
+            disabled={semEntrada || ocupado}
+            onCheckedChange={(v) => salvar({ aceita_copia: v })}
+            className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
+            aria-label={`Abrir ticket também quando ${endereco} está em cópia`}
+          />
+          Também quando está em cópia
+        </label>
+      )}
+      </div>
 
       <Select value={destino} onValueChange={(v) => salvar({ destino: v as DestinoEmail })} disabled={semEntrada || ocupado}>
         <SelectTrigger className="h-9" aria-label={`Destino de ${endereco}`}>

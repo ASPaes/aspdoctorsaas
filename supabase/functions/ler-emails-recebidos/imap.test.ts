@@ -111,6 +111,61 @@ describe("acentos", () => {
   });
 });
 
+describe("corpo de e-mail com anexo (Gmail, 14/09/2026)", () => {
+  // Estrutura exata do primeiro e-mail com anexo que chegou: multipart/mixed
+  // com uma multipart/alternative (texto + html) e o arquivo.
+  const bruto = [
+    'Content-Type: multipart/mixed; boundary="000000000000823ffd065b7b0c22"',
+    "",
+    "--000000000000823ffd065b7b0c22",
+    'Content-Type: multipart/alternative; boundary="000000000000823ffd065b7b0c20"',
+    "",
+    "--000000000000823ffd065b7b0c20",
+    'Content-Type: text/plain; charset="UTF-8"',
+    "",
+    "Segue anexo",
+    "",
+    "--000000000000823ffd065b7b0c20",
+    'Content-Type: text/html; charset="UTF-8"',
+    "",
+    '<div dir="ltr">Segue anexo</div>',
+    "",
+    "--000000000000823ffd065b7b0c20--",
+    "--000000000000823ffd065b7b0c22",
+    'Content-Type: application/pdf; name="boleto.pdf"',
+    'Content-Disposition: attachment; filename="boleto.pdf"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    "JVBERi0xLjQK",
+    "--000000000000823ffd065b7b0c22--",
+  ].join(CRLF);
+
+  test("sai só o texto, sem fronteira, sem html e sem o anexo", () => {
+    const texto = extrairTexto(bruto);
+    expect(texto.trim()).toBe("Segue anexo");
+    expect(texto).not.toContain("--0000");
+    expect(texto).not.toContain("Content-Type");
+  });
+
+  test("texto enviado como arquivo anexado não vira o corpo", () => {
+    const comTxtAnexado = [
+      'Content-Type: multipart/mixed; boundary="M"',
+      "",
+      "--M",
+      'Content-Type: text/plain; name="log.txt"',
+      'Content-Disposition: attachment; filename="log.txt"',
+      "",
+      "linha de log",
+      "--M",
+      "Content-Type: text/plain; charset=UTF-8",
+      "",
+      "Mensagem de verdade",
+      "--M--",
+    ].join(CRLF);
+    expect(extrairTexto(comTxtAnexado).trim()).toBe("Mensagem de verdade");
+  });
+});
+
 describe("corpo", () => {
   const multipart = [
     "Content-Type: multipart/alternative; boundary=\"XYZ\"",
