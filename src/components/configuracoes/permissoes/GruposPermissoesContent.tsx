@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import {
-  useRbacConfig, RECURSOS_SEM_PORTAO, NIVEL_LABEL, ESCOPO_LABEL,
+  useRbacConfig, RECURSOS_SEM_PORTAO, NIVEL_LABEL,
   ACOES_POR_NIVEL, ACAO_LABEL,
-  type Nivel, type Acao, type Escopo, type RbacGrupo, type RbacRecurso,
+  type Nivel, type Acao, type RbacGrupo, type RbacRecurso,
 } from "@/hooks/useRbacConfig";
 import LinhaRecurso, { ChipAcao } from "./LinhaRecurso";
 import { Label } from "@/components/ui/label";
@@ -66,7 +66,7 @@ function travada(g: RbacGrupo, key: string, acao: string) {
 
 export default function GruposPermissoesContent() {
   const {
-    config, isLoading, setPermissao, setEscopo, setNivel,
+    config, isLoading, setPermissao, setNivel,
     duplicarGrupo, renomearGrupo, excluirGrupo,
   } = useRbacConfig();
   const [grupoId, setGrupoId] = useState<string | null>(null);
@@ -83,11 +83,11 @@ export default function GruposPermissoesContent() {
   );
 
   const mapa = useMemo(() => {
-    const m = new Map<string, Record<Acao, boolean> & { escopo: Escopo }>();
+    const m = new Map<string, Record<Acao, boolean>>();
     if (!config || !grupo) return m;
     for (const p of config.permissoes) {
       if (p.group_id === grupo.id) {
-        m.set(p.key, { view: p.view, insert: p.insert, update: p.update, delete: p.delete, escopo: p.escopo });
+        m.set(p.key, { view: p.view, insert: p.insert, update: p.update, delete: p.delete });
       }
     }
     return m;
@@ -243,7 +243,6 @@ export default function GruposPermissoesContent() {
             // Todas as letras do nível, sempre: ação que não existe no item aparece
             // apagada, e as colunas de chips ficam alinhadas entre as linhas.
             const acoesDoModulo = ACOES_POR_NIVEL[mod.nivel];
-            const mostraEscopo = mod.nivel >= 3 && itens.some((r) => r.escopo_aplicavel);
             // Entrada do MÓDULO = item do menu principal (sem grupo). Entradas de
             // sub-item (Chat, Tickets, Ficha do cliente...) ficam dentro do grupo.
             const entrada = itens.find((r) => r.secao === "entrada" && !r.grupo);
@@ -346,15 +345,11 @@ export default function GruposPermissoesContent() {
                           r={r}
                           estado={mapa.get(r.key)}
                           acoesVisiveis={acoesDoModulo}
-                          mostraEscopo={mostraEscopo}
                           alcancavel={alcancavel}
                           mostrarChave={mostrarChaves}
                           travada={(acao) => travada(grupo, r.key, acao)}
                           onAcao={(acao, valor) =>
                             setPermissao.mutate({ groupId: grupo.id, key: r.key, acao, valor })
-                          }
-                          onEscopo={(escopo) =>
-                            setEscopo.mutate({ groupId: grupo.id, key: r.key, escopo })
                           }
                         />
                       );

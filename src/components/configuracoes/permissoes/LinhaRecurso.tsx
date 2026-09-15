@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Lock, MapPin, Info, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  ACAO_LABEL, ESCOPO_LABEL, RECURSOS_SEM_PORTAO,
-  type Acao, type Escopo, type RbacRecurso,
+  ACAO_LABEL, RECURSOS_SEM_PORTAO,
+  type Acao, type RbacRecurso,
 } from "@/hooks/useRbacConfig";
 
 const LETRA: Record<Acao, string> = { view: "V", insert: "I", update: "E", delete: "X" };
@@ -56,19 +55,17 @@ export function ChipAcao({ acao, ligado, existe, travado, desabilitado, rotulo, 
 
 interface Props {
   r: RbacRecurso;
-  estado?: Record<Acao, boolean> & { escopo: Escopo };
+  estado?: Record<Acao, boolean>;
   acoesVisiveis: Acao[];
-  mostraEscopo: boolean;
   /** A entrada do módulo está ligada? Se não, nada aqui dentro é alcançável. */
   alcancavel: boolean;
   travada: (acao: Acao) => boolean;
   mostrarChave: boolean;
   onAcao: (acao: Acao, valor: boolean) => void;
-  onEscopo: (escopo: Escopo) => void;
 }
 
 export default function LinhaRecurso({
-  r, estado, acoesVisiveis, mostraEscopo, alcancavel, travada, mostrarChave, onAcao, onEscopo,
+  r, estado, acoesVisiveis, alcancavel, travada, mostrarChave, onAcao,
 }: Props) {
   const [aberto, setAberto] = useState(false);
   const semPortao = RECURSOS_SEM_PORTAO.has(r.key);
@@ -132,35 +129,6 @@ export default function LinhaRecurso({
           />
         ))}
       </div>
-
-      {mostraEscopo && (
-        <div className="w-[150px] shrink-0">
-          {r.escopo_aplicavel ? (
-            <Select
-              value={estado?.escopo ?? "todos"}
-              disabled={!estado?.view || !alcancavel}
-              onValueChange={(v) => onEscopo(v as Escopo)}
-            >
-              <SelectTrigger className="h-7 border-border bg-muted/50 px-2 text-[11px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {r.escopos_validos.map((e) => (
-                  <SelectItem key={e} value={e} className="text-xs">{ESCOPO_LABEL[e]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="block text-center text-[11px] text-muted-foreground/50">—</span>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs">
-                Este item não tem linhas para filtrar: ou é uma ação única, ou é um
-                ajuste que vale para a empresa inteira.
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
-      )}
     </div>
   );
 }

@@ -86,10 +86,7 @@ begin
     insert into res values ('T8 operador nao edita permissao', sqlerrm ilike '%admin%', sqlerrm);
   end;
 
-  -- T9 · escopo só existe no motor v2
   perform set_config('request.jwt.claims', json_build_object('sub', v_admin)::text, true);
-  insert into res values ('T9 perm_scope responde', public.perm_scope('clientes','view') is not null,
-                          'escopo='||public.perm_scope('clientes','view'));
 
   -- T11 · vincular pessoa a grupo atualiza o papel legado (D8)
   select user_id into v_alvo from public.profiles
@@ -107,19 +104,17 @@ begin
     insert into res values ('T12 nao troca o proprio grupo', sqlerrm ilike '%proprio%', sqlerrm);
   end;
 
-  -- T13 · escopo só aceita valor válido para aquele recurso
-  begin
-    perform public.rbac_set_group_scope(v_gope, 'cfg.percentuais', 'setor');
-    insert into res values ('T13 escopo invalido e recusado', false, 'NAO bloqueou');
-  exception when others then
-    insert into res values ('T13 escopo invalido e recusado', sqlerrm ilike '%nao vale%', sqlerrm);
-  end;
-
-  -- T14 · escopo válido é gravado
-  perform public.rbac_set_group_scope(v_gope, 'atendimento_chat', 'setor');
-  select escopo into v_msg from public.group_permissions
-   where group_id=v_gope and resource_key='atendimento_chat';
-  insert into res values ('T14 escopo valido e gravado', v_msg='setor', 'escopo='||coalesce(v_msg,'null'));
+  -- T13 · o escopo de linha saiu por inteiro (15/09): nenhuma coluna, função
+  -- ou policy dele pode voltar sem decisão nova.
+  select (select count(*) from information_schema.columns
+           where table_schema='public' and column_name ilike 'escopo%'
+             and table_name in ('group_permissions','resources','permission_audit'))
+       + (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+           where n.nspname='public' and p.proname in ('perm_scope','my_departments','rbac_set_group_scope'))
+       + (select count(*) from pg_policies
+           where schemaname='public' and policyname in ('rbac_conversas_escopo','rbac_tickets_escopo'))
+    into v_n;
+  insert into res values ('T13 escopo de linha removido', v_n = 0, v_n||' sobras');
 
   -- T15 · descer de nível também não pode DIMINUIR o que a herança dava
   -- (o filho sem linha propria herda do tenant/global; materializar como
@@ -146,7 +141,7 @@ begin
 
   -- T10c · as funcoes de RLS sao PARALLEL SAFE (senao desligam o scan paralelo)
   select count(*) into v_n from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-   where n.nspname='public' and p.proname in ('has_perm','perm_scope','my_departments')
+   where n.nspname='public' and p.proname = 'has_perm'
      and p.proparallel <> 's';
   insert into res values ('T10c funcoes de RLS sao parallel safe', v_n = 0, v_n||' inseguras');
 end $$;

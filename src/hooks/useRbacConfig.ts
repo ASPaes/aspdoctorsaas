@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
 export type Nivel = 1 | 2 | 3;
-export type Escopo = "nenhum" | "proprio" | "setor" | "unidade" | "todos";
 export type Acao = "view" | "insert" | "update" | "delete";
 export interface RbacModulo { id: string; nome: string; descricao: string | null; ordem: number; nivel: Nivel }
 export interface RbacGrupo {
@@ -33,13 +32,10 @@ export interface RbacRecurso {
   /** Ações que fazem sentido aqui. Recurso que já É uma ação (exportar,
    *  cancelar) traz apenas ["view"]: ligado = pode fazer. */
   acoes: Acao[];
-  /** Escopo de linha só existe onde há coluna para filtrar. */
-  escopo_aplicavel: boolean;
-  escopos_validos: Escopo[];
 }
 export interface RbacPermissao {
   group_id: string; key: string;
-  view: boolean; insert: boolean; update: boolean; delete: boolean; escopo: Escopo;
+  view: boolean; insert: boolean; update: boolean; delete: boolean;
 }
 export interface RbacConfig {
   tenant_id: string; v2_ligado: boolean;
@@ -93,10 +89,6 @@ export const RECURSOS_SEM_PORTAO = new Set<string>([
   "onb.cfg.retornos", "onb.cfg.contabilidade", "onb.cfg.indicadores",
   "certificados.dashboard",
 ]);
-export const ESCOPO_LABEL: Record<Escopo, string> = {
-  nenhum: "Nenhuma", proprio: "Só as minhas", setor: "Do meu setor",
-  unidade: "Das minhas unidades", todos: "Todas",
-};
 /** Quais ações a tela mostra em cada nível de controle. */
 export const ACOES_POR_NIVEL: Record<Nivel, Acao[]> = {
   1: ["view"],
@@ -144,14 +136,6 @@ export function useRbacConfig() {
     onSuccess: invalidar,
     onError: (e: Error) => toast.error(e.message),
   });
-  const setEscopo = useMutation({
-    mutationFn: (v: { groupId: string; key: string; escopo: Escopo }) =>
-      chamar("rbac_set_group_scope", {
-        p_group_id: v.groupId, p_resource_key: v.key, p_escopo: v.escopo,
-      }),
-    onSuccess: invalidar,
-    onError: (e: Error) => toast.error(e.message),
-  });
   const setNivel = useMutation({
     mutationFn: (v: { moduleId: string; nivel: Nivel }) =>
       chamar("rbac_set_module_level", {
@@ -183,6 +167,6 @@ export function useRbacConfig() {
   });
   return {
     config: query.data, isLoading: query.isLoading, error: query.error,
-    setPermissao, setEscopo, setNivel, duplicarGrupo, renomearGrupo, excluirGrupo,
+    setPermissao, setNivel, duplicarGrupo, renomearGrupo, excluirGrupo,
   };
 }

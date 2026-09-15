@@ -79,7 +79,7 @@ docker exec -i supabase_db_vbngjzovjhkmietztffo psql -U postgres -d postgres \
   < scripts/sql-tests/30_rbac_v2.sql
 ```
 
-Resultado atual: **10 passaram, 0 falharam** — cascata, anti-lockout, rebaixar nível, duplicar, exclusão de grupo base, um-grupo-por-pessoa, grupo com membros, operador sem poder editar, escopo, e `has_perm` ainda dormente.
+Resultado atual (15/09, banco local antigo): **15 passaram, 0 falharam** — cascata, anti-lockout, rebaixar nível (sem aumentar nem diminuir), duplicar, exclusão de grupo base, um-grupo-por-pessoa, grupo com membros, operador sem poder editar, vínculo atualiza o papel, ninguém troca o próprio grupo, `has_perm` no RLS sempre restritiva e paralela, e o escopo de linha removido sem sobras.
 
 Frontend: `bunx vitest run` → **971 de 972 passam**. As 2 falhas (`CsatReportModal.tsx`, `MacroDialog.tsx`) são **anteriores** a este trabalho — arquivos que não foram tocados.
 
@@ -108,7 +108,8 @@ Frontend: `bunx vitest run` → **971 de 972 passam**. As 2 falhas (`CsatReportM
 | `20260914010000_rbac_v2_estrutura.sql` | flag `rbac_v2_enabled`, 10 módulos normalizados, `nivel` nos recursos, tabelas de grupo |
 | `20260914020000_rbac_v2_semeadura_e_motor.sql` | 42 grupos-semente, 1.782 regras copiadas, 112 vínculos, `get_my_permissions` com desvio pela flag |
 | `20260914030000_rbac_v2_rpcs.sql` | 7 RPCs de administração + anti-lockout + RLS das tabelas novas |
-| `20260914040000_rbac_v2_has_perm_dormente.sql` | `has_perm` / `perm_scope` / `my_departments` — prontas, **nenhuma policy usa** |
+| `20260914040000_rbac_v2_has_perm_dormente.sql` | `has_perm` / `perm_scope` / `my_departments` — prontas, **nenhuma policy usa** (as duas últimas saem na `185000`) |
+| `20260914185000_rbac_remove_escopo_de_linha.sql` | **remove o escopo de linha** ("Quais linhas"): colunas, `perm_scope`, `my_departments`, `rbac_set_group_scope` e as policies `rbac_conversas_escopo` / `rbac_tickets_escopo`. "Todas" nunca abria outro setor e o setor vinha da tabela errada. No lugar entram permissões com o nome do que a tela faz |
 | `20260914050000_rbac_v2_fix_dashboard_atendimento.sql` | bug B5 — ver acima |
 
 **Frontend:**
