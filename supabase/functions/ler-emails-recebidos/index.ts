@@ -6,6 +6,7 @@ import {
 import {
   assuntoConfirmacao, ehDeUmaDasNossasCaixas, htmlConfirmacao, resolverEnderecoDestino, semSufixo,
 } from './rotas.ts';
+import { caminhoDoAnexo, extrairAnexos, selecionarAnexos, type AnexoEmail } from './anexos.ts';
 
 /**
  * Lê as caixas e registra em `email_recebidos` o que interessa:
@@ -46,6 +47,8 @@ const MAX_TENTATIVAS = 5;
 const LOTE = 50;
 /** no máximo 1 aviso de abertura por remetente nesse intervalo: dois robôs não conversam */
 const AVISO_A_CADA_MIN = 15;
+/** o mesmo bucket dos anexos que a equipe sobe no ticket; a tela abre de lá */
+const BUCKET_ANEXOS = 'ticket-attachments';
 
 interface Resultado {
   conta: string;
@@ -285,11 +288,19 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const bruto = await imap.mensagem(uid);
-        const texto = cortarCitacao(extrairTexto(bruto)).slice(0, MAX_CORPO);
+        const { texto: brutoTexto, binario } = await imap.mensagemCompleta(uid);
+        const texto = cortarCitacao(extrairTexto(brutoTexto)).slice(0, MAX_CORPO);
         const assunto = decodificarCabecalho(cab['subject'] ?? '').replace(/\s*\[#[A-HJ-NP-Z2-9]{10}\]\s*$/i, '');
         const recebidoEm = cab['date'] ? new Date(cab['date']) : new Date();
         const agora = new Date().toISOString();
+        // sem Message-ID a trava de repetição precisa de outra chave estável
+        const messageId = cab['message-id'] || `<imap-${caixa.uidValidity}-${uid}@${conta.id}>`;
+
+        // Anexos sobem ANTES de gravar o e-mail, num caminho fixo por mensagem:
+        // se algo cair no meio, a próxima leitura regrava o mesmo arquivo.
+        // Quando o e-mail é ligado a um ticket, o banco coloca os anexos nele.
+        const { aceitos, ignorados } = selecionarAnexos(extrairAnexos(binario));
+        const anexos = await guardarAnexos(supabase, conta.tenant_id, `${conta.id}|${messageId}`, aceitos, ignorados);
 
         const { data: novo, error: erroInsert } = await supabase
           .from('email_recebidos')
@@ -300,8 +311,7 @@ Deno.serve(async (req) => {
             cliente_id: clienteId,
             referencia_id: envio?.referencia_id ?? null,
             origem: envio?.origem ?? null,
-            // sem Message-ID a trava de repetição precisa de outra chave estável
-            message_id: cab['message-id'] || `<imap-${caixa.uidValidity}-${uid}@${conta.id}>`,
+            message_id: messageId,
             imap_uid: uid,
             de_email: de.email,
             de_nome: de.nome || null,
@@ -313,6 +323,8 @@ Deno.serve(async (req) => {
             endereco_destino: destino,
             acao,
             processado_em: acao === 'registrado' ? agora : null,
+            anexos,
+            anexos_ignorados: ignorados,
           })
           .select('id')
           .maybeSingle();
@@ -382,6 +394,30 @@ Deno.serve(async (req) => {
     avisos_enviados: avisos,
   });
 });
+
+/** sobe os anexos aceitos; a falha de um arquivo vira ignorado com motivo e não derruba os outros */
+async function guardarAnexos(
+  supabase: SupabaseClient,
+  tenantId: string,
+  chaveDaMensagem: string,
+  aceitos: AnexoEmail[],
+  ignorados: string[],
+): Promise<{ nome: string; mime: string; tamanho: number; caminho: string }[]> {
+  const guardados: { nome: string; mime: string; tamanho: number; caminho: string }[] = [];
+  for (const [i, anexo] of aceitos.entries()) {
+    const caminho = await caminhoDoAnexo(tenantId, chaveDaMensagem, i, anexo.nome);
+    const { error } = await supabase.storage
+      .from(BUCKET_ANEXOS)
+      .upload(caminho, anexo.bytes, { contentType: anexo.mime, upsert: true });
+    if (error) {
+      ignorados.push(`${anexo.nome} (não foi guardado: ${error.message})`);
+      console.error(`[ler-emails-recebidos] anexo ${anexo.nome} não subiu: ${error.message}`);
+      continue;
+    }
+    guardados.push({ nome: anexo.nome, mime: anexo.mime, tamanho: anexo.bytes.length, caminho });
+  }
+  return guardados;
+}
 
 /** processa as linhas novas e as pendentes/erro das últimas 48h, até 5 tentativas cada */
 async function processarFila(supabase: SupabaseClient, tenants: string[], novos: string[]) {

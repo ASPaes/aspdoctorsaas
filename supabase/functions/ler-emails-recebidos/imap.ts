@@ -164,6 +164,17 @@ export class ClienteImap {
     return separarFetch(bruto)[0]?.cabecalho ?? "";
   }
 
+  /**
+   * A mesma mensagem nas duas formas, com um download só: texto (UTF-8, para
+   * extrairTexto) e binário (1 caractere por byte, para os anexos, cujos bytes
+   * não sobrevivem à conversão para UTF-8).
+   */
+  async mensagemCompleta(uid: number): Promise<{ texto: string; binario: string }> {
+    const bruto = await this.comando(`UID FETCH ${uid} (BODY.PEEK[])`);
+    const binario = separarFetch(bruto, true)[0]?.cabecalho ?? "";
+    return { texto: binarioParaTexto(binario), binario };
+  }
+
   async encerrar(): Promise<void> {
     try {
       await this.comando("LOGOUT");
@@ -186,7 +197,7 @@ export class ClienteImap {
  * O UID pode vir antes ou depois do literal; a ordem dos itens é do servidor,
  * que não precisa seguir a ordem pedida.
  */
-export function separarFetch(bruto: string): { uid: number; cabecalho: string }[] {
+export function separarFetch(bruto: string, manterBinario = false): { uid: number; cabecalho: string }[] {
   const saida: { uid: number; cabecalho: string }[] = [];
   const re = /\* \d+ FETCH \(/g;
   let m: RegExpExecArray | null;
@@ -206,7 +217,8 @@ export function separarFetch(bruto: string): { uid: number; cabecalho: string }[
     if (fimItem < 0) fimItem = bruto.length;
     const resto = bruto.slice(fimConteudo, fimItem);
     const uid = Number(`${linha} ${resto}`.match(/\bUID (\d+)/)?.[1] ?? 0);
-    saida.push({ uid, cabecalho: binarioParaTexto(bruto.slice(inicio, fimConteudo)) });
+    const conteudo = bruto.slice(inicio, fimConteudo);
+    saida.push({ uid, cabecalho: manterBinario ? conteudo : binarioParaTexto(conteudo) });
     re.lastIndex = fimItem;
   }
   return saida;

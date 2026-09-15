@@ -134,11 +134,13 @@ function TicketAttachments({
   // A regra é repetida na edge function — aqui é só o que a UI mostra.
   const canDeleteAny =
     profile?.is_super_admin === true || profile?.role === "admin" || profile?.role === "head";
-  const canDelete = (att: { uploaded_by: string }) => canDeleteAny || att.uploaded_by === user?.id;
+  // anexo que veio no e-mail do cliente não tem autor: só quem pode excluir qualquer um exclui
+  const canDelete = (att: { uploaded_by: string | null }) =>
+    canDeleteAny || (!!att.uploaded_by && att.uploaded_by === user?.id);
 
   // Mesma regra do excluir, de propósito: duas permissões diferentes na mesma lista
   // seriam duas explicações para o operador. É trava de tela — o RLS libera por tenant.
-  const canEditTitle = (att: { uploaded_by: string }) => isOnboarding && canDelete(att);
+  const canEditTitle = (att: { uploaded_by: string | null }) => isOnboarding && canDelete(att);
 
   const handlePreview = async (att: any) => {
     try {
@@ -189,15 +191,19 @@ function TicketAttachments({
       return (data ?? []) as Array<{
         id: string; file_name: string; file_path: string;
         file_size: number | null; file_type: string | null;
-        uploaded_by: string; created_at: string; title: string | null;
+        uploaded_by: string | null; created_at: string; title: string | null;
       }>;
     },
   });
 
   // Só o onboarding exibe autoria — no Suporte a consulta nem sai.
-  const autorIds = isOnboarding ? attachments.map((a) => a.uploaded_by) : [];
+  const autorIds = isOnboarding
+    ? attachments.map((a) => a.uploaded_by).filter((id): id is string => !!id)
+    : [];
   const { data: nomes = {} } = useUserNames(autorIds);
-  const autorDe = (att: { uploaded_by: string }) => nomes[att.uploaded_by] ?? "Usuário";
+  // sem autor = veio anexado no e-mail do cliente (ler-emails-recebidos, 14/09/2026)
+  const autorDe = (att: { uploaded_by: string | null }) =>
+    !att.uploaded_by ? "Cliente por e-mail" : (nomes[att.uploaded_by] ?? "Usuário");
 
   // Busca só existe no onboarding, e só aparece quando há o que procurar.
   const mostrarBusca = isOnboarding && attachments.length >= 2;

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import {
-  ChevronLeft, ChevronRight, Inbox, Loader2, Lock, Mail, RefreshCw, RotateCcw, Search, Trash2,
+  ChevronLeft, ChevronRight, Inbox, Loader2, Lock, Mail, Paperclip, RefreshCw, RotateCcw, Search, Trash2,
 } from "lucide-react";
 import { subDays } from "date-fns";
 import { toast } from "sonner";
@@ -384,6 +384,29 @@ export default function EmailsRecebidosTab() {
                     </TableCell>
                     <TableCell className="align-top">
                       <span className="font-medium">{linha.assunto || "(sem assunto)"}</span>
+                      {((linha.anexos?.length ?? 0) > 0 || (linha.anexos_ignorados?.length ?? 0) > 0) && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="ml-1.5 inline-flex items-center gap-0.5 align-middle text-xs text-muted-foreground tabular-nums">
+                                <Paperclip className="h-3 w-3" />
+                                {linha.anexos?.length ?? 0}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs space-y-1 text-xs">
+                              {(linha.anexos ?? []).map((a) => (
+                                <p key={a.caminho}>{a.nome}</p>
+                              ))}
+                              {(linha.anexos_ignorados?.length ?? 0) > 0 && (
+                                <p className="text-muted-foreground">Não guardados: {linha.anexos_ignorados!.join("; ")}</p>
+                              )}
+                              {(linha.anexos?.length ?? 0) > 0 && !linha.ticket_id && (
+                                <p className="text-muted-foreground">Entram no ticket quando ele for aberto.</p>
+                              )}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                       {linha.corpo_texto && (
                         <span className="mt-0.5 block max-w-[420px] truncate text-[11.5px] text-muted-foreground">
                           {linha.corpo_texto.replace(/\s+/g, " ").slice(0, 140)}
