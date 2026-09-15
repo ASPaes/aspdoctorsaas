@@ -93,6 +93,7 @@ Deno.serve(async (req) => {
   let tenantId: string;
   let enviadoPor: string | null = null;
   let chamadaInterna = false;
+  let superAdmin = false;
 
   // chave de service_role em formato novo (sb_secret_…) não é JWT: compara direto
   if (papelDoToken(token) === 'service_role' || token === serviceKey) {
@@ -124,6 +125,7 @@ Deno.serve(async (req) => {
       ['active', 'ativo'].includes(profile.access_status || '') &&
       ['ativo', 'active'].includes(profile.status || 'ativo');
     const isSuperAdmin = profile.is_super_admin === true;
+    superAdmin = isSuperAdmin;
     const pedido = typeof body.tenant_id === 'string' ? body.tenant_id : null;
 
     if (isSuperAdmin && pedido && UUID.test(pedido)) {
@@ -183,11 +185,13 @@ Deno.serve(async (req) => {
     return json(409, { error: `A conta ${conta.email} está inativa.` });
   }
 
-  // Envio pelo chat: a pessoa só escolhe entre as contas ligadas a ela, direto
-  // ou pelo setor; sem nenhuma ligada, qualquer ativa do tenant (regra do
-  // Alexandre, 10/09/2026: "o servidor confere a escolha, não é só a tela").
-  // As outras origens (teste de conta, resumo automático) seguem como antes.
-  if (origem === 'chat' && enviadoPor && !chamadaInterna) {
+  // Envio pelo chat: a conta tem de estar ligada a quem envia, direto ou por
+  // algum setor dele. Sem ligação nenhuma, não envia (regra do Alexandre,
+  // 15/09/2026, que substitui o "sem ligada, qualquer ativa" de 10/09; "todos
+  // os setores" é a conta ligada a cada setor). O servidor confere, não só a
+  // tela. As outras origens (teste de conta, resumo automático) seguem como antes.
+  // super admin é bypass: não é membro dos setores do tenant que está simulando
+  if (origem === 'chat' && enviadoPor && !chamadaInterna && !superAdmin) {
     const [ativas, doUsuario, membros] = await Promise.all([
       supabase.from('email_accounts').select('id').eq('tenant_id', tenantId).eq('ativo', true),
       supabase.from('email_account_usuarios').select('account_id').eq('tenant_id', tenantId).eq('user_id', enviadoPor),
@@ -201,9 +205,11 @@ Deno.serve(async (req) => {
     const ligadas = new Set(
       [...(doUsuario.data ?? []), ...(doSetor ?? [])].map((l) => l.account_id).filter((id) => idsAtivas.has(id)),
     );
-    if (ligadas.size > 0 && !ligadas.has(conta.id)) {
+    if (!ligadas.has(conta.id)) {
       return json(403, {
-        error: `A conta ${conta.email} não está liberada para você. Escolha uma das contas ligadas ao seu usuário ou setor.`,
+        error: ligadas.size > 0
+          ? `A conta ${conta.email} não está liberada para você. Escolha uma das contas ligadas ao seu usuário ou setor.`
+          : 'Nenhuma conta de e-mail está liberada para você ou para o seu setor. Peça ao administrador da empresa ou ao responsável pelo setor para configurar.',
       });
     }
   }

@@ -45,11 +45,12 @@ export function useAbrirEnvioEmail(conversation: ConversationWithContact) {
     if (verificando) return;
     const tenantId = conversation.tenant_id;
     const userId = user?.id ?? null;
+    const superAdmin = profile?.is_super_admin === true;
     setVerificando(true);
     try {
       const r = await queryClient.fetchQuery({
-        queryKey: chaveContasDeEnvio(tenantId, userId),
-        queryFn: () => buscarContasDeEnvio(tenantId, userId),
+        queryKey: chaveContasDeEnvio(tenantId, userId, superAdmin),
+        queryFn: () => buscarContasDeEnvio(tenantId, userId, superAdmin),
         staleTime: 60_000,
       });
       if (r.contas.length === 0) setSemConta(true);

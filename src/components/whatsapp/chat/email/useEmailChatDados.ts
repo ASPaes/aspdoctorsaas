@@ -13,28 +13,32 @@ export interface ContaDeEnvio {
 }
 
 /**
- * Contas que aparecem no Remetente (regra do Alexandre, 10/09/2026):
- * as ligadas a quem envia, direto (`email_account_usuarios`) ou pelo setor
- * (`support_department_members` → `email_account_setores`). Nenhuma ligada:
- * todas as ativas do tenant. O setor do ASSUNTO não libera conta sozinho.
+ * Contas que aparecem no Remetente (regra do Alexandre, 15/09/2026, que
+ * substitui a de 10/09): só as ligadas a quem envia, direto
+ * (`email_account_usuarios`) ou por algum setor dele (`support_department_members`
+ * → `email_account_setores`). "Todos os setores" é a conta ligada a cada setor.
+ * Nenhuma ligada: lista vazia, e o botão mostra o aviso em vez de abrir a tela.
+ * Super admin é bypass (convenção do projeto): vê todas as ativas do tenant que
+ * está simulando, porque não é membro dos setores dele.
+ * O setor do ASSUNTO não libera conta sozinho. A send-email confere o mesmo.
  *
  * O tenant vem da conversa, não do filtro global: com o super admin em "Todos"
  * o filtro é null e a lista sairia vazia.
  */
-export const chaveContasDeEnvio = (tenantId: string | null, userId: string | null) =>
-  ["email-chat-contas", tenantId, userId] as const;
+export const chaveContasDeEnvio = (tenantId: string | null, userId: string | null, superAdmin: boolean) =>
+  ["email-chat-contas", tenantId, userId, superAdmin] as const;
 
-export function useContasDeEnvio(tenantId: string | null, userId: string | null, enabled: boolean) {
+export function useContasDeEnvio(tenantId: string | null, userId: string | null, superAdmin: boolean, enabled: boolean) {
   return useQuery({
-    queryKey: chaveContasDeEnvio(tenantId, userId),
+    queryKey: chaveContasDeEnvio(tenantId, userId, superAdmin),
     enabled: enabled && !!tenantId && !!userId,
     staleTime: 60_000,
-    queryFn: () => buscarContasDeEnvio(tenantId, userId),
+    queryFn: () => buscarContasDeEnvio(tenantId, userId, superAdmin),
   });
 }
 
 /** separada do hook para o botão conferir no clique, antes de abrir a tela */
-export async function buscarContasDeEnvio(tenantId: string | null, userId: string | null) {
+export async function buscarContasDeEnvio(tenantId: string | null, userId: string | null, superAdmin: boolean) {
       const [contas, setores, usuarios, membros] = await Promise.all([
         (supabase.from("email_accounts" as any) as any)
           .select("id, rotulo, email, from_name, is_default")
@@ -59,8 +63,8 @@ export async function buscarContasDeEnvio(tenantId: string | null, userId: strin
         ...((setores.data ?? []) as any[]).filter((s) => meusSetores.has(s.setor_id)).map((s) => s.account_id),
       ]);
 
-      const ligadas = todas.filter((c) => ligadasIds.has(c.id));
-      return { contas: ligadas.length > 0 ? ligadas : todas, soAsLigadas: ligadas.length > 0 };
+      if (superAdmin) return { contas: todas };
+      return { contas: todas.filter((c) => ligadasIds.has(c.id)) };
 }
 
 export interface SugestaoEmail {

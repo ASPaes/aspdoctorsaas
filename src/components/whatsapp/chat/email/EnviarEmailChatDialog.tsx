@@ -41,8 +41,8 @@ interface Props {
  * atendimento e Formal. Enviar vai pela `send-email` com origem 'chat'.
  */
 export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Props) {
-  const { user } = useAuth();
-  const contasQuery = useContasDeEnvio(conversation.tenant_id, user?.id ?? null, open);
+  const { user, profile } = useAuth();
+  const contasQuery = useContasDeEnvio(conversation.tenant_id, user?.id ?? null, profile?.is_super_admin === true, open);
   const clienteQuery = useClienteDoEmail(conversation, open);
 
   const [opcoes, setOpcoes] = useState<OpcoesGeracao>(OPCOES_PADRAO);
