@@ -7,7 +7,9 @@ import {
   normalizarQuantidade,
   OPCOES_PADRAO,
   separarEmails,
-  textoParaHtml,
+  htmlParaEmail,
+  normalizarUrl,
+  textoParaParagrafos,
   type OpcoesGeracao,
 } from "./travaEnvioEmail";
 
@@ -37,17 +39,42 @@ describe("referência no assunto", () => {
   });
 });
 
-describe("textoParaHtml", () => {
-  it("parágrafo por linha em branco, <br> por quebra simples", () => {
-    const html = textoParaHtml("Prezados,\n\nLinha 1\nLinha 2\n\n\nAtenciosamente,\nVinicius");
-    expect(html).toContain('<p style="margin:0 0 12px">Prezados,</p>');
-    expect(html).toContain("Linha 1<br>Linha 2");
-    expect(html).toContain("Atenciosamente,<br>Vinicius");
-    expect(html.match(/<p /g)).toHaveLength(3);
+describe("textoParaParagrafos", () => {
+  it("parágrafo por linha em branco, <br> por quebra simples, lista por •", () => {
+    expect(textoParaParagrafos("Prezados,\n\nEscopo:\n• Cardápio\n• Usuários\n\n\nAtenciosamente,\nVinicius")).toBe(
+      "<p>Prezados,</p><p>Escopo:</p><ul><li><p>Cardápio</p></li><li><p>Usuários</p></li></ul><p>Atenciosamente,<br>Vinicius</p>",
+    );
   });
 
   it("escapa o que parece marcação", () => {
-    expect(textoParaHtml('<script>x</script> & "a"')).toContain("&lt;script&gt;x&lt;/script&gt; &amp; &quot;a&quot;");
+    expect(textoParaParagrafos('<script>x</script> & "a"')).toBe("<p>&lt;script&gt;x&lt;/script&gt; &amp; &quot;a&quot;</p>");
+  });
+
+  it("vazio", () => {
+    expect(textoParaParagrafos("")).toBe("");
+  });
+});
+
+describe("htmlParaEmail", () => {
+  it("margens inline, parágrafo vazio visível e item de lista sem folga", () => {
+    const html = htmlParaEmail("<p>Olá</p><p></p><ul><li><p>A</p></li></ul>");
+    expect(html.startsWith('<div style="font-family:Arial')).toBe(true);
+    expect(html).toContain('<p style="margin:0 0 12px;">Olá</p>');
+    expect(html).toContain('<p style="margin:0 0 12px;"><br></p>');
+    expect(html).toContain('<ul style="margin:0 0 12px;padding-left:22px"><li><p style="margin:0;">A</p></li></ul>');
+  });
+
+  it("mantém o alinhamento que veio do editor", () => {
+    expect(htmlParaEmail('<p style="text-align: center">X</p>')).toContain('<p style="margin:0 0 12px;text-align: center">X</p>');
+  });
+});
+
+describe("normalizarUrl", () => {
+  it("completa protocolo, reconhece e-mail e respeita o que já veio certo", () => {
+    expect(normalizarUrl(" ajuda.gulamenu.com.br/manual ")).toBe("https://ajuda.gulamenu.com.br/manual");
+    expect(normalizarUrl("http://x.com")).toBe("http://x.com");
+    expect(normalizarUrl("suporte@digioffice.com.br")).toBe("mailto:suporte@digioffice.com.br");
+    expect(normalizarUrl("")).toBe("");
   });
 });
 

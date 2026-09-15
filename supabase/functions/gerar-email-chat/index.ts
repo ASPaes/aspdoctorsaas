@@ -16,6 +16,10 @@ import { callAI, getAIConfig } from '../_shared/ai-client.ts';
  * pessoa ainda pode escrever o texto à mão.
  *
  * A assinatura NÃO entra no texto: a `send-email` aplica a da conta remetente.
+ *
+ * Modo "corrigir" (15/09/2026, botão Ortografia do editor): recebe o HTML do
+ * corpo e devolve o mesmo HTML com ortografia e gramática corrigidas, sem mexer
+ * nas tags. Passa pelo mesmo teto de gasto e registra custo igual.
  */
 
 const corsHeaders = {
@@ -36,6 +40,7 @@ const QUANTIDADE_MAXIMA = 10;
 const MSGS_ULTIMO = 150;
 const MSGS_POR_ATENDIMENTO_RESUMO = 40;
 const MAX_CHARS_MSG = 700;
+const MAX_HTML_CORRIGIR = 40_000;
 
 const TONS: Record<string, string> = {
   formal: 'Formal: tratamento respeitoso ("Prezados"), frases completas, sem gírias nem exclamações.',
@@ -105,6 +110,56 @@ function lerResposta(bruto: string): { assunto: string; corpo: string } | null {
   }
 }
 
+/** traduz a falha do provedor para uma frase que a pessoa entende */
+function falhaDaIa(e: unknown): Response {
+  const msg = e instanceof Error ? e.message : String(e);
+  console.error(`[gerar-email-chat] erro da IA: ${msg}`);
+  if (msg.includes('401') || msg.includes('invalid_api_key')) {
+    return falha('ia_chave_invalida', 'A chave da IA foi recusada pelo provedor. Um administrador precisa conferir em Configurações › Inteligência Artificial.');
+  }
+  if (msg.includes('429') || msg.includes('quota')) {
+    return falha('ia_limite_provedor', 'O provedor de IA recusou por limite ou créditos esgotados. Tente de novo em alguns minutos.');
+  }
+  return falha('ia_erro', 'A IA não respondeu. Tente de novo em alguns instantes.');
+}
+
+/** o custo já aconteceu: registra mesmo que a resposta venha ruim */
+async function registrarCusto(
+  supabase: any,
+  tenantId: string,
+  aiConfig: { model: string; provider: string },
+  usage: { inputTokens: number; outputTokens: number; estimatedCostUsd: number },
+) {
+  const { error } = await supabase.from('ai_usage_log').insert({
+    tenant_id: tenantId,
+    function_name: 'gerar-email-chat',
+    input_tokens: usage.inputTokens,
+    output_tokens: usage.outputTokens,
+    model: aiConfig.model,
+    provider: aiConfig.provider,
+    estimated_cost_usd: usage.estimatedCostUsd,
+  });
+  if (error) console.error(`[gerar-email-chat] custo não registrado: ${error.message}`);
+}
+
+/** resposta do modo corrigir: JSON {html} (função ou texto), ou o HTML cru */
+function lerHtmlCorrigido(bruto: string): string | null {
+  const s = (bruto || '').trim().replace(/^```(?:json|html)?/i, '').replace(/```$/i, '').trim();
+  let html = '';
+  const a = s.indexOf('{');
+  const b = s.lastIndexOf('}');
+  if (a >= 0 && b > a) {
+    try {
+      html = String(JSON.parse(s.slice(a, b + 1))?.html ?? '');
+    } catch {
+      // não era JSON: tenta o HTML cru abaixo
+    }
+  }
+  if (!html && /^<(p|ul|ol|blockquote)[\s>]/i.test(s)) html = s;
+  html = html.replace(/<script[\s\S]*?<\/script>/gi, '').trim();
+  return html && html.length <= 60_000 ? html : null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -126,6 +181,12 @@ Deno.serve(async (req) => {
     ? Math.max(1, Math.min(QUANTIDADE_MAXIMA, Math.trunc(Number(body.quantidade)) || 1))
     : 1;
   const tom = typeof body.tom === 'string' && TONS[body.tom] ? body.tom : 'formal';
+  const modo = body.modo === 'corrigir' ? 'corrigir' : 'gerar';
+  const htmlParaCorrigir = typeof body.html === 'string' ? body.html.trim() : '';
+  if (modo === 'corrigir' && !htmlParaCorrigir) return falha('corpo_invalido', 'Não há texto para corrigir.', 400);
+  if (htmlParaCorrigir.length > MAX_HTML_CORRIGIR) {
+    return falha('corpo_invalido', 'O texto é grande demais para corrigir de uma vez.', 400);
+  }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -177,6 +238,50 @@ Deno.serve(async (req) => {
   const aiConfig = await getAIConfig(tenantId, supabase);
   if (!aiConfig) {
     return falha('ia_nao_configurada', 'Nenhuma IA configurada. Um administrador pode configurar em Configurações › Inteligência Artificial.');
+  }
+
+  // ── modo corrigir: só revisa o corpo que está no editor ──
+  if (modo === 'corrigir') {
+    const ferramentaCorrigir = [
+      {
+        type: 'function',
+        function: {
+          name: 'devolver_texto_corrigido',
+          description: 'Devolve o mesmo e-mail em HTML, com ortografia e gramática corrigidas.',
+          parameters: {
+            type: 'object',
+            properties: {
+              html: { type: 'string', description: 'O HTML completo, com as mesmas tags e atributos, só com o texto corrigido.' },
+            },
+            required: ['html'],
+          },
+        },
+      },
+    ];
+    const sistemaCorrigir = `Você revisa e-mails em português do Brasil.
+
+Corrija ortografia, acentuação, concordância, crase e pontuação. Mantenha o mesmo conteúdo, a mesma ordem, o mesmo tom e o mesmo significado: não acrescente, não resuma e não remova frases.
+
+O texto vem em HTML. Preserve todas as tags e atributos exatamente como estão (parágrafos, negrito, listas, links, cores, alinhamento); altere só as palavras entre as tags. Não use travessão (—).
+
+Responda chamando a função devolver_texto_corrigido. Se não puder usar a função, responda apenas com JSON {"html": "..."}.`;
+
+    let aiCorrecao;
+    try {
+      aiCorrecao = await callAI({ ...aiConfig, systemPrompt: null }, [
+        { role: 'system', content: sistemaCorrigir },
+        { role: 'user', content: htmlParaCorrigir },
+      ], ferramentaCorrigir, { maxTokens: 6000 });
+    } catch (e) {
+      return falhaDaIa(e);
+    }
+    await registrarCusto(supabase, tenantId, aiConfig, aiCorrecao.usage);
+
+    const htmlCorrigido = lerHtmlCorrigido(aiCorrecao.content);
+    if (!htmlCorrigido) {
+      return falha('resposta_invalida', 'A IA devolveu o texto fora do formato. Tente corrigir de novo.');
+    }
+    return json(200, { ok: true, html: htmlCorrigido });
   }
 
   // ── o que a IA vai ler ──
@@ -294,28 +399,10 @@ Responda chamando a função escrever_email. Se não puder usar a função, resp
       { role: 'user', content: pedido },
     ], FERRAMENTA, { maxTokens: 1500 });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(`[gerar-email-chat] erro da IA: ${msg}`);
-    if (msg.includes('401') || msg.includes('invalid_api_key')) {
-      return falha('ia_chave_invalida', 'A chave da IA foi recusada pelo provedor. Um administrador precisa conferir em Configurações › Inteligência Artificial.');
-    }
-    if (msg.includes('429') || msg.includes('quota')) {
-      return falha('ia_limite_provedor', 'O provedor de IA recusou por limite ou créditos esgotados. Tente de novo em alguns minutos.');
-    }
-    return falha('ia_erro', 'A IA não respondeu. Tente de novo em alguns instantes.');
+    return falhaDaIa(e);
   }
 
-  // o custo já aconteceu: registra mesmo que a resposta venha ruim
-  const { error: logErr } = await supabase.from('ai_usage_log').insert({
-    tenant_id: tenantId,
-    function_name: 'gerar-email-chat',
-    input_tokens: ai.usage.inputTokens,
-    output_tokens: ai.usage.outputTokens,
-    model: aiConfig.model,
-    provider: aiConfig.provider,
-    estimated_cost_usd: ai.usage.estimatedCostUsd,
-  });
-  if (logErr) console.error(`[gerar-email-chat] custo não registrado: ${logErr.message}`);
+  await registrarCusto(supabase, tenantId, aiConfig, ai.usage);
 
   const email = lerResposta(ai.content);
   if (!email) return falha('resposta_invalida', 'A IA devolveu um texto fora do formato. Clique em Gerar novo para tentar de novo.');

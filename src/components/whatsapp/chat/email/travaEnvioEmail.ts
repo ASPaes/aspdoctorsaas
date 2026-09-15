@@ -85,19 +85,73 @@ export function assuntoComReferencia(assunto: string, referencia: string | null)
 const escaparHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
+const ITEM_DE_LISTA = /^\s*[•\-*]\s+(.*)$/;
+
 /**
- * Corpo digitado na tela vira HTML simples: linha em branco separa parágrafo,
- * quebra simples vira <br>. Tudo escapado, então o que a pessoa (ou a IA)
- * escreveu nunca vira marcação. A versão em texto puro sai do próprio corpo.
+ * Texto da IA (texto simples) vira o HTML que o editor entende: linha em branco
+ * separa parágrafo, quebra simples vira <br>, e linhas seguidas começando com
+ * "• " (ou "- ") viram lista. Tudo escapado: o que veio da IA nunca vira marcação.
  */
-export function textoParaHtml(texto: string): string {
-  const paragrafos = texto
+export function textoParaParagrafos(texto: string): string {
+  const blocos = (texto || "")
     .replace(/\r\n/g, "\n")
     .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .map((p) => `<p style="margin:0 0 12px">${p.split("\n").map(escaparHtml).join("<br>")}</p>`);
-  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1E293B">${paragrafos.join("")}</div>`;
+    .map((b) => b.trim())
+    .filter(Boolean);
+
+  return blocos
+    .map((bloco) => {
+      const partes: string[] = [];
+      let linhas: string[] = [];
+      let itens: string[] = [];
+      const fecharLinhas = () => {
+        if (linhas.length) partes.push(`<p>${linhas.map(escaparHtml).join("<br>")}</p>`);
+        linhas = [];
+      };
+      const fecharItens = () => {
+        if (itens.length) partes.push(`<ul>${itens.map((i) => `<li><p>${escaparHtml(i)}</p></li>`).join("")}</ul>`);
+        itens = [];
+      };
+      for (const linha of bloco.split("\n")) {
+        const item = ITEM_DE_LISTA.exec(linha);
+        if (item) {
+          fecharLinhas();
+          itens.push(item[1].trim());
+        } else {
+          fecharItens();
+          linhas.push(linha.trim());
+        }
+      }
+      fecharLinhas();
+      fecharItens();
+      return partes.join("");
+    })
+    .join("");
+}
+
+/**
+ * HTML do editor pronto para cliente de e-mail: margens inline (Outlook e Gmail
+ * ignoram CSS de fora), parágrafo vazio com <br> para não sumir, e a fonte
+ * padrão no contêiner. Fonte, tamanho, cor e alinhamento já saem inline do editor.
+ */
+export function htmlParaEmail(htmlEditor: string): string {
+  const corpo = (htmlEditor || "")
+    .replace(/<p><\/p>/g, "<p><br></p>")
+    .replace(/<p(?:\s+style="([^"]*)")?>/g, (_m, estilo?: string) => `<p style="margin:0 0 12px;${estilo ?? ""}">`)
+    .replace(/<li><p style="margin:0 0 12px;/g, '<li><p style="margin:0;')
+    .replace(/<ul>/g, '<ul style="margin:0 0 12px;padding-left:22px">')
+    .replace(/<ol>/g, '<ol style="margin:0 0 12px;padding-left:22px">')
+    .replace(/<blockquote>/g, '<blockquote style="margin:0 0 12px;padding-left:12px;border-left:3px solid #CBD5E1;color:#475569">');
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1E293B">${corpo}</div>`;
+}
+
+/** endereço digitado no botão de link: completa o protocolo; e-mail vira mailto */
+export function normalizarUrl(bruto: string): string {
+  const u = (bruto || "").trim();
+  if (!u) return "";
+  if (/^(https?:|mailto:|tel:)/i.test(u)) return u;
+  if (/^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/.test(u)) return `mailto:${u}`;
+  return `https://${u.replace(/^\/+/, "")}`;
 }
 
 /**

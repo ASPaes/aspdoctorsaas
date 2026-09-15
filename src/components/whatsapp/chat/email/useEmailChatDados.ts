@@ -210,6 +210,28 @@ export async function enviarEmailChat(input: {
     : { ok: false, mensagem: r?.mensagem || r?.error || "O e-mail não foi enviado." };
 }
 
+export type ResultadoCorrecao = { ok: true; html: string } | { ok: false; mensagem: string };
+
+/**
+ * "Corrigir gramática do texto": a mesma `gerar-email-chat`, no modo corrigir.
+ * Manda o HTML do editor para a formatação voltar intacta, e passa pelo mesmo
+ * teto de gasto de IA da geração.
+ */
+export async function corrigirEmailChat(input: { conversation_id: string; html: string }): Promise<ResultadoCorrecao> {
+  const { data, error } = await supabase.functions.invoke("gerar-email-chat", { body: { ...input, modo: "corrigir" } });
+  if (error) {
+    let mensagem = error.message || "Falha ao falar com o servidor.";
+    try {
+      const corpo = await (error as any)?.context?.json?.();
+      if (corpo?.mensagem || corpo?.error) mensagem = String(corpo.mensagem || corpo.error);
+    } catch {
+      // corpo não era JSON
+    }
+    return { ok: false, mensagem };
+  }
+  return data as ResultadoCorrecao;
+}
+
 export type ResultadoGeracao =
   | { ok: true; assunto: string; corpo: string }
   | { ok: false; mensagem: string };

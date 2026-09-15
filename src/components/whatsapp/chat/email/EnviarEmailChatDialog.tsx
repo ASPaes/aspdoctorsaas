@@ -5,14 +5,21 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ConversationWithContact } from "../../hooks/useWhatsAppConversations";
-import { enviarEmailChat, gerarEmailChat, useClienteDoEmail, useContasDeEnvio, type SugestaoEmail } from "./useEmailChatDados";
+import {
+  corrigirEmailChat,
+  enviarEmailChat,
+  gerarEmailChat,
+  useClienteDoEmail,
+  useContasDeEnvio,
+  type SugestaoEmail,
+} from "./useEmailChatDados";
+import { EditorEmail } from "./EditorEmail";
 import {
   assuntoComReferencia,
   referenciaDoAssunto,
@@ -21,7 +28,8 @@ import {
   normalizarQuantidade,
   OPCOES_PADRAO,
   QUANTIDADE_MAXIMA,
-  textoParaHtml,
+  htmlParaEmail,
+  textoParaParagrafos,
   TONS,
   type OpcoesGeracao,
   type TomEmail,
@@ -54,7 +62,13 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
   const [mostrarCc, setMostrarCc] = useState(false);
   const [mostrarCco, setMostrarCco] = useState(false);
   const [assunto, setAssunto] = useState("");
+  /** texto puro do editor: validação e parte text/plain do e-mail */
   const [corpo, setCorpo] = useState("");
+  /** HTML do editor: o que vai no envio */
+  const [corpoHtml, setCorpoHtml] = useState("");
+  /** sobe quando o conteúdo vem de fora (IA gerou ou corrigiu), para o editor aplicar */
+  const [versaoCorpo, setVersaoCorpo] = useState(0);
+  const [corrigindo, setCorrigindo] = useState(false);
   const paraPreenchido = useRef(false);
   const [gerando, setGerando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -77,6 +91,9 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
     setMostrarCco(false);
     setAssunto("");
     setCorpo("");
+    setCorpoHtml("");
+    setVersaoCorpo((v) => v + 1);
+    setCorrigindo(false);
     paraPreenchido.current = false;
     setGerando(false);
     setEnviando(false);
@@ -121,7 +138,9 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
         toast.error(r.mensagem, { duration: 10000 });
         return;
       }
-      setCorpo(r.corpo);
+      // o editor aplica e devolve o texto puro pelo onChange
+      setCorpoHtml(textoParaParagrafos(r.corpo));
+      setVersaoCorpo((v) => v + 1);
       // assunto escrito pela pessoa fica; o que veio da IA é trocado pelo novo
       setAssunto((atual) => (!atual.trim() || atual === assuntoDaIa.current ? r.assunto : atual));
       assuntoDaIa.current = r.assunto;
@@ -141,8 +160,27 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, conversation.id]);
 
+  const corrigir = async () => {
+    if (corrigindo || gerando || enviando || !corpo.trim()) return;
+    setCorrigindo(true);
+    try {
+      const r = await corrigirEmailChat({ conversation_id: conversation.id, html: corpoHtml });
+      if (r.ok === false) {
+        toast.error(r.mensagem, { duration: 10000 });
+        return;
+      }
+      setCorpoHtml(r.html);
+      setVersaoCorpo((v) => v + 1);
+      toast.success("Gramática corrigida. Confira o texto antes de enviar.");
+    } catch (err: any) {
+      toast.error(err?.message || "Não foi possível corrigir o texto.");
+    } finally {
+      setCorrigindo(false);
+    }
+  };
+
   const enviar = async () => {
-    if (enviando || gerando || trava.travado) return;
+    if (enviando || gerando || corrigindo || trava.travado) return;
     const faltando: string[] = [];
     if (!contaId) faltando.push("o remetente");
     if (para.length === 0) faltando.push("pelo menos um destinatário");
@@ -164,7 +202,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
         cco,
         assunto: assuntoComReferencia(assunto, referencia),
         texto: corpo.trim(),
-        html: textoParaHtml(corpo),
+        html: htmlParaEmail(corpoHtml),
         atendimento_id: dados?.atendimentoId ?? null,
         cliente_id: dados?.cliente?.id ?? null,
         department_id: dados?.departmentId ?? null,
@@ -343,7 +381,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
               type="button"
               variant={trava.travado && !gerando ? "default" : "outline"}
               onClick={() => gerar(opcoes)}
-              disabled={gerando}
+              disabled={gerando || corrigindo}
               className={cn(
                 "gap-2",
                 !(trava.travado && !gerando) && "border-primary text-primary hover:text-primary",
@@ -357,15 +395,26 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
 
           <div className="space-y-1.5">
             <Label htmlFor="envio-corpo" className="font-normal text-muted-foreground">Corpo do e-mail</Label>
-            <Textarea
+            <EditorEmail
               id="envio-corpo"
-              value={corpo}
-              onChange={(e) => setCorpo(e.target.value)}
-              disabled={gerando}
-              placeholder={gerando ? "Gerando o texto a partir da conversa..." : ""}
-              className="min-h-[200px] text-sm leading-relaxed"
+              valor={corpoHtml}
+              versao={versaoCorpo}
+              onChange={(c) => {
+                setCorpoHtml(c.html);
+                setCorpo(c.vazio ? "" : c.texto);
+              }}
+              desabilitado={gerando || corrigindo || enviando}
+              placeholder={
+                gerando ? "Gerando o texto a partir da conversa..." : corrigindo ? "Corrigindo a gramática..." : "Escreva o e-mail"
+              }
+              onCorrigirGramatica={corrigir}
+              corrigindo={corrigindo}
+              rodape={
+                <p className="mt-3 mb-1 text-xs text-muted-foreground">
+                  A assinatura da conta remetente entra automaticamente no envio.
+                </p>
+              }
             />
-            <p className="text-xs text-muted-foreground">A assinatura da conta remetente entra automaticamente no envio.</p>
           </div>
         </div>
 
@@ -382,7 +431,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={enviando}>
             Cancelar
           </Button>
-          <Button onClick={enviar} disabled={trava.travado || gerando || enviando} className="gap-2">
+          <Button onClick={enviar} disabled={trava.travado || gerando || enviando || corrigindo} className="gap-2">
             {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             {enviando ? "Enviando..." : "Enviar"}
           </Button>

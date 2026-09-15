@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { MailX } from "lucide-react";
@@ -16,8 +16,12 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import type { ConversationWithContact } from "../../hooks/useWhatsAppConversations";
-import { EnviarEmailChatDialog } from "./EnviarEmailChatDialog";
 import { buscarContasDeEnvio, chaveContasDeEnvio } from "./useEmailChatDados";
+
+// A tela carrega o editor (TipTap/ProseMirror) e o seletor de emoji. Fora do
+// bundle principal: o cabeçalho do chat está em toda conversa, o e-mail não.
+const carregarTela = () => import("./EnviarEmailChatDialog");
+const EnviarEmailChatDialog = lazy(() => carregarTela().then((m) => ({ default: m.EnviarEmailChatDialog })));
 
 /**
  * Botão "Enviar e-mail" do chat (cabeçalho e painel Detalhes).
@@ -34,6 +38,8 @@ export function useAbrirEnvioEmail(conversation: ConversationWithContact) {
   const { can, rbacEnabled } = usePermissions();
 
   const [aberto, setAberto] = useState(false);
+  /** montada depois da 1ª abertura e mantida: fechar e reabrir não baixa de novo */
+  const [jaAbriu, setJaAbriu] = useState(false);
   const [semConta, setSemConta] = useState(false);
   const [verificando, setVerificando] = useState(false);
 
@@ -47,14 +53,20 @@ export function useAbrirEnvioEmail(conversation: ConversationWithContact) {
     const userId = user?.id ?? null;
     const superAdmin = profile?.is_super_admin === true;
     setVerificando(true);
+    // o arquivo da tela começa a baixar junto com a conferência das contas
+    void carregarTela().catch(() => undefined);
     try {
       const r = await queryClient.fetchQuery({
         queryKey: chaveContasDeEnvio(tenantId, userId, superAdmin),
         queryFn: () => buscarContasDeEnvio(tenantId, userId, superAdmin),
         staleTime: 60_000,
       });
-      if (r.contas.length === 0) setSemConta(true);
-      else setAberto(true);
+      if (r.contas.length === 0) {
+        setSemConta(true);
+      } else {
+        setJaAbriu(true);
+        setAberto(true);
+      }
     } catch (err: any) {
       toast.error(err?.message || "Não foi possível conferir as contas de e-mail. Tente de novo.");
     } finally {
@@ -64,7 +76,11 @@ export function useAbrirEnvioEmail(conversation: ConversationWithContact) {
 
   const elementos = (
     <>
-      <EnviarEmailChatDialog open={aberto} onOpenChange={setAberto} conversation={conversation} />
+      {jaAbriu && (
+        <Suspense fallback={null}>
+          <EnviarEmailChatDialog open={aberto} onOpenChange={setAberto} conversation={conversation} />
+        </Suspense>
+      )}
 
       <AlertDialog open={semConta} onOpenChange={setSemConta}>
         <AlertDialogContent className="sm:max-w-md">

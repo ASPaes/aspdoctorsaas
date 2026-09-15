@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 15/09
 
+- 🆕 **Formatação, link, emoji e corretor no e-mail enviado pelo chat** — O corpo do e-mail na tela **Enviar e-mail** ganhou a barra de opções que os programas de e-mail costumam ter: desfazer e refazer, fonte, tamanho, **negrito**, itálico, sublinhado, tachado, cor do texto, alinhamento, listas, citação e remover formatação. Também dá para **inserir link**, **inserir emoji** e usar a **Ortografia**: as palavras erradas aparecem sublinhadas em vermelho enquanto você digita, e a opção **Corrigir gramática do texto** revisa o e-mail inteiro com a IA sem perder a formatação (respeita o limite mensal de gasto com IA). O cliente recebe o e-mail com a formatação igual à da tela.
+
 - ⬆️ **Remetente do e-mail pelo chat respeita o setor de cada pessoa** — Na tela **Enviar e-mail** do chat, o remetente agora mostra só as contas de e-mail ligadas a você ou a um dos seus setores. Antes, quem não tinha conta ligada via todas as contas da empresa. Para liberar uma conta para todos, basta ligá-la a todos os setores em **Configurações › Atendimento › Canais › E-mail**. Sem nenhuma conta ligada, aparece o aviso para procurar o administrador ou o responsável pelo setor.
 
 - ⬆️ **Aviso claro quando não há e-mail configurado para enviar pelo chat** — Antes, o botão **Enviar e-mail** abria a tela, gerava o texto e só então mostrava o remetente bloqueado. Agora a conferência acontece no clique: sem conta de e-mail liberada, a tela nem abre e aparece **E-mail ainda não configurado**, dizendo o que fazer. Quem configura e-mail na empresa ganha o atalho **Abrir configurações de e-mail**; os demais são orientados a pedir ao administrador ou ao responsável pelo setor.
