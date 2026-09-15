@@ -145,6 +145,75 @@ export function htmlParaEmail(htmlEditor: string): string {
   return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1E293B">${corpo}</div>`;
 }
 
+/**
+ * Anexo do e-mail. Espelha `supabase/functions/send-email/anexos.ts`, que
+ * confere de novo no servidor: mudou um, mude o outro.
+ */
+export const ANEXO_MAX_ARQUIVOS = 10;
+/** somados: em base64 o e-mail cresce ~37%, e 18 MB viram ~25 MB, o teto de Gmail e Outlook */
+export const ANEXO_MAX_TOTAL_BYTES = 18 * 1024 * 1024;
+
+const ANEXO_TIPOS = new Set([
+  "application/pdf",
+  "application/xml",
+  "text/xml",
+  "text/csv",
+  "text/plain",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-zip",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.oasis.opendocument.text",
+  "application/vnd.oasis.opendocument.spreadsheet",
+]);
+const ANEXO_PREFIXOS = ["image/", "video/", "audio/"];
+const ANEXO_EXTENSOES = [
+  "pdf", "xml", "csv", "txt", "zip", "doc", "docx", "xls", "xlsx", "odt", "ods",
+  "jpg", "jpeg", "png", "gif", "webp", "heic", "mp4", "mov", "mp3", "ogg", "wav", "m4a",
+];
+
+/** `accept` do seletor de arquivo: filtra a janela, a regra de verdade é anexoPermitido */
+export const ANEXO_ACCEPT = [...ANEXO_EXTENSOES.map((e) => `.${e}`), "image/*", "video/*", "audio/*"].join(",");
+
+export function anexoPermitido(mime: string, nome: string): boolean {
+  const tipo = (mime || "").toLowerCase().split(";")[0].trim();
+  if (tipo === "image/svg+xml" || /\.svg$/i.test(nome)) return false;
+  if (ANEXO_TIPOS.has(tipo) || ANEXO_PREFIXOS.some((p) => tipo.startsWith(p))) return true;
+  if (!tipo || tipo === "application/octet-stream") {
+    return ANEXO_EXTENSOES.includes((nome.split(".").pop() || "").toLowerCase());
+  }
+  return false;
+}
+
+export type TipoVisualizacao = "imagem" | "pdf" | "video" | "audio";
+
+/**
+ * O que abre no olhinho antes de enviar. HEIC e TIFF são imagem, mas o Chrome
+ * não desenha: ficam só com Baixar, em vez de abrir uma prévia quebrada.
+ * Tipo vazio (navegador que não informa) decide pela extensão.
+ */
+export function tipoParaVisualizar(mime: string, nome: string): TipoVisualizacao | null {
+  const tipo = (mime || "").toLowerCase().split(";")[0].trim();
+  const ext = (nome.split(".").pop() || "").toLowerCase();
+  if (/^image\/(heic|heif|tiff)$/.test(tipo) || ["heic", "heif", "tif", "tiff"].includes(ext)) return null;
+  if (tipo === "image/svg+xml") return null;
+  if (tipo.startsWith("image/") || (!tipo && ["jpg", "jpeg", "png", "gif", "webp"].includes(ext))) return "imagem";
+  if (tipo === "application/pdf" || (!tipo && ext === "pdf")) return "pdf";
+  if (tipo.startsWith("video/") || (!tipo && ["mp4", "mov", "webm"].includes(ext))) return "video";
+  if (tipo.startsWith("audio/") || (!tipo && ["mp3", "ogg", "wav", "m4a"].includes(ext))) return "audio";
+  return null;
+}
+
+export function formatarTamanho(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  const mb = (bytes / (1024 * 1024)).toFixed(1).replace(".", ",");
+  return `${mb.endsWith(",0") ? mb.slice(0, -2) : mb} MB`;
+}
+
 /** endereço digitado no botão de link: completa o protocolo; e-mail vira mailto */
 export function normalizarUrl(bruto: string): string {
   const u = (bruto || "").trim();

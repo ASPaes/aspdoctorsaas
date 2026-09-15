@@ -63,6 +63,8 @@ interface Props {
   corrigindo?: boolean;
   /** vai entre o texto e a barra (a frase da assinatura) */
   rodape?: ReactNode;
+  /** botão Anexar, no começo do grupo da direita */
+  acaoAnexar?: ReactNode;
 }
 
 /**
@@ -132,6 +134,7 @@ export function EditorEmail({
   onCorrigirGramatica,
   corrigindo = false,
   rodape,
+  acaoAnexar,
 }: Props) {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -384,6 +387,7 @@ export function EditorEmail({
 
         <div className="ml-auto flex items-center gap-0.5">
           <Divisor />
+          {acaoAnexar}
           {editor && <BotaoLink editor={editor} ativo={!!estado?.link} desabilitado={bloqueado} />}
 
           <BotaoEmoji desabilitado={bloqueado} onEscolher={(emoji) => cmd().insertContent(emoji).run()} />
@@ -436,7 +440,7 @@ type BotaoBarraProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "title"> & 
  * mousedown com preventDefault: clicar na barra não tira a seleção do texto.
  * forwardRef e ...resto: é o que deixa servir de gatilho de menu (asChild).
  */
-const BotaoBarra = forwardRef<HTMLButtonElement, BotaoBarraProps>(function BotaoBarra(
+export const BotaoBarra = forwardRef<HTMLButtonElement, BotaoBarraProps>(function BotaoBarra(
   { titulo, ativo, desabilitado, className, children, onMouseDown, ...resto },
   ref,
 ) {

@@ -95,6 +95,8 @@ export interface MensagemEntrada {
   texto?: string | null;
   /** imagens referenciadas no HTML por cid: (hoje, só a da assinatura) */
   embutidas?: { cid: string; mime: string; nome: string; base64: string }[];
+  /** arquivos anexados: viram multipart/mixed, com o corpo inteiro na 1ª parte */
+  anexos?: { nome: string; mime: string; base64: string }[];
   agora?: Date;
 }
 
@@ -174,5 +176,44 @@ export function montarMensagem(m: MensagemEntrada): MensagemMontada {
     corpo = [parteTexto];
   }
 
+  if (m.anexos && m.anexos.length) {
+    // o corpo (texto, HTML e imagem da assinatura) vira a 1ª parte; cada arquivo, uma parte attachment
+    const mista = `=_dsm_${crypto.randomUUID().replace(/-/g, "")}`;
+    corpo = [
+      `Content-Type: multipart/mixed; boundary="${mista}"`,
+      "",
+      `--${mista}`,
+      ...corpo,
+      ...m.anexos.flatMap((a) => [
+        `--${mista}`,
+        `Content-Type: ${tipoSeguro(a.mime)}; name="${codificarCabecalho(nomeDeArquivo(a.nome)).replace(/\r\n /g, "")}"`,
+        "Content-Transfer-Encoding: base64",
+        `Content-Disposition: attachment; ${parametroFilename(a.nome)}`,
+        "",
+        (a.base64.replace(/\s+/g, "").match(/.{1,76}/g) ?? [""]).join("\r\n"),
+      ]),
+      `--${mista}--`,
+    ];
+  }
+
   return { bruta: [...cabecalhos, ...corpo].join("\r\n"), messageId };
+}
+
+/** tipo que não parece MIME vira octet-stream: nunca deixa texto livre entrar no cabeçalho */
+const tipoSeguro = (mime: string) =>
+  /^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/i.test(mime) ? mime.toLowerCase() : "application/octet-stream";
+
+/** sem quebra, aspas nem barra invertida, e com teto: o nome vai dentro de parâmetro de cabeçalho */
+const nomeDeArquivo = (nome: string) => semQuebra(nome).replace(/["\\]/g, "_").slice(0, 150) || "anexo";
+
+/**
+ * `filename` ASCII vai entre aspas; com acento vai no formato da RFC 2231
+ * (`filename*=UTF-8''...`), que Gmail e Outlook leem. Palavra codificada
+ * (=?UTF-8?B?) em filename não é padrão e alguns clientes mostram crua.
+ */
+export function parametroFilename(nome: string): string {
+  const limpo = nomeDeArquivo(nome);
+  if (soAscii(limpo)) return `filename="${limpo}"`;
+  const pct = encodeURIComponent(limpo).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `filename*=UTF-8''${pct}`;
 }

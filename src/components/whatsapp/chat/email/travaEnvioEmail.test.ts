@@ -10,8 +10,49 @@ import {
   htmlParaEmail,
   normalizarUrl,
   textoParaParagrafos,
+  anexoPermitido,
+  formatarTamanho,
+  tipoParaVisualizar,
   type OpcoesGeracao,
 } from "./travaEnvioEmail";
+
+describe("tipoParaVisualizar", () => {
+  it("imagem, PDF, vídeo e áudio abrem na tela", () => {
+    expect(tipoParaVisualizar("image/png", "print.png")).toBe("imagem");
+    expect(tipoParaVisualizar("application/pdf", "proposta.pdf")).toBe("pdf");
+    expect(tipoParaVisualizar("", "proposta.PDF")).toBe("pdf");
+    expect(tipoParaVisualizar("video/mp4", "tela.mp4")).toBe("video");
+    expect(tipoParaVisualizar("audio/mpeg", "audio.mp3")).toBe("audio");
+  });
+  it("planilha, HEIC e SVG só baixam", () => {
+    expect(tipoParaVisualizar("application/vnd.ms-excel", "a.xls")).toBeNull();
+    expect(tipoParaVisualizar("image/heic", "foto.heic")).toBeNull();
+    expect(tipoParaVisualizar("", "foto.HEIC")).toBeNull();
+    expect(tipoParaVisualizar("image/svg+xml", "logo.svg")).toBeNull();
+  });
+});
+
+describe("anexoPermitido (espelho de send-email/anexos.ts)", () => {
+  it("aceita documento, imagem e extensão conhecida sem tipo", () => {
+    expect(anexoPermitido("application/pdf", "proposta.pdf")).toBe(true);
+    expect(anexoPermitido("image/jpeg", "foto.jpg")).toBe(true);
+    expect(anexoPermitido("", "planilha.xlsx")).toBe(true);
+  });
+  it("recusa SVG e executável", () => {
+    expect(anexoPermitido("image/svg+xml", "logo.svg")).toBe(false);
+    expect(anexoPermitido("", "setup.exe")).toBe(false);
+    expect(anexoPermitido("application/x-msdownload", "setup.exe")).toBe(false);
+  });
+});
+
+describe("formatarTamanho", () => {
+  it("B, KB e MB com vírgula, sem ,0", () => {
+    expect(formatarTamanho(512)).toBe("512 B");
+    expect(formatarTamanho(184 * 1024)).toBe("184 KB");
+    expect(formatarTamanho(1.5 * 1024 * 1024)).toBe("1,5 MB");
+    expect(formatarTamanho(18 * 1024 * 1024)).toBe("18 MB");
+  });
+});
 
 describe("referência no assunto", () => {
   it("ticket vence atendimento", () => {

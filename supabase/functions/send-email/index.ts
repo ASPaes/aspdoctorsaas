@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { enviarSmtp, mensagemAmigavel, type EmailSecurity } from '../test-email-account/smtp.ts';
 import { enderecoValido, montarMensagem, semQuebra } from './mime.ts';
 import { aplicarAssinatura, montarAssinatura } from './assinatura.ts';
+import { ANEXO_BUCKET, ANEXO_MAX_TOTAL_BYTES, bytesParaBase64, validarAnexos } from './anexos.ts';
 
 /**
  * Porta única de saída de e-mail do DoctorSaaS.
@@ -17,6 +18,9 @@ import { aplicarAssinatura, montarAssinatura } from './assinatura.ts';
  * origem 'chat' (tela "Enviar e-mail" do chat), a conta tem de ser uma das
  * liberadas para quem envia: ver a conferência mais abaixo.
  * Cco (`bcc`) entra só no envelope SMTP, nunca no cabeçalho, e não é gravado.
+ * Anexos (`anexos`, 15/09/2026): arquivos já subidos no `whatsapp-media` pela
+ * get-media-upload-url. Conferidos em anexos.ts, baixados, anexados e APAGADOS
+ * depois do envio com sucesso (a purge-chat-media não alcança esses arquivos).
  * Assinatura da conta (`email_account_assinaturas`) entra no fim de todo e-mail.
  * Cada tentativa vira uma linha em `email_envios`, com ou sem sucesso.
  * O corpo da mensagem não é guardado em lugar nenhum.
@@ -164,6 +168,9 @@ Deno.serve(async (req) => {
   if ((html?.length ?? 0) + (texto?.length ?? 0) > MAX_CORPO) {
     return json(400, { error: 'Mensagem grande demais.' });
   }
+  const anexosValidados = validarAnexos(body.anexos, tenantId);
+  if (!anexosValidados.ok) return json(400, { error: anexosValidados.erro });
+  const anexosPedidos = anexosValidados.anexos;
 
   // ── por qual conta ──
   const pedidaConta = typeof body.account_id === 'string' && UUID.test(body.account_id) ? body.account_id : null;
@@ -230,6 +237,21 @@ Deno.serve(async (req) => {
   if (assinaturaErr) console.error(`[send-email] assinatura de ${conta.email} não lida: ${assinaturaErr.message}`);
   const corpo = aplicarAssinatura({ html, texto }, montarAssinatura(assinaturaSalva));
 
+  // ── anexos: só baixa do Storage depois de conta e permissão conferidas ──
+  const arquivos: { nome: string; mime: string; base64: string }[] = [];
+  let bytesAnexos = 0;
+  for (const a of anexosPedidos) {
+    const { data: blob, error: baixarErr } = await supabase.storage.from(ANEXO_BUCKET).download(a.path);
+    if (baixarErr || !blob) {
+      return json(409, { error: `O anexo ${a.nome} não foi encontrado. Tire e anexe o arquivo de novo.` });
+    }
+    bytesAnexos += blob.size;
+    if (bytesAnexos > ANEXO_MAX_TOTAL_BYTES) {
+      return json(400, { error: `Os anexos passam de ${Math.round(ANEXO_MAX_TOTAL_BYTES / (1024 * 1024))} MB somados.` });
+    }
+    arquivos.push({ nome: a.nome, mime: a.mime, base64: bytesParaBase64(new Uint8Array(await blob.arrayBuffer())) });
+  }
+
   // ── envio ──
   // a resposta volta pelo endereço com sufixo; a marca no assunto é o plano B,
   // para provedor que não entrega sufixo e para quem responde de outro jeito
@@ -244,6 +266,7 @@ Deno.serve(async (req) => {
     html: corpo.html,
     texto: corpo.texto,
     embutidas: corpo.embutidas,
+    anexos: arquivos,
   });
 
   let ok = false;
@@ -293,6 +316,13 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (registroErr) {
     console.error(`[send-email] envio ${ok ? 'feito' : 'falhou'} mas o registro falhou: ${registroErr.message}`);
+  }
+
+  // Enviado: o arquivo não serve mais e ninguém o apagaria. Falhou: fica, para a
+  // pessoa tentar de novo sem anexar outra vez.
+  if (ok && anexosPedidos.length) {
+    const { error: apagarErr } = await supabase.storage.from(ANEXO_BUCKET).remove(anexosPedidos.map((a) => a.path));
+    if (apagarErr) console.error(`[send-email] anexos enviados mas não apagados: ${apagarErr.message}`);
   }
 
   return json(200, {

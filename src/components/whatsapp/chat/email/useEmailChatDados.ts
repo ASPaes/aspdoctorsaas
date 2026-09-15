@@ -177,6 +177,8 @@ export async function enviarEmailChat(input: {
   atendimento_id: string | null;
   cliente_id: string | null;
   department_id: string | null;
+  /** já no bucket whatsapp-media; a send-email baixa, anexa e apaga depois de enviar */
+  anexos: { path: string; nome: string; mime: string }[];
 }): Promise<ResultadoEnvio> {
   const { data, error } = await supabase.functions.invoke("send-email", {
     body: {
@@ -192,6 +194,7 @@ export async function enviarEmailChat(input: {
       referencia_id: input.atendimento_id,
       cliente_id: input.cliente_id,
       department_id: input.department_id,
+      anexos: input.anexos,
     },
   });
   if (error) {

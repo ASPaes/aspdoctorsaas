@@ -20,9 +20,15 @@ import {
   type SugestaoEmail,
 } from "./useEmailChatDados";
 import { EditorEmail } from "./EditorEmail";
+import { BotaoAnexar, ListaAnexos, type AnexoNaTela } from "./AnexosEmail";
+import { uploadChatMedia } from "../../hooks/uploadChatMedia";
 import {
   assuntoComReferencia,
   referenciaDoAssunto,
+  ANEXO_MAX_ARQUIVOS,
+  ANEXO_MAX_TOTAL_BYTES,
+  anexoPermitido,
+  formatarTamanho,
   conferirTrava,
   emailValido,
   normalizarQuantidade,
@@ -69,6 +75,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
   /** sobe quando o conteúdo vem de fora (IA gerou ou corrigiu), para o editor aplicar */
   const [versaoCorpo, setVersaoCorpo] = useState(0);
   const [corrigindo, setCorrigindo] = useState(false);
+  const [anexos, setAnexos] = useState<AnexoNaTela[]>([]);
   const paraPreenchido = useRef(false);
   const [gerando, setGerando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -94,6 +101,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
     setCorpoHtml("");
     setVersaoCorpo((v) => v + 1);
     setCorrigindo(false);
+    setAnexos([]);
     paraPreenchido.current = false;
     setGerando(false);
     setEnviando(false);
@@ -117,6 +125,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
   }, [open, clienteQuery.isSuccess, sugestoes]);
 
   const trava = useMemo(() => conferirTrava(opcoes, gerado), [opcoes, gerado]);
+  const anexando = anexos.some((a) => a.status === "enviando");
 
   const cliente = clienteQuery.data?.cliente;
   const clienteNome = cliente
@@ -160,6 +169,56 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, conversation.id]);
 
+  /** confere tipo, quantidade e tamanho somado; o que passa sobe na hora */
+  const adicionarAnexos = (arquivos: File[]) => {
+    const recusados: string[] = [];
+    let total = anexos.reduce((soma, a) => soma + a.tamanho, 0);
+    let quantidade = anexos.length;
+    const aceitos: { anexo: AnexoNaTela; arquivo: File }[] = [];
+
+    for (const arquivo of arquivos) {
+      if (!anexoPermitido(arquivo.type, arquivo.name)) {
+        recusados.push(`${arquivo.name} (tipo de arquivo não aceito)`);
+      } else if (quantidade >= ANEXO_MAX_ARQUIVOS) {
+        recusados.push(`${arquivo.name} (passou de ${ANEXO_MAX_ARQUIVOS} arquivos)`);
+      } else if (total + arquivo.size > ANEXO_MAX_TOTAL_BYTES) {
+        recusados.push(`${arquivo.name} (passou de ${formatarTamanho(ANEXO_MAX_TOTAL_BYTES)} somados)`);
+      } else {
+        total += arquivo.size;
+        quantidade += 1;
+        aceitos.push({
+          arquivo,
+          anexo: { id: crypto.randomUUID(), nome: arquivo.name, tamanho: arquivo.size, mime: arquivo.type, status: "enviando", arquivo },
+        });
+      }
+    }
+
+    if (recusados.length) toast.error(`Não foi anexado: ${recusados.join("; ")}.`, { duration: 10000 });
+    if (aceitos.length === 0) return;
+    setAnexos((lista) => [...lista, ...aceitos.map((a) => a.anexo)]);
+
+    // resposta de upload de um anexo já removido (ou da tela reaberta) não acha o id e some
+    for (const { anexo, arquivo } of aceitos) {
+      uploadChatMedia(conversation.id, arquivo)
+        .then((r) =>
+          setAnexos((lista) =>
+            lista.map((x) =>
+              x.id === anexo.id
+                ? { ...x, status: "pronto", path: r.storagePath, mime: r.mediaMimetype, nome: r.fileName, tamanho: r.mediaSizeBytes }
+                : x,
+            ),
+          ),
+        )
+        .catch((err: any) =>
+          setAnexos((lista) =>
+            lista.map((x) => (x.id === anexo.id ? { ...x, status: "erro", erro: err?.message || "Falha no upload" } : x)),
+          ),
+        );
+    }
+  };
+
+  const removerAnexo = (id: string) => setAnexos((lista) => lista.filter((a) => a.id !== id));
+
   const corrigir = async () => {
     if (corrigindo || gerando || enviando || !corpo.trim()) return;
     setCorrigindo(true);
@@ -181,6 +240,14 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
 
   const enviar = async () => {
     if (enviando || gerando || corrigindo || trava.travado) return;
+    if (anexando) {
+      toast.error("Espere os arquivos terminarem de anexar antes de enviar.");
+      return;
+    }
+    if (anexos.some((a) => a.status === "erro")) {
+      toast.error("Tire os anexos que falharam (marcados em vermelho) antes de enviar.");
+      return;
+    }
     const faltando: string[] = [];
     if (!contaId) faltando.push("o remetente");
     if (para.length === 0) faltando.push("pelo menos um destinatário");
@@ -206,6 +273,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
         atendimento_id: dados?.atendimentoId ?? null,
         cliente_id: dados?.cliente?.id ?? null,
         department_id: dados?.departmentId ?? null,
+        anexos: anexos.filter((a) => a.status === "pronto" && a.path).map((a) => ({ path: a.path!, nome: a.nome, mime: a.mime })),
       });
       if (r.ok === false) {
         toast.error(r.mensagem, { duration: 12000 });
@@ -407,6 +475,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
               placeholder={
                 gerando ? "Gerando o texto a partir da conversa..." : corrigindo ? "Corrigindo a gramática..." : "Escreva o e-mail"
               }
+              acaoAnexar={<BotaoAnexar desabilitado={gerando || corrigindo || enviando} onEscolher={adicionarAnexos} />}
               onCorrigirGramatica={corrigir}
               corrigindo={corrigindo}
               rodape={
@@ -415,6 +484,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
                 </p>
               }
             />
+            <ListaAnexos anexos={anexos} onRemover={removerAnexo} />
           </div>
         </div>
 
@@ -431,7 +501,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={enviando}>
             Cancelar
           </Button>
-          <Button onClick={enviar} disabled={trava.travado || gerando || enviando || corrigindo} className="gap-2">
+          <Button onClick={enviar} disabled={trava.travado || gerando || enviando || corrigindo || anexando} className="gap-2">
             {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             {enviando ? "Enviando..." : "Enviar"}
           </Button>
