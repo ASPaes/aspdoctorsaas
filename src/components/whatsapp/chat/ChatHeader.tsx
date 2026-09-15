@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch, ShieldOff, FileText, Search, Play, Plus, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { InChatMessageSearchModal } from "./InChatMessageSearchModal";
-import { EnviarEmailChatDialog } from "./email/EnviarEmailChatDialog";
+import { useAbrirEnvioEmail } from "./email/useAbrirEnvioEmail";
 import { ScheduleAttendanceDialog } from "./ScheduleAttendanceDialog";
 import GroupParticipantsSheet from "./GroupParticipantsSheet";
 import { format } from "date-fns";
@@ -94,7 +94,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [groupIncludePrevious, setGroupIncludePrevious] = useState<number>(2);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInChatSearch, setShowInChatSearch] = useState(false);
-  const [showEnviarEmail, setShowEnviarEmail] = useState(false);
+  const envioEmail = useAbrirEnvioEmail(conversation);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [showAttendanceTicketPicker, setShowAttendanceTicketPicker] = useState(false);
@@ -918,7 +918,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setShowEnviarEmail(true)} aria-label="Enviar e-mail">
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={envioEmail.abrir} disabled={envioEmail.verificando} aria-label="Enviar e-mail">
                   <Mail className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -1135,11 +1135,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         conversationId={conversation.id}
         contactName={name}
       />
-      <EnviarEmailChatDialog
-        open={showEnviarEmail}
-        onOpenChange={setShowEnviarEmail}
-        conversation={conversation}
-      />
+      {envioEmail.elementos}
       <EditContactModal
         open={isEditContactOpen}
         onOpenChange={setIsEditContactOpen}

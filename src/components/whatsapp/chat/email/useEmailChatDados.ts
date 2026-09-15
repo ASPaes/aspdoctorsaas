@@ -21,12 +21,20 @@ export interface ContaDeEnvio {
  * O tenant vem da conversa, não do filtro global: com o super admin em "Todos"
  * o filtro é null e a lista sairia vazia.
  */
+export const chaveContasDeEnvio = (tenantId: string | null, userId: string | null) =>
+  ["email-chat-contas", tenantId, userId] as const;
+
 export function useContasDeEnvio(tenantId: string | null, userId: string | null, enabled: boolean) {
   return useQuery({
-    queryKey: ["email-chat-contas", tenantId, userId],
+    queryKey: chaveContasDeEnvio(tenantId, userId),
     enabled: enabled && !!tenantId && !!userId,
     staleTime: 60_000,
-    queryFn: async () => {
+    queryFn: () => buscarContasDeEnvio(tenantId, userId),
+  });
+}
+
+/** separada do hook para o botão conferir no clique, antes de abrir a tela */
+export async function buscarContasDeEnvio(tenantId: string | null, userId: string | null) {
       const [contas, setores, usuarios, membros] = await Promise.all([
         (supabase.from("email_accounts" as any) as any)
           .select("id, rotulo, email, from_name, is_default")
@@ -53,8 +61,6 @@ export function useContasDeEnvio(tenantId: string | null, userId: string | null,
 
       const ligadas = todas.filter((c) => ligadasIds.has(c.id));
       return { contas: ligadas.length > 0 ? ligadas : todas, soAsLigadas: ligadas.length > 0 };
-    },
-  });
 }
 
 export interface SugestaoEmail {
