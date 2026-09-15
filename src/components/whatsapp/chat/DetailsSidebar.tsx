@@ -10,7 +10,8 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert, Pin, ExternalLink, User, TimerOff, PowerOff } from "lucide-react";
+import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert, Pin, ExternalLink, User, TimerOff, PowerOff, Mail } from "lucide-react";
+import { EnviarEmailChatDialog } from "./email/EnviarEmailChatDialog";
 import { format } from "date-fns";
 import { AttendanceMessagesDialog } from "./AttendanceMessagesDialog";
 import { Switch } from "@/components/ui/switch";
@@ -90,6 +91,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const [contactName, setContactName] = useState(contact?.name || "");
   const [contactNotes, setContactNotes] = useState(contact?.notes || "");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
   const [groupAttendancesOpen, setGroupAttendancesOpen] = useState(true);
   const [selectedAttendance, setSelectedAttendance] = useState<any | null>(null);
 
@@ -274,6 +276,17 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             <History className="h-3.5 w-3.5" />
             Histórico do Contato
           </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-7 text-xs gap-1.5"
+            onClick={() => setEmailOpen(true)}
+          >
+            <Mail className="h-3.5 w-3.5" />
+            Enviar e-mail
+          </Button>
+          <EnviarEmailChatDialog open={emailOpen} onOpenChange={setEmailOpen} conversation={conversation} />
 
           <Separator />
           {/* ─── 5. Últimos atendimentos (grupos) ─── */}

@@ -13,7 +13,10 @@ import { aplicarAssinatura, montarAssinatura } from './assinatura.ts';
  *     verify_jwt = true já conferiu a assinatura, então o claim `role` vale.
  *     Chave no formato novo (sb_secret_…) não é JWT e o gateway recusa.
  *
- * Conta: a pedida em `account_id`, ou a padrão de envio do tenant.
+ * Conta: a pedida em `account_id`, ou a padrão de envio do tenant. Com
+ * origem 'chat' (tela "Enviar e-mail" do chat), a conta tem de ser uma das
+ * liberadas para quem envia: ver a conferência mais abaixo.
+ * Cco (`bcc`) entra só no envelope SMTP, nunca no cabeçalho, e não é gravado.
  * Assinatura da conta (`email_account_assinaturas`) entra no fim de todo e-mail.
  * Cada tentativa vira uma linha em `email_envios`, com ou sem sucesso.
  * O corpo da mensagem não é guardado em lugar nenhum.
@@ -89,6 +92,7 @@ Deno.serve(async (req) => {
   // ── quem está enviando ──
   let tenantId: string;
   let enviadoPor: string | null = null;
+  let chamadaInterna = false;
 
   // chave de service_role em formato novo (sb_secret_…) não é JWT: compara direto
   if (papelDoToken(token) === 'service_role' || token === serviceKey) {
@@ -97,6 +101,7 @@ Deno.serve(async (req) => {
     }
     tenantId = body.tenant_id;
     enviadoPor = typeof body.enviado_por === 'string' && UUID.test(body.enviado_por) ? body.enviado_por : null;
+    chamadaInterna = true;
   } else {
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -134,6 +139,7 @@ Deno.serve(async (req) => {
   // ── o que vai ser enviado ──
   const para = lista(body.to);
   const cc = lista(body.cc);
+  const cco = lista(body.bcc);
   const assunto = typeof body.subject === 'string' ? semQuebra(body.subject) : '';
   const html = typeof body.html === 'string' && body.html.trim() ? body.html : null;
   const texto = typeof body.text === 'string' && body.text.trim() ? body.text : null;
@@ -145,10 +151,10 @@ Deno.serve(async (req) => {
   const departmentId = typeof body.department_id === 'string' && UUID.test(body.department_id) ? body.department_id : null;
 
   if (para.length === 0) return json(400, { error: 'Informe pelo menos um destinatário.' });
-  if (para.length + cc.length > MAX_DESTINATARIOS) {
+  if (para.length + cc.length + cco.length > MAX_DESTINATARIOS) {
     return json(400, { error: `No máximo ${MAX_DESTINATARIOS} destinatários por envio.` });
   }
-  const invalido = [...para, ...cc, ...(responderPara ? [responderPara] : [])].find((e) => !enderecoValido(e));
+  const invalido = [...para, ...cc, ...cco, ...(responderPara ? [responderPara] : [])].find((e) => !enderecoValido(e));
   if (invalido) return json(400, { error: `Endereço de e-mail inválido: ${invalido}` });
   if (!assunto) return json(400, { error: 'Informe o assunto.' });
   if (assunto.length > MAX_ASSUNTO) return json(400, { error: `Assunto com mais de ${MAX_ASSUNTO} caracteres.` });
@@ -175,6 +181,31 @@ Deno.serve(async (req) => {
   }
   if (!conta.ativo) {
     return json(409, { error: `A conta ${conta.email} está inativa.` });
+  }
+
+  // Envio pelo chat: a pessoa só escolhe entre as contas ligadas a ela, direto
+  // ou pelo setor; sem nenhuma ligada, qualquer ativa do tenant (regra do
+  // Alexandre, 10/09/2026: "o servidor confere a escolha, não é só a tela").
+  // As outras origens (teste de conta, resumo automático) seguem como antes.
+  if (origem === 'chat' && enviadoPor && !chamadaInterna) {
+    const [ativas, doUsuario, membros] = await Promise.all([
+      supabase.from('email_accounts').select('id').eq('tenant_id', tenantId).eq('ativo', true),
+      supabase.from('email_account_usuarios').select('account_id').eq('tenant_id', tenantId).eq('user_id', enviadoPor),
+      supabase.from('support_department_members').select('department_id').eq('tenant_id', tenantId).eq('user_id', enviadoPor).eq('is_active', true),
+    ]);
+    const setores = (membros.data ?? []).map((m) => m.department_id);
+    const { data: doSetor } = setores.length
+      ? await supabase.from('email_account_setores').select('account_id').eq('tenant_id', tenantId).in('setor_id', setores)
+      : { data: [] as { account_id: string }[] };
+    const idsAtivas = new Set((ativas.data ?? []).map((c) => c.id));
+    const ligadas = new Set(
+      [...(doUsuario.data ?? []), ...(doSetor ?? [])].map((l) => l.account_id).filter((id) => idsAtivas.has(id)),
+    );
+    if (ligadas.size > 0 && !ligadas.has(conta.id)) {
+      return json(403, {
+        error: `A conta ${conta.email} não está liberada para você. Escolha uma das contas ligadas ao seu usuário ou setor.`,
+      });
+    }
   }
 
   const { data: senha } = await supabase.rpc('get_email_account_secret', { p_account_id: conta.id });
@@ -220,7 +251,8 @@ Deno.serve(async (req) => {
       username: conta.smtp_username || conta.email,
       password: senha as string,
       remetente: conta.email,
-      destinatarios: [...para, ...cc],
+      // Cco só aqui: quem está no envelope recebe, mas não aparece em cabeçalho nenhum
+      destinatarios: [...para, ...cc, ...cco],
       mensagem: mensagem.bruta,
     });
     ok = true;

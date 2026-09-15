@@ -295,6 +295,12 @@ verify_jwt = true
 [functions.send-email]
 verify_jwt = true
 
+# Texto do e-mail ao cliente gerado pela IA na tela "Enviar e-mail" do chat.
+# verify_jwt = TRUE: só a tela chama, com a sessão do usuário; a function ainda
+# confere auth.getUser + tenant da conversa por dentro e gasta IA do tenant.
+[functions.gerar-email-chat]
+verify_jwt = true
+
 # Motor das mensagens agendadas do chat. Chamada pelo pg_cron a cada minuto,
 # com a anon key no Authorization -- mesma receita do purge-chat-media. `true`
 # de proposito: ela manda WhatsApp para cliente, entao sem JWT valido do

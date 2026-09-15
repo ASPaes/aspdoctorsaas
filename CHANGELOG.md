@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 15/09
+
+- 🆕 **Enviar e-mail ao cliente direto do chat, com o texto pronto pela IA** — Na conversa, um novo botão de envelope no cabeçalho (e **Enviar e-mail** no painel Detalhes) abre a tela de e-mail já com o texto escrito a partir do atendimento. Dá para escolher o **último atendimento** ou um **resumo dos últimos atendimentos** e o tom (**Formal, Amigável, Técnico ou Profissional**); ao trocar alguma opção, o botão Enviar espera você clicar em **Gerar novo**, para não sair um texto diferente do escolhido. O destinatário vem preenchido com o e-mail do cliente, com **Cc** e **Cco** como em qualquer e-mail, e o remetente mostra só as contas liberadas para você ou para o seu setor. O assunto leva o número do atendimento (ou do ticket), a assinatura da conta entra sozinha e o envio aparece em **E-mails › Enviados**. Respeita o limite mensal de gasto com IA: se ele acabou, você ainda pode escrever o texto à mão.
+
 ### 14/09
 
 - ⬆️ **Ver e baixar o anexo direto em E-mails › Recebidos** — Clicando no clipe do assunto, abre a lista de arquivos do e-mail com o tamanho de cada um. Imagem, PDF, vídeo e áudio abrem na própria tela; qualquer arquivo pode ser baixado. Cada pessoa só abre anexo de e-mail que ela já pode ver na lista.

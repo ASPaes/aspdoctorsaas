@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch, ShieldOff, FileText, Search, Play, Plus } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch, ShieldOff, FileText, Search, Play, Plus, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { InChatMessageSearchModal } from "./InChatMessageSearchModal";
+import { EnviarEmailChatDialog } from "./email/EnviarEmailChatDialog";
 import { ScheduleAttendanceDialog } from "./ScheduleAttendanceDialog";
 import GroupParticipantsSheet from "./GroupParticipantsSheet";
 import { format } from "date-fns";
@@ -93,6 +94,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [groupIncludePrevious, setGroupIncludePrevious] = useState<number>(2);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInChatSearch, setShowInChatSearch] = useState(false);
+  const [showEnviarEmail, setShowEnviarEmail] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [showAttendanceTicketPicker, setShowAttendanceTicketPicker] = useState(false);
@@ -916,6 +918,15 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
             <Tooltip>
               <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setShowEnviarEmail(true)} aria-label="Enviar e-mail">
+                  <Mail className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Enviar e-mail</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onToggleDetails} aria-label="Detalhes">
                   <PanelRightOpen className="h-4 w-4" />
                 </Button>
@@ -1123,6 +1134,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         onOpenChange={setShowInChatSearch}
         conversationId={conversation.id}
         contactName={name}
+      />
+      <EnviarEmailChatDialog
+        open={showEnviarEmail}
+        onOpenChange={setShowEnviarEmail}
+        conversation={conversation}
       />
       <EditContactModal
         open={isEditContactOpen}
