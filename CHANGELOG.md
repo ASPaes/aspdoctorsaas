@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 16/09
+
+- 🆕 **Mensagem de feriado agora é sua** — Em **Configurações › Horário & plantão › Feriados e Folgas Coletivas** apareceu o bloco **Mensagem automática em feriados**, com três escolhas: manter o texto padrão da plataforma, reaproveitar a mesma **Mensagem fora do horário** que você já escreveu (inclusive a do setor, quando ele tem uma própria), ou escrever um texto só de feriado. Serve para quem atende de sobreaviso e não quer mandar o cliente embora dizendo que o atendimento está pausado. No texto próprio dá para usar os campos que o sistema preenche na hora do envio: a saudação, o nome do feriado e o dia e a hora do retorno. Uma prévia mostra como a mensagem chega ao cliente antes de salvar, e nesse modo a inteligência artificial não reescreve nada: sai exatamente o que você escreveu. Vale para o dia marcado como **Fechado o dia todo** e também para o **Horário reduzido**, quando o cliente escreve fora da janela do dia. Quem não mexer na tela continua exatamente como estava.
+
 ### 15/09
 
 - 🆕 **Abrir, arquivar e organizar os e-mails em pastas** — Nas abas **Enviados** e **Recebidos**, o ícone de olho abre o e-mail inteiro: quem enviou, quem recebeu, cliente, setor, ticket, o texto e os anexos (com ver e baixar). Chegou também o botão **Arquivadas**, para tirar da lista o que já foi resolvido sem jogar na lixeira, e as **Pastas**: você cria com nome e cor, escolhe se a pasta é **só sua** ou **de todo o setor**, e move os e-mails por linha ou vários de uma vez. Apagar uma pasta não apaga e-mail: eles voltam para "sem pasta". Os e-mails enviados a partir de agora guardam o texto, então abrem completos; os anteriores mostram só o cabeçalho, porque o texto nunca foi guardado. Esse texto é apagado automaticamente depois de 12 meses.
