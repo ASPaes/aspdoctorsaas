@@ -1,5 +1,5 @@
 {
-  "capturado_em": "2026-09-16T02:56:52.954Z",
+  "capturado_em": "2026-09-16T03:04:20.678Z",
   "project_ref": "vbngjzovjhkmietztffo",
   "motivo": "atualizacao manual",
   "functions": {
@@ -54,9 +54,9 @@
       "updated_at": "2026-09-16T02:23:05.180Z"
     },
     "check-inactivity-timeout": {
-      "sha": "fdccd8cbad3c346844705950167a39b300da01c39d40ec583d95849b133fa78a",
-      "version": 326,
-      "updated_at": "2026-09-16T02:23:07.090Z"
+      "sha": "5b7e22a2957c1ea5f2a135202ec8c6eb6aa1711f5e440be05785f2f5e5493a06",
+      "version": 327,
+      "updated_at": "2026-09-16T02:59:43.747Z"
     },
     "check-instances-status": {
       "sha": "a7602a987206e6f50a6709a2715a32df633b63ca033ffec8662d64895ccddb1c",
@@ -134,9 +134,9 @@
       "updated_at": "2026-09-16T02:23:36.372Z"
     },
     "evolution-webhook": {
-      "sha": "87b7ac86fedac985cdf6172f999d437a507231f898a1aaddcd331b11e41c7503",
-      "version": 733,
-      "updated_at": "2026-09-16T02:23:38.766Z"
+      "sha": "3a4f91b422a0ecc4c9efdf362f1931245dd2059fc147f0bb5362db3160a6cb46",
+      "version": 734,
+      "updated_at": "2026-09-16T03:00:13.579Z"
     },
     "fetch-evolution-history": {
       "sha": "e2d8552172052c27875c6a06746947b270dcde5ea3f9e73f92450f7288fee776",
@@ -184,9 +184,9 @@
       "updated_at": "2026-09-16T02:23:53.634Z"
     },
     "get-media-upload-url": {
-      "sha": "2d9511f5503a933c392b0cf1f463c44f3a8bbcb122bf092232de52e25e4a6657",
-      "version": 169,
-      "updated_at": "2026-09-16T02:51:34.679Z"
+      "sha": "6a1ce545996cf6c4e3854763b6cbd6a544fbc3667a8f46220f7670cc01170b92",
+      "version": 170,
+      "updated_at": "2026-09-16T03:00:29.110Z"
     },
     "get-note-media-url": {
       "sha": "48d0ff3b2dac4105fd71995c85d728d0f765642e93335c3a64052e814d314c16",
@@ -219,9 +219,9 @@
       "updated_at": "2026-09-16T02:24:11.482Z"
     },
     "meta-webhook": {
-      "sha": "25d80acbd9acc16c013125991ada84485cc3d8db5151d5489d5535c598c79c0f",
-      "version": 519,
-      "updated_at": "2026-09-16T02:24:13.427Z"
+      "sha": "bc8806ac54aed2a46029745d0819fec206272b09ec2c02be0970ffcd5e2956a8",
+      "version": 520,
+      "updated_at": "2026-09-16T03:00:44.121Z"
     },
     "oem-atualizar-cadastro-licenca": {
       "sha": "3c147e9995b02950508af7abc7a7bea8ac7c72df1605e441f790f1c526aee512",
@@ -339,9 +339,9 @@
       "updated_at": "2026-09-16T02:25:08.584Z"
     },
     "recon-vincular-lote": {
-      "sha": "07b1c9395dc030c06a521732fa1702a05bb23ae01a7eb1ac2b3ccf970ec22b9a",
-      "version": 81,
-      "updated_at": "2026-09-15T04:51:03.526Z"
+      "sha": "7c54b251cb6b8d0b5186ed176c22979c076ef7ae5d74a872e0d85ea0f3c39fe4",
+      "version": 82,
+      "updated_at": "2026-09-16T03:01:31.034Z"
     },
     "recon-vincular-unitario": {
       "sha": "6f09cf3416c726774937b1ed1e0cabade6ff198cab866fcdce18b750b9aa2ae7",
@@ -379,9 +379,9 @@
       "updated_at": "2026-09-16T02:25:26.673Z"
     },
     "send-assignment-greeting": {
-      "sha": "6a1cf1ee99bfcd88e3aba2559138fe8f98f5eab635ee779ebd3ceebcfb31a5eb",
-      "version": 22,
-      "updated_at": "2026-09-16T02:25:28.715Z"
+      "sha": "040fd67cb86f44e11e5749260adeda35ac03541a355ff2324790393d98030605",
+      "version": 23,
+      "updated_at": "2026-09-16T03:01:45.136Z"
     },
     "send-attendance-summary": {
       "sha": "1032ce33c34f3463e4985b00133e09a3b4d1ea4506631e4375d853635f961edf",
@@ -404,9 +404,9 @@
       "updated_at": "2026-09-16T02:25:36.387Z"
     },
     "send-whatsapp-template": {
-      "sha": "d4b13d4079a0e64d623f508fc62d7c35cb070df63143fa94f49bd1ef49c6e728",
-      "version": 251,
-      "updated_at": "2026-09-16T02:25:38.357Z"
+      "sha": "445ea60234a7a863ce00efe41301fce51a45abc6fd1d409cb384b0b6475a11ba",
+      "version": 252,
+      "updated_at": "2026-09-16T03:01:54.415Z"
     },
     "suggest-smart-replies": {
       "sha": "fead80dac2edba1769f10dde2dd19a8743f59b250bd3f43b0a03d76c02a62acd",
@@ -494,9 +494,9 @@
       "updated_at": "2026-09-16T02:26:14.561Z"
     },
     "zapi-webhook": {
-      "sha": "4172a12e77e802af4baf4df309ee56d473720ca5543eb09dc936367dd74276a0",
-      "version": 461,
-      "updated_at": "2026-09-16T02:26:16.506Z"
+      "sha": "41ceb36060a1abc48700cef52c9ceed1340129f71c907b98a39261da845e3fb7",
+      "version": 462,
+      "updated_at": "2026-09-16T03:02:31.884Z"
     }
   }
 }
