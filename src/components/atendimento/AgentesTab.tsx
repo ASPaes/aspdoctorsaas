@@ -1,33 +1,20 @@
-import { Loader2, Users, MessageSquare, Star, RotateCcw } from "lucide-react";
-import { useAtendimentoAgentes } from "./useAtendimentoAgentes";
+import { useState } from "react";
+import { Loader2, Users, MessageSquare, Star, RotateCcw, Download } from "lucide-react";
+import { useAtendimentoAgentes, type AgenteRow } from "./useAtendimentoAgentes";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
+import { Button } from "@/components/ui/button";
 import { LatenciaHistograma } from "./LatenciaHistograma";
+import { LatenciaAgenteDialog } from "./LatenciaAgenteDialog";
+import { fmtDur } from "./fmtDuracao";
+import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
+import { exportScorecardAgentesXlsx } from "@/lib/exportLatenciaXlsx";
 import { cn } from "@/lib/utils";
-
-// Formata duração mostrando segundos (latência/TMA/1ª resp são curtos; "1m" escondia tudo entre 1s e 119s)
-function fmtDur(s: number | null | undefined): string {
-  if (!s || s <= 0) return "—";
-  if (s > 86400) {
-    const d = Math.floor(s / 86400);
-    const h = Math.floor((s % 86400) / 3600);
-    return `${d}d ${h}h`;
-  }
-  if (s >= 3600) {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    return `${h}h ${m}m`;
-  }
-  if (s >= 60) {
-    const m = Math.floor(s / 60);
-    const sec = Math.round(s % 60);
-    return sec > 0 ? `${m}m ${sec}s` : `${m}m`;
-  }
-  return `${Math.round(s)}s`;
-}
 
 export function AgentesTab() {
   const { data, isLoading, isError, error } = useAtendimentoAgentes();
+  const { dateRange } = useAtendimentoFilter();
+  const [verLatencia, setVerLatencia] = useState<AgenteRow | null>(null);
   const dur = (s: number | null | undefined) => fmtDur(s);
 
   return (
@@ -88,9 +75,26 @@ export function AgentesTab() {
           </div>
 
           <div className="rounded-lg border border-border bg-card p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <h3 className="text-sm font-semibold">Scorecard por Agente</h3>
-              <KpiHelpPopover kpiKey="atendimento_scorecard" />
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold">Scorecard por Agente</h3>
+                <KpiHelpPopover kpiKey="atendimento_scorecard" />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  exportScorecardAgentesXlsx({
+                    rows: data.agentes,
+                    from: dateRange.from,
+                    to: dateRange.to,
+                  })
+                }
+                disabled={data.agentes.length === 0}
+              >
+                <Download className="h-4 w-4" />
+                Exportar XLSX
+              </Button>
             </div>
             {data.agentes.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhum agente com atendimento no período.</p>
@@ -134,14 +138,34 @@ export function AgentesTab() {
                   </thead>
                   <tbody>
                     {data.agentes.map((a) => (
-                      <tr key={a.agent_id} className="border-b border-border/50 last:border-0">
+                      <tr
+                        key={a.agent_id}
+                        onClick={() => a.latencia_p50 !== null && setVerLatencia(a)}
+                        title={
+                          a.latencia_p50 !== null
+                            ? `Ver as respostas que formaram a latência de ${a.nome}`
+                            : "Sem latência medida no período"
+                        }
+                        className={cn(
+                          "group border-b border-border/50 last:border-0 transition-colors",
+                          a.latencia_p50 !== null && "cursor-pointer hover:bg-muted/50",
+                        )}
+                      >
                         <td className="py-2 pr-3 truncate max-w-[14rem]">{a.nome}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{a.total}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{a.encerrados}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{a.pico_simultaneos}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.tma_p50)}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.frt_p50)}</td>
-                        <td className="py-2 px-3 text-right tabular-nums">{dur(a.latencia_p50)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">
+                          {a.latencia_p50 !== null ? (
+                            <span className="font-medium text-accent underline decoration-dotted underline-offset-4">
+                              {dur(a.latencia_p50)}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                         <td className="py-2 px-3 text-right">
                           {a.latencia_faixa ? (
                             <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-xs">{a.latencia_faixa}</span>
@@ -179,6 +203,11 @@ export function AgentesTab() {
           </div>
 
           <LatenciaHistograma />
+
+          <LatenciaAgenteDialog
+            agente={verLatencia}
+            onOpenChange={(v) => !v && setVerLatencia(null)}
+          />
         </>
       )}
     </div>

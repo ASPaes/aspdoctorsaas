@@ -2,8 +2,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Loader2 } from "lucide-react";
 import { useAtendimentoLatenciaHistograma } from "./useAtendimentoLatenciaHistograma";
 
-// verde (rápido) -> vermelho (lento)
-const CORES = [
+// verde (rápido) -> vermelho (lento). Exportado: o diálogo de detalhe (DEM-0364)
+// desenha o histograma do agente com a mesma escala.
+export const CORES_FAIXA_LATENCIA = [
   "hsl(142 71% 45%)",
   "hsl(142 60% 50%)",
   "hsl(48 96% 53%)",
@@ -53,12 +54,15 @@ export function LatenciaHistograma() {
                     border: "1px solid hsl(var(--border))",
                     borderRadius: 8,
                     fontSize: 12,
+                    color: "hsl(var(--foreground))",
                   }}
+                  itemStyle={{ color: "hsl(var(--foreground))", fontSize: 12 }}
+                  labelStyle={{ color: "hsl(var(--foreground))", fontWeight: 600 }}
                   formatter={(v: any) => [`${v} respostas`, "Qtd"]}
                 />
                 <Bar dataKey="qtd" radius={[4, 4, 0, 0]}>
                   {data.faixas.map((f, i) => (
-                    <Cell key={f.idx} fill={CORES[i] ?? CORES[CORES.length - 1]} />
+                    <Cell key={f.idx} fill={CORES_FAIXA_LATENCIA[i] ?? CORES_FAIXA_LATENCIA[CORES_FAIXA_LATENCIA.length - 1]} />
                   ))}
                 </Bar>
               </BarChart>
