@@ -5,6 +5,7 @@ import { getAdapter } from './providers/index.ts';
 import { NormalizedInboundMessage, SendContext, PhoneParseResult, UNSUPPORTED_MESSAGE_LABEL } from './message-types.ts';
 import { normalizeBRPhone, phoneSearchVariants } from './phone.ts';
 import { isGoodbyeOnlyMessage } from './goodbye.ts';
+import { extractCsatScore, isReopenKeyword } from './csat-score.ts';
 import { extractLocation } from './location.ts';
 import { previewCut } from './preview.ts';
 
@@ -707,15 +708,18 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
     const trimmed = (messageContent || '').trim();
 
     if (csat.status === 'pending') {
-      // Parse robusto: a resposta precisa ser essencialmente só a nota (mensagem curta, só dígitos).
-      const digits = trimmed.replace(/[^0-9]/g, '');
-      const scoreNum = (trimmed.length <= 4 && /^[0-9]+$/.test(digits)) ? parseInt(digits, 10) : NaN;
+      // Parse robusto: a resposta precisa ser essencialmente a nota — o número
+      // sozinho ou dentro de uma frase curta de cortesia ("Nota 5, atendimento
+      // excelente"). Mesma régua do caminho da nota tardia, de propósito: quem
+      // responde no prazo não pode ser reconhecido pior que quem responde
+      // atrasado. Ver csat-score.ts.
+      const scoreNum = extractCsatScore(trimmed, supportConfig.support_csat_score_min, supportConfig.support_csat_score_max);
 
       // Não é nota. Dois caminhos:
-      if (isNaN(scoreNum) || scoreNum < supportConfig.support_csat_score_min || scoreNum > supportConfig.support_csat_score_max) {
+      if (scoreNum === null) {
         // (a) Cliente pediu pra reabrir: expira o CSAT e deixa o fluxo seguir →
         //     ensureAttendanceForIncomingMessage reabre o atendimento.
-        if (/\breabrir\b/i.test(trimmed)) {
+        if (isReopenKeyword(trimmed)) {
           await supabase.from('support_csat').update({ status: 'expired', responded_at: new Date().toISOString() }).eq('id', csat.id);
           return false;
         }
@@ -775,14 +779,14 @@ export async function handleLateCsatResponse(supabase: any, ctx: SendContext, co
   try {
     const trimmed = (messageContent || '').trim();
 
-    // Filtro barato: so age se a mensagem for essencialmente um numero curto
-    const digits = trimmed.replace(/[^0-9]/g, '');
-    if (!(trimmed.length <= 4 && /^[0-9]+$/.test(digits))) return false;
-
-    const scoreNum = parseInt(digits, 10);
+    // Filtro barato: descarta o que nem de longe parece nota, antes de ir ao banco.
+    if (!trimmed || trimmed.length > 60 || !/\d/.test(trimmed)) return false;
 
     const supportConfig = await getSupportConfig(supabase, tenantId);
-    if (scoreNum < supportConfig.support_csat_score_min || scoreNum > supportConfig.support_csat_score_max) return false;
+    // Aceita a nota dentro de frase curta de cortesia ("Nota 5, atendimento
+    // excelente"), nao so a mensagem que e apenas o numero. Ver csat-score.ts.
+    const scoreNum = extractCsatScore(trimmed, supportConfig.support_csat_score_min, supportConfig.support_csat_score_max);
+    if (scoreNum === null) return false;
 
     // Nao age se ja houver atendimento ativo (o numero pode pertencer a um fluxo em curso)
     const { data: activeAtt } = await supabase
@@ -1006,6 +1010,7 @@ async function ensureWaitingAttendanceForOutOfHours(
   conversationId: string,
   contactId: string,
   tenantId: string,
+  content?: string | null,
 ): Promise<void> {
   try {
     const { data: existing } = await supabase
@@ -1051,7 +1056,9 @@ async function ensureWaitingAttendanceForOutOfHours(
 
     if (lastClosed?.closed_at) {
       const diffMin = (Date.now() - new Date(lastClosed.closed_at).getTime()) / (1000 * 60);
-      if (diffMin <= 60) { // 60min window para out-of-hours reopen
+      // A avaliação não ressuscita o atendimento avaliado — ver csatBlocksReopen.
+      // Bloqueado aqui, o fluxo cai no INSERT abaixo e abre atendimento novo.
+      if (diffMin <= 60 && !(await csatBlocksReopen(supabase, lastClosed.id, content))) { // 60min window para out-of-hours reopen
         await supabase.from('support_attendances').update({
           status: 'waiting',
           reopened_at: nowIso,
@@ -1659,7 +1666,48 @@ async function isPostClosureFarewell(supabase: any, conversationId: string, cont
   return !!encerrado;
 }
 
-export async function ensureAttendanceForIncomingMessage(supabase: any, conversationId: string, contactId: string, tenantId: string, ctx?: SendContext, skipUra: boolean = false): Promise<void> {
+/**
+ * A resposta da pesquisa não reabre o atendimento que ela está avaliando.
+ *
+ * O CSAT sai junto com o encerramento, e o cliente responde minutos depois —
+ * dentro das duas janelas de reabertura (`support_reopen_window_minutes` no
+ * expediente, 60 min fixos fora dele). Quando a resposta não é reconhecida como
+ * nota (frase em volta do número, elogio, cortesia), ela reabria o chat: o
+ * atendimento voltava para o agente, e o "5" que vinha na mensagem seguinte era
+ * descartado pela guarda de "já existe atendimento ativo" em
+ * handleLateCsatResponse. Foi o que aconteceu no 06962/26 da Digi Office
+ * (DEM-0414): reaberto pela própria avaliação em 03/09 e parado no mesmo agente
+ * até 15/09, engolindo um assunto novo do cliente no meio do caminho.
+ *
+ * Bloquear aqui NÃO engole a mensagem: sem reabertura o fluxo segue e cria um
+ * atendimento NOVO, que passa pela distribuição e começa a própria contagem de
+ * SLA — que é o que a demanda pede. Quem quiser mesmo continuar o atendimento
+ * anterior tem a palavra-chave que as mensagens de CSAT oferecem ("digite
+ * *Reabrir*"), e ela tem precedência sobre esta guarda.
+ *
+ * A janela é a mesma em que o sistema ainda aceita nota atrasada
+ * (CSAT_LATE_GRACE_MINUTES): enquanto a avaliação pode chegar, o atendimento
+ * avaliado não ressuscita.
+ */
+async function csatBlocksReopen(supabase: any, attendanceId: string, content?: string | null): Promise<boolean> {
+  try {
+    if (isReopenKeyword(content)) return false;
+    const cutoff = new Date(Date.now() - CSAT_LATE_GRACE_MINUTES * 60 * 1000).toISOString();
+    const { data } = await supabase
+      .from('support_csat').select('id')
+      .eq('attendance_id', attendanceId)
+      .gte('asked_at', cutoff)
+      .limit(1).maybeSingle();
+    return !!data;
+  } catch (err) {
+    // Fail-open: na dúvida reabre como antes — perder a continuidade custa mais
+    // que abrir um atendimento a mais.
+    console.error('[processor] csatBlocksReopen failed:', err);
+    return false;
+  }
+}
+
+export async function ensureAttendanceForIncomingMessage(supabase: any, conversationId: string, contactId: string, tenantId: string, ctx?: SendContext, skipUra: boolean = false, content?: string | null): Promise<void> {
   try {
     const { data: active } = await supabase.from('support_attendances').select('id, status').eq('conversation_id', conversationId).in('status', ['waiting', 'in_progress']).limit(1).maybeSingle();
     if (active) return;
@@ -1670,7 +1718,10 @@ export async function ensureAttendanceForIncomingMessage(supabase: any, conversa
     const nowIso = now.toISOString();
     const closedAt = lastClosed?.closed_at ? new Date(lastClosed.closed_at) : null;
     const diffMin = closedAt ? (now.getTime() - closedAt.getTime()) / (1000 * 60) : Infinity;
-    if (lastClosed && diffMin <= reopenWindow && lastClosed.status === 'closed') {
+    const csatBlocked = (lastClosed && diffMin <= reopenWindow && lastClosed.status === 'closed')
+      ? await csatBlocksReopen(supabase, lastClosed.id, content)
+      : false;
+    if (lastClosed && diffMin <= reopenWindow && lastClosed.status === 'closed' && !csatBlocked) {
       const { data: full } = await supabase.from('support_attendances').select('assigned_to, attendance_code').eq('id', lastClosed.id).single();
       const lastOp = full?.assigned_to ?? null;
       const attCode = full?.attendance_code ?? '';
@@ -2340,7 +2391,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
           if (!bh.inside) {
             const nowIso = new Date().toISOString();
             await supabase.from('whatsapp_conversations').update({ status: 'active', opened_out_of_hours: true, opened_out_of_hours_at: timestamp, updated_at: nowIso }).eq('id', conversationId);
-            await ensureWaitingAttendanceForOutOfHours(supabase, conversationId, contactId, tenantId);
+            await ensureWaitingAttendanceForOutOfHours(supabase, conversationId, contactId, tenantId, content);
             return;
           }
         }
@@ -2363,7 +2414,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
             const lastBh = (bhMsgs || []).find((m: any) => { const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata; return meta?.outside_hours === true; });
             if (!lastBh) { const cutoff8h = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(); const { count: oc } = await supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('tenant_id', tenantId).eq('is_from_me', false).gte('created_at', cutoff8h); if (oc && oc > 1) { const shorts = ['Ainda estamos fora do horário \u{1F550} Retornaremos assim que possível!', 'Sua mensagem foi registrada! Responderemos no início do expediente \u{1F60A}', 'Obrigado pela mensagem! Nossa equipe responde assim que possível \u{23F0}']; await sendAndPersistAutoMessage(supabase, ctx, conversationId, shorts[Math.floor(Math.random() * shorts.length)], { business_hours: true, outside_hours: true, short_reply: true }); } }
            }
-           await ensureWaitingAttendanceForOutOfHours(supabase, conversationId, contactId, tenantId);
+           await ensureWaitingAttendanceForOutOfHours(supabase, conversationId, contactId, tenantId, content);
            return;
         }
       }
@@ -2386,7 +2437,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
         const lastBh = (bhMsgs || []).find((m: any) => { const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata; return meta?.outside_hours === true; });
         if (!lastBh) { const cutoff8h = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(); const { count: oc } = await supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('tenant_id', tenantId).eq('is_from_me', false).gte('created_at', cutoff8h); if (oc && oc > 1) { const shorts = ['Ainda estamos fora do horário \u{1F550} Retornaremos assim que possível!', 'Sua mensagem foi registrada! Responderemos no início do expediente \u{1F60A}', 'Obrigado pela mensagem! Nossa equipe responde assim que possível \u{23F0}']; await sendAndPersistAutoMessage(supabase, ctx, conversationId, shorts[Math.floor(Math.random() * shorts.length)], { business_hours: true, outside_hours: true, short_reply: true }); } }
       }
-      await ensureWaitingAttendanceForOutOfHours(supabase, conversationId, contactId, tenantId);
+      await ensureWaitingAttendanceForOutOfHours(supabase, conversationId, contactId, tenantId, content);
       return;
     }
     } // fecha else (sem URA)
@@ -2403,6 +2454,6 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   } else {
     const uraHandled = await handleUraResponse(supabase, ctx, conversationId, tenantId, content, supportConfig);
     if (uraHandled) { incrementAttendanceCounter(supabase, conversationId, 'customer').catch(() => {}); }
-    else { ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, ctx, skipUra).then(() => incrementAttendanceCounter(supabase, conversationId, 'customer')).catch(() => {}); supabase.from('whatsapp_conversations').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', conversationId).eq('status', 'closed').then(() => {}).catch(() => {}); }
+    else { ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, ctx, skipUra, content).then(() => incrementAttendanceCounter(supabase, conversationId, 'customer')).catch(() => {}); supabase.from('whatsapp_conversations').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', conversationId).eq('status', 'closed').then(() => {}).catch(() => {}); }
   }
 }

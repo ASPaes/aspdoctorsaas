@@ -92,3 +92,14 @@ export function isGoodbyeOnlyMessage(raw: string | null | undefined): boolean {
   }
   return temNucleo;
 }
+
+/**
+ * Palavra "leve": agradecimento, aceite ou acessoria de cortesia.
+ *
+ * Exposta para o reconhecedor de nota tardia (csat-score.ts) reaproveitar o
+ * mesmo vocabulario. Uma unica lista para as duas decisoes: o que nao reabre o
+ * chat e o que pode acompanhar a nota.
+ */
+export function isFillerWord(token: string): boolean {
+  return NUCLEO.has(token) || ACESSORIAS.has(token);
+}
