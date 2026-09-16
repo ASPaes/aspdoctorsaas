@@ -1,5 +1,5 @@
 {
-  "capturado_em": "2026-09-16T02:27:29.082Z",
+  "capturado_em": "2026-09-16T02:56:52.954Z",
   "project_ref": "vbngjzovjhkmietztffo",
   "motivo": "atualizacao manual",
   "functions": {
@@ -184,9 +184,9 @@
       "updated_at": "2026-09-16T02:23:53.634Z"
     },
     "get-media-upload-url": {
-      "sha": "3fcac20b5c2cad1db869e15b036fa318fe50013ccf995a711bbb4d8f1e9ef44e",
-      "version": 168,
-      "updated_at": "2026-09-16T02:23:55.352Z"
+      "sha": "2d9511f5503a933c392b0cf1f463c44f3a8bbcb122bf092232de52e25e4a6657",
+      "version": 169,
+      "updated_at": "2026-09-16T02:51:34.679Z"
     },
     "get-note-media-url": {
       "sha": "48d0ff3b2dac4105fd71995c85d728d0f765642e93335c3a64052e814d314c16",
@@ -389,9 +389,9 @@
       "updated_at": "2026-09-16T02:25:30.542Z"
     },
     "send-email": {
-      "sha": "d0cec73043f06103d5384913a5127bce521e12a48c84c814fca77ff0c765f3cd",
-      "version": 10,
-      "updated_at": "2026-09-16T02:25:32.603Z"
+      "sha": "b69e33d036324d90aac878efabb91a0a62223273b69e487b2388f333bed287a6",
+      "version": 12,
+      "updated_at": "2026-09-16T02:51:27.940Z"
     },
     "send-meta-message": {
       "sha": "96c4cac448e593f9ad1a28083e2e66486d5caf996ba771f8ace0327eb1b1ebb3",
