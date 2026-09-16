@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CalendarIcon, Plus, Pencil, Trash2, Loader2, CalendarOff, Download } from "lucide-react";
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { SetoresMultiSelect } from "@/components/configuracoes/email/SetoresMultiSelect";
+import HolidayAutoMessageSection from "./HolidayAutoMessageSection";
 
 interface Exception {
   id: string;
@@ -462,6 +463,8 @@ export default function BusinessHoursExceptionsSection() {
           Uma exceção pode valer para todos os setores ou só para os setores escolhidos. Quando
           as duas existem na mesma data, a do setor vence para aquele setor.
         </p>
+
+        <HolidayAutoMessageSection />
 
         <div className="flex flex-wrap justify-end gap-2">
           <Button size="sm" variant="outline" onClick={() => setImportDialogOpen(true)}>

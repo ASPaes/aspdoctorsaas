@@ -1206,6 +1206,100 @@ export function renderOffHoursTemplate(
     .replace(/\{\{slot2_end\}\}/g, slots[1]?.end || lastEnd);
 }
 
+/** DEM-0370: de onde sai o aviso automático em feriado fechado o dia todo. */
+export type HolidayMessageMode = 'auto' | 'off_hours' | 'custom';
+
+export const HOLIDAY_MESSAGE_MODE_DEFAULT: HolidayMessageMode = 'auto';
+
+/** Valor do banco → modo válido. Vazio, nulo ou desconhecido volta ao padrão. */
+export function resolveHolidayMessageMode(raw: unknown): HolidayMessageMode {
+  return raw === 'off_hours' || raw === 'custom' ? raw : HOLIDAY_MESSAGE_MODE_DEFAULT;
+}
+
+/**
+ * Qual texto o aviso de feriado usa.
+ *
+ * O modo é escolha do admin, mas cada um depende de o texto existir: quem
+ * marcou "custom" e deixou o campo vazio, ou "off_hours" sem nunca ter escrito
+ * a mensagem de fora do horário, cai no padrão da plataforma em vez de receber
+ * o texto genérico de horário comercial — que num feriado diz a hora errada
+ * ("atendemos das 09:00 às 18:00" num dia em que não se atende).
+ */
+export function decideHolidayMessageSource(params: {
+  mode: HolidayMessageMode;
+  hasHolidayMessage: boolean;
+  hasOffHoursTemplate: boolean;
+}): HolidayMessageMode {
+  const { mode, hasHolidayMessage, hasOffHoursTemplate } = params;
+  if (mode === 'custom') return hasHolidayMessage ? 'custom' : 'auto';
+  if (mode === 'off_hours') return hasOffHoursTemplate ? 'off_hours' : 'auto';
+  return 'auto';
+}
+
+/**
+ * Troca os placeholders do texto de feriado.
+ *
+ * `{{next_when}}` é o retorno já por extenso ("amanhã a partir das 07:30");
+ * `{{next_start}}` é só a hora. Aceita também os placeholders de fora do
+ * horário, porque quem escolhe reusar aquele texto espera que continuem valendo.
+ */
+export function renderHolidayTemplate(
+  template: string,
+  vars: {
+    greeting: string; holidayName: string; nextStart: string; nextWhen: string;
+    firstStart: string; lastEnd: string; slots: { start: string; end: string }[];
+  },
+): string {
+  return renderOffHoursTemplate(template, {
+    firstStart: vars.firstStart,
+    lastEnd: vars.lastEnd,
+    nextStart: vars.nextStart,
+    slots: vars.slots,
+  })
+    .replace(/\{\{greeting\}\}/g, vars.greeting)
+    .replace(/\{\{holiday_name\}\}/g, vars.holidayName)
+    .replace(/\{\{next_when\}\}/g, vars.nextWhen);
+}
+
+/** Texto fixo da plataforma — o que saía antes de o admin poder escolher. */
+export function defaultHolidayMessage(vars: { greeting: string; holidayName: string; nextWhen: string }): string {
+  return `${vars.greeting}! \u{1F4C5} Hoje é feriado (${vars.holidayName}) e nosso atendimento está pausado.\nRetornamos ${vars.nextWhen}. Sua mensagem foi registrada e responderemos assim que voltarmos. \u{1F64F}`;
+}
+
+/**
+ * Lê o modo de feriado à parte do getSupportConfig, e não junto.
+ *
+ * Mesma razão do intervalo entre avisos (DEM-0400): aquele é um select único e
+ * uma coluna que ainda não exista no banco derrubaria o horário de TODOS os
+ * tenants. Aqui a falha só devolve o comportamento antigo. Só roda em feriado.
+ */
+async function getHolidayMessageConfig(
+  supabase: any,
+  tenantId: string,
+): Promise<{ mode: HolidayMessageMode; message: string }> {
+  const fallback = { mode: HOLIDAY_MESSAGE_MODE_DEFAULT, message: '' };
+  try {
+    const { data, error } = await supabase
+      .from('configuracoes')
+      .select('business_hours_holiday_message_mode, business_hours_holiday_message')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (error) {
+      console.error('[processor] getHolidayMessageConfig error:', error.message);
+      return fallback;
+    }
+    return {
+      mode: resolveHolidayMessageMode(data?.business_hours_holiday_message_mode),
+      message: typeof data?.business_hours_holiday_message === 'string'
+        ? data.business_hours_holiday_message.trim()
+        : '',
+    };
+  } catch (err) {
+    console.error('[processor] getHolidayMessageConfig unexpected:', err);
+    return fallback;
+  }
+}
+
 /** Quantos avisos de fora do horário já saíram na janela atual. */
 async function countOffHoursNotices(supabase: any, conversationId: string, tenantId: string): Promise<number> {
   try {
@@ -1269,14 +1363,30 @@ async function sendBusinessHoursMessage(
       : '';
     const hasTemplate = rawTemplate.length > 0;
     const fromDepartment = supportConfig._from_department === true;
-    const previousNoticeCount = hasTemplate && !isHolidayToday
+
+    // DEM-0370: em feriado o admin pode escolher o texto. Quando escolheu, ele
+    // vence a IA — o ponto do campo é sair exatamente o que ele escreveu.
+    const holidayCfg = isHolidayToday
+      ? await getHolidayMessageConfig(supabase, tenantId)
+      : { mode: HOLIDAY_MESSAGE_MODE_DEFAULT, message: '' };
+    const holidaySource = isHolidayToday
+      ? decideHolidayMessageSource({
+          mode: holidayCfg.mode,
+          hasHolidayMessage: holidayCfg.message.length > 0,
+          hasOffHoursTemplate: hasTemplate,
+        })
+      : HOLIDAY_MESSAGE_MODE_DEFAULT;
+    const holidayTextChosen = isHolidayToday && holidaySource !== 'auto';
+
+    const usesTenantText = isHolidayToday ? holidayTextChosen : hasTemplate;
+    const previousNoticeCount = usesTenantText
       ? await countOffHoursNotices(supabase, conversationId, tenantId)
       : 0;
 
     // A IA só é consultada quando pode de fato assumir o texto: a 1ª chamada
     // pergunta "a IA seria candidata?" e evita um read + decrypt no Vault a cada
     // aviso que já sairia do template. A regra mora num lugar só.
-    const aiIsCandidate = decideOffHoursMessageMode({
+    const aiIsCandidate = !holidayTextChosen && decideOffHoursMessageMode({
       hasTemplate, hasAI: true, isHoliday: isHolidayToday, previousNoticeCount,
     }) === 'ai';
 
@@ -1301,15 +1411,20 @@ async function sendBusinessHoursMessage(
             ai_generated: true,
             notice_index: previousNoticeCount + 1,
             ...(hasTemplate && !isHolidayToday ? { ai_reason: 'repeticao' } : {}),
-            ...(isHolidayToday ? { holiday: true, holiday_name: holidayName } : {}),
+            ...(isHolidayToday ? { holiday: true, holiday_name: holidayName, holiday_message_source: 'auto' } : {}),
           });
           return;
         }
       }
     } catch { /* fallback to template */ }
 
+    const holidayVars = { greeting, holidayName, nextStart, nextWhen, firstStart, lastEnd, slots };
     const message = isHolidayToday
-      ? `${greeting}! \u{1F4C5} Hoje é feriado (${holidayName}) e nosso atendimento está pausado.\nRetornamos ${nextWhen}. Sua mensagem foi registrada e responderemos assim que voltarmos. \u{1F64F}`
+      ? (holidaySource === 'custom'
+          ? renderHolidayTemplate(holidayCfg.message, holidayVars)
+          : holidaySource === 'off_hours'
+            ? renderHolidayTemplate(rawTemplate, holidayVars)
+            : defaultHolidayMessage({ greeting, holidayName, nextWhen }))
       : renderOffHoursTemplate(hasTemplate ? rawTemplate : OFF_HOURS_DEFAULT_TEMPLATE, {
           firstStart, lastEnd, nextStart, slots,
         });
@@ -1319,7 +1434,7 @@ async function sendBusinessHoursMessage(
       outside_hours: true,
       notice_index: previousNoticeCount + 1,
       ...(fromDepartment && hasTemplate ? { department_message: true } : {}),
-      ...(isHolidayToday ? { holiday: true, holiday_name: holidayName } : {}),
+      ...(isHolidayToday ? { holiday: true, holiday_name: holidayName, holiday_message_source: holidaySource } : {}),
     });
   } catch (err) { console.error('[processor] Error in sendBusinessHoursMessage:', err); }
 }
