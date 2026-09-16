@@ -11,6 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ColumnFilter, FiltroTexto, FiltroFaixa, FiltroData, FiltroOpcoes,
+} from "@/components/ui/ColumnFilter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -27,7 +30,7 @@ import {
   Loader2, RefreshCw, Plug, Link2, HelpCircle, TrendingDown, Search, AlertTriangle, KeyRound,
   Undo2, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
   ArrowUpDown, ArrowUp, ArrowDown, Boxes, Plus, CalendarClock, ArrowDownToLine, ArrowUpFromLine,
-  Clock, Copy, Check, History, ArrowLeftRight, Unlink,
+  Clock, Copy, Check, History, ArrowLeftRight, Unlink, FilterX,
 } from "lucide-react";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
@@ -254,7 +257,68 @@ function combina(q: string, campos: (string | null | undefined)[]) {
 }
 
 // Colunas ordenáveis da aba Custos.
-type CustoSort = "cliente" | "cnpj" | "custo_ds" | "mensalidade" | "markup" | "custo_oem" | "diferenca";
+type CustoSort =
+  | "cliente" | "cnpj" | "ativacao" | "fornecedor"
+  | "custo_ds" | "mensalidade" | "markup" | "custo_oem" | "diferenca";
+
+// Um funil por coluna da aba Custos.
+//
+// As faixas guardam TEXTO, não número: o campo passa por "1," no meio da
+// digitação de "1,5", e converter a cada tecla comeria a vírgula.
+type FaixaNum = { min: string; max: string };
+type FiltrosCusto = {
+  cliente: string;
+  cnpj: string;
+  ativacao: { de: string; ate: string };
+  // Ids de fornecedor como texto, que é o que o checkbox devolve. Vazio = todos.
+  fornecedor: string[];
+  custo_ds: FaixaNum;
+  mensalidade: FaixaNum;
+  markup: FaixaNum;
+  custo_oem: FaixaNum;
+  diferenca: FaixaNum;
+};
+const FAIXA_ZERO: FaixaNum = { min: "", max: "" };
+const FILTROS_CUSTO_ZERO: FiltrosCusto = {
+  cliente: "", cnpj: "", ativacao: { de: "", ate: "" }, fornecedor: [],
+  custo_ds: FAIXA_ZERO, mensalidade: FAIXA_ZERO, markup: FAIXA_ZERO,
+  custo_oem: FAIXA_ZERO, diferenca: FAIXA_ZERO,
+};
+const faixaAtiva = (f: FaixaNum) => f.min.trim() !== "" || f.max.trim() !== "";
+
+/**
+ * O que a pessoa digitou no filtro de faixa, em número.
+ *
+ * Aceita as duas escritas porque as duas aparecem: quem copia da tela cola
+ * "1.234,56" e quem digita direto escreve "1234.56". A regra é a vírgula: com
+ * ela, o ponto é separador de milhar e sai; sem ela, o ponto é o decimal.
+ * "R$", espaço e o resto caem fora antes.
+ *
+ * Campo vazio (ou que ainda não é número, como "-" ou "1,") devolve null, que
+ * o filtro lê como "sem limite deste lado" — filtrar no meio da digitação
+ * esvaziaria a tabela a cada tecla.
+ */
+const numeroDoFiltro = (s: string): number | null => {
+  const limpo = s.replace(/[^\d,.-]/g, "");
+  if (!limpo) return null;
+  const normal = limpo.includes(",")
+    ? limpo.replace(/\./g, "").replace(",", ".")
+    : limpo;
+  const v = Number(normal);
+  return Number.isFinite(v) ? v : null;
+};
+
+/** Valor dentro da faixa. Faixa vazia passa tudo; valor nulo não entra em faixa. */
+const dentroDaFaixa = (v: number | null, f: FaixaNum) => {
+  const min = numeroDoFiltro(f.min);
+  const max = numeroDoFiltro(f.max);
+  if (min == null && max == null) return true;
+  // Markup incalculável não é zero nem infinito: não cabe em faixa nenhuma.
+  if (v == null) return false;
+  if (min != null && v < min) return false;
+  if (max != null && v > max) return false;
+  return true;
+};
 
 /**
  * `ao lado` é um segundo número no mesmo card — o contraponto do principal
@@ -470,6 +534,16 @@ export default function OemIntegrationTab() {
   // que alguém conferiu, quando o que houve foi o valor bater com o do OEM.
   const [filtroCusto, setFiltroCusto] = useState<"todos" | "corrigir" | "emdia">("todos");
   const [custoDir, setCustoDir] = useState<"asc" | "desc">("asc");
+  // O funil de cada coluna. Tudo num objeto só (e não nove estados soltos) por
+  // causa do "Limpar filtros": com nove setters, limpar tudo seria nove
+  // chamadas e qualquer coluna nova ficaria de fora sem ninguém perceber.
+  const [filtrosCusto, setFiltrosCusto] = useState<FiltrosCusto>(FILTROS_CUSTO_ZERO);
+  // Toda mexida em filtro volta para a primeira página: filtrar estando na
+  // página 9 de 18 mostraria "nenhum cliente" com a lista cheia atrás.
+  const mexerFiltroCusto = <K extends keyof FiltrosCusto>(campo: K, valor: FiltrosCusto[K]) => {
+    setFiltrosCusto((f) => ({ ...f, [campo]: valor }));
+    setPaginaCusto(0);
+  };
   // A aba Custos tem duas leituras do mesmo assunto, e elas têm ESCOPOS
   // OPOSTOS: a tabela de custos só olha par confirmado com licença ativa (é
   // dela que sai o markup), e a conciliação existe justamente para mostrar
@@ -546,13 +620,18 @@ export default function OemIntegrationTab() {
       fetchAllRows<{
         oem_codigo_filial: string; cliente_id: string; produto_id: number;
         vlr_custo: number | null; ativo: boolean;
+        // Quando a licença entrou e de quem ela é. Vêm na mesma linha do custo
+        // porque são da mesma ficha: a tabela de preços do parceiro só vale
+        // para quem entrou depois dela, e é a data que explica o cliente que
+        // custa menos do que a tabela de hoje cobra.
+        data_ativacao: string | null; fornecedor_id: number | null;
         // O nome vem junto porque a divergência do código em produto de outro
         // fornecedor tira o cliente da reconciliação: sem ele aqui, a linha
         // aparecia com "—" no lugar do nome.
         clientes?: { nome_fantasia: string | null; razao_social: string | null } | null;
       }>(() => {
         let q = (supabase.from("cliente_produtos" as any) as any)
-          .select("oem_codigo_filial, cliente_id, produto_id, vlr_custo, ativo, clientes!inner(unidade_base_id, nome_fantasia, razao_social)")
+          .select("oem_codigo_filial, cliente_id, produto_id, vlr_custo, ativo, data_ativacao, fornecedor_id, clientes!inner(unidade_base_id, nome_fantasia, razao_social)")
           .eq("tenant_id", tid)
           .not("oem_codigo_filial", "is", null);
         // A aba é da unidade desta conta: o custo digitado na ficha de um
@@ -639,6 +718,46 @@ export default function OemIntegrationTab() {
       if (!p.ativo) continue;
       const k = String(p.oem_codigo_filial);
       m.set(k, (m.get(k) ?? 0) + Number(p.vlr_custo || 0));
+    }
+    return m;
+  }, [produtosOem]);
+
+  // Data de ativação e fornecedor DA FICHA daquela filial.
+  //
+  // Diferente do custo, aqui não há o que somar: são atributos, e a linha ativa
+  // manda. A inativa entra só quando não sobrou nenhuma ativa — é o mesmo
+  // critério do fornecedor do cliente, e é o que dá data ao produto que foi
+  // cancelado e recontratado (senão a coluna ficaria vazia justo em quem tem
+  // história). Com duas linhas ativas, a data que vale é a mais ANTIGA: a
+  // pergunta é desde quando o cliente está na base, não qual foi a última
+  // mexida na ficha.
+  //
+  // Medido em 15/09/2026: das 898 fichas com código de filial, 4 têm mais de
+  // uma linha e nenhuma delas discorda na data nem no fornecedor. O desempate
+  // existe para não mentir se isso mudar, não porque acontece hoje.
+  const fichaOemPorFilial = useMemo(() => {
+    const m = new Map<string, { ativacao: string | null; fornecedorId: number | null }>();
+    const ativas = new Set<string>();
+    for (const p of produtosOem) {
+      const k = String(p.oem_codigo_filial);
+      // Achou a primeira ativa de uma filial que só tinha inativa: recomeça.
+      if (p.ativo && !ativas.has(k)) {
+        ativas.add(k);
+        m.delete(k);
+      } else if (!p.ativo && ativas.has(k)) {
+        continue;
+      }
+      const atual = m.get(k);
+      if (!atual) {
+        m.set(k, { ativacao: p.data_ativacao ?? null, fornecedorId: p.fornecedor_id ?? null });
+        continue;
+      }
+      if (p.data_ativacao && (!atual.ativacao || p.data_ativacao < atual.ativacao)) {
+        atual.ativacao = p.data_ativacao;
+      }
+      if (atual.fornecedorId == null && p.fornecedor_id != null) {
+        atual.fornecedorId = p.fornecedor_id;
+      }
     }
     return m;
   }, [produtosOem]);
@@ -1233,12 +1352,14 @@ export default function OemIntegrationTab() {
     type Linha = {
       id: string; cliente: string; cnpj: string | null; filiais: string[];
       mensalidade: number; custo_ds: number; custo_oem: number;
+      ativacao: string | null; fornecedores: number[];
     };
     const porCliente = new Map<string, Linha>();
     for (const l of confirmadas) {
       const k = l.ds_customer_id!;
       const filial = String(l.filial_codigo);
       const custoDs = custoDsPorFilial.get(filial) ?? 0;
+      const ficha = fichaOemPorFilial.get(filial);
       const atual = porCliente.get(k);
       if (!atual) {
         porCliente.set(k, {
@@ -1251,16 +1372,31 @@ export default function OemIntegrationTab() {
           mensalidade: Number(l.mensalidade_ds || 0),
           custo_ds: custoDs,
           custo_oem: Number(l.custo_oem || 0),
+          // Data e fornecedor não somam: numa linha de cliente com várias
+          // licenças, a data é a da PRIMEIRA delas (desde quando ele está na
+          // base) e o fornecedor lista o que aparecer, sem escolher um.
+          ativacao: ficha?.ativacao ?? null,
+          fornecedores: ficha?.fornecedorId != null ? [ficha.fornecedorId] : [],
         });
       } else {
         atual.filiais.push(filial);
         atual.custo_ds += custoDs;
         atual.custo_oem += Number(l.custo_oem || 0);
+        if (ficha?.ativacao && (!atual.ativacao || ficha.ativacao < atual.ativacao)) {
+          atual.ativacao = ficha.ativacao;
+        }
+        if (ficha?.fornecedorId != null && !atual.fornecedores.includes(ficha.fornecedorId)) {
+          atual.fornecedores.push(ficha.fornecedorId);
+        }
       }
     }
 
     const lista = [...porCliente.values()].map((c) => ({
       ...c,
+      // O nome resolvido aqui, e não no render: é por ele que a coluna ordena e
+      // que a busca encontra ("Base BM"), e resolver na hora de desenhar faria
+      // a ordenação comparar número de fornecedor.
+      fornecedorNome: c.fornecedores.map(nomeFornecedor).sort((a, b) => a.localeCompare(b, "pt-BR")).join(" · "),
       // Markup é quantas vezes a mensalidade cobre o custo da licença, e o
       // divisor é SEMPRE o custo do OEM (decisão do Alexandre, 17/08/2026: o
       // valor do OEM é o correto por definição; o do DoctorSaaS é cópia que
@@ -1307,7 +1443,7 @@ export default function OemIntegrationTab() {
       divergentes: lista.filter((c) => c.divergente).length,
       emDia: lista.filter((c) => !c.divergente).length,
     };
-  }, [linhas, filiaisComCodigo, custoDsPorFilial]);
+  }, [linhas, filiaisComCodigo, custoDsPorFilial, fichaOemPorFilial, nomeFornecedor]);
 
   // ------------------------------------------------------- Conciliação
   // Os dois cadastros um de frente para o outro, na mesma linha. A pergunta
@@ -2130,9 +2266,34 @@ export default function OemIntegrationTab() {
     const porEstado = filtroCusto === "todos"
       ? custos.lista
       : custos.lista.filter((c) => (filtroCusto === "corrigir" ? c.divergente : !c.divergente));
-    const base = q
-      ? porEstado.filter((c) => combina(q, [c.cliente, c.cnpj, ...c.filiais]))
+    const buscados = q
+      ? porEstado.filter((c) => combina(q, [c.cliente, c.cnpj, c.fornecedorNome, ...c.filiais]))
       : porEstado;
+
+    // Os funis de coluna, todos em E: cada um estreita o que o anterior deixou
+    // passar. É o que a pessoa espera de filtro de planilha, e é o que faz
+    // "PDV Legal - Base BM com markup abaixo de 1,5" ser uma pergunta só.
+    const f = filtrosCusto;
+    const fornecedores = new Set(f.fornecedor);
+    const base = buscados.filter((c) => {
+      if (f.cliente.trim() && !combina(f.cliente.trim().toLowerCase(), [c.cliente])) return false;
+      if (f.cnpj.trim() && !combina(f.cnpj.trim().toLowerCase(), [c.cnpj])) return false;
+      // Data em ISO compara como texto, e é por isso que ela não passa por
+      // `new Date`: "2026-09-10" lido como UTC viraria dia 9 em Brasília.
+      if (f.ativacao.de && (!c.ativacao || c.ativacao < f.ativacao.de)) return false;
+      if (f.ativacao.ate && (!c.ativacao || c.ativacao > f.ativacao.ate)) return false;
+      // Nada marcado = todos passam. Ficha sem fornecedor fica fora quando há
+      // marcação: ela não é nenhum dos fornecedores escolhidos.
+      if (fornecedores.size && !c.fornecedores.some((id) => fornecedores.has(String(id)))) {
+        return false;
+      }
+      if (!dentroDaFaixa(c.custo_ds, f.custo_ds)) return false;
+      if (!dentroDaFaixa(c.mensalidade, f.mensalidade)) return false;
+      if (!dentroDaFaixa(c.markup, f.markup)) return false;
+      if (!dentroDaFaixa(c.custo_oem, f.custo_oem)) return false;
+      if (!dentroDaFaixa(c.diferenca, f.diferenca)) return false;
+      return true;
+    });
 
     const dir = custoDir === "asc" ? 1 : -1;
     const numero = (c: (typeof base)[number]) =>
@@ -2148,6 +2309,21 @@ export default function OemIntegrationTab() {
     return [...base].sort((a, b) => {
       if (custoSort === "cliente") return dir * a.cliente.localeCompare(b.cliente, "pt-BR");
       if (custoSort === "cnpj") return dir * String(a.cnpj ?? "").localeCompare(String(b.cnpj ?? ""));
+      if (custoSort === "fornecedor") {
+        // Empate de fornecedor cai no nome do cliente: com 853 linhas do mesmo
+        // fornecedor, ordem indefinida entre elas embaralharia a lista a cada
+        // render e faria a mesma página mostrar clientes diferentes.
+        const f = a.fornecedorNome.localeCompare(b.fornecedorNome, "pt-BR");
+        return f !== 0 ? dir * f : a.cliente.localeCompare(b.cliente, "pt-BR");
+      }
+      if (custoSort === "ativacao") {
+        // ISO compara como texto, sem `new Date` no meio (que leria "2026-09-10"
+        // como UTC e, em Brasília, viraria dia 9). Ficha sem data vai para o
+        // fim nas duas direções: é ausência, não a data mais antiga.
+        if (!a.ativacao) return b.ativacao ? 1 : 0;
+        if (!b.ativacao) return -1;
+        return dir * a.ativacao.localeCompare(b.ativacao);
+      }
       const na = numero(a);
       const nb = numero(b);
       // Markup incalculável fica no fim nas duas direções: ele não é o menor
@@ -2156,7 +2332,42 @@ export default function OemIntegrationTab() {
       if (nb == null) return -1;
       return dir * (na - nb);
     });
-  }, [custos.lista, buscaCusto, filtroCusto, custoSort, custoDir]);
+  }, [custos.lista, buscaCusto, filtroCusto, custoSort, custoDir, filtrosCusto]);
+
+  // Quais colunas estão filtrando. O número vai para o botão "Limpar filtros",
+  // e cada entrada pinta o funil da sua coluna.
+  const funilAtivo = useMemo(() => {
+    const f = filtrosCusto;
+    const mapa = {
+      cliente: f.cliente.trim() !== "",
+      cnpj: f.cnpj.trim() !== "",
+      ativacao: f.ativacao.de !== "" || f.ativacao.ate !== "",
+      fornecedor: f.fornecedor.length > 0,
+      custo_ds: faixaAtiva(f.custo_ds),
+      mensalidade: faixaAtiva(f.mensalidade),
+      markup: faixaAtiva(f.markup),
+      custo_oem: faixaAtiva(f.custo_oem),
+      diferenca: faixaAtiva(f.diferenca),
+    };
+    return { ...mapa, quantos: Object.values(mapa).filter(Boolean).length };
+  }, [filtrosCusto]);
+
+  // As opções do funil de Fornecedor saem da própria lista, com a contagem de
+  // cada uma: opção fixa em código apareceria com zero linha no tenant que não
+  // usa aquele fornecedor, e a contagem é o que evita o clique que volta vazio.
+  //
+  // Conta sobre a lista INTEIRA da aba, não sobre o que os outros funis
+  // deixaram passar: número que muda conforme o filtro do vizinho faria a
+  // opção de 44 linhas aparecer como 3 e parecer erro.
+  const opcoesFornecedor = useMemo(() => {
+    const n = new Map<number, number>();
+    for (const c of custos.lista) {
+      for (const id of c.fornecedores) n.set(id, (n.get(id) ?? 0) + 1);
+    }
+    return [...n.entries()]
+      .map(([id, qtd]) => ({ valor: String(id), rotulo: nomeFornecedor(id), n: qtd }))
+      .sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR"));
+  }, [custos.lista, nomeFornecedor]);
 
   // Ordem: primeiro o que não tem par, depois o que tem. Quem abre a
   // conciliação vem procurar o que sobra de um lado; com 877 linhas em ordem
@@ -2209,8 +2420,11 @@ export default function OemIntegrationTab() {
     } else {
       setCustoSort(campo);
       // Nome começa em A→Z; dinheiro, do maior para o menor, que é onde está o
-      // que importa olhar.
-      setCustoDir(campo === "cliente" || campo === "cnpj" ? "asc" : "desc");
+      // que importa olhar. Data entra com a mais RECENTE no topo: é o cliente
+      // que acabou de entrar que tem que estar na tabela de preços de hoje.
+      setCustoDir(
+        campo === "cliente" || campo === "cnpj" || campo === "fornecedor" ? "asc" : "desc",
+      );
     }
     setPaginaCusto(0);
   }
@@ -2247,24 +2461,75 @@ export default function OemIntegrationTab() {
     }
   }
 
-  // Cabeçalho clicável. É função, não componente, para não remontar (e perder o
-  // foco) a cada re-render da tabela.
-  function thCusto(campo: CustoSort, rotulo: React.ReactNode, cls: string, direita = false) {
+  // Cabeçalho clicável, agora com o funil de filtro ao lado da ordenação. É
+  // função, não componente, para não remontar (e perder o foco) a cada
+  // re-render da tabela.
+  //
+  // A célula deixou de SER o botão e passou a CONTER um: botão dentro de botão
+  // é HTML inválido, e o clique no funil subiria para a ordenação — cada
+  // abertura do filtro reordenaria a tabela por baixo do popover.
+  //
+  // O funil vai na ponta EXTERNA da célula: à direita nas colunas de texto, à
+  // esquerda nas de número. Nas de número o rótulo tem que continuar encostado
+  // na borda direita, que é onde os valores estão alinhados embaixo; um funil
+  // depois dele empurraria o cabeçalho ~20px para dentro e desalinharia a
+  // coluna inteira.
+  function thCusto(
+    campo: CustoSort, rotulo: React.ReactNode, cls: string, direita = false,
+    filtro?: React.ReactNode,
+  ) {
     const ativo = custoSort === campo;
     const Icone = !ativo ? ArrowUpDown : custoDir === "asc" ? ArrowUp : ArrowDown;
     return (
-      <button
-        type="button"
-        onClick={() => ordenarCusto(campo)}
-        className={`flex items-center gap-1 hover:text-foreground transition-colors ${
-          direita ? "justify-end" : ""
-        } ${ativo ? "text-foreground" : ""} ${cls}`}
-      >
-        {direita && <Icone className={`h-3 w-3 ${ativo ? "" : "opacity-40"}`} />}
-        <span className="truncate">{rotulo}</span>
-        {!direita && <Icone className={`h-3 w-3 ${ativo ? "" : "opacity-40"}`} />}
-      </button>
+      <div className={`flex items-center gap-1 ${direita ? "justify-end" : ""} ${cls}`}>
+        {direita && filtro}
+        <button
+          type="button"
+          onClick={() => ordenarCusto(campo)}
+          className={`flex min-w-0 items-center gap-1 transition-colors hover:text-foreground ${
+            direita ? "justify-end" : ""
+          } ${ativo ? "text-foreground" : ""}`}
+        >
+          {direita && <Icone className={`h-3 w-3 shrink-0 ${ativo ? "" : "opacity-40"}`} />}
+          <span className="truncate">{rotulo}</span>
+          {!direita && <Icone className={`h-3 w-3 shrink-0 ${ativo ? "" : "opacity-40"}`} />}
+        </button>
+        {!direita && filtro}
+      </div>
     );
+  }
+
+  // O funil de uma coluna, com o conteúdo certo para o tipo dela. Fica junto do
+  // `thCusto` porque os dois são a mesma célula partida em dois pedaços.
+  function funilCusto(campo: keyof FiltrosCusto, titulo: string, conteudo: React.ReactNode) {
+    return (
+      <ColumnFilter
+        titulo={titulo}
+        ativo={funilAtivo[campo]}
+        onLimpar={() => mexerFiltroCusto(campo, FILTROS_CUSTO_ZERO[campo])}
+        align={campo === "diferenca" ? "end" : "start"}
+        largura={campo === "fornecedor" ? "w-72" : "w-64"}
+      >
+        {conteudo}
+      </ColumnFilter>
+    );
+  }
+
+  // Faixa de dinheiro ou de número puro, que é o conteúdo de 5 das 9 colunas.
+  function funilFaixa(
+    campo: "custo_ds" | "mensalidade" | "markup" | "custo_oem" | "diferenca",
+    titulo: string, prefixo?: string, dica?: string,
+  ) {
+    const faixa = filtrosCusto[campo];
+    return funilCusto(campo, titulo, (
+      <FiltroFaixa
+        min={faixa.min}
+        max={faixa.max}
+        onChange={(v) => mexerFiltroCusto(campo, v)}
+        prefixo={prefixo}
+        dica={dica}
+      />
+    ));
   }
 
   async function sincronizar() {
@@ -3771,6 +4036,13 @@ export default function OemIntegrationTab() {
             a conta do markup não fecha com o número da coluna ao lado, e quem está errado é o
             Custo DS. Só entram os clientes com <strong>vínculo confirmado</strong> e licença
             ativa: sem confirmação, o custo seria atribuído no chute.
+            <br /><br />
+            <strong>Data Ativação</strong> e <strong>Fornecedor</strong> saem da ficha do produto
+            aqui, e não do OEM, que não informa desde quando a licença existe. A data é a que
+            explica custo antigo em cliente antigo: reajuste de tabela do parceiro só vale para
+            quem entra depois dele, então diferença concentrada em ativação recente é tabela nova,
+            e não cadastro errado. Em cliente com mais de uma licença, a data mostrada é a da{" "}
+            <strong>primeira</strong>.
           </Explica>
 
           <Card>
@@ -3821,7 +4093,7 @@ export default function OemIntegrationTab() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     className="pl-9"
-                    placeholder="Buscar por cliente, CNPJ ou filial…"
+                    placeholder="Buscar por cliente, CNPJ, filial ou fornecedor…"
                     value={buscaCusto}
                     onChange={(e) => { setBuscaCusto(e.target.value); setPaginaCusto(0); }}
                   />
@@ -3848,31 +4120,107 @@ export default function OemIntegrationTab() {
                     </button>
                   ))}
                 </div>
+                {/* Sair de um filtro de coluna sem este botão é abrir funil por
+                    funil para descobrir qual estava ligado. O contador diz
+                    quantas colunas estão recortando, que é o que o funil
+                    pintado não consegue dizer quando a tabela rola para o lado
+                    e o cabeçalho filtrado está fora da tela. */}
+                {funilAtivo.quantos > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-muted-foreground"
+                    onClick={() => { setFiltrosCusto(FILTROS_CUSTO_ZERO); setPaginaCusto(0); }}
+                  >
+                    <FilterX className="h-4 w-4" />
+                    Limpar {funilAtivo.quantos} filtro{funilAtivo.quantos > 1 ? "s" : ""} de coluna
+                  </Button>
+                )}
               </div>
 
               <div className="overflow-x-auto">
-                <div className="min-w-[1064px]">
+                <div className="min-w-[1392px]">
                   <div className="flex items-center gap-3 border-y bg-muted/50 px-6 py-2 text-xs font-medium text-muted-foreground">
-                    {thCusto("cliente", "Cliente", "min-w-0 flex-1")}
-                    {thCusto("cnpj", "CNPJ/CPF", "w-40 shrink-0")}
-                    {thCusto("custo_ds", <span className="text-emerald-600 dark:text-emerald-400">Custo DS</span>, "w-28 shrink-0", true)}
-                    {thCusto("mensalidade", <span className="text-emerald-600 dark:text-emerald-400">Mensalidade DS</span>, "w-32 shrink-0", true)}
-                    {thCusto("markup", "Markup", "w-24 shrink-0", true)}
-                    {thCusto("custo_oem", <span className="text-sky-600 dark:text-sky-400">Custo OEM</span>, "w-28 shrink-0", true)}
-                    {thCusto("diferenca", "Diferença", "w-28 shrink-0", true)}
+                    {thCusto("cliente", "Cliente", "min-w-0 flex-1", false,
+                      funilCusto("cliente", "Cliente", (
+                        <FiltroTexto
+                          valor={filtrosCusto.cliente}
+                          onChange={(v) => mexerFiltroCusto("cliente", v)}
+                          placeholder="Nome contém…"
+                        />
+                      )))}
+                    {thCusto("cnpj", "CNPJ/CPF", "w-40 shrink-0", false,
+                      funilCusto("cnpj", "CNPJ/CPF", (
+                        <FiltroTexto
+                          valor={filtrosCusto.cnpj}
+                          onChange={(v) => mexerFiltroCusto("cnpj", v)}
+                          placeholder="Com ou sem pontuação"
+                        />
+                      )))}
+                    {/* Identificação primeiro, dinheiro depois: data e
+                        fornecedor dizem QUEM é a licença, e entrar no meio das
+                        colunas de valor quebraria a leitura dos dois custos
+                        lado a lado, que é o que a aba existe para mostrar. */}
+                    {thCusto("ativacao", "Data Ativação", "w-36 shrink-0", false,
+                      funilCusto("ativacao", "Data Ativação", (
+                        <FiltroData
+                          de={filtrosCusto.ativacao.de}
+                          ate={filtrosCusto.ativacao.ate}
+                          onChange={(v) => mexerFiltroCusto("ativacao", v)}
+                        />
+                      )))}
+                    {thCusto("fornecedor", "Fornecedor", "w-36 shrink-0", false,
+                      funilCusto("fornecedor", "Fornecedor", (
+                        <FiltroOpcoes
+                          opcoes={opcoesFornecedor}
+                          selecionadas={filtrosCusto.fornecedor}
+                          onChange={(v) => mexerFiltroCusto("fornecedor", v)}
+                        />
+                      )))}
+                    {thCusto("custo_ds", <span className="text-emerald-600 dark:text-emerald-400">Custo DS</span>, "w-28 shrink-0", true,
+                      funilFaixa("custo_ds", "Custo DS", "R$"))}
+                    {thCusto("mensalidade", <span className="text-emerald-600 dark:text-emerald-400">Mensalidade DS</span>, "w-36 shrink-0", true,
+                      funilFaixa("mensalidade", "Mensalidade DS", "R$"))}
+                    {thCusto("markup", "Markup", "w-24 shrink-0", true,
+                      funilFaixa("markup", "Markup", undefined,
+                        "Quantas vezes a mensalidade cobre o custo do OEM. Licença sem custo fica de fora da faixa."))}
+                    {thCusto("custo_oem", <span className="text-sky-600 dark:text-sky-400">Custo OEM</span>, "w-28 shrink-0", true,
+                      funilFaixa("custo_oem", "Custo OEM", "R$"))}
+                    {thCusto("diferenca", "Diferença", "w-28 shrink-0", true,
+                      funilFaixa("diferenca", "Diferença", "R$",
+                        "Vale o sinal: negativo é cadastro acima do que a licença cobra."))}
                     <span className="w-36 shrink-0 text-right">Ação</span>
                   </div>
 
                   {custosPagina.length === 0 ? (
-                    <p className="px-6 py-8 text-sm text-muted-foreground text-center">
-                      {custos.lista.length === 0
-                        ? "Nenhum cliente com vínculo confirmado e licença ativa nesta conta."
-                        : filtroCusto === "corrigir" && custos.divergentes === 0
-                          ? "Nenhum cliente a corrigir: todos os custos estão iguais aos do OEM."
-                          : buscaCusto.trim()
-                            ? "Nenhum cliente encontrado para esta busca."
-                            : "Nenhum cliente neste filtro."}
-                    </p>
+                    <div className="px-6 py-8 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        {custos.lista.length === 0
+                          ? "Nenhum cliente com vínculo confirmado e licença ativa nesta conta."
+                          : filtroCusto === "corrigir" && custos.divergentes === 0
+                            ? "Nenhum cliente a corrigir: todos os custos estão iguais aos do OEM."
+                            : funilAtivo.quantos > 0
+                              // Lista vazia com funil ligado é o caso em que a
+                              // pessoa mais precisa saber POR QUE ela está
+                              // vazia: sem isso, a faixa digitada errado lê
+                              // como "não existe cliente assim".
+                              ? "Nenhum cliente passa pelos filtros de coluna."
+                              : buscaCusto.trim()
+                                ? "Nenhum cliente encontrado para esta busca."
+                                : "Nenhum cliente neste filtro."}
+                      </p>
+                      {funilAtivo.quantos > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-3 gap-1.5"
+                          onClick={() => { setFiltrosCusto(FILTROS_CUSTO_ZERO); setPaginaCusto(0); }}
+                        >
+                          <FilterX className="h-4 w-4" />
+                          Limpar filtros de coluna
+                        </Button>
+                      )}
+                    </div>
                   ) : (
                     <div className="divide-y">
                       {custosPagina.map((c) => (
@@ -3898,6 +4246,24 @@ export default function OemIntegrationTab() {
                           <span className="w-40 shrink-0 tabular-nums text-muted-foreground">
                             {doc(c.cnpj)}
                           </span>
+                          {/* Ficha sem data não fica em branco: em branco leria
+                              como "sem licença", e o que falta é o cadastro. */}
+                          <span
+                            className="w-36 shrink-0 tabular-nums text-muted-foreground"
+                            title={c.ativacao
+                              ? c.filiais.length > 1
+                                ? "Ativação da primeira licença deste cliente"
+                                : "Ativação na ficha do produto, no DoctorSaaS"
+                              : "Sem data de ativação na ficha do produto"}
+                          >
+                            {c.ativacao ? dataBR(c.ativacao) : "—"}
+                          </span>
+                          <span
+                            className="w-36 shrink-0 truncate text-muted-foreground"
+                            title={c.fornecedorNome || "Ficha do produto sem fornecedor"}
+                          >
+                            {c.fornecedorNome || "—"}
+                          </span>
                           <span
                             className={`w-28 shrink-0 text-right tabular-nums ${
                               c.divergente ? "text-amber-600 dark:text-amber-400 font-medium" : ""
@@ -3908,7 +4274,7 @@ export default function OemIntegrationTab() {
                           >
                             {brl(c.custo_ds)}
                           </span>
-                          <span className="w-32 shrink-0 text-right tabular-nums">
+                          <span className="w-36 shrink-0 text-right tabular-nums">
                             {brl(c.mensalidade)}
                           </span>
                           <span
