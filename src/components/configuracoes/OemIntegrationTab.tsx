@@ -2508,7 +2508,7 @@ export default function OemIntegrationTab() {
         ativo={funilAtivo[campo]}
         onLimpar={() => mexerFiltroCusto(campo, FILTROS_CUSTO_ZERO[campo])}
         align={campo === "diferenca" ? "end" : "start"}
-        largura={campo === "fornecedor" ? "w-72" : "w-64"}
+        largura="w-72"
       >
         {conteudo}
       </ColumnFilter>

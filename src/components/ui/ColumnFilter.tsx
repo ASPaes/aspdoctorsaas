@@ -41,7 +41,7 @@ export function ColumnFilter({
   onLimpar,
   children,
   align = "start",
-  largura = "w-64",
+  largura = "w-72",
 }: ColumnFilterProps) {
   return (
     <Popover>
@@ -168,26 +168,34 @@ export function FiltroData({
   ate: string;
   onChange: (v: { de: string; ate: string }) => void;
 }) {
+  // UM EM CIMA DO OUTRO, e não lado a lado.
+  //
+  // Campo de data nativo tem largura mínima própria: "dd/mm/aaaa" mais o ícone
+  // do calendário não cabem em meia largura de popover, e o Chrome não encolhe
+  // nem quebra — ele CORTA a direita. O que se perde é justamente o ícone e o
+  // fim do "aaaa", então o campo "Até" ficava impossível de preencher.
+  // Empilhado, cada campo tem a largura inteira do popover e a conta não
+  // depende de quanto o texto do ano mede em cada navegador.
   return (
-    <div className="flex items-end gap-2">
-      <label className="flex-1 space-y-1">
+    <div className="space-y-2">
+      <label className="block space-y-1">
         <span className="text-xs text-muted-foreground">De</span>
         <Input
           type="date"
           value={de}
           max={ate || undefined}
           onChange={(e) => onChange({ de: e.target.value, ate })}
-          className="h-8"
+          className="h-8 w-full"
         />
       </label>
-      <label className="flex-1 space-y-1">
+      <label className="block space-y-1">
         <span className="text-xs text-muted-foreground">Até</span>
         <Input
           type="date"
           value={ate}
           min={de || undefined}
           onChange={(e) => onChange({ de, ate: e.target.value })}
-          className="h-8"
+          className="h-8 w-full"
         />
       </label>
     </div>
