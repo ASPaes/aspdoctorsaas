@@ -20,8 +20,9 @@ import {
   formatarTamanho,
   htmlParaEmail,
 } from "@/components/whatsapp/chat/email/travaEnvioEmail";
+import { buscarAnexo } from "./AnexosDoEmail";
 import { useOpcoesFiltro } from "./useEmailsEnviados";
-import { uploadAnexoEmail } from "./uploadAnexoEmail";
+import { uploadAnexoEmail } from "@/components/whatsapp/chat/email/uploadAnexoEmail";
 import {
   ORIGEM_DO_MODO,
   ROTULO_MODO,
@@ -46,8 +47,8 @@ export interface EmailOriginal {
   departmentId?: string | null;
   /** atendimento ou ticket a que o e-mail já estava ligado */
   referenciaId?: string | null;
-  /** só para avisar no encaminhar: os arquivos do original não vão junto */
-  temAnexos?: boolean;
+  /** anexos guardados do e-mail recebido; no encaminhar eles já entram prontos */
+  anexos?: { nome: string; mime: string; tamanho: number; caminho: string }[];
 }
 
 export interface PedidoEscrita {
@@ -56,14 +57,50 @@ export interface PedidoEscrita {
 }
 
 /**
+ * Anexos do original já prontos para o encaminhamento: nada sobe de novo, o
+ * caminho no Storage é que vai no envio. Os mesmos limites do anexo comum valem
+ * aqui, e o que passar do teto fica de fora com aviso, em vez de derrubar o envio.
+ */
+function anexosDoOriginal(lista: NonNullable<EmailOriginal["anexos"]>): {
+  anexos: AnexoNaTela[];
+  deixados: string[];
+} {
+  const anexos: AnexoNaTela[] = [];
+  const deixados: string[] = [];
+  let total = 0;
+
+  for (const a of lista) {
+    if (!anexoPermitido(a.mime, a.nome)) {
+      deixados.push(`${a.nome} (tipo de arquivo não aceito)`);
+    } else if (anexos.length >= ANEXO_MAX_ARQUIVOS) {
+      deixados.push(`${a.nome} (passou de ${ANEXO_MAX_ARQUIVOS} arquivos)`);
+    } else if (total + a.tamanho > ANEXO_MAX_TOTAL_BYTES) {
+      deixados.push(`${a.nome} (passou de ${formatarTamanho(ANEXO_MAX_TOTAL_BYTES)} somados)`);
+    } else {
+      total += a.tamanho;
+      anexos.push({
+        id: crypto.randomUUID(),
+        nome: a.nome,
+        tamanho: a.tamanho,
+        mime: a.mime,
+        status: "pronto",
+        path: a.caminho,
+        bucket: "ticket-attachments",
+      });
+    }
+  }
+  return { anexos, deixados };
+}
+
+/**
  * Responder, responder a todos e encaminhar pela tela E-mails (entrega 3,
  * 15/09/2026). É a tela de escrever e-mail FORA do chat: o editor, o anexo e o
  * campo de destinatários são os mesmos do chat, e quem envia continua sendo a
  * send-email (porta única de saída, com assinatura e registro em email_envios).
  *
- * Anexo do e-mail original NÃO vai junto no encaminhar: os arquivos recebidos
- * moram em outro bucket e reenviá-los exige mais do que esta entrega. A tela
- * avisa quando isso acontece, em vez de encaminhar sem os arquivos em silêncio.
+ * Encaminhar leva os anexos do original junto (16/09/2026): eles já estão no
+ * bucket `ticket-attachments` e vão pela send-email pelo caminho, sem passar
+ * pelo navegador. O cartão deixa tirar o que não deve ir, e ver ou baixar antes.
  */
 export function EscreverEmailDialog({
   pedido,
@@ -99,7 +136,6 @@ export function EscreverEmailDialog({
   const original = pedido?.original;
   const modo = pedido?.modo ?? "responder";
   const anexando = anexos.some((a) => a.status === "enviando");
-  const temAnexoNoOriginal = modo === "encaminhar" && original?.temAnexos === true;
 
   // cada abertura monta destinatários, assunto e citação a partir do original
   useEffect(() => {
@@ -132,7 +168,11 @@ export function EscreverEmailDialog({
       }),
     );
     setVersaoCorpo((v) => v + 1);
-    setAnexos([]);
+    const doOriginal = pedido.modo === "encaminhar" ? anexosDoOriginal(original.anexos ?? []) : { anexos: [], deixados: [] };
+    setAnexos(doOriginal.anexos);
+    if (doOriginal.deixados.length) {
+      toast.warning(`Não coube no encaminhamento: ${doOriginal.deixados.join("; ")}.`, { duration: 10000 });
+    }
     setEnviando(false);
     setContaId(contas.length === 1 ? contas[0].id : "");
   }, [pedido, original, contas, contasDoTenant]);
@@ -215,7 +255,7 @@ export function EscreverEmailDialog({
           department_id: original.departmentId ?? null,
           anexos: anexos
             .filter((a) => a.status === "pronto" && a.path)
-            .map((a) => ({ path: a.path!, nome: a.nome, mime: a.mime })),
+            .map((a) => ({ path: a.path!, nome: a.nome, mime: a.mime, bucket: a.bucket ?? "whatsapp-media" })),
         },
       });
 
@@ -358,11 +398,18 @@ export function EscreverEmailDialog({
               rodape={
                 <p className="mb-1 mt-3 text-xs text-muted-foreground">
                   A assinatura da conta remetente entra automaticamente no envio.
-                  {temAnexoNoOriginal && " Os anexos do e-mail original não vão junto: anexe de novo se precisar."}
                 </p>
               }
             />
-            <ListaAnexos anexos={anexos} onRemover={(id) => setAnexos((l) => l.filter((a) => a.id !== id))} />
+            <ListaAnexos
+              anexos={anexos}
+              onRemover={(id) => setAnexos((l) => l.filter((a) => a.id !== id))}
+              buscarRemoto={(a) =>
+                a.bucket === "ticket-attachments" && a.path
+                  ? buscarAnexo(a.path)
+                  : Promise.reject(new Error("Este arquivo ainda está sendo anexado."))
+              }
+            />
           </div>
         </div>
 

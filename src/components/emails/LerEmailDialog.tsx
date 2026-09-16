@@ -32,7 +32,7 @@ interface Props {
 }
 
 const COLUNAS_ENVIADO =
-  "id, created_at, assunto, remetente, para, cc, origem, status, erro, corpo_texto, corpo_html, arquivado_em, deleted_at, " +
+  "id, created_at, assunto, remetente, para, cc, cco, origem, status, erro, corpo_texto, corpo_html, arquivado_em, deleted_at, " +
   "cliente_id, department_id, referencia_id, " +
   "pasta_id, email_pastas(nome, cor), email_accounts(email, rotulo), clientes(razao_social, nome_fantasia), support_departments(name)";
 
@@ -68,7 +68,7 @@ export function LerEmailDialog({ tipo, id, onOpenChange }: Props) {
         clienteId: email.cliente_id ?? null,
         departmentId: email.department_id ?? null,
         referenciaId: email.referencia_id ?? email.ticket_id ?? null,
-        temAnexos: (email.anexos ?? []).length > 0,
+        anexos: tipo === "recebido" ? (email.anexos ?? []) : [],
       },
     });
   };
@@ -147,6 +147,15 @@ export function LerEmailDialog({ tipo, id, onOpenChange }: Props) {
                 <>
                   <dt className="text-muted-foreground">Cc</dt>
                   <dd className="min-w-0 break-words">{email.cc.join(", ")}</dd>
+                </>
+              )}
+              {tipo === "enviado" && (email.cco ?? []).length > 0 && (
+                <>
+                  <dt className="text-muted-foreground">Cco</dt>
+                  <dd className="min-w-0 break-words">
+                    {email.cco.join(", ")}
+                    <span className="ml-1.5 text-[11px] text-muted-foreground">(quem recebeu não vê esta lista)</span>
+                  </dd>
                 </>
               )}
               <dt className="text-muted-foreground">{tipo === "enviado" ? "Enviado" : "Recebido"}</dt>

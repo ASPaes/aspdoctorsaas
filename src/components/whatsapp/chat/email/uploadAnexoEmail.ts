@@ -1,13 +1,18 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Anexo escolhido na tela E-mails (responder, encaminhar).
+ * Anexo escolhido para enviar por e-mail, no chat ou na tela E-mails.
  *
- * Mesmo caminho do anexo do chat: quem assina a URL é a edge function
- * `get-media-upload-url`, com service_role — upload direto do navegador para o
- * Storage não funciona neste projeto. A diferença é que aqui não existe
- * conversa, então mandamos o tenant e o arquivo cai em `<tenant>/emails/`.
- * A send-email aceita esse formato de caminho e apaga o arquivo depois de enviar.
+ * Quem assina a URL é a edge function `get-media-upload-url`, com service_role
+ * — upload direto do navegador para o Storage não funciona neste projeto. Aqui
+ * mandamos o tenant em vez da conversa, e o arquivo cai em `<tenant>/emails/`.
+ * A send-email aceita esse caminho e apaga o arquivo depois de enviar.
+ *
+ * Desde 16/09/2026 o anexo do e-mail do CHAT também vem por aqui, e não mais
+ * pela pasta da conversa: lá ele ficava misturado com a mídia das mensagens, e
+ * o que a pessoa anexa e nunca envia não teria como ser apagado depois sem
+ * risco de levar mídia de mensagem junto. Em `<tenant>/emails/` só existe anexo
+ * de e-mail, e a `purge-email-anexos` limpa o que sobrou.
  */
 export interface AnexoSubido {
   storagePath: string;

@@ -12,6 +12,8 @@
  */
 
 export const ANEXO_BUCKET = "whatsapp-media";
+/** onde o robô de recebidos guarda o anexo do cliente; só é LIDO, nunca apagado */
+export const ANEXO_BUCKET_RECEBIDOS = "ticket-attachments";
 export const ANEXO_MAX_ARQUIVOS = 10;
 /** somados: em base64 o e-mail cresce ~37%, e 18 MB viram ~25 MB, o teto de Gmail e Outlook */
 export const ANEXO_MAX_TOTAL_BYTES = 18 * 1024 * 1024;
@@ -50,10 +52,20 @@ export function tipoPermitido(mime: string, nome: string): boolean {
   return false;
 }
 
+/**
+ * De onde o arquivo vem:
+ *   whatsapp-media     -> anexo escolhido agora (chat ou tela E-mails). Temporário:
+ *                         a send-email apaga depois de enviar.
+ *   ticket-attachments -> anexo de um e-mail RECEBIDO, sendo encaminhado
+ *                         (16/09/2026). É o arquivo do ticket: NUNCA apagar.
+ */
+export type BucketAnexo = typeof ANEXO_BUCKET | typeof ANEXO_BUCKET_RECEBIDOS;
+
 export interface AnexoPedido {
   path: string;
   nome: string;
   mime: string;
+  bucket: BucketAnexo;
 }
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -73,19 +85,30 @@ export function validarAnexos(
     return { ok: false, erro: `No máximo ${ANEXO_MAX_ARQUIVOS} arquivos por e-mail.` };
   }
 
-  // dois formatos, os dois gerados pela get-media-upload-url:
+  // dois formatos gerados pela get-media-upload-url, no bucket temporário:
   //   <tenant>/<conversa>/<uuid>.<ext>  anexo escolhido no chat
   //   <tenant>/emails/<uuid>.<ext>      anexo escolhido na tela E-mails
-  const caminho = new RegExp(`^${tenantId}/(?:${UUID}|emails)/${UUID}\\.[a-z0-9]{1,5}$`, "i");
+  const temporario = new RegExp(`^${tenantId}/(?:${UUID}|emails)/${UUID}\\.[a-z0-9]{1,5}$`, "i");
+  // e o do e-mail recebido, escrito pelo robô: <tenant>/email/<hash>-<n>-<nome>.
+  // O nome é livre, então a trava é não deixar subir de pasta nem sair do tenant.
+  const doRecebido = new RegExp(`^${tenantId}/email/[^/]+$`, "i");
+
   const anexos: AnexoPedido[] = [];
   for (const item of lista) {
     const path = typeof item?.path === "string" ? item.path : "";
     const nome = typeof item?.nome === "string" ? item.nome.trim() : "";
     const mime = typeof item?.mime === "string" ? item.mime.trim() : "";
-    if (!caminho.test(path)) return { ok: false, erro: "Anexo inválido: arquivo fora da área do seu tenant." };
+    const bucket: BucketAnexo = item?.bucket === ANEXO_BUCKET_RECEBIDOS ? ANEXO_BUCKET_RECEBIDOS : ANEXO_BUCKET;
+
+    const formatoOk = path.includes("..")
+      ? false
+      : bucket === ANEXO_BUCKET
+        ? temporario.test(path)
+        : doRecebido.test(path);
+    if (!formatoOk) return { ok: false, erro: "Anexo inválido: arquivo fora da área do seu tenant." };
     if (!nome) return { ok: false, erro: "Anexo sem nome." };
     if (!tipoPermitido(mime, nome)) return { ok: false, erro: `Tipo de arquivo não aceito: ${nome}` };
-    anexos.push({ path, nome: nome.slice(0, 150), mime: mime || "application/octet-stream" });
+    anexos.push({ path, nome: nome.slice(0, 150), mime: mime || "application/octet-stream", bucket });
   }
   return { ok: true, anexos };
 }

@@ -9,6 +9,7 @@ export interface EmailEnviado {
   remetente: string;
   para: string[];
   cc: string[];
+  cco: string[];
   origem: string;
   status: string;
   erro: string | null;
@@ -111,7 +112,7 @@ export function useEmailsEnviados(filtros: FiltrosEnviados, pagina: number) {
 
       let q = (supabase.from("email_envios" as any) as any)
         .select(
-          "id, created_at, assunto, remetente, para, cc, origem, status, erro, referencia_id, cliente_id, department_id, account_id, deleted_at, arquivado_em, pasta_id, email_pastas(nome, cor), email_accounts(email, rotulo), clientes(razao_social, nome_fantasia), support_departments(name)",
+          "id, created_at, assunto, remetente, para, cc, cco, origem, status, erro, referencia_id, cliente_id, department_id, account_id, deleted_at, arquivado_em, pasta_id, email_pastas(nome, cor), email_accounts(email, rotulo), clientes(razao_social, nome_fantasia), support_departments(name)",
           { count: "exact" },
         )
         .eq("tenant_id", tid)

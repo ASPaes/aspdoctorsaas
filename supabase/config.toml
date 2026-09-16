@@ -339,3 +339,11 @@ verify_jwt = true
 # tela valida o token do usuário com auth.getUser e exige admin.
 [functions.ler-emails-recebidos]
 verify_jwt = false
+
+# Faxina do anexo de e-mail que nunca foi enviado (pasta <tenant>/emails/ do
+# bucket whatsapp-media). Chamada pelo pg_cron 1x por dia com a anon key no
+# Authorization -- mesma receita do purge-chat-media, e o mesmo motivo para
+# verify_jwt = TRUE: ela apaga arquivo, entao sem JWT valido do projeto ninguem
+# a dispara de fora. Sem esta entrada o CI publicaria com FALSE.
+[functions.purge-email-anexos]
+verify_jwt = true

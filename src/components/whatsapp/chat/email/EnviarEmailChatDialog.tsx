@@ -21,7 +21,7 @@ import {
 } from "./useEmailChatDados";
 import { EditorEmail } from "./EditorEmail";
 import { BotaoAnexar, ListaAnexos, type AnexoNaTela } from "./AnexosEmail";
-import { uploadChatMedia } from "../../hooks/uploadChatMedia";
+import { uploadAnexoEmail } from "./uploadAnexoEmail";
 import {
   assuntoComReferencia,
   referenciaDoAssunto,
@@ -199,14 +199,10 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
 
     // resposta de upload de um anexo já removido (ou da tela reaberta) não acha o id e some
     for (const { anexo, arquivo } of aceitos) {
-      uploadChatMedia(conversation.id, arquivo)
+      uploadAnexoEmail(conversation.tenant_id, arquivo)
         .then((r) =>
           setAnexos((lista) =>
-            lista.map((x) =>
-              x.id === anexo.id
-                ? { ...x, status: "pronto", path: r.storagePath, mime: r.mediaMimetype, nome: r.fileName, tamanho: r.mediaSizeBytes }
-                : x,
-            ),
+            lista.map((x) => (x.id === anexo.id ? { ...x, status: "pronto", path: r.storagePath } : x)),
           ),
         )
         .catch((err: any) =>

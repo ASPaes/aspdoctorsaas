@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Download, ExternalLink, Eye, FileText, Image as ImageIcon, Loader2, Paperclip, X } from "lucide-react";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,12 @@ export interface AnexoNaTela {
   arquivo?: File;
   /** caminho no bucket, só depois de subir */
   path?: string;
+  /**
+   * de onde o servidor vai ler na hora de enviar. Vazio = `whatsapp-media`, o
+   * arquivo que acabou de subir. `ticket-attachments` é o anexo de um e-mail
+   * recebido sendo encaminhado: ele já está no Storage e não tem `arquivo`.
+   */
+  bucket?: "whatsapp-media" | "ticket-attachments";
   erro?: string;
 }
 
@@ -95,8 +102,18 @@ function baixarArquivo(arquivo: Blob, nome: string) {
 const botaoCartao =
   "rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-export function ListaAnexos({ anexos, onRemover }: { anexos: AnexoNaTela[]; onRemover: (id: string) => void }) {
+export function ListaAnexos({
+  anexos,
+  onRemover,
+  buscarRemoto,
+}: {
+  anexos: AnexoNaTela[];
+  onRemover: (id: string) => void;
+  /** como buscar o anexo que já está no Storage (encaminhar), já que não há `arquivo` aqui */
+  buscarRemoto?: (anexo: AnexoNaTela) => Promise<Blob>;
+}) {
   const [previa, setPrevia] = useState<Previa | null>(null);
+  const [carregando, setCarregando] = useState<string | null>(null);
 
   // endereço temporário da prévia é liberado ao trocar de arquivo ou fechar a tela
   useEffect(() => () => {
@@ -106,17 +123,41 @@ export function ListaAnexos({ anexos, onRemover }: { anexos: AnexoNaTela[]; onRe
   if (anexos.length === 0) return null;
   const total = anexos.reduce((soma, a) => soma + a.tamanho, 0);
 
-  const ver = (a: AnexoNaTela) => {
+  /** o arquivo em mãos: o que foi escolhido agora, ou o que ainda está no Storage */
+  const arquivoDe = async (a: AnexoNaTela): Promise<File | null> => {
+    if (a.arquivo) return a.arquivo;
+    if (!buscarRemoto) return null;
+    setCarregando(a.id);
+    try {
+      const blob = await buscarRemoto(a);
+      return new File([blob], a.nome, { type: a.mime || blob.type });
+    } catch (err: any) {
+      toast.error(err?.message ?? "Não foi possível abrir o anexo.");
+      return null;
+    } finally {
+      setCarregando(null);
+    }
+  };
+
+  const ver = async (a: AnexoNaTela) => {
     const tipo = tipoParaVisualizar(a.arquivo?.type || a.mime, a.nome);
-    if (!a.arquivo || !tipo) return;
-    setPrevia({ url: URL.createObjectURL(a.arquivo), nome: a.nome, tipo, arquivo: a.arquivo });
+    if (!tipo) return;
+    const arquivo = await arquivoDe(a);
+    if (!arquivo) return;
+    setPrevia({ url: URL.createObjectURL(arquivo), nome: a.nome, tipo, arquivo });
+  };
+
+  const baixar = async (a: AnexoNaTela) => {
+    const arquivo = await arquivoDe(a);
+    if (arquivo) baixarArquivo(arquivo, a.nome);
   };
 
   return (
     <>
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
         {anexos.map((a) => {
-          const visualizavel = !!a.arquivo && !!tipoParaVisualizar(a.arquivo.type || a.mime, a.nome);
+          const temArquivo = !!a.arquivo || !!buscarRemoto;
+          const visualizavel = temArquivo && !!tipoParaVisualizar(a.arquivo?.type || a.mime, a.nome);
           return (
             <span
               key={a.id}
@@ -141,16 +182,24 @@ export function ListaAnexos({ anexos, onRemover }: { anexos: AnexoNaTela[]; onRe
               </span>
               <span className="flex items-center">
                 {visualizavel && (
-                  <button type="button" aria-label={`Ver ${a.nome}`} title="Ver" onClick={() => ver(a)} className={botaoCartao}>
-                    <Eye className="h-3.5 w-3.5" />
+                  <button
+                    type="button"
+                    aria-label={`Ver ${a.nome}`}
+                    title="Ver"
+                    onClick={() => ver(a)}
+                    disabled={carregando === a.id}
+                    className={botaoCartao}
+                  >
+                    {carregando === a.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
                   </button>
                 )}
-                {a.arquivo && (
+                {temArquivo && (
                   <button
                     type="button"
                     aria-label={`Baixar ${a.nome}`}
                     title="Baixar"
-                    onClick={() => baixarArquivo(a.arquivo!, a.nome)}
+                    onClick={() => baixar(a)}
+                    disabled={carregando === a.id}
                     className={botaoCartao}
                   >
                     <Download className="h-3.5 w-3.5" />

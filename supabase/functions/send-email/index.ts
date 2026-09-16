@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
   const arquivos: { nome: string; mime: string; base64: string }[] = [];
   let bytesAnexos = 0;
   for (const a of anexosPedidos) {
-    const { data: blob, error: baixarErr } = await supabase.storage.from(ANEXO_BUCKET).download(a.path);
+    const { data: blob, error: baixarErr } = await supabase.storage.from(a.bucket).download(a.path);
     if (baixarErr || !blob) {
       return json(409, { error: `O anexo ${a.nome} não foi encontrado. Tire e anexe o arquivo de novo.` });
     }
@@ -311,6 +311,7 @@ Deno.serve(async (req) => {
       referencia_id: referenciaId,
       cliente_id: clienteId,
       department_id: departmentId,
+      cco,
       corpo_texto: texto ? texto.slice(0, MAX_CORPO_GUARDADO) : null,
       corpo_html: html ? html.slice(0, MAX_CORPO_GUARDADO) : null,
       status: ok ? 'enviado' : 'erro',
@@ -325,10 +326,13 @@ Deno.serve(async (req) => {
     console.error(`[send-email] envio ${ok ? 'feito' : 'falhou'} mas o registro falhou: ${registroErr.message}`);
   }
 
-  // Enviado: o arquivo não serve mais e ninguém o apagaria. Falhou: fica, para a
-  // pessoa tentar de novo sem anexar outra vez.
-  if (ok && anexosPedidos.length) {
-    const { error: apagarErr } = await supabase.storage.from(ANEXO_BUCKET).remove(anexosPedidos.map((a) => a.path));
+  // Enviado: o arquivo temporário não serve mais e ninguém o apagaria. Falhou:
+  // fica, para a pessoa tentar de novo sem anexar outra vez.
+  // O anexo de e-mail RECEBIDO (ticket-attachments) nunca entra aqui: ele é do
+  // ticket, e encaminhar não pode apagar o arquivo do cliente.
+  const temporarios = anexosPedidos.filter((a) => a.bucket === ANEXO_BUCKET).map((a) => a.path);
+  if (ok && temporarios.length) {
+    const { error: apagarErr } = await supabase.storage.from(ANEXO_BUCKET).remove(temporarios);
     if (apagarErr) console.error(`[send-email] anexos enviados mas não apagados: ${apagarErr.message}`);
   }
 

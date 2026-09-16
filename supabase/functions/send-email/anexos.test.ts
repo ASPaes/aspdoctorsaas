@@ -33,7 +33,39 @@ describe("validarAnexos", () => {
 
   test("caminho do próprio tenant, no formato da get-media-upload-url", () => {
     const r = validarAnexos([{ path: caminho(), nome: " proposta.pdf ", mime: "application/pdf" }], TENANT);
-    expect(r).toEqual({ ok: true, anexos: [{ path: caminho(), nome: "proposta.pdf", mime: "application/pdf" }] });
+    expect(r).toEqual({
+      ok: true,
+      anexos: [{ path: caminho(), nome: "proposta.pdf", mime: "application/pdf", bucket: "whatsapp-media" }],
+    });
+  });
+
+  test("aceita o anexo de e-mail recebido, para encaminhar, e marca o bucket certo", () => {
+    const doRecebido = `${TENANT}/email/1b0f7c6f0000abcd-1-proposta.pdf`;
+    const r = validarAnexos(
+      [{ path: doRecebido, nome: "proposta.pdf", mime: "application/pdf", bucket: "ticket-attachments" }],
+      TENANT,
+    );
+    expect(r).toEqual({
+      ok: true,
+      anexos: [{ path: doRecebido, nome: "proposta.pdf", mime: "application/pdf", bucket: "ticket-attachments" }],
+    });
+  });
+
+  test("caminho de recebido só vale no bucket de recebidos, e vice-versa", () => {
+    const doRecebido = `${TENANT}/email/abc-1-a.pdf`;
+    expect(validarAnexos([{ path: doRecebido, nome: "a.pdf", mime: "application/pdf" }], TENANT).ok).toBe(false);
+    expect(
+      validarAnexos([{ path: caminho(), nome: "a.pdf", mime: "application/pdf", bucket: "ticket-attachments" }], TENANT).ok,
+    ).toBe(false);
+  });
+
+  test("recusa subir de pasta mesmo no bucket de recebidos", () => {
+    expect(
+      validarAnexos(
+        [{ path: `${TENANT}/email/..%2F..%2Fsecreto.pdf`, nome: "a.pdf", mime: "application/pdf", bucket: "ticket-attachments" }],
+        TENANT,
+      ).ok,
+    ).toBe(false);
   });
 
   test("aceita o caminho da tela E-mails, que não tem conversa", () => {
