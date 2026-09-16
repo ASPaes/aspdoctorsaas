@@ -5,6 +5,23 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
+// ds-omie-contract-update
+//
+// v15 (25/08/2026) - dVigFinal NUNCA ANTES DE dVigInicial (mesma trava do
+//     ds-omie-contrato-alterar v18, caso BEDA PIZZARIA / CT-2026-5681). Este e o TERCEIRO portao
+//     que escreve dVigFinal no Omie; sem a trava ele reintroduziria o erro
+//     "Data de Vigencia Inicial [dVigInicial] maior que a Data de Vigencia Final [dVigFinal]!"
+//     por um caminho diferente -- que e exatamente como o ALTERAR virou um segundo portao sem a
+//     regra do CRIAR e causou o incidente do LAVEI em julho.
+//     Aqui vale o AJUSTE (nao o bloqueio do criar): esta funcao altera contrato que ja existe.
+//     O espelho local (omie_contratos.vigencia_final) passa a gravar o valor AJUSTADO, nao o
+//     pedido -- gravar o pedido faria o espelho afirmar uma data que o Omie nao tem.
+//     Falha aberta: sem dVigInicial legivel, nao mexe em nada.
+// v15: dd/mm/aaaa -> aaaammdd (numero) so para COMPARAR. null no que nao for data reconhecivel.
+function omieDateToNum(v) {
+  const m = String(v ?? "").trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? Number(`${m[3]}${m[2]}${m[1]}`) : null;
+}
 function toOmieDate(v) {
   if (v === undefined || v === null || v === "") return v;
   const s = String(v).trim();
@@ -175,7 +192,22 @@ Deno.serve(async (req)=>{
     console.log("CONSULTA_OK");
     const numOrKeep = (v, keep)=>v !== undefined && v !== null && v !== "" ? Number(v) : keep;
     const dVigInicial = alteracoes.dVigInicial !== undefined && alteracoes.dVigInicial !== null && alteracoes.dVigInicial !== "" ? toOmieDate(alteracoes.dVigInicial) : cab.dVigInicial;
-    const dVigFinal = alteracoes.dVigFinal !== undefined && alteracoes.dVigFinal !== null && alteracoes.dVigFinal !== "" ? toOmieDate(alteracoes.dVigFinal) : cab.dVigFinal;
+    let dVigFinal = alteracoes.dVigFinal !== undefined && alteracoes.dVigFinal !== null && alteracoes.dVigFinal !== "" ? toOmieDate(alteracoes.dVigFinal) : cab.dVigFinal;
+    // v15: dVigFinal nunca antes da dVigInicial que vai no mesmo payload. Ver cabecalho.
+    let vigencia_final_ajustada = null;
+    {
+      const nIni = omieDateToNum(dVigInicial);
+      const nFim = omieDateToNum(dVigFinal);
+      if (nIni !== null && nFim !== null && nFim < nIni) {
+        vigencia_final_ajustada = {
+          pedida: dVigFinal,
+          aplicada: dVigInicial,
+          motivo: "vigencia final anterior a vigencia inicial do contrato"
+        };
+        console.log("VIGENCIA_FINAL_AJUSTADA:", JSON.stringify(vigencia_final_ajustada));
+        dVigFinal = dVigInicial;
+      }
+    }
     const cabecalho = {
       nCodCtr: Number(nCodCtr),
       nCodCli: cab.nCodCli,
@@ -222,7 +254,8 @@ Deno.serve(async (req)=>{
     };
     if (alteracoes.nDiaFat !== undefined && alteracoes.nDiaFat !== null && alteracoes.nDiaFat !== "") localUpdate.dia_faturamento = Number(alteracoes.nDiaFat);
     if (alteracoes.dVigInicial) localUpdate.vigencia_inicial = toIsoDate(alteracoes.dVigInicial);
-    if (alteracoes.dVigFinal) localUpdate.vigencia_final = toIsoDate(alteracoes.dVigFinal);
+    // v15: toIsoDate(dVigFinal) -- o valor que REALMENTE foi ao Omie, nao o que foi pedido.
+    if (alteracoes.dVigFinal) localUpdate.vigencia_final = toIsoDate(dVigFinal);
     // Campos sem coluna pr\u00f3pria: espelha no raw (infAdic e observacoes)
     const mudouContato = alteracoes.cContato !== undefined && alteracoes.cContato !== null && alteracoes.cContato !== "";
     const mudouConta = alteracoes.nCodCC !== undefined && alteracoes.nCodCC !== null && alteracoes.nCodCC !== "";
@@ -267,6 +300,7 @@ Deno.serve(async (req)=>{
         nCodCtr,
         omie: resp,
         local_atualizado: false,
+        vigencia_final_ajustada,
         aviso: "Alterado no Omie, mas o espelho local n\u00e3o atualizou."
       });
     }
@@ -283,7 +317,8 @@ Deno.serve(async (req)=>{
       ok: true,
       nCodCtr,
       omie: resp,
-      local_atualizado: true
+      local_atualizado: true,
+      vigencia_final_ajustada
     });
   } catch (e) {
     const msg = e.message ?? String(e);
