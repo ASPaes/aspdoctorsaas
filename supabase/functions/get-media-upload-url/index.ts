@@ -41,29 +41,46 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { conversationId, mediaMimetype, fileName } = body || {};
-    if (!conversationId || !mediaMimetype) {
-      return new Response(JSON.stringify({ error: 'conversationId e mediaMimetype sao obrigatorios' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // `tenantId` sem conversa (15/09/2026): anexo da tela E-mails, onde não
+    // existe conversa. O arquivo cai em <tenant>/emails/, e a send-email aceita
+    // esse formato de caminho além do <tenant>/<conversa>/ do chat.
+    const { conversationId, tenantId: tenantPedido, mediaMimetype, fileName } = body || {};
+    if ((!conversationId && !tenantPedido) || !mediaMimetype) {
+      return new Response(JSON.stringify({ error: 'Informe conversationId ou tenantId, e mediaMimetype' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const [convRes, profRes] = await Promise.all([
-      supabase.from('whatsapp_conversations').select('tenant_id').eq('id', conversationId).maybeSingle(),
+      conversationId
+        ? supabase.from('whatsapp_conversations').select('tenant_id').eq('id', conversationId).maybeSingle()
+        : Promise.resolve({ data: null, error: null } as any),
       supabase.from('profiles').select('tenant_id, is_super_admin').eq('user_id', authUser.id).maybeSingle(),
     ]);
 
-    const convTenant = (convRes.data as any)?.tenant_id;
-    if (convRes.error || !convTenant) {
-      return new Response(JSON.stringify({ error: 'Conversa nao encontrada' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
     const isSuperAdmin = (profRes.data as any)?.is_super_admin === true;
     const userTenant = (profRes.data as any)?.tenant_id;
-    if (!isSuperAdmin && userTenant !== convTenant) {
-      return new Response(JSON.stringify({ error: 'Sem permissao para esta conversa' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+    let tenantDoArquivo: string | null = null;
+    if (conversationId) {
+      const convTenant = (convRes.data as any)?.tenant_id;
+      if (convRes.error || !convTenant) {
+        return new Response(JSON.stringify({ error: 'Conversa nao encontrada' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      if (!isSuperAdmin && userTenant !== convTenant) {
+        return new Response(JSON.stringify({ error: 'Sem permissao para esta conversa' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      tenantDoArquivo = convTenant;
+    } else {
+      // super admin pode estar simulando outro tenant; os demais só no próprio
+      if (!isSuperAdmin && userTenant !== tenantPedido) {
+        return new Response(JSON.stringify({ error: 'Sem permissao para este tenant' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      tenantDoArquivo = String(tenantPedido);
     }
 
     const ext = extFor(String(mediaMimetype), fileName);
-    const path = `${convTenant}/${conversationId}/${crypto.randomUUID()}.${ext}`;
+    const path = conversationId
+      ? `${tenantDoArquivo}/${conversationId}/${crypto.randomUUID()}.${ext}`
+      : `${tenantDoArquivo}/emails/${crypto.randomUUID()}.${ext}`;
 
     const { data, error } = await supabase.storage.from('whatsapp-media').createSignedUploadUrl(path);
     if (error || !data) {

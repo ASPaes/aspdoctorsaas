@@ -17,6 +17,9 @@ export interface EmailEnviado {
   department_id: string | null;
   account_id: string | null;
   deleted_at: string | null;
+  arquivado_em: string | null;
+  pasta_id: string | null;
+  email_pastas?: { nome: string; cor: string } | null;
   email_accounts?: { email: string; rotulo: string } | null;
   clientes?: { razao_social: string | null; nome_fantasia: string | null } | null;
   support_departments?: { name: string } | null;
@@ -30,6 +33,10 @@ export interface FiltrosEnviados {
   situacoes: string[];
   periodo: { from: Date; to: Date };
   lixeira: boolean;
+  /** true = mostra só os arquivados; na lixeira este filtro não vale */
+  arquivadas: boolean;
+  /** id da pasta escolhida; null = todas */
+  pasta: string | null;
 }
 
 export const POR_PAGINA = 50;
@@ -65,6 +72,8 @@ export const ROTULO_ORIGEM: Record<string, string> = {
   onboarding: "Ticket O",
   teste: "Teste",
   manual: "Manual",
+  resposta: "Resposta",
+  encaminho: "Encaminhado",
   ticket_email: "Aviso de ticket",
 };
 
@@ -102,7 +111,7 @@ export function useEmailsEnviados(filtros: FiltrosEnviados, pagina: number) {
 
       let q = (supabase.from("email_envios" as any) as any)
         .select(
-          "id, created_at, assunto, remetente, para, cc, origem, status, erro, referencia_id, cliente_id, department_id, account_id, deleted_at, email_accounts(email, rotulo), clientes(razao_social, nome_fantasia), support_departments(name)",
+          "id, created_at, assunto, remetente, para, cc, origem, status, erro, referencia_id, cliente_id, department_id, account_id, deleted_at, arquivado_em, pasta_id, email_pastas(nome, cor), email_accounts(email, rotulo), clientes(razao_social, nome_fantasia), support_departments(name)",
           { count: "exact" },
         )
         .eq("tenant_id", tid)
@@ -112,6 +121,11 @@ export function useEmailsEnviados(filtros: FiltrosEnviados, pagina: number) {
         .range(pagina * POR_PAGINA, pagina * POR_PAGINA + POR_PAGINA - 1);
 
       q = filtros.lixeira ? q.not("deleted_at", "is", null) : q.is("deleted_at", null);
+      // na lixeira aparece tudo o que está lá, arquivado ou não
+      if (!filtros.lixeira) {
+        q = filtros.arquivadas ? q.not("arquivado_em", "is", null) : q.is("arquivado_em", null);
+      }
+      if (filtros.pasta) q = q.eq("pasta_id", filtros.pasta);
       if (filtros.setores.length) q = q.in("department_id", filtros.setores);
       if (filtros.origens.length) q = q.in("origem", filtros.origens);
       if (filtros.contas.length) q = q.in("account_id", filtros.contas);

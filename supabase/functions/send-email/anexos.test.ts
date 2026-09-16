@@ -36,6 +36,16 @@ describe("validarAnexos", () => {
     expect(r).toEqual({ ok: true, anexos: [{ path: caminho(), nome: "proposta.pdf", mime: "application/pdf" }] });
   });
 
+  test("aceita o caminho da tela E-mails, que não tem conversa", () => {
+    const daTela = `${TENANT}/emails/1b0f7c6f-0000-4000-8000-000000000001.pdf`;
+    expect(validarAnexos([{ path: daTela, nome: "a.pdf", mime: "application/pdf" }], TENANT).ok).toBe(true);
+  });
+
+  test("recusa pasta inventada no lugar da conversa", () => {
+    const inventado = `${TENANT}/qualquer/1b0f7c6f-0000-4000-8000-000000000001.pdf`;
+    expect(validarAnexos([{ path: inventado, nome: "a.pdf", mime: "application/pdf" }], TENANT).ok).toBe(false);
+  });
+
   test("recusa arquivo de outro tenant e caminho com ..", () => {
     const outro = caminho().replace(TENANT, "b0000000-0000-0000-0000-000000000002");
     expect(validarAnexos([{ path: outro, nome: "x.pdf", mime: "application/pdf" }], TENANT).ok).toBe(false);

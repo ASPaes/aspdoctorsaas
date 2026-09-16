@@ -23,7 +23,10 @@ import { ANEXO_BUCKET, ANEXO_MAX_TOTAL_BYTES, bytesParaBase64, validarAnexos } f
  * depois do envio com sucesso (a purge-chat-media não alcança esses arquivos).
  * Assinatura da conta (`email_account_assinaturas`) entra no fim de todo e-mail.
  * Cada tentativa vira uma linha em `email_envios`, com ou sem sucesso.
- * O corpo da mensagem não é guardado em lugar nenhum.
+ * O corpo VAI para `email_envios` desde 15/09/2026, para a tela E-mails abrir o
+ * e-mail: guardamos o que a pessoa escreveu, ANTES da assinatura, com teto de
+ * tamanho. Guardar depois traria a imagem da assinatura em base64 em cada linha.
+ * `fn_email_limpar_corpo_antigo` apaga esse texto quando passa de 12 meses.
  *
  * Sem horário de silêncio: e-mail transacional sai a qualquer hora (decisão de
  * 10/09/2026). Disparo em massa, quando existir, usa is_wa_quiet_hours().
@@ -44,6 +47,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_DESTINATARIOS = 50;
 const MAX_CORPO = 2_000_000; // caracteres; anexo ainda não existe
 const MAX_ASSUNTO = 300;
+/** teto do que vai para o banco por envio; o e-mail em si pode ser maior */
+const MAX_CORPO_GUARDADO = 256_000;
 
 /** role do JWT; a assinatura já foi conferida pelo gateway (verify_jwt = true) */
 function papelDoToken(token: string): string | null {
@@ -198,7 +203,7 @@ Deno.serve(async (req) => {
   // os setores" é a conta ligada a cada setor). O servidor confere, não só a
   // tela. As outras origens (teste de conta, resumo automático) seguem como antes.
   // super admin é bypass: não é membro dos setores do tenant que está simulando
-  if (origem === 'chat' && enviadoPor && !chamadaInterna && !superAdmin) {
+  if (['chat', 'resposta', 'encaminho'].includes(origem) && enviadoPor && !chamadaInterna && !superAdmin) {
     const [ativas, doUsuario, membros] = await Promise.all([
       supabase.from('email_accounts').select('id').eq('tenant_id', tenantId).eq('ativo', true),
       supabase.from('email_account_usuarios').select('account_id').eq('tenant_id', tenantId).eq('user_id', enviadoPor),
@@ -306,6 +311,8 @@ Deno.serve(async (req) => {
       referencia_id: referenciaId,
       cliente_id: clienteId,
       department_id: departmentId,
+      corpo_texto: texto ? texto.slice(0, MAX_CORPO_GUARDADO) : null,
+      corpo_html: html ? html.slice(0, MAX_CORPO_GUARDADO) : null,
       status: ok ? 'enviado' : 'erro',
       erro,
       message_id: mensagem.messageId,

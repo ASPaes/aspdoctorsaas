@@ -553,7 +553,7 @@ function RotuloComFechar({ id, texto, onFechar }: { id: string; texto: string; o
  * sair do campo confirma o endereço; Backspace no campo vazio tira o último.
  * Ao focar, mostra os e-mails do cadastro do cliente que ainda não estão nele.
  */
-function CampoEmails({
+export function CampoEmails({
   id,
   valores,
   onChange,

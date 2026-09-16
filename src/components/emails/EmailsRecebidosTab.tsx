@@ -16,9 +16,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import {
-  ChevronLeft, ChevronRight, Download, Eye, FileText, Inbox, Loader2, Lock, Mail, Paperclip, RefreshCw, RotateCcw, Search,
-  Trash2,
+  Archive, ArchiveRestore, ChevronLeft, ChevronRight, Eye, FolderInput, Inbox, Loader2, Lock, Mail, RefreshCw, RotateCcw,
+  Search, Trash2,
 } from "lucide-react";
+import { AnexosDoEmail } from "./AnexosDoEmail";
+import { LerEmailDialog } from "./LerEmailDialog";
+import { useArquivarEmails } from "./useArquivarEmails";
+import { MenuPastas, MoverParaPasta } from "./MenuPastas";
+import { useMoverParaPasta } from "./usePastasEmail";
 import { subDays } from "date-fns";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -69,10 +74,14 @@ export default function EmailsRecebidosTab() {
     setor: null,
     periodo: { from: subDays(new Date(), 30), to: new Date() },
     lixeira: false,
+    arquivadas: false,
+    pasta: null,
   });
   const [pagina, setPagina] = useState(0);
   const [selecionados, setSelecionados] = useState<string[]>([]);
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
+  /** id do e-mail aberto para leitura */
+  const [lendo, setLendo] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -84,10 +93,50 @@ export default function EmailsRecebidosTab() {
 
   const { contas, setores } = useOpcoesFiltro();
   const { data, isLoading } = useEmailsRecebidos(filtros, pagina);
-  const { data: contagem } = useContagemRecebidos(filtros.periodo, filtros.lixeira);
+  const { data: contagem } = useContagemRecebidos(filtros.periodo, filtros.lixeira, filtros.arquivadas);
   const { data: caixasLendo = [] } = useEstadoDaLeitura();
   const lixeira = useLixeiraRecebidos();
   const lerAgora = useLerAgora();
+  const arquivar = useArquivarEmails("recebidos");
+  const mover = useMoverParaPasta("recebidos");
+
+  /** move um ou vários para a pasta; null tira da pasta */
+  const moverEmails = (ids: string[], pastaId: string | null) => {
+    mover.mutate(
+      { ids, pastaId },
+      {
+        onSuccess: ({ afetados, bloqueados }) => {
+          toast.success(
+            pastaId
+              ? `${afetados} e-mail${afetados === 1 ? "" : "s"} movido${afetados === 1 ? "" : "s"} para a pasta.`
+              : `${afetados} e-mail${afetados === 1 ? "" : "s"} tirado${afetados === 1 ? "" : "s"} da pasta.`,
+            { description: bloqueados ? `${bloqueados} ficou de fora: é de outra pessoa ou já estava assim.` : undefined },
+          );
+          setSelecionados([]);
+        },
+        onError: (err: any) => toast.error(err?.message || "Não foi possível mover."),
+      },
+    );
+  };
+
+  /** arquiva ou devolve para a lista; `bloqueados` vira aviso, não silêncio */
+  const arquivarEmails = (ids: string[], paraArquivo: boolean) => {
+    arquivar.mutate(
+      { ids, arquivar: paraArquivo },
+      {
+        onSuccess: ({ afetados, bloqueados }) => {
+          toast.success(
+            `${afetados} e-mail${afetados === 1 ? "" : "s"} ${paraArquivo ? "arquivado" : "devolvido para a lista"}${afetados === 1 ? "" : "s"}.`,
+            {
+              description: bloqueados ? `${bloqueados} ficou de fora: é de outra pessoa ou já estava assim.` : undefined,
+            },
+          );
+          setSelecionados([]);
+        },
+        onError: (err: any) => toast.error(err?.message || "Não foi possível arquivar."),
+      },
+    );
+  };
 
   const linhas = data?.linhas ?? [];
   const total = data?.total ?? 0;
@@ -248,6 +297,25 @@ export default function EmailsRecebidosTab() {
           onChange={(v) => mudarFiltro({ acoes: v })}
         />
         <DateRangePicker dateRange={filtros.periodo} onDateRangeChange={(r) => mudarFiltro({ periodo: r })} align="end" />
+        <MenuPastas
+          pastaAtual={filtros.pasta}
+          onEscolher={(pastaId) => {
+            mudarFiltro({ pasta: pastaId });
+            setPagina(0);
+          }}
+        />
+        <Button
+          variant={filtros.arquivadas ? "default" : "outline"}
+          size="sm"
+          className="h-9"
+          onClick={() => {
+            mudarFiltro({ arquivadas: !filtros.arquivadas, lixeira: false });
+            setPagina(0);
+          }}
+        >
+          <Archive className="mr-2 h-4 w-4" />
+          Arquivadas
+        </Button>
         {ehAdmin && (
           <>
             <Button variant="outline" size="sm" className="h-9" onClick={lerCaixasAgora} disabled={lerAgora.isPending}>
@@ -294,10 +362,32 @@ export default function EmailsRecebidosTab() {
               </Button>
             </>
           ) : (
-            <Button size="sm" variant="outline" className="h-7" onClick={() => executar("lixeira")} disabled={lixeira.isPending}>
-              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-              Mover para a lixeira
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7"
+                onClick={() => arquivarEmails(selecionados, !filtros.arquivadas)}
+                disabled={arquivar.isPending}
+              >
+                {filtros.arquivadas ? (
+                  <ArchiveRestore className="mr-1.5 h-3.5 w-3.5" />
+                ) : (
+                  <Archive className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                {filtros.arquivadas ? "Tirar do arquivo" : "Arquivar"}
+              </Button>
+              <MoverParaPasta pastaAtual={null} onMover={(pastaId) => moverEmails(selecionados, pastaId)} desabilitado={mover.isPending}>
+                <Button size="sm" variant="outline" className="h-7" disabled={mover.isPending}>
+                  <FolderInput className="mr-1.5 h-3.5 w-3.5" />
+                  Mover para
+                </Button>
+              </MoverParaPasta>
+              <Button size="sm" variant="outline" className="h-7" onClick={() => executar("lixeira")} disabled={lixeira.isPending}>
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                Mover para a lixeira
+              </Button>
+            </>
           )}
           {travados > 0 && (
             <span className="text-xs text-muted-foreground">
@@ -342,7 +432,9 @@ export default function EmailsRecebidosTab() {
                 <TableHead className="w-[190px]">De</TableHead>
                 <TableHead className="w-[160px]">Cliente</TableHead>
                 <TableHead className="w-[130px]">Setor</TableHead>
+                <TableHead className="w-[120px]">Pasta</TableHead>
                 <TableHead className="w-[190px]">O que aconteceu</TableHead>
+                <TableHead className="w-[118px] text-right">Abrir</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -406,8 +498,60 @@ export default function EmailsRecebidosTab() {
                     <TableCell className="max-w-[130px] truncate align-top text-sm">
                       {linha.support_departments?.name ?? <span className="text-xs text-muted-foreground">sem setor</span>}
                     </TableCell>
+                    <TableCell className="max-w-[120px] truncate align-top">
+                      {linha.email_pastas ? (
+                        <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px]">
+                          <span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: linha.email_pastas.cor }} aria-hidden />
+                          <span className="truncate">{linha.email_pastas.nome}</span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">sem pasta</span>
+                      )}
+                    </TableCell>
                     <TableCell className="align-top">
                       <OQueAconteceu linha={linha} />
+                    </TableCell>
+                    <TableCell className="align-top text-right">
+                      <div className="flex justify-end gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => setLendo(linha.id)}
+                          aria-label={`Abrir e-mail de ${linha.de_email}`}
+                          title="Abrir o e-mail"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        {!filtros.lixeira && (
+                          <MoverParaPasta
+                            pastaAtual={linha.pasta_id}
+                            onMover={(pastaId) => moverEmails([linha.id], pastaId)}
+                            desabilitado={mover.isPending}
+                          >
+                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Mover para pasta" aria-label="Mover para pasta">
+                              <FolderInput className="h-3.5 w-3.5" />
+                            </Button>
+                          </MoverParaPasta>
+                        )}
+                        {!filtros.lixeira && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => arquivarEmails([linha.id], !linha.arquivado_em)}
+                            disabled={arquivar.isPending}
+                            aria-label={linha.arquivado_em ? "Tirar do arquivo" : "Arquivar"}
+                            title={linha.arquivado_em ? "Tirar do arquivo" : "Arquivar"}
+                          >
+                            {linha.arquivado_em ? (
+                              <ArchiveRestore className="h-3.5 w-3.5" />
+                            ) : (
+                              <Archive className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -416,6 +560,8 @@ export default function EmailsRecebidosTab() {
           </Table>
         </div>
       )}
+
+      <LerEmailDialog tipo="recebido" id={lendo} onOpenChange={(aberto) => !aberto && setLendo(null)} />
 
       {total > POR_PAGINA_RECEBIDOS && (
         <div className="flex items-center justify-between text-sm text-muted-foreground">
@@ -517,157 +663,6 @@ function OQueAconteceu({ linha }: { linha: EmailRecebido }) {
   );
 }
 
-const tamanhoLegivel = (bytes: number) =>
-  bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : bytes >= 1024 ? `${Math.round(bytes / 1024)} KB` : `${bytes} B`;
-
-const podeVerNaTela = (mime: string) =>
-  mime.startsWith("image/") || mime === "application/pdf" || mime.startsWith("video/") || mime.startsWith("audio/");
-
-/**
- * Clipe com a lista de anexos do e-mail: ver na tela (imagem, PDF, vídeo, áudio)
- * e baixar. Busca o arquivo pela rota autenticada do Storage, como a tela de
- * anexos do ticket; quem libera é a regra email_recebidos_anexos_select, que
- * segue o RLS de email_recebidos (o operador só abre anexo de e-mail que vê).
- */
-function AnexosDoEmail({ linha }: { linha: EmailRecebido }) {
-  const anexos = linha.anexos ?? [];
-  const ignorados = linha.anexos_ignorados ?? [];
-  const [previa, setPrevia] = useState<{ url: string; nome: string; mime: string } | null>(null);
-  const [carregando, setCarregando] = useState<string | null>(null);
-
-  if (anexos.length === 0 && ignorados.length === 0) return null;
-
-  const buscar = async (caminho: string) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) throw new Error("Sua sessão expirou. Entre de novo para abrir o anexo.");
-    const resposta = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/authenticated/ticket-attachments/${caminho}`,
-      { headers: { Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } },
-    );
-    if (!resposta.ok) {
-      throw new Error(
-        resposta.status === 400 || resposta.status === 404
-          ? "Arquivo não encontrado, ou você não tem acesso a este e-mail."
-          : `Não foi possível abrir o anexo (erro ${resposta.status}).`,
-      );
-    }
-    return resposta.blob();
-  };
-
-  const ver = async (a: { nome: string; mime: string; caminho: string }) => {
-    setCarregando(a.caminho);
-    try {
-      const blob = await buscar(a.caminho);
-      setPrevia({ url: URL.createObjectURL(blob), nome: a.nome, mime: a.mime });
-    } catch (err: any) {
-      toast.error(err?.message ?? "Não foi possível abrir o anexo.");
-    } finally {
-      setCarregando(null);
-    }
-  };
-
-  const baixar = async (a: { nome: string; caminho: string }) => {
-    setCarregando(a.caminho);
-    try {
-      const blob = await buscar(a.caminho);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = a.nome;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (err: any) {
-      toast.error(err?.message ?? "Não foi possível baixar o anexo.");
-    } finally {
-      setCarregando(null);
-    }
-  };
-
-  const fecharPrevia = () => {
-    if (previa) URL.revokeObjectURL(previa.url);
-    setPrevia(null);
-  };
-
-  return (
-    <>
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className="ml-1.5 inline-flex items-center gap-0.5 rounded px-1 align-middle text-xs text-muted-foreground tabular-nums hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={`${anexos.length} anexo${anexos.length === 1 ? "" : "s"}: ver ou baixar`}
-          >
-            <Paperclip className="h-3 w-3" />
-            {anexos.length}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-80 p-2">
-          <p className="px-1 pb-1.5 text-xs font-medium text-muted-foreground">Anexos do e-mail</p>
-          {anexos.length === 0 && <p className="px-1 py-1 text-xs text-muted-foreground">Nenhum arquivo foi guardado.</p>}
-          {anexos.map((a) => (
-            <div key={a.caminho} className="flex items-center gap-2 rounded px-1.5 py-1 hover:bg-muted/60">
-              <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate text-sm" title={a.nome}>
-                {a.nome}
-              </span>
-              <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{tamanhoLegivel(a.tamanho)}</span>
-              {podeVerNaTela(a.mime) && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 shrink-0"
-                  onClick={() => ver(a)}
-                  disabled={carregando === a.caminho}
-                  aria-label={`Ver ${a.nome}`}
-                >
-                  {carregando === a.caminho ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 shrink-0"
-                onClick={() => baixar(a)}
-                disabled={carregando === a.caminho}
-                aria-label={`Baixar ${a.nome}`}
-              >
-                <Download className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          ))}
-          {ignorados.length > 0 && (
-            <p className="mt-1.5 border-t px-1 pt-1.5 text-[11px] text-muted-foreground">Não guardados: {ignorados.join("; ")}</p>
-          )}
-          {anexos.length > 0 && !linha.ticket_id && (
-            <p className="mt-1 px-1 text-[11px] text-muted-foreground">Entram nos anexos do ticket quando ele for aberto.</p>
-          )}
-        </PopoverContent>
-      </Popover>
-
-      <Dialog open={!!previa} onOpenChange={(aberto) => { if (!aberto) fecharPrevia(); }}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle className="truncate pr-6">{previa?.nome}</DialogTitle>
-          </DialogHeader>
-          {previa &&
-            (previa.mime.startsWith("image/") ? (
-              <img src={previa.url} alt={previa.nome} className="mx-auto max-h-[75vh] max-w-full object-contain" />
-            ) : previa.mime === "application/pdf" ? (
-              <iframe src={previa.url} title={previa.nome} className="h-[75vh] w-full rounded border" />
-            ) : previa.mime.startsWith("video/") ? (
-              <video src={previa.url} controls className="max-h-[75vh] w-full" />
-            ) : (
-              <audio src={previa.url} controls className="w-full" />
-            ))}
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
 
 function CaixaTriagem({ linha, setores }: { linha: EmailRecebido; setores: { id: string; name: string }[] }) {
   const [cliente, setCliente] = useState<SelectedCliente | null>(null);

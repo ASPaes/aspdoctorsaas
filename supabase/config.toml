@@ -295,6 +295,15 @@ verify_jwt = true
 [functions.send-email]
 verify_jwt = true
 
+# Assina a URL de upload do anexo (chat e, desde 15/09/2026, tela E-mails).
+# verify_jwt = FALSE: é o valor com que ela já roda em produção (v169), e está
+# aqui declarado para o CI não mudar esse portão sozinho. Quem protege é a
+# própria function: ela chama auth.getUser e confere o tenant da conversa ou o
+# tenant pedido antes de assinar. Subir para `true` é decisão à parte, porque
+# mexe no upload de mídia de todo o chat.
+[functions.get-media-upload-url]
+verify_jwt = false
+
 # Texto do e-mail ao cliente gerado pela IA na tela "Enviar e-mail" do chat.
 # verify_jwt = TRUE: só a tela chama, com a sessão do usuário; a function ainda
 # confere auth.getUser + tenant da conversa por dentro e gasta IA do tenant.

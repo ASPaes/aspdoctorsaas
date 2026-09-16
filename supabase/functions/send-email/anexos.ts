@@ -73,7 +73,10 @@ export function validarAnexos(
     return { ok: false, erro: `No máximo ${ANEXO_MAX_ARQUIVOS} arquivos por e-mail.` };
   }
 
-  const caminho = new RegExp(`^${tenantId}/${UUID}/${UUID}\\.[a-z0-9]{1,5}$`, "i");
+  // dois formatos, os dois gerados pela get-media-upload-url:
+  //   <tenant>/<conversa>/<uuid>.<ext>  anexo escolhido no chat
+  //   <tenant>/emails/<uuid>.<ext>      anexo escolhido na tela E-mails
+  const caminho = new RegExp(`^${tenantId}/(?:${UUID}|emails)/${UUID}\\.[a-z0-9]{1,5}$`, "i");
   const anexos: AnexoPedido[] = [];
   for (const item of lista) {
     const path = typeof item?.path === "string" ? item.path : "";

@@ -29,6 +29,9 @@ export interface EmailRecebido {
   origem: string | null;
   account_id: string | null;
   deleted_at: string | null;
+  arquivado_em: string | null;
+  pasta_id: string | null;
+  email_pastas?: { nome: string; cor: string } | null;
   acao: AcaoRecebido | null;
   acao_detalhe: string | null;
   department_id: string | null;
@@ -51,6 +54,10 @@ export interface FiltrosRecebidos {
   setor: string | null;
   periodo: { from: Date; to: Date };
   lixeira: boolean;
+  /** true = mostra só os arquivados; na lixeira este filtro não vale */
+  arquivadas: boolean;
+  /** id da pasta escolhida; null = todas */
+  pasta: string | null;
 }
 
 export const POR_PAGINA_RECEBIDOS = 50;
@@ -121,10 +128,10 @@ export const nomeDoClienteRecebido = (e: EmailRecebido) =>
  * por prevenção.
  */
 const COLUNAS =
-  "id, recebido_em, assunto, corpo_texto, de_email, de_nome, status, envio_id, cliente_id, referencia_id, origem, account_id, deleted_at, " +
+  "id, recebido_em, assunto, corpo_texto, de_email, de_nome, status, envio_id, cliente_id, referencia_id, origem, account_id, deleted_at, arquivado_em, " +
   "acao, acao_detalhe, department_id, ticket_id, anexos, anexos_ignorados, email_accounts(email, rotulo), clientes(razao_social, nome_fantasia), " +
   "support_departments(name), support_tickets!email_recebidos_ticket_id_fkey(ticket_code), " +
-  "email_envios!email_recebidos_envio_id_fkey(assunto, created_at)";
+  "email_envios!email_recebidos_envio_id_fkey(assunto, created_at), pasta_id, email_pastas(nome, cor)";
 
 export function useEmailsRecebidos(filtros: FiltrosRecebidos, pagina: number) {
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -155,6 +162,11 @@ export function useEmailsRecebidos(filtros: FiltrosRecebidos, pagina: number) {
         .range(pagina * POR_PAGINA_RECEBIDOS, pagina * POR_PAGINA_RECEBIDOS + POR_PAGINA_RECEBIDOS - 1);
 
       q = filtros.lixeira ? q.not("deleted_at", "is", null) : q.is("deleted_at", null);
+      // na lixeira aparece tudo o que está lá, arquivado ou não
+      if (!filtros.lixeira) {
+        q = filtros.arquivadas ? q.not("arquivado_em", "is", null) : q.is("arquivado_em", null);
+      }
+      if (filtros.pasta) q = q.eq("pasta_id", filtros.pasta);
       if (filtros.setor) q = q.eq("department_id", filtros.setor);
       if (filtros.contas.length) q = q.in("account_id", filtros.contas);
       // sem filtro escolhido, o ignorado (propaganda bloqueada, endereço desligado) fica fora
@@ -175,11 +187,11 @@ export function useEmailsRecebidos(filtros: FiltrosRecebidos, pagina: number) {
 }
 
 /** contagem por setor e da triagem, para as abas e o atalho; respeita o período */
-export function useContagemRecebidos(periodo: { from: Date; to: Date }, lixeira: boolean) {
+export function useContagemRecebidos(periodo: { from: Date; to: Date }, lixeira: boolean, arquivadas: boolean) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
   return useQuery({
-    queryKey: ["emails_recebidos_contagem", tid, periodo.from.toISOString(), periodo.to.toISOString(), lixeira],
+    queryKey: ["emails_recebidos_contagem", tid, periodo.from.toISOString(), periodo.to.toISOString(), lixeira, arquivadas],
     enabled: !!tid,
     ...LISTA_AO_VIVO,
     queryFn: async () => {
@@ -191,6 +203,8 @@ export function useContagemRecebidos(periodo: { from: Date; to: Date }, lixeira:
           .lte("recebido_em", periodo.to.toISOString())
           .neq("acao", "ignorado");
         q = lixeira ? q.not("deleted_at", "is", null) : q.is("deleted_at", null);
+        // a aba por setor conta o que está na lista: arquivado não entra
+        if (!lixeira) q = arquivadas ? q.not("arquivado_em", "is", null) : q.is("arquivado_em", null);
         return q;
       });
 
