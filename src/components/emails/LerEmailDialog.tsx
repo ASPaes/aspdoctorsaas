@@ -59,6 +59,7 @@ export function LerEmailDialog({ tipo, id, onOpenChange }: Props) {
         id: email.id,
         tipo,
         de: tipo === "enviado" ? email.remetente : email.de_email,
+        deNome: tipo === "enviado" ? (email.email_accounts?.rotulo ?? null) : (email.de_nome ?? null),
         para: email.para ?? [],
         cc: email.cc ?? [],
         assunto: email.assunto,

@@ -83,17 +83,68 @@ export function citacaoDoOriginal(original: {
         .split(/\r?\n/)
         .join("<br>")}</p>`;
 
-  return [
-    "<p></p>",
-    `<p>${cabecalho}</p>`,
-    `<blockquote>${corpo}</blockquote>`,
-  ].join("");
+  return [`<p>${cabecalho}</p>`, `<blockquote>${corpo}</blockquote>`].join("");
 }
 
-/** o corpo com que a tela abre: espaço para escrever em cima da citação */
-export function corpoInicial(modo: ModoEscrita, original: Parameters<typeof citacaoDoOriginal>[0]): string {
-  const abertura = modo === "encaminhar" ? "<p></p><p>Segue abaixo o e-mail.</p>" : "<p></p>";
-  return `${abertura}${citacaoDoOriginal(original)}`;
+/** texto guardado vira parágrafos: linha em branco separa parágrafo, quebra simples vira <br> */
+const textoEmParagrafos = (texto: string) =>
+  texto
+    .split(/\r?\n\s*\r?\n/)
+    .map((bloco) => bloco.trim())
+    .filter(Boolean)
+    .map((bloco) => `<p>${escapar(bloco).split(/\r?\n/).join("<br>")}</p>`)
+    .join("");
+
+export interface OriginalEncaminhado {
+  de: string | null;
+  /** nome de quem escreveu, quando o e-mail trouxe; vira "Nome <email>" */
+  deNome?: string | null;
+  quando: string | null;
+  assunto: string | null;
+  para?: string[];
+  cc?: string[];
+  corpoHtml?: string | null;
+  corpoTexto?: string | null;
+}
+
+/**
+ * Encaminhar no formato de Gmail e Outlook (16/09/2026): a linha
+ * "Mensagem encaminhada", o cabeçalho do original (De, Data, Assunto, Para, Cc)
+ * e o texto por inteiro, SEM recuo de citação.
+ *
+ * Antes o encaminhar usava a mesma citação da resposta ("Em ..., fulano
+ * escreveu:" dentro de <blockquote>). Os programas de e-mail tratam esse bloco
+ * como histórico já lido e o escondem atrás do "•••": quem recebia via só a
+ * mensagem nova, como se o e-mail encaminhado não tivesse ido.
+ */
+export function blocoEncaminhado(original: OriginalEncaminhado): string {
+  const de = original.de
+    ? original.deNome && original.deNome.trim() && original.deNome.trim() !== original.de
+      ? `${original.deNome.trim()} <${original.de}>`
+      : original.de
+    : "";
+  const linhas: [string, string][] = [
+    ["De", de],
+    ["Data", dataLegivel(original.quando)],
+    ["Assunto", (original.assunto ?? "").replace(MARCA_TOKEN, "").trim()],
+    ["Para", (original.para ?? []).join(", ")],
+    ["Cc", (original.cc ?? []).join(", ")],
+  ];
+  const cabecalho = linhas
+    .filter(([, valor]) => valor)
+    .map(([rotulo, valor]) => `${rotulo}: ${escapar(valor)}`)
+    .join("<br>");
+
+  const corpo = original.corpoHtml
+    ? original.corpoHtml
+    : textoEmParagrafos(original.corpoTexto ?? "") || "<p>(e-mail sem texto)</p>";
+
+  return ["<p></p>", "<p>---------- Mensagem encaminhada ---------</p>", `<p>${cabecalho}</p>`, corpo].join("");
+}
+
+/** o corpo com que a tela abre: espaço para escrever em cima do original */
+export function corpoInicial(modo: ModoEscrita, original: OriginalEncaminhado): string {
+  return modo === "encaminhar" ? blocoEncaminhado(original) : `<p></p>${citacaoDoOriginal(original)}`;
 }
 
 export const ROTULO_MODO: Record<ModoEscrita, string> = {

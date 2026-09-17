@@ -37,6 +37,8 @@ export interface EmailOriginal {
   id: string;
   tipo: "enviado" | "recebido";
   de: string | null;
+  /** nome de quem escreveu, para o cabeçalho do encaminhamento */
+  deNome?: string | null;
   para: string[];
   cc?: string[];
   assunto: string | null;
@@ -132,10 +134,26 @@ export function EscreverEmailDialog({
   const [anexos, setAnexos] = useState<AnexoNaTela[]>([]);
   const [enviando, setEnviando] = useState(false);
   const chave = useRef<string | null>(null);
+  /**
+   * Qual abertura já teve o corpo preparado. O editor só monta depois disso
+   * (bug de 16/09/2026, reproduzido em teste): montado junto com a janela, ele
+   * ainda recebia o corpo VAZIO da renderização anterior, devolvia "vazio" pelo
+   * onChange, e esse aviso atrasado sobrescrevia o original já preparado. Os
+   * anexos iam, o texto encaminhado não.
+   */
+  const [preparado, setPreparado] = useState<string | null>(null);
 
   const original = pedido?.original;
   const modo = pedido?.modo ?? "responder";
   const anexando = anexos.some((a) => a.status === "enviando");
+  const chaveAtual = pedido && original ? `${pedido.modo}:${original.id}` : null;
+
+  // fechou: a próxima abertura prepara tudo de novo, mesmo sendo o mesmo e-mail
+  useEffect(() => {
+    if (pedido) return;
+    chave.current = null;
+    setPreparado(null);
+  }, [pedido]);
 
   // cada abertura monta destinatários, assunto e citação a partir do original
   useEffect(() => {
@@ -143,6 +161,7 @@ export function EscreverEmailDialog({
     const atual = `${pedido.modo}:${original.id}`;
     if (chave.current === atual) return;
     chave.current = atual;
+    setPreparado(atual);
 
     const destinos = destinatariosDaResposta({
       modo: pedido.modo,
@@ -161,6 +180,9 @@ export function EscreverEmailDialog({
     setCorpoHtml(
       corpoInicial(pedido.modo, {
         de: original.de,
+        deNome: original.deNome,
+        para: original.para,
+        cc: original.cc,
         quando: original.quando,
         assunto: original.assunto,
         corpoHtml: original.corpoHtml,
@@ -384,23 +406,28 @@ export function EscreverEmailDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="escrever-corpo" className="font-normal text-muted-foreground">Mensagem</Label>
-            <EditorEmail
-              id="escrever-corpo"
-              valor={corpoHtml}
-              versao={versaoCorpo}
-              onChange={(c) => {
-                setCorpoHtml(c.html);
-                setCorpoTexto(c.vazio ? "" : c.texto);
-              }}
-              desabilitado={enviando}
-              placeholder="Escreva a resposta"
-              acaoAnexar={<BotaoAnexar desabilitado={enviando} onEscolher={adicionarAnexos} />}
-              rodape={
-                <p className="mb-1 mt-3 text-xs text-muted-foreground">
-                  A assinatura da conta remetente entra automaticamente no envio.
-                </p>
-              }
-            />
+            {chaveAtual && preparado === chaveAtual ? (
+              <EditorEmail
+                key={preparado}
+                id="escrever-corpo"
+                valor={corpoHtml}
+                versao={versaoCorpo}
+                onChange={(c) => {
+                  setCorpoHtml(c.html);
+                  setCorpoTexto(c.vazio ? "" : c.texto);
+                }}
+                desabilitado={enviando}
+                placeholder="Escreva a resposta"
+                acaoAnexar={<BotaoAnexar desabilitado={enviando} onEscolher={adicionarAnexos} />}
+                rodape={
+                  <p className="mb-1 mt-3 text-xs text-muted-foreground">
+                    A assinatura da conta remetente entra automaticamente no envio.
+                  </p>
+                }
+              />
+            ) : (
+              <div className="min-h-[290px] rounded-md border border-border bg-muted/30" aria-hidden />
+            )}
             <ListaAnexos
               anexos={anexos}
               onRemover={(id) => setAnexos((l) => l.filter((a) => a.id !== id))}

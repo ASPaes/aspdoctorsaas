@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 16/09
 
+- 🔧 **Encaminhar e responder saíam sem o e-mail original** — Pela tela **E-mails**, o encaminhamento chegava com os anexos mas só com a mensagem nova: o texto do e-mail encaminhado se perdia ao abrir a tela. O mesmo acontecia com a citação no **Responder**. Agora a tela abre com o original completo, e o encaminhamento segue o formato de Gmail e Outlook: a linha **Mensagem encaminhada**, quem enviou, a data, o assunto, para quem foi e o texto inteiro.
+
 - ⬆️ **Cópia oculta aparece no e-mail enviado** — Quem foi colocado em **Cco** agora fica registrado e aparece ao abrir o e-mail em **E-mails › Enviados**, junto de Para e Cc. Isso é só para a sua equipe conferir depois: no e-mail em si o Cco continua invisível, ninguém que recebeu descobre quem mais recebeu. Vale para os envios feitos a partir de agora.
 
 - 🆕 **Ver e exportar a latência de cada agente** — Na aba **Agentes** do Dashboard de Atendimento, o valor de **Latência** deixou de ser só um número: clicando na linha do agente abre a lista das respostas que formaram aquela mediana, da maior demora para a menor. Cada linha mostra quando o cliente escreveu, o contato e o cliente, um trecho da mensagem e quanto tempo o agente levou para responder; clicar nela abre o histórico do chat naquele momento, e a seta leva direto para a conversa no WhatsApp. Um gráfico no topo mostra como as respostas daquele agente se distribuem por faixa de tempo, e as que passaram de 4 horas aparecem marcadas como fora do cálculo da mediana. Chegou também o botão **Exportar XLSX** em dois lugares: no scorecard, com uma linha por agente, e dentro do detalhe, com uma linha por resposta.

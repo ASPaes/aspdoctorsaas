@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   assuntoDaEscrita,
+  blocoEncaminhado,
   citacaoDoOriginal,
+  corpoInicial,
   destinatariosDaResposta,
   limparAssunto,
 } from "./respostaEmail";
@@ -80,5 +82,45 @@ describe("citação", () => {
     const html = citacaoDoOriginal({ de: "<script>", quando: null, assunto: null, corpoTexto: "<b>x</b>" });
     expect(html).toContain("&lt;script&gt;");
     expect(html).toContain("&lt;b&gt;x&lt;/b&gt;");
+  });
+});
+
+describe("encaminhar", () => {
+  const original = {
+    de: "contato@espeteria.com.br",
+    deNome: "Espeteria Contato",
+    quando: "2026-09-15T11:12:00-03:00",
+    assunto: "Falha no OMIE [#VPK4UZSG26]",
+    para: ["suporte@digioffice.com.br"],
+    cc: ["financeiro@espeteria.com.br"],
+    corpoTexto: "Bom dia\nSegue o retorno\n\nAtt,\nJoão",
+  };
+
+  it("sai no formato de encaminhamento, sem o recuo que os programas escondem", () => {
+    const html = corpoInicial("encaminhar", original);
+    expect(html).toContain("---------- Mensagem encaminhada ---------");
+    expect(html).not.toContain("<blockquote>");
+    expect(html).not.toContain("escreveu:");
+  });
+
+  it("traz o cabeçalho do original e o texto inteiro", () => {
+    const html = blocoEncaminhado(original);
+    expect(html).toContain("De: Espeteria Contato &lt;contato@espeteria.com.br&gt;");
+    expect(html).toContain("Data: ");
+    expect(html).toContain("Assunto: Falha no OMIE<br>");
+    expect(html).toContain("Para: suporte@digioffice.com.br");
+    expect(html).toContain("Cc: financeiro@espeteria.com.br");
+    expect(html).toContain("<p>Bom dia<br>Segue o retorno</p><p>Att,<br>João</p>");
+  });
+
+  it("sem nome, sem Cc e sem texto, não deixa linha vazia nem corpo em branco", () => {
+    const html = blocoEncaminhado({ de: "a@b.com", quando: null, assunto: "X", para: [], corpoTexto: "" });
+    expect(html).toContain("De: a@b.com<br>Assunto: X</p>");
+    expect(html).not.toContain("Cc:");
+    expect(html).toContain("(e-mail sem texto)");
+  });
+
+  it("responder continua com a citação recuada", () => {
+    expect(corpoInicial("responder", original)).toContain("<blockquote>");
   });
 });
