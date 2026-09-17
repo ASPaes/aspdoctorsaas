@@ -347,3 +347,10 @@ verify_jwt = false
 # a dispara de fora. Sem esta entrada o CI publicaria com FALSE.
 [functions.purge-email-anexos]
 verify_jwt = true
+
+# Motor do e-mail agendado. Chamada pelo pg_cron a cada minuto com a anon key
+# no Authorization -- mesma receita do dispatch-scheduled-messages. `true` de
+# proposito: ela manda e-mail para cliente, entao sem JWT valido do projeto
+# ninguem a dispara de fora. Sem esta entrada o CI publicaria com FALSE.
+[functions.dispatch-scheduled-emails]
+verify_jwt = true

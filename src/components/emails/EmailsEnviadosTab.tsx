@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { LerEmailDialog } from "./LerEmailDialog";
+import { EmailsAgendadosBloco } from "./EmailsAgendadosBloco";
 import { useArquivarEmails } from "./useArquivarEmails";
 import { MenuPastas, MoverParaPasta } from "./MenuPastas";
 import { useMoverParaPasta } from "./usePastasEmail";
@@ -288,6 +289,9 @@ export default function EmailsEnviadosTab() {
           )}
         </div>
       )}
+
+      {/* agendados: só na lista principal, fora da lixeira e das arquivadas */}
+      {!filtros.lixeira && !filtros.arquivadas && !filtros.pasta && <EmailsAgendadosBloco />}
 
       {/* tabela */}
       {isLoading ? (

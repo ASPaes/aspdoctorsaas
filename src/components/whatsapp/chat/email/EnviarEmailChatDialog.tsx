@@ -28,6 +28,10 @@ import { ConversaCompletaPrevia } from "./ConversaCompletaPrevia";
 import { BotaoAjustar, BotaoSotaque, FaixaAjustes } from "./SotaqueEmail";
 import { comSotaque, SEM_AJUSTES, semAjustes, type AjustesTexto } from "./estadosSotaque";
 import { BotaoAnexar, ListaAnexos, type AnexoNaTela } from "./AnexosEmail";
+import { BotaoEnviarComAgenda } from "./AgendarEnvio";
+import { agendarEmail } from "@/components/emails/useEmailsAgendados";
+import { useBusinessHoursConfig } from "../../hooks/useBusinessHoursConfig";
+import { format } from "date-fns";
 import { uploadAnexoEmail } from "./uploadAnexoEmail";
 import {
   assuntoComReferencia,
@@ -65,6 +69,8 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
   const { user, profile } = useAuth();
   const contasQuery = useContasDeEnvio(conversation.tenant_id, user?.id ?? null, profile?.is_super_admin === true, open);
   const clienteQuery = useClienteDoEmail(conversation, open);
+  /** só para o aviso de fora do horário no agendamento; nunca bloqueia */
+  const horarioComercial = useBusinessHoursConfig();
 
   const [opcoes, setOpcoes] = useState<OpcoesGeracao>(OPCOES_PADRAO);
   const [gerado, setGerado] = useState<OpcoesGeracao>(OPCOES_PADRAO);
@@ -316,25 +322,26 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
     }
   };
 
-  const enviar = async () => {
-    if (enviando || gerando || corrigindo || reescrevendo || trava.travado) return;
+  /** as mesmas conferências valem para enviar agora e para agendar */
+  const prontoParaSair = (): boolean => {
+    if (enviando || gerando || corrigindo || reescrevendo || trava.travado) return false;
     if (incluirConversa) {
       if (conversaQuery.isFetching || !conversaQuery.data) {
         toast.error("Espere a conversa completa terminar de carregar antes de enviar.");
-        return;
+        return false;
       }
       if (conversaErro) {
         toast.error(`${conversaErro} Desmarque "Incluir a conversa completa" para enviar sem ela.`, { duration: 10000 });
-        return;
+        return false;
       }
     }
     if (anexando) {
       toast.error("Espere os arquivos terminarem de anexar antes de enviar.");
-      return;
+      return false;
     }
     if (anexos.some((a) => a.status === "erro")) {
       toast.error("Tire os anexos que falharam (marcados em vermelho) antes de enviar.");
-      return;
+      return false;
     }
     const faltando: string[] = [];
     if (!contaId) faltando.push("o remetente");
@@ -343,8 +350,54 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
     if (!corpo.trim()) faltando.push("o corpo do e-mail");
     if (faltando.length > 0) {
       toast.error(`Falta preencher ${faltando.join(", ")}.`);
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const anexosProntos = () =>
+    anexos.filter((a) => a.status === "pronto" && a.path).map((a) => ({ path: a.path!, nome: a.nome, mime: a.mime }));
+  const conversaParaEnviar = () =>
+    incluirConversa && conversaMontada && conversaMontada.mensagens > 0
+      ? { html: conversaMontada.html, texto: conversaMontada.texto }
+      : null;
+
+  /** guarda o e-mail como está agora; sai pela send-email na hora marcada */
+  const agendar = async (quando: Date): Promise<boolean> => {
+    if (!prontoParaSair()) return false;
+    setEnviando(true);
+    try {
+      const dados = clienteQuery.data;
+      const historico = conversaParaEnviar();
+      await agendarEmail(conversation.tenant_id, quando, {
+        account_id: contaId,
+        para,
+        cc,
+        cco,
+        assunto: assuntoComReferencia(assunto, referencia),
+        texto: corpo.trim(),
+        html: htmlParaEmail(corpoHtml),
+        historico_html: historico?.html ?? null,
+        historico_texto: historico?.texto ?? null,
+        origem: "chat",
+        referencia_id: dados?.atendimentoId ?? null,
+        cliente_id: dados?.cliente?.id ?? null,
+        department_id: dados?.departmentId ?? null,
+        anexos: anexosProntos(),
+      });
+      toast.success(`E-mail agendado para ${format(quando, "dd/MM 'às' HH:mm")}. Ele aparece em E-mails › Enviados até sair.`);
+      onOpenChange(false);
+      return true;
+    } catch (err: any) {
+      toast.error(err?.message || "Não foi possível agendar o e-mail.", { duration: 10000 });
+      return false;
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const enviar = async () => {
+    if (!prontoParaSair()) return;
 
     setEnviando(true);
     try {
@@ -361,11 +414,8 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
         atendimento_id: dados?.atendimentoId ?? null,
         cliente_id: dados?.cliente?.id ?? null,
         department_id: dados?.departmentId ?? null,
-        anexos: anexos.filter((a) => a.status === "pronto" && a.path).map((a) => ({ path: a.path!, nome: a.nome, mime: a.mime })),
-        historico:
-          incluirConversa && conversaMontada && conversaMontada.mensagens > 0
-            ? { html: conversaMontada.html, texto: conversaMontada.texto }
-            : null,
+        anexos: anexosProntos(),
+        historico: conversaParaEnviar(),
       });
       if (r.ok === false) {
         toast.error(r.mensagem, { duration: 12000 });
@@ -650,14 +700,13 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={enviando}>
             Cancelar
           </Button>
-          <Button
-            onClick={enviar}
-            disabled={trava.travado || gerando || enviando || corrigindo || anexando || reescrevendo}
-            className="gap-2"
-          >
-            {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {enviando ? "Enviando..." : "Enviar"}
-          </Button>
+          <BotaoEnviarComAgenda
+            enviando={enviando}
+            desabilitado={trava.travado || gerando || enviando || corrigindo || anexando || reescrevendo}
+            horario={horarioComercial}
+            onEnviar={enviar}
+            onAgendar={agendar}
+          />
         </div>
       </DialogContent>
     </Dialog>

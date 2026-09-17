@@ -74,6 +74,23 @@ Deno.serve(async (req) => {
 
   if (erroTenants) return json(500, { ok: false, error: `Não foi possível listar os tenants: ${erroTenants.message}` });
 
+  // Anexo de e-mail AGENDADO (16/09/2026) fica no Storage até o envio, que
+  // pode ser daqui a meses. Sem conseguir ler essa lista, nada é apagado: pior
+  // do que sobrar arquivo é o e-mail agendado sair sem o anexo.
+  const { data: agendados, error: erroAgendados } = await supabase
+    .from('email_agendados')
+    .select('anexos')
+    .in('status', ['agendado', 'enviando']);
+  // tabela ainda não criada (function publicada antes da migration): não há agendado
+  if (erroAgendados && erroAgendados.code !== '42P01' && !/does not exist|could not find the table/i.test(erroAgendados.message)) {
+    return json(500, { ok: false, error: `Não foi possível ler os e-mails agendados: ${erroAgendados.message}` });
+  }
+  const protegidos = new Set<string>(
+    (agendados ?? []).flatMap((a: { anexos: unknown }) =>
+      Array.isArray(a.anexos) ? a.anexos.map((x: any) => String(x?.path ?? '')).filter(Boolean) : [],
+    ),
+  );
+
   const alvos = (tenants ?? []).map((t: { id: string }) => t.id).filter((id) => !soTenant || id === soTenant);
   const resultado: PorTenant[] = [];
   const amostra: string[] = [];
@@ -101,6 +118,7 @@ Deno.serve(async (req) => {
         if (!item.name || !item.id) continue;
         const quando = item.created_at ? new Date(item.created_at) : null;
         if (!quando || quando >= corte) continue;
+        if (protegidos.has(`${pasta}/${item.name}`)) continue;
         velhos.push({ path: `${pasta}/${item.name}`, tamanho: Number((item.metadata as any)?.size ?? 0) });
       }
 

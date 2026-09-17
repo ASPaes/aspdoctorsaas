@@ -41,12 +41,14 @@ function Pai() {
   return <EscreverEmailDialog pedido={p} onOpenChange={(a) => !a && setP(null)} />;
 }
 
-const esperar = () =>
-  act(async () => {
-    await new Promise((r) => setTimeout(r, 300));
-  });
-
 const textoDoEditor = () => document.body.querySelector(".ProseMirror")?.textContent ?? "";
+
+/** confere de 50 em 50 ms, até 3 s: com a máquina ocupada, espera fixa deu falso negativo */
+const esperar = (condicao: () => boolean = () => true) =>
+  act(async () => {
+    for (let i = 0; i < 60 && !condicao(); i++) await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
+  });
 
 describe("tela de encaminhar", () => {
   it("abre com o original no editor, e de novo depois de fechar e reabrir o mesmo e-mail", async () => {
@@ -58,15 +60,17 @@ describe("tela de encaminhar", () => {
     });
 
     await act(async () => definir(pedido));
-    await esperar();
+    await esperar(() => textoDoEditor().includes("Texto do original"));
     expect(textoDoEditor()).toContain("Mensagem encaminhada");
     expect(textoDoEditor()).toContain("Texto do original");
     expect(document.body.textContent).toContain("a.pdf");
 
     await act(async () => definir(null));
-    await esperar();
+    // o editor precisa sumir antes, senão a conferência abaixo leria o editor da abertura anterior
+    await esperar(() => !document.body.querySelector(".ProseMirror"));
+    expect(document.body.querySelector(".ProseMirror")).toBeNull();
     await act(async () => definir(pedido));
-    await esperar();
+    await esperar(() => textoDoEditor().includes("Texto do original"));
     expect(textoDoEditor()).toContain("Texto do original");
-  });
+  }, 15_000);
 });
