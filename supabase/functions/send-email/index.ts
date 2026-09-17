@@ -335,6 +335,14 @@ Deno.serve(async (req) => {
     console.error(`[send-email] envio ${ok ? 'feito' : 'falhou'} mas o registro falhou: ${registroErr.message}`);
   }
 
+  // E-mail ligado a um chamado vira linha nas Ocorrências dele (17/09/2026). A
+  // função decide se a referência é mesmo um ticket; falhar aqui não pode
+  // derrubar o envio, que já aconteceu.
+  if (ok && registro?.id && referenciaId) {
+    const { error: eventoErr } = await supabase.rpc('fn_email__evento_enviado', { p_envio_id: registro.id });
+    if (eventoErr) console.error(`[send-email] envio ${registro.id} não virou ocorrência do ticket: ${eventoErr.message}`);
+  }
+
   // Enviado: o arquivo temporário não serve mais e ninguém o apagaria. Falhou:
   // fica, para a pessoa tentar de novo sem anexar outra vez.
   // O anexo de e-mail RECEBIDO (ticket-attachments) nunca entra aqui: ele é do

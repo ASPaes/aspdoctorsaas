@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -21,9 +21,11 @@ import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketD
 import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
 import { useAbrirEnvioEmail } from "@/components/whatsapp/chat/email/useAbrirEnvioEmail";
+// a tela de leitura traz o editor de resposta junto: só baixa quando alguém abre um e-mail
+const LerEmailDialog = lazy(() => import("@/components/emails/LerEmailDialog").then((m) => ({ default: m.LerEmailDialog })));
 import { TicketAttachments } from "@/components/tickets/TicketAttachments";
 import {
-  Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
+  Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail, Eye,
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
   Tag as TagIcon, X, ListChecks, Trash2, ChevronDown, Building2, MessageSquare, UserPlus, Rocket,
   Check, Lock, RefreshCw,
@@ -580,6 +582,9 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const getAgentName = (uid: string) => eventAgents.find((a) => a.user_id === uid)?.nome ?? "Sistema";
 
   const ticketClienteId = ticket?.cliente_id ?? ticket?.clientes?.id ?? null;
+
+  /** e-mail aberto pela ocorrência: a mesma tela de leitura de E-mails, com Responder */
+  const [emailAberto, setEmailAberto] = useState<{ tipo: "enviado" | "recebido"; id: string } | null>(null);
 
   // botão E-mail do cabeçalho: mesma conferência de contas do chat, e a tela só
   // baixa no clique (ela carrega o editor de texto inteiro)
@@ -1721,6 +1726,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               <div key={evt.id} className="relative pl-5 pb-4">
                 <div className={`absolute -left-[5px] top-1.5 w-2 h-2 rounded-full ${
                   evt.event_type === "email_cliente" ? "bg-accent" :
+                  evt.event_type === "email_enviado" ? "bg-emerald-500" :
                   evt.event_type === "email_reaberto" || evt.event_type === "email_continuacao" ? "bg-sky-400" :
                   evt.event_type === "comment" ? "bg-primary" :
                   evt.event_type === "checklist" ? "bg-emerald-400" :
@@ -1740,8 +1746,24 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                       <Mail className="h-3.5 w-3.5 text-accent" />
                       <span className="text-xs font-medium">Cliente por e-mail</span>
                       <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                      {evt.new_value && (
+                        <BotaoVerEmail onClick={() => setEmailAberto({ tipo: "recebido", id: evt.new_value! })} />
+                      )}
                     </div>
                     <p className="text-sm whitespace-pre-wrap break-words rounded-md border border-accent/20 bg-accent/5 px-2.5 py-1.5">{evt.content}</p>
+                  </div>
+                ) : evt.event_type === "email_enviado" ? (
+                  // e-mail que saiu pelo chamado (17/09/2026): ver e responder daqui
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <Send className="h-3.5 w-3.5 text-emerald-500" />
+                      <span className="text-xs font-medium">E-mail enviado ao cliente</span>
+                      <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                      {evt.new_value && (
+                        <BotaoVerEmail onClick={() => setEmailAberto({ tipo: "enviado", id: evt.new_value! })} />
+                      )}
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap break-words rounded-md border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1.5">{evt.content}</p>
                   </div>
                 ) : evt.event_type === "email_reaberto" || evt.event_type === "email_continuacao" ? (
                   <div className="flex items-center gap-2 flex-wrap">
@@ -2446,6 +2468,20 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         closedAt={viewChatMeta.closedAt}
       />
       {envioEmail.elementos}
+      {emailAberto && (
+        <Suspense fallback={null}>
+          <LerEmailDialog
+            tipo={emailAberto.tipo}
+            id={emailAberto.id}
+            onOpenChange={(aberto) => {
+              if (aberto) return;
+              setEmailAberto(null);
+              // respondeu ou encaminhou daqui: a ocorrência nova aparece na hora
+              queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
+            }}
+          />
+        </Suspense>
+      )}
       <StartConversationFromTicketDialog
         open={startConvOpen}
         onOpenChange={setStartConvOpen}
@@ -2531,3 +2567,17 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 }
 
 export default SupportTicketDetailDialog;
+
+/** abre a ocorrência de e-mail na tela de leitura, que já tem Responder */
+function BotaoVerEmail({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-sky-600 hover:bg-sky-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-400"
+    >
+      <Eye className="h-3 w-3" />
+      Ver e responder
+    </button>
+  );
+}
