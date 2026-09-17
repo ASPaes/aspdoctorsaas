@@ -1,11 +1,15 @@
-import type { ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useOemIntegracaoAtiva } from "@/hooks/useOemIntegracaoAtiva";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 import { Badge } from "@/components/ui/badge";
-import { Cpu, Lock, TrendingDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ArrowLeftRight, Cpu, Link2, Lock, TrendingDown } from "lucide-react";
 import OemLicencaEstadoBotoes from "./OemLicencaEstadoBotoes";
+import EscolherLicencaOemDialog, { type LicencaOem } from "@/components/configuracoes/EscolherLicencaOemDialog";
 
 // ============================================================================
 // As licenças do OEM deste cliente.
@@ -35,7 +39,25 @@ type Licenca = {
   mensalidade_ds: number | null;
   status_usuario: string;
   resolvido_em: string | null;
+  // Os três abaixo só existem para a licença servir de `soltar` no diálogo de troca.
+  cnpj_norm: string | null;
+  ds_customer_id: string | null;
+  razao_ds: string | null;
 };
+
+const CAMPOS_LICENCA =
+  "id, filial_codigo, empresa_codigo, razao_oem, custo_oem, status_oem, " +
+  "bloqueado_oem, desativa_em, mensalidade_ds, status_usuario, resolvido_em, " +
+  "cnpj_norm, ds_customer_id, razao_ds";
+
+// A mesma permissão de Bloquear/Desativar (`OemLicencaEstadoBotoes`), por
+// decisão do Alexandre: quem mexe nos módulos do cliente troca a licença. No
+// banco é `pode_mexer_licenca_oem`, que confere a mesma chave e o tenant.
+// Esconder o botão aqui é conveniência; quem barra de verdade é o banco.
+function usePodeTrocarLicencaOem() {
+  const { can } = usePermissions();
+  return can("clientes.modulos", "view");
+}
 
 // A IDADE DA LEITURA, EM TEXTO CURTO O SUFICIENTE PARA CABER NO CABEÇALHO.
 //
@@ -136,7 +158,7 @@ export function useOemDoCliente(clienteId: string) {
   // grupo se repete, ele aponta todas as filiais para o mesmo cadastro. O que
   // vale é o par grupo+filial gravado em cliente_produtos, que só é escrito
   // quando não há dúvida.
-  const { data: codigos = [] } = useQuery({
+  const { data: codigos = [], isSuccess: codigosLidos } = useQuery({
     queryKey: ["oem-codigos-cliente", tid, clienteId],
     enabled: !!tid && !!clienteId && temConta === true,
     queryFn: async () => {
@@ -165,15 +187,12 @@ export function useOemDoCliente(clienteId: string) {
   //
   // O índice `idx_recon_oem_cliente (tenant_id, ds_customer_id)` já existe, e
   // o resultado é de poucas linhas.
-  const { data: apontam = [] } = useQuery({
+  const { data: apontam = [], isSuccess: apontamLidos } = useQuery({
     queryKey: ["oem-apontam-cliente", tid, clienteId],
     enabled: !!tid && !!clienteId && temConta === true,
     queryFn: async () => {
       const { data, error } = await (supabase.from("reconciliacao_oem" as any) as any)
-        .select(
-          "id, filial_codigo, empresa_codigo, razao_oem, custo_oem, status_oem, " +
-          "bloqueado_oem, desativa_em, mensalidade_ds, status_usuario, resolvido_em",
-        )
+        .select(CAMPOS_LICENCA)
         .eq("tenant_id", tid)
         .eq("ds_customer_id", clienteId)
         .not("filial_codigo", "is", null)
@@ -189,10 +208,7 @@ export function useOemDoCliente(clienteId: string) {
     enabled: !!tid && !!clienteId && temConta === true && codigos.length > 0,
     queryFn: async () => {
       const { data, error } = await (supabase.from("reconciliacao_oem" as any) as any)
-        .select(
-          "id, filial_codigo, empresa_codigo, razao_oem, custo_oem, status_oem, " +
-          "bloqueado_oem, desativa_em, mensalidade_ds, status_usuario, resolvido_em",
-        )
+        .select(CAMPOS_LICENCA)
         .eq("tenant_id", tid)
         .in("filial_codigo", codigos)
         .order("filial_codigo");
@@ -225,9 +241,16 @@ export function useOemDoCliente(clienteId: string) {
   });
 
   const ativo = !!tid && temConta === true;
+  const podeDecidir = usePodeTrocarLicencaOem();
   // Vínculo indefinido: o de/para aponta para cá, mas nenhuma licença foi
   // confirmada. Dizer isso é mais útil do que listar 38 palpites.
   const indefinido = ativo && codigos.length === 0 && pendentes > 0;
+  // Nenhuma licença e nenhum palpite. Só aparece para quem pode vincular: para
+  // o resto seria uma seção vazia sem nada a fazer com ela.
+  // Só depois das duas leituras: com elas carregando, `codigos` e `apontam`
+  // valem [] e a seção piscaria "sem licença" em quem tem.
+  const semLicenca = ativo && podeDecidir && codigosLidos && apontamLidos
+    && codigos.length === 0 && !indefinido;
 
   // As decididas que não couberam na ficha.
   //
@@ -248,12 +271,103 @@ export function useOemDoCliente(clienteId: string) {
     orfas,
     codigos,
     lidoEm,
-    visivel: ativo && (licencas.length > 0 || indefinido),
+    podeDecidir,
+    semLicenca,
+    visivel: ativo && (licencas.length > 0 || indefinido || semLicenca),
   };
 }
 
+/**
+ * Trocar ou vincular a licença pela ficha do cliente.
+ *
+ * Antes a troca só existia em Configurações › OEM › Divergências, e só no alerta
+ * de baixa programada. Cliente vinculado à licença errada mandava toda mudança
+ * de módulo para a licença de outro cliente, e quem estava na ficha não tinha
+ * por onde corrigir.
+ *
+ * A lista de licenças (~2.600) só é buscada quando o diálogo abre: a ficha é
+ * aberta o dia inteiro e quase nunca para trocar licença.
+ */
+function TrocarLicencaOem({
+  clienteId, soltar, rotulo, icone,
+}: {
+  clienteId: string;
+  soltar: Licenca | null;
+  rotulo: string;
+  icone: ReactNode;
+}) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const qc = useQueryClient();
+  const [aberto, setAberto] = useState(false);
+
+  const { data: clienteNome = "este cliente" } = useQuery({
+    queryKey: ["oem-troca-nome-cliente", clienteId],
+    enabled: aberto,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("nome_fantasia, razao_social")
+        .eq("id", clienteId)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.nome_fantasia?.trim() || data?.razao_social || "este cliente") as string;
+    },
+  });
+
+  const { data: todas = [] } = useQuery({
+    queryKey: ["oem-licencas-todas", tid],
+    enabled: aberto && !!tid,
+    staleTime: 60_000,
+    queryFn: () =>
+      fetchAllRows<LicencaOem>(() =>
+        (supabase.from("reconciliacao_oem" as any) as any)
+          .select("id, empresa_codigo, filial_codigo, razao_oem, cnpj_norm, custo_oem, status_oem, ds_customer_id, razao_ds")
+          .eq("tenant_id", tid)
+          .not("filial_codigo", "is", null)
+          // Ordem estável: paginação por range sem ORDER BY pode repetir e pular linhas.
+          .order("id"),
+      ),
+  });
+
+  // A troca mexe no código da ficha, nos módulos e no custo. Tudo que a ficha
+  // mostra disso é recarregado, de qualquer cliente: a licença pode ter saído
+  // de outro cadastro.
+  function recarregar() {
+    for (const k of [
+      "oem-codigos-cliente", "oem-apontam-cliente", "oem-licencas-cliente", "oem-lido-em-cliente",
+      "oem-custo-cliente", "oem-licencas-todas", "cliente_produtos", "cliente_produto_modulos",
+      "cliente", "oem_pendencias_cliente", "contrato_itens_cliente",
+    ]) {
+      void qc.invalidateQueries({ queryKey: [k] });
+    }
+  }
+
+  return (
+    <>
+      {/* Mesmo desenho de Desativar/Bloquear, que ficam do lado: é decisão sobre a licença, não consulta como o Reler. */}
+      <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1.5 text-muted-foreground"
+        onClick={() => setAberto(true)}>
+        {icone}
+        {rotulo}
+      </Button>
+      {aberto && (
+        <EscolherLicencaOemDialog
+          cliente={{ id: clienteId, nome: clienteNome, soltar: soltar as LicencaOem | null }}
+          licencas={todas}
+          aberto={aberto}
+          onOpenChange={setAberto}
+          onDecidido={recarregar}
+          permitirSoSoltar={false}
+        />
+      )}
+    </>
+  );
+}
+
 export default function IntegracaoOemSection({ clienteId }: { clienteId: string }) {
-  const { licencas, pendentes, indefinido, orfas, codigos, lidoEm, visivel } = useOemDoCliente(clienteId);
+  const {
+    licencas, pendentes, indefinido, orfas, codigos, lidoEm, podeDecidir, semLicenca, visivel,
+  } = useOemDoCliente(clienteId);
 
   if (!visivel) return null;
 
@@ -286,6 +400,21 @@ export default function IntegracaoOemSection({ clienteId }: { clienteId: string 
     </div>
   );
 
+  if (semLicenca) {
+    return (
+      <section className="px-6 py-4">
+        {cabecalho(
+          undefined,
+          <TrocarLicencaOem clienteId={clienteId} soltar={null} rotulo="Vincular licença"
+            icone={<Link2 className="h-3.5 w-3.5" />} />,
+        )}
+        <p className="text-sm text-muted-foreground">
+          Nenhuma licença do OEM está vinculada a este cliente.
+        </p>
+      </section>
+    );
+  }
+
   if (indefinido) {
     return (
       <section className="px-6 py-4">
@@ -293,6 +422,10 @@ export default function IntegracaoOemSection({ clienteId }: { clienteId: string 
           <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-500/40">
             vínculo indefinido
           </Badge>,
+          podeDecidir ? (
+            <TrocarLicencaOem clienteId={clienteId} soltar={null} rotulo="Escolher licença"
+              icone={<Link2 className="h-3.5 w-3.5" />} />
+          ) : undefined,
         )}
         <p className="text-sm text-muted-foreground">
           {pendentes === 1
@@ -337,7 +470,13 @@ export default function IntegracaoOemSection({ clienteId }: { clienteId: string 
           )}
         </>,
         licencas.length === 1 ? (
-          <OemLicencaEstadoBotoes clienteId={clienteId} licenca={licencas[0]} />
+          <div className="flex items-center gap-1.5">
+            {podeDecidir && (
+              <TrocarLicencaOem clienteId={clienteId} soltar={licencas[0]} rotulo="Trocar licença"
+                icone={<ArrowLeftRight className="h-3.5 w-3.5" />} />
+            )}
+            <OemLicencaEstadoBotoes clienteId={clienteId} licenca={licencas[0]} />
+          </div>
         ) : undefined,
       )}
 
@@ -425,7 +564,13 @@ export default function IntegracaoOemSection({ clienteId }: { clienteId: string 
                   licença, a ação precisa estar do lado da filial em que ela
                   age. */}
               {licencas.length > 1 && (
-                <OemLicencaEstadoBotoes clienteId={clienteId} licenca={l} />
+                <>
+                  {podeDecidir && (
+                    <TrocarLicencaOem clienteId={clienteId} soltar={l} rotulo="Trocar"
+                      icone={<ArrowLeftRight className="h-3.5 w-3.5" />} />
+                  )}
+                  <OemLicencaEstadoBotoes clienteId={clienteId} licenca={l} />
+                </>
               )}
             </div>
           );

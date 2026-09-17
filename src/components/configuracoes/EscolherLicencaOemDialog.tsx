@@ -47,8 +47,12 @@ const soDigitos = (s: string) => s.replace(/\D/g, "");
 const TETO = 40;
 
 export default function EscolherLicencaOemDialog({
-  cliente, licencas, aberto, onOpenChange, onDecidido,
+  cliente, licencas, aberto, onOpenChange, onDecidido, permitirSoSoltar = true,
 }: {
+  // "Só soltar" passa por `desvincular_filial_oem`, que é admin/head. A ficha do
+  // cliente abre esta tela com a permissão de módulos (a de Bloquear), então lá
+  // o botão fica escondido para não oferecer um clique que o banco recusa.
+  permitirSoSoltar?: boolean;
   // `soltar` é o caso da TROCA: o cliente já tem uma licença vinculada e ela é
   // a errada — foi por ela que a divergência apareceu. Sem isso a tela deixava
   // vincular a certa e a errada continuava no nome dele, com o mesmo alerta na
@@ -98,28 +102,23 @@ export default function EscolherLicencaOemDialog({
     if (!cliente) return;
     setGravando(l.id);
     try {
-      // A ORDEM AQUI NÃO É ESCOLHA DE ESTILO. `desvincular_filial_oem` apaga o
-      // código do OEM da ficha do cliente; rodando depois do vínculo novo, ela
-      // apagaria justamente o código que acabou de ser gravado e o cliente
-      // ficaria sem licença nenhuma. Soltar primeiro, vincular depois.
-      const aSoltar = cliente.soltar;
-      if (aSoltar && aSoltar.id !== l.id) {
-        const { error } = await (supabase as any).rpc("desvincular_filial_oem", {
-          p_recon_id: aSoltar.id,
-        });
-        if (error) throw error;
-      }
-      // A mesma RPC da fila de conciliação: ela já tira o código da ficha do
-      // dono antigo antes de gravar no novo, então a troca não deixa dois
-      // cadastros dizendo ser a mesma filial.
-      const { error } = await (supabase as any).rpc("vincular_filial_oem", {
-        p_recon_id: l.id,
+      // UMA chamada, uma transação. Eram duas (`desvincular_filial_oem` e
+      // `vincular_filial_oem`) e a segunda podia falhar com a primeira já
+      // gravada, deixando o cliente sem licença nenhuma. Pior: o vínculo é void
+      // e "não coube na ficha" voltava como sucesso. `trocar_filial_oem` solta,
+      // vincula, confere o código na ficha e desfaz tudo se faltar; também
+      // recusa com pedido vivo na fila do OEM, que iria para a licença errada.
+      // Licença de outro cliente sai da ficha dele pelo mesmo caminho.
+      const aSoltar = cliente.soltar && cliente.soltar.id !== l.id ? cliente.soltar : null;
+      const { error } = await (supabase as any).rpc("trocar_filial_oem", {
         p_cliente_id: cliente.id,
+        p_recon_nova: l.id,
+        p_recon_antiga: aSoltar?.id ?? null,
       });
       if (error) throw error;
       toast({
         title: "Licença vinculada",
-        description: aSoltar && aSoltar.id !== l.id
+        description: aSoltar
           ? `Filial ${l.filial_codigo} agora é de ${cliente.nome}, e a filial ${aSoltar.filial_codigo} voltou para a fila sem dono.`
           : `Filial ${l.filial_codigo} agora é de ${cliente.nome}. A decisão sobrevive às próximas sincronizações.`,
       });
@@ -182,7 +181,8 @@ export default function EscolherLicencaOemDialog({
                 </p>
                 <p>
                   Vincular grava o <strong>código da filial na ficha do cliente</strong>, que é o
-                  que faz o custo da licença aparecer nele. Nada é enviado ao parceiro.
+                  que faz o custo da licença aparecer nele. Os módulos do OEM na ficha passam a
+                  ser os da licença escolhida. Nada é enviado ao parceiro.
                 </p>
               </div>
             </DialogDescription>
@@ -237,13 +237,15 @@ export default function EscolherLicencaOemDialog({
                         <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-400">
                           vinculada hoje
                         </Badge>
-                        <Button size="sm" variant="ghost" className="gap-1.5"
-                          disabled={!!gravando} onClick={() => soltar(l)}>
-                          {gravando === l.id
-                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            : <Unlink className="h-3.5 w-3.5" />}
-                          Só soltar
-                        </Button>
+                        {permitirSoSoltar && (
+                          <Button size="sm" variant="ghost" className="gap-1.5"
+                            disabled={!!gravando} onClick={() => soltar(l)}>
+                            {gravando === l.id
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <Unlink className="h-3.5 w-3.5" />}
+                            Só soltar
+                          </Button>
+                        )}
                       </div>
                     ) : jaDele ? (
                       <Badge variant="outline" className="shrink-0">já é deste cliente</Badge>
