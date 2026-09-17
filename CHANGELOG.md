@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 16/09
 
+- 🆕 **Trocar a licença do OEM pela ficha do cliente** — Quando um cliente estava vinculado à licença de outra loja, toda mudança de módulo ia para o cliente errado e não havia como corrigir pela ficha. Agora o card **Integração** tem o botão **Trocar licença**: você procura a licença certa pelo nome, CNPJ ou número da filial, e a troca acontece de uma vez. A licença errada volta para a fila sem cliente, e custo, margem e módulos da ficha passam a ser os da licença nova. Se a licença escolhida for de outro cliente, a tela pede confirmação antes de tirá-la dele. Cliente sem licença ganhou o botão **Vincular licença**. Por segurança, a troca não acontece se houver pedido na fila do OEM para aquelas licenças, e nada é enviado ao parceiro. Quem pode trocar é quem já pode bloquear e desativar a licença.
+
 - 🔧 **Nova conversa trocava a instância sozinha** — Ao iniciar uma conversa pelo **+** do chat e escolher alguém na aba **Buscar Contato**, a instância padrão do setor era trocada pela última em que aquele contato tinha falado, e a mensagem saía pelo número errado. Agora a instância escolhida continua valendo; para usar outra, basta trocar no campo.
 
 - ⬆️ **Cancelamento de módulo registra o vendedor** — Ao cancelar um módulo na aba **Produtos** do cliente, o diálogo agora tem o campo **Vendedor**, que já vem preenchido com o vendedor do módulo (ou do produto), como acontece ao adicionar. O downsell gerado em **Movimentos de MRR** passa a mostrar esse vendedor na coluna **Funcionário**, igual ao upsell. Vale também para cancelamentos de módulos com licença OEM que passam por aprovação.
