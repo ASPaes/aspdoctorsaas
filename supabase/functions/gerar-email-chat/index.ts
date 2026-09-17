@@ -212,6 +212,11 @@ Deno.serve(async (req) => {
     ? Math.max(1, Math.min(QUANTIDADE_MAXIMA, Math.trunc(Number(body.quantidade)) || 1))
     : 1;
   const tom = typeof body.tom === 'string' && TONS[body.tom] ? body.tom : 'formal';
+  // "sotaque" é o nome da 1ª versão (no ar de 16/09 até o Ajustar): aba aberta
+  // com a tela antiga continua funcionando, em vez de cair em "gerar" e gastar IA
+  if (body.modo === 'sotaque') {
+    body = { ...body, modo: 'reescrever', sotaque: { uf: body.uf, intensidade: body.intensidade } };
+  }
   const modo = body.modo === 'corrigir' || body.modo === 'reescrever' || body.modo === 'conversa' ? body.modo : 'gerar';
   const htmlParaCorrigir = typeof body.html === 'string' ? body.html.trim() : '';
   if ((modo === 'corrigir' || modo === 'reescrever') && !htmlParaCorrigir) {

@@ -62,3 +62,11 @@ describe("promptReescrita", () => {
     expect(p).toContain("href");
   });
 });
+
+describe("compatibilidade com a tela antiga", () => {
+  test("o pedido da 1ª versão (modo sotaque com uf e intensidade soltos) vira reescrita válida", () => {
+    const antigo: Record<string, unknown> = { modo: "sotaque", uf: "ba", intensidade: "raiz" };
+    const convertido = { ...antigo, modo: "reescrever", sotaque: { uf: antigo.uf, intensidade: antigo.intensidade } };
+    expect(lerReescrita(convertido)).toEqual({ sotaque: { uf: "BA", intensidade: "raiz" }, idioma: null, tamanho: null });
+  });
+});
