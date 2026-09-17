@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 16/09
 
+- 🆕 **Ticket aberto por e-mail já pode nascer com responsável** — Em **Configurações › Atendimento › Canais › E-mail › Parâmetros de Recebidos**, a coluna **Abre ticket** de cada endereço ganhou três opções: **Não**, **Manual na fila** (o ticket abre sem responsável e alguém do setor assume na tela Tickets, como já funcionava) e **Automática**, em que o ticket já nasce com um agente do setor. Na Automática você escolhe **como distribuir**: para quem tem **menos tickets em aberto** (empate decidido por sorteio, como no chat), em **rodízio**, ou sempre para um **agente fixo**. Só entram agentes ativos do setor, a distribuição vale também fora do horário e o responsável recebe o aviso de chamado em seu nome. Endereços que já abriam ticket continuam iguais, agora com o nome Manual na fila.
+
 - 🔧 **Encaminhar e responder saíam sem o e-mail original** — Pela tela **E-mails**, o encaminhamento chegava com os anexos mas só com a mensagem nova: o texto do e-mail encaminhado se perdia ao abrir a tela. O mesmo acontecia com a citação no **Responder**. Agora a tela abre com o original completo, e o encaminhamento segue o formato de Gmail e Outlook: a linha **Mensagem encaminhada**, quem enviou, a data, o assunto, para quem foi e o texto inteiro.
 
 - ⬆️ **Cópia oculta aparece no e-mail enviado** — Quem foi colocado em **Cco** agora fica registrado e aparece ao abrir o e-mail em **E-mails › Enviados**, junto de Para e Cc. Isso é só para a sua equipe conferir depois: no e-mail em si o Cco continua invisível, ninguém que recebeu descobre quem mais recebeu. Vale para os envios feitos a partir de agora.

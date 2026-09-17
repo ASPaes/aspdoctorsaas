@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 import { useEmailAccounts, type EmailAccount } from "./useEmailAccounts";
 import {
   mensagemDoBanco, useParametrosRecebidos,
-  type DestinoEmail, type EnderecoDestino, type RegraAssunto, type RemetenteBloqueado, type SetorTicket,
+  type AgenteSetor, type DestinoEmail, type Distribuicao, type EnderecoDestino, type RegraAssunto,
+  type RemetenteBloqueado, type SetorTicket,
 } from "./useParametrosRecebidos";
 
 /**
@@ -140,7 +141,7 @@ export default function EmailParametrosRecebidosTab() {
 
       <Secao
         titulo="Endereços que recebem e para onde vai cada e-mail"
-        descricao="O endereço para o qual o cliente escreveu decide o destino. Funciona com uma caixa por setor ou com vários endereços caindo na mesma caixa. Endereço desligado continua registrando respostas, mas não abre ticket com e-mail novo."
+        descricao="O endereço para o qual o cliente escreveu decide o destino. Funciona com uma caixa por setor ou com vários endereços caindo na mesma caixa. Em Manual na fila o ticket nasce sem responsável; em Automática, já com um agente do setor. Endereço em Não continua registrando respostas, mas não abre ticket com e-mail novo."
       >
         {contasOrdenadas.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-muted-foreground">
@@ -148,7 +149,7 @@ export default function EmailParametrosRecebidosTab() {
           </p>
         ) : (
           <div>
-            <div className="hidden grid-cols-[minmax(0,1.3fr)_180px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)] gap-3 border-b px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground lg:grid">
+            <div className={cn("hidden gap-3 border-b px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground lg:grid", GRADE_ENDERECOS)}>
               <span>Endereço</span>
               <span>Abre ticket</span>
               <span>Destino</span>
@@ -169,6 +170,7 @@ export default function EmailParametrosRecebidosTab() {
                   setores={setoresTicket}
                   iniciais={iniciais}
                   nomeSetor={nomeSetor}
+                  agentesPorSetor={dados.agentesPorSetor}
                   ocupado={p.salvarEndereco.isPending}
                   onSalvar={(e) => p.salvarEndereco.mutate(e, { onSuccess: () => toast.success("Endereço salvo."), onError: falhou })}
                 />,
@@ -182,6 +184,7 @@ export default function EmailParametrosRecebidosTab() {
                     setores={setoresTicket}
                     iniciais={iniciais}
                     nomeSetor={nomeSetor}
+                    agentesPorSetor={dados.agentesPorSetor}
                     ocupado={p.salvarEndereco.isPending || p.removerEndereco.isPending}
                     onSalvar={(e) => p.salvarEndereco.mutate(e, { onSuccess: () => toast.success("Endereço salvo."), onError: falhou })}
                     onRemover={() =>
@@ -200,10 +203,19 @@ export default function EmailParametrosRecebidosTab() {
                 ocupado={p.salvarEndereco.isPending}
                 onAdicionar={(endereco, contaId, limpar) =>
                   p.salvarEndereco.mutate(
-                    { account_id: contaId, endereco, abre_ticket: false, aceita_copia: false, destino: "suporte", department_id: null },
+                    {
+                      account_id: contaId,
+                      endereco,
+                      abre_ticket: false,
+                      aceita_copia: false,
+                      destino: "suporte",
+                      department_id: null,
+                      distribuicao: null,
+                      agente_fixo_user_id: null,
+                    },
                     {
                       onSuccess: () => {
-                        toast.success(`${endereco} adicionado. Escolha o destino e ligue a abertura de ticket.`);
+                        toast.success(`${endereco} adicionado. Escolha o destino e como o ticket abre.`);
                         limpar();
                       },
                       onError: falhou,
@@ -404,8 +416,25 @@ export default function EmailParametrosRecebidosTab() {
   );
 }
 
+type ModoAbertura = "nao" | "manual" | "automatica";
+
+const ROTULO_MODO: Record<ModoAbertura, string> = { nao: "Não", manual: "Manual na fila", automatica: "Automática" };
+const COR_MODO: Record<ModoAbertura, string> = {
+  nao: "bg-muted-foreground/50",
+  manual: "bg-warning",
+  automatica: "bg-success",
+};
+const ROTULO_DISTRIBUICAO: Record<Distribuicao, string> = {
+  menor_carga: "Menos tickets em aberto",
+  rodizio: "Rodízio",
+  fixo: "Agente fixo",
+};
+
+/** colunas da tabela de endereços; o cabeçalho usa a mesma */
+const GRADE_ENDERECOS = "lg:grid-cols-[minmax(0,1.3fr)_210px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)]";
+
 function LinhaEndereco({
-  conta, endereco, registro, extra, setores, iniciais, nomeSetor, ocupado, onSalvar, onRemover,
+  conta, endereco, registro, extra, setores, iniciais, nomeSetor, agentesPorSetor, ocupado, onSalvar, onRemover,
 }: {
   conta: EmailAccount;
   endereco: string;
@@ -414,6 +443,7 @@ function LinhaEndereco({
   setores: SetorTicket[];
   iniciais: Set<string>;
   nomeSetor: (id: string | null) => string | null;
+  agentesPorSetor: Record<string, AgenteSetor[]>;
   ocupado: boolean;
   onSalvar: (e: Omit<EnderecoDestino, "id">) => void;
   onRemover?: () => void;
@@ -422,12 +452,27 @@ function LinhaEndereco({
   const aceitaCopia = registro?.aceita_copia ?? false;
   const destino: DestinoEmail = registro?.destino ?? "suporte";
   const setor = registro?.department_id ?? null;
+  const distribuicao = registro?.distribuicao ?? null;
+  const agenteFixo = registro?.agente_fixo_user_id ?? null;
   const semEntrada = !conta.imap_host || !conta.ativo;
   const semStatus = destino === "suporte" && !!setor && !iniciais.has(setor);
+  const agentes = setor ? (agentesPorSetor[setor] ?? []) : [];
 
-  // A chave só libera para LIGAR quando dá para ligar; ligada, sempre deixa
-  // desligar. Antes o clique era aceito e desfeito por um aviso que sumia, e a
-  // chave ficava em Não sem ninguém perceber (teste do Alexandre, 14/09/2026).
+  // Na jornada de onboarding o responsável já é o da jornada: ligada, ela é
+  // sempre "Automática" e não tem Manual nem forma de distribuir.
+  const modo: ModoAbertura = !abre ? "nao" : destino === "onboarding" || distribuicao ? "automatica" : "manual";
+
+  // "Agente fixo" só grava junto com a pessoa (o banco exige): até escolher,
+  // a opção fica só na tela.
+  const [fixoPendente, setFixoPendente] = useState(false);
+  useEffect(() => {
+    if (distribuicao === "fixo" || modo !== "automatica") setFixoPendente(false);
+  }, [distribuicao, modo]);
+  const distribuicaoNaTela: Distribuicao | null = fixoPendente ? "fixo" : distribuicao;
+
+  // Só deixa LIGAR quando dá para ligar; ligada, sempre deixa desligar. Antes o
+  // clique era aceito e desfeito por um aviso que sumia, e a chave ficava em Não
+  // sem ninguém perceber (teste do Alexandre, 14/09/2026).
   const trava = semEntrada
     ? null
     : !abre && destino === "suporte" && !setor
@@ -436,8 +481,21 @@ function LinhaEndereco({
         ? "Setor sem status inicial"
         : null;
 
-  const salvar = (mudanca: Partial<Pick<EnderecoDestino, "abre_ticket" | "aceita_copia" | "destino" | "department_id">>) => {
-    const novo = { abre_ticket: abre, aceita_copia: aceitaCopia, destino, department_id: setor, ...mudanca };
+  const salvar = (
+    mudanca: Partial<Pick<EnderecoDestino, "abre_ticket" | "aceita_copia" | "destino" | "department_id" | "distribuicao" | "agente_fixo_user_id">>,
+  ) => {
+    const novo = {
+      abre_ticket: abre,
+      aceita_copia: aceitaCopia,
+      destino,
+      department_id: setor,
+      distribuicao,
+      agente_fixo_user_id: agenteFixo,
+      ...mudanca,
+    };
+    // regras do banco, aplicadas antes para a mensagem sair clara
+    if (!novo.abre_ticket || novo.destino !== "suporte") novo.distribuicao = null;
+    if (novo.distribuicao !== "fixo") novo.agente_fixo_user_id = null;
     if (novo.abre_ticket && novo.destino === "suporte") {
       if (!novo.department_id) {
         toast.error("Escolha o setor antes de ligar a abertura de ticket.");
@@ -454,19 +512,62 @@ function LinhaEndereco({
     onSalvar({ account_id: conta.id, endereco, ...novo });
   };
 
+  const escolherModo = (m: ModoAbertura) => {
+    if (m === modo) return;
+    if (m === "nao") return salvar({ abre_ticket: false });
+    if (m === "manual") return salvar({ abre_ticket: true, distribuicao: null });
+    salvar({ abre_ticket: true, distribuicao: destino === "suporte" ? "menor_carga" : null });
+  };
+
+  const escolherDistribuicao = (d: Distribuicao) => {
+    if (d === "fixo") {
+      setFixoPendente(distribuicao !== "fixo");
+      return;
+    }
+    setFixoPendente(false);
+    if (d !== distribuicao) salvar({ distribuicao: d });
+  };
+
+  const escolherDestino = (d: DestinoEmail) => {
+    // saindo da jornada ligada, continua Automática no ticket de suporte
+    const mudanca: Parameters<typeof salvar>[0] = { destino: d };
+    if (d === "suporte" && abre && destino === "onboarding") mudanca.distribuicao = "menor_carga";
+    salvar(mudanca);
+  };
+
+  const nomeFixo = agentes.find((a) => a.user_id === agenteFixo)?.nome ?? null;
+  const copia = aceitaCopia ? " Vale também quando está em cópia." : " Só em cópia, não abre ticket.";
+
+  const aviso: string | null =
+    semEntrada || modo !== "automatica" || destino !== "suporte"
+      ? null
+      : abre && semStatus
+        ? "Setor sem status inicial: o e-mail vai para a Triagem até definirem um."
+        : agentes.length === 0
+          ? "O setor não tem agente ativo: o ticket nasce sem responsável."
+          : distribuicaoNaTela === "fixo" && fixoPendente
+            ? "Escolha o agente para salvar."
+            : distribuicao === "fixo" && !nomeFixo
+              ? "O agente escolhido não está ativo neste setor: o ticket nasce sem responsável."
+              : null;
+
   const comoNasce = semEntrada
     ? "Conta sem servidor de entrada ou inativa. Preencha o IMAP em Cadastros."
-    : !abre
+    : modo === "nao"
       ? "Não abre ticket. Respostas continuam registradas."
       : destino === "onboarding"
-        ? "Entra na jornada ativa do cliente. Sem jornada ativa, vai para a Triagem."
-        : aceitaCopia
-          ? "Abre ticket na fila do setor, sem responsável, inclusive quando está em cópia."
-          : "Abre ticket na fila do setor, sem responsável. Só em cópia, não abre ticket.";
+        ? "Entra na jornada ativa do cliente, com o responsável que a jornada já tem. Sem jornada ativa, vai para a Triagem."
+        : modo === "manual"
+          ? `Abre ticket na fila do setor, sem responsável. Alguém do setor assume na tela Tickets.${copia}`
+          : distribuicao === "rodizio"
+            ? `Abre ticket já com responsável, em rodízio entre os agentes ativos do setor.${copia}`
+            : distribuicao === "fixo"
+              ? `Abre ticket já com responsável: ${nomeFixo ?? "o agente escolhido"}.${copia}`
+              : `Abre ticket já com responsável: o agente ativo do setor com menos tickets em aberto. Empate decide por sorteio.${copia}`;
 
   return (
-    <div className="grid gap-3 border-b px-4 py-3 lg:grid-cols-[minmax(0,1.3fr)_180px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)] lg:items-center">
-      <div className="flex min-w-0 items-center gap-2.5">
+    <div className={cn("grid gap-3 border-b px-4 py-3 lg:items-start", GRADE_ENDERECOS)}>
+      <div className="flex min-w-0 items-center gap-2.5 lg:min-h-9">
         <span
           className={cn(
             "grid h-8 w-8 shrink-0 place-items-center rounded-md",
@@ -498,40 +599,87 @@ function LinhaEndereco({
       </div>
 
       <div className="space-y-1.5">
-      <label className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Switch
-          checked={abre}
-          disabled={semEntrada || ocupado || !!trava}
-          onCheckedChange={(v) => salvar({ abre_ticket: v })}
-          aria-label={`Abrir ticket com e-mail para ${endereco}`}
-          aria-describedby={trava ? `trava-${conta.id}-${endereco}` : undefined}
-        />
-        {trava ? (
-          <span id={`trava-${conta.id}-${endereco}`} className="flex items-center gap-1 font-medium text-warning">
+        <Select value={modo} onValueChange={(v) => escolherModo(v as ModoAbertura)} disabled={semEntrada || ocupado}>
+          <SelectTrigger className="h-9" aria-label={`Abre ticket com e-mail para ${endereco}`}>
+            <span className="flex items-center gap-2">
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", COR_MODO[modo])} aria-hidden="true" />
+              {ROTULO_MODO[modo]}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="nao">Não</SelectItem>
+            {destino === "suporte" && (
+              <SelectItem value="manual" disabled={!abre && !!trava}>
+                Manual na fila
+              </SelectItem>
+            )}
+            <SelectItem value="automatica" disabled={!abre && !!trava}>
+              Automática
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
+        {trava && (
+          <p className="flex items-center gap-1 text-[11px] font-medium text-warning">
             <Lock className="h-3 w-3 shrink-0" />
             {trava}
-          </span>
-        ) : abre ? (
-          <span className="font-semibold text-success">Sim</span>
-        ) : (
-          "Não"
+          </p>
         )}
-      </label>
-      {abre && (
-        <label className="flex items-center gap-1.5 text-[11px] leading-tight text-muted-foreground">
-          <Switch
-            checked={aceitaCopia}
-            disabled={semEntrada || ocupado}
-            onCheckedChange={(v) => salvar({ aceita_copia: v })}
-            className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
-            aria-label={`Abrir ticket também quando ${endereco} está em cópia`}
-          />
-          Também quando está em cópia
-        </label>
-      )}
+
+        {modo === "automatica" && destino === "suporte" && (
+          <>
+            <p className="pt-1 text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">Como distribuir</p>
+            <Select
+              value={distribuicaoNaTela ?? "menor_carga"}
+              onValueChange={(v) => escolherDistribuicao(v as Distribuicao)}
+              disabled={semEntrada || ocupado}
+            >
+              <SelectTrigger className="h-9 text-xs" aria-label={`Como distribuir os tickets de ${endereco}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="menor_carga">{ROTULO_DISTRIBUICAO.menor_carga}</SelectItem>
+                <SelectItem value="rodizio">{ROTULO_DISTRIBUICAO.rodizio}</SelectItem>
+                <SelectItem value="fixo">{ROTULO_DISTRIBUICAO.fixo}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {distribuicaoNaTela === "fixo" && (
+              <Select
+                value={fixoPendente ? undefined : (agenteFixo ?? undefined)}
+                onValueChange={(v) => salvar({ distribuicao: "fixo", agente_fixo_user_id: v })}
+                disabled={semEntrada || ocupado || agentes.length === 0}
+              >
+                <SelectTrigger className="h-9 text-xs" aria-label={`Agente fixo de ${endereco}`}>
+                  <SelectValue placeholder={agentes.length ? "Escolha o agente" : "Setor sem agente ativo"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {agentes.map((a) => (
+                    <SelectItem key={a.user_id} value={a.user_id}>
+                      {a.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </>
+        )}
+
+        {modo !== "nao" && destino === "suporte" && (
+          <label className="flex items-center gap-1.5 pt-0.5 text-[11px] leading-tight text-muted-foreground">
+            <Switch
+              checked={aceitaCopia}
+              disabled={semEntrada || ocupado}
+              onCheckedChange={(v) => salvar({ aceita_copia: v })}
+              className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
+              aria-label={`Abrir ticket também quando ${endereco} está em cópia`}
+            />
+            Também quando está em cópia
+          </label>
+        )}
       </div>
 
-      <Select value={destino} onValueChange={(v) => salvar({ destino: v as DestinoEmail })} disabled={semEntrada || ocupado}>
+      <Select value={destino} onValueChange={(v) => escolherDestino(v as DestinoEmail)} disabled={semEntrada || ocupado}>
         <SelectTrigger className="h-9" aria-label={`Destino de ${endereco}`}>
           <SelectValue />
         </SelectTrigger>
@@ -556,19 +704,25 @@ function LinhaEndereco({
           </SelectContent>
         </Select>
       ) : (
-        <span className="text-xs text-muted-foreground">Setor da jornada do cliente</span>
+        <span className="text-xs text-muted-foreground lg:leading-9">Setor da jornada do cliente</span>
       )}
 
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        {abre && semStatus ? (
-          <span className="flex items-start gap-1.5 text-warning">
+      <div className="space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+        {abre && semStatus && modo === "manual" ? (
+          <p className="flex items-start gap-1.5 text-warning">
             <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
             Setor sem status inicial: o e-mail vai para a Triagem até definirem um.
-          </span>
+          </p>
         ) : (
-          comoNasce
+          <p>{comoNasce}</p>
         )}
-      </p>
+        {aviso && (
+          <p className="flex items-start gap-1.5 text-warning">
+            <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+            {aviso}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

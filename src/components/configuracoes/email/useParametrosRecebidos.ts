@@ -12,6 +12,18 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
 export type DestinoEmail = "suporte" | "onboarding";
 
+/**
+ * Abertura Automática (16/09/2026): como escolher o responsável do ticket.
+ * Nulo com abre_ticket = Manual na fila. Quem escolhe é
+ * fn_email__escolher_responsavel, no banco.
+ */
+export type Distribuicao = "menor_carga" | "rodizio" | "fixo";
+
+export interface AgenteSetor {
+  user_id: string;
+  nome: string;
+}
+
 export interface EnderecoDestino {
   id: string;
   account_id: string;
@@ -21,6 +33,8 @@ export interface EnderecoDestino {
   aceita_copia: boolean;
   destino: DestinoEmail;
   department_id: string | null;
+  distribuicao: Distribuicao | null;
+  agente_fixo_user_id: string | null;
 }
 
 export interface RegraAssunto {
@@ -69,6 +83,10 @@ const tabela = (nome: string) => supabase.from(nome as any) as any;
 export function mensagemDoBanco(err: any): string {
   const m = `${err?.message ?? ""} ${err?.details ?? ""}`;
   if (m.includes("email_enderecos_destino_setor")) return "Escolha o setor antes de ligar a abertura de ticket.";
+  if (m.includes("email_enderecos_destino_fixo")) return "Escolha o agente fixo antes de salvar.";
+  if (m.includes("email_enderecos_destino_distribuicao")) {
+    return "A distribuição automática só vale para ticket de suporte com abertura ligada.";
+  }
   if (m.includes("email_enderecos_destino_endereco")) return "Endereço de e-mail inválido.";
   if (m.includes("email_enderecos_destino_unico")) return "Esse endereço já está cadastrado.";
   if (m.includes("email_remetentes_bloqueados_padrao")) {
@@ -94,13 +112,13 @@ export function useParametrosRecebidos() {
     queryKey: chave,
     enabled: !!tid,
     queryFn: async () => {
-      const [parametros, enderecos, regras, bloqueados, setores, iniciais, estado] = await Promise.all([
+      const [parametros, enderecos, regras, bloqueados, setores, iniciais, estado, membros, perfis] = await Promise.all([
         tabela("email_recebidos_parametros")
           .select("aceitar_dominio_cliente, dias_reabrir, confirmar_abertura")
           .eq("tenant_id", tid)
           .maybeSingle(),
         tabela("email_enderecos_destino")
-          .select("id, account_id, endereco, abre_ticket, aceita_copia, destino, department_id")
+          .select("id, account_id, endereco, abre_ticket, aceita_copia, destino, department_id, distribuicao, agente_fixo_user_id")
           .eq("tenant_id", tid)
           .order("created_at"),
         tabela("email_regras_assunto")
@@ -123,12 +141,42 @@ export function useParametrosRecebidos() {
         tabela("email_ingestao_estado")
           .select("account_id, ultima_leitura, ultimo_erro, falhas_seguidas")
           .eq("tenant_id", tid),
+        // agentes que a distribuição automática pode escolher: o mesmo filtro da
+        // fn_email__escolher_responsavel (membro ativo do setor com perfil ativo)
+        tabela("support_department_members")
+          .select("user_id, department_id")
+          .eq("tenant_id", tid)
+          .eq("is_active", true),
+        tabela("profiles")
+          .select("user_id, funcionario_id, status, access_status")
+          .eq("tenant_id", tid),
       ]);
       for (const r of [parametros, enderecos, regras, bloqueados, setores, iniciais]) {
         if (r.error) throw r.error;
       }
 
+      const ativos = ((perfis.error ? [] : perfis.data) ?? []).filter(
+        (p: any) => ["active", "ativo"].includes(p.access_status ?? "") && ["ativo", "active"].includes(p.status ?? "ativo"),
+      );
+      const funcIds = ativos.map((p: any) => p.funcionario_id).filter(Boolean);
+      const funcionarios = funcIds.length
+        ? await tabela("funcionarios").select("id, nome").in("id", funcIds)
+        : { data: [] };
+      const nomePorFunc = new Map(((funcionarios.data ?? []) as { id: number; nome: string }[]).map((f) => [f.id, f.nome]));
+      const nomePorUsuario = new Map<string, string>(
+        ativos.map((p: any) => [p.user_id, (p.funcionario_id && nomePorFunc.get(p.funcionario_id)) || "Sem nome cadastrado"]),
+      );
+      const agentesPorSetor: Record<string, AgenteSetor[]> = {};
+      for (const m of ((membros.error ? [] : membros.data) ?? []) as { user_id: string; department_id: string }[]) {
+        const nome = nomePorUsuario.get(m.user_id);
+        if (!nome) continue;
+        const lista = (agentesPorSetor[m.department_id] ??= []);
+        if (!lista.some((a) => a.user_id === m.user_id)) lista.push({ user_id: m.user_id, nome });
+      }
+      for (const lista of Object.values(agentesPorSetor)) lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
       return {
+        agentesPorSetor,
         parametros: { ...PADRAO_PARAMETROS, ...(parametros.data ?? {}) } as ParametrosRecebidos,
         enderecos: (enderecos.data ?? []) as EnderecoDestino[],
         regras: (regras.data ?? []) as RegraAssunto[],
@@ -166,6 +214,8 @@ export function useParametrosRecebidos() {
           aceita_copia: e.aceita_copia,
           destino: e.destino,
           department_id: e.department_id,
+          distribuicao: e.distribuicao,
+          agente_fixo_user_id: e.agente_fixo_user_id,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "tenant_id,endereco" },
