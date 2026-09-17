@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 16/09
 
+- 🔧 **Nova conversa trocava a instância sozinha** — Ao iniciar uma conversa pelo **+** do chat e escolher alguém na aba **Buscar Contato**, a instância padrão do setor era trocada pela última em que aquele contato tinha falado, e a mensagem saía pelo número errado. Agora a instância escolhida continua valendo; para usar outra, basta trocar no campo.
+
 - ⬆️ **Cancelamento de módulo registra o vendedor** — Ao cancelar um módulo na aba **Produtos** do cliente, o diálogo agora tem o campo **Vendedor**, que já vem preenchido com o vendedor do módulo (ou do produto), como acontece ao adicionar. O downsell gerado em **Movimentos de MRR** passa a mostrar esse vendedor na coluna **Funcionário**, igual ao upsell. Vale também para cancelamentos de módulos com licença OEM que passam por aprovação.
 
 - 🆕 **Ticket aberto por e-mail já pode nascer com responsável** — Em **Configurações › Atendimento › Canais › E-mail › Parâmetros de Recebidos**, a coluna **Abre ticket** de cada endereço ganhou três opções: **Não**, **Manual na fila** (o ticket abre sem responsável e alguém do setor assume na tela Tickets, como já funcionava) e **Automática**, em que o ticket já nasce com um agente do setor. Na Automática você escolhe **como distribuir**: para quem tem **menos tickets em aberto** (empate decidido por sorteio, como no chat), em **rodízio**, ou sempre para um **agente fixo**. Só entram agentes ativos do setor, a distribuição vale também fora do horário e o responsável recebe o aviso de chamado em seu nome. Endereços que já abriam ticket continuam iguais, agora com o nome Manual na fila.
