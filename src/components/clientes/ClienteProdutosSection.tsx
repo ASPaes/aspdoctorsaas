@@ -290,6 +290,9 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   const [valorDownsell, setValorDownsell] = useState<number | null>(null);
   const [downsellTocado, setDownsellTocado] = useState(false);
   const [qtdCancelamento, setQtdCancelamento] = useState(1);
+  // Vendedor do downsell. Vem do módulo (quem vendeu responde pela perda) ou,
+  // sem ele, do produto — a mesma herança do diálogo de adicionar módulo.
+  const [vendedorCancelModulo, setVendedorCancelModulo] = useState<string>("");
   const [cancelandoModulo, setCancelandoModulo] = useState(false);
   // Cancelar produto é o caminho certo para tirar produto do cliente: a RPC
   // cancel_cliente_produto desfaz o item de contrato (ou cancela o contrato
@@ -652,6 +655,18 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       let q = (supabase.from("motivos_cancelamento" as any) as any).select("id, descricao").order("descricao");
+      if (lookupTenantId) q = q.eq("tenant_id", lookupTenantId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+
+  const funcionariosCancelQuery = useQuery<{ id: number; nome: string }[]>({
+    queryKey: ["funcionarios_lookup", lookupTenantId],
+    enabled: !!cancelarModulo && !!lookupTenantId,
+    queryFn: async () => {
+      let q = (supabase.from("funcionarios" as any) as any).select("id, nome").order("nome");
       if (lookupTenantId) q = q.eq("tenant_id", lookupTenantId);
       const { data, error } = await q;
       if (error) throw error;
@@ -1118,6 +1133,8 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                                   setValorDownsell(null);
                                                   setDownsellTocado(false);
                                                   setQtdCancelamento(Number(m.quantidade) || 1);
+                                                  const vendedor = m.funcionario_id ?? p.funcionario_id ?? null;
+                                                  setVendedorCancelModulo(vendedor ? String(vendedor) : "");
                                                 }}
                                               >
                                                 <X className="h-4 w-4" />
@@ -1516,6 +1533,25 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
               </Select>
             </div>
 
+            {/* Sem opção "Nenhum": vazio, o banco usa o vendedor do módulo, e a
+                tela prometeria um downsell sem dono que não acontece. */}
+            <div className="space-y-1.5">
+              <Label>Vendedor</Label>
+              <Select value={vendedorCancelModulo} onValueChange={setVendedorCancelModulo}>
+                <SelectTrigger>
+                  <SelectValue placeholder={funcionariosCancelQuery.isLoading ? "Carregando..." : "Selecione"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(funcionariosCancelQuery.data ?? []).map(f => (
+                    <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Vem com o vendedor do módulo. É ele que aparece no downsell em Movimentos de MRR.
+              </p>
+            </div>
+
             {(Number(cancelarModulo?.quantidade) || 1) > 1 && (
               <div className="space-y-1.5">
                 <Label>Quantidade a cancelar</Label>
@@ -1630,6 +1666,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                     motivo_id: motivoModuloId ? Number(motivoModuloId) : null,
                     data: dataCancelModulo || null,
                     valor_downsell: valorDownsell ?? 0,
+                    funcionario_id: vendedorCancelModulo ? Number(vendedorCancelModulo) : null,
                   };
 
                   // A ordem continua a mesma de sempre — OEM primeiro, ficha
@@ -1665,6 +1702,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                       p_motivo_id: payload.motivo_id,
                       p_data: payload.data,
                       p_valor_downsell: payload.valor_downsell,
+                      p_funcionario_id: payload.funcionario_id,
                     });
                     if (error) throw new Error(error.message);
                     toast({ title: "Módulo cancelado", description: detalhe });
