@@ -1,6 +1,10 @@
 /**
- * Sotaque do e-mail (16/09/2026): reescreve o corpo com o jeito de falar de um
- * estado. Diferencial pedido pelo Alexandre; o mockup aprovado tem Leve e Raiz.
+ * Reescrita do corpo do e-mail: Sotaque (etapa 1) e Ajustar, com Idioma e
+ * Tamanho (etapa 2), mockups aprovados pelo Alexandre em 16/09/2026.
+ *
+ * Tudo sai numa chamada só e sempre a partir do texto original, para as
+ * combinações não se acumularem (espanhol + mais curto, sotaque + mais curto).
+ * Idioma e sotaque não se misturam: sotaque é jeito de falar do português.
  *
  * As dicas por estado só orientam a IA para expressões conhecidas. Onde a dica
  * é curta, é de propósito: pedir expressão que a gente não tem certeza que
@@ -8,6 +12,14 @@
  */
 
 export type Intensidade = "leve" | "raiz";
+export type Idioma = "en" | "es";
+export type Tamanho = "curto" | "detalhado";
+
+export interface Reescrita {
+  sotaque: { uf: string; intensidade: Intensidade } | null;
+  idioma: Idioma | null;
+  tamanho: Tamanho | null;
+}
 
 export const ESTADOS: Record<string, { nome: string; dicas: string }> = {
   AC: { nome: "Acre", dicas: "jeito nortista de falar, acolhedor" },
@@ -39,27 +51,61 @@ export const ESTADOS: Record<string, { nome: string; dicas: string }> = {
   TO: { nome: "Tocantins", dicas: "uai, trem, égua" },
 };
 
-export const ufValida = (uf: unknown): uf is string => typeof uf === "string" && uf.toUpperCase() in ESTADOS;
+const IDIOMAS: Record<Idioma, string> = { en: "inglês", es: "espanhol" };
 
-export function promptSotaque(uf: string, intensidade: Intensidade): string {
-  const estado = ESTADOS[uf.toUpperCase()];
-  const dose =
-    intensidade === "raiz"
-      ? "Intensidade RAIZ: carregue no jeito de falar do estado, com várias expressões típicas ao longo do texto, como uma pessoa de lá escreveria para um cliente conhecido."
-      : "Intensidade LEVE: use só duas ou três expressões típicas, bem colocadas. O e-mail continua sério e profissional.";
+export const ufValida = (uf: unknown): uf is string =>
+  typeof uf === "string" && Object.prototype.hasOwnProperty.call(ESTADOS, uf.toUpperCase());
 
-  return `Você reescreve e-mails de uma empresa de software para clientes, em português do Brasil, com o sotaque e as expressões de ${estado.nome} (${uf.toUpperCase()}).
+/** lê o pedido da tela; devolve null quando não há nada para reescrever ou é inválido */
+export function lerReescrita(body: Record<string, unknown>): Reescrita | null {
+  const s = body.sotaque as { uf?: unknown; intensidade?: unknown } | null | undefined;
+  const sotaque = s && ufValida(s.uf)
+    ? { uf: String(s.uf).toUpperCase(), intensidade: (s.intensidade === "raiz" ? "raiz" : "leve") as Intensidade }
+    : null;
+  const idioma = body.idioma === "en" || body.idioma === "es" ? body.idioma : null;
+  const tamanho = body.tamanho === "curto" || body.tamanho === "detalhado" ? body.tamanho : null;
+  if (s && !sotaque) return null;
+  if (sotaque && idioma) return null;
+  if (!sotaque && !idioma && !tamanho) return null;
+  return { sotaque, idioma, tamanho };
+}
 
-Expressões típicas para se inspirar: ${estado.dicas}. Use só expressões reais e conhecidas desse estado; se não tiver certeza de uma, não use.
+export function promptReescrita(r: Reescrita): string {
+  const pedidos: string[] = [];
 
-${dose}
+  if (r.sotaque) {
+    const estado = ESTADOS[r.sotaque.uf];
+    pedidos.push(
+      `SOTAQUE: escreva com o sotaque e as expressões de ${estado.nome} (${r.sotaque.uf}). Expressões típicas para se inspirar: ${estado.dicas}. Use só expressões reais e conhecidas desse estado; se não tiver certeza de uma, não use.`,
+      r.sotaque.intensidade === "raiz"
+        ? "Intensidade RAIZ: carregue no jeito de falar do estado, com várias expressões típicas ao longo do texto, como uma pessoa de lá escreveria para um cliente conhecido."
+        : "Intensidade LEVE: use só duas ou três expressões típicas, bem colocadas. O e-mail continua sério e profissional.",
+      "Respeitoso e simpático: nada que soe como deboche, caricatura ou preconceito sobre o estado ou as pessoas de lá. Sem palavrão.",
+    );
+  }
+  if (r.idioma) {
+    pedidos.push(
+      `IDIOMA: traduza o e-mail inteiro para ${IDIOMAS[r.idioma]}, natural e profissional, como escreveria um nativo. Nomes de pessoas, empresas e sistemas não se traduzem.`,
+    );
+  }
+  if (r.tamanho === "curto") {
+    pedidos.push("TAMANHO: deixe o e-mail mais curto e direto, cortando repetição e rodeio. Mantenha todas as informações importantes, pedidos e próximos passos.");
+  } else if (r.tamanho === "detalhado") {
+    pedidos.push("TAMANHO: deixe o e-mail mais detalhado e explicativo, desenvolvendo melhor o que já está escrito. Não invente fatos, passos ou promessas que não estejam no texto.");
+  }
+
+  const lingua = r.idioma ? IDIOMAS[r.idioma] : "português do Brasil";
+
+  return `Você reescreve e-mails de uma empresa de software para clientes. O texto final deve estar em ${lingua}.
+
+${pedidos.join("\n\n")}
 
 Regras:
-- Mantenha exatamente os mesmos fatos, pedidos, prazos, números, datas, valores, nomes de pessoas, nomes de sistemas e links. Não acrescente nem remova informação.
-- Respeitoso e simpático: nada que soe como deboche, caricatura ou preconceito sobre o estado ou as pessoas de lá. Sem palavrão.
+- Mantenha exatamente os mesmos fatos, pedidos, prazos, números, datas, valores, nomes de pessoas, nomes de sistemas e links. Não acrescente informação nova.
 - O texto vem em HTML. Preserve as tags e atributos (parágrafos, negrito, listas, links, cores, alinhamento); reescreva só as palavras entre as tags. O atributo href dos links fica igual.
 - Mantenha a despedida e o nome de quem assina, se houver.
+- Se vier um assunto, devolva o assunto reescrito com as mesmas regras (sem código de atendimento, até 90 caracteres).
 - Não use travessão (—).
 
-Responda chamando a função devolver_texto_reescrito. Se não puder usar a função, responda apenas com JSON {"html": "..."}.`;
+Responda chamando a função devolver_texto_reescrito. Se não puder usar a função, responda apenas com JSON {"html": "...", "assunto": "..."}.`;
 }

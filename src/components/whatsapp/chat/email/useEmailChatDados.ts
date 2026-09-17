@@ -4,6 +4,7 @@ import { useRelevantAttendance } from "../../hooks/useRelevantAttendance";
 import type { ConversationWithContact } from "../../hooks/useWhatsAppConversations";
 import { separarEmails, type OpcoesGeracao } from "./travaEnvioEmail";
 import type { BlocoConversa } from "./conversaCompleta";
+import type { AjustesTexto } from "./estadosSotaque";
 
 export interface ContaDeEnvio {
   id: string;
@@ -253,16 +254,32 @@ async function mensagemDoErro(error: any): Promise<string> {
   return mensagem;
 }
 
-/** Sotaque: a mesma `gerar-email-chat`, no modo sotaque; gasta IA como o Corrigir */
-export async function aplicarSotaqueEmailChat(input: {
+export type ResultadoReescrita = { ok: true; html: string; assunto: string | null } | { ok: false; mensagem: string };
+
+/**
+ * Sotaque e Ajustar (idioma, tamanho): a mesma `gerar-email-chat`, no modo
+ * reescrever; gasta IA como o Corrigir. O assunto só vai quando deve ser
+ * reescrito junto (tradução).
+ */
+export async function reescreverEmailChat(input: {
   conversation_id: string;
   html: string;
-  uf: string;
-  intensidade: "leve" | "raiz";
-}): Promise<ResultadoCorrecao> {
-  const { data, error } = await supabase.functions.invoke("gerar-email-chat", { body: { ...input, modo: "sotaque" } });
+  assunto: string | null;
+  ajustes: AjustesTexto;
+}): Promise<ResultadoReescrita> {
+  const { data, error } = await supabase.functions.invoke("gerar-email-chat", {
+    body: {
+      conversation_id: input.conversation_id,
+      modo: "reescrever",
+      html: input.html,
+      assunto: input.assunto ?? undefined,
+      sotaque: input.ajustes.sotaque ?? undefined,
+      idioma: input.ajustes.idioma ?? undefined,
+      tamanho: input.ajustes.tamanho ?? undefined,
+    },
+  });
   if (error) return { ok: false, mensagem: await mensagemDoErro(error) };
-  return data as ResultadoCorrecao;
+  return data as ResultadoReescrita;
 }
 
 export type ResultadoConversa =

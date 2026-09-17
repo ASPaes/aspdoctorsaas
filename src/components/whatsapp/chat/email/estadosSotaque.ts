@@ -5,6 +5,42 @@
  */
 
 export type IntensidadeSotaque = "leve" | "raiz";
+export type IdiomaEmail = "en" | "es";
+export type TamanhoEmail = "curto" | "detalhado";
+
+/**
+ * O que está aplicado no corpo (Sotaque e Ajustar, 16/09/2026). A reescrita
+ * sempre parte do texto original guardado aqui, numa chamada só; idioma e
+ * sotaque não convivem (sotaque é jeito de falar do português).
+ */
+export interface AjustesTexto {
+  sotaque: { uf: string; intensidade: IntensidadeSotaque } | null;
+  idioma: IdiomaEmail | null;
+  tamanho: TamanhoEmail | null;
+}
+
+export const ROTULO_IDIOMA: Record<IdiomaEmail, string> = { en: "Inglês", es: "Espanhol" };
+export const ROTULO_TAMANHO: Record<TamanhoEmail, string> = { curto: "Mais curto", detalhado: "Mais detalhado" };
+
+export const semAjustes = (a: AjustesTexto) => !a.sotaque && !a.idioma && !a.tamanho;
+
+/** próxima combinação quando a pessoa escolhe um sotaque */
+export const comSotaque = (a: AjustesTexto, uf: string, intensidade: IntensidadeSotaque): AjustesTexto => ({
+  sotaque: { uf, intensidade },
+  idioma: null,
+  tamanho: a.tamanho,
+});
+
+/** clicar no idioma já aplicado tira; escolher um idioma tira o sotaque */
+export const alternarIdioma = (a: AjustesTexto, idioma: IdiomaEmail): AjustesTexto =>
+  a.idioma === idioma ? { ...a, idioma: null } : { sotaque: null, idioma, tamanho: a.tamanho };
+
+export const alternarTamanho = (a: AjustesTexto, tamanho: TamanhoEmail): AjustesTexto => ({
+  ...a,
+  tamanho: a.tamanho === tamanho ? null : tamanho,
+});
+
+export const SEM_AJUSTES: AjustesTexto = { sotaque: null, idioma: null, tamanho: null };
 
 export const REGIOES: { nome: string; ufs: string[] }[] = [
   { nome: "Sul", ufs: ["PR", "RS", "SC"] },

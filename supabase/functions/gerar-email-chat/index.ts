@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { callAI, getAIConfig } from '../_shared/ai-client.ts';
-import { promptSotaque, ufValida, type Intensidade } from './sotaque.ts';
+import { lerReescrita, promptReescrita } from './sotaque.ts';
 
 /**
  * Escreve assunto e corpo de um e-mail ao cliente a partir da conversa do chat.
@@ -22,8 +22,10 @@ import { promptSotaque, ufValida, type Intensidade } from './sotaque.ts';
  * corpo e devolve o mesmo HTML com ortografia e gramática corrigidas, sem mexer
  * nas tags. Passa pelo mesmo teto de gasto e registra custo igual.
  *
- * Modo "sotaque" (16/09/2026): igual ao corrigir, mas reescreve o corpo com o
- * jeito de falar de um estado (uf + intensidade leve|raiz). Ver sotaque.ts.
+ * Modo "reescrever" (16/09/2026, botões Sotaque e Ajustar): igual ao corrigir,
+ * mas reescreve o corpo com sotaque de um estado, em outro idioma e/ou em outro
+ * tamanho, numa chamada só e a partir do texto original. Com assunto, devolve
+ * o assunto reescrito também. Ver sotaque.ts.
  *
  * Modo "conversa" (16/09/2026, "Incluir a conversa completa"): devolve as
  * mensagens dos mesmos atendimentos que o resumo usa, sem IA. Por isso roda
@@ -171,6 +173,24 @@ function lerHtmlCorrigido(bruto: string): string | null {
   return html && html.length <= 60_000 ? html : null;
 }
 
+/** assunto devolvido junto no modo reescrever: JSON {assunto}; sem ele, fica o de antes */
+function lerAssuntoReescrito(bruto: string): string | null {
+  const s = (bruto || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
+  const a = s.indexOf('{');
+  const b = s.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  try {
+    const assunto = String(JSON.parse(s.slice(a, b + 1))?.assunto ?? '')
+      .replace(/\s+/g, ' ')
+      .replace(/\[#[^\]]*\]/g, '')
+      .trim()
+      .slice(0, 200);
+    return assunto || null;
+  } catch {
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -192,13 +212,14 @@ Deno.serve(async (req) => {
     ? Math.max(1, Math.min(QUANTIDADE_MAXIMA, Math.trunc(Number(body.quantidade)) || 1))
     : 1;
   const tom = typeof body.tom === 'string' && TONS[body.tom] ? body.tom : 'formal';
-  const modo = body.modo === 'corrigir' || body.modo === 'sotaque' || body.modo === 'conversa' ? body.modo : 'gerar';
+  const modo = body.modo === 'corrigir' || body.modo === 'reescrever' || body.modo === 'conversa' ? body.modo : 'gerar';
   const htmlParaCorrigir = typeof body.html === 'string' ? body.html.trim() : '';
-  if ((modo === 'corrigir' || modo === 'sotaque') && !htmlParaCorrigir) {
+  if ((modo === 'corrigir' || modo === 'reescrever') && !htmlParaCorrigir) {
     return falha('corpo_invalido', 'Não há texto para reescrever.', 400);
   }
-  if (modo === 'sotaque' && !ufValida(body.uf)) return falha('corpo_invalido', 'Escolha o estado do sotaque.', 400);
-  const intensidade: Intensidade = body.intensidade === 'raiz' ? 'raiz' : 'leve';
+  const reescrita = modo === 'reescrever' ? lerReescrita(body) : null;
+  if (modo === 'reescrever' && !reescrita) return falha('corpo_invalido', 'Pedido de ajuste inválido.', 400);
+  const assuntoParaReescrever = typeof body.assunto === 'string' ? body.assunto.trim().slice(0, 300) : '';
   if (htmlParaCorrigir.length > MAX_HTML_CORRIGIR) {
     return falha('corpo_invalido', 'O texto é grande demais para corrigir de uma vez.', 400);
   }
@@ -324,28 +345,29 @@ Deno.serve(async (req) => {
     return falha('ia_nao_configurada', 'Nenhuma IA configurada. Um administrador pode configurar em Configurações › Inteligência Artificial.');
   }
 
-  // ── modos corrigir e sotaque: reescrevem só o corpo que está no editor ──
-  if (modo === 'corrigir' || modo === 'sotaque') {
-    const nomeFerramenta = modo === 'sotaque' ? 'devolver_texto_reescrito' : 'devolver_texto_corrigido';
+  // ── modos corrigir e reescrever: mexem só no corpo que está no editor ──
+  if (modo === 'corrigir' || modo === 'reescrever') {
+    const nomeFerramenta = modo === 'reescrever' ? 'devolver_texto_reescrito' : 'devolver_texto_corrigido';
     const ferramentaCorrigir = [
       {
         type: 'function',
         function: {
           name: nomeFerramenta,
-          description: modo === 'sotaque'
-            ? 'Devolve o mesmo e-mail em HTML, reescrito com o sotaque pedido.'
+          description: modo === 'reescrever'
+            ? 'Devolve o mesmo e-mail em HTML, reescrito como pedido, e o assunto reescrito se veio um.'
             : 'Devolve o mesmo e-mail em HTML, com ortografia e gramática corrigidas.',
           parameters: {
             type: 'object',
             properties: {
               html: { type: 'string', description: 'O HTML completo, com as mesmas tags e atributos, só com o texto alterado.' },
+              ...(modo === 'reescrever' ? { assunto: { type: 'string', description: 'O assunto reescrito, se veio um.' } } : {}),
             },
             required: ['html'],
           },
         },
       },
     ];
-    const sistemaCorrigir = modo === 'sotaque' ? promptSotaque(String(body.uf), intensidade) : `Você revisa e-mails em português do Brasil.
+    const sistemaCorrigir = modo === 'reescrever' ? promptReescrita(reescrita!) : `Você revisa e-mails em português do Brasil.
 
 Corrija ortografia, acentuação, concordância, crase e pontuação. Mantenha o mesmo conteúdo, a mesma ordem, o mesmo tom e o mesmo significado: não acrescente, não resuma e não remova frases.
 
@@ -357,7 +379,12 @@ Responda chamando a função devolver_texto_corrigido. Se não puder usar a fun�
     try {
       aiCorrecao = await callAI({ ...aiConfig, systemPrompt: null }, [
         { role: 'system', content: sistemaCorrigir },
-        { role: 'user', content: htmlParaCorrigir },
+        {
+          role: 'user',
+          content: modo === 'reescrever' && assuntoParaReescrever
+            ? `Assunto: ${assuntoParaReescrever}\n\nHTML do corpo:\n${htmlParaCorrigir}`
+            : htmlParaCorrigir,
+        },
       ], ferramentaCorrigir, { maxTokens: 6000 });
     } catch (e) {
       return falhaDaIa(e);
@@ -368,12 +395,14 @@ Responda chamando a função devolver_texto_corrigido. Se não puder usar a fun�
     if (!htmlCorrigido) {
       return falha(
         'resposta_invalida',
-        modo === 'sotaque'
-          ? 'A IA devolveu o texto fora do formato. Tente aplicar o sotaque de novo.'
+        modo === 'reescrever'
+          ? 'A IA devolveu o texto fora do formato. Tente ajustar de novo.'
           : 'A IA devolveu o texto fora do formato. Tente corrigir de novo.',
       );
     }
-    return json(200, { ok: true, html: htmlCorrigido });
+    // assunto reescrito só vale quando veio um para reescrever e a resposta trouxe texto
+    const assuntoNovo = modo === 'reescrever' && assuntoParaReescrever ? lerAssuntoReescrito(aiCorrecao.content) : null;
+    return json(200, { ok: true, html: htmlCorrigido, assunto: assuntoNovo });
   }
 
   // ── o que a IA vai ler ──

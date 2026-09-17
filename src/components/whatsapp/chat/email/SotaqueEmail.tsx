@@ -1,10 +1,29 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, Loader2, MapPin, Undo2 } from "lucide-react";
+import { ChevronDown, Languages, Loader2, MapPin, Undo2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BotaoBarra } from "./EditorEmail";
-import { EXEMPLO_ESTADO, NOME_ESTADO, REGIOES, siglaValida, type IntensidadeSotaque } from "./estadosSotaque";
+import {
+  alternarIdioma,
+  alternarTamanho,
+  EXEMPLO_ESTADO,
+  NOME_ESTADO,
+  REGIOES,
+  ROTULO_IDIOMA,
+  ROTULO_TAMANHO,
+  siglaValida,
+  type AjustesTexto,
+  type IntensidadeSotaque,
+} from "./estadosSotaque";
 
 /**
  * Botão Sotaque ao lado do Anexar (mockup "Conversa Completa e Sotaque",
@@ -108,7 +127,8 @@ export function BotaoSotaque({
             <span className="text-muted-foreground">Escolha o estado.</span>
           )}
           <span className="mt-1 block text-muted-foreground">
-            Muda só o texto do corpo. Nomes, números, links e a conversa completa ficam como estão.
+            Muda só o texto do corpo. Nomes, números, links e a conversa completa ficam como estão. Se o texto estiver
+            traduzido, volta para o português.
           </span>
         </p>
 
@@ -134,23 +154,81 @@ export function BotaoSotaque({
   );
 }
 
-/** faixa acima do editor enquanto o sotaque está aplicado */
-export function FaixaSotaque({
-  uf,
-  intensidade,
+/**
+ * Botão Ajustar (etapa 2, 16/09/2026): Idioma e Tamanho num botão só, para a
+ * barra do editor não virar duas linhas. Cada clique aplica na hora; clicar no
+ * que está marcado tira.
+ */
+export function BotaoAjustar({
+  ajustes,
+  aplicando,
+  desabilitado,
+  onAjustar,
+}: {
+  ajustes: AjustesTexto;
+  aplicando: boolean;
+  desabilitado?: boolean;
+  onAjustar: (proximo: AjustesTexto) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <BotaoBarra
+          titulo="Ajustar: traduzir ou mudar o tamanho do texto"
+          desabilitado={desabilitado || aplicando}
+          ativo={!!(ajustes.idioma || ajustes.tamanho)}
+          className="gap-1.5 px-2 text-xs font-medium"
+        >
+          {aplicando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Languages className="h-4 w-4" />}
+          Ajustar
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+        </BotaoBarra>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64" onCloseAutoFocus={(e) => e.preventDefault()}>
+        <DropdownMenuLabel className="text-[10.5px] uppercase tracking-wide text-muted-foreground">Idioma</DropdownMenuLabel>
+        {(["en", "es"] as const).map((i) => (
+          <DropdownMenuCheckboxItem key={i} checked={ajustes.idioma === i} onSelect={() => onAjustar(alternarIdioma(ajustes, i))}>
+            Traduzir para {ROTULO_IDIOMA[i].toLowerCase()}
+          </DropdownMenuCheckboxItem>
+        ))}
+        {ajustes.sotaque && (
+          <p className="px-2 pb-1 text-[11px] text-muted-foreground">Traduzir tira o sotaque.</p>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-[10.5px] uppercase tracking-wide text-muted-foreground">Tamanho</DropdownMenuLabel>
+        {(["curto", "detalhado"] as const).map((t) => (
+          <DropdownMenuCheckboxItem key={t} checked={ajustes.tamanho === t} onSelect={() => onAjustar(alternarTamanho(ajustes, t))}>
+            {t === "curto" ? "Mais curto e direto" : "Mais detalhado"}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** faixa acima do editor enquanto há sotaque, idioma ou tamanho aplicado */
+export function FaixaAjustes({
+  ajustes,
   onVoltar,
   desabilitado,
 }: {
-  uf: string;
-  intensidade: IntensidadeSotaque;
+  ajustes: AjustesTexto;
   onVoltar: () => void;
   desabilitado?: boolean;
 }) {
+  const partes = [
+    ajustes.sotaque
+      ? `Sotaque: ${NOME_ESTADO[ajustes.sotaque.uf]} · ${ajustes.sotaque.intensidade === "leve" ? "leve" : "raiz"}`
+      : null,
+    ajustes.idioma ? ROTULO_IDIOMA[ajustes.idioma] : null,
+    ajustes.tamanho ? ROTULO_TAMANHO[ajustes.tamanho] : null,
+  ].filter(Boolean);
+
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
       <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 font-semibold text-amber-700 dark:text-amber-300">
-        <MapPin className="h-3 w-3" />
-        Sotaque: {NOME_ESTADO[uf]} · {intensidade === "leve" ? "leve" : "raiz"}
+        {ajustes.sotaque ? <MapPin className="h-3 w-3" /> : <Languages className="h-3 w-3" />}
+        {ajustes.sotaque ? partes.join(" · ") : `Ajustado: ${partes.join(" · ")}`}
       </span>
       <button
         type="button"

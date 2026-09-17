@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ConversationWithContact } from "../../hooks/useWhatsAppConversations";
 import {
-  aplicarSotaqueEmailChat,
+  reescreverEmailChat,
   corrigirEmailChat,
   enviarEmailChat,
   gerarEmailChat,
@@ -25,8 +25,8 @@ import {
 import { EditorEmail } from "./EditorEmail";
 import { montarConversaCompleta } from "./conversaCompleta";
 import { ConversaCompletaPrevia } from "./ConversaCompletaPrevia";
-import { BotaoSotaque, FaixaSotaque } from "./SotaqueEmail";
-import type { IntensidadeSotaque } from "./estadosSotaque";
+import { BotaoAjustar, BotaoSotaque, FaixaAjustes } from "./SotaqueEmail";
+import { comSotaque, SEM_AJUSTES, semAjustes, type AjustesTexto } from "./estadosSotaque";
 import { BotaoAnexar, ListaAnexos, type AnexoNaTela } from "./AnexosEmail";
 import { uploadAnexoEmail } from "./uploadAnexoEmail";
 import {
@@ -84,9 +84,11 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
   const [corrigindo, setCorrigindo] = useState(false);
   /** "Incluir a conversa completa" (16/09/2026): vai depois da assinatura, sem IA */
   const [incluirConversa, setIncluirConversa] = useState(false);
-  /** sotaque aplicado, com o texto de antes para o "Voltar ao texto original" */
-  const [sotaque, setSotaque] = useState<{ uf: string; intensidade: IntensidadeSotaque; htmlOriginal: string } | null>(null);
-  const [aplicandoSotaque, setAplicandoSotaque] = useState(false);
+  /** sotaque/idioma/tamanho aplicados, com o texto e o assunto de antes para o "Voltar ao texto original" */
+  const [ajustes, setAjustes] = useState<
+    (AjustesTexto & { htmlOriginal: string; assuntoOriginal: string; assuntoAplicado: string }) | null
+  >(null);
+  const [reescrevendo, setReescrevendo] = useState(false);
   const [anexos, setAnexos] = useState<AnexoNaTela[]>([]);
   const paraPreenchido = useRef(false);
   const [gerando, setGerando] = useState(false);
@@ -114,8 +116,8 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
     setVersaoCorpo((v) => v + 1);
     setCorrigindo(false);
     setIncluirConversa(false);
-    setSotaque(null);
-    setAplicandoSotaque(false);
+    setAjustes(null);
+    setReescrevendo(false);
     setAnexos([]);
     paraPreenchido.current = false;
     setGerando(false);
@@ -175,8 +177,8 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
       // o editor aplica e devolve o texto puro pelo onChange
       setCorpoHtml(textoParaParagrafos(r.corpo));
       setVersaoCorpo((v) => v + 1);
-      // texto novo da IA: o sotaque anterior não vale mais
-      setSotaque(null);
+      // texto novo da IA: sotaque e ajustes anteriores não valem mais
+      setAjustes(null);
       // assunto escrito pela pessoa fica; o que veio da IA é trocado pelo novo
       setAssunto((atual) => (!atual.trim() || atual === assuntoDaIa.current ? r.assunto : atual));
       assuntoDaIa.current = r.assunto;
@@ -242,36 +244,61 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
 
   const removerAnexo = (id: string) => setAnexos((lista) => lista.filter((a) => a.id !== id));
 
-  const aplicarSotaque = async (uf: string, intensidade: IntensidadeSotaque) => {
-    if (aplicandoSotaque || corrigindo || gerando || enviando || !corpo.trim()) return;
-    // trocar de estado reescreve a partir do original, e não do texto já com sotaque
-    const htmlOriginal = sotaque?.htmlOriginal ?? corpoHtml;
-    setAplicandoSotaque(true);
+  /**
+   * Sotaque e Ajustar. A combinação nova é sempre aplicada sobre o texto
+   * original, numa chamada só; sem nada marcado, o original volta. O assunto só
+   * é reescrito na tradução, e só volta se a pessoa não mexeu nele depois.
+   */
+  const aplicarAjustes = async (proximo: AjustesTexto) => {
+    if (reescrevendo || corrigindo || gerando || enviando || !corpo.trim()) return;
+    const htmlOriginal = ajustes?.htmlOriginal ?? corpoHtml;
+    const assuntoOriginal = ajustes?.assuntoOriginal ?? assunto;
+
+    if (semAjustes(proximo)) {
+      voltarAoOriginal();
+      return;
+    }
+
+    setReescrevendo(true);
     try {
-      const r = await aplicarSotaqueEmailChat({ conversation_id: conversation.id, html: htmlOriginal, uf, intensidade });
+      const r = await reescreverEmailChat({
+        conversation_id: conversation.id,
+        html: htmlOriginal,
+        assunto: proximo.idioma && assuntoOriginal.trim() ? assuntoOriginal : null,
+        ajustes: proximo,
+      });
       if (r.ok === false) {
         toast.error(r.mensagem, { duration: 10000 });
         return;
       }
       setCorpoHtml(r.html);
       setVersaoCorpo((v) => v + 1);
-      setSotaque({ uf, intensidade, htmlOriginal });
+      const assuntoNovo = proximo.idioma ? (r.assunto ?? assuntoOriginal) : assuntoOriginal;
+      setAssunto((atual) => (atual === (ajustes?.assuntoAplicado ?? assuntoOriginal) ? assuntoNovo : atual));
+      if (assuntoDaIa.current === (ajustes?.assuntoAplicado ?? assuntoOriginal)) assuntoDaIa.current = assuntoNovo;
+      setAjustes({ ...proximo, htmlOriginal, assuntoOriginal, assuntoAplicado: assuntoNovo });
     } catch (err: any) {
-      toast.error(err?.message || "Não foi possível aplicar o sotaque.");
+      toast.error(err?.message || "Não foi possível ajustar o texto.");
     } finally {
-      setAplicandoSotaque(false);
+      setReescrevendo(false);
     }
   };
 
-  const voltarSemSotaque = () => {
-    if (!sotaque) return;
-    setCorpoHtml(sotaque.htmlOriginal);
+  const voltarAoOriginal = () => {
+    if (!ajustes) return;
+    setCorpoHtml(ajustes.htmlOriginal);
     setVersaoCorpo((v) => v + 1);
-    setSotaque(null);
+    setAssunto((atual) => (atual === ajustes.assuntoAplicado ? ajustes.assuntoOriginal : atual));
+    if (assuntoDaIa.current === ajustes.assuntoAplicado) assuntoDaIa.current = ajustes.assuntoOriginal;
+    setAjustes(null);
   };
 
+  const ajustesAtuais: AjustesTexto = ajustes
+    ? { sotaque: ajustes.sotaque, idioma: ajustes.idioma, tamanho: ajustes.tamanho }
+    : SEM_AJUSTES;
+
   const corrigir = async () => {
-    if (corrigindo || gerando || enviando || aplicandoSotaque || !corpo.trim()) return;
+    if (corrigindo || gerando || enviando || reescrevendo || !corpo.trim()) return;
     setCorrigindo(true);
     try {
       const r = await corrigirEmailChat({ conversation_id: conversation.id, html: corpoHtml });
@@ -290,7 +317,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
   };
 
   const enviar = async () => {
-    if (enviando || gerando || corrigindo || aplicandoSotaque || trava.travado) return;
+    if (enviando || gerando || corrigindo || reescrevendo || trava.travado) return;
     if (incluirConversa) {
       if (conversaQuery.isFetching || !conversaQuery.data) {
         toast.error("Espere a conversa completa terminar de carregar antes de enviar.");
@@ -543,12 +570,11 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
 
           <div className="space-y-1.5">
             <Label htmlFor="envio-corpo" className="font-normal text-muted-foreground">Corpo do e-mail</Label>
-            {sotaque && (
-              <FaixaSotaque
-                uf={sotaque.uf}
-                intensidade={sotaque.intensidade}
-                onVoltar={voltarSemSotaque}
-                desabilitado={aplicandoSotaque || gerando || enviando}
+            {ajustes && (
+              <FaixaAjustes
+                ajustes={ajustesAtuais}
+                onVoltar={voltarAoOriginal}
+                desabilitado={reescrevendo || gerando || enviando}
               />
             )}
             <EditorEmail
@@ -559,24 +585,30 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
                 setCorpoHtml(c.html);
                 setCorpo(c.vazio ? "" : c.texto);
               }}
-              desabilitado={gerando || corrigindo || enviando || aplicandoSotaque}
+              desabilitado={gerando || corrigindo || enviando || reescrevendo}
               placeholder={
                 gerando
                   ? "Gerando o texto a partir da conversa..."
                   : corrigindo
                     ? "Corrigindo a gramática..."
-                    : aplicandoSotaque
-                      ? "Aplicando o sotaque..."
+                    : reescrevendo
+                      ? "Ajustando o texto..."
                       : "Escreva o e-mail"
               }
               acaoAnexar={
                 <>
-                  <BotaoAnexar desabilitado={gerando || corrigindo || enviando || aplicandoSotaque} onEscolher={adicionarAnexos} />
+                  <BotaoAnexar desabilitado={gerando || corrigindo || enviando || reescrevendo} onEscolher={adicionarAnexos} />
                   <BotaoSotaque
                     ufCliente={(cliente as any)?.estados?.sigla ?? null}
-                    aplicando={aplicandoSotaque}
+                    aplicando={reescrevendo}
                     desabilitado={gerando || corrigindo || enviando || !corpo.trim()}
-                    onAplicar={aplicarSotaque}
+                    onAplicar={(uf, intensidade) => aplicarAjustes(comSotaque(ajustesAtuais, uf, intensidade))}
+                  />
+                  <BotaoAjustar
+                    ajustes={ajustesAtuais}
+                    aplicando={reescrevendo}
+                    desabilitado={gerando || corrigindo || enviando || !corpo.trim()}
+                    onAjustar={aplicarAjustes}
                   />
                 </>
               }
@@ -620,7 +652,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
           </Button>
           <Button
             onClick={enviar}
-            disabled={trava.travado || gerando || enviando || corrigindo || anexando || aplicandoSotaque}
+            disabled={trava.travado || gerando || enviando || corrigindo || anexando || reescrevendo}
             className="gap-2"
           >
             {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
