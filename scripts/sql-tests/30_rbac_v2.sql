@@ -133,11 +133,26 @@ begin
    where schemaname='public' and (coalesce(qual,'')||coalesce(with_check,'')) ilike '%has_perm%';
   insert into res values ('T10 F4: has_perm no RLS', v_n >= 10, v_n||' policies');
 
-  -- T10b · nenhuma policy de RBAC pode ser PERMISSIVE (ela AMPLIARIA o acesso)
+  -- T10b · policy de RBAC NOVA nasce RESTRICTIVE: PERMISSIVE soma com OU e
+  -- AMPLIA o acesso, em silêncio.
+  -- As 3 da lista são a exceção conhecida, e o motivo importa: nelas o has_perm
+  -- não criou ramo novo — ele SUBSTITUIU o `is_admin_or_head()` dentro da policy
+  -- original, que já concedia ("vê todos os setores"). O ramo ficou mais
+  -- estreito (empresa + permissão), então restringe. Qualquer OUTRA permissiva
+  -- citando has_perm continua sendo falha.
   select count(*) into v_n from pg_policies
    where schemaname='public' and permissive='PERMISSIVE'
-     and (coalesce(qual,'')||coalesce(with_check,'')) ilike '%has_perm%';
-  insert into res values ('T10b nenhuma policy de RBAC permissiva', v_n = 0, v_n||' permissivas');
+     and (coalesce(qual,'')||coalesce(with_check,'')) ilike '%has_perm%'
+     and policyname not in ('whatsapp_conversations_select','support_attendances_select','whatsapp_messages_select');
+  insert into res values ('T10b nenhuma permissiva de RBAC fora da lista', v_n = 0, v_n||' permissivas');
+
+  -- T10d · o Chat continua decidindo por PERMISSÃO, e nas 3 tabelas.
+  -- Se alguém recolocar o papel no lugar da permissão, isto fica vermelho.
+  select count(*) into v_n from pg_policies
+   where schemaname='public'
+     and policyname in ('whatsapp_conversations_select','support_attendances_select','whatsapp_messages_select')
+     and coalesce(qual,'') ilike '%atend.todos_setores%';
+  insert into res values ('T10d chat: ver todos os setores e permissao', v_n = 3, v_n||' de 3 policies');
 
   -- T10c · as funcoes de RLS sao PARALLEL SAFE (senao desligam o scan paralelo)
   select count(*) into v_n from pg_proc p join pg_namespace n on n.oid=p.pronamespace

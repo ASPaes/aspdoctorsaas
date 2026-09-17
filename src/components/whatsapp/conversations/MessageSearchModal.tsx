@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, AlertTriangle, FileSearch } from "lucide-react";
 import { useMessageSearch, type MessageSearchResult } from "../hooks/useMessageSearch";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -28,13 +28,13 @@ interface Props {
 export function MessageSearchModal({ open, onOpenChange, onSelectMessage }: Props) {
   const [search, setSearch] = useState("");
   const [daysBack, setDaysBack] = useState(90);
-  const { profile } = useAuth();
-  const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+  const { can } = usePermissions();
+  const podeVerTodosSetores = can("atend.todos_setores", "view");
   const { data: userDepartmentId } = useUserDepartment();
   const { data: results = [], isLoading, isFetching } = useMessageSearch(
     search,
     daysBack,
-    isAdmin ? null : (userDepartmentId ?? null)
+    podeVerTodosSetores ? null : (userDepartmentId ?? null)
   );
 
   const hasSearch = search.trim().length >= 3;

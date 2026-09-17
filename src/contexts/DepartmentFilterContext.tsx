@@ -3,6 +3,7 @@ import { useAllowedDepartments, type AllowedDepartment } from "@/hooks/useAllowe
 import { useDepartmentInstances } from "@/components/whatsapp/hooks/useSupportDepartments";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 
 // Legado: chave GLOBAL em localStorage — não tinha user_id, então em máquina
 // compartilhada um usuário herdava o setor do anterior. Só removemos daqui pra frente.
@@ -32,9 +33,12 @@ const DepartmentFilterContext = createContext<DepartmentFilterContextValue | und
 
 export function DepartmentFilterProvider({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
-  const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
-  // Admin e super admin enxergam a operação inteira: abrem em "Todos os setores".
-  // Head continua abrindo no setor do próprio cadastro — ele gerencia um setor.
+  const { can } = usePermissions();
+  // QUEM pode ver os outros setores é permissão (`atend.todos_setores`).
+  // ONDE o chat ABRE continua sendo papel: admin e super admin abrem em "Todos
+  // os setores"; head abre no setor do próprio cadastro, porque ele gerencia um
+  // setor (decisão do owner em 24/08). São duas perguntas diferentes.
+  const podeVerTodosSetores = can("atend.todos_setores", "view");
   const opensOnAllDepartments = profile?.role === "admin" || !!profile?.is_super_admin;
 
   const userId = profile?.user_id ?? null;
@@ -57,7 +61,7 @@ export function DepartmentFilterProvider({ children }: { children: React.ReactNo
   const { data: departments = [], isLoading } = useAllowedDepartments();
   const { data: userDepartmentId, isLoading: userDeptLoading } = useUserDepartment();
 
-  const canSeeAllDepartments = !!isAdmin;
+  const canSeeAllDepartments = !!podeVerTodosSetores;
 
   // Auto-select department on first load
   useEffect(() => {

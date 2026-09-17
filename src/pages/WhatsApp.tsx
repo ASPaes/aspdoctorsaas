@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { ShieldAlert } from "lucide-react";
 import AgentPresenceOverlay from "@/components/whatsapp/presence/AgentPresenceOverlay";
 import { ScheduleReminderBanner } from "@/components/whatsapp/ScheduleReminderBanner";
@@ -29,8 +29,8 @@ function WhatsAppContent() {
   const queryClient = useQueryClient();
   const { selectedDepartment, departments, isLoading: departmentsLoading } = useDepartmentFilter();
   const { data: userDepartmentId, isLoading: userDepartmentLoading } = useUserDepartment();
-  const { profile: authProfile } = useAuth();
-  const isAdmin = authProfile?.role === "admin" || authProfile?.role === "head" || authProfile?.is_super_admin;
+  // Quem enxerga os outros setores é permissão, não papel (`atend.todos_setores`).
+  const podeVerTodosSetores = usePermissions().can("atend.todos_setores", "view");
 
 
   // Keep selected conversation in sync; detect RLS loss (department transfer)
@@ -260,7 +260,7 @@ function WhatsAppContent() {
   }, []);
 
   // Bloquear acesso se user não tem setor vinculado
-  if (!departmentsLoading && !isAdmin && departments.length === 0) {
+  if (!departmentsLoading && !podeVerTodosSetores && departments.length === 0) {
     return (
       <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center bg-background">
         <div className="text-center max-w-md px-6">

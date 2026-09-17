@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export interface AllowedDepartment {
   id: string;
@@ -16,22 +17,26 @@ export interface AllowedDepartment {
 
 /**
  * Returns the departments the current user is allowed to see:
- * - admin / head / super_admin: all active departments in the tenant
- * - regular user: only the single department from funcionarios.department_id
+ * - quem tem `atend.todos_setores`: all active departments in the tenant
+ * - os demais: only the single department from funcionarios.department_id
+ *
+ * A permissão nasceu semeada com o que valia antes (admin e gestor ligados,
+ * operador desligado), então ligar este portão não muda o acesso de ninguém.
  */
 export function useAllowedDepartments() {
   const { user, profile } = useAuth();
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { can } = usePermissions();
 
-  const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+  const podeVerTodosSetores = can("atend.todos_setores", "view");
   const funcionarioId = profile?.funcionario_id;
 
   return useQuery<AllowedDepartment[]>({
-    queryKey: ["allowed_departments", tid, user?.id, isAdmin, funcionarioId],
+    queryKey: ["allowed_departments", tid, user?.id, podeVerTodosSetores, funcionarioId],
     enabled: !!user?.id && !!tid,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      if (isAdmin) {
+      if (podeVerTodosSetores) {
         // Setor que só segura opção de autoatendimento da URA fica de fora: não
         // recebe atendimento, então filtrar por ele devolveria sempre vazio.
         const { data, error } = await supabase
@@ -45,7 +50,7 @@ export function useAllowedDepartments() {
         return (data ?? []) as AllowedDepartment[];
       }
 
-      // Regular user: get department from funcionarios.department_id
+      // Sem a permissão: só o setor do cadastro (funcionarios.department_id)
       if (!funcionarioId) return [];
 
       const { data: func } = await supabase
