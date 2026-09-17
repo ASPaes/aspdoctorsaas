@@ -12,6 +12,12 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 17/09
+
+- 🔧 **Venda da calculadora entrava sem custo do OEM** — Os módulos de clientes vindos da calculadora de vendas chegavam com custo zero e continuavam zerados mesmo depois de vincular a licença, então a conferência do OEM acusava diferença contra R$ 0,00. Agora a venda já entra com o custo da tabela de preços do OEM, e se a licença cobrar diferente a divergência aparece para ajustar. Os 10 clientes que tinham entrado assim foram corrigidos.
+
+- 🔧 **Data da venda da calculadora** — Cliente novo vindo da calculadora passa a ter como data da venda o dia em que o ticket foi finalizado lá, e entra em Vendas do mês certo.
+
 ### 16/09
 
 - 🆕 **Aba Ticket Dev nos Tickets** — Em **Atendimento › Tickets**, ao lado de Pendentes, a nova aba **Ticket Dev** reúne só os tickets que têm o campo Ticket Dev preenchido, separados em **Abertos** e **Fechados** (resolvidos e encerrados), com a quantidade de cada lado. A aba não depende do período escolhido, então um chamado que está com o desenvolvimento há meses continua à vista. Busca, agente, cliente, setor, filtros e exportação funcionam dentro dela.
