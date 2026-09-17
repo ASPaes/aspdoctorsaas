@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { CalendarClock, ChevronDown, Loader2, Send } from "lucide-react";
+import { CalendarClock, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { ConfigHorario } from "@/lib/businessHours";
@@ -8,8 +8,8 @@ import { EscolherHorario, atalhosDeAgendamento, lerHorario, problemaDoHorario } 
 import { paraInputLocal } from "../input/ScheduleBar";
 
 /**
- * Enviar com a seta do agendamento ao lado (mockup "E-mail etapa 2", aprovado
- * em 16/09/2026). A seta abre o horário; confirmar guarda o e-mail como está e
+ * Agendar e Enviar lado a lado (mockup "E-mail etapa 2", aprovado
+ * em 16/09/2026). Agendar abre o horário; confirmar guarda o e-mail como está e
  * fecha a tela. Quem confere remetente, destinatário e o resto é a tela, antes.
  */
 export function BotaoEnviarComAgenda({
@@ -36,21 +36,15 @@ export function BotaoEnviarComAgenda({
     setAberto(v);
   };
 
+  // 17/09/2026: a seta colada no Enviar passava despercebida (pedido do
+  // Alexandre); virou um botão Agendar visível, antes do Enviar
   return (
-    <div className="flex">
-      <Button onClick={onEnviar} disabled={desabilitado} className="gap-2 rounded-r-none">
-        {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        {enviando ? "Enviando..." : "Enviar"}
-      </Button>
+    <div className="flex items-center gap-2">
       <Popover open={aberto} onOpenChange={abrir}>
         <PopoverTrigger asChild>
-          <Button
-            disabled={desabilitado}
-            className="rounded-l-none border-l border-primary-foreground/30 px-2"
-            aria-label="Agendar envio"
-            title="Agendar envio"
-          >
-            <ChevronDown className="h-4 w-4" />
+          <Button variant="outline" disabled={desabilitado} className="gap-2">
+            <CalendarClock className="h-4 w-4" />
+            Agendar
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" side="top" className="w-[21rem] space-y-3">
@@ -82,6 +76,10 @@ export function BotaoEnviarComAgenda({
           </div>
         </PopoverContent>
       </Popover>
+      <Button onClick={onEnviar} disabled={desabilitado} className="gap-2">
+        {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        {enviando ? "Enviando..." : "Enviar"}
+      </Button>
     </div>
   );
 }
