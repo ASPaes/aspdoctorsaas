@@ -163,13 +163,15 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const { results: contactResults, isLoading: isSearchingContacts } = useContactSearch(contactTerm);
 
   // O contato do diretório já sabe a instância dele e o cliente a que pertence.
-  // Só pré-seleciona a instância se ela ainda estiver na lista — instância
-  // removida/inativa deixaria o Select com um valor que não tem item visível.
+  // A instância dele só entra quando o campo está vazio: escolhida (padrão do
+  // setor ou pelo usuário), ela vale — trocar em silêncio mandava a conversa
+  // pela instância onde o contato falou por último. Só usa se ainda estiver na
+  // lista — instância removida/inativa deixaria o Select sem item visível.
   const handleSelectDirectoryContact = (c: ContactSearchResult) => {
     setSelectedContact(c);
     setPhone(c.phone_number);
     setName(c.name || "");
-    if (c.instance_id && instances.some((i) => i.id === c.instance_id)) {
+    if (!instanceId && c.instance_id && instances.some((i) => i.id === c.instance_id)) {
       handleInstanceChange(c.instance_id);
     }
   };
