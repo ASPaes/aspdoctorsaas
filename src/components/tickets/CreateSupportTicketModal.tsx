@@ -148,6 +148,7 @@ export function CreateSupportTicketModal({
   const [observacaoAgente, setObservacaoAgente] = useState<string>("");
   const [departamentoId, setDepartamentoId] = useState("");
   const [responsavelId, setResponsavelId] = useState("");
+  const [authUserId, setAuthUserId] = useState("");
   const [contatoSolicitante, setContatoSolicitante] = useState("");
   const [contatoSelectedId, setContatoSelectedId] = useState<string | null>(null);
   const [contatoResults, setContatoResults] = useState<Array<{ id: string; name: string; phone_number: string | null; email: string | null; role: string | null }>>([]);
@@ -188,6 +189,7 @@ export function CreateSupportTicketModal({
     setAgendadoPara("");
     setObservacaoAgente("");
     setDepartamentoId("");
+    setResponsavelId("");
     setContatoSolicitante("");
     setContatoSelectedId(null);
     setContatoResults([]);
@@ -375,11 +377,13 @@ export function CreateSupportTicketModal({
 
 
   useEffect(() => {
-    if (open && !fromClosure) {
-      supabase.auth.getUser().then(({ data }) => {
-        if (data?.user?.id) setResponsavelId(data.user.id);
-      });
-    }
+    if (!open) return;
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data?.user?.id;
+      if (!uid) return;
+      setAuthUserId(uid);
+      if (!fromClosure) setResponsavelId((prev) => prev || uid);
+    });
   }, [open, fromClosure]);
 
   // Manual mode: pré-selecionar cliente/setor a partir do chat (editáveis)
@@ -480,12 +484,12 @@ export function CreateSupportTicketModal({
   });
 
   const { data: userDepartmentId } = useQuery({
-    queryKey: ["user_department", responsavelId],
-    enabled: !!responsavelId && open,
+    queryKey: ["user_department", authUserId],
+    enabled: !!authUserId && open,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_department_members" as any) as any)
         .select("department_id")
-        .eq("user_id", responsavelId)
+        .eq("user_id", authUserId)
         .eq("is_active", true)
         .limit(1)
         .maybeSingle();
@@ -535,6 +539,48 @@ export function CreateSupportTicketModal({
     },
   });
 
+  // Responsáveis válidos = membros ativos do setor selecionado (1 agente = 1 setor)
+  const { data: setorMembroIds } = useQuery({
+    queryKey: ["create_ticket_setor_membros", tid, departamentoId],
+    enabled: !!tid && !!departamentoId && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_department_members" as any) as any)
+        .select("user_id")
+        .eq("department_id", departamentoId)
+        .eq("is_active", true);
+      if (error) throw error;
+      return ((data ?? []) as any[]).map((m: any) => m.user_id as string);
+    },
+  });
+
+  // Setor sem ninguém vinculado: não travar a criação — cai na lista completa, com aviso.
+  const setorSemAgentes = !!departamentoId && Array.isArray(setorMembroIds) && setorMembroIds.length === 0;
+
+  const agentesDoSetor = useMemo(() => {
+    if (!departamentoId || !setorMembroIds || setorMembroIds.length === 0) return agentes;
+    const ids = new Set(setorMembroIds);
+    return agentes.filter((a) => ids.has(a.user_id));
+  }, [agentes, departamentoId, setorMembroIds]);
+
+  const responsavelForaDoSetor =
+    !!responsavelId && !setorSemAgentes && Array.isArray(setorMembroIds) && !setorMembroIds.includes(responsavelId);
+
+  const responsavelInvalido = responsavelForaDoSetor && !fromClosure;
+
+  // O responsável já escolhido continua listado mesmo fora do setor, para o nome não sumir do campo.
+  const agentesSelecionaveis = useMemo(() => {
+    if (!responsavelForaDoSetor) return agentesDoSetor;
+    const atual = agentes.find((a) => a.user_id === responsavelId);
+    return atual ? [...agentesDoSetor, atual] : agentesDoSetor;
+  }, [agentesDoSetor, agentes, responsavelForaDoSetor, responsavelId]);
+
+  // Setor preenchido sozinho (perfil do usuário ou chat de origem): se o próprio usuário não for
+  // daquele setor, limpa o responsável em vez de abrir o modal já com erro na tela.
+  useEffect(() => {
+    if (!open || fromClosure) return;
+    if (responsavelId && responsavelId === authUserId && responsavelForaDoSetor) setResponsavelId("");
+  }, [open, fromClosure, responsavelId, authUserId, responsavelForaDoSetor]);
+
   const { data: availableTags = [], refetch: refetchAvailableTags } = useQuery({
     queryKey: ["create_ticket_tags", tid],
     enabled: !!tid && open,
@@ -550,12 +596,12 @@ export function CreateSupportTicketModal({
   });
 
   const { data: currentUserName } = useQuery({
-    queryKey: ["create_ticket_current_user", responsavelId],
-    enabled: !!responsavelId,
+    queryKey: ["create_ticket_current_user", authUserId],
+    enabled: !!authUserId,
     queryFn: async () => {
       const { data } = await (supabase.from("profiles" as any) as any)
         .select("funcionarios:funcionario_id(nome)")
-        .eq("user_id", responsavelId)
+        .eq("user_id", authUserId)
         .maybeSingle();
       return ((data as any)?.funcionarios?.nome as string) || null;
     },
@@ -708,6 +754,16 @@ export function CreateSupportTicketModal({
     if (!departamentoId) {
       toast.error("Selecione o setor");
       return;
+    }
+    if (!fromClosure) {
+      if (!responsavelId) {
+        toast.error("Selecione o responsável");
+        return;
+      }
+      if (responsavelInvalido) {
+        toast.error("O responsável não pertence ao setor selecionado");
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -1069,7 +1125,13 @@ export function CreateSupportTicketModal({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Setor <Req /></Label>
-                <Select value={departamentoId} onValueChange={setDepartamentoId}>
+                <Select
+                  value={departamentoId}
+                  onValueChange={(v) => {
+                    setDepartamentoId(v);
+                    if (v !== departamentoId) setResponsavelId("");
+                  }}
+                >
                   <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
                     {departamentos.map((d) => (
@@ -1105,14 +1167,25 @@ export function CreateSupportTicketModal({
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Responsável <Req /></Label>
-                <Select value={responsavelId} onValueChange={setResponsavelId}>
-                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <Select value={responsavelId} onValueChange={setResponsavelId} disabled={!departamentoId}>
+                  <SelectTrigger className={`h-9 text-xs ${responsavelInvalido ? "border-destructive" : ""}`}>
+                    <SelectValue placeholder={departamentoId ? "Selecione..." : "Selecione o setor"} />
+                  </SelectTrigger>
                   <SelectContent>
-                    {agentes.map((a) => (
-                      <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+                    {agentesSelecionaveis.map((a) => (
+                      <SelectItem key={a.user_id} value={a.user_id}>
+                        {a.nome}
+                        {responsavelForaDoSetor && a.user_id === responsavelId ? " (fora do setor)" : ""}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {responsavelInvalido && (
+                  <p className="text-[11px] text-destructive">Este responsável não pertence ao setor selecionado.</p>
+                )}
+                {setorSemAgentes && (
+                  <p className="text-[11px] text-muted-foreground">Nenhum agente vinculado a este setor.</p>
+                )}
               </div>
             </div>
 
