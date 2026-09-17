@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 16/09
 
+- 🔧 **Licença sem produto não aparecia para vincular** — Na troca de licença, uma licença que já tinha sido ligada ao cliente mas cujo produto foi cancelado aparecia como "já é deste cliente", sem botão, e não havia como trazê-la de volta para a ficha. Agora a tela confere o que está de fato nos produtos do cliente e oferece **Vincular** para ela.
+
 - 🆕 **Mandar a conversa completa junto com o e-mail** — Na tela **Enviar e-mail** do chat, o grupo **Atendimento** ganhou a opção **Incluir a conversa completa**. Marcada, as mensagens do atendimento vão no e-mail depois da assinatura, do jeito que foram trocadas: quem escreveu, o horário e o texto, com foto, documento e áudio indicados (o áudio leva a transcrição quando houver). No Resumo geral vai a conversa de cada atendimento escolhido. A conversa não passa pela IA, então não gasta o limite mensal e não muda nada do que foi dito; as notas internas da equipe nunca entram. Antes de enviar dá para conferir tudo na própria tela, e se a conversa for grande a ponto de o Gmail esconder o final do e-mail, a tela avisa.
 
 - 🆕 **Sotaque: o e-mail com o jeito de falar do estado do cliente** — Ao lado do **Anexar**, no editor do e-mail do chat, chegou o botão **Sotaque**. Você escolhe o estado (o do cliente já vem marcado) e a intensidade, **Leve** (duas ou três expressões, o e-mail continua sério) ou **Raiz**, e a IA reescreve o texto com as expressões de lá, como "uai, trem, sô" em Minas ou "bah, tchê" no Rio Grande do Sul. Nomes, números, datas, links e a conversa completa ficam como estão, e **Voltar ao texto original** desfaz na hora. Usa o limite mensal de gasto com IA, como o Corrigir gramática.

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -70,6 +71,28 @@ export default function EscolherLicencaOemDialog({
   // a troca espera confirmação: tirar a licença de um cadastro e pôr em outro
   // muda a margem dos dois, e é o tipo de coisa que não pode sair num clique.
   const [trocar, setTrocar] = useState<LicencaOem | null>(null);
+
+  // AS FILIAIS QUE ESTÃO DE FATO NA FICHA DO CLIENTE.
+  //
+  // "Já é deste cliente" era decidido por `ds_customer_id` da conciliação, e
+  // isso mente quando a linha de produto que guardava o código foi cancelada:
+  // a conciliação continua apontando para o cliente, a ficha não tem mais o
+  // código, e a licença aparecia sem botão nenhum. Foi o caso da RESERVA BAMBU
+  // 01 em 16/09/2026: a 13988 era dela, o produto dela foi cancelado, e não
+  // havia como trazer a licença de volta. A fonte da verdade do vínculo é o
+  // código em `cliente_produtos`, então é por ele que a tela decide.
+  const { data: naFicha = [], isSuccess: fichaLida } = useQuery({
+    queryKey: ["oem-codigos-cliente-dialogo", cliente?.id],
+    enabled: aberto && !!cliente?.id,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("cliente_produtos" as any) as any)
+        .select("oem_codigo_filial")
+        .eq("cliente_id", cliente!.id)
+        .not("oem_codigo_filial", "is", null);
+      if (error) throw error;
+      return (data ?? []).map((r: any) => String(r.oem_codigo_filial));
+    },
+  });
 
   const resultado = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -207,7 +230,13 @@ export default function EscolherLicencaOemDialog({
             ) : (
               resultado.achadas.map((l) => {
                 const doOutro = !!l.ds_customer_id && l.ds_customer_id !== cliente?.id;
-                const jaDele = !!cliente && l.ds_customer_id === cliente.id;
+                // Pelo código na ficha, não pela conciliação (ver `naFicha`).
+                // Enquanto a ficha não foi lida, vale o critério antigo: melhor
+                // esconder um botão por um instante do que oferecer vincular o
+                // que já está lá.
+                const jaDele = !!cliente && (fichaLida
+                  ? naFicha.includes(String(l.filial_codigo))
+                  : l.ds_customer_id === cliente.id);
                 // A que motivou a troca. Ela é "já é deste cliente" como as
                 // outras, mas é a única com saída própria: soltar sem escolher
                 // substituta, para quem não sabe qual é a certa.
