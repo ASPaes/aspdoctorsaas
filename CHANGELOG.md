@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 16/09
 
+- 🆕 **Aba Ticket Dev nos Tickets** — Em **Atendimento › Tickets**, ao lado de Pendentes, a nova aba **Ticket Dev** reúne só os tickets que têm o campo Ticket Dev preenchido, separados em **Abertos** e **Fechados** (resolvidos e encerrados), com a quantidade de cada lado. A aba não depende do período escolhido, então um chamado que está com o desenvolvimento há meses continua à vista. Busca, agente, cliente, setor, filtros e exportação funcionam dentro dela.
+
 - 🔧 **Licença sem produto não aparecia para vincular** — Na troca de licença, uma licença que já tinha sido ligada ao cliente mas cujo produto foi cancelado aparecia como "já é deste cliente", sem botão, e não havia como trazê-la de volta para a ficha. Agora a tela confere o que está de fato nos produtos do cliente e oferece **Vincular** para ela.
 
 - 🆕 **Mandar a conversa completa junto com o e-mail** — Na tela **Enviar e-mail** do chat, o grupo **Atendimento** ganhou a opção **Incluir a conversa completa**. Marcada, as mensagens do atendimento vão no e-mail depois da assinatura, do jeito que foram trocadas: quem escreveu, o horário e o texto, com foto, documento e áudio indicados (o áudio leva a transcrição quando houver). No Resumo geral vai a conversa de cada atendimento escolhido. A conversa não passa pela IA, então não gasta o limite mensal e não muda nada do que foi dito; as notas internas da equipe nunca entram. Antes de enviar dá para conferir tudo na própria tela, e se a conversa for grande a ponto de o Gmail esconder o final do e-mail, a tela avisa.

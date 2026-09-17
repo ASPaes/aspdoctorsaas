@@ -163,7 +163,7 @@ type FiltrosTickets = {
   attTipoFilter: string;
 };
 
-const VIEWS_VALIDAS = ["lista", "kanban", "atendimentos", "pendentes"];
+const VIEWS_VALIDAS = ["lista", "kanban", "atendimentos", "pendentes", "ticketdev"];
 
 const textoSalvo = (v: unknown, padrao: string) =>
   typeof v === "string" && v.length > 0 ? v : padrao;
@@ -218,6 +218,16 @@ export default function SupportTickets() {
   const [csatModalOpen, setCsatModalOpen] = useState(false);
   const [ticketStateFilter, setTicketStateFilter] = useState<string>(() => textoSalvo(filtrosSalvos.ticketStateFilter, "all"));
   const [sortBy, setSortBy] = useState<string>(() => textoSalvo(filtrosSalvos.sortBy, "recent"));
+  /**
+   * Aba "Ticket Dev": a mesma lista, presa aos tickets com o campo Ticket Dev
+   * preenchido e dividida em Abertos × Fechados pelo `is_terminal` do status
+   * (o mesmo critério do seletor "Encerrados"). Ignora o período de propósito:
+   * demanda de dev fica aberta por meses e sumiria da aba ao sair da janela.
+   */
+  const emTicketDev = ticketsView === "ticketdev";
+  const [ticketDevEstado, setTicketDevEstado] = useState<"open" | "closed">("open");
+  const ticketDevEfetivo = emTicketDev ? "preenchido" : ticketDevFilter;
+  const estadoEfetivo = emTicketDev ? ticketDevEstado : ticketStateFilter;
   const [attClosureTypeFilter, setAttClosureTypeFilter] = useState<string>(() => textoSalvo(filtrosSalvos.attClosureTypeFilter, "all"));
   const [attCsatFilter, setAttCsatFilter] = useState<string>(() => textoSalvo(filtrosSalvos.attCsatFilter, "all"));
   const [attCsatScoreFilter, setAttCsatScoreFilter] = useState<string>(() => textoSalvo(filtrosSalvos.attCsatScoreFilter, "all"));
@@ -246,6 +256,7 @@ export default function SupportTickets() {
     produtoFilter, statusFilter, atendenteFilter, categoriaFilter, subcategoriaFilter,
     canalFilter, tipoHorarioFilter, ticketDevFilter, serviceTypeFilters, departmentFilter, tagFilters,
     clienteFilterId, selectedUnidadeId, ticketStateFilter, sortBy, debouncedSearch,
+    ticketsView, ticketDevEstado,
   ]);
   const { results: clienteSearchResults, isLoading: clienteSearchLoading } = useClienteSearch(clienteSearchTerm);
   const queryClient = useQueryClient();
@@ -657,7 +668,7 @@ export default function SupportTickets() {
     if (subcategoriaFilter !== "all") count++;
     if (canalFilter !== "all") count++;
     if (tipoHorarioFilter !== "all") count++;
-    if (ticketDevFilter !== "all") count++;
+    if (ticketDevFilter !== "all" && !emTicketDev) count++;
     if (serviceTypeFilters.length > 0) count++;
     if (tagFilters.length > 0) count++;
     if (ticketsView === "atendimentos") {
@@ -671,7 +682,7 @@ export default function SupportTickets() {
       if (attTipoFilter !== "all") count++;
     }
     return count;
-  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, ticketDevFilter, serviceTypeFilters, tagFilters, ticketsView, attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter, attSentimentFilter, attInstanceFilter, attResolucaoFilter, attTipoFilter]);
+  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, ticketDevFilter, serviceTypeFilters, tagFilters, ticketsView, attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter, attSentimentFilter, attInstanceFilter, attResolucaoFilter, attTipoFilter, emTicketDev]);
 
   /**
    * Filtro salvo pode ter virado poeira entre uma visita e outra: agente
@@ -779,13 +790,13 @@ export default function SupportTickets() {
    * dois casos, senão o ticket que teve código e foi apagado ficava de fora.
    */
   const applyTicketDevFilter = (q: any) => {
-    if (ticketDevFilter === "preenchido") return q.not("ticket_dev", "is", null).neq("ticket_dev", "");
-    if (ticketDevFilter === "vazio") return q.or("ticket_dev.is.null,ticket_dev.eq.");
+    if (ticketDevEfetivo === "preenchido") return q.not("ticket_dev", "is", null).neq("ticket_dev", "");
+    if (ticketDevEfetivo === "vazio") return q.or("ticket_dev.is.null,ticket_dev.eq.");
     return q;
   };
 
   const { data: listData = { rows: [] as TicketRow[], total: 0 }, isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, tipoHorarioFilter, ticketDevFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, userDepartmentId, clienteFilterId, selectedUnidadeId, ticketStateFilter, sortBy, debouncedSearch, currentPage, ticketStatuses.map((s) => s.id).join(","), matchedAgentIds.join(",")],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, tipoHorarioFilter, ticketDevFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, userDepartmentId, clienteFilterId, selectedUnidadeId, ticketStateFilter, emTicketDev, ticketDevEstado, sortBy, debouncedSearch, currentPage, ticketStatuses.map((s) => s.id).join(","), matchedAgentIds.join(",")],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -846,9 +857,8 @@ export default function SupportTickets() {
         `, { count: "exact" })
         .eq("tenant_id", tid)
         .is("deleted_at", null)
-        .neq("contexto", "onboarding")
-        .gte("aberto_em", fromISO)
-        .lte("aberto_em", toISO);
+        .neq("contexto", "onboarding");
+      if (!emTicketDev) q = q.gte("aberto_em", fromISO).lte("aberto_em", toISO);
 
       if (!isAdminOrHead) {
         if (userDepartmentId) q = q.eq("department_id", userDepartmentId);
@@ -870,10 +880,10 @@ export default function SupportTickets() {
 
       const hasAgentMatch = !!s && matchedAgentIds.length > 0;
 
-      if (!hasAgentMatch) {
-        if (ticketStateFilter === "closed" && terminalIds.length > 0) {
+      if (!hasAgentMatch || emTicketDev) {
+        if (estadoEfetivo === "closed" && terminalIds.length > 0) {
           q = q.in("status_id", terminalIds);
-        } else if (ticketStateFilter === "open" && openIds.length > 0) {
+        } else if (estadoEfetivo === "open" && openIds.length > 0) {
           q = q.or(`status_id.in.(${openIds.join(",")}),status_id.is.null`);
         }
       }
@@ -909,7 +919,7 @@ export default function SupportTickets() {
   const tickets = listData.rows;
 
   const { data: counts = { total: 0, ativos: 0, finalizados: 0 } } = useQuery({
-    queryKey: ["support_tickets_counts", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, ticketDevFilter, serviceTypeFilters.join(","), departmentFilter, tagFilters.join(","), clienteFilterId, selectedUnidadeId, isAdminOrHead, userId, userDepartmentId, ticketStatuses.map((s) => s.id).join(",")],
+    queryKey: ["support_tickets_counts", tid, emTicketDev, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, ticketDevFilter, serviceTypeFilters.join(","), departmentFilter, tagFilters.join(","), clienteFilterId, selectedUnidadeId, isAdminOrHead, userId, userDepartmentId, ticketStatuses.map((s) => s.id).join(",")],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -935,9 +945,8 @@ export default function SupportTickets() {
           // Ticket de onboarding (implantação, sub-ticket de treino, acompanhamento) vive no
           // módulo de Implantação, não na fila de suporte. `contexto` é NOT NULL, então o neq
           // não descarta linha nenhuma por engano.
-          .neq("contexto", "onboarding")
-          .gte("aberto_em", fromISO)
-          .lte("aberto_em", toISO);
+          .neq("contexto", "onboarding");
+        if (!emTicketDev) q = q.gte("aberto_em", fromISO).lte("aberto_em", toISO);
         if (!isAdminOrHead) {
           if (userDepartmentId) q = q.eq("department_id", userDepartmentId);
           else if (userId) q = q.eq("responsavel_user_id", userId);
@@ -1043,9 +1052,8 @@ export default function SupportTickets() {
         `)
         .eq("tenant_id", tid)
         .is("deleted_at", null)
-        .neq("contexto", "onboarding")
-        .gte("aberto_em", fromISO)
-        .lte("aberto_em", toISO);
+        .neq("contexto", "onboarding");
+      if (!emTicketDev) q = q.gte("aberto_em", fromISO).lte("aberto_em", toISO);
 
       if (!isAdminOrHead) {
         if (userDepartmentId) q = q.eq("department_id", userDepartmentId);
@@ -1064,9 +1072,9 @@ export default function SupportTickets() {
       if (selectedUnidadeId) q = q.eq("unidade_base_id", selectedUnidadeId);
       if (taggedTicketIds) q = q.in("id", taggedTicketIds);
 
-      if (ticketStateFilter === "closed" && terminalIds.length > 0) {
+      if (estadoEfetivo === "closed" && terminalIds.length > 0) {
         q = q.in("status_id", terminalIds);
-      } else if (ticketStateFilter === "open" && openIds.length > 0) {
+      } else if (estadoEfetivo === "open" && openIds.length > 0) {
         q = q.or(`status_id.in.(${openIds.join(",")}),status_id.is.null`);
       }
 
@@ -1256,17 +1264,21 @@ export default function SupportTickets() {
 
       {/* Toolbar: filtros globais + views */}
       <div className="flex items-center gap-2 flex-wrap">
-        <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
+        {!emTicketDev && (
+          <>
+            <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
 
-        <Select value={ticketStateFilter} onValueChange={setTicketStateFilter}>
-          <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="open">Abertos</SelectItem>
-            <SelectItem value="closed">Encerrados</SelectItem>
-          </SelectContent>
-        </Select>
-        {ticketsView === "lista" && (
+            <Select value={ticketStateFilter} onValueChange={setTicketStateFilter}>
+              <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="open">Abertos</SelectItem>
+                <SelectItem value="closed">Encerrados</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        )}
+        {(ticketsView === "lista" || emTicketDev) && (
           <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="h-9 w-[180px] text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -1386,7 +1398,7 @@ export default function SupportTickets() {
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-[460px] p-4">
-            {(ticketsView === "lista" || ticketsView === "kanban") ? (
+            {(ticketsView === "lista" || ticketsView === "kanban" || emTicketDev) ? (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -1482,17 +1494,19 @@ export default function SupportTickets() {
                       </PopoverContent>
                     </Popover>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Tickets Dev</label>
-                    <Select value={ticketDevFilter} onValueChange={setTicketDevFilter}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="preenchido">Preenchido</SelectItem>
-                        <SelectItem value="vazio">Vazio</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {!emTicketDev && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground">Tickets Dev</label>
+                      <Select value={ticketDevFilter} onValueChange={setTicketDevFilter}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="preenchido">Preenchido</SelectItem>
+                          <SelectItem value="vazio">Vazio</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1 pt-2 border-t">
@@ -1664,6 +1678,7 @@ export default function SupportTickets() {
             ...(departmentFilter !== "all" ? [{ id: "kanban", label: "Kanban", Icon: LayoutGrid }] : []),
             { id: "atendimentos", label: "Atendimentos - Chats", Icon: Headphones },
             ...(isAdminOrHead ? [{ id: "pendentes", label: "Pendentes", Icon: Clock }] : []),
+            { id: "ticketdev", label: "Ticket Dev", Icon: Code2 },
           ].map((v) => (
             <button
               key={v.id}
@@ -1717,7 +1732,30 @@ export default function SupportTickets() {
       )}
 
       {/* Chips de filtros ativos */}
-      {activeFilterCount > 0 && (ticketsView === "lista" || ticketsView === "kanban") && (
+      {/* Ticket Dev: Abertos × Fechados, com a contagem de cada lado */}
+      {emTicketDev && (
+        <div className="flex items-center gap-1.5">
+          {([
+            { id: "open", label: "Abertos", total: counts.ativos },
+            { id: "closed", label: "Fechados", total: counts.finalizados },
+          ] as const).map((aba) => (
+            <button
+              key={aba.id}
+              onClick={() => setTicketDevEstado(aba.id)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs transition-colors ${
+                ticketDevEstado === aba.id
+                  ? "border-primary/50 bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {aba.label}
+              <span className="font-mono text-[11px] opacity-80">{aba.total}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {activeFilterCount > 0 && (ticketsView === "lista" || ticketsView === "kanban" || emTicketDev) && (
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[11px] text-muted-foreground mr-1">Filtros:</span>
           {produtoFilter !== "all" && (
@@ -1768,7 +1806,7 @@ export default function SupportTickets() {
               {getFilterLabel("tipoHorario", tipoHorarioFilter)} <X className="h-3 w-3" />
             </button>
           )}
-          {ticketDevFilter !== "all" && (
+          {ticketDevFilter !== "all" && !emTicketDev && (
             <button
               onClick={() => setTicketDevFilter("all")}
               className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
@@ -1811,8 +1849,8 @@ export default function SupportTickets() {
       )}
 
       {/* Conteúdo por view */}
-      {ticketsView === "lista" && !isLoading && <Paginador />}
-      {ticketsView === "lista" && (
+      {(ticketsView === "lista" || emTicketDev) && !isLoading && <Paginador />}
+      {(ticketsView === "lista" || emTicketDev) && (
         isLoading ? (
           <div className="space-y-2">
             {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
@@ -1919,7 +1957,7 @@ export default function SupportTickets() {
         )
       )}
 
-      {ticketsView === "lista" && !isLoading && <Paginador />}
+      {(ticketsView === "lista" || emTicketDev) && !isLoading && <Paginador />}
 
 
       {ticketsView === "kanban" && (
