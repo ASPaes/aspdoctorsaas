@@ -39,6 +39,30 @@ export function atalhosDeAgendamento(agora = new Date()): { rotulo: string; quan
   return lista.filter((a, i) => a.quando.getTime() > agora.getTime() + 60_000 && !(i === 1 && a.quando.getTime() === amanha8.getTime()));
 }
 
+/**
+ * "hoje às 08:31 (daqui a 8 h)". O botão de confirmar diz o dia por extenso e
+ * quanto falta porque, em 17/09/2026, um e-mail que devia sair em 2 minutos
+ * ficou para 8 horas depois: a hora 08 do atalho sobrou quando a pessoa
+ * ajustou só o dia e os minutos.
+ */
+export function descreverHorario(quando: Date, agora = new Date()): string {
+  const dia = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDias = Math.round((dia(quando) - dia(agora)) / 86_400_000);
+  const hora = format(quando, "HH:mm");
+  const qualDia =
+    diffDias === 0 ? "hoje" : diffDias === 1 ? "amanhã" : format(quando, "EEEE, dd/MM", { locale: ptBR });
+
+  const minutos = Math.max(0, Math.round((quando.getTime() - agora.getTime()) / 60_000));
+  const falta =
+    minutos < 60
+      ? `daqui a ${minutos} min`
+      : minutos < 48 * 60
+        ? `daqui a ${Math.round(minutos / 60)} h`
+        : `daqui a ${Math.round(minutos / 1440)} dias`;
+
+  return `${qualDia} às ${hora} (${falta})`;
+}
+
 export function lerHorario(valor: string): Date | null {
   if (!valor) return null;
   const d = new Date(valor);

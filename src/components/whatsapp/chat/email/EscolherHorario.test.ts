@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { atalhosDeAgendamento, lerHorario, problemaDoHorario } from "./EscolherHorario";
+import { atalhosDeAgendamento, descreverHorario, lerHorario, problemaDoHorario } from "./EscolherHorario";
 
 describe("atalhos do agendamento", () => {
   it("numa quarta às 10h: amanhã 08:00, segunda 08:00 e daqui a 2 horas", () => {
@@ -24,5 +24,15 @@ describe("conferência do horário", () => {
     expect(problemaDoHorario(new Date(2026, 8, 16, 10, 0, 30), agora)).toContain("1 minuto");
     expect(problemaDoHorario(new Date(2027, 3, 1), agora)).toContain("180 dias");
     expect(problemaDoHorario(new Date(2026, 8, 17, 8, 0), agora)).toBeNull();
+  });
+});
+
+describe("descreverHorario", () => {
+  const agora = new Date(2026, 8, 17, 0, 29, 0);
+  it("mostra hoje/amanhã e quanto falta, para o engano de hora saltar aos olhos", () => {
+    expect(descreverHorario(new Date(2026, 8, 17, 0, 31), agora)).toBe("hoje às 00:31 (daqui a 2 min)");
+    expect(descreverHorario(new Date(2026, 8, 17, 8, 31), agora)).toBe("hoje às 08:31 (daqui a 8 h)");
+    expect(descreverHorario(new Date(2026, 8, 18, 8, 0), agora)).toBe("amanhã às 08:00 (daqui a 32 h)");
+    expect(descreverHorario(new Date(2026, 8, 21, 8, 0), agora)).toBe("segunda-feira, 21/09 às 08:00 (daqui a 4 dias)");
   });
 });

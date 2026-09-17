@@ -12,7 +12,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { useBusinessHoursConfig } from "@/components/whatsapp/hooks/useBusinessHoursConfig";
-import { EscolherHorario, lerHorario, problemaDoHorario } from "@/components/whatsapp/chat/email/EscolherHorario";
+import { EscolherHorario, descreverHorario, lerHorario, problemaDoHorario } from "@/components/whatsapp/chat/email/EscolherHorario";
 import { paraInputLocal } from "@/components/whatsapp/chat/input/ScheduleBar";
 import { useAcaoAgendado, useEmailsAgendados, type EmailAgendado } from "./useEmailsAgendados";
 import { ROTULO_ORIGEM } from "./useEmailsEnviados";
@@ -131,7 +131,7 @@ function LinhaAgendado({ agendado: a }: { agendado: EmailAgendado }) {
                       setMudando(false);
                       executar(
                         { id: a.id, acao: "reagendar", quando: novo },
-                        `Agendado para ${format(novo, "dd/MM 'às' HH:mm")}.`,
+                        `Agendado para ${descreverHorario(novo)}.`,
                       );
                     }}
                   >

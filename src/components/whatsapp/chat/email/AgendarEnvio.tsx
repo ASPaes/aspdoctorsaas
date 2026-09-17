@@ -1,11 +1,9 @@
 import { useState } from "react";
-import { format } from "date-fns";
 import { CalendarClock, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { ConfigHorario } from "@/lib/businessHours";
-import { EscolherHorario, atalhosDeAgendamento, lerHorario, problemaDoHorario } from "./EscolherHorario";
-import { paraInputLocal } from "../input/ScheduleBar";
+import { EscolherHorario, descreverHorario, lerHorario, problemaDoHorario } from "./EscolherHorario";
 
 /**
  * Agendar e Enviar lado a lado (mockup "E-mail etapa 2", aprovado
@@ -30,9 +28,10 @@ export function BotaoEnviarComAgenda({
   const quando = lerHorario(valor);
   const problema = valor ? problemaDoHorario(quando) : null;
 
+  // abre vazio: com "Amanhã, 08:00" já preenchido, quem ajustava só o dia e os
+  // minutos deixava a hora 08 sem perceber (e-mail de 00:31 saiu marcado 08:31)
   const abrir = (v: boolean) => {
-    // abre já com o primeiro atalho marcado: um clique a menos no caso comum
-    if (v && !valor) setValor(paraInputLocal(atalhosDeAgendamento()[0]?.quando ?? new Date(Date.now() + 3_600_000)));
+    if (v) setValor("");
     setAberto(v);
   };
 
@@ -54,13 +53,14 @@ export function BotaoEnviarComAgenda({
           </p>
           <EscolherHorario id="envio-agendar-para" valor={valor} onChange={setValor} horario={horario} />
           {problema && <p className="text-xs font-medium text-destructive">{problema}</p>}
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => setAberto(false)}>
               Voltar
             </Button>
             <Button
               type="button"
               size="sm"
+              className="h-auto min-h-8 whitespace-normal py-1.5 text-left"
               disabled={!quando || !!problemaDoHorario(quando) || enviando}
               onClick={async () => {
                 if (!quando || problemaDoHorario(quando)) return;
@@ -71,7 +71,7 @@ export function BotaoEnviarComAgenda({
                 }
               }}
             >
-              {quando ? `Agendar para ${format(quando, "dd/MM 'às' HH:mm")}` : "Agendar"}
+              {quando && !problemaDoHorario(quando) ? `Agendar para ${descreverHorario(quando)}` : "Agendar"}
             </Button>
           </div>
         </PopoverContent>

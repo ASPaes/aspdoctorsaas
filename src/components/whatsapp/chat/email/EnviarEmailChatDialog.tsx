@@ -29,9 +29,9 @@ import { BotaoAjustar, BotaoSotaque, FaixaAjustes } from "./SotaqueEmail";
 import { comSotaque, SEM_AJUSTES, semAjustes, type AjustesTexto } from "./estadosSotaque";
 import { BotaoAnexar, ListaAnexos, type AnexoNaTela } from "./AnexosEmail";
 import { BotaoEnviarComAgenda } from "./AgendarEnvio";
+import { descreverHorario } from "./EscolherHorario";
 import { agendarEmail } from "@/components/emails/useEmailsAgendados";
 import { useBusinessHoursConfig } from "../../hooks/useBusinessHoursConfig";
-import { format } from "date-fns";
 import { uploadAnexoEmail } from "./uploadAnexoEmail";
 import {
   assuntoComReferencia,
@@ -385,7 +385,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
         department_id: dados?.departmentId ?? null,
         anexos: anexosProntos(),
       });
-      toast.success(`E-mail agendado para ${format(quando, "dd/MM 'às' HH:mm")}. Ele aparece em E-mails › Enviados até sair.`);
+      toast.success(`E-mail agendado para ${descreverHorario(quando)}. Ele aparece em E-mails › Enviados até sair.`);
       onOpenChange(false);
       return true;
     } catch (err: any) {
