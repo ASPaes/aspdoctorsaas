@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { callAI, getAIConfig } from '../_shared/ai-client.ts';
+import { promptSotaque, ufValida, type Intensidade } from './sotaque.ts';
 
 /**
  * Escreve assunto e corpo de um e-mail ao cliente a partir da conversa do chat.
@@ -20,6 +21,14 @@ import { callAI, getAIConfig } from '../_shared/ai-client.ts';
  * Modo "corrigir" (15/09/2026, botão Ortografia do editor): recebe o HTML do
  * corpo e devolve o mesmo HTML com ortografia e gramática corrigidas, sem mexer
  * nas tags. Passa pelo mesmo teto de gasto e registra custo igual.
+ *
+ * Modo "sotaque" (16/09/2026): igual ao corrigir, mas reescreve o corpo com o
+ * jeito de falar de um estado (uf + intensidade leve|raiz). Ver sotaque.ts.
+ *
+ * Modo "conversa" (16/09/2026, "Incluir a conversa completa"): devolve as
+ * mensagens dos mesmos atendimentos que o resumo usa, sem IA. Por isso roda
+ * ANTES do teto de gasto: não custa nada e precisa funcionar com o limite
+ * estourado. A tela monta o bloco; a send-email põe depois da assinatura.
  */
 
 const corsHeaders = {
@@ -41,6 +50,8 @@ const MSGS_ULTIMO = 150;
 const MSGS_POR_ATENDIMENTO_RESUMO = 40;
 const MAX_CHARS_MSG = 700;
 const MAX_HTML_CORRIGIR = 40_000;
+/** teto da conversa completa por pedido; acima disso a tela já avisa que o Gmail corta */
+const MAX_MSGS_CONVERSA = 3000;
 
 const TONS: Record<string, string> = {
   formal: 'Formal: tratamento respeitoso ("Prezados"), frases completas, sem gírias nem exclamações.',
@@ -181,9 +192,13 @@ Deno.serve(async (req) => {
     ? Math.max(1, Math.min(QUANTIDADE_MAXIMA, Math.trunc(Number(body.quantidade)) || 1))
     : 1;
   const tom = typeof body.tom === 'string' && TONS[body.tom] ? body.tom : 'formal';
-  const modo = body.modo === 'corrigir' ? 'corrigir' : 'gerar';
+  const modo = body.modo === 'corrigir' || body.modo === 'sotaque' || body.modo === 'conversa' ? body.modo : 'gerar';
   const htmlParaCorrigir = typeof body.html === 'string' ? body.html.trim() : '';
-  if (modo === 'corrigir' && !htmlParaCorrigir) return falha('corpo_invalido', 'Não há texto para corrigir.', 400);
+  if ((modo === 'corrigir' || modo === 'sotaque') && !htmlParaCorrigir) {
+    return falha('corpo_invalido', 'Não há texto para reescrever.', 400);
+  }
+  if (modo === 'sotaque' && !ufValida(body.uf)) return falha('corpo_invalido', 'Escolha o estado do sotaque.', 400);
+  const intensidade: Intensidade = body.intensidade === 'raiz' ? 'raiz' : 'leve';
   if (htmlParaCorrigir.length > MAX_HTML_CORRIGIR) {
     return falha('corpo_invalido', 'O texto é grande demais para corrigir de uma vez.', 400);
   }
@@ -218,6 +233,75 @@ Deno.serve(async (req) => {
     return falha('sem_permissao', 'Sem permissão para esta conversa.', 403);
   }
 
+  // ── modo conversa: as mensagens como foram trocadas, sem IA ──
+  if (modo === 'conversa') {
+    const { data: atts } = await supabase
+      .from('support_attendances')
+      .select('id, attendance_code, opened_at, closed_at')
+      .eq('tenant_id', tenantId)
+      .eq('conversation_id', conversationId)
+      .order('opened_at', { ascending: false })
+      .limit(quantidade);
+
+    const colunas = 'id, content, timestamp, is_from_me, sender_name, message_type, audio_transcription, media_filename, deleted_at';
+    const buscar = async (desde: string | null, ate: string | null, restante: number) => {
+      const linhas: any[] = [];
+      for (let de = 0; linhas.length < restante; de += 1000) {
+        let q = supabase
+          .from('whatsapp_messages')
+          .select(colunas)
+          .eq('tenant_id', tenantId)
+          .eq('conversation_id', conversationId)
+          .is('deleted_at', null)
+          .order('timestamp', { ascending: true })
+          .range(de, de + Math.min(999, restante - linhas.length - 1));
+        if (desde) q = q.gte('timestamp', desde);
+        if (ate) q = q.lte('timestamp', ate);
+        const { data, error } = await q;
+        if (error) throw error;
+        linhas.push(...(data ?? []));
+        if (!data || data.length < 1000) break;
+      }
+      return linhas;
+    };
+
+    try {
+      const blocos: unknown[] = [];
+      let total = 0;
+      let cortada = false;
+      for (const att of [...(atts ?? [])].reverse()) {
+        const restante = MAX_MSGS_CONVERSA - total;
+        if (restante <= 0) {
+          cortada = true;
+          break;
+        }
+        const msgs = await buscar(att.opened_at, att.closed_at ?? new Date().toISOString(), restante);
+        total += msgs.length;
+        if (msgs.length >= restante) cortada = true;
+        blocos.push({ codigo: att.attendance_code, aberto_em: att.opened_at, encerrado_em: att.closed_at, mensagens: msgs });
+      }
+      // conversa sem atendimento registrado: as mensagens mais recentes, como o resumo faz
+      if (blocos.length === 0) {
+        const { data: recentes } = await supabase
+          .from('whatsapp_messages')
+          .select(colunas)
+          .eq('tenant_id', tenantId)
+          .eq('conversation_id', conversationId)
+          .is('deleted_at', null)
+          .order('timestamp', { ascending: false })
+          .limit(MSGS_ULTIMO);
+        const msgs = [...(recentes ?? [])].reverse();
+        if (msgs.length) blocos.push({ codigo: null, aberto_em: msgs[0].timestamp, encerrado_em: null, mensagens: msgs });
+      }
+
+      const contato = (conversa as any).contact ?? {};
+      return json(200, { ok: true, blocos, cortada, contato_nome: contato.name ?? null });
+    } catch (e) {
+      console.error(`[gerar-email-chat] conversa não lida: ${e instanceof Error ? e.message : String(e)}`);
+      return falha('erro_conversa', 'Não foi possível ler a conversa agora. Tente de novo.');
+    }
+  }
+
   // ── teto de gasto antes de qualquer chamada de IA ──
   const { data: cfg } = await supabase
     .from('configuracoes')
@@ -240,25 +324,28 @@ Deno.serve(async (req) => {
     return falha('ia_nao_configurada', 'Nenhuma IA configurada. Um administrador pode configurar em Configurações › Inteligência Artificial.');
   }
 
-  // ── modo corrigir: só revisa o corpo que está no editor ──
-  if (modo === 'corrigir') {
+  // ── modos corrigir e sotaque: reescrevem só o corpo que está no editor ──
+  if (modo === 'corrigir' || modo === 'sotaque') {
+    const nomeFerramenta = modo === 'sotaque' ? 'devolver_texto_reescrito' : 'devolver_texto_corrigido';
     const ferramentaCorrigir = [
       {
         type: 'function',
         function: {
-          name: 'devolver_texto_corrigido',
-          description: 'Devolve o mesmo e-mail em HTML, com ortografia e gramática corrigidas.',
+          name: nomeFerramenta,
+          description: modo === 'sotaque'
+            ? 'Devolve o mesmo e-mail em HTML, reescrito com o sotaque pedido.'
+            : 'Devolve o mesmo e-mail em HTML, com ortografia e gramática corrigidas.',
           parameters: {
             type: 'object',
             properties: {
-              html: { type: 'string', description: 'O HTML completo, com as mesmas tags e atributos, só com o texto corrigido.' },
+              html: { type: 'string', description: 'O HTML completo, com as mesmas tags e atributos, só com o texto alterado.' },
             },
             required: ['html'],
           },
         },
       },
     ];
-    const sistemaCorrigir = `Você revisa e-mails em português do Brasil.
+    const sistemaCorrigir = modo === 'sotaque' ? promptSotaque(String(body.uf), intensidade) : `Você revisa e-mails em português do Brasil.
 
 Corrija ortografia, acentuação, concordância, crase e pontuação. Mantenha o mesmo conteúdo, a mesma ordem, o mesmo tom e o mesmo significado: não acrescente, não resuma e não remova frases.
 
@@ -279,7 +366,12 @@ Responda chamando a função devolver_texto_corrigido. Se não puder usar a fun�
 
     const htmlCorrigido = lerHtmlCorrigido(aiCorrecao.content);
     if (!htmlCorrigido) {
-      return falha('resposta_invalida', 'A IA devolveu o texto fora do formato. Tente corrigir de novo.');
+      return falha(
+        'resposta_invalida',
+        modo === 'sotaque'
+          ? 'A IA devolveu o texto fora do formato. Tente aplicar o sotaque de novo.'
+          : 'A IA devolveu o texto fora do formato. Tente corrigir de novo.',
+      );
     }
     return json(200, { ok: true, html: htmlCorrigido });
   }

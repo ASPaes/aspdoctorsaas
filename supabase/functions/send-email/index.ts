@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { enviarSmtp, mensagemAmigavel, type EmailSecurity } from '../test-email-account/smtp.ts';
 import { enderecoValido, montarMensagem, semQuebra } from './mime.ts';
 import { aplicarAssinatura, montarAssinatura } from './assinatura.ts';
+import { anexarHistorico } from './historico.ts';
 import { ANEXO_BUCKET, ANEXO_MAX_TOTAL_BYTES, bytesParaBase64, validarAnexos } from './anexos.ts';
 
 /**
@@ -154,6 +155,9 @@ Deno.serve(async (req) => {
   const assunto = typeof body.subject === 'string' ? semQuebra(body.subject) : '';
   const html = typeof body.html === 'string' && body.html.trim() ? body.html : null;
   const texto = typeof body.text === 'string' && body.text.trim() ? body.text : null;
+  // conversa completa do atendimento (16/09/2026): vai depois da assinatura
+  const historicoHtml = typeof body.historico_html === 'string' && body.historico_html.trim() ? body.historico_html : null;
+  const historicoTexto = typeof body.historico_texto === 'string' && body.historico_texto.trim() ? body.historico_texto : null;
   const responderPara = typeof body.reply_to === 'string' && body.reply_to.trim() ? body.reply_to.trim() : null;
   const origem = typeof body.origem === 'string' && /^[a-z_]{1,30}$/.test(body.origem) ? body.origem : 'manual';
   const referenciaId = typeof body.referencia_id === 'string' && UUID.test(body.referencia_id) ? body.referencia_id : null;
@@ -170,7 +174,7 @@ Deno.serve(async (req) => {
   if (!assunto) return json(400, { error: 'Informe o assunto.' });
   if (assunto.length > MAX_ASSUNTO) return json(400, { error: `Assunto com mais de ${MAX_ASSUNTO} caracteres.` });
   if (!html && !texto) return json(400, { error: 'Informe o corpo da mensagem.' });
-  if ((html?.length ?? 0) + (texto?.length ?? 0) > MAX_CORPO) {
+  if ((html?.length ?? 0) + (texto?.length ?? 0) + (historicoHtml?.length ?? 0) + (historicoTexto?.length ?? 0) > MAX_CORPO) {
     return json(400, { error: 'Mensagem grande demais.' });
   }
   const anexosValidados = validarAnexos(body.anexos, tenantId);
@@ -240,7 +244,10 @@ Deno.serve(async (req) => {
     .eq('account_id', conta.id)
     .maybeSingle();
   if (assinaturaErr) console.error(`[send-email] assinatura de ${conta.email} não lida: ${assinaturaErr.message}`);
-  const corpo = aplicarAssinatura({ html, texto }, montarAssinatura(assinaturaSalva));
+  const corpo = anexarHistorico(
+    aplicarAssinatura({ html, texto }, montarAssinatura(assinaturaSalva)),
+    { html: historicoHtml, texto: historicoTexto },
+  );
 
   // ── anexos: só baixa do Storage depois de conta e permissão conferidas ──
   const arquivos: { nome: string; mime: string; base64: string }[] = [];
@@ -312,8 +319,10 @@ Deno.serve(async (req) => {
       cliente_id: clienteId,
       department_id: departmentId,
       cco,
-      corpo_texto: texto ? texto.slice(0, MAX_CORPO_GUARDADO) : null,
-      corpo_html: html ? html.slice(0, MAX_CORPO_GUARDADO) : null,
+      // a conversa completa entra no registro, sem a assinatura: abrir o e-mail
+      // em Enviados mostra o que o cliente recebeu
+      corpo_texto: texto ? [texto, historicoTexto].filter(Boolean).join('\n\n').slice(0, MAX_CORPO_GUARDADO) : null,
+      corpo_html: html ? (html + (historicoHtml ?? '')).slice(0, MAX_CORPO_GUARDADO) : null,
       status: ok ? 'enviado' : 'erro',
       erro,
       message_id: mensagem.messageId,

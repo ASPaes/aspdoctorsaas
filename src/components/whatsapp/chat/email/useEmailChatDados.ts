@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRelevantAttendance } from "../../hooks/useRelevantAttendance";
 import type { ConversationWithContact } from "../../hooks/useWhatsAppConversations";
 import { separarEmails, type OpcoesGeracao } from "./travaEnvioEmail";
+import type { BlocoConversa } from "./conversaCompleta";
 
 export interface ContaDeEnvio {
   id: string;
@@ -129,7 +130,8 @@ export function useClienteDoEmail(conversation: ConversationWithContact, enabled
       const [cli, contatos] = await Promise.all([
         supabase
           .from("clientes")
-          .select("id, codigo_sequencial, nome_fantasia, razao_social, email")
+          // a sigla do estado marca o sotaque do cliente primeiro na lista
+          .select("id, codigo_sequencial, nome_fantasia, razao_social, email, estados(sigla)")
           .eq("id", clienteId)
           .eq("tenant_id", tenantId)
           .maybeSingle(),
@@ -179,6 +181,8 @@ export async function enviarEmailChat(input: {
   department_id: string | null;
   /** já no bucket whatsapp-media; a send-email baixa, anexa e apaga depois de enviar */
   anexos: { path: string; nome: string; mime: string }[];
+  /** conversa completa do atendimento: a send-email põe depois da assinatura */
+  historico?: { html: string; texto: string } | null;
 }): Promise<ResultadoEnvio> {
   const { data, error } = await supabase.functions.invoke("send-email", {
     body: {
@@ -195,6 +199,8 @@ export async function enviarEmailChat(input: {
       cliente_id: input.cliente_id,
       department_id: input.department_id,
       anexos: input.anexos,
+      historico_html: input.historico?.html || undefined,
+      historico_texto: input.historico?.texto || undefined,
     },
   });
   if (error) {
@@ -233,6 +239,58 @@ export async function corrigirEmailChat(input: { conversation_id: string; html: 
     return { ok: false, mensagem };
   }
   return data as ResultadoCorrecao;
+}
+
+/** erro do functions.invoke vira a frase que o servidor mandou */
+async function mensagemDoErro(error: any): Promise<string> {
+  let mensagem = error?.message || "Falha ao falar com o servidor.";
+  try {
+    const corpo = await error?.context?.json?.();
+    if (corpo?.mensagem || corpo?.error) mensagem = String(corpo.mensagem || corpo.error);
+  } catch {
+    // corpo não era JSON
+  }
+  return mensagem;
+}
+
+/** Sotaque: a mesma `gerar-email-chat`, no modo sotaque; gasta IA como o Corrigir */
+export async function aplicarSotaqueEmailChat(input: {
+  conversation_id: string;
+  html: string;
+  uf: string;
+  intensidade: "leve" | "raiz";
+}): Promise<ResultadoCorrecao> {
+  const { data, error } = await supabase.functions.invoke("gerar-email-chat", { body: { ...input, modo: "sotaque" } });
+  if (error) return { ok: false, mensagem: await mensagemDoErro(error) };
+  return data as ResultadoCorrecao;
+}
+
+export type ResultadoConversa =
+  | { ok: true; blocos: BlocoConversa[]; cortada: boolean; contato_nome: string | null }
+  | { ok: false; mensagem: string };
+
+/**
+ * "Incluir a conversa completa": as mensagens dos mesmos atendimentos que o
+ * resumo usa. Sem IA; o servidor lê com as mesmas regras do Gerar novo.
+ */
+export function useConversaCompleta(
+  conversationId: string,
+  base: OpcoesGeracao["base"],
+  quantidade: number,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ["email-chat-conversa", conversationId, base, base === "resumo" ? quantidade : 1],
+    enabled,
+    staleTime: 60_000,
+    queryFn: async (): Promise<ResultadoConversa> => {
+      const { data, error } = await supabase.functions.invoke("gerar-email-chat", {
+        body: { conversation_id: conversationId, base, quantidade, modo: "conversa" },
+      });
+      if (error) return { ok: false, mensagem: await mensagemDoErro(error) };
+      return data as ResultadoConversa;
+    },
+  });
 }
 
 export type ResultadoGeracao =

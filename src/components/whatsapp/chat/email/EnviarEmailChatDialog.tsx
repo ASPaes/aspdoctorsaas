@@ -6,20 +6,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ConversationWithContact } from "../../hooks/useWhatsAppConversations";
 import {
+  aplicarSotaqueEmailChat,
   corrigirEmailChat,
   enviarEmailChat,
   gerarEmailChat,
   useClienteDoEmail,
   useContasDeEnvio,
+  useConversaCompleta,
   type SugestaoEmail,
 } from "./useEmailChatDados";
 import { EditorEmail } from "./EditorEmail";
+import { montarConversaCompleta } from "./conversaCompleta";
+import { ConversaCompletaPrevia } from "./ConversaCompletaPrevia";
+import { BotaoSotaque, FaixaSotaque } from "./SotaqueEmail";
+import type { IntensidadeSotaque } from "./estadosSotaque";
 import { BotaoAnexar, ListaAnexos, type AnexoNaTela } from "./AnexosEmail";
 import { uploadAnexoEmail } from "./uploadAnexoEmail";
 import {
@@ -75,6 +82,11 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
   /** sobe quando o conteúdo vem de fora (IA gerou ou corrigiu), para o editor aplicar */
   const [versaoCorpo, setVersaoCorpo] = useState(0);
   const [corrigindo, setCorrigindo] = useState(false);
+  /** "Incluir a conversa completa" (16/09/2026): vai depois da assinatura, sem IA */
+  const [incluirConversa, setIncluirConversa] = useState(false);
+  /** sotaque aplicado, com o texto de antes para o "Voltar ao texto original" */
+  const [sotaque, setSotaque] = useState<{ uf: string; intensidade: IntensidadeSotaque; htmlOriginal: string } | null>(null);
+  const [aplicandoSotaque, setAplicandoSotaque] = useState(false);
   const [anexos, setAnexos] = useState<AnexoNaTela[]>([]);
   const paraPreenchido = useRef(false);
   const [gerando, setGerando] = useState(false);
@@ -101,6 +113,9 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
     setCorpoHtml("");
     setVersaoCorpo((v) => v + 1);
     setCorrigindo(false);
+    setIncluirConversa(false);
+    setSotaque(null);
+    setAplicandoSotaque(false);
     setAnexos([]);
     paraPreenchido.current = false;
     setGerando(false);
@@ -125,6 +140,16 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
   }, [open, clienteQuery.isSuccess, sugestoes]);
 
   const trava = useMemo(() => conferirTrava(opcoes, gerado), [opcoes, gerado]);
+
+  // a conversa segue as opções da tela: o Enviar só libera quando elas são as
+  // da última geração, então no envio conversa e resumo falam dos mesmos atendimentos
+  const conversaQuery = useConversaCompleta(conversation.id, opcoes.base, opcoes.quantidade, open && incluirConversa);
+  const conversaDados = conversaQuery.data?.ok ? conversaQuery.data : null;
+  const conversaErro = conversaQuery.data && conversaQuery.data.ok === false ? conversaQuery.data.mensagem : null;
+  const conversaMontada = useMemo(
+    () => (conversaDados ? montarConversaCompleta(conversaDados.blocos, conversaDados.contato_nome) : null),
+    [conversaDados],
+  );
   const anexando = anexos.some((a) => a.status === "enviando");
 
   const cliente = clienteQuery.data?.cliente;
@@ -150,6 +175,8 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
       // o editor aplica e devolve o texto puro pelo onChange
       setCorpoHtml(textoParaParagrafos(r.corpo));
       setVersaoCorpo((v) => v + 1);
+      // texto novo da IA: o sotaque anterior não vale mais
+      setSotaque(null);
       // assunto escrito pela pessoa fica; o que veio da IA é trocado pelo novo
       setAssunto((atual) => (!atual.trim() || atual === assuntoDaIa.current ? r.assunto : atual));
       assuntoDaIa.current = r.assunto;
@@ -215,8 +242,36 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
 
   const removerAnexo = (id: string) => setAnexos((lista) => lista.filter((a) => a.id !== id));
 
+  const aplicarSotaque = async (uf: string, intensidade: IntensidadeSotaque) => {
+    if (aplicandoSotaque || corrigindo || gerando || enviando || !corpo.trim()) return;
+    // trocar de estado reescreve a partir do original, e não do texto já com sotaque
+    const htmlOriginal = sotaque?.htmlOriginal ?? corpoHtml;
+    setAplicandoSotaque(true);
+    try {
+      const r = await aplicarSotaqueEmailChat({ conversation_id: conversation.id, html: htmlOriginal, uf, intensidade });
+      if (r.ok === false) {
+        toast.error(r.mensagem, { duration: 10000 });
+        return;
+      }
+      setCorpoHtml(r.html);
+      setVersaoCorpo((v) => v + 1);
+      setSotaque({ uf, intensidade, htmlOriginal });
+    } catch (err: any) {
+      toast.error(err?.message || "Não foi possível aplicar o sotaque.");
+    } finally {
+      setAplicandoSotaque(false);
+    }
+  };
+
+  const voltarSemSotaque = () => {
+    if (!sotaque) return;
+    setCorpoHtml(sotaque.htmlOriginal);
+    setVersaoCorpo((v) => v + 1);
+    setSotaque(null);
+  };
+
   const corrigir = async () => {
-    if (corrigindo || gerando || enviando || !corpo.trim()) return;
+    if (corrigindo || gerando || enviando || aplicandoSotaque || !corpo.trim()) return;
     setCorrigindo(true);
     try {
       const r = await corrigirEmailChat({ conversation_id: conversation.id, html: corpoHtml });
@@ -235,7 +290,17 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
   };
 
   const enviar = async () => {
-    if (enviando || gerando || corrigindo || trava.travado) return;
+    if (enviando || gerando || corrigindo || aplicandoSotaque || trava.travado) return;
+    if (incluirConversa) {
+      if (conversaQuery.isFetching || !conversaQuery.data) {
+        toast.error("Espere a conversa completa terminar de carregar antes de enviar.");
+        return;
+      }
+      if (conversaErro) {
+        toast.error(`${conversaErro} Desmarque "Incluir a conversa completa" para enviar sem ela.`, { duration: 10000 });
+        return;
+      }
+    }
     if (anexando) {
       toast.error("Espere os arquivos terminarem de anexar antes de enviar.");
       return;
@@ -270,6 +335,10 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
         cliente_id: dados?.cliente?.id ?? null,
         department_id: dados?.departmentId ?? null,
         anexos: anexos.filter((a) => a.status === "pronto" && a.path).map((a) => ({ path: a.path!, nome: a.nome, mime: a.mime })),
+        historico:
+          incluirConversa && conversaMontada && conversaMontada.mensagens > 0
+            ? { html: conversaMontada.html, texto: conversaMontada.texto }
+            : null,
       });
       if (r.ok === false) {
         toast.error(r.mensagem, { duration: 12000 });
@@ -347,6 +416,21 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
                   className="h-8 w-16 px-2 text-center tabular-nums"
                 />
               </div>
+            </div>
+            <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2.5 gap-y-0.5 border-t border-dashed border-border pt-2.5">
+              <Checkbox
+                id="envio-conversa-completa"
+                checked={incluirConversa}
+                onCheckedChange={(v) => setIncluirConversa(v === true)}
+                className="mt-0.5"
+              />
+              <Label htmlFor="envio-conversa-completa" className="cursor-pointer text-sm font-medium">
+                Incluir a conversa completa
+              </Label>
+              <p className="col-start-2 text-xs text-muted-foreground">
+                As mensagens do atendimento vão depois da assinatura, do jeito que foram trocadas. Não passa pela IA e não
+                muda o texto do resumo.
+              </p>
             </div>
           </Grupo>
 
@@ -459,6 +543,14 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
 
           <div className="space-y-1.5">
             <Label htmlFor="envio-corpo" className="font-normal text-muted-foreground">Corpo do e-mail</Label>
+            {sotaque && (
+              <FaixaSotaque
+                uf={sotaque.uf}
+                intensidade={sotaque.intensidade}
+                onVoltar={voltarSemSotaque}
+                desabilitado={aplicandoSotaque || gerando || enviando}
+              />
+            )}
             <EditorEmail
               id="envio-corpo"
               valor={corpoHtml}
@@ -467,11 +559,27 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
                 setCorpoHtml(c.html);
                 setCorpo(c.vazio ? "" : c.texto);
               }}
-              desabilitado={gerando || corrigindo || enviando}
+              desabilitado={gerando || corrigindo || enviando || aplicandoSotaque}
               placeholder={
-                gerando ? "Gerando o texto a partir da conversa..." : corrigindo ? "Corrigindo a gramática..." : "Escreva o e-mail"
+                gerando
+                  ? "Gerando o texto a partir da conversa..."
+                  : corrigindo
+                    ? "Corrigindo a gramática..."
+                    : aplicandoSotaque
+                      ? "Aplicando o sotaque..."
+                      : "Escreva o e-mail"
               }
-              acaoAnexar={<BotaoAnexar desabilitado={gerando || corrigindo || enviando} onEscolher={adicionarAnexos} />}
+              acaoAnexar={
+                <>
+                  <BotaoAnexar desabilitado={gerando || corrigindo || enviando || aplicandoSotaque} onEscolher={adicionarAnexos} />
+                  <BotaoSotaque
+                    ufCliente={(cliente as any)?.estados?.sigla ?? null}
+                    aplicando={aplicandoSotaque}
+                    desabilitado={gerando || corrigindo || enviando || !corpo.trim()}
+                    onAplicar={aplicarSotaque}
+                  />
+                </>
+              }
               onCorrigirGramatica={corrigir}
               corrigindo={corrigindo}
               rodape={
@@ -481,6 +589,19 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
               }
             />
             <ListaAnexos anexos={anexos} onRemover={removerAnexo} />
+            {incluirConversa && (
+              <div className="pt-1.5">
+                <ConversaCompletaPrevia
+                  carregando={conversaQuery.isFetching && !conversaQuery.data}
+                  erro={conversaErro}
+                  blocos={conversaDados?.blocos ?? []}
+                  montada={conversaMontada}
+                  cortada={conversaDados?.cortada ?? false}
+                  contatoNome={conversaDados?.contato_nome ?? null}
+                  bytesResumo={new TextEncoder().encode(corpoHtml).length}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -497,7 +618,11 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={enviando}>
             Cancelar
           </Button>
-          <Button onClick={enviar} disabled={trava.travado || gerando || enviando || corrigindo || anexando} className="gap-2">
+          <Button
+            onClick={enviar}
+            disabled={trava.travado || gerando || enviando || corrigindo || anexando || aplicandoSotaque}
+            className="gap-2"
+          >
             {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             {enviando ? "Enviando..." : "Enviar"}
           </Button>
