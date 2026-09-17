@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 17/09
 
+- ⬆️ **Responsável do ticket agora segue o setor** — Ao abrir um ticket, a lista de **Responsável** passa a mostrar só quem é do **Setor** escolhido, e trocar o setor limpa o campo para a escolha ser feita de novo. Se o setor não tiver ninguém vinculado, a lista continua completa e a tela avisa. Ticket com responsável de outro setor não é mais criado, nem por engano.
+
 - 🔧 **Venda da calculadora entrava sem custo do OEM** — Os módulos de clientes vindos da calculadora de vendas chegavam com custo zero e continuavam zerados mesmo depois de vincular a licença, então a conferência do OEM acusava diferença contra R$ 0,00. Agora a venda já entra com o custo da tabela de preços do OEM, e se a licença cobrar diferente a divergência aparece para ajustar. Os 10 clientes que tinham entrado assim foram corrigidos.
 
 - 🔧 **Data da venda da calculadora** — Cliente novo vindo da calculadora passa a ter como data da venda o dia em que o ticket foi finalizado lá, e entra em Vendas do mês certo.
