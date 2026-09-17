@@ -151,7 +151,12 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
 
   // a conversa segue as opções da tela: o Enviar só libera quando elas são as
   // da última geração, então no envio conversa e resumo falam dos mesmos atendimentos
-  const conversaQuery = useConversaCompleta(conversation.id, opcoes.base, opcoes.quantidade, open && incluirConversa);
+  const conversaQuery = useConversaCompleta(
+    { conversation_id: conversation.id },
+    opcoes.base,
+    opcoes.quantidade,
+    open && incluirConversa,
+  );
   const conversaDados = conversaQuery.data?.ok ? conversaQuery.data : null;
   const conversaErro = conversaQuery.data && conversaQuery.data.ok === false ? conversaQuery.data.mensagem : null;
   const conversaMontada = useMemo(
@@ -174,7 +179,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
     const pedido = ++pedidoAtual.current;
     setGerando(true);
     try {
-      const r = await gerarEmailChat({ conversation_id: conversation.id, ...alvo });
+      const r = await gerarEmailChat({ alvo: { conversation_id: conversation.id }, ...alvo });
       if (pedido !== pedidoAtual.current) return;
       if (r.ok === false) {
         toast.error(r.mensagem, { duration: 10000 });
@@ -268,7 +273,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
     setReescrevendo(true);
     try {
       const r = await reescreverEmailChat({
-        conversation_id: conversation.id,
+        alvo: { conversation_id: conversation.id },
         html: htmlOriginal,
         assunto: proximo.idioma && assuntoOriginal.trim() ? assuntoOriginal : null,
         ajustes: proximo,
@@ -307,7 +312,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
     if (corrigindo || gerando || enviando || reescrevendo || !corpo.trim()) return;
     setCorrigindo(true);
     try {
-      const r = await corrigirEmailChat({ conversation_id: conversation.id, html: corpoHtml });
+      const r = await corrigirEmailChat({ alvo: { conversation_id: conversation.id }, html: corpoHtml });
       if (r.ok === false) {
         toast.error(r.mensagem, { duration: 10000 });
         return;

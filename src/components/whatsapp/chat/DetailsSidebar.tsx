@@ -91,7 +91,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const [contactName, setContactName] = useState(contact?.name || "");
   const [contactNotes, setContactNotes] = useState(contact?.notes || "");
   const [historyOpen, setHistoryOpen] = useState(false);
-  const envioEmail = useAbrirEnvioEmail(conversation);
+  const envioEmail = useAbrirEnvioEmail({ tipo: "chat", conversation });
   const [groupAttendancesOpen, setGroupAttendancesOpen] = useState(true);
   const [selectedAttendance, setSelectedAttendance] = useState<any | null>(null);
 

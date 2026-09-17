@@ -184,6 +184,8 @@ export async function enviarEmailChat(input: {
   anexos: { path: string; nome: string; mime: string }[];
   /** conversa completa do atendimento: a send-email põe depois da assinatura */
   historico?: { html: string; texto: string } | null;
+  /** 'chat' (padrão) ou 'ticket', para a tela E-mails mostrar de onde saiu */
+  origem?: string;
 }): Promise<ResultadoEnvio> {
   const { data, error } = await supabase.functions.invoke("send-email", {
     body: {
@@ -195,7 +197,7 @@ export async function enviarEmailChat(input: {
       subject: input.assunto,
       text: input.texto,
       html: input.html,
-      origem: "chat",
+      origem: input.origem ?? "chat",
       referencia_id: input.atendimento_id,
       cliente_id: input.cliente_id,
       department_id: input.department_id,
@@ -227,8 +229,10 @@ export type ResultadoCorrecao = { ok: true; html: string } | { ok: false; mensag
  * Manda o HTML do editor para a formatação voltar intacta, e passa pelo mesmo
  * teto de gasto de IA da geração.
  */
-export async function corrigirEmailChat(input: { conversation_id: string; html: string }): Promise<ResultadoCorrecao> {
-  const { data, error } = await supabase.functions.invoke("gerar-email-chat", { body: { ...input, modo: "corrigir" } });
+export async function corrigirEmailChat(input: { alvo: AlvoEmail; html: string }): Promise<ResultadoCorrecao> {
+  const { data, error } = await supabase.functions.invoke("gerar-email-chat", {
+    body: { ...input.alvo, html: input.html, modo: "corrigir" },
+  });
   if (error) {
     let mensagem = error.message || "Falha ao falar com o servidor.";
     try {
@@ -241,6 +245,12 @@ export async function corrigirEmailChat(input: { conversation_id: string; html: 
   }
   return data as ResultadoCorrecao;
 }
+
+/**
+ * De onde o texto sai: a conversa do chat ou o chamado. A mesma
+ * `gerar-email-chat` atende os dois (17/09/2026).
+ */
+export type AlvoEmail = { conversation_id: string } | { ticket_id: string };
 
 /** erro do functions.invoke vira a frase que o servidor mandou */
 async function mensagemDoErro(error: any): Promise<string> {
@@ -262,14 +272,14 @@ export type ResultadoReescrita = { ok: true; html: string; assunto: string | nul
  * reescrito junto (tradução).
  */
 export async function reescreverEmailChat(input: {
-  conversation_id: string;
+  alvo: AlvoEmail;
   html: string;
   assunto: string | null;
   ajustes: AjustesTexto;
 }): Promise<ResultadoReescrita> {
   const { data, error } = await supabase.functions.invoke("gerar-email-chat", {
     body: {
-      conversation_id: input.conversation_id,
+      ...input.alvo,
       modo: "reescrever",
       html: input.html,
       assunto: input.assunto ?? undefined,
@@ -291,18 +301,19 @@ export type ResultadoConversa =
  * resumo usa. Sem IA; o servidor lê com as mesmas regras do Gerar novo.
  */
 export function useConversaCompleta(
-  conversationId: string,
-  base: OpcoesGeracao["base"],
+  alvo: AlvoEmail,
+  base: string,
   quantidade: number,
   enabled: boolean,
 ) {
+  const chave = "conversation_id" in alvo ? alvo.conversation_id : alvo.ticket_id;
   return useQuery({
-    queryKey: ["email-chat-conversa", conversationId, base, base === "resumo" ? quantidade : 1],
+    queryKey: ["email-chat-conversa", chave, base, base === "resumo" ? quantidade : 1],
     enabled,
     staleTime: 60_000,
     queryFn: async (): Promise<ResultadoConversa> => {
       const { data, error } = await supabase.functions.invoke("gerar-email-chat", {
-        body: { conversation_id: conversationId, base, quantidade, modo: "conversa" },
+        body: { ...alvo, base, quantidade, modo: "conversa" },
       });
       if (error) return { ok: false, mensagem: await mensagemDoErro(error) };
       return data as ResultadoConversa;
@@ -319,8 +330,11 @@ export type ResultadoGeracao =
  * conversa vazia) vem com 200 e ok:false; erro de verdade vem com status e o
  * motivo no JSON, que o `functions.invoke` esconde atrás de "non-2xx".
  */
-export async function gerarEmailChat(input: { conversation_id: string } & OpcoesGeracao): Promise<ResultadoGeracao> {
-  const { data, error } = await supabase.functions.invoke("gerar-email-chat", { body: input });
+export async function gerarEmailChat(
+  input: { alvo: AlvoEmail; base: string; quantidade?: number; tom: string; com_notas?: boolean },
+): Promise<ResultadoGeracao> {
+  const { alvo, ...resto } = input;
+  const { data, error } = await supabase.functions.invoke("gerar-email-chat", { body: { ...alvo, ...resto } });
   if (error) {
     let mensagem = error.message || "Falha ao falar com o servidor.";
     try {

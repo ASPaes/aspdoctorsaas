@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { callAI, getAIConfig } from '../_shared/ai-client.ts';
 import { lerReescrita, promptReescrita } from './sotaque.ts';
+import { cabecalhoDoTicket, formatarEventos } from './ticket.ts';
 
 /**
  * Escreve assunto e corpo de um e-mail ao cliente a partir da conversa do chat.
@@ -206,7 +207,11 @@ Deno.serve(async (req) => {
   }
 
   const conversationId = typeof body.conversation_id === 'string' && UUID.test(body.conversation_id) ? body.conversation_id : null;
-  if (!conversationId) return falha('corpo_invalido', 'conversation_id obrigatório.', 400);
+  // e-mail pelo ticket (17/09/2026): a mesma tela, com o texto saindo do chamado
+  const ticketId = typeof body.ticket_id === 'string' && UUID.test(body.ticket_id) ? body.ticket_id : null;
+  if (!conversationId && !ticketId) return falha('corpo_invalido', 'Informe conversation_id ou ticket_id.', 400);
+  const comChats = ticketId ? body.base === 'ticket_chats' : false;
+  const comNotas = ticketId ? body.com_notas === true : false;
   const base = body.base === 'resumo' ? 'resumo' : 'ultimo';
   const quantidade = base === 'resumo'
     ? Math.max(1, Math.min(QUANTIDADE_MAXIMA, Math.trunc(Number(body.quantidade)) || 1))
@@ -239,13 +244,29 @@ Deno.serve(async (req) => {
   const { data: { user }, error: userError } = await userClient.auth.getUser(token);
   if (userError || !user) return falha('nao_autorizado', 'Não autorizado: token inválido.', 401);
 
-  const { data: conversa } = await supabase
-    .from('whatsapp_conversations')
-    .select('id, tenant_id, is_group, metadata, contact_id, contact:whatsapp_contacts(name, cliente_id)')
-    .eq('id', conversationId)
-    .maybeSingle();
-  if (!conversa) return falha('nao_encontrada', 'Conversa não encontrada.', 404);
-  const tenantId = conversa.tenant_id as string;
+  let conversa: any = null;
+  let ticket: any = null;
+  let tenantId: string;
+
+  if (ticketId) {
+    const { data } = await supabase
+      .from('support_tickets')
+      .select('id, tenant_id, ticket_code, assunto, descricao, aberto_em, concluido_em, cliente_id, department_id, status_id, deleted_at')
+      .eq('id', ticketId)
+      .maybeSingle();
+    if (!data || data.deleted_at) return falha('nao_encontrada', 'Chamado não encontrado.', 404);
+    ticket = data;
+    tenantId = data.tenant_id as string;
+  } else {
+    const { data } = await supabase
+      .from('whatsapp_conversations')
+      .select('id, tenant_id, is_group, metadata, contact_id, contact:whatsapp_contacts(name, cliente_id)')
+      .eq('id', conversationId)
+      .maybeSingle();
+    if (!data) return falha('nao_encontrada', 'Conversa não encontrada.', 404);
+    conversa = data;
+    tenantId = data.tenant_id as string;
+  }
 
   const { data: perfil } = await supabase
     .from('profiles')
@@ -261,23 +282,25 @@ Deno.serve(async (req) => {
 
   // ── modo conversa: as mensagens como foram trocadas, sem IA ──
   if (modo === 'conversa') {
-    const { data: atts } = await supabase
+    const consultaAtts = supabase
       .from('support_attendances')
-      .select('id, attendance_code, opened_at, closed_at')
+      .select('id, attendance_code, conversation_id, opened_at, closed_at')
       .eq('tenant_id', tenantId)
-      .eq('conversation_id', conversationId)
-      .order('opened_at', { ascending: false })
-      .limit(quantidade);
+      .order('opened_at', { ascending: false });
+    // pelo ticket vêm os chats ligados a ele, que podem ser de conversas diferentes
+    const { data: atts } = ticketId
+      ? await consultaAtts.eq('ticket_id', ticketId).limit(QUANTIDADE_MAXIMA)
+      : await consultaAtts.eq('conversation_id', conversationId).limit(quantidade);
 
     const colunas = 'id, content, timestamp, is_from_me, sender_name, message_type, audio_transcription, media_filename, deleted_at';
-    const buscar = async (desde: string | null, ate: string | null, restante: number) => {
+    const buscar = async (conversaDoAtendimento: string, desde: string | null, ate: string | null, restante: number) => {
       const linhas: any[] = [];
       for (let de = 0; linhas.length < restante; de += 1000) {
         let q = supabase
           .from('whatsapp_messages')
           .select(colunas)
           .eq('tenant_id', tenantId)
-          .eq('conversation_id', conversationId)
+          .eq('conversation_id', conversaDoAtendimento)
           .is('deleted_at', null)
           .order('timestamp', { ascending: true })
           .range(de, de + Math.min(999, restante - linhas.length - 1));
@@ -301,13 +324,13 @@ Deno.serve(async (req) => {
           cortada = true;
           break;
         }
-        const msgs = await buscar(att.opened_at, att.closed_at ?? new Date().toISOString(), restante);
+        const msgs = await buscar(att.conversation_id, att.opened_at, att.closed_at ?? new Date().toISOString(), restante);
         total += msgs.length;
         if (msgs.length >= restante) cortada = true;
         blocos.push({ codigo: att.attendance_code, aberto_em: att.opened_at, encerrado_em: att.closed_at, mensagens: msgs });
       }
       // conversa sem atendimento registrado: as mensagens mais recentes, como o resumo faz
-      if (blocos.length === 0) {
+      if (blocos.length === 0 && conversationId) {
         const { data: recentes } = await supabase
           .from('whatsapp_messages')
           .select(colunas)
@@ -320,7 +343,7 @@ Deno.serve(async (req) => {
         if (msgs.length) blocos.push({ codigo: null, aberto_em: msgs[0].timestamp, encerrado_em: null, mensagens: msgs });
       }
 
-      const contato = (conversa as any).contact ?? {};
+      const contato = (conversa as any)?.contact ?? {};
       return json(200, { ok: true, blocos, cortada, contato_nome: contato.name ?? null });
     } catch (e) {
       console.error(`[gerar-email-chat] conversa não lida: ${e instanceof Error ? e.message : String(e)}`);
@@ -411,15 +434,50 @@ Responda chamando a função devolver_texto_corrigido. Se não puder usar a fun�
   }
 
   // ── o que a IA vai ler ──
-  const { data: atendimentos } = await supabase
+  const consultaAtendimentos = supabase
     .from('support_attendances')
-    .select('id, attendance_code, status, opened_at, closed_at, cliente_id, ai_summary, ai_problem, ai_solution')
+    .select('id, attendance_code, conversation_id, status, opened_at, closed_at, cliente_id, ai_summary, ai_problem, ai_solution')
     .eq('tenant_id', tenantId)
-    .eq('conversation_id', conversationId)
-    .order('opened_at', { ascending: false })
-    .limit(quantidade);
+    .order('opened_at', { ascending: false });
+  // pelo ticket, os chats ligados a ele, e só quando a tela pede
+  const { data: atendimentos } = ticketId
+    ? comChats
+      ? await consultaAtendimentos.eq('ticket_id', ticketId).limit(QUANTIDADE_MAXIMA)
+      : { data: [] as any[] }
+    : await consultaAtendimentos.eq('conversation_id', conversationId).limit(quantidade);
 
-  const blocos: string[] = [];
+  // Histórico do chamado: abertura, andamento e e-mails trocados. Nota interna
+  // só entra se a tela pedir, e mesmo assim é contexto, nunca texto para copiar.
+  const blocosTicket: string[] = [];
+  if (ticketId) {
+    const [{ data: eventos }, { data: statusAtual }] = await Promise.all([
+      supabase
+        .from('support_ticket_events')
+        .select('event_type, content, old_value, new_value, created_at')
+        .eq('tenant_id', tenantId)
+        .eq('ticket_id', ticketId)
+        .order('created_at', { ascending: true })
+        .limit(300),
+      ticket.status_id
+        ? supabase.from('ticket_statuses').select('name').eq('id', ticket.status_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    const historico = formatarEventos((eventos ?? []) as any[], comNotas, hora);
+    const cabecalho = cabecalhoDoTicket(
+      {
+        ticket_code: ticket.ticket_code,
+        assunto: ticket.assunto,
+        descricao: ticket.descricao,
+        aberto_em: ticket.aberto_em,
+        status: (statusAtual as { name?: string } | null)?.name ?? null,
+        encerrado_em: ticket.concluido_em,
+      },
+      hora,
+    );
+    blocosTicket.push(`${cabecalho}\nHistórico:\n${historico || '(sem andamento registrado)'}`);
+  }
+
+  const blocos: string[] = [...blocosTicket];
   const lista = [...(atendimentos ?? [])].reverse(); // do mais antigo ao mais recente
   const limitePorAtendimento = base === 'ultimo' ? MSGS_ULTIMO : MSGS_POR_ATENDIMENTO_RESUMO;
 
@@ -458,16 +516,23 @@ Responda chamando a função devolver_texto_corrigido. Se não puder usar a fun�
   }
 
   if (blocos.length === 0) {
-    return falha('sem_conteudo', 'Esta conversa ainda não tem mensagens para montar o e-mail.');
+    return falha(
+      'sem_conteudo',
+      ticketId
+        ? 'Este chamado ainda não tem histórico para montar o e-mail.'
+        : 'Esta conversa ainda não tem mensagens para montar o e-mail.',
+    );
   }
 
-  // cliente: o do atendimento mais recente, depois o da conversa, depois o do contato
-  const contato = (conversa as any).contact ?? {};
-  const clienteId =
-    (atendimentos ?? []).find((a: any) => a.cliente_id)?.cliente_id ??
-    ((conversa.metadata ?? {}) as Record<string, unknown>).cliente_id ??
-    contato.cliente_id ??
-    null;
+  // cliente: o do chamado; no chat, o do atendimento mais recente, depois o da
+  // conversa, depois o do contato
+  const contato = (conversa as any)?.contact ?? {};
+  const clienteId = ticketId
+    ? (ticket.cliente_id ?? null)
+    : ((atendimentos ?? []).find((a: any) => a.cliente_id)?.cliente_id ??
+      ((conversa.metadata ?? {}) as Record<string, unknown>).cliente_id ??
+      contato.cliente_id ??
+      null);
   let empresa: string | null = null;
   let contatoNome: string | null = null;
   if (typeof clienteId === 'string') {
@@ -487,9 +552,11 @@ Responda chamando a função devolver_texto_corrigido. Se não puder usar a fun�
     atendente = (func?.nome || '').trim().split(/\s+/)[0] || null;
   }
 
-  const sistema = `Você escreve e-mails de uma empresa de software para os clientes dela, em português do Brasil, a partir do histórico de atendimento pelo WhatsApp.
+  const sistema = `Você escreve e-mails de uma empresa de software para os clientes dela, em português do Brasil, a partir do ${
+    ticketId ? 'histórico de um chamado de suporte' : 'histórico de atendimento pelo WhatsApp'
+  }.
 
-Regras:
+Regras:${ticketId ? '\n- O histórico é de uso interno da equipe. NUNCA copie nota interna, checklist, nome de responsável ou comentário da equipe: use como contexto e escreva só o que interessa ao cliente.' : ''}
 - Use SOMENTE fatos que aparecem no histórico. Não invente datas, horários, valores, prazos, nomes ou promessas.
 - Escreva para o cliente, nunca sobre ele. Não cite que a informação veio de um resumo automático ou de IA.
 - Não copie mensagens literalmente; reescreva com clareza.
@@ -508,10 +575,14 @@ Responda chamando a função escrever_email. Se não puder usar a função, resp
     empresa ? `Empresa do cliente: ${empresa}` : 'Empresa do cliente: não vinculada',
     contatoNome ? `Contato principal do cadastro: ${contatoNome}` : null,
     !contatoNome && contato.name ? `Nome do contato no WhatsApp: ${contato.name}` : null,
-    conversa.is_group ? 'A conversa é um grupo de WhatsApp com várias pessoas do cliente.' : null,
+    conversa?.is_group ? 'A conversa é um grupo de WhatsApp com várias pessoas do cliente.' : null,
     atendente ? `Atendente que vai enviar: ${atendente}` : null,
     '',
-    base === 'ultimo'
+    ticketId
+      ? `Objetivo: e-mail ao cliente sobre o chamado ${ticket.ticket_code ?? ''}, dizendo em que pé está, o que já foi feito e o que falta ou o que foi resolvido.${
+          comChats ? ' Depois do chamado vêm os chats de WhatsApp ligados a ele.' : ''
+        }`
+      : base === 'ultimo'
       ? 'Objetivo: e-mail sobre o atendimento abaixo, registrando o que foi tratado e os próximos passos combinados.'
       : `Objetivo: e-mail com o resumo dos últimos ${blocos.length} atendimentos abaixo, um item por atendimento, em ordem do mais antigo ao mais recente, e os próximos passos que ainda estiverem em aberto.`,
     '',

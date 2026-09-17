@@ -94,7 +94,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [groupIncludePrevious, setGroupIncludePrevious] = useState<number>(2);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInChatSearch, setShowInChatSearch] = useState(false);
-  const envioEmail = useAbrirEnvioEmail(conversation);
+  const envioEmail = useAbrirEnvioEmail({ tipo: "chat", conversation });
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [showAttendanceTicketPicker, setShowAttendanceTicketPicker] = useState(false);

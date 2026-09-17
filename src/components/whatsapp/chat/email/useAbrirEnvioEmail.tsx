@@ -22,6 +22,13 @@ import { buscarContasDeEnvio, chaveContasDeEnvio } from "./useEmailChatDados";
 // bundle principal: o cabeçalho do chat está em toda conversa, o e-mail não.
 const carregarTela = () => import("./EnviarEmailChatDialog");
 const EnviarEmailChatDialog = lazy(() => carregarTela().then((m) => ({ default: m.EnviarEmailChatDialog })));
+const carregarTelaTicket = () => import("@/components/tickets/EnviarEmailTicketDialog");
+const EnviarEmailTicketDialog = lazy(() => carregarTelaTicket().then((m) => ({ default: m.EnviarEmailTicketDialog })));
+
+/** de onde o e-mail sai: a conversa do chat ou o chamado (17/09/2026) */
+export type AlvoDoEnvio =
+  | { tipo: "chat"; conversation: ConversationWithContact }
+  | { tipo: "ticket"; tenantId: string; ticketId: string };
 
 /**
  * Botão "Enviar e-mail" do chat (cabeçalho e painel Detalhes).
@@ -31,7 +38,7 @@ const EnviarEmailChatDialog = lazy(() => carregarTela().then((m) => ({ default: 
  * gera texto à toa e ninguém descobre só no fim que não tem remetente. No lugar
  * aparece um aviso dizendo a quem pedir; quem pode configurar ganha o atalho.
  */
-export function useAbrirEnvioEmail(conversation: ConversationWithContact) {
+export function useAbrirEnvioEmail(alvo: AlvoDoEnvio) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { user, profile } = useAuth();
@@ -49,12 +56,12 @@ export function useAbrirEnvioEmail(conversation: ConversationWithContact) {
 
   const abrir = async () => {
     if (verificando) return;
-    const tenantId = conversation.tenant_id;
+    const tenantId = alvo.tipo === "chat" ? alvo.conversation.tenant_id : alvo.tenantId;
     const userId = user?.id ?? null;
     const superAdmin = profile?.is_super_admin === true;
     setVerificando(true);
     // o arquivo da tela começa a baixar junto com a conferência das contas
-    void carregarTela().catch(() => undefined);
+    void (alvo.tipo === "chat" ? carregarTela() : carregarTelaTicket()).catch(() => undefined);
     try {
       const r = await queryClient.fetchQuery({
         queryKey: chaveContasDeEnvio(tenantId, userId, superAdmin),
@@ -78,7 +85,11 @@ export function useAbrirEnvioEmail(conversation: ConversationWithContact) {
     <>
       {jaAbriu && (
         <Suspense fallback={null}>
-          <EnviarEmailChatDialog open={aberto} onOpenChange={setAberto} conversation={conversation} />
+          {alvo.tipo === "chat" ? (
+            <EnviarEmailChatDialog open={aberto} onOpenChange={setAberto} conversation={alvo.conversation} />
+          ) : (
+            <EnviarEmailTicketDialog open={aberto} onOpenChange={setAberto} ticketId={alvo.ticketId} />
+          )}
         </Suspense>
       )}
 
@@ -91,7 +102,7 @@ export function useAbrirEnvioEmail(conversation: ConversationWithContact) {
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm text-muted-foreground">
-                <p>Não há nenhuma conta de e-mail liberada para você enviar mensagens pelo chat.</p>
+                <p>Não há nenhuma conta de e-mail liberada para você enviar mensagens.</p>
                 {podeConfigurar ? (
                   <p>
                     Cadastre uma conta, ou ligue uma conta que já existe a você ou ao seu setor, em{" "}

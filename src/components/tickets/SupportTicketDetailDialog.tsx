@@ -20,6 +20,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketDialog";
 import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
+import { useAbrirEnvioEmail } from "@/components/whatsapp/chat/email/useAbrirEnvioEmail";
 import { TicketAttachments } from "@/components/tickets/TicketAttachments";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
@@ -579,6 +580,14 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const getAgentName = (uid: string) => eventAgents.find((a) => a.user_id === uid)?.nome ?? "Sistema";
 
   const ticketClienteId = ticket?.cliente_id ?? ticket?.clientes?.id ?? null;
+
+  // botão E-mail do cabeçalho: mesma conferência de contas do chat, e a tela só
+  // baixa no clique (ela carrega o editor de texto inteiro)
+  const envioEmail = useAbrirEnvioEmail({
+    tipo: "ticket",
+    tenantId: ticket?.tenant_id ?? "",
+    ticketId: ticketId ?? "",
+  });
 
   const { data: clienteContatos = [], refetch: refetchContatos } = useQuery({
     queryKey: ["ticket_detail_contatos", ticketClienteId],
@@ -1948,6 +1957,16 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                 size="sm"
                 variant="outline"
                 className="h-8 text-xs gap-1.5"
+                onClick={envioEmail.abrir}
+                disabled={envioEmail.verificando || !ticket}
+              >
+                {envioEmail.verificando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+                E-mail
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs gap-1.5"
                 onClick={() => setChildOpen(true)}
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -2426,6 +2445,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         openedAt={viewChatMeta.openedAt}
         closedAt={viewChatMeta.closedAt}
       />
+      {envioEmail.elementos}
       <StartConversationFromTicketDialog
         open={startConvOpen}
         onOpenChange={setStartConvOpen}
