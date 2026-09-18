@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useTheme } from "next-themes";
 import { Archive, ArchiveRestore, FolderInput, Forward, Loader2, Mail, Paperclip, Reply, ReplyAll } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,7 +46,31 @@ const COLUNAS_RECEBIDO =
 const dataHora = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
 
+/**
+ * Documento do quadro do e-mail enviado. O HTML é o que foi para o cliente, com
+ * texto escuro pensado para fundo branco; no tema escuro o quadro pintava um
+ * retângulo branco no meio da tela (retorno do Alexandre, 17/09/2026). Aqui o
+ * tema escuro recebe as cores da tela, e o que o cliente recebeu não muda.
+ * Cor escolhida no editor se perde só nesta visualização escura: legibilidade
+ * primeiro.
+ */
+export function documentoDoEmail(corpoHtml: string, escuro: boolean): string {
+  const base =
+    "html,body{margin:0;background:transparent}" +
+    "body{padding:12px 16px;font:14px/1.6 Arial,Helvetica,sans-serif;overflow-wrap:anywhere}" +
+    "img{max-width:100%;height:auto}";
+  const tema = escuro
+    ? ":root{color-scheme:dark}" +
+      "body{color:#E2E8F0}" +
+      "body *{color:inherit!important;background-color:transparent!important;border-color:rgba(148,163,184,.3)!important}" +
+      "a,a *{color:#38BDF8!important}"
+    : ":root{color-scheme:light}body{color:#1E293B}";
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${base}${tema}</style></head><body>${corpoHtml}</body></html>`;
+}
+
 export function LerEmailDialog({ tipo, id, onOpenChange }: Props) {
+  const { resolvedTheme } = useTheme();
+  const escuro = resolvedTheme === "dark";
   const arquivar = useArquivarEmails(tipo === "enviado" ? "enviados" : "recebidos");
   const mover = useMoverParaPasta(tipo === "enviado" ? "enviados" : "recebidos");
   const [escrevendo, setEscrevendo] = useState<PedidoEscrita | null>(null);
@@ -194,8 +219,10 @@ export function LerEmailDialog({ tipo, id, onOpenChange }: Props) {
                 <iframe
                   title="Corpo do e-mail"
                   sandbox=""
-                  srcDoc={email.corpo_html}
-                  className="h-[46vh] w-full bg-white"
+                  srcDoc={documentoDoEmail(email.corpo_html, escuro)}
+                  className="h-[46vh] w-full bg-transparent"
+                  // mesmo esquema de cor dentro e fora: é o que deixa o quadro transparente
+                  style={{ colorScheme: escuro ? "dark" : "light" }}
                 />
               ) : email.corpo_texto ? (
                 <p className="whitespace-pre-wrap px-4 py-3 text-[13.5px] leading-relaxed">{email.corpo_texto}</p>
