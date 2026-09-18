@@ -258,11 +258,13 @@ async function enviarUma(supabase: any, ag: Agendada): Promise<{ ok: boolean; me
 
   // Novo atendimento (DEM-0423): abre ou adota ANTES de enviar. Idempotente --
   // na retentativa a funcao so reconhece o atendimento que ja abriu.
+  let atendimentoNaFila = false;
   if (ag.opens_attendance) {
     const { data: aberto, error: openErr } = await supabase
       .rpc('fn_open_scheduled_attendance', { p_id: ag.id });
     if (openErr) return { ok: false, error: `nao abriu o atendimento: ${openErr.message}` };
     console.log(`${LOG} ag=${ag.id} atendimento ${aberto?.acao} ${aberto?.attendance_id}`);
+    atendimentoNaFila = aberto?.acao === 'opened_queue' || aberto?.acao === 'kept_queue';
   }
 
   const assinatura = await resolverAssinatura(supabase, conversation, ag.created_by);
@@ -328,7 +330,14 @@ async function enviarUma(supabase: any, ag: Agendada): Promise<{ ok: boolean; me
       // atendente: tres gatilhos de whatsapp_messages so disparam com
       // `sent_by_user_id` preenchido (abre atendimento em grupo, limpa o
       // "fora do horario", reinicia a regua de inatividade).
-      sent_by_user_id: ag.created_by,
+      //
+      // EXCETO quando o atendimento foi para a fila (quem agendou estava
+      // offline). O gatilho trg_set_first_human_response trata mensagem com
+      // autor num atendimento `waiting` como "o operador assumiu": atribuia o
+      // atendimento a quem estava offline 1,7 s depois de ele entrar na fila
+      // (caso real de 18/09). A assinatura no texto e o sender_name continuam;
+      // so deixa de contar como posse.
+      sent_by_user_id: atendimentoNaFila ? null : ag.created_by,
       sender_name: assinatura.nome,
       sender_role: assinatura.cargo,
       metadata: {
