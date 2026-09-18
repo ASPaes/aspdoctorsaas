@@ -11,6 +11,11 @@
 //   3. `fn_finish_scheduled_message` da o veredito. Falha com tentativa
 //      sobrando volta para a fila com espera crescente; na quinta, vira
 //      `failed` e avisa o autor no sino.
+//   Com `opens_attendance` (DEM-0423), antes do passo 2 a
+//      `fn_open_scheduled_attendance` abre ou adota o atendimento para quem
+//      agendou -- antes do envio, para o eco do webhook ja achar dono. E no
+//      canal da API Meta a mensagem e um TEMPLATE, mandado direto na Graph API
+//      (fora da janela de 24h a Meta recusa texto livre).
 //   4. Limpa do Storage o anexo de agendamento que morreu (cancelado/falhado
 //      ha mais de 7 dias). A `purge-chat-media` nao alcanca esses arquivos:
 //      ela so apaga o que virou linha em `whatsapp_messages`.
@@ -28,8 +33,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { getAdapter, getInstanceSecrets } from '../_shared/providers/index.ts';
 import { previewCut } from '../_shared/preview.ts';
+import { normalizeBRPhone } from '../_shared/phone.ts';
+import {
+  parseTemplateParams,
+  resolveValues,
+  buildBodyComponent,
+  renderTemplateText,
+} from '../_shared/meta-template-params.ts';
 
 const LOG = '[dispatch-scheduled-messages]';
+const META_API_VERSION = 'v21.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -58,6 +71,9 @@ interface Agendada {
   media_file_name: string | null;
   media_size_bytes: number | null;
   scheduled_at: string;
+  opens_attendance: boolean;
+  template_id: string | null;
+  template_parameters: string[] | Record<string, string> | null;
 }
 
 interface Assinatura {
@@ -111,6 +127,85 @@ async function resolverAssinatura(
   return { prefixo: `*${nome}*`, nome, cargo: func.data?.cargo || null, modo, valor: nome };
 }
 
+// Template Meta. Mesma montagem da send-whatsapp-template (que exige JWT de
+// usuario e por isso nao serve aqui). Devolve o wamid e o texto montado, que e
+// o que vai para a bolha do chat.
+async function enviarTemplate(
+  supabase: any,
+  ag: Agendada,
+  instanceData: any,
+  secrets: any,
+  telefone: string,
+): Promise<{ ok: true; messageId: string; texto: string; meta: Record<string, unknown> } | { ok: false; error: string }> {
+  if (instanceData.provider_type !== 'meta_cloud') return { ok: false, error: 'template so sai por instancia da API Meta' };
+  if (!instanceData.meta_phone_number_id) return { ok: false, error: 'instancia sem meta_phone_number_id' };
+  const accessToken = secrets?.meta_access_token;
+  if (!accessToken) return { ok: false, error: 'instancia sem meta_access_token' };
+
+  const { data: tpl } = await supabase
+    .from('whatsapp_meta_templates')
+    .select('id, instance_id, name, language, status, body_text, components')
+    .eq('id', ag.template_id)
+    .maybeSingle();
+
+  if (!tpl) return { ok: false, error: 'template nao encontrado (apagado depois do agendamento?)' };
+  if (tpl.instance_id !== instanceData.id) return { ok: false, error: 'template nao pertence a instancia' };
+  if (tpl.status !== 'APPROVED') return { ok: false, error: `template nao esta aprovado (status: ${tpl.status})` };
+
+  const spec = parseTemplateParams(tpl.components);
+  if (spec.unsupported.length > 0) return { ok: false, error: `template nao suportado: ${spec.unsupported.join('; ')}` };
+  const resolved = resolveValues(spec, ag.template_parameters ?? []);
+  if (!resolved.ok) return { ok: false, error: resolved.error };
+
+  // Mesma normalizacao da send-whatsapp-template: o 9 so entra em celular antigo.
+  const clean = telefone.replace(/\D/g, '').replace(/^0+/, '');
+  const { phone: base, isLandline } = normalizeBRPhone(clean);
+  let to = base;
+  if (!isLandline && to.startsWith('55') && to.length === 12) to = to.slice(0, 4) + '9' + to.slice(4);
+
+  const bodyComponent = buildBodyComponent(spec, resolved.values);
+  const resp = await fetch(
+    `https://graph.facebook.com/${META_API_VERSION}/${instanceData.meta_phone_number_id}/messages`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to,
+        type: 'template',
+        template: {
+          name: tpl.name,
+          language: { code: tpl.language },
+          ...(bodyComponent ? { components: [bodyComponent] } : {}),
+        },
+      }),
+    },
+  );
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    const code = data?.error?.code;
+    const msg = data?.error?.error_data?.details || data?.error?.message || `HTTP ${resp.status}`;
+    return { ok: false, error: `a Meta recusou${code ? ` (codigo ${code})` : ''}: ${msg}` };
+  }
+  const wamid: string | undefined = data?.messages?.[0]?.id;
+  if (!wamid) return { ok: false, error: 'a Meta nao devolveu o id da mensagem' };
+
+  return {
+    ok: true,
+    messageId: wamid,
+    texto: tpl.body_text ? renderTemplateText(tpl.body_text, spec, resolved.values) : `[Template: ${tpl.name}]`,
+    meta: {
+      message_kind: 'template',
+      template_name: tpl.name,
+      template_language: tpl.language,
+      template_id: tpl.id,
+      ...(resolved.values.length > 0
+        ? { template_parameters: resolved.values, template_param_names: spec.names, template_param_format: spec.format }
+        : {}),
+    },
+  };
+}
+
 async function enviarUma(supabase: any, ag: Agendada): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   // Sem embed de whatsapp_instances aqui: a conversa tem DUAS FKs para
   // instancia (instance_id e current_instance_id) e o PostgREST devolve o
@@ -152,13 +247,22 @@ async function enviarUma(supabase: any, ag: Agendada): Promise<{ ok: boolean; me
   // Anexo: URL assinada curta, igual ao reenvio. O arquivo esta no bucket
   // desde a hora em que o operador agendou.
   let mediaUrl: string | undefined;
-  if (ag.message_type !== 'text') {
+  if (ag.message_type !== 'text' && ag.message_type !== 'template') {
     if (!ag.storage_path) return { ok: false, error: 'anexo sem caminho no storage' };
     const { data: signed, error: signedErr } = await supabase.storage
       .from('whatsapp-media')
       .createSignedUrl(ag.storage_path, 300);
     if (signedErr || !signed?.signedUrl) return { ok: false, error: 'anexo nao esta mais no storage' };
     mediaUrl = signed.signedUrl;
+  }
+
+  // Novo atendimento (DEM-0423): abre ou adota ANTES de enviar. Idempotente --
+  // na retentativa a funcao so reconhece o atendimento que ja abriu.
+  if (ag.opens_attendance) {
+    const { data: aberto, error: openErr } = await supabase
+      .rpc('fn_open_scheduled_attendance', { p_id: ag.id });
+    if (openErr) return { ok: false, error: `nao abriu o atendimento: ${openErr.message}` };
+    console.log(`${LOG} ag=${ag.id} atendimento ${aberto?.acao} ${aberto?.attendance_id}`);
   }
 
   const assinatura = await resolverAssinatura(supabase, conversation, ag.created_by);
@@ -168,18 +272,31 @@ async function enviarUma(supabase: any, ag: Agendada): Promise<{ ok: boolean; me
     ? (corpo ? `${assinatura.prefixo}\n${corpo}` : assinatura.prefixo)
     : corpo;
 
-  const adapter = getAdapter(instanceData.provider_type || 'self_hosted');
-  const sendResult = await adapter.send(secrets, instanceData, {
-    to: destino,
-    messageType: ag.message_type as any,
-    content: conteudoFinal || undefined,
-    mediaUrl,
-    mediaMimetype: ag.media_mimetype || undefined,
-    fileName: ag.media_file_name || undefined,
-  });
+  // Template: o texto e o aprovado pela Meta, sem assinatura na frente.
+  let sendResult: { messageId: string };
+  let templateMeta: Record<string, unknown> | null = null;
+  let conteudoGravado = conteudoFinal;
+  if (ag.message_type === 'template') {
+    const t = await enviarTemplate(supabase, ag, instanceData, secrets, contact.phone_number);
+    if (!t.ok) return { ok: false, error: t.error };
+    sendResult = { messageId: t.messageId };
+    templateMeta = t.meta;
+    conteudoGravado = t.texto;
+  } else {
+    const adapter = getAdapter(instanceData.provider_type || 'self_hosted');
+    sendResult = await adapter.send(secrets, instanceData, {
+      to: destino,
+      messageType: ag.message_type as any,
+      content: conteudoFinal || undefined,
+      mediaUrl,
+      mediaMimetype: ag.media_mimetype || undefined,
+      fileName: ag.media_file_name || undefined,
+    });
+  }
 
   const agora = new Date().toISOString();
-  const kind = ag.message_type === 'text' ? null : ag.message_type;
+  const ehTexto = ag.message_type === 'text' || ag.message_type === 'template';
+  const kind = ehTexto ? null : ag.message_type;
   const arquivo = ag.media_file_name || (ag.storage_path ? ag.storage_path.split('/').pop() : null);
   const ext = arquivo && arquivo.includes('.')
     ? arquivo.split('.').pop()!.toLowerCase()
@@ -192,8 +309,8 @@ async function enviarUma(supabase: any, ag: Agendada): Promise<{ ok: boolean; me
       conversation_id: ag.conversation_id,
       message_id: sendResult.messageId,
       remote_jid: isGroup ? (conversation.group_jid || contact.phone_number) : contact.phone_number,
-      content: conteudoFinal || (ag.message_type === 'text' ? '' : `Sent ${ag.message_type}`),
-      message_type: ag.message_type,
+      content: conteudoGravado || (ehTexto ? '' : `Sent ${ag.message_type}`),
+      message_type: ehTexto ? 'text' : ag.message_type,
       media_url: ag.storage_path || null,
       media_path: ag.storage_path || null,
       media_mimetype: ag.media_mimetype || null,
@@ -219,6 +336,7 @@ async function enviarUma(supabase: any, ag: Agendada): Promise<{ ok: boolean; me
         sender_signature_value: assinatura.valor,
         scheduled: true,
         scheduled_message_id: ag.id,
+        ...(templateMeta ?? {}),
         ...(ag.media_file_name ? { fileName: ag.media_file_name } : {}),
       },
     })
@@ -236,7 +354,7 @@ async function enviarUma(supabase: any, ag: Agendada): Promise<{ ok: boolean; me
     .from('whatsapp_conversations')
     .update({
       last_message_at: agora,
-      last_message_preview: previewCut(conteudoFinal),
+      last_message_preview: previewCut(conteudoGravado),
       is_last_message_from_me: true,
       updated_at: agora,
     })

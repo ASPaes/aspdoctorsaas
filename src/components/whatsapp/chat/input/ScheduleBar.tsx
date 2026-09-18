@@ -8,7 +8,7 @@ import { useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarClock, MoonStar } from "lucide-react";
+import { CalendarClock, Headset, MoonStar } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,14 @@ interface Props {
   onChangeCancelarSeResponder: (v: boolean) => void;
   horario: ConfigHorario | null;
   erro?: string | null;
+  /**
+   * DEM-0423. Sem `onChangeNovoAtendimento` a escolha não aparece (grupo, ou
+   * edição de um agendamento já feito, que não troca de tipo).
+   */
+  novoAtendimento?: boolean;
+  onChangeNovoAtendimento?: (v: boolean) => void;
+  /** Nome de quem vai receber o atendimento, para a frase de explicação. */
+  nomeResponsavel?: string | null;
 }
 
 const ATALHOS: Array<{ label: string; calcular: () => Date }> = [
@@ -61,6 +69,7 @@ const ATALHOS: Array<{ label: string; calcular: () => Date }> = [
 
 export function ScheduleBar({
   valor, onChangeValor, cancelarSeResponder, onChangeCancelarSeResponder, horario, erro,
+  novoAtendimento, onChangeNovoAtendimento, nomeResponsavel,
 }: Props) {
   const escolhida = useMemo(() => {
     if (!valor) return null;
@@ -82,6 +91,35 @@ export function ScheduleBar({
 
   return (
     <div className="mb-2 rounded-lg border border-violet-500/40 bg-violet-500/5 p-3 space-y-2.5">
+      {onChangeNovoAtendimento && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-violet-700 dark:text-violet-300">O que agendar</span>
+          <div role="group" aria-label="Tipo de agendamento" className="inline-flex gap-1">
+            {([
+              { v: false, label: "Mensagem nesta conversa" },
+              { v: true, label: "Novo atendimento" },
+            ] as const).map((op) => (
+              <Button
+                key={op.label}
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-pressed={!!novoAtendimento === op.v}
+                onClick={() => onChangeNovoAtendimento(op.v)}
+                className={cn(
+                  "h-7 px-2.5 text-xs border-violet-500/40",
+                  !!novoAtendimento === op.v
+                    ? "bg-violet-500 text-white border-violet-500 hover:bg-violet-600 hover:text-white"
+                    : "text-violet-700 dark:text-violet-300 hover:bg-violet-500/10",
+                )}
+              >
+                {op.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1.5 text-xs font-medium text-violet-700 dark:text-violet-300">
           <CalendarClock className="h-3.5 w-3.5" />
@@ -113,6 +151,17 @@ export function ScheduleBar({
           ))}
         </div>
       </div>
+
+      {novoAtendimento && (
+        <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+          <Headset className="h-3.5 w-3.5 shrink-0 text-violet-600 dark:text-violet-400" />
+          <span>
+            Na hora marcada a mensagem sai e um <b className="font-semibold text-foreground">novo atendimento
+            abre na fila de {nomeResponsavel || "quem agendou"}</b>. Se o cliente estiver com outro
+            operador nessa hora, a mensagem sai e o atendimento continua com ele.
+          </span>
+        </p>
+      )}
 
       {foraDoExpediente && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5">

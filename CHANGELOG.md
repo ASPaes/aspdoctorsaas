@@ -12,6 +12,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 18/09
+
+- 🆕 **Agendar um novo atendimento pelo chat** — A aba **Agendar** do chat ganhou a opção **Novo atendimento**, ao lado de Mensagem nesta conversa. Você escolhe a data e a hora e, na hora marcada, a mensagem sai sozinha e um atendimento novo abre **já na sua fila**, sem passar pela distribuição. Serve para o retorno combinado com o cliente ("me chama na quinta"). No WhatsApp da **API oficial da Meta** a mensagem é um **template aprovado**, com as variáveis preenchidas na hora de agendar, porque fora da janela de 24h a Meta não aceita texto livre. Nos demais números vai o texto que você escrever, com anexo se quiser. Se nessa hora o cliente já estiver sendo atendido por outra pessoa, a mensagem sai e o atendimento continua com ela. Fora do horário de atendimento a tela avisa e sugere o próximo horário, sem impedir.
+
 ### 17/09
 
 - 🆕 **Macros no Enviar e-mail** — A tela **Enviar e-mail** do chat, do chamado e da jornada ganhou o botão **Macros**, ao lado de Anexar. Também dá para abrir digitando **/** no começo de uma linha do texto. A busca mostra primeiro as macros que você mais usa e já exibe o e-mail pronto para aquele cliente, antes de inserir: nome do contato, empresa, razão social, CNPJ, código, cidade, setor, número do chamado, saudação pela hora e outros **17 campos preenchidos sozinhos**, em verde. O que a macro pede e o sistema não sabe (como a data de uma visita) aparece em amarelo para completar ali mesmo, e o e-mail não sai com campo em branco. A macro pode trazer o **assunto e anexos fixos**, que entram junto sem anexar de novo. Depois de inserir, o **Adaptar com IA** encaixa o caso do cliente na macro sem mudar a estrutura, e **Voltar ao texto anterior** desfaz. O cadastro fica em **Configurações › Atendimento › Canais › E-mail › Macros**, com prévia usando um cliente de verdade e com a escolha de quais setores usam cada macro. Escreveu um e-mail bom? **Salvar este e-mail como macro** transforma os dados do cliente em campos automáticos para reaproveitar.

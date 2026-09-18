@@ -37,6 +37,20 @@ interface Props {
   /** Nome do contato do outro lado, para preencher "Olá {{nome}},". */
   contactName?: string | null;
   onSent?: (result: { conversation_id: string; message_id: string }) => void;
+  /**
+   * Modo "escolher" (agendamento, DEM-0423): valida e devolve o template com as
+   * variáveis em vez de enviar agora. Quem envia é o motor, na hora marcada.
+   */
+  onChoose?: (escolha: TemplateEscolhido) => void;
+}
+
+export interface TemplateEscolhido {
+  templateId: string;
+  templateName: string;
+  /** Mesmo formato que a send-whatsapp-template recebe; null = sem variáveis. */
+  parameters: string[] | Record<string, string> | null;
+  /** Texto montado, para a bolha do chat. */
+  texto: string;
 }
 
 export function MetaTemplatePicker({
@@ -47,6 +61,7 @@ export function MetaTemplatePicker({
   operatorName,
   contactName,
   onSent,
+  onChoose,
 }: Props) {
   const [selected, setSelected] = useState<MetaTemplate | null>(null);
   const [parameters, setParameters] = useState<string[]>([]);
@@ -168,6 +183,19 @@ export function MetaTemplatePicker({
           ? { parameters: Object.fromEntries(spec.names.map((n, i) => [n, parameters[i]])) }
           : { parameters };
 
+    if (onChoose) {
+      onChoose({
+        templateId: selected.id,
+        templateName: selected.name,
+        parameters: (paramsPayload as any).parameters ?? null,
+        texto: selected.body_text
+          ? renderTemplateText(selected.body_text, spec, parameters)
+          : `[Template: ${selected.name}]`,
+      });
+      onOpenChange(false);
+      return;
+    }
+
     setSending(true);
     try {
       const { data, error: invokeErr } = await supabase.functions.invoke(
@@ -230,7 +258,7 @@ export function MetaTemplatePicker({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <DialogTitle>Enviar template Meta</DialogTitle>
+            <DialogTitle>{onChoose ? 'Escolher template para o agendamento' : 'Enviar template Meta'}</DialogTitle>
             <Button
               variant="ghost"
               size="sm"
@@ -242,7 +270,9 @@ export function MetaTemplatePicker({
             </Button>
           </div>
           <DialogDescription>
-            Selecione um template aprovado para enviar a {to}.
+            {onChoose
+              ? 'Selecione um template aprovado. Ele sai sozinho na hora marcada.'
+              : `Selecione um template aprovado para enviar a ${to}.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -391,7 +421,7 @@ export function MetaTemplatePicker({
             disabled={!selected || !spec || sending || spec.unsupported.length > 0}
           >
             {sending && <Loader2 className="animate-spin" />}
-            Enviar template
+            {onChoose ? 'Usar este template' : 'Enviar template'}
           </Button>
         </DialogFooter>
       </DialogContent>

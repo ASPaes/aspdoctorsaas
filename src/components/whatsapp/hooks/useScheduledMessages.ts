@@ -22,6 +22,9 @@ export interface ScheduledMessage {
   last_error: string | null;
   created_by: string;
   created_at: string;
+  /** DEM-0423: no disparo, abre (ou adota) um atendimento para quem agendou. */
+  opens_attendance: boolean;
+  template_id: string | null;
 }
 
 export interface AgendarParams {
@@ -34,6 +37,10 @@ export interface AgendarParams {
   mediaSizeBytes?: number | null;
   cancelIfClientReplies?: boolean;
   instanceId?: string | null;
+  opensAttendance?: boolean;
+  /** Só com messageType "template" (canal da API Meta). */
+  templateId?: string | null;
+  templateParameters?: string[] | Record<string, string> | null;
 }
 
 export const scheduledKey = (conversationId: string) => ["scheduled-messages", conversationId];
@@ -51,7 +58,7 @@ export function useScheduledMessages(conversationId: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("whatsapp_scheduled_messages" as any)
-        .select("id, conversation_id, content, message_type, media_file_name, media_mimetype, storage_path, scheduled_at, cancel_if_client_replies, status, attempts, last_error, created_by, created_at")
+        .select("id, conversation_id, content, message_type, media_file_name, media_mimetype, storage_path, scheduled_at, cancel_if_client_replies, status, attempts, last_error, created_by, created_at, opens_attendance, template_id")
         .eq("conversation_id", conversationId!)
         .in("status", ["pending", "sending", "failed"])
         .order("scheduled_at", { ascending: true });
@@ -81,6 +88,9 @@ export function useScheduledMessages(conversationId: string | null) {
         p_media_size_bytes: p.mediaSizeBytes ?? null,
         p_cancel_if_client_replies: p.cancelIfClientReplies ?? false,
         p_instance_id: p.instanceId ?? null,
+        p_opens_attendance: p.opensAttendance ?? false,
+        p_template_id: p.templateId ?? null,
+        p_template_parameters: p.templateParameters ?? null,
       });
       if (error) throw error;
       return data as string;

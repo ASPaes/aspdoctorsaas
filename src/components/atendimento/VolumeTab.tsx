@@ -12,6 +12,7 @@ const CANAL_LABEL: Record<string, string> = {
   out_of_hours: "Fora do horário",
   billing_automation: "Cobrança (auto)",
   ticket: "Ticket",
+  scheduled: "Retorno agendado",
   "(sem origem)": "Sem origem",
 };
 

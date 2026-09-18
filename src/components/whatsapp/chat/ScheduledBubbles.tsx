@@ -21,7 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format, isToday, isTomorrow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AlertTriangle, CalendarClock, EyeOff, Paperclip, Pencil, Send, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarClock, EyeOff, FileText, Headset, Paperclip, Pencil, Send, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useScheduledMessages, scheduledKey, type ScheduledMessage } from "../hooks/useScheduledMessages";
@@ -164,6 +164,19 @@ export function ScheduledBubbles({ conversationId, messages, acoes, editandoId, 
                   {emEdicao && (
                     <span className="text-[11px] text-violet-600 dark:text-violet-400">· editando no campo abaixo</span>
                   )}
+                  {a.opens_attendance && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex items-center gap-1 rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:text-violet-300">
+                          <Headset className="h-2.5 w-2.5" />
+                          novo atendimento
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Na hora marcada abre um atendimento para quem agendou. Se o cliente já estiver com outro operador, continua com ele.
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                   {a.cancel_if_client_replies && !falhou && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -179,7 +192,12 @@ export function ScheduledBubbles({ conversationId, messages, acoes, editandoId, 
                   )}
                 </div>
 
-                {a.message_type !== "text" && (
+                {a.message_type === "template" ? (
+                  <span className="mb-1 inline-flex w-fit items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                    <FileText className="h-3 w-3" />
+                    Template Meta
+                  </span>
+                ) : a.message_type !== "text" && (
                   <span className="mb-1 inline-flex w-fit items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
                     <Paperclip className="h-3 w-3" />
                     {a.media_file_name || a.message_type}
@@ -212,7 +230,10 @@ export function ScheduledBubbles({ conversationId, messages, acoes, editandoId, 
                     <Pencil className="h-3 w-3" />
                     {falhou ? "Reagendar" : "Editar"}
                   </button>
-                  {!falhou && (
+                  {/* Template não tem "enviar agora": o envio imediato do compositor
+                      mandaria o texto montado como mensagem livre, e a Meta recusa
+                      fora da janela de 24h. Para antecipar, use Editar. */}
+                  {!falhou && a.message_type !== "template" && (
                     <button
                       type="button"
                       disabled={travado}

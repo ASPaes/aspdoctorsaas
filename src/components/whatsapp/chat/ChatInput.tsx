@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMetaWindow } from "@/hooks/useMetaWindow";
-import { MetaTemplatePicker } from "@/components/whatsapp/templates/MetaTemplatePicker";
+import { MetaTemplatePicker, type TemplateEscolhido } from "@/components/whatsapp/templates/MetaTemplatePicker";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Send, Mic, Paperclip, Maximize2, Minimize2, FileText, AlertTriangle, StickyNote, CalendarClock } from "lucide-react";
@@ -139,6 +139,11 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const [editandoAgendadaId, setEditandoAgendadaId] = useState<string | null>(null);
   const [agendandoAnexo, setAgendandoAnexo] = useState(false);
   const [erroAgendamento, setErroAgendamento] = useState<string | null>(null);
+  // DEM-0423: "Novo atendimento" — na hora marcada abre um atendimento para quem
+  // agendou. No canal da API Meta a mensagem é um template, escolhido aqui.
+  const [novoAtendimento, setNovoAtendimento] = useState(false);
+  const [templateAgendado, setTemplateAgendado] = useState<TemplateEscolhido | null>(null);
+  const [showTemplateAgendado, setShowTemplateAgendado] = useState(false);
 
   // Trocar de conversa zera o agendamento em edição — ele é da conversa antiga.
   useEffect(() => {
@@ -146,6 +151,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     setCancelIfReplies(false);
     setEditandoAgendadaId(null);
     setErroAgendamento(null);
+    setNovoAtendimento(false);
+    setTemplateAgendado(null);
   }, [conversationId]);
 
   // Menções em grupo (autocomplete só no modo "message"; lookup carregado sempre que for grupo)
@@ -292,6 +299,12 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const { data: metaWindow } = useMetaWindow(conversationId);
   const isMeta = metaWindow?.isMeta === true;
   const requiresTemplate = metaWindow?.requiresTemplate === true;
+  // Novo atendimento no canal Meta: sai template, não texto livre. Numa edição
+  // o tipo não muda, então quem manda é o agendamento que está sendo editado.
+  const agendadaEmEdicao = editandoAgendadaId ? agendadas.find((a) => a.id === editandoAgendadaId) : null;
+  const agendaTemplate = isScheduleMode && (
+    agendadaEmEdicao ? agendadaEmEdicao.message_type === "template" : (novoAtendimento && isMeta)
+  );
 
   const { data: contactInfo } = useQuery({
     queryKey: ["conversation-contact-phone", conversationId],
@@ -647,7 +660,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       const ok = await reagendar.mutateAsync({
         id: editandoAgendadaId,
         scheduledAt: quando,
-        content: texto,
+        // O texto do template é o aprovado pela Meta: só a hora muda.
+        content: alvo?.message_type === "template" ? undefined : texto,
         cancelIfClientReplies: cancelIfReplies,
       });
       if (ok) {
@@ -655,6 +669,33 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         setEditandoAgendadaId(null);
         setMessage("");
         setScheduleAt(paraInputLocal(proximaHoraCheia()));
+      }
+      return;
+    }
+
+    const abreAtendimento = novoAtendimento && !isGroup;
+
+    if (abreAtendimento && isMeta) {
+      if (!templateAgendado) {
+        setErroAgendamento("Escolha o template que vai sair na hora marcada.");
+        return;
+      }
+      try {
+        await agendar.mutateAsync({
+          scheduledAt: quando,
+          content: templateAgendado.texto,
+          messageType: "template",
+          templateId: templateAgendado.templateId,
+          templateParameters: templateAgendado.parameters,
+          opensAttendance: true,
+          cancelIfClientReplies: cancelIfReplies,
+          instanceId: metaWindow?.instanceId || instanceId || null,
+        });
+        toast.success(`Novo atendimento agendado para ${quandoLegivel}`);
+        setTemplateAgendado(null);
+        setScheduleAt(paraInputLocal(proximaHoraCheia()));
+      } catch {
+        // O hook já avisou no toast; o template continua escolhido.
       }
       return;
     }
@@ -682,6 +723,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             mediaSizeBytes: anexo.mediaSizeBytes,
             cancelIfClientReplies: cancelIfReplies,
             instanceId: instanceId || null,
+            // Todos marcados: a abertura é idempotente (o 2º arquivo acha o
+            // atendimento já com quem agendou) e não depende da ordem do lote.
+            opensAttendance: abreAtendimento,
           });
         }
       } else {
@@ -690,10 +734,13 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           content: texto,
           cancelIfClientReplies: cancelIfReplies,
           instanceId: instanceId || null,
+          opensAttendance: abreAtendimento,
         });
       }
 
-      toast.success(`Mensagem agendada para ${quandoLegivel}`);
+      toast.success(abreAtendimento
+        ? `Novo atendimento agendado para ${quandoLegivel}`
+        : `Mensagem agendada para ${quandoLegivel}`);
       setMessage("");
       setAttachedFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -707,6 +754,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   }, [
     scheduleAt, message, editandoAgendadaId, agendadas, reagendar, cancelIfReplies,
     attachedFiles, conversationId, agendar, instanceId,
+    novoAtendimento, isGroup, isMeta, templateAgendado, metaWindow?.instanceId,
   ]);
 
   const handleSend = useCallback(() => {
@@ -776,9 +824,11 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     // própria agendada, então a troca é feita à mão preservando o rascunho atual.
     setDraft(conversationId, mode, message);
     setMode("schedule");
-    setMessage(a.content || "");
+    // Template aparece no cartão acima do campo; o campo fica vazio e travado.
+    setMessage(a.message_type === "template" ? "" : a.content || "");
     setScheduleAt(paraInputLocal(new Date(a.scheduled_at)));
     setCancelIfReplies(a.cancel_if_client_replies);
+    setNovoAtendimento(!!a.opens_attendance);
     setEditandoAgendadaId(a.id);
     setErroAgendamento(null);
     requestAnimationFrame(() => textareaRef.current?.focus());
@@ -1222,7 +1272,51 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             onChangeCancelarSeResponder={setCancelIfReplies}
             horario={horarioComercial}
             erro={erroAgendamento}
+            novoAtendimento={novoAtendimento}
+            onChangeNovoAtendimento={
+              isGroup || editandoAgendadaId
+                ? undefined
+                : (v) => { setNovoAtendimento(v); setErroAgendamento(null); }
+            }
+            nomeResponsavel={agentName}
           />
+        )}
+
+        {agendaTemplate && (
+          <div className="mb-2 rounded-lg border border-violet-500/30 bg-background">
+            <div className="flex items-center gap-2 border-b px-3 py-1.5">
+              <FileText className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+              <span className="text-xs font-medium truncate">
+                {agendadaEmEdicao ? "Template agendado" : templateAgendado ? templateAgendado.templateName : "Nenhum template escolhido"}
+              </span>
+              {!agendadaEmEdicao && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto h-6 px-2 text-xs text-violet-700 dark:text-violet-300"
+                  onClick={() => setShowTemplateAgendado(true)}
+                  disabled={!metaWindow?.instanceId || !contactPhone}
+                >
+                  {templateAgendado ? "Trocar template" : "Escolher template"}
+                </Button>
+              )}
+            </div>
+            <p className="px-3 py-2 text-sm whitespace-pre-wrap text-foreground">
+              {agendadaEmEdicao
+                ? agendadaEmEdicao.content
+                : templateAgendado?.texto || (
+                  <span className="text-muted-foreground text-xs">
+                    Na API Meta o novo atendimento sai por template: fora da janela de 24h o WhatsApp recusa texto livre.
+                  </span>
+                )}
+            </p>
+            {agendadaEmEdicao && (
+              <p className="px-3 pb-2 text-[11px] text-muted-foreground">
+                O texto do template não se edita. Para trocar, cancele e agende de novo.
+              </p>
+            )}
+          </div>
         )}
 
         {requiresTemplate && (
@@ -1307,7 +1401,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               size="icon"
               variant="ghost"
               onClick={() => fileInputRef.current?.click()}
-              disabled={sendMutation.isPending || (isBlocked && !isInternalNote)}
+              disabled={sendMutation.isPending || (isBlocked && !isInternalNote) || agendaTemplate}
               aria-label={isInternalNote ? "Anexar imagem ou vídeo à nota" : "Anexar arquivo"}
             >
               <Paperclip className="w-5 h-5" />
@@ -1357,7 +1451,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={
-                isScheduleMode
+                agendaTemplate
+                  ? "No canal da API Meta sai o template escolhido acima"
+                  : isScheduleMode
                   ? "Escreva a mensagem que vai sair na hora marcada..."
                   : isInternalNote
                   ? "Escreva uma nota interna para a equipe (n\u{00E3}o ser\u{00E1} enviada ao cliente)..."
@@ -1380,7 +1476,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                 maxHeight: isExpanded ? '400px' : '200px',
                 overflowY: isExpanded ? 'auto' : undefined,
               }}
-              disabled={(!isInternalNote && !isScheduleMode && (isBlocked || requiresTemplate)) || !!activeMacro}
+              disabled={(!isInternalNote && !isScheduleMode && (isBlocked || requiresTemplate)) || !!activeMacro || agendaTemplate}
             />
             <Button
               type="button"
@@ -1400,7 +1496,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                 <Button
                   onClick={handleSend}
                   disabled={
-                    (!message.trim() && attachedFiles.length === 0) ||
+                    (agendaTemplate
+                      ? (!agendadaEmEdicao && !templateAgendado)
+                      : (!message.trim() && attachedFiles.length === 0)) ||
                     !scheduleAt || agendar.isPending || reagendar.isPending || agendandoAnexo
                   }
                   className="bg-violet-500 hover:bg-violet-600 text-violet-50 gap-1.5"
@@ -1458,6 +1556,18 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           to={contactPhone}
           operatorName={agentName}
           contactName={contactName}
+        />
+      )}
+
+      {isMeta && metaWindow?.instanceId && contactPhone && (
+        <MetaTemplatePicker
+          open={showTemplateAgendado}
+          onOpenChange={setShowTemplateAgendado}
+          instanceId={metaWindow.instanceId}
+          to={contactPhone}
+          operatorName={agentName}
+          contactName={contactName}
+          onChoose={(escolha) => { setTemplateAgendado(escolha); setErroAgendamento(null); }}
         />
       )}
 
