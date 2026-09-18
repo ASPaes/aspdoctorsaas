@@ -6,6 +6,7 @@ import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { TempoRealTab } from "@/components/atendimento/TempoRealTab";
 import { VelocidadeTab } from "@/components/atendimento/VelocidadeTab";
 import { AgentesTab } from "@/components/atendimento/AgentesTab";
+import { JornadaTab } from "@/components/atendimento/JornadaTab";
 import { SatisfacaoTab } from "@/components/atendimento/SatisfacaoTab";
 import { VolumeTab } from "@/components/atendimento/VolumeTab";
 import { UraTab } from "@/components/atendimento/UraTab";
@@ -42,6 +43,11 @@ const FILTROS_POR_ABA: Record<string, FiltroConfig> = {
   taxonomia:  { date: true, setor: true, agente: true, cliente: true },
   backlog:    { date: true, setor: true, agente: true, cliente: true },
   clientes:   { date: true, setor: false, agente: false, cliente: true },
+  // Última aba, depois de Cobertura. Jornada lê support_agent_presence_events,
+  // que não sabe de conversa: não há is_group nem classificação de plantão para
+  // filtrar. Setor vem da lotação atual do agente (support_department_members),
+  // não do atendimento.
+  jornada:    { date: true, setor: true, agente: true },
 };
 
 function formatSecondsAgo(seg: number): string {
@@ -195,7 +201,11 @@ function AtendimentoDashboardInner() {
       {FILTROS_POR_ABA[tab] && <FiltrosGlobais cfg={FILTROS_POR_ABA[tab]} />}
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList>
+        {/* Com 12 abas a régua passa de 1073px e cortava a última em notebook
+            de 1366 e 1280, sem scrollbar nenhuma: a aba ficava inalcançável.
+            Quebrar em duas linhas mantém toda aba visível sem barra de rolagem;
+            em tela larga continua em uma linha só. */}
+        <TabsList className="h-auto flex-wrap justify-start">
           {can("atd.tempo_real", "view") && (<TabsTrigger value="tempo-real">Tempo Real</TabsTrigger>)}
           {can("atd.velocidade", "view") && (<TabsTrigger value="velocidade">Velocidade / SLA</TabsTrigger>)}
           {can("atd.agentes", "view") && (<TabsTrigger value="agentes">Agentes</TabsTrigger>)}
@@ -207,6 +217,7 @@ function AtendimentoDashboardInner() {
           {can("atd.backlog", "view") && (<TabsTrigger value="backlog">Backlog</TabsTrigger>)}
           {can("atd.clientes", "view") && (<TabsTrigger value="clientes">Clientes</TabsTrigger>)}
           {isSuperAdmin && can("atd.cobertura", "view") && (<TabsTrigger value="cobertura">Cobertura</TabsTrigger>)}
+          {can("atd.jornada", "view") && (<TabsTrigger value="jornada">Jornada / Pausas</TabsTrigger>)}
         </TabsList>
         <TabsContent value="tempo-real" className="mt-4">
           <TempoRealTab />
@@ -243,6 +254,9 @@ function AtendimentoDashboardInner() {
             <CoberturaTab />
           </TabsContent>
         )}
+        <TabsContent value="jornada" className="mt-4">
+          <JornadaTab />
+        </TabsContent>
       </Tabs>
     </div>
   );

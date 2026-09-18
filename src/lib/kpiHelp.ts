@@ -1065,6 +1065,37 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Tamanho efetivo da operação no período — base para carga por agente.",
     formula: "agentes distintos com atendimento no período",
   },
+  atendimento_jornada_efetiva: {
+    title: "Jornada Efetiva",
+    definition: "Tempo em que os agentes estavam em expediente e fora de pausa, somando todos os dias e agentes do período.",
+    why_it_matters: "É a capacidade real de atendimento que a operação teve. Diferente de 'saída menos entrada', não conta pausa nem o intervalo entre dois expedientes do mesmo dia.",
+    formula: "Σ dos trechos em estado ativo (expediente aberto e sem pausa vigente)",
+    example: "Entrou 07:32, saiu 18:03 com 1h39 de almoço = 8h52 de jornada efetiva",
+  },
+  atendimento_jornada_pausa: {
+    title: "Tempo em Pausa",
+    definition: "Soma de todas as pausas registradas no período, com o percentual sobre a presença (jornada efetiva + pausa).",
+    why_it_matters: "Pausa é parte do trabalho, mas o percentual mostra desequilíbrio: um agente muito acima da equipe costuma indicar pausa esquecida aberta, não folga a mais.",
+    formula: "Σ (fim da pausa − início da pausa) ÷ Σ presença registrada",
+  },
+  atendimento_jornada_qtd_pausas: {
+    title: "Pausas no Período",
+    definition: "Quantidade de pausas iniciadas no período, com a duração média de cada uma.",
+    why_it_matters: "Muitas pausas curtas e poucas pausas longas pedem conversas diferentes com o time.",
+    formula: "contagem de pausas iniciadas no período",
+  },
+  atendimento_jornada_incompleto: {
+    title: "Registro Incompleto",
+    definition: "Dias em que falta a hora de entrada ou o encerramento do expediente. O agente que fecha o navegador sem encerrar, ou que pausa e só volta no dia seguinte, não deixa o horário gravado.",
+    why_it_matters: "Este relatório não é marcação de ponto. Nesses dias a conta para no último evento registrado, então a jornada sai por baixo e o número não serve para cobrança de hora.",
+    formula: "dias sem evento de início de expediente OU sem evento de encerramento",
+  },
+  atendimento_jornada_motivos: {
+    title: "Pausas por Motivo",
+    definition: "Distribuição do tempo em pausa entre os motivos cadastrados, com quantidade e duração média de cada um.",
+    why_it_matters: "Separa a pausa prevista (almoço, lanche) da pausa que compete com o atendimento (reunião, treinamento) e mostra onde o tempo está indo.",
+    formula: "Σ duração das pausas agrupada pelo motivo escolhido pelo agente",
+  },
   atendimento_scorecard: {
     title: "Scorecard por Agente",
     definition: "Desempenho de cada agente: volume, pico de simultâneos, tempos e latência de resposta (mediana), CSAT, reabertura e mensagens por atendimento.",
