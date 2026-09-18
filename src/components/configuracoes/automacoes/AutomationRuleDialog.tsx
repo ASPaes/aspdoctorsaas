@@ -156,7 +156,8 @@ export function AutomationRuleDialog({ open, onOpenChange, rule, onSave, salvand
         <DialogHeader>
           <DialogTitle>{rule?.id ? "Editar automação" : "Nova automação"}</DialogTitle>
           <DialogDescription>
-            Vale para os chats que entrarem depois de salvar. Atendimento já em andamento não muda de dono.
+            Vale para o chat que chega e também para o que já está esperando na fila (em até 1 minuto).
+            Atendimento em andamento não muda de dono.
           </DialogDescription>
         </DialogHeader>
 
