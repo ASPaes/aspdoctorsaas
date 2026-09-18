@@ -42,10 +42,10 @@ Cada mensagem vem numa linha: #número [dia/mês hora:min] Nome (equipe|cliente)
 
 Separe o que aconteceu nestas seções:
 - interacoes: o que foi feito ou tratado no período, em frases objetivas.
-- treinamentos: treinamentos realizados ou agendados (tema, quem conduziu).
+- treinamentos: treinamentos (tema, quem conduziu). Diga se foi realizado ou agendado, nunca "realizado/agendado"; sem confirmação de que aconteceu, é agendado.
 - duvidas: dúvidas do cliente e a resposta dada ("Pergunta? Resposta.").
-- pendencias_cliente: o que o CLIENTE ficou de fazer ou enviar.
-- pendencias_internas: o que a EQUIPE ficou de fazer.
+- pendencias_cliente: o que o CLIENTE ficou de fazer ou enviar e ainda está em aberto no fim do período.
+- pendencias_internas: o que a EQUIPE ficou de fazer e ainda está em aberto no fim do período.
 - decisoes: definições combinadas entre as partes.
 - proximos_passos: próximas ações, em ordem.
 
@@ -54,6 +54,8 @@ Regras:
 - Diga quem é responsável e a data quando a mensagem disser ("Marcos enviar a planilha até 19/09").
 - Um item por assunto, curto. Ignore cumprimentos e conversa sem conteúdo.
 - Em cada item, "ref" é o número (#) da mensagem que melhor comprova o item. Use null se não houver uma.
+- Pendência resolvida mais adiante no período (o link foi enviado, o cliente disse que concluiu) NÃO é pendência: registre o que foi feito em interacoes.
+- Não crie item genérico que valeria para qualquer conversa ("acionar a equipe se precisar", "acompanhar o cliente"). Na dúvida, deixe de fora.
 - Seção sem conteúdo fica como lista vazia.`;
 
 const itemSchema = {
