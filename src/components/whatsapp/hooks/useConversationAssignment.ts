@@ -163,7 +163,16 @@ export const useConversationAssignment = () => {
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
       toast({ title: "Conversa transferida", description: "A conversa foi transferida com sucesso." });
     },
-    onError: () => {
+    onError: (error: any) => {
+      // O onMutate já tirou a conversa da lista; como ela não saiu de verdade, volta.
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
+      // DEM-0421: o servidor barra quem já está no limite de chats simultâneos e
+      // manda a explicação pronta (nome, ocupação e limite).
+      if (error?.hint === 'agent_at_limit') {
+        toast({ title: "Agente no limite de atendimentos", description: error.message, variant: "destructive", duration: 10000 });
+        return;
+      }
       toast({ title: "Erro ao transferir", description: "Não foi possível transferir a conversa.", variant: "destructive" });
     },
   });

@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 17/09
 
+- ⬆️ **Transferência respeita o limite de atendimentos do agente** — Ao transferir uma conversa para outro agente, o sistema agora confere o limite de atendimentos simultâneos dele, do mesmo jeito que já fazia a distribuição automática. Se ele já estiver no limite, a transferência não acontece e a tela explica o motivo, por exemplo: "Ruan Leite já está com 1 de 1 atendimento(s) simultâneo(s)". Aí dá para escolher outro agente ou transferir para o setor, onde a conversa aguarda na fila até alguém ter vaga. Transferir para você mesmo continua liberado.
+
 - ⬆️ **Janela do ticket lembra o tamanho e a divisão** — A divisória entre os dados do chamado e a Timeline agora fica onde você deixou, mesmo depois de fechar, abrir outro ticket ou recarregar a página. A janela do ticket também pode ser aumentada ou diminuída puxando a borda direita, a de baixo ou o canto inferior direito, e o tamanho escolhido fica salvo do mesmo jeito. Um duplo clique numa dessas bordas volta a janela ao tamanho padrão. O ajuste vale para o computador em que foi feito.
 
 - ⬆️ **Instância já escolhida ao iniciar conversa pelo ticket ou pela jornada** — No botão **Conversa** do chamado e da jornada de Implantação e Onboarding, o campo **Instância WhatsApp** já vem preenchido: primeiro com o WhatsApp próprio de quem está usando, se tiver um; senão, com a instância padrão do setor do chamado ou do setor da pessoa. Continua dando para trocar antes de iniciar, e na próxima vez o campo volta ao padrão.
