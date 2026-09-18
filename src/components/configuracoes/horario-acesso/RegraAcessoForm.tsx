@@ -70,34 +70,79 @@ export function RegraAcessoForm({
   const [aviso, setAviso] = useState(String(regra ? regra.warn_before_minutes ?? 0 : 15));
   const [tolerancia, setTolerancia] = useState(String(regra?.grace_minutes ?? 10));
   const [devolverFila, setDevolverFila] = useState(regra?.release_queue_on_end ?? true);
-  const [setorIds, setSetorIds] = useState<string[]>(meus.flatMap((a) => (a.department_id ? [a.department_id] : [])));
+  const setorDe = useMemo(() => new Map(pessoas.map((p) => [p.user_id, p.department_id])), [pessoas]);
+  const nomeDaRegra = useMemo(() => new Map(regras.map((r) => [r.id, r.name])), [regras]);
+
+  // O setor funciona como filtro da lista de pessoas. Setor sem ninguém marcado
+  // = setor inteiro; com pessoas marcadas = só elas (decisão de 18/09). Por isso,
+  // ao reabrir, o setor de cada pessoa marcada volta selecionado também.
+  const [setorIds, setSetorIds] = useState<string[]>(() => {
+    const ids = new Set(meus.flatMap((a) => (a.department_id ? [a.department_id] : [])));
+    for (const a of meus) {
+      const d = a.user_id ? setorDe.get(a.user_id) : null;
+      if (d) ids.add(d);
+    }
+    return [...ids];
+  });
   const [pessoaIds, setPessoaIds] = useState<string[]>(meus.flatMap((a) => (a.user_id ? [a.user_id] : [])));
   const [tentouSalvar, setTentouSalvar] = useState(false);
 
-  const nomeDaRegra = useMemo(() => new Map(regras.map((r) => [r.id, r.name])), [regras]);
+  const regraDoSetorInteiro = (setorId: string) => {
+    const outra = alvos.find((a) => a.department_id === setorId && a.schedule_id !== regra?.id);
+    return outra ? nomeDaRegra.get(outra.schedule_id) ?? "outra regra" : null;
+  };
 
-  // Setor e pessoa só podem estar numa regra: a opção já usada por OUTRA regra vem travada com o nome dela.
+  // O setor nunca trava: escolher o Suporte só para filtrar 2 estagiárias tem de
+  // funcionar mesmo que o Suporte inteiro já esteja noutra regra.
   const opcoesSetor: OpcaoMulti[] = setores.map((s) => {
-    const outra = alvos.find((a) => a.department_id === s.id && a.schedule_id !== regra?.id);
-    return { id: s.id, label: s.name, bloqueio: outra ? `em ${nomeDaRegra.get(outra.schedule_id) ?? "outra regra"}` : null };
+    const outra = regraDoSetorInteiro(s.id);
+    return { id: s.id, label: s.name, detalhe: outra ? `setor todo em ${outra}` : null };
   });
 
+  const mudarSetores = (ids: string[]) => {
+    setSetorIds(ids);
+    // Quem era de um setor que saiu da seleção sai junto.
+    if (ids.length > 0) setPessoaIds((prev) => prev.filter((u) => ids.includes(setorDe.get(u) ?? "")));
+  };
+
   const opcoesPessoa: OpcaoMulti[] = pessoas
-    .filter((p) => p.origin !== "exempt")
+    .filter((p) => setorIds.length === 0 || setorIds.includes(p.department_id ?? "") || pessoaIds.includes(p.user_id))
     .map((p) => {
       const outra = alvos.find((a) => a.user_id === p.user_id && a.schedule_id !== regra?.id);
       return {
         id: p.user_id,
         label: p.nome,
         detalhe: p.department_name,
-        bloqueio: outra ? `em ${nomeDaRegra.get(outra.schedule_id) ?? "outra regra"}` : null,
+        // Admin aparece, mas travado: sumir da lista parecia defeito.
+        bloqueio:
+          p.origin === "exempt"
+            ? "Admin, sempre livre"
+            : outra
+              ? `em ${nomeDaRegra.get(outra.schedule_id) ?? "outra regra"}`
+              : null,
       };
     });
 
+  // O que vai ser gravado: setor sem pessoa marcada entra inteiro.
+  const setoresInteiros = setorIds.filter((s) => !pessoaIds.some((u) => setorDe.get(u) === s));
+  const resumo = setorIds
+    .map((s) => {
+      const nomeSetor = setores.find((x) => x.id === s)?.name ?? "Setor";
+      const n = pessoaIds.filter((u) => setorDe.get(u) === s).length;
+      return n === 0 ? `${nomeSetor} (setor inteiro)` : `${nomeSetor} (${n} ${n === 1 ? "pessoa" : "pessoas"})`;
+    })
+    .concat(
+      pessoaIds.filter((u) => !setorIds.includes(setorDe.get(u) ?? "")).map((u) => pessoas.find((p) => p.user_id === u)?.nome ?? "Pessoa"),
+    );
+
+  const setorOcupado = setoresInteiros.map((s) => [s, regraDoSetorInteiro(s)] as const).find(([, r]) => r);
   const erroIntervalos = erroDosIntervalos(intervalos);
   const erroNome = nome.trim() ? null : "Informe o nome da regra.";
   const erroAlvo = setorIds.length + pessoaIds.length > 0 ? null : "Escolha pelo menos um setor ou uma pessoa.";
-  const erro = erroNome ?? erroAlvo ?? erroIntervalos;
+  const erroSetor = setorOcupado
+    ? `O setor ${setores.find((x) => x.id === setorOcupado[0])?.name} inteiro já está na regra "${setorOcupado[1]}". Marque as pessoas desta regra ou tire o setor.`
+    : null;
+  const erro = erroNome ?? erroAlvo ?? erroSetor ?? erroIntervalos;
 
   const mudarIntervalo = (i: number, patch: Partial<AccessInterval>) =>
     setIntervalos((prev) => prev.map((iv, k) => (k === i ? { ...iv, ...patch } : iv)));
@@ -121,7 +166,7 @@ export function RegraAcessoForm({
       warn_before_minutes: aviso === "0" ? null : Number(aviso),
       grace_minutes: Number(tolerancia),
       release_queue_on_end: devolverFila,
-      department_ids: setorIds,
+      department_ids: setoresInteiros,
       user_ids: pessoaIds,
     });
   };
@@ -168,12 +213,14 @@ export function RegraAcessoForm({
               id="ha-setores"
               opcoes={opcoesSetor}
               value={setorIds}
-              onChange={setSetorIds}
+              onChange={mudarSetores}
               placeholder="Adicionar setor..."
               vazio="Nenhum setor ativo cadastrado."
               chipClassName="bg-sky-500/15 text-sky-700 dark:text-sky-300"
             />
-            <p className="text-xs text-muted-foreground">Vale para todo mundo do setor, inclusive quem entrar depois.</p>
+            <p className="text-xs text-muted-foreground">
+              Sem ninguém marcado, vale para o setor inteiro, inclusive quem entrar depois.
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="ha-pessoas">Usuários</Label>
@@ -182,11 +229,21 @@ export function RegraAcessoForm({
               opcoes={opcoesPessoa}
               value={pessoaIds}
               onChange={setPessoaIds}
-              placeholder="Adicionar pessoa..."
-              vazio="Nenhuma pessoa disponível."
+              placeholder={setorIds.length > 0 ? "Todo o setor (ou escolha pessoas)..." : "Adicionar pessoa..."}
+              vazio={setorIds.length > 0 ? "Ninguém ativo nos setores escolhidos." : "Nenhuma pessoa disponível."}
             />
-            <p className="text-xs text-muted-foreground">Regra por pessoa sempre vence a do setor.</p>
+            <p className="text-xs text-muted-foreground">
+              {setorIds.length > 0
+                ? "Mostra só quem é dos setores escolhidos. Marcando pessoas, a regra vale só para elas."
+                : "Sem setor escolhido, lista todo mundo. Regra por pessoa sempre vence a do setor."}
+            </p>
           </div>
+          {resumo.length > 0 && (
+            <p className="rounded-md bg-muted/60 px-3 py-2 text-sm md:col-span-2">
+              <span className="text-muted-foreground">A regra vale para: </span>
+              {resumo.join(" · ")}
+            </p>
+          )}
         </div>
       </section>
 
