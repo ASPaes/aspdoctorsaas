@@ -46,6 +46,7 @@ export const SECTION_TO_RESOURCE: Record<string, string> = {
   "kb": "cfg.kb",
   // Equipe
   "seguranca": "cfg.seguranca",
+  "horario-acesso": "cfg.horario_acesso",
   // Dados
   "duplicidades": "cfg.duplicidades",
   "importacao": "cfg.importacao",
@@ -201,6 +202,7 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
         { value: "acessos", label: "Acessos & permissões" },
         { value: "permissoes", label: "Permissões e papéis" },
         { value: "seguranca", label: "Segurança" },
+        { value: "horario-acesso", label: "Horário de acesso" },
       ] }],
     },
 

@@ -8,27 +8,78 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff, Clock } from "lucide-react";
+import {
+  ACCESS_ENDED_KEY,
+  type AccessEndedNotice,
+  type AccessInterval,
+  fetchMyAccessWindow,
+  formatarProximoAcesso,
+  isOutsideWindow,
+  resumirIntervalos,
+} from "@/lib/accessWindow";
+
+/** DEM-0415: por que a pessoa não entrou (ou foi desconectada). */
+type AvisoHorario = {
+  motivo: "fora" | "encerrado";
+  released: number;
+  next_start_at: string | null;
+  timezone: string;
+  intervals: AccessInterval[];
+};
+
+function lerAvisoDeEncerramento(): AvisoHorario | null {
+  try {
+    const bruto = sessionStorage.getItem(ACCESS_ENDED_KEY);
+    if (!bruto) return null;
+    sessionStorage.removeItem(ACCESS_ENDED_KEY);
+    const a = JSON.parse(bruto) as AccessEndedNotice;
+    return { motivo: "encerrado", ...a };
+  } catch {
+    return null;
+  }
+}
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [avisoHorario, setAvisoHorario] = useState<AvisoHorario | null>(lerAvisoDeEncerramento);
   const navigate = useNavigate();
-  const { signInWithPassword } = useAuth();
+  const { signInWithPassword, signOut } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setAvisoHorario(null);
     const { error } = await signInWithPassword(email, password);
-    setLoading(false);
     if (error) {
+      setLoading(false);
       toast.error(error.message);
-    } else {
-      navigate("/clientes", { replace: true });
+      return;
     }
+    // A senha estava certa; falta conferir o horário de acesso.
+    const janela = await fetchMyAccessWindow();
+    if (isOutsideWindow(janela)) {
+      await signOut();
+      setLoading(false);
+      setAvisoHorario({
+        motivo: "fora",
+        released: 0,
+        next_start_at: janela!.next_start_at ?? null,
+        timezone: janela!.timezone ?? "America/Sao_Paulo",
+        intervals: janela!.intervals ?? [],
+      });
+      return;
+    }
+    setLoading(false);
+    navigate("/clientes", { replace: true });
   };
+
+  const proximoAcesso = avisoHorario
+    ? formatarProximoAcesso(avisoHorario.next_start_at, avisoHorario.timezone)
+    : null;
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-background">
@@ -48,6 +99,40 @@ export default function Login() {
         </CardHeader>
 
         <CardContent>
+          {avisoHorario && (
+            <div
+              role="alert"
+              className="mb-4 space-y-1.5 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-left text-sm"
+            >
+              <p className="flex items-center gap-2 font-semibold text-destructive">
+                <Clock className="h-4 w-4 shrink-0" />
+                {avisoHorario.motivo === "encerrado"
+                  ? "Seu horário de acesso terminou"
+                  : "Fora do seu horário de acesso"}
+              </p>
+              {avisoHorario.motivo === "encerrado" && avisoHorario.released > 0 && (
+                <p className="text-foreground">
+                  {avisoHorario.released === 1
+                    ? "O atendimento que estava com você voltou para a fila."
+                    : `Os ${avisoHorario.released} atendimentos que estavam com você voltaram para a fila.`}
+                </p>
+              )}
+              {avisoHorario.intervals.length > 0 && (
+                <div className="text-foreground">
+                  Seu acesso é liberado em:
+                  <ul className="mt-0.5 list-disc pl-5 tabular-nums">
+                    {resumirIntervalos(avisoHorario.intervals).map((linha) => (
+                      <li key={linha}>{linha}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {proximoAcesso ? `Próximo acesso: ${proximoAcesso}. ` : ""}
+                Se precisar entrar agora, fale com o administrador da sua empresa.
+              </p>
+            </div>
+          )}
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

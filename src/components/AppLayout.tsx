@@ -20,6 +20,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DepartmentFilterProvider } from "@/contexts/DepartmentFilterContext";
 import { QueueAlertProvider } from "@/contexts/QueueAlertContext";
 import { useAccentColorSync } from "@/hooks/useAccentColorSync";
+import { AccessWindowBanner } from "@/components/auth/AccessWindowBanner";
 
 export default function AppLayout() {
   useAccentColorSync();
@@ -92,6 +93,8 @@ export default function AppLayout() {
                   <ThemeToggle />
                 </div>
               </header>
+              {/* DEM-0415: aviso de fim do horário de acesso e logout */}
+              <AccessWindowBanner />
               {/* Full-bleed ocupa a área inteira: sem padding do layout e sem scroll externo */}
               <main
                 className={

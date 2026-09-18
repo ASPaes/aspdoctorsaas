@@ -48,6 +48,7 @@ import OperacaoTab from "@/components/configuracoes/whatsapp/OperacaoTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import KBTab from "@/components/configuracoes/KBTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
+import HorarioAcessoTab from "@/components/configuracoes/horario-acesso/HorarioAcessoTab";
 import HorarioPlantaoTab from "@/components/configuracoes/HorarioPlantaoTab";
 import ClienteImportModal from "@/components/import/ClienteImportModal";
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
@@ -99,6 +100,7 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   operacao: { breadcrumb: ["Atendimento", "Operação"], title: "Operação", description: "CSAT, pausas, macros e grupos do atendimento." },
   automacoes: { breadcrumb: ["Atendimento", "Automações"], title: "Automações", description: "Regras que interceptam o chat na entrada e mudam para onde ele vai." },
   seguranca: { breadcrumb: ["Equipe", "Segurança"], title: "Segurança", description: "Aprovação de novas contas e restrição de domínio de email." },
+  "horario-acesso": { breadcrumb: ["Equipe", "Horário de acesso"], title: "Horário de acesso", description: "Em que horários cada setor ou pessoa pode usar o sistema." },
   duplicidades: { breadcrumb: ["Dados", "Duplicidades"], title: "Duplicidades", description: "Unificação de contatos duplicados." },
   ia: { breadcrumb: ["Atendimento", "Inteligência artificial"], title: "Inteligência artificial", description: "Modelos, prompts e comportamento da IA." },
   "horario-plantao": { breadcrumb: ["Atendimento", "Horário & plantão"], title: "Horário & plantão", description: "Horário de atendimento e plantões fora do expediente." },
@@ -436,6 +438,8 @@ export default function Configuracoes() {
         return <AutomacoesTab />;
       case "seguranca":
         return <SecuritySettingsTab />;
+      case "horario-acesso":
+        return <HorarioAcessoTab />;
       case "duplicidades":
         return <DuplicateContactsTab />;
       case "ia":
