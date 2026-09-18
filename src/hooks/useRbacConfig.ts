@@ -43,48 +43,28 @@ export interface RbacConfig {
   recursos: RbacRecurso[]; permissoes: RbacPermissao[];
 }
 /**
- * Recursos que existem no catálogo mas ainda não têm portão no código.
- * Levantado em 13/09/2026 — ver docs/rbac/RBAC_ATUAL.md, P1.
- * Marcá-los é a F0: enquanto não forem aplicados, o admin precisa saber
- * que mexer neles não muda nada.
+ * Recursos que existem no catálogo mas ainda NÃO têm portão no código: mexer
+ * neles não muda o acesso de ninguém, e a tela precisa dizer isso.
+ *
+ * ⚠️ Esta lista é mantida À MÃO e já mentiu nas duas direções. Em 18/09/2026
+ * ela marcava como "ainda não aplicado" 37 chaves que JÁ tinham portão —
+ * incluindo `atendimento_chat` e `tickets`, onde desligar derruba o módulo
+ * inteiro. Ao ligar um portão novo, REMOVA a chave daqui no mesmo commit.
+ *
+ * Conferência: procure por `usePortao("<chave>"`, `resource="<chave>"` e
+ * `can("<chave>"` em src/ — se achar, a chave não pertence a esta lista.
  */
 export const RECURSOS_SEM_PORTAO = new Set<string>([
-  // Já existiam no catálogo e nunca tiveram portão (levantado em 13/09/2026).
-  "atendimento_chat", "atendimento_filtros", "atendimento_transferir",
-  "base_conhecimento", "clientes.oem_aprovacao", "dashboard_conselho",
-  "dashboard_operacional",  "nav.emails",
-  "parametros_atendimento", "super_monitor", 
-   "whatsapp_instancias", "lancamentos",
-  "receita_mrr", "dashboard_financeiro", "cfg.whatsapp",
-  // Entraram com o catálogo completo em 14/09/2026. Nenhum tem portão ainda —
-  // ligá-los é a F3, tenant a tenant, com aviso antes.
-  "nav.onboarding", "nav.cadastros", "nav.whatsapp_contatos",
-  "nav.meu_painel", "nav.super", 
-  "dash.meu_painel", "dash.valores_financeiros", 
-   "clientes.ficha", "clientes.contratos",
-  "clientes.financeiro", "clientes.cancelar", 
-  "clientes.reajuste", "clientes.purge", 
-  "clientes.filiais", "clientes.contatos", 
-  "fin.bridge", "fin.movimentos", "atend.assumir",
-  "atend.enviar", "atend.agendar", "atend.encaminhar",
-  "atend.macros", "atend.historico_terceiros", "atend.acesso_remoto",
-  "atend.contatos", "atend.busca", "tickets",
-  "tickets.criar", "tickets.editar", "tickets.encerrar",
-  "tickets.reabrir", "tickets.excluir", "tickets.transferir",
-  "tickets.anexos", "tickets.mencoes", "onb.quadro",
-  "onb.mover", "onb.criar_jornada", "onb.editar_jornada",
-  "onb.golive", "onb.cancelar", "onb.reabrir",
-  "onb.transferir", "onb.treinos", "onb.dashboard",
-  "onb.cfg.pipelines", "onb.cfg.checklists", "onb.cfg.papeis",
-  "onb.cfg.distribuicao", "onb.cfg.motivos", "onb.cfg.templates",
-  "usuarios.desativar", "usuarios.auditoria", "cs.painel",
-  "certificados", "painel_uso", "meu_painel",
+  "clientes.oem_aprovacao", "super_monitor", "cfg.whatsapp",
+  "nav.onboarding", "nav.super", "dash.meu_painel",
+  "dash.valores_financeiros", "clientes.financeiro", "fin.bridge",
+  "atend.macros", "onb.mover", "onb.criar_jornada",
+  "onb.editar_jornada", "onb.golive", "onb.cancelar",
+  "onb.reabrir", "onb.transferir", "onb.treinos",
+  "onb.dashboard", "onb.cfg.pipelines", "onb.cfg.checklists",
+  "onb.cfg.papeis", "onb.cfg.distribuicao", "onb.cfg.motivos",
+  "onb.cfg.templates", "usuarios.desativar", "usuarios.auditoria",
   "super.tenants", "super.templates", "super.limpeza_uras",
-  // Entraram com a estrutura do menu (14/09/2026): seções reais da ficha do
-  // cliente, abas da lista de Clientes, abas da configuração de Implantação.
-  "clientes.dados", "clientes.venda_produto", "clientes.tickets",
-  "clientes.integracao", "clientes.parametros_atendimento",
-  "clientes.divergencias_hiper", "clientes.cadastro_incompleto",
   "onb.cfg.jornadas", "onb.cfg.demandas", "onb.cfg.tipos_treino",
   "onb.cfg.retornos", "onb.cfg.contabilidade", "onb.cfg.indicadores",
   "certificados.dashboard",
