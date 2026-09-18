@@ -6,6 +6,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -20,7 +21,8 @@ import ImportSimpleTemplateModal from "@/components/configuracoes/ImportSimpleTe
 export interface ColumnDef {
   key: string;
   label: string;
-  type?: "text" | "select" | "boolean";
+  /** textarea: texto longo; na tabela aparece numa linha só, cortado */
+  type?: "text" | "select" | "boolean" | "textarea";
   options?: { value: string | number; label: string }[];
   /** For select type: "number" (default) or "string" (for UUIDs) */
   valueType?: "number" | "string";
@@ -28,6 +30,12 @@ export interface ColumnDef {
   render?: (value: any, row: any) => string;
   /** Texto de apoio abaixo do campo no formulário */
   hint?: string;
+  /** Exemplo dentro do campo vazio (text/textarea) */
+  placeholder?: string;
+  /** Limite de caracteres (text/textarea) */
+  maxLength?: number;
+  /** Texto da célula quando o valor está vazio (padrão "—") */
+  emptyLabel?: string;
 }
 
 interface CrudTableProps {
@@ -264,7 +272,11 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
                         ? c.render(row[c.key], row)
                         : c.type === "boolean"
                           ? (row[c.key] ? "Sim" : "Não")
-                          : String(row[c.key] ?? "—")}
+                          : c.type === "textarea"
+                            ? (row[c.key]
+                                ? <span className="block max-w-[280px] truncate" title={row[c.key]}>{row[c.key]}</span>
+                                : <span className="text-muted-foreground">{c.emptyLabel ?? "—"}</span>)
+                            : String(row[c.key] ?? c.emptyLabel ?? "—")}
                     </TableCell>
                   ))}
                   <TableCell>
@@ -327,10 +339,20 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
                       <SelectItem value="false">Não</SelectItem>
                     </SelectContent>
                   </Select>
+                ) : c.type === "textarea" ? (
+                  <Textarea
+                    value={formData[c.key] ?? ""}
+                    onChange={(e) => setFormData((p) => ({ ...p, [c.key]: e.target.value }))}
+                    placeholder={c.placeholder}
+                    maxLength={c.maxLength}
+                    rows={3}
+                  />
                 ) : (
                   <Input
                     value={formData[c.key] ?? ""}
                     onChange={(e) => setFormData((p) => ({ ...p, [c.key]: e.target.value }))}
+                    placeholder={c.placeholder}
+                    maxLength={c.maxLength}
                   />
                 )}
                 {c.hint && <p className="text-xs text-muted-foreground">{c.hint}</p>}

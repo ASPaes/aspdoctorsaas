@@ -164,6 +164,14 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
         { key: "average_minutes", label: "Tempo médio (min)" },
         { key: "sort_order", label: "Ordem" },
         { key: "is_active", label: "Ativo", type: "boolean" },
+        // DEM-0341: o message-processor envia este texto ao cliente que escreve num
+        // atendimento de quem está nesta pausa. Vazio = não envia.
+        {
+          key: "auto_message", label: "Mensagem automática ao cliente", type: "textarea", maxLength: 1000,
+          emptyLabel: "Não envia",
+          placeholder: "Ex: Estou em reunião e retorno em breve. Sua mensagem já está registrada.",
+          hint: "Enviada uma vez por pausa, quando o cliente escreve num atendimento de quem está pausado. Sai com \"Mensagem automática\" no início. Em branco, nada é enviado.",
+        },
       ],
     },
     {
