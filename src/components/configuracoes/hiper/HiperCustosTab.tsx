@@ -57,7 +57,7 @@ export default function HiperCustosTab({ recon }: { recon: LinhaRecon[] }) {
     <div className="space-y-3">
       <Explica>
         O <strong>Custo DS</strong> é o valor no contrato daqui; o <strong>Custo Hiper</strong> é
-        o que a Hiper cobra ou retém de fato, no último lote fechado. A{" "}
+        o que a Hiper cobra ou retém de fato: o valor vigente do cadastro no portal (o último extrato só quando o cadastro não traz custo). A{" "}
         <strong>Diferença</strong> é Custo DS menos Custo Hiper, e o sinal é a informação: com{" "}
         <strong>+</strong>, o cadastro daqui cobra custo acima do real e a margem verdadeira é{" "}
         <em>melhor</em> do que a ficha mostra; com <strong>−</strong>, é <em>pior</em>.
@@ -74,7 +74,7 @@ export default function HiperCustosTab({ recon }: { recon: LinhaRecon[] }) {
         <Numero valor={brl(totais.ds)} rotulo="Custo no DoctorSaaS"
           sub={`${num(linhas.length)} ${linhas.length === 1 ? "conta" : "contas"} nesta lista`} />
         <Numero valor={brl(totais.hiper)} rotulo="Custo no Hiper"
-          sub="O que a Hiper cobra ou retém no último lote fechado" />
+          sub="Valor vigente do cadastro no portal" />
         <Numero valor={brl(totais.aMenos)} rotulo="Custo a menos no cadastro"
           tom={totais.aMenos < -0.01 ? "ruim" : "bom"}
           sub={`${num(totais.qtMenos)} contas · a margem real é PIOR do que a ficha mostra`} />

@@ -69,12 +69,26 @@ const base: LinhaRecon = {
 };
 
 describe("abas da integração Hiper", () => {
-  it("Visão geral soma custo e receita só das contas vinculadas", () => {
+  it("Visão geral mostra custo do lado Hiper e mensalidade do lado DoctorSaaS", () => {
     render(<HiperVisaoGeralTab recon={[base]} />);
     const txt = container.textContent ?? "";
     expect(txt).toContain("Contas ativas no Hiper");
     expect(txt).toContain("1.461,77");   // custo do lado Hiper
     expect(txt).toContain("425,63");     // mensalidade do lado DoctorSaaS
+  });
+
+  it("Custo Hiper soma TODAS as ativas — sem dono entra, bloqueada não", () => {
+    // É o total que o portal mostra cliente a cliente (Liberty: 9.239,05, contra
+    // 8.250,90 quando somava só as vinculadas). A margem segue só das vinculadas.
+    render(<HiperVisaoGeralTab recon={[
+      { ...base, id: "v", custo_hiper: 100 },
+      { ...base, id: "s", custo_hiper: 30, estado_match: "sem_dono", ds_cliente_id: null, mensalidade_ds: null },
+      { ...base, id: "b", custo_hiper: 7, situacao_hiper: "bloqueado" },
+    ]} />);
+    const txt = (container.textContent ?? "").replace(/\u00a0/g, " ");
+    expect(txt).toContain("R$ 130,00");                  // 100 + 30, sem os 7 da bloqueada
+    expect(txt).toContain("R$ 30,00 de 1 sem cliente aqui");
+    expect(txt).toContain("R$ 325,63");                  // margem: 425,63 − 100, só a vinculada
   });
 
   it("Visão geral avisa quando o espelho nunca foi puxado, em vez de mostrar zeros", () => {
