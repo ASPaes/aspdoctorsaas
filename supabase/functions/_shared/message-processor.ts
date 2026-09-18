@@ -320,8 +320,9 @@ export async function sendAndPersistAutoMessage(
   ctx: SendContext,
   conversationId: string,
   text: string,
-  metadata?: Record<string, any>
-): Promise<void> {
+  metadata?: Record<string, any>,
+  opts?: { keepConversationState?: boolean }
+): Promise<boolean> {
   try {
     const adapter = getAdapter(ctx.providerType);
     const result = await adapter.send(ctx.secrets as any, ctx.instanceInfo as any, {
@@ -332,7 +333,7 @@ export async function sendAndPersistAutoMessage(
 
     if (!result.messageId) {
       console.error('[processor] sendAndPersistAutoMessage: no messageId returned');
-      return;
+      return false;
     }
 
     const nowIso = new Date().toISOString();
@@ -350,13 +351,52 @@ export async function sendAndPersistAutoMessage(
       metadata: metadata || { auto: true },
     });
 
+    // keepConversationState: o aviso não conta como resposta. A conversa segue com a
+    // mensagem do cliente como a última, e o chat continua "esperando o agente".
+    if (opts?.keepConversationState) return true;
+
     await supabase.from('whatsapp_conversations').update({
       last_message_at: nowIso,
       last_message_preview: previewCut(text),
       is_last_message_from_me: true,
     }).eq('id', conversationId);
+    return true;
   } catch (err) {
     console.error('[processor] sendAndPersistAutoMessage error:', err);
+    return false;
+  }
+}
+
+/**
+ * DEM-0341 — cliente escreveu num atendimento cujo responsável está em pausa.
+ *
+ * Quem decide é try_claim_pause_notice: atendimento in_progress, responsável 'paused',
+ * motivo com texto e esta pausa ainda sem aviso nesta conversa. A reivindicação é
+ * atômica, então duas mensagens juntas do cliente geram um aviso só.
+ *
+ * system_message: o eco fromMe do provedor não pode virar "operador respondeu" (isso
+ * mexeria no timer de inatividade). keepConversationState: o chat continua esperando
+ * o agente. O "voltou da pausa" é gravado pelo gatilho em support_agent_presence.
+ */
+async function sendPauseNoticeIfAgentPaused(supabase: any, ctx: SendContext, conversationId: string): Promise<void> {
+  try {
+    const { data, error } = await supabase.rpc('try_claim_pause_notice', { p_conversation_id: conversationId });
+    if (error) { console.error('[processor] try_claim_pause_notice error:', error.message); return; }
+    if (!data?.message) return;
+    const sent = await sendAndPersistAutoMessage(
+      supabase, ctx, conversationId,
+      `*Mensagem automática*\n${data.message}`,
+      { auto: true, system_message: true, pause_notice: true, pause_notice_id: data.notice_id, paused_user_id: data.user_id, attendance_id: data.attendance_id },
+      { keepConversationState: true },
+    );
+    // Envio falhou: devolve a reserva, senão esta pausa fica "avisada" sem o cliente ter
+    // recebido nada. A próxima mensagem do cliente tenta de novo.
+    if (!sent) {
+      console.warn(`[processor] pause notice not sent — releasing claim ${data.notice_id}`);
+      await supabase.from('support_pause_notices').delete().eq('id', data.notice_id);
+    }
+  } catch (err) {
+    console.error('[processor] sendPauseNoticeIfAgentPaused error:', err);
   }
 }
 
@@ -2561,6 +2601,10 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   const lastBilling = await getLastBillingMessageAt(supabase, conversationId, tenantId);
   if (lastBilling) { const secs = Math.max(0, (new Date(timestamp).getTime() - lastBilling.getTime()) / 1000); if (secs <= 30 && isLikelyBusinessAutoReplyPTBR(content)) return; }
   if (isLikelyThirdPartyURA(content)) return;
+
+  // DEM-0341: depois do bloco de horário (fora do expediente o fluxo já retornou, então
+  // os dois avisos nunca saem juntos) e depois dos filtros de robô de terceiros.
+  await sendPauseNoticeIfAgentPaused(supabase, ctx, conversationId);
 
   const billing = await checkBillingSkipUra(supabase, conversationId, tenantId, supportConfig, phone);
   if (billing.skip) {

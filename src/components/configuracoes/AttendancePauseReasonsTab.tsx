@@ -5,12 +5,13 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Plus, Pencil, Loader2 } from "lucide-react";
+import { Plus, Pencil, Loader2, MessageSquareText } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NumericInput } from "@/components/ui/numeric-input";
 
@@ -21,6 +22,7 @@ interface PauseReason {
   is_active: boolean;
   sort_order: number;
   tenant_id: string;
+  auto_message: string | null;
 }
 
 export default function AttendancePauseReasonsTab() {
@@ -33,12 +35,13 @@ export default function AttendancePauseReasonsTab() {
   const [averageMinutes, setAverageMinutes] = useState<number>(15);
   const [isActive, setIsActive] = useState(true);
   const [sortOrder, setSortOrder] = useState<number>(0);
+  const [autoMessage, setAutoMessage] = useState("");
 
   const { data: reasons = [], isLoading } = useQuery({
     queryKey: ["support_pause_reasons", tid],
     queryFn: async () => {
-      let q = supabase
-        .from("support_pause_reasons")
+      // auto_message (DEM-0341) ainda não está no types.ts gerado.
+      let q = (supabase.from("support_pause_reasons" as any) as any)
         .select("*")
         .order("sort_order", { ascending: true })
         .order("name", { ascending: true });
@@ -56,6 +59,7 @@ export default function AttendancePauseReasonsTab() {
     setAverageMinutes(15);
     setIsActive(true);
     setSortOrder((reasons.length + 1) * 10);
+    setAutoMessage("");
     setDialogOpen(true);
   };
 
@@ -65,6 +69,7 @@ export default function AttendancePauseReasonsTab() {
     setAverageMinutes(r.average_minutes);
     setIsActive(r.is_active);
     setSortOrder(r.sort_order);
+    setAutoMessage(r.auto_message ?? "");
     setDialogOpen(true);
   };
 
@@ -79,17 +84,16 @@ export default function AttendancePauseReasonsTab() {
         average_minutes: averageMinutes,
         is_active: isActive,
         sort_order: sortOrder,
+        auto_message: autoMessage.trim() || null,
       };
 
       if (editing) {
-        const { error } = await supabase
-          .from("support_pause_reasons")
+        const { error } = await (supabase.from("support_pause_reasons" as any) as any)
           .update(payload)
           .eq("id", editing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from("support_pause_reasons")
+        const { error } = await (supabase.from("support_pause_reasons" as any) as any)
           .insert({ ...payload, tenant_id: tid });
         if (error) throw error;
       }
@@ -134,6 +138,7 @@ export default function AttendancePauseReasonsTab() {
                 <TableHead>Ordem</TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Tempo médio (min)</TableHead>
+                <TableHead>Mensagem ao cliente</TableHead>
                 <TableHead>Ativo</TableHead>
                 <TableHead className="w-[60px]" />
               </TableRow>
@@ -144,6 +149,16 @@ export default function AttendancePauseReasonsTab() {
                   <TableCell>{r.sort_order}</TableCell>
                   <TableCell className="font-medium">{r.name}</TableCell>
                   <TableCell>{r.average_minutes} min</TableCell>
+                  <TableCell className="max-w-[280px]">
+                    {r.auto_message ? (
+                      <span className="flex items-center gap-1.5 text-sm text-muted-foreground" title={r.auto_message}>
+                        <MessageSquareText className="h-3.5 w-3.5 shrink-0 text-primary" />
+                        <span className="truncate">{r.auto_message}</span>
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Não envia</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <span className={r.is_active ? "text-green-600" : "text-muted-foreground"}>
                       {r.is_active ? "Sim" : "Não"}
@@ -174,6 +189,20 @@ export default function AttendancePauseReasonsTab() {
             <div className="space-y-2">
               <Label>Tempo médio (minutos) *</Label>
               <NumericInput value={averageMinutes} onChange={setAverageMinutes} placeholder="15" suffix="min" />
+            </div>
+            <div className="space-y-2">
+              <Label>Mensagem automática ao cliente</Label>
+              <Textarea
+                value={autoMessage}
+                onChange={(e) => setAutoMessage(e.target.value)}
+                placeholder="Ex: Estou em horário de almoço e retorno em breve. Sua mensagem já está registrada."
+                rows={3}
+                maxLength={1000}
+              />
+              <p className="text-xs text-muted-foreground">
+                Enviada uma vez por pausa, quando o cliente escreve num atendimento de quem está pausado.
+                Sai com "Mensagem automática" no início. Em branco, nada é enviado.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Ordem de exibição</Label>

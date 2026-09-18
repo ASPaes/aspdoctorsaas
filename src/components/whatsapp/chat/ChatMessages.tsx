@@ -473,6 +473,18 @@ export function ChatMessages({
               </div>
               {items.map((item) => {
                 if (item.type === 'message') {
+                  // DEM-0341: "Fulano voltou da pausa" — gravado pelo gatilho de presença,
+                  // só no banco (não vai ao cliente). Aviso, não balão.
+                  if (item.msg.message_type === 'system' && item.msg.metadata?.pause_event) {
+                    return (
+                      <div key={item.msg.id} className="flex justify-center my-3" role="status">
+                        <span className="text-[11px] font-medium text-muted-foreground bg-muted/60 border border-border/60 px-3 py-1 rounded-lg">
+                          {item.msg.content} <span className="opacity-70">· {formatTime(item.msg.timestamp, timezone)}</span>
+                        </span>
+                      </div>
+                    );
+                  }
+
                   // Check if this is an attendance system event
                   const attendanceEvent = parseAttendanceEvent(item.msg);
                   if (attendanceEvent) {
