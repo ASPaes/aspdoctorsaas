@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, AlertTriangle, FileSearch } from "lucide-react";
 import { useMessageSearch, type MessageSearchResult } from "../hooks/useMessageSearch";
-import { usePermissions } from "@/hooks/usePermissions";
+import { usePodeVerTodosSetores } from "@/hooks/usePodeVerTodosSetores";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -28,8 +28,7 @@ interface Props {
 export function MessageSearchModal({ open, onOpenChange, onSelectMessage }: Props) {
   const [search, setSearch] = useState("");
   const [daysBack, setDaysBack] = useState(90);
-  const { can } = usePermissions();
-  const podeVerTodosSetores = can("atend.todos_setores", "view");
+  const podeVerTodosSetores = usePodeVerTodosSetores();
   const { data: userDepartmentId } = useUserDepartment();
   const { data: results = [], isLoading, isFetching } = useMessageSearch(
     search,

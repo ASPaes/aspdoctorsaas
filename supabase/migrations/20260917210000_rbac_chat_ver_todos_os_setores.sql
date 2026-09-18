@@ -15,7 +15,9 @@
 --     linha a cadeia termina em `false` e o GESTOR delas perderia o seletor de
 --     setores no dia da publicação.
 --   · 4 estão com rbac_enabled=false             -> o motor devolve `true` para
---     tudo; não precisam de linha e não mudam.
+--     TUDO, então permissão não serve de portão nelas. Ficam na regra de papel,
+--     dentro de `pode_ver_todos_setores()` (abaixo). Sem isso, os 6 operadores
+--     da DEMO Doctor SaaS ganhariam todos os setores em silêncio.
 --
 -- O QUE NÃO ENTRA AQUI, de propósito:
 --   · O padrão de ABERTURA do chat (admin abre em "Todos", gestor abre no próprio
@@ -57,6 +59,36 @@ select g.id, 'atend.todos_setores', g.nivel_base in ('admin','head'), false, fal
   from public.permission_groups g
 on conflict (group_id, resource_key) do nothing;
 
+-- ====================================================== a regra, num lugar só
+-- ⚠️ `has_perm()` devolve TRUE quando a empresa está com `rbac_enabled = false`
+-- (é a regra do motor: sem sistema de permissões, tudo liberado). São 4 empresas
+-- hoje, e uma delas (DEMO Doctor SaaS) tem 6 operadores. Trocar papel por
+-- permissão sem tratar isso DARIA a esses operadores as conversas de todos os
+-- setores — silenciosamente. Aqui a regra fica explícita:
+--   · super admin                     -> vê tudo (como sempre)
+--   · empresa SEM sistema de permissões -> continua no papel de hoje (admin/head)
+--   · empresa COM o sistema            -> decide pela permissão
+create or replace function public.pode_ver_todos_setores()
+returns boolean language plpgsql stable parallel safe security definer
+set search_path='public','pg_catalog' as $$
+declare v_role text; v_super boolean; v_tenant uuid; v_rbac boolean;
+begin
+  select p.role, p.is_super_admin, p.tenant_id into v_role, v_super, v_tenant
+    from public.profiles p where p.user_id = auth.uid() limit 1;
+  if v_super then return true; end if;
+  if v_role is null or v_tenant is null then return false; end if;
+
+  select t.rbac_enabled into v_rbac from public.tenants t where t.id = v_tenant limit 1;
+  if not coalesce(v_rbac,false) then
+    return v_role in ('admin','head');     -- exatamente o que valia antes
+  end if;
+
+  return public.has_perm('atend.todos_setores','view');
+end $$;
+
+revoke all on function public.pode_ver_todos_setores() from public;
+grant execute on function public.pode_ver_todos_setores() to authenticated, service_role;
+
 -- ============================================================ o portão no banco
 -- As 3 policies de leitura do chat tinham o MESMO ramo `is_admin_or_head()`.
 -- Ele vira a permissão. Mantidas PERMISSIVE (é a policy original, que concede);
@@ -70,7 +102,7 @@ alter policy whatsapp_conversations_select on public.whatsapp_conversations
   using (
     (select public.is_super_admin())
     or (tenant_id = (select public.current_tenant_id())
-        and ((select public.has_perm('atend.todos_setores','view'))
+        and ((select public.pode_ver_todos_setores())
              or department_id = (select public.current_user_department_id())
              or department_id is null
              or is_group = true))
@@ -82,7 +114,7 @@ alter policy support_attendances_select on public.support_attendances
   using (
     (select public.is_super_admin())
     or (tenant_id = (select public.current_tenant_id())
-        and ((select public.has_perm('atend.todos_setores','view'))
+        and ((select public.pode_ver_todos_setores())
              or department_id = (select public.current_user_department_id())
              or department_id is null
              or is_group = true))
@@ -96,7 +128,7 @@ alter policy whatsapp_messages_select on public.whatsapp_messages
   using (
     (select public.is_super_admin())
     or (tenant_id = (select public.current_tenant_id())
-        and (select public.has_perm('atend.todos_setores','view')))
+        and (select public.pode_ver_todos_setores()))
     or exists (
       select 1 from public.whatsapp_conversations c
        where c.id = whatsapp_messages.conversation_id

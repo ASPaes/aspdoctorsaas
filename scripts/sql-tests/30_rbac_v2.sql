@@ -151,8 +151,27 @@ begin
   select count(*) into v_n from pg_policies
    where schemaname='public'
      and policyname in ('whatsapp_conversations_select','support_attendances_select','whatsapp_messages_select')
-     and coalesce(qual,'') ilike '%atend.todos_setores%';
+     and coalesce(qual,'') ilike '%pode_ver_todos_setores%';
   insert into res values ('T10d chat: ver todos os setores e permissao', v_n = 3, v_n||' de 3 policies');
+
+  -- T16 · empresa SEM sistema de permissoes nao pode GANHAR acesso
+  -- has_perm() devolve true para tudo quando rbac_enabled=false. Se o portao do
+  -- chat chamasse has_perm direto, os operadores dessas empresas (6 so na DEMO)
+  -- passariam a ver todos os setores. A regra ali e o papel de hoje.
+  select p.user_id into v_alvo from public.profiles p
+    join public.tenants t on t.id = p.tenant_id
+   where not coalesce(t.rbac_enabled,false) and p.role='user'
+     and not coalesce(p.is_super_admin,false) and coalesce(p.status,'ativo')='ativo'
+   limit 1;
+  if v_alvo is null then
+    insert into res values ('T16 empresa sem RBAC: operador nao ganha setores', true, 'sem operador nessas empresas');
+  else
+    perform set_config('request.jwt.claims', json_build_object('sub', v_alvo)::text, true);
+    v_ok := public.pode_ver_todos_setores();
+    perform set_config('request.jwt.claims', json_build_object('sub', v_admin)::text, true);
+    insert into res values ('T16 empresa sem RBAC: operador nao ganha setores', v_ok is false,
+                            'pode_ver_todos_setores='||coalesce(v_ok::text,'null'));
+  end if;
 
   -- T10c · as funcoes de RLS sao PARALLEL SAFE (senao desligam o scan paralelo)
   select count(*) into v_n from pg_proc p join pg_namespace n on n.oid=p.pronamespace

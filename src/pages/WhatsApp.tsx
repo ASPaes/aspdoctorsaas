@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
-import { usePermissions } from "@/hooks/usePermissions";
+import { usePodeVerTodosSetores } from "@/hooks/usePodeVerTodosSetores";
 import { ShieldAlert } from "lucide-react";
 import AgentPresenceOverlay from "@/components/whatsapp/presence/AgentPresenceOverlay";
 import { ScheduleReminderBanner } from "@/components/whatsapp/ScheduleReminderBanner";
@@ -30,7 +30,7 @@ function WhatsAppContent() {
   const { selectedDepartment, departments, isLoading: departmentsLoading } = useDepartmentFilter();
   const { data: userDepartmentId, isLoading: userDepartmentLoading } = useUserDepartment();
   // Quem enxerga os outros setores é permissão, não papel (`atend.todos_setores`).
-  const podeVerTodosSetores = usePermissions().can("atend.todos_setores", "view");
+  const podeVerTodosSetores = usePodeVerTodosSetores();
 
 
   // Keep selected conversation in sync; detect RLS loss (department transfer)

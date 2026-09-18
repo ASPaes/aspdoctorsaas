@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
-import { usePermissions } from "@/hooks/usePermissions";
+import { usePodeVerTodosSetores } from "@/hooks/usePodeVerTodosSetores";
 
 export interface AllowedDepartment {
   id: string;
@@ -26,9 +26,7 @@ export interface AllowedDepartment {
 export function useAllowedDepartments() {
   const { user, profile } = useAuth();
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { can } = usePermissions();
-
-  const podeVerTodosSetores = can("atend.todos_setores", "view");
+  const podeVerTodosSetores = usePodeVerTodosSetores();
   const funcionarioId = profile?.funcionario_id;
 
   return useQuery<AllowedDepartment[]>({
