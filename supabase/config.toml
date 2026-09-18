@@ -39,6 +39,10 @@ verify_jwt = false
 [functions.generate-conversation-summary]
 verify_jwt = false
 
+# DEM-0277: autentica por dentro (auth.getUser + membro ativo do tenant do grupo).
+[functions.summarize-whatsapp-group]
+verify_jwt = false
+
 [functions.transcribe-whatsapp-audio]
 verify_jwt = false
 
