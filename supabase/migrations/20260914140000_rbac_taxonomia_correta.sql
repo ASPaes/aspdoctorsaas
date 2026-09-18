@@ -29,6 +29,13 @@ comment on column public.resources.secao is
 
 -- ============================ 1. FUSÃO ======================================
 -- 1a) Chaves COM portão: AND, para nunca conceder.
+-- ⚠️ ESTA REGRA QUEBROU PRODUÇÃO EM 18/09/2026 — leia antes de copiar o padrão.
+-- O E vale para a AÇÃO que a chave morta de fato controlava. `nav.clientes` e
+-- `nav.tickets` são chaves de MENU: nascem com inserir/editar/excluir em
+-- `false`, porque menu só se abre. O E abaixo zerou essas três ações em
+-- `clientes` e `tickets` para TODOS os grupos, e o administrador da ASP parou
+-- de conseguir salvar a ficha do cliente ("Você não tem acesso a esta ação").
+-- Corrigido em 20260918010000. Fusão nova: aplique o E SÓ em `can_view`.
 do $$
 declare p record;
 begin
