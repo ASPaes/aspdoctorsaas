@@ -14,6 +14,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 18/09
 
+- 🔧 **Mensagem agendada que falhou pode ser reagendada ou cancelada** — Quando uma mensagem agendada não conseguia sair (por exemplo, com o WhatsApp desconectado na hora), ela ficava na conversa como "Não foi enviada" e os botões **Reagendar** e **Cancelar** não faziam nada. Agora os dois funcionam: Reagendar já sugere um horário novo e a mensagem volta para a fila; Cancelar tira ela da conversa.
+
+- ⬆️ **Novo atendimento agendado vai para o setor se você estiver desconectado** — Se na hora marcada quem agendou não estiver conectado à plataforma, a mensagem sai normalmente e o atendimento entra na **fila do setor da pessoa**, para o próximo atendente disponível assumir, em vez de ficar parado no nome de quem está fora. Quem está em pausa continua recebendo o atendimento.
+
 - 🔧 **Resposta para contato de outro país não era entregue** — Cliente com WhatsApp dos Estados Unidos, Canadá ou Austrália era cadastrado como se fosse do Brasil (o código do país virava DDD), e toda resposta, inclusive boas-vindas, avaliação, PIX e boleto, ficava com "Sem confirmação de entrega". Agora o número é gravado como chega e as respostas saem normalmente.
 
 - 🆕 **Mensagem automática quando o atendente está em pausa** — Cada motivo de pausa ganhou o campo **Mensagem automática ao cliente**, em **Configurações › Cadastros › Motivos de pausa**. Se o cliente escrever num atendimento enquanto o responsável está em pausa, ele recebe essa mensagem, com "Mensagem automática" no início, **uma única vez por pausa**, mesmo que mande várias mensagens. O atendimento continua com o mesmo atendente e o chat segue marcado como aguardando resposta. Quando o atendente volta, o chat mostra "Fulano voltou da pausa" (o aviso fica só no sistema, o cliente não recebe). Fora do horário de atendimento vale o aviso de fora do horário, e os dois nunca saem juntos. Motivo com a mensagem em branco não envia nada, como antes.

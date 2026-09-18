@@ -826,7 +826,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     setMode("schedule");
     // Template aparece no cartão acima do campo; o campo fica vazio e travado.
     setMessage(a.message_type === "template" ? "" : a.content || "");
-    setScheduleAt(paraInputLocal(new Date(a.scheduled_at)));
+    // Falhada: o horário dela já passou. Vem sugerida a próxima hora cheia,
+    // senão o Salvar esbarraria em "pelo menos 1 minuto no futuro".
+    setScheduleAt(paraInputLocal(a.status === "failed" ? proximaHoraCheia() : new Date(a.scheduled_at)));
     setCancelIfReplies(a.cancel_if_client_replies);
     setNovoAtendimento(!!a.opens_attendance);
     setEditandoAgendadaId(a.id);
