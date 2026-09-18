@@ -42,6 +42,9 @@ interface Props {
   /** Nota a mostrar, pedida de fora do chat (barra de Detalhes) */
   focusNote?: ConversationNote | null;
   onFocusNoteHandled?: () => void;
+  /** Mensagem a mostrar, pedida de fora do chat (resumo do grupo por IA) */
+  focusMessage?: { id: string; at: string } | null;
+  onFocusMessageHandled?: () => void;
   /** Ações das bolhas agendadas. Undefined = compositor fora da tela; botões desligados. */
   agendadaAcoes?: AcoesAgendada;
   /** Agendada aberta para edição no campo de mensagem, para destacar a bolha. */
@@ -88,6 +91,8 @@ export function ChatMessages({
   instanceId,
   focusNote,
   onFocusNoteHandled,
+  focusMessage,
+  onFocusMessageHandled,
   agendadaAcoes,
   editandoAgendadaId = null,
   agendadasExpandidas = false,
@@ -124,7 +129,8 @@ export function ChatMessages({
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [internalHighlight, setInternalHighlight] = useState<string | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
-  const [noteJump, setNoteJump] = useState<ConversationNote | null>(null);
+  // Alvo de um "ir até": nota interna ou mensagem. `at` decide até onde paginar.
+  const [noteJump, setNoteJump] = useState<{ kind: "note" | "message"; id: string; at: string } | null>(null);
   const noteJumpPagesRef = useRef(0);
   const pendingNewCountRef = useRef(0);
   const prependAnchorRef = useRef<number | null>(null);
@@ -255,7 +261,7 @@ export function ChatMessages({
     // Impede o auto-scroll para o fim ao chegarem as páginas anteriores
     isNearBottomRef.current = false;
     noteJumpPagesRef.current = 0;
-    setNoteJump(note);
+    setNoteJump({ kind: "note", id: note.id, at: note.created_at });
   }, []);
 
   useEffect(() => {
@@ -263,6 +269,14 @@ export function ChatMessages({
     if (focusNote.conversation_id === conversationId) goToNote(focusNote);
     onFocusNoteHandled?.();
   }, [focusNote, conversationId, goToNote, onFocusNoteHandled]);
+
+  useEffect(() => {
+    if (!focusMessage) return;
+    isNearBottomRef.current = false;
+    noteJumpPagesRef.current = 0;
+    setNoteJump({ kind: "message", id: focusMessage.id, at: focusMessage.at });
+    onFocusMessageHandled?.();
+  }, [focusMessage, onFocusMessageHandled]);
 
   // Compute the ID of the first unread incoming message
   const firstUnreadId = useMemo(() => {
@@ -402,7 +416,7 @@ export function ChatMessages({
     const needsOlder =
       hasNextPage &&
       !!oldestLoaded &&
-      new Date(oldestLoaded).getTime() > new Date(noteJump.created_at).getTime() &&
+      new Date(oldestLoaded).getTime() > new Date(noteJump.at).getTime() &&
       noteJumpPagesRef.current < MAX_NOTE_JUMP_PAGES;
     if (needsOlder) {
       if (!isFetchingNextPage) {
@@ -413,7 +427,8 @@ export function ChatMessages({
       }
       return;
     }
-    const el = viewportRef.current?.querySelector(`[data-note-id="${noteJump.id}"]`);
+    const attr = noteJump.kind === "note" ? "data-note-id" : "data-msg-id";
+    const el = viewportRef.current?.querySelector(`[${attr}="${noteJump.id}"]`);
     setNoteJump(null);
     if (!el) return;
     el.scrollIntoView({ behavior: "smooth", block: "center" });

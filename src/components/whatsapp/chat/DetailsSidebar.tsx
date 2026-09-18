@@ -59,6 +59,7 @@ import {
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { Input } from "@/components/ui/input";
 import KBEditDialog from "@/components/configuracoes/kb/KBEditDialog";
+import { GroupSummarySection } from "./group-summary/GroupSummarySection";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -67,9 +68,11 @@ interface Props {
   onConversationClosed?: () => void;
   /** Clique numa nota da lista: o chat rola até ela */
   onGoToNote?: (note: ConversationNote) => void;
+  /** Clique na hora de um item do resumo do grupo: o chat rola até a mensagem */
+  onGoToMessage?: (target: { id: string; at: string }) => void;
 }
 
-export function DetailsSidebar({ conversation, onClose, onNavigateToConversation, onConversationClosed, onGoToNote }: Props) {
+export function DetailsSidebar({ conversation, onClose, onNavigateToConversation, onConversationClosed, onGoToNote, onGoToMessage }: Props) {
   const { timezone } = useAppTimezone();
   const contact = conversation.contact;
   const isGroup = (conversation as any)?.is_group === true;
@@ -302,6 +305,15 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               open={groupAttendancesOpen}
               onOpenChange={setGroupAttendancesOpen}
               onSelect={setSelectedAttendance}
+            />
+          )}
+
+          {/* ─── 5b. Resumo do grupo por IA (DEM-0277) ─── */}
+          {isGroup && (
+            <GroupSummarySection
+              conversationId={conversation.id}
+              groupName={name}
+              onGoToMessage={onGoToMessage}
             />
           )}
 
@@ -546,7 +558,8 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             )}
           </CollapsibleSection>
 
-          {/* ─── 10. Resumos ─── */}
+          {/* ─── 10. Resumos ─── (em grupo quem resume é a seção 5b) */}
+          {!isGroup && (
           <CollapsibleSection
             icon={<FileText className="h-3.5 w-3.5" />}
             title="Resumos"
@@ -588,6 +601,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               )}
             </div>
           </CollapsibleSection>
+          )}
 
           {/* ─── 11. Base de Conhecimento (KB) ─── */}
           {closedAttendanceId && (

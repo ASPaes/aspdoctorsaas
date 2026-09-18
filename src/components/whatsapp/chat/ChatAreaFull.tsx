@@ -53,6 +53,8 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   const [showDetails, setShowDetails] = useState(false);
   // Nota clicada na barra de Detalhes: o chat rola até ela
   const [noteToFocus, setNoteToFocus] = useState<ConversationNote | null>(null);
+  // Origem de um item do resumo do grupo por IA: o chat rola até a mensagem
+  const [messageToFocus, setMessageToFocus] = useState<{ id: string; at: string } | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const { status: presenceStatus, isBlocked: presenceBlocked } = useAgentPresence();
   const chatInputRef = useRef<ChatInputHandle>(null);
@@ -325,6 +327,8 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           instanceId={(conversation as any)?.instance_id ?? null}
           focusNote={noteToFocus}
           onFocusNoteHandled={() => setNoteToFocus(null)}
+          focusMessage={messageToFocus}
+          onFocusMessageHandled={() => setMessageToFocus(null)}
           agendadaAcoes={!selectionMode && isAccessActive && !hasHardBlock ? agendadaAcoes : undefined}
           editandoAgendadaId={editandoAgendadaId}
           agendadasExpandidas={
@@ -422,6 +426,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           onNavigateToConversation={onNavigateToConversation}
           onConversationClosed={onClose}
           onGoToNote={setNoteToFocus}
+          onGoToMessage={setMessageToFocus}
         />
       )}
 
