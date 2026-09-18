@@ -579,16 +579,22 @@ grant execute on function public.fn_access_schedule_intervals_error(jsonb) to se
 -- Nos 3 degraus (global, por empresa, por grupo). Ver as migrations de
 -- 17/09 (`automacoes_rbac_v2_herda_operacao`) para o porquê.
 
-insert into public.resources (key, module, label, description, display_order, hidden, is_navigation, where_it_appears)
+-- Copia a linha INTEIRA da vizinha. O RBAC v2 acrescentou 6 colunas em
+-- `resources` (module_id obrigatória, nivel, acoes, secao, grupo, grupo_ordem)
+-- que o banco local não tem; listar colunas à mão quebrou a 1ª tentativa em
+-- produção (18/09, module_id nulo). Copiando da vizinha, a aba nova cai no
+-- mesmo módulo, grupo e seção da Segurança.
+insert into public.resources
+  (key, module, label, description, parent_key, display_order, hidden, is_navigation,
+   where_it_appears, module_id, nivel, acoes, secao, grupo, grupo_ordem)
 select
-  'cfg.horario_acesso',
-  coalesce((select module from public.resources where key = 'cfg.seguranca'), 'Configurações > Equipe'),
-  'Horário de acesso',
+  'cfg.horario_acesso', r.module, 'Horário de acesso',
   'Em que horários cada setor ou pessoa pode usar o sistema.',
-  coalesce((select display_order + 1 from public.resources where key = 'cfg.seguranca'), 700),
-  false,
-  coalesce((select is_navigation from public.resources where key = 'cfg.seguranca'), false),
-  'Configurações > Equipe > Horário de acesso'
+  r.parent_key, r.display_order + 1, r.hidden, r.is_navigation,
+  'Configurações > Equipe > Horário de acesso',
+  r.module_id, r.nivel, r.acoes, r.secao, r.grupo, r.grupo_ordem
+  from public.resources r
+ where r.key = 'cfg.seguranca'
 on conflict (key) do nothing;
 
 insert into public.role_permissions (role, resource_key, can_view, can_insert, can_update, can_delete)
