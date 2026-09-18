@@ -21,6 +21,17 @@ export interface AgenteRow {
   msgs_atend: number | null;
 }
 
+/** Célula do quadro Agente × Categoria. category_id null = sem ticket categorizado. */
+export interface AgenteCategoriaRow {
+  agent_id: string;
+  category_id: string | null;
+  categoria: string | null;
+  total: number;
+  tma_p50: number | null;
+  csat: number | null;
+  csat_n: number;
+}
+
 export interface AtendimentoAgentes {
   total_encerrados: number;
   agentes_ativos: number;
@@ -29,16 +40,17 @@ export interface AtendimentoAgentes {
   csat_equipe_sent_n: number;
   reabertura_equipe_pct: number | null;
   agentes: AgenteRow[];
+  por_categoria: AgenteCategoriaRow[];
 }
 
 export function useAtendimentoAgentes() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
-  const { dateRange, departmentId, tipoAtendimento, plantao } = useAtendimentoFilter();
+  const { dateRange, departmentId, tipoAtendimento, plantao, categoryIds, subcategoryIds } = useAtendimentoFilter();
   const pIsGroup = tipoAtendimento === 'all' ? null : tipoAtendimento === 'group';
   const pPlantao = plantao === 'all' ? null : plantao;
   return useQuery<AtendimentoAgentes>({
-    queryKey: ["atendimento-agentes", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, tipoAtendimento, plantao],
+    queryKey: ["atendimento-agentes", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, tipoAtendimento, plantao, categoryIds, subcategoryIds],
     enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -50,6 +62,8 @@ export function useAtendimentoAgentes() {
         p_department_id: departmentId ?? null,
         p_is_group: pIsGroup,
         p_plantao: pPlantao,
+        p_category_ids: categoryIds.length ? categoryIds : null,
+        p_subcategory_ids: subcategoryIds.length ? subcategoryIds : null,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
@@ -76,6 +90,15 @@ export function useAtendimentoAgentes() {
           latencia_p50: num(r.latencia_p50),
           latencia_faixa: r.latencia_faixa ?? null,
           msgs_atend: num(r.msgs_atend),
+        })),
+        por_categoria: ((d.por_categoria ?? []) as any[]).map((r) => ({
+          agent_id: String(r.agent_id),
+          category_id: r.category_id ?? null,
+          categoria: r.categoria ?? null,
+          total: Number(r.total ?? 0),
+          tma_p50: num(r.tma_p50),
+          csat: num(r.csat),
+          csat_n: Number(r.csat_n ?? 0),
         })),
       } as AtendimentoAgentes;
     },

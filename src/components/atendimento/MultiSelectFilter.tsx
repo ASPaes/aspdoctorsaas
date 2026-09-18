@@ -11,6 +11,12 @@ import {
 export interface FilterOption<T extends string | number = string | number> {
   id: T;
   nome: string;
+  /**
+   * Cabeçalho do grupo. Opcional: sem ele a lista sai plana, como sempre foi.
+   * Com ele, também entra na chave de busca do cmdk, que ignora maiúscula e
+   * faria "PDV" e "Pdv" (categorias de produtos diferentes) virarem o mesmo item.
+   */
+  grupo?: string;
 }
 
 interface MultiSelectFilterProps<T extends string | number> {
@@ -32,6 +38,13 @@ export function MultiSelectFilter<T extends string | number>({ label, options, s
   };
 
   const count = selected.length;
+
+  const grupos: { nome: string | undefined; itens: FilterOption<T>[] }[] = [];
+  for (const opt of options) {
+    const g = grupos.find((x) => x.nome === opt.grupo);
+    if (g) g.itens.push(opt);
+    else grupos.push({ nome: opt.grupo, itens: [opt] });
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -57,13 +70,14 @@ export function MultiSelectFilter<T extends string | number>({ label, options, s
           <CommandInput placeholder={searchPlaceholder ?? `Buscar ${label.toLowerCase()}...`} />
           <CommandList>
             <CommandEmpty>Nenhum encontrado.</CommandEmpty>
-            <CommandGroup>
-              {options.map((opt) => {
+            {grupos.map((g) => (
+            <CommandGroup key={g.nome ?? "__sem_grupo__"} heading={g.nome}>
+              {g.itens.map((opt) => {
                 const isSel = selected.includes(opt.id);
                 return (
                   <CommandItem
                     key={opt.id}
-                    value={opt.nome}
+                    value={opt.grupo ? `${opt.nome} ${opt.grupo} ${opt.id}` : opt.nome}
                     onSelect={() => toggle(opt.id)}
                     className="cursor-pointer"
                   >
@@ -80,6 +94,7 @@ export function MultiSelectFilter<T extends string | number>({ label, options, s
                 );
               })}
             </CommandGroup>
+            ))}
           </CommandList>
           {count > 0 && (
             <div className="border-t p-2">

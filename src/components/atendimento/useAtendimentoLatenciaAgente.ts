@@ -10,7 +10,8 @@ import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
  * `whatsapp_messages`, casando bloco do cliente -> primeira resposta do agente.
  *
  * Por isso o recorte aqui é o mesmo da `get_atendimento_agentes` e só usa
- * `tipoAtendimento` e `plantao` — setor e unidade NÃO filtram a latência lá, e
+ * `tipoAtendimento`, `plantao` e categoria/subcategoria (DEM-0315) — setor e
+ * unidade NÃO filtram a latência lá, e
  * filtrar aqui faria a lista deixar de fechar com o valor da tela.
  */
 export interface LatenciaRespostaItem {
@@ -59,6 +60,8 @@ export interface LatenciaAgenteParams {
   to: string;
   isGroup: boolean | null;
   plantao: string | null;
+  categoryIds: string[];
+  subcategoryIds: string[];
   limit: number;
 }
 
@@ -77,6 +80,8 @@ export async function fetchLatenciaAgente(
     p_is_group: p.isGroup,
     p_plantao: p.plantao,
     p_limit: p.limit,
+    p_category_ids: p.categoryIds.length ? p.categoryIds : null,
+    p_subcategory_ids: p.subcategoryIds.length ? p.subcategoryIds : null,
   });
   if (error) throw error;
   const d = (data ?? {}) as any;
@@ -115,7 +120,7 @@ export async function fetchLatenciaAgente(
 
 export function useAtendimentoLatenciaAgente(agentId: string | null, enabled: boolean) {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { dateRange, tipoAtendimento, plantao } = useAtendimentoFilter();
+  const { dateRange, tipoAtendimento, plantao, categoryIds, subcategoryIds } = useAtendimentoFilter();
   const pIsGroup = tipoAtendimento === "all" ? null : tipoAtendimento === "group";
   const pPlantao = plantao === "all" ? null : plantao;
 
@@ -128,6 +133,8 @@ export function useAtendimentoLatenciaAgente(agentId: string | null, enabled: bo
       dateRange.to.toISOString(),
       tipoAtendimento,
       plantao,
+      categoryIds,
+      subcategoryIds,
     ],
     enabled: enabled && !!agentId && !!tid,
     refetchOnWindowFocus: false,
@@ -138,6 +145,8 @@ export function useAtendimentoLatenciaAgente(agentId: string | null, enabled: bo
         from: dateRange.from.toISOString(),
         to: dateRange.to.toISOString(),
         isGroup: pIsGroup,
+        categoryIds,
+        subcategoryIds,
         plantao: pPlantao,
         limit: LATENCIA_LIMITE_TELA,
       }),

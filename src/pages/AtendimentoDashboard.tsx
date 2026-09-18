@@ -30,17 +30,24 @@ const ALL = "__all__";
 //                support_tickets, com mecanismo de horário próprio; filtrar só
 //                a metade de chats deixaria "interações" misturando uma parte
 //                filtrada com outra inteira e o risco sairia errado.
-//   taxonomia / backlog — não leem support_attendances.
-type FiltroConfig = { date: boolean; setor: boolean; agente: boolean; cliente?: boolean; tipo?: boolean; plantao?: boolean };
+//   backlog    — não lê support_attendances.
+//
+// taxonomia (aba Tickets) entra, mas lendo support_tickets.tipo_horario, que é
+// o turno gravado no próprio ticket, e não o plantão do atendimento (DEM-0315).
+// `categoria`: categoria/subcategoria do ticket (DEM-0315). Só nas abas cujas
+// RPCs aceitam p_category_ids: Tickets, Agentes e Chats. Na Chats, a série de
+// 12 meses (get_atendimento_chats_timeline) segue sem filtro, como já era com
+// data, agente e plantão.
+type FiltroConfig = { date: boolean; setor: boolean; agente: boolean; cliente?: boolean; tipo?: boolean; plantao?: boolean; categoria?: boolean };
 const FILTROS_POR_ABA: Record<string, FiltroConfig> = {
   "tempo-real": { date: false, setor: false, agente: false, tipo: true },
   velocidade: { date: true, setor: true, agente: true, tipo: true, plantao: true },
-  agentes:    { date: true, setor: true, agente: true, tipo: true, plantao: true },
+  agentes:    { date: true, setor: true, agente: true, tipo: true, plantao: true, categoria: true },
   satisfacao: { date: true, setor: true, agente: true, tipo: true, plantao: true },
   volume:     { date: true, setor: true, agente: true, tipo: true, plantao: true },
   ura:        { date: true, setor: true, agente: false, plantao: true },
-  chats:      { date: true, setor: true, agente: true, cliente: true, tipo: true, plantao: true },
-  taxonomia:  { date: true, setor: true, agente: true, cliente: true },
+  chats:      { date: true, setor: true, agente: true, cliente: true, tipo: true, plantao: true, categoria: true },
+  taxonomia:  { date: true, setor: true, agente: true, cliente: true, plantao: true, categoria: true },
   backlog:    { date: true, setor: true, agente: true, cliente: true },
   clientes:   { date: true, setor: false, agente: false, cliente: true },
   // Última aba, depois de Cobertura. Jornada lê support_agent_presence_events,
@@ -81,7 +88,15 @@ function FiltrosGlobais({ cfg }: { cfg: FiltroConfig }) {
     cidadeIds, setCidadeIds,
     fornecedorIds, setFornecedorIds,
     produtoIds, setProdutoIds,
+    categoryIds, setCategoryIds,
+    subcategoryIds, setSubcategoryIds,
+    categorias, subcategorias,
   } = useAtendimentoFilter();
+
+  // Com categoria escolhida, só as subcategorias dela; sem, todas agrupadas.
+  const subcategoriasVisiveis = categoryIds.length
+    ? subcategorias.filter((s) => categoryIds.includes(s.category_id))
+    : subcategorias;
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
@@ -150,6 +165,12 @@ function FiltrosGlobais({ cfg }: { cfg: FiltroConfig }) {
             <SelectItem value="comercial">Só horário padrão</SelectItem>
           </SelectContent>
         </Select>
+      )}
+      {cfg.categoria && (
+        <>
+          <MultiSelectFilter label="Categoria" options={categorias} selected={categoryIds} onChange={setCategoryIds} />
+          <MultiSelectFilter label="Subcategoria" options={subcategoriasVisiveis} selected={subcategoryIds} onChange={setSubcategoryIds} />
+        </>
       )}
       {cfg.cliente && (
         <>

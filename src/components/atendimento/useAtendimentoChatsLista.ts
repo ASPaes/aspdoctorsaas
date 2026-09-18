@@ -26,6 +26,9 @@ export interface ChatListaItem {
   /** Primeiro instante de trabalho fora do expediente. NULL quando não houve. */
   plantao_em: string | null;
   is_group: boolean;
+  /** Do ticket vinculado (DEM-0315). NULL quando o chat não virou ticket categorizado. */
+  categoria: string | null;
+  subcategoria: string | null;
   duracao_seg: number;
 }
 
@@ -61,6 +64,7 @@ export function useAtendimentoChatsLista(opts: {
   const {
     dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds,
     cidadeIds, fornecedorIds, produtoIds, tipoAtendimento, plantao,
+    categoryIds, subcategoryIds,
   } = useAtendimentoFilter();
 
   const pIsGroup = tipoAtendimento === "all" ? null : tipoAtendimento === "group";
@@ -72,7 +76,7 @@ export function useAtendimentoChatsLista(opts: {
       dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey,
       departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds,
       fornecedorIds, produtoIds, closedReasons, hasTicket, sentiments,
-      resolucoes, tipoAtendimento, plantao,
+      resolucoes, tipoAtendimento, plantao, categoryIds, subcategoryIds,
     ],
     enabled: enabled && !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
@@ -94,6 +98,8 @@ export function useAtendimentoChatsLista(opts: {
         p_resolucoes: resolucoes.length ? resolucoes : null,
         p_plantao: pPlantao,
         p_limit: LIMITE,
+        p_category_ids: categoryIds.length ? categoryIds : null,
+        p_subcategory_ids: subcategoryIds.length ? subcategoryIds : null,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
@@ -120,6 +126,8 @@ export function useAtendimentoChatsLista(opts: {
           plantao: !!i.plantao,
           plantao_em: i.plantao_em ?? null,
           is_group: !!i.is_group,
+          categoria: i.categoria ?? null,
+          subcategoria: i.subcategoria ?? null,
           duracao_seg: Number(i.duracao_seg ?? 0),
         })),
       };

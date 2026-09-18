@@ -121,6 +121,11 @@ export function ChatsListaDialog({
                           )}
                         </div>
                         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          {i.categoria && (
+                            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5" title="Categoria do ticket">
+                              {i.subcategoria ? `${i.categoria} › ${i.subcategoria}` : i.categoria}
+                            </span>
+                          )}
                           {i.sentimento && SENTIMENTO[i.sentimento] && (
                             <span className={cn("shrink-0 rounded px-1.5 py-0.5 font-medium", SENTIMENTO[i.sentimento].classe)}>
                               {SENTIMENTO[i.sentimento].texto}

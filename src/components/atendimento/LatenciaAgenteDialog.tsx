@@ -52,7 +52,7 @@ export function LatenciaAgenteDialog({ agente, onOpenChange }: Props) {
   const [exportando, setExportando] = useState(false);
 
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { dateRange, tipoAtendimento, plantao } = useAtendimentoFilter();
+  const { dateRange, tipoAtendimento, plantao, categoryIds, subcategoryIds } = useAtendimentoFilter();
 
   const abrirNoWhatsApp = (conversationId: string) => {
     onOpenChange(false);
@@ -72,6 +72,8 @@ export function LatenciaAgenteDialog({ agente, onOpenChange }: Props) {
         to: dateRange.to.toISOString(),
         isGroup: tipoAtendimento === "all" ? null : tipoAtendimento === "group",
         plantao: plantao === "all" ? null : plantao,
+        categoryIds,
+        subcategoryIds,
         limit: LATENCIA_LIMITE_EXPORT,
       });
       if (completo.itens.length === 0) {

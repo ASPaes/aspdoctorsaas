@@ -6,6 +6,7 @@ import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 import { Button } from "@/components/ui/button";
 import { LatenciaHistograma } from "./LatenciaHistograma";
 import { LatenciaAgenteDialog } from "./LatenciaAgenteDialog";
+import { AgenteCategoriaQuadro } from "./AgenteCategoriaQuadro";
 import { fmtDur } from "./fmtDuracao";
 import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 import { exportScorecardAgentesXlsx } from "@/lib/exportLatenciaXlsx";
@@ -13,12 +14,19 @@ import { cn } from "@/lib/utils";
 
 export function AgentesTab() {
   const { data, isLoading, isError, error } = useAtendimentoAgentes();
-  const { dateRange } = useAtendimentoFilter();
+  const { dateRange, categoryIds, subcategoryIds } = useAtendimentoFilter();
+  const filtraCategoria = categoryIds.length > 0 || subcategoryIds.length > 0;
   const [verLatencia, setVerLatencia] = useState<AgenteRow | null>(null);
   const dur = (s: number | null | undefined) => fmtDur(s);
 
   return (
     <div className="space-y-4">
+      {filtraCategoria && (
+        <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+          Categoria e subcategoria vêm do ticket. Com esse filtro, só entram os atendimentos que viraram ticket
+          categorizado; os outros ficam fora de todos os números desta aba.
+        </p>
+      )}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -201,6 +209,8 @@ export function AgentesTab() {
               </div>
             )}
           </div>
+
+          <AgenteCategoriaQuadro agentes={data.agentes} porCategoria={data.por_categoria} />
 
           <LatenciaHistograma />
 

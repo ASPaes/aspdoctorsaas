@@ -10,6 +10,8 @@ export interface ChatResolucaoRow { resolucao: string; qtd: number; pct: number;
 export interface ChatCsatDistRow { nota: number; qtd: number; }
 
 export interface ChatCsat { enviados: number; respondidos: number; response_rate: number; media: number | null; distribuicao: ChatCsatDistRow[]; }
+/** category_id null = atendimento sem ticket categorizado. Horas: soma do TMA dentro do teto. */
+export interface ChatCategoriaRow { category_id: string | null; nome: string; qtd: number; horas: number; tma_p50: number | null; pct: number; }
 export interface ChatAtendenteRow { nome: string; qtd: number; }
 export interface ChatHeatRow { dow: number; hora: number; qtd: number; }
 export interface ChatOfensorRow { cliente_id: string | null; nome: string; qtd: number; }
@@ -25,6 +27,7 @@ export interface AtendimentoChats {
   por_resolucao: ChatResolucaoRow[];
 
   csat: ChatCsat;
+  por_categoria: ChatCategoriaRow[];
   por_atendente: ChatAtendenteRow[];
   heatmap: ChatHeatRow[];
   ofensores: ChatOfensorRow[];
@@ -39,11 +42,11 @@ export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: 
 
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
-  const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, tipoAtendimento, plantao } = useAtendimentoFilter();
+  const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, tipoAtendimento, plantao, categoryIds, subcategoryIds } = useAtendimentoFilter();
   const pIsGroup = tipoAtendimento === 'all' ? null : tipoAtendimento === 'group';
   const pPlantao = plantao === 'all' ? null : plantao;
   return useQuery<AtendimentoChats>({
-    queryKey: ["atendimento-chats", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, closedReasons, hasTicket, sentiments, resolucoes, tipoAtendimento, plantao],
+    queryKey: ["atendimento-chats", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, closedReasons, hasTicket, sentiments, resolucoes, tipoAtendimento, plantao, categoryIds, subcategoryIds],
     enabled: !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -63,6 +66,8 @@ export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: 
         p_resolucoes: resolucoes.length ? resolucoes : null,
         p_is_group: pIsGroup,
         p_plantao: pPlantao,
+        p_category_ids: categoryIds.length ? categoryIds : null,
+        p_subcategory_ids: subcategoryIds.length ? subcategoryIds : null,
       });
 
       if (error) throw error;
@@ -81,6 +86,7 @@ export function useAtendimentoChats(opts: { closedReasons: string[]; hasTicket: 
           media: num(d.csat?.media),
           distribuicao: ((d.csat?.distribuicao ?? []) as any[]).map((r) => ({ nota: Number(r.nota ?? 0), qtd: Number(r.qtd ?? 0) })),
         },
+        por_categoria: ((d.por_categoria ?? []) as any[]).map((r) => ({ category_id: r.category_id ?? null, nome: r.nome ?? "(sem categoria)", qtd: Number(r.qtd ?? 0), horas: Number(r.horas ?? 0), tma_p50: num(r.tma_p50), pct: Number(r.pct ?? 0) })),
         por_atendente: ((d.por_atendente ?? []) as any[]).map((r) => ({ nome: r.nome ?? "(não atribuído)", qtd: Number(r.qtd ?? 0) })),
         heatmap: ((d.heatmap ?? []) as any[]).map((r) => ({ dow: Number(r.dow ?? 0), hora: Number(r.hora ?? 0), qtd: Number(r.qtd ?? 0) })),
         ofensores: ((d.ofensores ?? []) as any[]).map((r) => ({ cliente_id: r.cliente_id ?? null, nome: r.nome ?? "(sem nome)", qtd: Number(r.qtd ?? 0) })),

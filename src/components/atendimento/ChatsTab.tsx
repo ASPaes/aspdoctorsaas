@@ -3,6 +3,8 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAtendimentoChats, useAtendimentoChatsTimeline } from "./useAtendimentoChats";
 import { ChatsListaDialog } from "./ChatsListaDialog";
+import { fmtDur } from "./fmtDuracao";
+import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 
 const CLOSE_OPTS: { v: string; label: string }[] = [
   { v: "manual", label: "Manual" },
@@ -45,9 +47,11 @@ const resolColor = (r: string) =>
     : "hsl(var(--muted-foreground))";
 
 
-type BarRow = { key: string; nome: string; qtd: number; pct: number; color?: string };
+type BarRow = { key: string; nome: string; qtd: number; pct: number; color?: string; rotulo?: string };
 
-function Barras({ rows }: { rows: BarRow[] }) {
+// `colunas`: nome, barra e rótulo. Os quadros de categoria alargam o nome, que
+// leva o produto junto ("HARDWARE · PDV Legal").
+function Barras({ rows, colunas = "grid-cols-[1fr_2fr_120px]" }: { rows: BarRow[]; colunas?: string }) {
   const max = Math.max(1, ...rows.map((r) => r.qtd));
   if (rows.length === 0) {
     return <div className="text-xs text-muted-foreground italic py-6 text-center">Sem dados no período.</div>;
@@ -57,12 +61,12 @@ function Barras({ rows }: { rows: BarRow[] }) {
       {rows.map((r) => {
         const w = (100 * r.qtd) / max;
         return (
-          <div key={r.key} className="grid grid-cols-[1fr_2fr_120px] items-center gap-2 text-xs">
+          <div key={r.key} className={cn("grid items-center gap-2 text-xs", colunas)}>
             <span className="truncate" title={r.nome}>{r.nome}</span>
             <div className="h-2 rounded-full bg-muted overflow-hidden">
               <div className="h-full" style={{ width: `${w}%`, backgroundColor: r.color ?? "hsl(var(--primary))" }} />
             </div>
-            <span className="text-right tabular-nums text-muted-foreground">{r.qtd.toLocaleString("pt-BR")} · {Math.round(r.pct)}%</span>
+            <span className="text-right tabular-nums text-muted-foreground">{r.rotulo ?? `${r.qtd.toLocaleString("pt-BR")} · ${Math.round(r.pct)}%`}</span>
           </div>
         );
       })}
@@ -178,6 +182,17 @@ export function ChatsTab() {
   const { data, isLoading, isError, error } = useAtendimentoChats({ closedReasons, hasTicket, sentiments, resolucoes });
 
   const { data: timeline } = useAtendimentoChatsTimeline();
+  const { categorias, categoryIds, subcategoryIds } = useAtendimentoFilter();
+  const filtraCategoria = categoryIds.length > 0 || subcategoryIds.length > 0;
+  // Mesmo nome em produtos diferentes (PDV × Pdv): o produto vai junto no rótulo.
+  const nomeCategoria = (id: string | null, nome: string) => {
+    if (!id) return nome;
+    const c = categorias.find((x) => x.id === id);
+    const repetido = categorias.filter((x) => x.nome.toLowerCase() === nome.toLowerCase()).length > 1;
+    return c && repetido ? `${nome} · ${c.grupo}` : nome;
+  };
+  const horasCat = data ? [...data.por_categoria].sort((a, b) => b.horas - a.horas) : [];
+  const totalHoras = horasCat.reduce((a, r) => a + r.horas, 0);
   const sentimentTotal = data ? data.por_sentimento.reduce((a, s) => a + s.qtd, 0) : 0;
   const resolucaoRows = data ? data.por_resolucao.filter((r) => r.resolucao !== "(sem)") : [];
   const resolucaoTotal = resolucaoRows.reduce((a, r) => a + r.qtd, 0);
@@ -185,6 +200,12 @@ export function ChatsTab() {
   const semAnaliseQtd = semAnaliseRow?.qtd ?? 0;
   return (
     <div className="space-y-4">
+      {filtraCategoria && (
+        <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+          Categoria e subcategoria vêm do ticket. Com esse filtro, só entram os atendimentos que viraram ticket
+          categorizado; os outros ficam fora de todos os números desta aba.
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground whitespace-nowrap">Encerramento:</span>
@@ -364,6 +385,18 @@ export function ChatsTab() {
                 <Barras rows={data.csat.distribuicao.map((r) => ({ key: `n${r.nota}`, nome: `Nota ${r.nota}`, qtd: r.qtd, pct: data.csat.respondidos > 0 ? (100 * r.qtd) / data.csat.respondidos : 0 }))} />
               )}
               <p className="text-xs text-muted-foreground mt-3">{data.csat.enviados.toLocaleString("pt-BR")} enviados → {data.csat.respondidos.toLocaleString("pt-BR")} respondidos ({data.csat.response_rate}%)</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-3">Atendimentos por Categoria</h3>
+              <Barras rows={data.por_categoria.slice(0, 15).map((r) => ({ key: r.category_id ?? "sem", nome: nomeCategoria(r.category_id, r.nome), qtd: r.qtd, pct: r.pct, color: r.category_id ? undefined : "hsl(var(--muted-foreground))" }))} colunas="grid-cols-[minmax(0,1.5fr)_minmax(0,1.5fr)_90px]" />
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-1">Tempo gasto por Categoria</h3>
+              <p className="text-xs text-muted-foreground mb-3">Soma do tempo de atendimento: onde a equipe gasta as horas, não só quantos chats. Entre parênteses, o TMA.</p>
+              <Barras rows={horasCat.slice(0, 15).map((r) => ({ key: r.category_id ?? "sem", nome: nomeCategoria(r.category_id, r.nome), qtd: r.horas, pct: totalHoras > 0 ? (100 * r.horas) / totalHoras : 0, color: r.category_id ? "hsl(var(--accent))" : "hsl(var(--muted-foreground))", rotulo: `${r.horas.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}h (${fmtDur(r.tma_p50)})` }))} colunas="grid-cols-[minmax(0,1.5fr)_minmax(0,1.2fr)_120px]" />
             </div>
           </div>
 

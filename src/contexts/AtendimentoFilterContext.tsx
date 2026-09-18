@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useMemo, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { startOfDay, endOfDay, subDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,14 @@ export interface FiltroOpcoes {
   segmentos: FiltroOpt[]; areas: FiltroOpt[]; estados: FiltroOpt[];
   cidades: FiltroOpt[]; fornecedores: FiltroOpt[]; produtos: FiltroOpt[];
 }
+
+/**
+ * Categoria e subcategoria moram no TICKET (support_tickets), não no chat.
+ * `grupo` é o produto: há categorias de mesmo nome em produtos diferentes
+ * (PDV Legal "PDV" × Gula "Pdv"), e sem ele o filtro fica ambíguo.
+ */
+export interface CategoriaOpt { id: string; nome: string; grupo: string; }
+export interface SubcategoriaOpt { id: string; nome: string; grupo: string; category_id: string; }
 
 export type TipoAtendimento = 'all' | 'individual' | 'group';
 
@@ -42,6 +50,10 @@ interface AtendimentoFilterContextType {
   cidadeIds: number[]; setCidadeIds: (ids: number[]) => void;
   fornecedorIds: number[]; setFornecedorIds: (ids: number[]) => void;
   produtoIds: number[]; setProdutoIds: (ids: number[]) => void;
+  categoryIds: string[]; setCategoryIds: (ids: string[]) => void;
+  subcategoryIds: string[]; setSubcategoryIds: (ids: string[]) => void;
+  categorias: CategoriaOpt[];
+  subcategorias: SubcategoriaOpt[];
   setores: SetorOpt[];
   agentes: AgenteOpt[];
   opcoes: FiltroOpcoes;
@@ -73,6 +85,10 @@ const AtendimentoFilterContext = createContext<AtendimentoFilterContextType>({
   cidadeIds: [], setCidadeIds: () => {},
   fornecedorIds: [], setFornecedorIds: () => {},
   produtoIds: [], setProdutoIds: () => {},
+  categoryIds: [], setCategoryIds: () => {},
+  subcategoryIds: [], setSubcategoryIds: () => {},
+  categorias: [],
+  subcategorias: [],
   setores: [],
   agentes: [],
   opcoes: emptyOpcoes,
@@ -92,6 +108,8 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
   const [cidadeIds, setCidadeIds] = useState<number[]>([]);
   const [fornecedorIds, setFornecedorIds] = useState<number[]>([]);
   const [produtoIds, setProdutoIds] = useState<number[]>([]);
+  const [categoryIds, setCategoryIdsRaw] = useState<string[]>([]);
+  const [subcategoryIds, setSubcategoryIds] = useState<string[]>([]);
 
   // reseta filtros ao trocar de tenant (super admin simulando)
   useEffect(() => {
@@ -101,6 +119,7 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
     setPlantao('all');
     setSegmentoIds([]); setAreaIds([]); setEstadoIds([]);
     setCidadeIds([]); setFornecedorIds([]); setProdutoIds([]);
+    setCategoryIdsRaw([]); setSubcategoryIds([]);
   }, [tid]);
 
   // Expediente configurado no tenant OU em qualquer setor dele. É o mesmo
@@ -160,6 +179,65 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
     },
   });
 
+  const { data: taxOpcoes = { categorias: [] as CategoriaOpt[], subcategorias: [] as SubcategoriaOpt[] }, isLoading: loadingTax } = useQuery({
+    queryKey: ["atendimento_filtro_categorias", tid],
+    enabled: !!tid,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const [cats, subs, links] = await Promise.all([
+        (supabase.from("service_categories" as any) as any)
+          .select("id, nome, ativo").eq("tenant_id", tid),
+        (supabase.from("service_subcategories" as any) as any)
+          .select("id, nome, ativo, category_id").eq("tenant_id", tid),
+        (supabase.from("service_category_products" as any) as any)
+          .select("category_id, produto:produtos(nome)").eq("tenant_id", tid),
+      ]);
+      if (cats.error) throw cats.error;
+      if (subs.error) throw subs.error;
+      if (links.error) throw links.error;
+      // Uma categoria pode valer para várias variantes do produto (PDV Legal,
+      // PDV Legal - Raspberry...). O menor nome é o produto-base.
+      const produtoDaCat = new Map<string, string>();
+      for (const l of (links.data ?? []) as any[]) {
+        const nome = l.produto?.nome as string | undefined;
+        if (!nome) continue;
+        const atual = produtoDaCat.get(l.category_id);
+        if (!atual || nome.length < atual.length) produtoDaCat.set(l.category_id, nome);
+      }
+      const sufixo = (ativo: boolean) => (ativo ? "" : " (inativa)");
+      const categorias: CategoriaOpt[] = ((cats.data ?? []) as any[])
+        .map((c) => ({ id: String(c.id), nome: String(c.nome) + sufixo(c.ativo), grupo: produtoDaCat.get(c.id) ?? "Sem produto" }))
+        .sort((a, b) => a.grupo.localeCompare(b.grupo) || a.nome.localeCompare(b.nome));
+      const catPorId = new Map(categorias.map((c) => [c.id, c]));
+      const subcategorias: SubcategoriaOpt[] = ((subs.data ?? []) as any[])
+        .filter((s) => catPorId.has(String(s.category_id)))
+        .map((s) => {
+          const c = catPorId.get(String(s.category_id))!;
+          return { id: String(s.id), nome: String(s.nome) + sufixo(s.ativo), category_id: c.id, grupo: `${c.nome} · ${c.grupo}` };
+        })
+        .sort((a, b) => {
+          const ia = categorias.findIndex((c) => c.id === a.category_id);
+          const ib = categorias.findIndex((c) => c.id === b.category_id);
+          return ia - ib || a.nome.localeCompare(b.nome);
+        });
+      return { categorias, subcategorias };
+    },
+  });
+
+  // Tirar uma categoria leva junto as subcategorias dela: senão o filtro
+  // seguiria valendo por uma subcategoria que o seletor nem lista mais.
+  const setCategoryIds = useCallback((ids: string[]) => {
+    setCategoryIdsRaw(ids);
+    if (ids.length === 0) return;
+    const permitidas = new Set(ids);
+    setSubcategoryIds((prev) =>
+      prev.filter((sid) => {
+        const s = taxOpcoes.subcategorias.find((x) => x.id === sid);
+        return !s || permitidas.has(s.category_id);
+      }),
+    );
+  }, [taxOpcoes.subcategorias]);
+
   const { data: opcoes = emptyOpcoes, isLoading: loadingOpc } = useQuery({
     queryKey: ["atendimento_filtro_opcoes", tid],
     enabled: !!tid,
@@ -190,10 +268,14 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
       cidadeIds, setCidadeIds,
       fornecedorIds, setFornecedorIds,
       produtoIds, setProdutoIds,
+      categoryIds, setCategoryIds,
+      subcategoryIds, setSubcategoryIds,
+      categorias: taxOpcoes.categorias,
+      subcategorias: taxOpcoes.subcategorias,
       setores, agentes, opcoes,
-      isLoading: loadingSet || loadingAg || loadingOpc,
+      isLoading: loadingSet || loadingAg || loadingOpc || loadingTax,
     }),
-    [dateRange, departmentId, agentId, tipoAtendimento, plantao, temHorarioConfigurado, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, setores, agentes, opcoes, loadingSet, loadingAg, loadingOpc]
+    [dateRange, departmentId, agentId, tipoAtendimento, plantao, temHorarioConfigurado, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, categoryIds, setCategoryIds, subcategoryIds, taxOpcoes, setores, agentes, opcoes, loadingSet, loadingAg, loadingOpc, loadingTax]
   );
 
   return (
