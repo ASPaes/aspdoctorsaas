@@ -310,17 +310,27 @@ export default function GruposPermissoesContent() {
                         "flex items-center gap-3 border-b px-3 py-2.5",
                         entradaLigada ? "bg-emerald-500/5" : "bg-muted/50",
                       )}>
-                        <ChipAcao
-                          acao="view"
-                          existe
-                          ligado={entradaLigada}
-                          travado={travada(grupo, entrada.key, "view")}
-                          desabilitado={setPermissao.isPending}
-                          rotulo={entrada.label}
-                          onChange={(v) =>
-                            setPermissao.mutate({ groupId: grupo.id, key: entrada.key, acao: "view", valor: v })
-                          }
-                        />
+                        {/* A entrada desenha TODAS as ações que ela aceita, e não só o "ver".
+                            Em Clientes é aqui que moram incluir, editar e excluir o cadastro —
+                            o "editar" desta linha é o que libera o botão Salvar da ficha. Até
+                            18/09/2026 a tela mostrava só o V, e esses três interruptores
+                            decidiam em silêncio, sem ninguém conseguir vê-los. */}
+                        <div className="flex shrink-0 items-center gap-[3px]">
+                          {acoesDoModulo.map((acao) => (
+                            <ChipAcao
+                              key={acao}
+                              acao={acao}
+                              existe={entrada.acoes.includes(acao)}
+                              ligado={!!mapa.get(entrada.key)?.[acao]}
+                              travado={travada(grupo, entrada.key, acao)}
+                              desabilitado={setPermissao.isPending}
+                              rotulo={entrada.label}
+                              onChange={(v) =>
+                                setPermissao.mutate({ groupId: grupo.id, key: entrada.key, acao, valor: v })
+                              }
+                            />
+                          ))}
+                        </div>
                         <div className="min-w-0 flex-1">
                           <span className="flex items-center gap-2 text-[13px] font-semibold">
                             {entrada.label}

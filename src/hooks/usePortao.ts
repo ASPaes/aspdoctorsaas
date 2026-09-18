@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { usePermissions } from "@/hooks/usePermissions";
+import { usePermissions, type PermissionAction } from "@/hooks/usePermissions";
 
 /**
  * O portão padrão do RBAC. Responde "esta pessoa pode fazer X?".
@@ -22,13 +22,17 @@ import { usePermissions } from "@/hooks/usePermissions";
  *
  * Irmão mais velho: `usePodeVerTodosSetores`, que faz isto para o Chat.
  */
-export function usePortao(chave: string, regraDeHoje: boolean = true): boolean {
+export function usePortao(
+  chave: string,
+  regraDeHoje: boolean = true,
+  acao: PermissionAction = "view",
+): boolean {
   const { profile } = useAuth();
   const { can, rbacEnabled, rbacLoading } = usePermissions();
 
   if (profile?.is_super_admin) return true;
   if (rbacLoading || !rbacEnabled) return regraDeHoje;
-  return can(chave, "view");
+  return can(chave, acao);
 }
 
 /** Papel de hoje em muitas telas: administrador ou gestor. */

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { usePortao } from "@/hooks/usePortao";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -34,6 +35,10 @@ const emptyForm: ContatoForm = { nome: "", cpf: "", fone: "", email: "", cargo: 
 export default function ContatosAdicionaisModal({ clienteId, open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  // Contato tem gravação própria, independente do Salvar da ficha — por isso a
+  // chave carrega incluir e excluir. antes: sem restrição nenhuma.
+  const podeIncluir = usePortao("clientes.contatos", true, "insert");
+  const podeExcluir = usePortao("clientes.contatos", true, "delete");
   const [form, setForm] = useState<ContatoForm>(emptyForm);
 
   const { data: contatos, isLoading } = useQuery({
@@ -118,15 +123,18 @@ export default function ContatosAdicionaisModal({ clienteId, open, onOpenChange 
                   <TableCell className="text-xs">{c.email ?? "—"}</TableCell>
                   <TableCell className="text-xs">{c.cargo ?? "—"}</TableCell>
                   <TableCell>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => deleteMutation.mutate(c.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
+                    {/* antes: sem restrição */}
+                    {podeExcluir && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => deleteMutation.mutate(c.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -179,10 +187,13 @@ export default function ContatosAdicionaisModal({ clienteId, open, onOpenChange 
             </div>
           </div>
         ) : (
-          <Button type="button" variant="outline" size="sm" onClick={() => setShowForm(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Adicionar Contato
-          </Button>
+          /* antes: sem restrição */
+          podeIncluir && (
+            <Button type="button" variant="outline" size="sm" onClick={() => setShowForm(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Adicionar Contato
+            </Button>
+          )
         )}
       </DialogContent>
     </Dialog>

@@ -1,6 +1,7 @@
 import { UseFormReturn } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { usePortao } from "@/hooks/usePortao";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEspelhoFinanceiro } from "@/hooks/useEspelhoFinanceiro";
 import { useCustoOemDoCliente } from "@/hooks/useCustoOemDoCliente";
@@ -109,6 +110,12 @@ export default function FinanceiroCard({
 
   const { can } = usePermissions();
   const canVerCustos = can("clientes.custos", "view");
+  // Financeiro virou linha própria do catálogo (decisão do owner em 18/09):
+  // o CARD responde por `clientes.financeiro` e "Custos e Margens" continua
+  // dentro dele, em `clientes.custos`.
+  // antes: o card inteiro sumia para quem não tinha `clientes.custos` — por
+  // isso a regra de hoje passada ao portão é o próprio `canVerCustos`.
+  const podeVerFinanceiro = usePortao("clientes.financeiro", canVerCustos);
 
   const { data: movimentos } = useQuery({
     queryKey: ["movimentos_mrr_totals", clienteId],
@@ -239,7 +246,7 @@ export default function FinanceiroCard({
   // condicional por cada card.
   const painelClass = cancelado ? "space-y-4 grayscale opacity-90" : "space-y-4";
 
-  if (!canVerCustos) return null;
+  if (!podeVerFinanceiro) return null;
 
   return (
     <Card>

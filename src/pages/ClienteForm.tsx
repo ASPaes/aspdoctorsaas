@@ -48,7 +48,6 @@ import DeleteClienteDialog from "@/components/clientes/DeleteClienteDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
 import { usePortao } from "@/hooks/usePortao";
-import AccessDenied from "@/pages/AccessDenied";
 import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import type { Database } from "@/integrations/supabase/types";
@@ -392,10 +391,6 @@ export default function ClienteForm() {
 
   // Portões de permissão da ficha. Cada um entra EM SÉRIE com a condição de
   // dado que já existia (isEditing, id, integração ativa etc.).
-  // antes: quem tinha `clientes` abria a ficha
-  const podeVerFicha = usePortao("clientes.ficha");
-  // antes: sem restrição
-  const podeVerDados = usePortao("clientes.dados");
   // antes: sem restrição
   const podeVerProdutos = usePortao("clientes.venda_produto");
   // antes: sem restrição
@@ -404,12 +399,11 @@ export default function ClienteForm() {
   const podeVerParametrosAtendimento = usePortao("clientes.parametros_atendimento");
   // antes: sem restrição
   const podeVerTickets = usePortao("clientes.tickets");
-  // antes: sem restrição
-  const podeVerFiliais = usePortao("clientes.filiais");
   // antes: sem restrição (só dependia de a integração estar ativa)
   const podeVerIntegracao = usePortao("clientes.integracao");
-  // antes: admin (ou super admin) — o mesmo `canDelete`
-  const podeExcluirTudo = usePortao("clientes.purge", !!canDelete);
+  // "Excluir tudo" é a ação EXCLUIR do próprio cadastro, não um item à parte
+  // (decisão do owner em 18/09). antes: admin ou super admin — o mesmo `canDelete`.
+  const podeExcluirTudo = usePortao("clientes", !!canDelete, "delete");
 
   const lookups = useLookups(estadoId);
 
@@ -719,8 +713,6 @@ export default function ClienteForm() {
     }
   };
 
-  // Ficha inteira fechada: mesma tela de acesso negado do resto do sistema.
-  if (!podeVerFicha) return <AccessDenied />;
 
   return (
     <div className="space-y-6">
@@ -857,7 +849,7 @@ export default function ClienteForm() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} onKeyDown={handleFormKeyDown} className="space-y-6">
           {/* Card: Dados Cadastrais */}
-          {podeVerDados && (
+          {(
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -1024,7 +1016,7 @@ export default function ClienteForm() {
           )}
 
           {/* Filiais vinculadas (apenas em edição) */}
-          {isEditing && id && podeVerFiliais && <FiliaisSection clienteId={id} />}
+          {isEditing && id && <FiliaisSection clienteId={id} />}
 
           {/* Card: Cancelamento (read-only — derivado dos contratos) */}
           {isEditing && (
