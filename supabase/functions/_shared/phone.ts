@@ -21,8 +21,12 @@ export function normalizeBRPhone(raw: string): NormalizedPhone {
     .replace(/\D/g, '')
     .replace(/^0+/, '');
 
-  // Adiciona 55 se BR sem código de país
-  if (!digits.startsWith('55') && digits.length >= 10 && digits.length <= 11) {
+  // Adiciona 55 se BR sem código de país. Com 11 dígitos só é BR se for
+  // celular (9 logo após o DDD): número dos EUA/Canadá (+1 + 10 dígitos) e
+  // da Austrália (+61 4…) também têm 11 dígitos e viravam "55 + DDD" — a Meta
+  // recusava todo envio com 131026 (DEM-0427, +1 437 caiu no DDD 14).
+  const isBR = digits.length === 10 || (digits.length === 11 && digits[2] === '9');
+  if (!digits.startsWith('55') && isBR) {
     digits = '55' + digits;
   }
 
